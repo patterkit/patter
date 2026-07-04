@@ -31,6 +31,8 @@
 .pt-wrap { max-width: 1160px; margin: 0 auto; padding-left: 32px; padding-right: 32px; }
 .pt-serif { font-family: var(--pt-read, "Newsreader", Georgia, serif); }
 .pt-em { font-style: italic; color: var(--pt-teal-ink); }
+/* The product name leading the hero headline: bold, in the ember accent. */
+.pt-h1-brand { font-weight: 700; color: var(--pt-ember); }
 
 /* Mono eyebrow / label */
 .pt-eye {
