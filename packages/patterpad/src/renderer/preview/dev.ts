@@ -51,9 +51,9 @@ const project = {
   scratchStatus: new URLSearchParams(location.search).get("view") === "audiofolders" ? "scratch" : null,
 };
 // A fake folder-derived index for the preview: a couple of resolved dialogue lines, the rest implicitly missing.
-const FAKE_AUDIO_INDEX: Record<string, { status: string; path: string }> = {
+const FAKE_AUDIO_INDEX: Record<string, { status: string; path: string; textHash?: string }> = {
   L_greet: { status: "recorded", path: "/audio/recorded/L_greet.wav" },
-  L_bo_reply: { status: "scratch", path: "/audio/scratch/L_bo_reply.mp3" },
+  L_bo_reply: { status: "scratch", path: "/audio/scratch/L_bo_reply.mp3", textHash: "0" }, // never matches -> "take out of date" badge
 };
 const recents = [
   { path: "/Users/ian/Projects/the-tavern.patter", name: "The Tavern", openedAt: 0 },

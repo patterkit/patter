@@ -76,10 +76,21 @@ and choose which stage's folder the takes land in (the **scratch** stage by defa
 
 Then, for any line **at or below** the scratch stage (one that hasn't already got a more
 finished take), the inspector shows a **● Record** button. Click it and a full-screen recorder
-takes over: a **3·2·1** countdown, then it records your microphone while everything else
-pauses. Press **Space** to finish (or **Esc** to cancel). Patterpad trims the silence off each
-end, saves the take into the scratch folder, and the line's status updates to match. No files
-to shuffle.
+takes over, opening on a **cue screen**: the line, its speaker, and a badge saying where its
+existing take stands - **no take yet**, **take out of date** (the line was edited after it was
+recorded), or **take up to date**. From there, press **Space** to record - a **3·2·1**
+countdown, then it records your microphone while everything else pauses, and **Space** again
+finishes the take (or **Esc** cancels). Patterpad trims the silence off each end, saves the
+take into the scratch folder, and the line's status updates to match. No files to shuffle.
 
-The take remembers the exact line it was recorded against, so if you later edit that line, the
-inspector flags it **⚠ out of date**, telling you which scratch needs redoing.
+After each take you can **replay** it, **re-record** it, or carry straight on: **Record
+next ▸** moves to the following line, and **Next needed ▸▸** jumps ahead to the next line
+whose take is missing or out of date, skipping everything already covered. The same skip
+buttons are on the cue screen, so a tidy-up pass works from anywhere: open the recorder on
+any line, hop from needed line to needed line, and stop when nothing's left. The next-line
+preview carries the same badge, so you always know whether the suggested line actually needs
+a take before committing to it.
+
+Each take remembers the exact line it was recorded against, so if you later edit that line,
+the inspector flags it **⚠ out of date** - and the recorder's badges pick out exactly which
+scratch needs redoing.

@@ -334,9 +334,18 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .scratch-stage.scratch-count { color: var(--accent); }
 .scratch-stage.scratch-rec { color: var(--danger); font-size: 2rem; animation: scratch-pulse var(--dur-slow) var(--ease-standard) infinite; }
 .scratch-stage.scratch-processing, .scratch-stage.scratch-error { font-size: 1.4rem; color: var(--muted); }
+.scratch-stage.scratch-ready { font-size: 1.4rem; color: var(--muted); }
 .scratch-hint { font: 0.8rem var(--font-ui); color: var(--muted); letter-spacing: 0.02em; }
 /* The speaker above the line being recorded. */
 .scratch-cue { font: 700 0.85rem var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: -0.9rem; }
+/* Take-state badge (#224): whether the shown line's existing take is missing, out of date, or up to date.
+   Sits under the line on the main card and beside the next-line preview in the saved state. */
+.scratch-badge { font: 600 0.68rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.14rem 0.55rem; border-radius: 999px; margin-top: -0.9rem; }
+.scratch-badge-missing { color: var(--muted); background: color-mix(in oklab, var(--ink) 8%, transparent); }
+.scratch-badge-stale { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
+.scratch-badge-current { color: var(--ok); background: color-mix(in oklab, var(--ok) 14%, transparent); }
+.scratch-next .scratch-badge { margin-top: 0.1rem; }
 .scratch-stage.scratch-saved { font-size: 1.6rem; color: var(--accent); }
 /* Processing progress: an indeterminate sliding bar while the take is decoded / encoded / saved. */
 .scratch-bar { width: 14rem; height: 5px; border-radius: 3px; overflow: hidden; background: color-mix(in oklab, var(--ink) 12%, transparent); }

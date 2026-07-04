@@ -22,7 +22,8 @@ Patterpad is versioned by `npm run bump:pad` and released by tagging `patterpad-
   status tracking, production reports (with export to spreadsheet), coverage testing,
   estimating, and voice-script export.
 - Audio: recording-status tracking, Audio Folders (takes on disk drive status), scratch
-  recording at the desk, and playback in the editor.
+  recording at the desk (take-state badges plus a skip-to-next-needed sweep), and playback
+  in the editor.
 - Localisation: languages declared per project, export / import for translators
   (JSON / Excel / PO), staleness tracking, and live language preview.
 - Publishing: compile the runtime bundle, publish a playable HTML page, a customisable

@@ -1199,25 +1199,41 @@ function startScratchRecording(id: string): void {
     setRecordingMode: (on) => window.patter.setRecordingMode(on),
     onComplete: () => { void refreshAudioIndex(); },
     nextLine: (beatId) => nextScratchLine(beatId, lines),
+    nextNeeded: (beatId) => nextScratchLine(beatId, lines, true),
+    takeState: (beatId, text) => scratchTakeState(beatId, text),
   });
+}
+
+/** The badge state of a line's existing take, for the recording overlay (#224): no file on disk at all,
+ *  a take whose stamped text-hash no longer matches the line (it was edited since), or a take that still
+ *  matches. A file without a stamp (hand-dropped, or from a more-finished rung) counts as up to date -
+ *  the same benefit of the doubt the inspector's ⚠ badge gives. */
+function scratchTakeState(beatId: string, text: string): "missing" | "stale" | "current" {
+  const e = audioIndex[beatId];
+  if (!e) return "missing";
+  if (e.textHash != null && e.textHash !== textHash(text)) return "stale";
+  return "current";
 }
 
 /** The next spoken line after `beatId` (in the captured order) that is still scratch-eligible: at or below
  *  the scratch rung, the SAME rule the inspector uses to offer the ● Record button (so the run skips lines
- *  already given a more-finished take). Null when none remain, or scratch recording is off. */
-function nextScratchLine(beatId: string, lines: Array<{ id: string; text: string; character: string }>): { beatId: string; text: string; character: string } | null {
+ *  already given a more-finished take). With `neededOnly`, also require the take to be missing or out of
+ *  date - the tidy-up sweep, hopping over lines already covered. Null when none remain, or scratch
+ *  recording is off. */
+function nextScratchLine(beatId: string, lines: Array<{ id: string; text: string; character: string }>, neededOnly = false): { beatId: string; text: string; character: string } | null {
   const scratch = project?.scratchStatus;
   if (!scratch) return null;
   const order = (project?.recordingStatuses ?? []).map((s) => s.name);
   const scrIdx = order.indexOf(scratch);
   const lowest = order[0];
   if (scrIdx < 0 || lowest === undefined) return null;
-  const eligible = (lineId: string): boolean => {
-    const curIdx = order.indexOf(audioIndex[lineId]?.status ?? lowest);
-    return curIdx >= 0 && curIdx <= scrIdx;
+  const eligible = (l: { id: string; text: string }): boolean => {
+    const curIdx = order.indexOf(audioIndex[l.id]?.status ?? lowest);
+    if (curIdx < 0 || curIdx > scrIdx) return false;
+    return !neededOnly || scratchTakeState(l.id, l.text) !== "current";
   };
   const from = lines.findIndex((l) => l.id === beatId);
-  for (let i = from + 1; i < lines.length; i++) { const l = lines[i]!; if (eligible(l.id)) return { beatId: l.id, text: l.text, character: l.character }; }
+  for (let i = from + 1; i < lines.length; i++) { const l = lines[i]!; if (eligible(l)) return { beatId: l.id, text: l.text, character: l.character }; }
   return null;
 }
 
