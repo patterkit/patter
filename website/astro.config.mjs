@@ -45,6 +45,10 @@ export default defineConfig({
             href: "https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap",
           },
         },
+        // Favicon fallbacks beside the SVG above: Safari doesn't do SVG favicons at
+        // all, and stray agents request /favicon.ico directly. Same mark, rasterised.
+        { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "48x48" } },
+        { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
       ],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/patterkit/patter" }],
       // Role-routed IA: newcomers/evaluators start at the top; writers, the project lead who sets
