@@ -16,6 +16,9 @@
     "build": "npm run build -w @patterkit/model -w @patterkit/core -w @patterkit/dialect -w @patterkit/compiler -w @patterkit/runtime -w @patterkit/ops -w @patterkit/play-helpers -w @patterkit/cli",
     "bump:play": "node scripts/bump-play-version.mjs",
     "bump:pad": "node scripts/bump-patterpad-version.mjs",
+    "release:pad": "node scripts/release.mjs pad",
+    "release:play": "node scripts/release.mjs play",
+    "release:cli": "node scripts/release.mjs cli",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "npm run build && changeset publish"
