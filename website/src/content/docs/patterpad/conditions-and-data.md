@@ -17,8 +17,7 @@ A **condition** decides whether a piece of content shows. Click a snippet or gro
 
 - build each test from **pills**: a property, a comparison, a value;
 - join them with **and / or**;
-- pick properties and built-ins from a menu, no need to remember names;
-- or flip to plain text and type the expression yourself.
+- pick properties and built-ins from a menu, no need to remember names
 
 It checks as you build, and the finished test shows on the snippet as a quiet `if …`
 tag. With no condition, the content always shows.
