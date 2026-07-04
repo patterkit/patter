@@ -1,0 +1,12 @@
+{
+  "name": "@patterkit/example-demo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The shared Patterplay API demo: a simple flow played through each runtime to exercise the API.",
+  "type": "module",
+  "scripts": {
+    "gen": "node gen.mjs",
+    "play": "node play.mjs",
+    "demo": "node gen.mjs && node play.mjs"
+  }
+}

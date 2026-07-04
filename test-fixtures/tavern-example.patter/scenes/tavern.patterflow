@@ -1,0 +1,212 @@
+{
+  "scene": {
+    "blocks": [
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "id": "T_scene",
+                "kind": "text",
+              },
+              {
+                "character": "BARKEEP",
+                "id": "L_greet",
+                "kind": "line",
+              },
+              {
+                "gameData": {
+                  "cue": "camera_focus",
+                  "target": "barkeep",
+                },
+                "id": "A_focus",
+                "kind": "gameEvent",
+              },
+            ],
+            "jump": {
+              "to": "menu",
+            },
+            "id": "sn_intro",
+            "type": "snippet",
+          },
+        ],
+        "id": "intro",
+        "name": "Intro",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "jump": {
+                      "to": "work",
+                    },
+                    "id": "opt_work_c",
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_work",
+                "prompt": {
+                  "id": "C_work",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "jump": {
+                      "to": "intimidate",
+                    },
+                    "id": "opt_intimidate_c",
+                    "type": "snippet",
+                  },
+                ],
+                "condition": "@strength >= 5",
+                "id": "opt_intimidate",
+                "prompt": {
+                  "id": "C_intim",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "jump": {
+                      "to": "secret",
+                    },
+                    "id": "opt_secret_c",
+                    "type": "snippet",
+                  },
+                ],
+                "condition": "@knows_secret",
+                "id": "opt_secret",
+                "prompt": {
+                  "id": "C_secret",
+                  "kind": "text",
+                },
+                "secretUntilEligible": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "jump": {
+                      "to": "scn_street",
+                    },
+                    "id": "opt_leave_c",
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_leave",
+                "prompt": {
+                  "id": "C_leave",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+            ],
+            "id": "grp_choice",
+            "selector": "choice",
+            "type": "group",
+          },
+        ],
+        "id": "menu",
+        "name": "Menu",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "BARKEEP",
+                "id": "L_work",
+                "kind": "line",
+              },
+            ],
+            "jump": {
+              "to": "menu",
+            },
+            "id": "sn_work",
+            "onExit": [
+              {
+                "kind": "set",
+                "target": "@knows_secret",
+                "value": "true",
+              },
+            ],
+            "type": "snippet",
+          },
+        ],
+        "id": "work",
+        "name": "Work",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "BARKEEP",
+                "id": "L_intim",
+                "kind": "line",
+              },
+            ],
+            "jump": {
+              "to": "scn_street",
+            },
+            "id": "sn_intim",
+            "onExit": [
+              {
+                "kind": "set",
+                "target": "@gold",
+                "value": "@gold + 5",
+              },
+            ],
+            "type": "snippet",
+          },
+        ],
+        "id": "intimidate",
+        "name": "Intimidate",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "id": "T_lean",
+                "kind": "text",
+              },
+              {
+                "character": "BARKEEP",
+                "id": "L_secret",
+                "kind": "line",
+              },
+            ],
+            "jump": {
+              "to": "scn_street",
+            },
+            "id": "sn_secret",
+            "type": "snippet",
+          },
+        ],
+        "id": "secret",
+        "name": "Secret",
+        "type": "block",
+      },
+    ],
+    "gameData": {
+      "music": "tavern_theme",
+    },
+    "id": "scn_tavern",
+    "name": "The Tavern",
+    "type": "scene",
+  },
+  "schema": "patter/flow@0",
+}

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A plain dotnet console that replays the conformance corpus through the C# runtime,
+       so the port's parity is verifiable OUTSIDE Unity (CI, local). It compiles the same
+       Runtime/*.cs the Unity asmdef ships, pinned to LangVersion 9 to stay Unity-safe. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>9.0</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>Patterplay.TestHost</AssemblyName>
+    <RootNamespace>Patterkit.Patterplay.TestHost</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../Patterplay/Runtime/**/*.cs" />
+    <!-- Runtime/Unity/* depends on UnityEngine (PatterBundleAsset); not part of the headless verify. -->
+    <Compile Remove="../Patterplay/Runtime/Unity/**/*.cs" />
+  </ItemGroup>
+
+  <!-- The Unity .patterc loader uses Newtonsoft (com.unity.nuget.newtonsoft-json in Unity);
+       referencing the same namespace here lets the TestHost verify that loader too. -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,44 @@
+.DS_Store
+node_modules
+dist
+out
+release
+/coverage/
+*.log
+.vitest
+
+# Default Build-Bundle output for the example projects (a sibling `patter-dist/` beside each .patter);
+# it's a compiled artifact, regenerated on build, not something to commit.
+examples/**/patter-dist/
+
+# Unreal generated output: everything a local editor / build / IDE session drops into the
+# plugin + sample-project folders. Only source ships (and the demos are deliberately
+# contentless - the tour loads its .patterc from disk - so locally imported assets under
+# Content/ stay local too; drop that line if shipped content is ever added on purpose).
+ports/unreal/**/Binaries/
+ports/unreal/**/Intermediate/
+ports/unreal/**/DerivedDataCache/
+ports/unreal/**/Saved/
+ports/unreal/**/Content/
+# IDE / generated project files (Xcode, VS, VS Code, Rider, Linux makefiles)
+ports/unreal/**/.vs/
+ports/unreal/**/.vscode/
+ports/unreal/**/.idea/
+ports/unreal/**/*.xcworkspace
+ports/unreal/**/*.xcodeproj
+ports/unreal/**/*.sln
+ports/unreal/**/*.suo
+ports/unreal/**/*.sdf
+ports/unreal/**/*.opensdf
+ports/unreal/**/*.VC.db
+ports/unreal/**/*.VC.opendb
+ports/unreal/**/*.code-workspace
+ports/unreal/**/Makefile
+ports/unreal/**/CMakeLists.txt
+
+# Local secrets - signing / notarization credentials (Apple ID, app-specific password, team id,
+# CSC cert + password) for `npm run publish:mac`. NEVER commit these.
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo

@@ -1,0 +1,8 @@
+{
+  schema: "patter/project@0",
+  project: { id: "proj_fix", name: "The Tavern" },
+  locales: { default: "en", all: ["en"] },
+  voiced: true,
+  properties: [{ name: "hp", type: "number", shared: true }],
+  cast: [{ name: "BARKEEP" }],
+}

@@ -1,0 +1,55 @@
+name: Release
+
+# Changesets drives the npm side: on every push to main it either opens/updates a
+# "Version Packages" PR (consuming the accumulated changesets) or, once that PR is
+# merged, builds + publishes the bumped @patterkit/* packages to npm.
+#
+# Publishing authenticates via npm TRUSTED PUBLISHING (OIDC): each @patterkit package
+# trusts this repo + this workflow file on npmjs.com, so no npm token is stored
+# anywhere. Provenance attestations are generated automatically. Requirements:
+# `id-token: write` below, and an OIDC-aware npm CLI (>= 11.5.1) on the runner.
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write        # push the Version PR branch + git tags
+  pull-requests: write   # open/update the Version Packages PR
+  id-token: write        # npm trusted publishing (OIDC) + provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+          fetch-depth: 0
+      - name: Checkout @wildwinter/expr (sibling source, aliased by tsconfig)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - name: OIDC-aware npm (trusted publishing needs >= 11.5.1)
+        run: npm install -g npm@latest
+      # Pre-seed ~/.npmrc so the changesets action doesn't write its own token line
+      # (there is no token); npm's OIDC detection handles auth by itself.
+      - run: echo "# auth via npm trusted publishing (OIDC) - no token" > ~/.npmrc
+      - run: npm ci
+        working-directory: patter
+      - name: Create Version PR or publish to npm
+        uses: changesets/action@v1
+        with:
+          cwd: patter
+          version: npm run version-packages
+          publish: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

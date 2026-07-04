@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patterpad · Search (UI preview)</title>
+  </head>
+  <body class="swin">
+    <header id="swin-head" class="swin-head">
+      <div class="swin-modes" role="tablist">
+        <button id="mode-content" class="swin-mode" type="button" role="tab">Text</button>
+        <button id="mode-replace" class="swin-mode" type="button" role="tab">Replace</button>
+        <button id="mode-status" class="swin-mode" type="button" role="tab">Writing</button>
+        <button id="mode-recording" class="swin-mode" type="button" role="tab">Recording</button>
+        <button id="mode-property" class="swin-mode" type="button" role="tab">Property</button>
+        <button id="mode-tag" class="swin-mode" type="button" role="tab">Tags</button>
+      </div>
+      <span class="swin-spacer"></span>
+      <button id="swin-pin" class="swin-pin" type="button" title="Keep on top" aria-pressed="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="17" x2="12" y2="22"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.3V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.7a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+      <button id="swin-close" class="swin-close" type="button" title="Close (Esc)">✕</button>
+    </header>
+    <input id="swin-input" class="swin-input" type="text" spellcheck="false" />
+    <div id="swin-replace-row" class="swin-replace-row" hidden>
+      <input id="swin-replace" class="swin-input swin-replace" type="text" spellcheck="false" placeholder="Replace with…" />
+      <button id="swin-replace-all" class="swin-replace-all" type="button">Replace all</button>
+    </div>
+    <div id="swin-chips" class="swin-chips" hidden></div>
+    <div id="swin-results" class="swin-results"></div>
+    <div id="swin-hint" class="swin-hint"></div>
+    <script type="module" src="./search-dev.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,794 @@
+/* Design tokens (palette, character palette, typography, sizing, motion) are the APP-WIDE layer in
+   theme.css - the single source of truth for the whole app. The rules below are the surface's
+   component styles, which only CONSUME those tokens (var(--...)). */
+
+* { box-sizing: border-box; }
+
+/* The one small-uppercase caption used across the app (section heads, card labels, table heads,
+   eyebrows). One rule replaces the ~18 bespoke declarations that had drifted to six sizes / two weights
+   / five tracking values (design-language §4 typography). Sites either carry the class or fold these
+   three properties in; per-site colour / padding / margin stay. Deviate only on purpose, with a note. */
+.overline { font: 600 0.66rem/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
+/* Themed scrollbars now live in theme.css (the shared layer), so the editor, play, and search windows
+   all get them - see the ::-webkit-scrollbar rules there. */
+/* A fixed-viewport app shell: the window itself NEVER scrolls - all scrolling lives in inner
+   overflow:auto regions (#editor, the panes, the welcome card). Clip at BOTH html and body (the window
+   scroll comes from html, so body:hidden alone doesn't stop it) so a stray or transient spill - e.g.
+   the editor reflowing mid-Writing-View-collapse - never grows outer-window scrollbars. */
+html { overflow: hidden; }
+body {
+  margin: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font: 1rem/1.6 var(--font-read); /* 1rem = the scaled root above (was a fixed 16px) */
+}
+header {
+  display: flex; align-items: baseline; gap: 1rem;
+  padding: 0.7rem 1.2rem; border-bottom: 1px solid var(--line);
+  font-family: var(--font-ui);
+}
+header .hint { color: var(--muted); font-size: 0.78rem; }
+/* TEMP in-session header toggle (theme preview) - far right, not persisted; see main.ts */
+.hdr-tools { margin-left: auto; display: flex; gap: 0.5rem; }
+.hdr-toggle {
+  background: none; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.2rem 0.55rem;
+  color: var(--muted); font: 600 0.7rem var(--font-ui); letter-spacing: 0.03em;
+  transition: color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+}
+.hdr-toggle:hover { color: var(--accent); border-color: var(--accent); }
+main { display: grid; grid-template-columns: 1fr 26rem; gap: 0; flex: 1; min-height: 0; }
+/* tall bottom padding gives the last lines room to rise to the middle (typewriter
+   scrolling in main.ts), so we are never forced to edit at the very page bottom. */
+#editor { overflow: auto; padding: 2.5rem clamp(1rem, 8vw, 5rem) 55vh; position: relative; } /* relative: the note-gutter overlay positions against it */
+aside { border-left: 1px solid var(--line); overflow: auto; background: var(--surface); }
+.aside-label { padding: 0.6rem 1rem; color: var(--muted); font: 0.72rem var(--font-ui); border-bottom: 1px solid var(--line); }
+#source { margin: 0; padding: 1rem; font: 12px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }
+
+/* the script surface */
+.ProseMirror { outline: none; max-width: 42rem; margin: 0 auto; line-height: 1.45; }
+.ProseMirror:focus { outline: none; }
+
+/* the document outline: scene Title + block H1 sections (groups §1/§3) - FLAT,
+   no indent; blocks just title the page, groups do the nesting. */
+.scene-title {
+  max-width: 42rem; margin: 0 auto 0.4rem; padding-top: 0.2rem;
+  font: 700 1.6rem/1.2 var(--font-read); color: var(--ink);
+}
+.block { position: relative; }
+/* RENDER VIRTUALIZATION (Patterpad §9 "virtualized rendering of long scenes"). The browser SKIPS
+   layout + paint for off-screen BLOCKS - the section unit, and the bulk of a long scene - so a
+   2,000-line script stays snappy even though ProseMirror keeps the whole document in the model
+   (selection, round-trip, find all stay intact). The `auto` intrinsic-size remembers each block's
+   real height once it has been on-screen, so the scrollbar and scroll position stay stable; the
+   length is only the first guess for a block that has never been seen. The block holding the caret
+   is always rendered (the browser force-renders the subtree that contains the selection). */
+.block { content-visibility: auto; contain-intrinsic-block-size: auto 320px; }
+/* On-screen, scope a keystroke's reflow to its OWN bubble (layout containment), so typing stays
+   instant no matter how long the scene is. NOT size containment - the bubble still sizes to its
+   content, so its real geometry is available for drag-and-drop and the caret recentre. */
+.bubble { contain: layout; }
+/* Bodies are flex columns so child margins DON'T collapse - that lets the drag "make
+   room" gap (a margin on the node at the active seam) open to its full size instead of
+   collapsing into the neighbour's margin (which made it barely visible). */
+.block-body, .group-rail-body { display: flex; flex-direction: column; }
+.block-head { display: flex; align-items: center; gap: 0.4rem; margin: 1.1rem 0 0.4rem; }
+/* Documentation notes surfaced under a scene / block heading (spec §18 reading layer): quiet, small,
+   clickable to open the notes editor (so headers need no gutter chip). */
+.doc-underhead { margin: 0 0 0.5rem; padding-left: 0.1rem; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--dur-quick) var(--ease-standard); }
+/* Block / group notes line up with the TITLE or type label, not the drag grip: the grip (~0.6rem glyph)
+   + the head's 0.4rem flex gap offset the label by ~1rem. */
+.doc-underhead-indent { padding-left: 1rem; }
+.doc-underhead:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.doc-underhead-line { font: italic 0.78rem var(--font-ui); color: var(--muted); line-height: 1.45; }
+.doc-underhead-cls { font-style: normal; font-weight: 600; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-right: 0.35rem; }
+.block-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); } /* to the left of the title */
+.block:hover > .block-head > .block-drag, .block:focus-within > .block-head > .block-drag { opacity: 1; }
+.block-dots { margin-left: auto; } /* the quiet ⋯ sits at the right end of the heading */
+.block:hover > .block-head > .block-dots, .block:focus-within > .block-head > .block-dots { opacity: 1; }
+.block-name {
+  flex: 0 1 auto; min-width: 6rem; background: none; border: 0; padding: 0;
+  font: 700 1.05rem var(--font-ui); color: var(--ink); letter-spacing: 0.01em;
+}
+.block-name:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.block-name::placeholder { color: var(--line); font-style: italic; }
+/* "+ block" lives in the space AFTER a block (the inter-block gap), hover-revealed.
+   LEFT-aligned (with the content's left edge) so it never collides with a snippet's
+   centred "+" add-after control. */
+.block-after { height: 1.4rem; display: flex; align-items: center; justify-content: flex-start; }
+.block-ctl {
+  background: none; border: 0; cursor: pointer; color: var(--muted);
+  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; padding: 0;
+  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+.block:hover > .block-after > .block-ctl, .block-after:hover > .block-ctl { opacity: 1; }
+.block-ctl:hover { color: var(--accent); }
+
+/* a snippet = a bubble. Chrome collapsed: no permanent top header / bottom foot; the ⋯
+   menu rides the first text line (right padding reserves its space), the drag grip sits
+   in the left gutter, and the read-only condition / jump tags appear only when set. */
+.bubble {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 2rem 0.75rem 1.8rem;   /* right reserves the ⋯; left is the drag gutter */
+  margin: 0 0 1.1rem;
+  /* A "soft raised surface" (Patterpad §2), NOT a framed card: no border, just a single faint lift
+     at rest, so the page reads as breathing script pages rather than a stack of bordered cards. The
+     depth deepens only on focus - quiet chrome, shown when it's relevant. */
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur-base) var(--ease-standard), transform var(--dur-base) var(--ease-standard), margin var(--dur-base) var(--ease-standard); /* margin eases the drag make-room gap */
+  position: relative;
+}
+.bubble:focus-within { box-shadow: var(--shadow-2); }
+/* the drag handle sits in the LEFT gutter, revealed on the whole-bubble rollover. */
+.bubble-drag {
+  /* The grab AREA is the full-height left-gutter strip (a tall, easy target that scales with the
+     bubble); the glyph itself stays small and centred - just a hint, not a bigger handle. */
+  position: absolute; left: 0; top: 0; bottom: 0; width: 1.5rem;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+/* The bubble grip is recessive even when the bubble is active - just a hint - and only firms up to
+   full when you actually hover the grip to grab it. */
+.bubble:hover > .bubble-drag, .bubble:focus-within > .bubble-drag { opacity: 0.35; }
+.bubble > .bubble-drag:hover { opacity: 1; }
+/* the ⋯ action control rides the top-right, level with the first text line. */
+.bubble-menu { position: absolute; top: 0.5rem; right: 0.55rem; }
+/* read-only condition tag (top, only when a condition is set) */
+.bubble-cond {
+  font: 600 0.66rem var(--font-ui); letter-spacing: 0.03em;
+  color: var(--accent); margin-bottom: 0.3rem; user-select: none;
+}
+.bubble:not(.has-cond) > .bubble-cond { display: none; } /* no empty row when there's no condition */
+/* read-only jump chip (bottom-right, only when a jump is set; the space appears with it) */
+.bubble-jump {
+  display: flex; justify-content: flex-end; align-items: center;
+  margin-top: 0.45rem; color: var(--accent);
+  font: 600 0.7rem var(--font-ui); letter-spacing: 0.04em; user-select: none;
+}
+.bubble:not(.has-jump) > .bubble-jump { display: none; }
+.bubble-jump { cursor: pointer; border-radius: var(--radius-sm); padding: 0.05rem 0.25rem; }
+.bubble-jump:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+/* Selected object (PM node-selection): a snippet / jump / action reads as "the current thing".
+   PM's default outline is replaced with a themed accent ring + a faint wash. The ring is INSET (drawn
+   just inside the edges) so it never clips against a container edge - an outset ring lost its right
+   side. The browser's text-selection highlight (which a node-selection paints over all the content) is
+   suppressed - a whole-node selection shouldn't read as "all this text is selected". */
+.ProseMirror-selectednode { outline: none; }
+.bubble.ProseMirror-selectednode {
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
+  background: color-mix(in oklab, var(--accent) 6%, var(--surface));
+}
+.beat.kind-gameEvent.ProseMirror-selectednode { background: color-mix(in oklab, var(--accent) 14%, transparent); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 45%, transparent); border-radius: var(--radius-sm); }
+.bubble.ProseMirror-selectednode ::selection, .beat.kind-gameEvent.ProseMirror-selectednode ::selection { background: transparent; }
+/* a shift-click multi-select run: each chunk in the run reads as selected; the raw text highlight is
+   suppressed so the run looks like one block, not a ragged drag (groups §6). */
+.chunk-multiselected {
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--accent) 50%, transparent);
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+  border-radius: var(--radius-md);
+}
+.chunk-multiselected ::selection { background: transparent; }
+/* the "+" add-after control, centred in the gap below the bubble (mirrors "+ block" /
+   "+ option"); hover-revealed, sits in the inter-bubble margin so it never adds height. */
+.bubble-after {
+  position: absolute; bottom: -1.45rem; left: 50%; transform: translateX(-50%);
+  width: 1.4rem; height: 1.4rem; padding: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 50%; cursor: pointer;
+  color: var(--muted);
+  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard); z-index: 2;
+}
+/* the "+" is two geometric bars centred on the button's middle (no font metrics involved) */
+.bubble-after::before, .bubble-after::after {
+  content: ""; position: absolute; top: 50%; left: 50%; background: currentColor; border-radius: 1px;
+}
+.bubble-after::before { width: 0.62rem; height: 1.6px; transform: translate(-50%, -50%); }
+.bubble-after::after  { width: 1.6px; height: 0.62rem; transform: translate(-50%, -50%); }
+.bubble:hover > .bubble-after { opacity: 1; }
+.bubble-after:hover { color: var(--accent); border-color: var(--accent); opacity: 1; }
+/* ghost-snippet placeholder: shown in an EMPTY container (block / group / option) so
+   there is always somewhere to start - a faint dashed bubble with a centred "+" that
+   materialises a real snippet (D1). Hidden unless its container is .is-empty. */
+.ghost-snippet { display: none; }
+.block.is-empty > .ghost-snippet, .group-rail.is-empty > .ghost-snippet {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 2.6rem; margin: 0 0 1.1rem; cursor: pointer; user-select: none;
+  border: 1px dashed color-mix(in oklab, var(--muted) 50%, transparent); border-radius: var(--radius-lg);
+  color: var(--muted); transition: border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), background var(--dur-quick) var(--ease-standard);
+}
+.group-rail.is-empty > .ghost-snippet { margin-bottom: 0.2rem; }
+.ghost-snippet:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 5%, transparent); }
+/* a drag is hovering this empty container: the ghost IS the drop target, so highlight it.
+   Selector matches the (more specific) base rule above so it actually wins the cascade. */
+.block.is-empty > .ghost-snippet.drop-into, .group-rail.is-empty > .ghost-snippet.drop-into {
+  border-style: solid; border-color: var(--accent); color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+.ghost-plus { font: 300 1.4rem/1 var(--font-ui); }
+/* An un-entered, beat-less bubble breathes instead of reading as a heavy empty card:
+   - Truly empty (a branch's else leaf): a quiet DASHED placeholder, not a solid surface.
+   - Jump-only: stays a soft bubble (the jump IS its content), just compact; the click-to-add
+     "+" is hover-revealed so at rest you simply read the jump. The click injects a type-following
+     line (seedBeatInSnippet). */
+.bubble.is-empty { padding-top: 0.4rem; padding-bottom: 0.4rem; }
+.bubble.is-empty:not(.has-jump) {
+  background: none; box-shadow: none;
+  border: 1px dashed color-mix(in oklab, var(--muted) 40%, transparent);
+}
+.bubble.is-empty > .bubble-ghost {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 1.2rem; cursor: pointer; user-select: none; color: var(--muted);
+  transition: color var(--dur-quick) var(--ease-standard), opacity var(--dur-quick) var(--ease-standard);
+}
+.bubble.is-empty.has-jump > .bubble-ghost { opacity: 0; }                 /* quiet: the jump is the content */
+.bubble.is-empty.has-jump:hover > .bubble-ghost,
+.bubble.is-empty.has-jump:focus-within > .bubble-ghost { opacity: 1; }
+.bubble.is-empty > .bubble-ghost:hover { color: var(--accent); }
+
+/* A JUMP-ONLY snippet (beat-less + a divert) collapses to a SLIM ROW, not a full bubble: no raised
+   surface, a single tight line dominated by the "↪ target" chip. The "add a line" ghost stays
+   hover-revealed (a slim hint) so the row grows back into a real bubble when you want beats before the
+   jump - click it (or the chip) to add content. */
+.bubble.is-empty.has-jump {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: nowrap;
+  background: none; box-shadow: none;
+  padding: 0.1rem 2rem 0.1rem 1.8rem;   /* slim; keep the ⋯ / drag gutters */
+  margin-bottom: 0.5rem;
+}
+.bubble.is-empty.has-jump > .bubble-after { display: none; }              /* no add-after gap on a divert row */
+/* The divert chip keeps its size AND its right-hand position (same as a jump chip in a normal snippet).
+   The "add a line" hint sits ON THE SAME LINE, off to the left where added content would begin - reserved
+   at rest so revealing it on hover / focus doesn't shift the row (no vertical "pop"); clicking it grows
+   the row into a real bubble. */
+.bubble.is-empty.has-jump > .bubble-jump { margin-left: auto; }
+.bubble.is-empty.has-jump > .bubble-ghost {
+  min-height: 0; justify-content: flex-start; font-size: 0.85em;
+  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard);
+}
+.bubble.is-empty.has-jump:hover > .bubble-ghost,
+.bubble.is-empty.has-jump:focus-within > .bubble-ghost { opacity: 1; }
+
+/* the ⋯ action control (Slack / Docs style): quiet, hover-revealed; a set group/snippet
+   keeps it discoverable. Shared by snippets (.bubble-menu) and group rails (.group-menu). */
+.menu-dots {
+  background: none; border: 0; cursor: pointer; color: var(--muted); padding: 0 0.2rem;
+  font-size: 1rem; line-height: 1; border-radius: var(--radius-sm); user-select: none;
+  opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), background var(--dur-quick) var(--ease-standard);
+}
+.bubble:hover > .bubble-menu, .bubble:focus-within > .bubble-menu { opacity: 1; }
+.group-rail:hover > .group-rail-head > .group-menu, .group-rail:focus-within > .group-rail-head > .group-menu { opacity: 1; }
+.menu-dots:hover { color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
+
+/* drag handle (groups §6) + the drop-seam targets */
+.drag-handle { cursor: grab; color: var(--muted); font-size: 0.78rem; line-height: 1; user-select: none; }
+.drag-handle:hover { color: var(--accent); }
+.is-dragging, .is-dragging * { cursor: grabbing !important; user-select: none; }
+.drag-source { opacity: 0.4; } /* the node being dragged, dimmed */
+/* during a drag every valid drop seam shows as a quiet target; the nearest is active.
+   Bars are positioned with translate and fade / slide via the transition (persistent
+   elements, reused frame to frame), so appearing, disappearing, and moving are all smooth. */
+.drop-layer { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+.drop-seam {
+  position: absolute; top: 0; left: 0; height: 0;
+  border-top: 1px dashed color-mix(in oklab, var(--muted) 55%, transparent); /* quiet grey dashed candidate */
+  opacity: 0; transition: opacity var(--dur-base) var(--ease-standard), transform var(--dur-base) var(--ease-standard); will-change: transform, opacity;
+}
+.drop-seam.shown { opacity: 1; }
+.drop-seam.active { border-top-color: var(--accent); } /* the drop target stands out, centred in the opened gap */
+/* beats (zone model) - each line lays its zones out inline, set tight */
+/* Clickable affordances read as clickable: the bubble's border / padding / beat-gaps SELECT the
+   snippet (pointer); the editable beats keep the text I-bar; the action atom node-selects (pointer). */
+.bubble { cursor: pointer; }
+.bubble .beat { cursor: text; }
+.bubble .beat.kind-gameEvent { cursor: pointer; }
+
+.beat { display: block; padding: 0; margin: 0; }
+.beat.kind-line, .beat.kind-prose { display: block; min-height: 1.45em; }
+/* Dialogue is INSET slightly (the character name sits in from the margin) so that when dialogue,
+   narration, and text mix in a bubble it reads more like a script - narration stays flush left,
+   speech steps in (Patterpad §4 "dialogue may be inset"). Snippet content only; option prompts are
+   their own cell and stay flush (--line-inset defaults to 0).
+   HANGING INDENT: when a dialogue line wraps, the continuation hangs under the first content zone -
+   the direction if there is one, else the content - which both begin right after the cue. So the
+   hang point is just "past the cue": inset + cue width + the cue->content gap. The cue is variable
+   (name, font, reading size), so views.ts MEASURES it into --cue-w; a negative text-indent pulls
+   the first line (the cue) back to the inset while padding-left holds the wrap at the hang point. */
+/* A dialogue line is a FLEX row: the cue (character name) is a fixed prefix; the say (content) flexes
+   to fill the rest of the line - so the content area is always a generous click / caret target, even
+   when empty, and wrapped speech hangs within the content column. (This replaces a negative-text-indent
+   hanging indent that mis-placed the caret on an EMPTY line - it rendered inside the character name -
+   which is why a freshly-named line felt like "the content area doesn't exist".) */
+.beat.kind-line {
+  display: flex; align-items: baseline;
+  padding-left: var(--line-inset, 0px);
+}
+.beats .beat.kind-line { --line-inset: 1.25rem; }
+.beat.kind-line > .zone.cue, .beat.kind-line > .zone.paren { flex: 0 0 auto; }
+.beat.kind-line > .zone.say { flex: 1 1 auto; min-width: 0; }
+/* Narration wraps flush-left. We previously hung wrapped continuations by 2ch via
+   `padding-left: 2ch; text-indent: -2ch`, but that negative text-indent mis-places the caret on an
+   EMPTY line - the browser positions the first-line caret at the indent offset, which on a beat-less
+   new line paints far to the left of where the text actually starts (the same hazard the dialogue line
+   hit and fixed by dropping its negative indent). Flush wrapping keeps the caret at the content start
+   in every state - empty, first character, or wrapped. */
+.beat.kind-prose { padding-left: 0; text-indent: 0; }
+/* A vertical gap ONLY where the register changes (text <-> dialogue) - so a run of text stays
+   together, a run of dialogue stays together, and the seam between them reads like a script.
+   Same-kind neighbours get no extra gap. (Flex-column bodies, so margins don't collapse.) */
+.beat.kind-line + .beat.kind-prose,
+.beat.kind-prose + .beat.kind-line { margin-top: 0.5rem; }
+
+/* zones flow on ONE row ("CHARACTER: (dir) content"). The cue / paren / say are
+   ProseMirror textblocks; ProseMirror puts a trailing <br> in an empty one. The
+   prefix zones (cue / paren) are inline-BLOCK so that break stays INSIDE the box
+   - it gives an empty zone a caret target (e.g. a freshly-typed "(") without
+   dropping the next zone onto a new line. The say zone is plain inline so long
+   content wraps; its trailing break is hidden (it is the last zone, so the caret
+   still sits at the line end and no blank row is added). */
+.zone { display: inline; vertical-align: baseline; }
+/* Hide the <br> ProseMirror puts in an empty textblock (it would break the row),
+   but give an EMPTY editable zone a small inline-block so the caret has a target
+   and doesn't fall through into the next zone. A zone with content is plain
+   inline (wraps normally). */
+/* Hide the trailing <br> only for the PREFIX zones (cue/paren) - there it would
+   wrap the next zone, and their empty caret is anchored by a sibling element.
+   The SAY zone keeps its <br> (the only caret anchor an empty last zone has); an
+   inline-block contains it so it doesn't add a blank row. */
+/* The prefix zones (cue / paren) hide their trailing <br> - it is anchored by a
+   chrome sibling and would otherwise wrap the next zone. The SAY keeps its <br>
+   visible: it is the caret's only measurable box when empty, and the inline-block
+   below contains the break so it stays on the row (no blank line, no next-zone wrap). */
+.zone.cue br.ProseMirror-trailingBreak,
+.zone.paren br.ProseMirror-trailingBreak { display: none; }
+/* An empty editable zone gets a small inline-block so the caret has a real box to
+   sit in (at the content start, right of the cue/colon gap) rather than collapsing
+   back onto the prefix. Only when empty (:has the trailing <br>); a filled zone is
+   plain inline and wraps normally. */
+.zone.paren .paren-text:has(> br.ProseMirror-trailingBreak),
+.zone.cue .cue-text:has(> br.ProseMirror-trailingBreak),
+.zone.say .say-text:has(> br.ProseMirror-trailingBreak) { display: inline-block; min-width: 0.5ch; }
+.zone.cue .cue-text {
+  font: 600 0.72rem/1 var(--font-ui);
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.zone.cue .cue-colon { color: var(--muted); user-select: none; }
+/* The gap after the cue/direction lives as a margin-LEFT on the following zone,
+   so it is present whether that zone is empty or filled - the caret then sits
+   where the text will, instead of flush against the ":" / ")" then jumping. */
+.beat.kind-line .zone.paren, .beat.kind-line .zone.say { margin-left: 0.45rem; }
+/* An unnamed dialogue line ALWAYS shows a muted "<character>:" placeholder, so a dialogue line is
+   recognizable even before a name is set. It is generated chrome (a ::before), never real text, so
+   it does not round-trip into the character; not uppercased, so it reads as a slot, not a name. */
+.zone.cue.empty .cue-text::before {
+  content: "<character>:"; color: var(--muted);
+  text-transform: none; font-weight: 500; letter-spacing: 0.02em; opacity: 0.75;
+}
+.zone.paren { color: var(--muted); font-style: italic; font-size: 0.86rem; }
+.zone.paren .paren-chrome { user-select: none; }
+/* Text beats are GENERAL on-screen content (a description, a sign, a newspaper), not necessarily
+   "authorial voice" - so they read upright, NOT italic-by-default: italic is now an authoring choice
+   (the em mark, §formatting), and a blanket italic would both presume a register the text may not
+   have and hide an authored <i>. A quieter soft ink is the register cue; the make-surface still reads
+   beautifully (design-language §4) - never a faint grey. */
+.beat.kind-prose .zone.say { color: var(--ink-soft); }
+/* Dialogue content: eased back from stark full ink (see --ink-read). */
+.beat.kind-line .zone.say { color: var(--ink-read); }
+/* Inline formatting marks (project-gated, §formatting). The mark toDOM emits <strong>/<em>; make the
+   effect explicit and colour-inheriting so bold / italic read in the dialogue + narration ink. The
+   author only ever sees this effect, never the <b>/<i> markup it round-trips to. */
+.zone strong { font-weight: 700; }
+.zone em { font-style: italic; }
+/* Play-mode step markers live as gutter dots, NEXT TO the line, so the path play took stays readable
+   without disturbing the prose. Both the visited trail and the playhead anchor to the beat (relative)
+   and centre-align in the same left gutter column - playhead bright, trail quiet. Cleared on reset. */
+.beat.visited, .beat.playing, .beat.has-comment { position: relative; }
+
+/* Threaded-comment speech-bubble (#148): a small monochrome bubble out in the right gutter, marking a beat
+   that carries a thread. Lives in the .comment-gutter overlay (positioned by JS, like the note chip) so it
+   escapes the bubble/block paint containment. Accent for an active thread, muted for a resolved one. */
+.comment-bubble {
+  position: absolute; pointer-events: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.4rem; height: 1.4rem; padding: 0; line-height: 0; cursor: pointer;
+  background: none; border: 0; color: var(--accent); opacity: 0.8;
+  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+}
+.comment-bubble:hover { opacity: 1; transform: scale(1.15); }
+.comment-bubble.resolved { color: var(--muted); opacity: 0.5; }
+.comment-bubble.orphaned { color: var(--muted); }
+.comment-bubble svg { display: block; }
+
+/* "Suggest a rewrite" pencil marker (review flow): the OUTERMOST gutter lane, in its own colour so it
+   reads distinct from a note / comment. A stale proposal (its baseline no longer matches the live text)
+   is muted. A faint tint under the say text marks a beat that carries an open proposal. */
+.suggestion-marker {
+  position: absolute; pointer-events: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.4rem; height: 1.4rem; padding: 0; line-height: 0; cursor: pointer;
+  border: 0; background: none; color: var(--accent); opacity: 0.85;
+  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+}
+.suggestion-marker:hover { opacity: 1; transform: scale(1.15); }
+.suggestion-marker.stale { color: var(--muted); opacity: 0.6; }
+.suggestion-marker svg { display: block; }
+.suggestion-count {
+  position: absolute; top: -0.2rem; right: -0.3rem; min-width: 0.85rem; height: 0.85rem;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0 0.15rem;
+  font: 600 0.55rem var(--font-ui); line-height: 1; border-radius: 0.5rem;
+  background: var(--accent); color: var(--surface);
+}
+.beat.has-suggestion .zone.say { background: color-mix(in oklab, var(--accent) 7%, transparent); border-radius: 3px; }
+
+/* Documentation note icon (#148 notes redesign): a small note glyph OUTSIDE the node's right edge, in the
+   gutter (not inside, where it collides with the ⋯ / jump chrome). Positioned against the containing
+   block (.bubble has `contain: layout`; .block / .group-rail are position:relative), then pushed fully
+   past the right edge with translateX(100%). No `top` - it keeps its in-flow vertical position, so it
+   lines up with its own beat. Hover reads the note (native title); click opens the editor. */
+/* Gutter overlays: a sibling of the doc (appended to the #editor scroller) so chips escape the
+   bubble/block paint containment and sit OUT in the right gutter. The layer never eats clicks; each chip
+   re-enables its own. The scroller clips it to the visible editor, so off-screen chips don't bleed.
+   Two lanes so a beat with BOTH a note and a comment doesn't collide: comment INNER, note just OUTSIDE it. */
+.note-gutter, .comment-gutter, .suggestion-gutter, .status-gutter { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+
+/* Writing-status badge (#196 / line-status tweaks): a PILL carrying the rung NAME in the LEFT icon
+   gutter, level with each line / prose beat, tinted by the rung's theme-palette slot. The gutter anchors
+   the pill's RIGHT edge at the gutter line; `translateX(-100%)` grows it leftward into the margin. Review
+   > Line Status chooses which rungs show; it hides in Writing View (the plugin stops painting). Text +
+   colour together so adjacent rungs are unmistakable where bare dots blurred. */
+.status-pill {
+  position: absolute; pointer-events: auto; transform: translateX(-100%);
+  white-space: nowrap; max-width: 7rem; overflow: hidden; text-overflow: ellipsis;
+  padding: 0.04rem 0.4rem; border-radius: var(--radius-pill); border: 1px solid var(--line);
+  background: var(--surface); color: var(--muted);
+  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em;
+}
+/* The colour swatch shown beside a rung's name in the "Status" submenu + the inspector dropdown. */
+.status-swatch {
+  display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; margin-right: 0.5rem;
+  vertical-align: -1px; background: var(--muted);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 18%, transparent);
+}
+.note-icon {
+  position: absolute; pointer-events: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.4rem; height: 1.4rem; padding: 0; line-height: 0; cursor: pointer;
+  border: 0; background: none;
+  color: var(--accent); opacity: 0.9; /* the filled glyph reads clearly on its own - no chip frame needed */
+  transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+}
+.note-icon:hover { opacity: 1; transform: scale(1.15); }
+.note-icon svg { display: block; }
+
+/* A sub-text range a comment is pinned to: a soft highlight under the words (#148). */
+.comment-range { background: color-mix(in oklab, var(--accent) 16%, transparent); border-radius: 2px; box-shadow: 0 1px 0 color-mix(in oklab, var(--accent) 45%, transparent); }
+.comment-range.resolved { background: color-mix(in oklab, var(--muted) 16%, transparent); box-shadow: none; }
+
+/* The dot lives in the bubble's left gutter (negative left, into the bubble's left padding) so it sits
+   clear of the beat's text for EVERY kind - dialogue (text is inset), action, AND prose/text (no inset,
+   so an in-content dot would land on the words). `translateY(-50%)` centres it on the line. */
+.beat.visited::before, .beat.playing::before {
+  content: ""; position: absolute; top: 0.72em; transform: translateY(-50%); border-radius: 50%; box-sizing: border-box;
+}
+/* A beat the playhead has PASSED THROUGH this run: a small, muted dot - a quiet breadcrumb that records
+   what was visited on the way to the current line (crucial for advance-to-stop). */
+.beat.visited::before {
+  left: -1.05rem; width: 5px; height: 5px;
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+/* The playhead: the line currently being walked. A soft accent wash on the row plus a larger, haloed
+   gutter dot reads as a running position without shouting; the wash is eased so it glides as play
+   advances. The dot centre-aligns with the visited trail above it. */
+.beat.playing {
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-base) var(--ease-standard);
+}
+.beat.playing::before {
+  left: -1.15rem; width: 7px; height: 7px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 20%, transparent);
+}
+
+/* The floating play pointer (#182): a bold accent chevron that hovers in the left margin pointing at
+   the playing beat - the obvious "you are here" cue on top of the quiet gutter dot. An absolute child
+   of the #editor scroller, placed by JS in content coords (so it tracks its beat through smooth-scroll)
+   and pinned to the beat's first line; top/left glide as the playhead advances. The drop-shadow lifts
+   it off the page; a slow nudge draws the eye. translate(-100%, -50%) hangs it just left of the text. */
+.play-pointer {
+  position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none;
+  transform: translate(-100%, -50%);
+  color: var(--accent); opacity: 0;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.3)) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.18));
+  transition: opacity var(--dur-base) var(--ease-standard); /* fade only; position is snapped until .gliding */
+}
+.play-pointer.is-active { opacity: 1; }
+/* Added one frame after the first placement so the pointer doesn't slide in from the origin; thereafter
+   its top/left ease as the playhead steps from beat to beat. */
+.play-pointer.gliding {
+  transition: opacity var(--dur-base) var(--ease-standard),
+              top var(--dur-base) var(--ease-standard), left var(--dur-base) var(--ease-standard);
+}
+.play-pointer svg { display: block; width: 13px; height: 20px; }
+.play-pointer .pp-chevron { animation: pp-nudge 1.5s var(--ease-standard) infinite; }
+@keyframes pp-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2.5px); } }
+@media (prefers-reduced-motion: reduce) { .play-pointer .pp-chevron { animation: none; } }
+
+/* Inline validation squiggle (problems with a node site, §4): a gentle wavy underline on a beat's
+   content, a soft left accent on a container (snippet / group / option) or an action atom. Severity
+   colours: error red, warning amber. Driven by the problems decoration plugin (problems.ts). */
+.beat.problem-error .zone.say, .beat.problem-warning .zone.say {
+  text-decoration-line: underline; text-decoration-style: wavy;
+  text-underline-offset: 3px; text-decoration-thickness: 1.5px;
+}
+.beat.problem-error .zone.say { text-decoration-color: var(--danger); }
+.beat.problem-warning .zone.say { text-decoration-color: var(--warn); }
+/* Inline spell-check (#177): the Word / Docs red wavy underline under a misspelled say-zone word. An
+   inline decoration (not a node class) so only the word is marked, surviving editing re-renders. */
+.spell-error { text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--danger); text-underline-offset: 2px; text-decoration-thickness: 1px; text-decoration-skip-ink: none; }
+/* The right-click fix menu reuses the action-menu look; the suggested words read in a slightly firmer weight. */
+.spell-menu .action-mi.spell-suggest { font-weight: 600; }
+.beat.kind-gameEvent.problem-error { box-shadow: inset 2px 0 0 var(--danger); border-radius: var(--radius-sm); }
+.beat.kind-gameEvent.problem-warning { box-shadow: inset 2px 0 0 var(--warn); border-radius: var(--radius-sm); }
+.bubble.problem-error, .group-rail.problem-error { box-shadow: inset 3px 0 0 var(--danger); }
+.bubble.problem-warning, .group-rail.problem-warning { box-shadow: inset 3px 0 0 var(--warn); }
+
+/* game event: the toDOM renders the gear glyph; push it to the right margin. The row is a flex
+   line (gear glyph + hover-revealed delete affordance, .atom-del below). */
+.beat.kind-gameEvent {
+  display: flex; justify-content: flex-end; align-items: center; gap: 0.4rem; margin: 0.25rem 0;
+  color: var(--accent); font-size: 0.9rem; user-select: none;
+}
+
+/* group container: a left RAIL + an always-visible structural label (groups §3).
+   Nesting reads as nested rails. The label is persistent (structure the author must
+   see); manipulation controls come later. */
+.group-rail {
+  border-left: 2px solid var(--line);
+  margin: 0 0 0.5rem; padding-left: 0.7rem;   /* bottom-only: in a flex body, a top margin would double the gap */
+  transition: margin var(--dur-base) var(--ease-standard);              /* eases the drag make-room gap open / closed */
+}
+/* the rails are a quiet structural cue, not a loud frame - they read like the neutral sequence/run
+   rail (plain --line); the label, the option PROMPT cell, and condition tags carry the identity. */
+.group-rail.is-choice { border-left-color: var(--line); }
+/* Intentionally NOT the shared `.overline` (700/0.62/0.07): the persistent structural rail label reads a
+   touch heavier + tighter than a one-off caption, and its is-choice / is-option variants below re-tune it. */
+.group-rail-head {
+  display: flex; align-items: baseline; gap: 0.4rem;
+  font: 700 0.62rem var(--font-ui);
+  text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+  padding: 0.1rem 0 0.25rem; user-select: none;
+}
+/* drag handle: INSIDE the rail, just left of the type label (so it never overlaps the
+   rail) - the label sits to its right. Hover-revealed; holds its space so nothing shifts. */
+.rail-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
+.group-rail:hover > .group-rail-head > .rail-drag, .group-rail:focus-within > .group-rail-head > .rail-drag { opacity: 1; }
+.group-rail.is-choice > .group-rail-head { color: color-mix(in oklab, var(--accent) 32%, var(--muted)); }
+.group-rail.is-option > .group-rail-head { color: var(--ink); text-transform: none; letter-spacing: normal; font-weight: 600; }
+/* an option's rail stays neutral too - its PROMPT cell (the accent-tinted box below) is the anchor */
+.group-rail.is-option { border-left-color: var(--line); }
+/* a choice option's PROMPT cell (groups §13.10): the tied choice-text line at the top of the option
+   - the option's ANCHOR, the confident label its contained content hangs off. A SOLID, accent-tinted
+   cell (never dashed - dashes are reserved for uncertain / placeholder content, §ghosts). */
+.option-prompt {
+  display: flex; align-items: baseline; gap: 0.5rem;   /* the ◇ marker, then the choice text */
+  margin: 0 0 0.5rem; padding: 0.4rem 0.7rem;
+  border: 1px solid color-mix(in oklab, var(--accent) 26%, var(--line)); border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--accent) 8%, var(--surface));
+}
+/* The option marker (◇) lives ON the prompt cell now, with the choice text it marks - not on the
+   rail label. Generated chrome, not editable, not selectable. */
+.option-prompt::before {
+  content: "◇"; flex: 0 0 auto; color: var(--accent);
+  font: 0.8rem var(--font-ui); line-height: 1; user-select: none;
+}
+.option-prompt > .option-prompt-body { flex: 1 1 auto; min-width: 0; }
+/* The prompt is a single-line label, so drop the prose hanging-indent (padding-left + negative
+   text-indent): on an EMPTY prompt that -2ch pulled the caret left, over the ◇ marker, so typing
+   made the caret jump forward. Flush start = caret sits where the text will. */
+.option-prompt .beat.kind-prose { padding-left: 0; text-indent: 0; }
+/* the choice text reads as a confident label - not the quiet muted-italic of body narration */
+/* The option prompt is a confident ANCHOR, so its text stays full ink (not the eased reading inks),
+   for both a text and a dialogue prompt. Higher specificity than the reading-ink rules above. */
+.option-prompt .beat.kind-prose .zone.say,
+.option-prompt .beat.kind-line .zone.say { color: var(--ink); font-style: normal; }
+/* "+ option" lives CENTRED in the gap after each option (mirroring "+ block"), giving a
+   little padding between options. Hidden on non-option groups; hover-revealed otherwise. */
+/* "+ option" sits in the gap after an option, LEFT-aligned against the rail (the controls
+   that belong to the rails live at the left edge; the snippet's centred "+" owns the middle). */
+.option-after { display: none; }
+.group-rail.is-option > .option-after { display: flex; justify-content: flex-start; align-items: center; height: 1.3rem; }
+.option-after > .add-option { opacity: 0; color: var(--accent); transition: opacity var(--dur-quick) var(--ease-standard); }
+.group-rail.is-option:hover > .option-after > .add-option,
+.option-after:hover > .add-option { opacity: 1; }
+/* read-only group condition tag (only when set) - sits after the type label */
+.group-rail-cond {
+  text-transform: none; letter-spacing: normal;
+  font: 600 0.62rem var(--font-ui); color: var(--accent);
+}
+/* the ⋯ menu is pushed to the right end of the rail head */
+.group-menu { margin-left: auto; font-size: 0.85rem; }
+/* the "+ option" control (the only remaining inline group control) */
+.group-ctl {
+  background: none; border: 0; cursor: pointer; color: var(--muted); padding: 0;
+  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.group-ctl:hover { color: var(--ink); }
+
+/* themed confirmation modal (design-language §4) - never an OS dialog */
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in oklab, var(--ink) 28%, transparent);
+  backdrop-filter: blur(3px); /* the shared modal-scrim treatment (design-language §4): ink scrim + soft blur */
+  animation: var(--anim-backdrop-in);
+}
+.confirm-dialog {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3); padding: 1.1rem 1.2rem; max-width: 22rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  font-family: var(--font-ui);
+  animation: var(--anim-panel-in);
+}
+.confirm-title { font: 700 0.95rem var(--font-ui); color: var(--ink); }
+.confirm-body { font: 0.82rem/1.45 var(--font-ui); color: var(--muted); }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
+.confirm-btn {
+  border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; padding: 0.35rem 0.8rem;
+  font: 600 0.78rem var(--font-ui); background: var(--bg); color: var(--ink);
+  transition: background var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), filter var(--dur-quick) var(--ease-standard);
+}
+.confirm-btn.cancel:hover { background: color-mix(in oklab, var(--line) 30%, transparent); }
+.confirm-btn.danger { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+/* Solid-accent primary: the one shared hover idiom (matches .btn.primary) - an eased brightness lift, not a
+   bespoke darken-mix (design-language §4 "one default"). */
+.confirm-btn.danger:hover { filter: brightness(1.06); }
+.group-rail-body > .bubble:last-child, .group-rail-body > .group-rail:last-child { margin-bottom: 0; }
+
+/* cue autocomplete (stub) */
+/* Exit motion: closeWithExit() (web/exit.ts) adds `.closing` just before teardown; this swaps the
+   enter keyframe for its reverse. Higher specificity than the base rule, so it wins. */
+.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing,
+.confirm-dialog.closing { animation: var(--anim-panel-out); }
+.confirm-overlay.closing { animation: var(--anim-backdrop-out); }
+/* a dismissing popup must not catch a stray click during its fade */
+.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing,
+.confirm-overlay.closing { pointer-events: none; }
+
+.cue-ac {
+  position: fixed; z-index: 10; animation: var(--anim-panel-in);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2); padding: 0.2rem; min-width: 7rem;
+  display: flex; flex-direction: column;
+}
+.cue-ac-item {
+  display: block; width: 100%; /* stack vertically even when the container is display:block */
+  text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); color: var(--ink);
+  font: 600 0.72rem var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase;
+}
+/* Only the ACTIVE row is highlighted - hovering SETS the active row (one highlight, keyboard + mouse
+   share it), so there's never a separate :hover highlight competing with the keyboard selection. */
+.cue-ac-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+/* the search "field" at the top of the dropdown (shows what's being typed) */
+.cue-ac-field {
+  padding: 0.3rem 0.6rem; margin-bottom: 0.15rem; border-bottom: 1px solid var(--line);
+  font: 600 0.72rem var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+}
+.cue-ac-field.placeholder { font-weight: 400; font-style: italic; letter-spacing: normal; text-transform: none; color: var(--muted); }
+/* the "Add new character" row - the one place a name is authored */
+.cue-ac-add {
+  display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); color: var(--accent);
+  font: 600 0.72rem var(--font-ui);
+}
+.cue-ac-add.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+
+/* the jump target picker (groups §6): one type-and-filter-and-confirm popup for `/jump` AND the
+   inspector / problems "Jump", hierarchical (scenes + indented blocks). Matches the cue popup's look. */
+.target-picker {
+  /* Above the floating condition / jump editor panels (z 900) when opened from a node-ref pill,
+     and above the editor chrome when opened from `/jump`. Matches the expr popover convention. */
+  position: fixed; z-index: 1000; animation: var(--anim-panel-in);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2); padding: 0.25rem;
+  display: flex; flex-direction: column; max-height: min(60vh, 22rem);
+}
+.tp-field {
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none;
+  padding: 0.32rem 0.5rem; margin-bottom: 0.2rem; color: var(--ink); font: 0.8rem var(--font-ui);
+}
+.tp-field:focus { border-color: color-mix(in oklab, var(--accent) 55%, var(--line)); }
+.tp-list { overflow: auto; display: flex; flex-direction: column; min-height: 0; }
+.tp-row {
+  display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 0.28rem 0.55rem; border-radius: var(--radius-sm); color: var(--ink); font: 0.8rem var(--font-ui);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tp-end { font: 600 0.7rem var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
+.tp-scene { font-weight: 600; color: var(--accent); }
+.tp-scene::before { content: "▸ "; color: var(--muted); }       /* a scene is a target (its start) + a heading */
+.tp-block { padding-left: 1.5rem; color: var(--ink-soft); }      /* blocks indented under their scene */
+.tp-clear { color: var(--muted); border-top: 1px solid var(--line); margin-top: 0.15rem; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.tp-row.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* one highlight, keyboard + mouse */
+.tp-row.sel { box-shadow: inset 2px 0 0 var(--accent); }         /* the current target, marked */
+
+/* contextual hint bar */
+#hintbar {
+  display: flex; gap: 1.1rem; align-items: center;
+  padding: 0.45rem 1.2rem; border-top: 1px solid var(--line);
+  background: var(--surface); min-height: 1.9rem;
+  font: 0.74rem var(--font-ui); color: var(--muted);
+}
+.hint { display: inline-flex; gap: 0.35rem; align-items: baseline; }
+.hint kbd {
+  font: 600 0.68rem var(--font-mono); color: var(--ink);
+  background: color-mix(in oklab, var(--line) 40%, transparent);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.05rem 0.3rem;
+}
+.hint-label { color: var(--muted); }
+
+/* the structural action menu (⋯ / right-click): a familiar vertical MENU - structural
+   actions only (data lives in the inspector). "Follow with" / "Wrap in" open submenu flyouts. */
+.action-menu {
+  position: fixed; z-index: 50; min-width: 11rem; animation: var(--anim-panel-in);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2); padding: 0.3rem;
+  display: flex; flex-direction: column; gap: 0.02rem;
+  font: 0.8rem var(--font-ui);
+}
+.action-submenu { min-width: 8rem; z-index: 51; }
+.action-head { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.25rem 0.5rem 0.3rem; }
+.action-mi {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 0.34rem 0.5rem; border-radius: var(--radius-sm); color: var(--ink);
+  font: 0.8rem var(--font-ui);
+}
+.action-mi:hover, .action-mi.open { background: color-mix(in oklab, var(--accent) 10%, transparent); }
+.action-caret { color: var(--muted); font-size: 1rem; line-height: 1; margin-left: auto; }
+/* Status submenu rows: left-align [tick][swatch][label] instead of spreading them apart. */
+.action-mi.action-run { justify-content: flex-start; gap: 0.4rem; }
+.action-check { flex: 0 0 0.8em; text-align: center; color: var(--accent); font-size: 0.72rem; line-height: 1; }
+.action-mi.del { color: var(--accent); }
+.action-mi.del:hover { background: color-mix(in oklab, var(--accent) 14%, transparent); }
+.action-sep { height: 1px; background: var(--line); margin: 0.2rem 0.3rem; }
+
+/* special-insert ("/") menu */
+.slash-menu {
+  position: fixed; z-index: 10; animation: var(--anim-panel-in);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2); padding: 0.2rem; min-width: 8rem;
+  display: flex; flex-direction: column;
+}
+.slash-item {
+  display: block; width: 100%;
+  text-align: left; background: none; border: 0; cursor: pointer; color: var(--ink);
+  padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 0.8rem var(--font-ui);
+}
+.slash-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* hover SETS .active (one shared highlight) */
+.slash-item u { text-decoration-color: var(--muted); text-underline-offset: 2px; } /* the access-key letter (type-ahead) */
+.slash-head { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.3rem 0.6rem 0.2rem; }
+.slash-head:not(:first-child) { margin-top: 0.15rem; border-top: 1px solid var(--line); padding-top: 0.4rem; } /* a quiet rule between the two sections */
+
+/* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */
+.atom-del {
+  background: none; border: 0; cursor: pointer; color: var(--muted);
+  font-size: 0.9rem; line-height: 1; padding: 0 0.2rem; opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard);
+}
+.beat.kind-gameEvent:hover .atom-del { opacity: 1; }
+.atom-del:hover { color: var(--accent); }
+
+/* --- Themed tooltip (web/tooltip.ts): one shared bubble replacing native `title` rollovers. A quiet,
+   inverted bubble (ink ground / surface text) so it reads as a tooltip in either theme; eases in with
+   the shared panel-enter; positioned by JS (position: fixed). Suppressed in Writing View by the JS. --- */
+.tooltip {
+  position: fixed; z-index: 100; pointer-events: none;
+  max-width: 22rem; white-space: pre-line; /* the comment / note tips carry newlines */
+  background: var(--ink); color: var(--surface);
+  font: 0.72rem/1.4 var(--font-ui); letter-spacing: 0.01em;
+  padding: 0.3rem 0.5rem; border-radius: var(--radius-sm);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--ink) 35%, transparent);
+}
+.tooltip[hidden] { display: none; }
+.tooltip.show { animation: var(--anim-panel-in); }

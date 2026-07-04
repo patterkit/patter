@@ -1,0 +1,1 @@
+{ schema: "patter/strings@0", scene: "scn_tavern", locale: "en", default: true, strings: { L_1: "Welcome." } }

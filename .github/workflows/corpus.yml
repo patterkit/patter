@@ -1,0 +1,50 @@
+name: Corpus release
+
+# The conformance corpus is the cross-language parity contract, versioned with the
+# bundle schema. Tagging `bundle-schema-vN` verifies the corpus regenerates + passes,
+# then attaches corpus.json to that GitHub Release - the stable asset the native port
+# pipelines (Unity / Unreal / Godot) consume.
+on:
+  push:
+    tags: ["bundle-schema-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+      - name: Checkout @wildwinter/expr (sibling source, aliased by vitest)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - run: npm ci
+        working-directory: patter
+      - name: Verify the corpus is reproducible (regenerates byte-identical + passes)
+        run: npm test -- packages/conformance
+        working-directory: patter
+      - name: Attach corpus.json to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Conformance corpus ${{ github.ref_name }}
+          body: |
+            `corpus.json` - the language-agnostic conformance corpus (expression and
+            playthrough cases) that every Patterplay runtime (JavaScript, Unity, Unreal,
+            Godot) is held to. This is the stable asset URL the port test harnesses pull.
+
+            Details: https://patterkit.dev/compatibility/
+          files: patter/packages/conformance/corpus.json
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

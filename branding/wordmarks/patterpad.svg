@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 220" width="940" height="220">
+  
+  <defs></defs>
+  <g transform="translate(34,32) scale(1.52)"><path fill="#214f4b" fill-rule="evenodd" d="M8 50 C30 36 48 22 64 22 A28 28 0 1 1 64 78 C48 78 30 64 8 50 Z M51 39 h26 v5 h-26 Z M51 49 h21 v5 h-21 Z M51 59 h16 v5 h-16 Z"></path></g>
+  <text x="232" y="150" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="120" letter-spacing="-2" fill="#312b22">Patterpad</text>
+</svg>

@@ -1,0 +1,909 @@
+{
+  "scene": {
+    "blocks": [
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "id": "T_rwkunh2z",
+                "kind": "text",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_uk56f61b",
+                "kind": "line",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_2ec5fwcx",
+                "kind": "line",
+              },
+              {
+                "id": "T_lqnostww",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_tvw1751s",
+            "jump": {
+              "to": "blk_v0qnj91x",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_p8s3uws3",
+        "name": "Welcome",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_jjyt2npu",
+                "kind": "line",
+              },
+            ],
+            "condition": "visits(blk_v0qnj91x) == 1",
+            "id": "sn_cxbjf67n",
+            "type": "snippet",
+          },
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_kqsapwb7",
+                "kind": "line",
+              },
+            ],
+            "condition": "visits('blk_v0qnj91x') > 1",
+            "id": "sn_5w72vmcm",
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "id": "sn_e1lkhfmm",
+                    "jump": {
+                      "to": "blk_y1llsc95",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_0tjh8vev",
+                "prompt": {
+                  "id": "L_kas0ve2p",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_88xj169v",
+                    "jump": {
+                      "to": "blk_1l08bk05",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_0gatjxka",
+                "prompt": {
+                  "id": "L_ss3kdmht",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_4o0hu5qq",
+                    "jump": {
+                      "to": "blk_bdp47vq7",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_elrx5lii",
+                "prompt": {
+                  "id": "L_g0o5prlt",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_eql8vx4k",
+                    "jump": {
+                      "to": "blk_96znfw0i",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_gks2cn82",
+                "prompt": {
+                  "id": "L_yh2umlmo",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_z35mvg12",
+                    "jump": {
+                      "to": "blk_oca7w7sm",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_v59msxd7",
+                "prompt": {
+                  "id": "L_54z9u1x9",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_kjctnoq9",
+                    "jump": {
+                      "to": "blk_gfsd8zkl",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_qbyoqcf2",
+                "prompt": {
+                  "id": "L_sbio1pqk",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_wqq16jg2",
+                    "jump": {
+                      "to": "blk_of8ubwtp",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_c66yx5qw",
+                "prompt": {
+                  "id": "L_gdllz7g4",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+            ],
+            "id": "g_8f62bme8",
+            "selector": "choice",
+            "type": "group",
+          },
+        ],
+        "id": "blk_v0qnj91x",
+        "name": "The Crossroads",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_g3i592c7",
+                "kind": "line",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_t3xxeijy",
+                "kind": "line",
+              },
+              {
+                "id": "T_i588fcvq",
+                "kind": "text",
+              },
+              {
+                "character": "GUIDE",
+                "direction": "warmly",
+                "id": "L_2rkpjkyq",
+                "kind": "line",
+              },
+              {
+                "id": "A_3fgbu7px",
+                "kind": "gameEvent",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_gzze295b",
+                "kind": "line",
+              },
+              {
+                "id": "T_z437j1m3",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_iskpf0cn",
+            "jump": {
+              "to": "blk_v0qnj91x",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_y1llsc95",
+        "name": "Lines & narration",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_0vvvty20",
+                "kind": "line",
+              },
+            ],
+            "id": "sn_r28gh6jt",
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "GUIDE",
+                        "id": "L_53ew1muy",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_h5tw1gr4",
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_adrdhfrp",
+                "prompt": {
+                  "id": "L_s3bqndtt",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "GUIDE",
+                        "id": "L_s2ugg6fo",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_fs4wtxba",
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_r6j3p3ui",
+                "prompt": {
+                  "id": "L_639390f8",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+            ],
+            "id": "g_yq6cvd0m",
+            "selector": "choice",
+            "type": "group",
+          },
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_dgowlmkp",
+                "kind": "line",
+              },
+              {
+                "id": "T_5wcgi4ho",
+                "kind": "text",
+              },
+              {
+                "id": "L_hzy81x3w",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_s333gksp",
+            "jump": {
+              "to": "blk_v0qnj91x",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_1l08bk05",
+        "name": "Choices & options",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_8ndfou2l",
+                "kind": "line",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_2lqfp2j1",
+                "kind": "line",
+              },
+            ],
+            "condition": "visits('blk_bdp47vq7') == 1",
+            "id": "sn_d2hwl0ft",
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "beats": [
+                          {
+                            "id": "T_waa8u9v5",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_7xxha1tt",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_v0bld3tg",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_1erm2ks0",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_73hre6sq",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_o6dq9erc",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_dwnh4047",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_mojh33gz",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_03dn26em",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_jx3l4mr6",
+                        "type": "snippet",
+                      },
+                    ],
+                    "id": "g_9zv3tj68",
+                    "options": {
+                      "exhaust": "repeat",
+                      "order": "shuffle",
+                    },
+                    "selector": "sequence",
+                    "type": "group",
+                  },
+                ],
+                "id": "opt_qpccf77s",
+                "prompt": {
+                  "id": "L_pemg6t65",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "beats": [
+                          {
+                            "id": "T_58mu80lb",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_b87omwp2",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_5cx5v6nr",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_pv60qc6i",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_ok2kghqb",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_kxzgqbr0",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_zbj90uk1",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_bbuo7lsi",
+                        "type": "snippet",
+                      },
+                    ],
+                    "id": "g_yp35qf8q",
+                    "options": {
+                      "exhaust": "repeat",
+                      "order": "sequential",
+                    },
+                    "selector": "sequence",
+                    "type": "group",
+                  },
+                ],
+                "id": "opt_x2verxmb",
+                "prompt": {
+                  "id": "L_ckfc2bb8",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "id": "T_c2qdt0pk",
+                        "kind": "text",
+                      },
+                      {
+                        "id": "L_6kk0egu8",
+                        "kind": "text",
+                      },
+                    ],
+                    "id": "sn_xy4cxs55",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@torch",
+                        "value": "@torch - 1",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                  {
+                    "children": [
+                      {
+                        "beats": [
+                          {
+                            "id": "T_08w6wcpc",
+                            "kind": "text",
+                          },
+                        ],
+                        "condition": "@torch >= 3",
+                        "id": "sn_veuns7ko",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_j5e1sdx5",
+                            "kind": "text",
+                          },
+                        ],
+                        "condition": "@torch >= 2",
+                        "id": "sn_jt4whv13",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_10kmsyzr",
+                            "kind": "text",
+                          },
+                        ],
+                        "condition": "@torch >= 1",
+                        "id": "sn_y70nsun2",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_gh7amer9",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_86xpj1tb",
+                        "type": "snippet",
+                      },
+                    ],
+                    "id": "g_5drwabln",
+                    "selector": "branch",
+                    "type": "group",
+                  },
+                ],
+                "id": "opt_va5zymhx",
+                "prompt": {
+                  "id": "L_2dmps0mq",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_rl9jp92j",
+                    "jump": {
+                      "to": "blk_v0qnj91x",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_vhykqu7o",
+                "prompt": {
+                  "id": "L_jdoujgwq",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+            ],
+            "id": "g_q21v9j2k",
+            "selector": "choice",
+            "type": "group",
+          },
+          {
+            "id": "sn_dfg3d6fu",
+            "jump": {
+              "to": "blk_bdp47vq7",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_bdp47vq7",
+        "name": "Selectors",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_mshi7u3l",
+                "kind": "line",
+              },
+              {
+                "id": "T_fquoaxvh",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_yg3oomg9",
+            "onEnter": [
+              {
+                "kind": "set",
+                "target": "@asks",
+                "value": "@asks + 1",
+              },
+            ],
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "GUIDE",
+                        "id": "L_l6w28hh0",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_fhg7iypt",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@brave",
+                        "value": "true",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_ftollk2o",
+                "prompt": {
+                  "id": "L_on8u43yq",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "GUIDE",
+                        "id": "L_jptgfwlx",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_cpmfz3kv",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@brave",
+                        "value": "false",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_h2vr3kvg",
+                "prompt": {
+                  "id": "L_2ndl4wd4",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+            ],
+            "id": "g_w5rfxbnf",
+            "selector": "choice",
+            "type": "group",
+          },
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_r1x3eof8",
+                "kind": "line",
+              },
+            ],
+            "condition": "@brave",
+            "id": "sn_gwa6q8sf",
+            "type": "snippet",
+          },
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_begzzbls",
+                "kind": "line",
+              },
+            ],
+            "condition": "not @brave",
+            "id": "sn_p9psw82m",
+            "type": "snippet",
+          },
+          {
+            "beats": [
+              {
+                "id": "T_eizaftpf",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_anosl5px",
+            "jump": {
+              "to": "blk_v0qnj91x",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_96znfw0i",
+        "name": "Memory",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_9lypohpy",
+                "kind": "line",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_navdbi88",
+                "kind": "line",
+              },
+              {
+                "character": "SFX",
+                "id": "L_heik1go9",
+                "kind": "line",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_48la1il4",
+                "kind": "line",
+              },
+              {
+                "id": "T_nazdfvyq",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_5hzzgwbc",
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "id": "sn_vtyv6lvu",
+                    "jump": {
+                      "to": "blk_oca7w7sm",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_cxn2lgv7",
+                "prompt": {
+                  "id": "L_tuuanup5",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_nb159mgc",
+                    "jump": {
+                      "to": "blk_v0qnj91x",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_gg2wcyqx",
+                "prompt": {
+                  "id": "L_4wvlp5r1",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+            ],
+            "id": "g_s1ehw8dr",
+            "selector": "choice",
+            "type": "group",
+          },
+        ],
+        "id": "blk_oca7w7sm",
+        "name": "Closed captions",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_w7yp2n8k",
+                "kind": "line",
+              },
+              {
+                "id": "T_afrv2qya",
+                "kind": "text",
+              },
+              {
+                "id": "T_1hm25b9c",
+                "kind": "text",
+              },
+              {
+                "id": "T_yugj2fx5",
+                "kind": "text",
+              },
+              {
+                "id": "T_pzvh33fc",
+                "kind": "text",
+              },
+              {
+                "id": "T_r6o7o5bt",
+                "kind": "text",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_4gw5bkrh",
+                "kind": "line",
+              },
+            ],
+            "id": "sn_rqgtjlbs",
+            "jump": {
+              "to": "blk_v0qnj91x",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_gfsd8zkl",
+        "name": "Under the hood",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "GUIDE",
+                "id": "L_jmnwski3",
+                "kind": "line",
+              },
+              {
+                "id": "T_mhgjuksd",
+                "kind": "text",
+              },
+              {
+                "character": "GUIDE",
+                "id": "L_02irf71j",
+                "kind": "line",
+              },
+              {
+                "id": "T_0yegn7g3",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_kavggzhr",
+            "jump": {
+              "to": "END",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_of8ubwtp",
+        "name": "The End",
+        "type": "block",
+      },
+    ],
+    "id": "scn_8007kfrw",
+    "name": "The Patter Tour",
+    "type": "scene",
+  },
+  "schema": "patter/flow@0",
+}

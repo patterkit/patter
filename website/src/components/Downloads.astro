@@ -1,0 +1,71 @@
+---
+// Reads the public, CORS-enabled GitHub Releases API in the BROWSER, so the list stays
+// current without rebuilding the static site. Renders newest-first, with each release's
+// downloadable assets (installers, AppImage, corpus.json, ...).
+const repo = "patterkit/patter";
+---
+
+<div id="pt-downloads" data-repo={repo} class="pt-downloads">
+  <p class="pt-dl-status">Loading the latest releases…</p>
+</div>
+
+<style>
+  .pt-downloads { margin-top: 1.5rem; }
+  .pt-dl-status { color: var(--sl-color-gray-3); }
+  .pt-release { border: 1px solid var(--sl-color-gray-5); border-radius: 0.6rem; padding: 1rem 1.25rem; margin: 0 0 1rem; background: var(--sl-color-bg-nav); }
+  .pt-release h3 { margin: 0 0 0.15rem; }
+  .pt-release .pt-meta { color: var(--sl-color-gray-3); font-size: 0.85rem; margin: 0 0 0.75rem; }
+  .pt-assets { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .pt-assets a { display: inline-block; padding: 0.3rem 0.7rem; border: 1px solid var(--sl-color-accent); border-radius: 0.4rem; color: var(--sl-color-text-accent); text-decoration: none; font-size: 0.9rem; }
+  .pt-assets a:hover { background: var(--sl-color-accent-low); }
+  .pt-empty a { color: var(--sl-color-text-accent); }
+</style>
+
+<script>
+  const root = document.getElementById("pt-downloads");
+  const repo = root?.dataset.repo;
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+
+  async function load() {
+    if (!root || !repo) return;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=30`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const releases = (await res.json()).filter((r: any) => !r.draft);
+      if (!releases.length) return empty();
+
+      root.innerHTML = releases.map((r: any) => {
+        const date = r.published_at ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+        // Order assets so the main app comes first: Patterpad installers, then the CLI binaries,
+        // then the JS drop-in, then everything else (corpus.json, etc.).
+        const rank = (name: string): number => {
+          if (/\.(dmg|exe|appimage|deb)$/i.test(name)) return 0;   // Patterpad installers
+          if (/cli|patter-(macos|win|windows|linux)/i.test(name)) return 1; // CLI executables
+          if (/patterplay.*\.js$|\.min\.js$/i.test(name)) return 2; // JS drop-in
+          return 3;
+        };
+        const assets = (r.assets || [])
+          .filter((a: any) => !/\.(yml|blockmap)$/.test(a.name)) // hide the electron-updater feeds + blockmaps
+          .sort((a: any, b: any) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name))
+          .map((a: any) => `<li><a href="${esc(a.browser_download_url)}">${esc(a.name)}</a></li>`)
+          .join("");
+        return `<div class="pt-release">
+          <h3>${esc(r.name || r.tag_name)}</h3>
+          <p class="pt-meta">${esc(r.tag_name)}${date ? " · " + esc(date) : ""}${r.prerelease ? " · pre-release" : ""}</p>
+          ${assets ? `<ul class="pt-assets">${assets}</ul>` : `<p class="pt-meta">No downloadable assets.</p>`}
+        </div>`;
+      }).join("");
+    } catch {
+      empty();
+    }
+  }
+
+  function empty() {
+    if (!root) return;
+    root.innerHTML = `<p class="pt-empty">No published releases yet: Patterpad installers, the CLI binaries, and the JS drop-in will appear here once the first release ships. In the meantime the runtime and CLI are on npm: <code>npm i @patterkit/runtime</code> · <code>npm i -g @patterkit/cli</code>.</p>`;
+  }
+
+  load();
+</script>

@@ -1,0 +1,9 @@
+{
+  schema: "patter/strings@0",
+  scene: "scn_street",
+  locale: "en",
+  default: true,
+  strings: {
+    T_street: "Cold night air. The tavern door thuds shut behind you.",
+  },
+}

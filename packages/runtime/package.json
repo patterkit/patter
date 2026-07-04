@@ -1,0 +1,36 @@
+{
+  "name": "@patterkit/runtime",
+  "version": "0.1.0",
+  "description": "Patter reference runtime: load a bundle and play dialogue - flows, selectors, choices, jumps, effects, properties. Built on @wildwinter/expr + scoperegistry.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ian Thomas",
+  "homepage": "https://patterkit.dev",
+  "repository": { "type": "git", "url": "git+https://github.com/patterkit/patter.git", "directory": "packages/runtime" },
+  "bugs": "https://github.com/patterkit/patter/issues",
+  "publishConfig": { "access": "public" },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./patterplay.min.js": "./dist/patterplay.min.js"
+  },
+  "unpkg": "./dist/patterplay.min.js",
+  "jsdelivr": "./dist/patterplay.min.js",
+  "files": ["dist", "README.md", "CHANGELOG.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup"
+  },
+  "dependencies": {
+    "@patterkit/model": "^0.1.0",
+    "@patterkit/dialect": "^0.1.0",
+    "@wildwinter/expr": "^0.3.0",
+    "@wildwinter/scoperegistry": "^0.1.0"
+  }
+}

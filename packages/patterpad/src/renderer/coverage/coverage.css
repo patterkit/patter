@@ -1,0 +1,74 @@
+/* The detached coverage results window (#159): an options bar pinned at the top, a scrolling results
+ * area below. Uses the shared app design tokens (theme.css). */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body.coverage-win {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  overflow: hidden;
+}
+
+/* Options bar */
+.cov-bar { flex: 0 0 auto; border-bottom: 1px solid var(--line); background: var(--surface); padding: 0.6rem 0.9rem; }
+.cov-opts { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.7rem; }
+.cov-opt { display: flex; flex-direction: column; gap: 0.2rem; font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-opt input, .cov-opt select { width: 6.5rem; font: 0.8rem var(--font-ui); padding: 0.3rem 0.4rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.cov-bar-spacer { flex: 1 1 auto; }
+.cov-bar .btn { font: 600 0.78rem var(--font-ui); border: 1px solid var(--line); border-radius: 6px; padding: 0.35rem 0.7rem; background: none; color: var(--ink); cursor: pointer; }
+.cov-bar .btn:hover { color: var(--accent); border-color: var(--accent); }
+.cov-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--paper, #fff); }
+.cov-bar .btn.primary:hover { color: var(--paper, #fff); filter: brightness(1.05); }
+.cov-bar .btn:disabled { opacity: 0.5; cursor: default; }
+.cov-pin { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 1.85rem; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); cursor: pointer; padding: 0; }
+.cov-pin:hover { color: var(--ink); border-color: var(--line); }
+.cov-pin svg { display: block; }
+.cov-pin.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
+
+.cov-drivers { flex: 0 0 auto; margin: 0; padding: 0.4rem 0.9rem 0; font: 0.74rem var(--font-ui); color: var(--ink-soft); }
+.cov-status { flex: 0 0 auto; margin: 0; padding: 0.5rem 0.9rem; color: var(--muted); font: 0.82rem var(--font-ui); }
+
+/* Results area (the renderCoverage output) */
+.cov-results { flex: 1 1 auto; overflow: auto; padding: 0.6rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.cov-stats { display: flex; gap: 1.6rem; }
+.cov-stat-big { font: 700 1.6rem var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cov-stat-label { font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-meta { display: flex; flex-direction: column; gap: 0.1rem; font: 0.76rem var(--font-ui); color: var(--ink-soft); }
+.cov-meta-sep { color: var(--muted); }
+.cov-note { margin: 0; font: 0.78rem var(--font-ui); color: var(--ink-soft); }
+.cov-note-input { color: var(--warn, var(--accent)); }
+.cov-note-dry { color: var(--danger); }
+
+/* Dry-choice list: clickable rows that reveal the offending choice in the editor. */
+.cov-dry-list { display: flex; flex-direction: column; gap: 0.15rem; margin: 0.15rem 0 0; }
+.cov-dry-item {
+  display: flex; align-items: baseline; gap: 0.6rem; width: 100%;
+  padding: 0.28rem 0.5rem; border: 0; border-radius: var(--radius-sm, 4px); cursor: pointer;
+  font: 0.8rem var(--font-ui); text-align: left; color: var(--ink);
+  background: color-mix(in oklab, var(--danger) 9%, transparent);
+}
+.cov-dry-item:hover { background: color-mix(in oklab, var(--danger) 15%, transparent); }
+.cov-dry-item:focus-visible { outline: 2px solid var(--danger); outline-offset: -2px; }
+.cov-dry-scene { font-weight: 600; color: var(--danger); }
+.cov-dry-id { color: var(--ink-soft); font-family: var(--font-mono, monospace); }
+.cov-dry-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cov-empty { color: var(--muted); font: 0.85rem var(--font-ui); }
+.cov-scene-cap { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.5rem 0 0; font: 600 0.78rem var(--font-ui); color: var(--accent); }
+.cov-scene-dead { font: 600 0.64rem var(--font-ui); color: var(--danger); text-transform: uppercase; letter-spacing: 0.03em; }
+.cov-table { width: 100%; border-collapse: collapse; font: 0.8rem var(--font-ui); }
+.cov-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); color: var(--ink); vertical-align: baseline; }
+.cov-table tr { cursor: pointer; }
+.cov-table tr:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.cov-table tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cov-row-dead { background: color-mix(in oklab, var(--danger) 9%, transparent); }
+.cov-row-input { background: color-mix(in oklab, var(--warn, var(--accent)) 9%, transparent); }
+.cov-mark { width: 1.2rem; text-align: center; font-weight: 700; color: var(--danger); }
+.cov-row-input .cov-mark { color: var(--warn, var(--accent)); }
+.cov-kind { display: inline-block; min-width: 3.2rem; font: 600 0.58rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-gate { display: block; margin-top: 0.1rem; font: italic 0.72rem var(--font-ui); color: var(--ink-soft); }
+.cov-gate-ref { font: 0.72rem var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.cov-gate-ref:hover { filter: brightness(1.15); }
+.cov-n { text-align: right; font-variant-numeric: tabular-nums; }
+.cov-reach { font-weight: 600; }

@@ -1,0 +1,8 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Patter source files: UTF-8 text, LF endings (spec §10).
+*.patter      text eol=lf
+*.patterloc   text eol=lf
+*.patterx     text eol=lf
+*.patterproj  text eol=lf

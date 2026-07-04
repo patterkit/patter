@@ -1,0 +1,30 @@
+{
+  "name": "patterkit-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "The Patter open core: language, compiler, runtime, and CLI (@patterkit/*).",
+  "license": "MIT",
+  "author": "Ian Thomas",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p examples/player/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:pad": "npm run dev -w @patterkit/patterpad",
+    "build": "npm run build -w @patterkit/model -w @patterkit/core -w @patterkit/dialect -w @patterkit/compiler -w @patterkit/runtime -w @patterkit/ops -w @patterkit/play-helpers -w @patterkit/cli",
+    "bump:play": "node scripts/bump-play-version.mjs",
+    "bump:pad": "node scripts/bump-patterpad-version.mjs",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "npm run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0",
+    "@types/node": "^22.10.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

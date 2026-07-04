@@ -1,0 +1,111 @@
+name: Patterplay JS release
+
+# Tagging `play-js-vX.Y.Z` releases the JS member of the Patterplay runtime set - the same
+# lockstep version as the Unity / Unreal / Godot plugins (bump via `npm run bump:play`).
+# Gated on the full JS test suite (which replays the conformance corpus through this runtime,
+# the cross-engine reference), it attaches to the matching GitHub Release:
+#   - patterplay-js-<ver>.zip    the JS runtime as a plain download, symmetric with the three
+#                                engine-plugin zips: patterplay.min.js + the module builds
+#                                (dist/) + README + CHANGELOG + demos/ (the zero-build drop-in
+#                                page and the interactive tour, audio-less). No npm needed.
+#   - patterplay.min.js          the <script> drop-in, loose, for a one-file grab
+# npm remains a parallel channel: @patterkit/runtime carries the same version (bump:play
+# writes it) and the Changesets release run on main publishes it, since it publishes any
+# public package whose local version is ahead of the registry.
+on:
+  push:
+    tags: ["play-js-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+      - name: Checkout @wildwinter/expr (the runtime bundle inlines its source)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - run: npm ci
+        working-directory: patter
+
+      - name: Check the tag matches the runtime version (bump via `npm run bump:play`)
+        working-directory: patter
+        run: |
+          version="${GITHUB_REF_NAME#play-js-v}"
+          manifest=$(node -p "require('./packages/runtime/package.json').version")
+          [ "$manifest" = "$version" ] || { echo "package.json says $manifest but the tag says $version"; exit 1; }
+          grep -q "^## \[${version}\] - [0-9]" packages/runtime/CHANGELOG.md \
+            || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+
+      - name: Verify parity (full test suite incl. the conformance corpus - gates the release)
+        working-directory: patter
+        run: npm test
+
+      - name: Build the patterplay.min.js drop-in
+        working-directory: patter
+        run: npm run -w @patterkit/runtime build
+
+      - name: Assemble the patterplay-js zip
+        working-directory: patter
+        run: |
+          version="${GITHUB_REF_NAME#play-js-v}"
+          pkg="patterplay-js-${version}"
+          out="/tmp/${pkg}"
+
+          # The runtime: the drop-in at the top, module builds under dist/.
+          mkdir -p "${out}/dist"
+          cp packages/runtime/dist/patterplay.min.js packages/runtime/dist/patterplay.min.js.map "${out}/"
+          cp packages/runtime/dist/index.js packages/runtime/dist/index.js.map \
+             packages/runtime/dist/index.cjs packages/runtime/dist/index.cjs.map \
+             packages/runtime/dist/index.d.ts packages/runtime/dist/index.d.cts "${out}/dist/"
+          cp packages/runtime/README.md packages/runtime/CHANGELOG.md "${out}/"
+
+          # Demo 1: the zero-build drop-in page (own runtime copy so it opens from anywhere).
+          mkdir -p "${out}/demos/drop-in"
+          cp examples/drop-in/index.html examples/drop-in/bundle.js examples/drop-in/README.md \
+             examples/drop-in/patterplay-icon.svg "${out}/demos/drop-in/"
+          cp packages/runtime/dist/patterplay.min.js "${out}/demos/drop-in/"
+          sed -i 's|\.\./\.\./packages/runtime/dist/patterplay.min.js|./patterplay.min.js|' "${out}/demos/drop-in/index.html"
+
+          # Demo 2: the interactive tour (audio-less; node serve.mjs).
+          node examples/tour-web/build.mjs
+          mkdir -p "${out}/demos/tour-web/assets"
+          cp examples/tour-web/index.html examples/tour-web/serve.mjs examples/tour-web/README.md "${out}/demos/tour-web/"
+          cp -R examples/tour-web/dist "${out}/demos/tour-web/dist"
+          cp examples/projects/patter-dist/tour.patterc "${out}/demos/tour-web/assets/tour.patterc"
+
+          ( cd /tmp && zip -r "${pkg}.zip" "${pkg}" )
+          echo "JS_ZIP=/tmp/${pkg}.zip" >> "$GITHUB_ENV"
+
+      - name: Release notes = this version's changelog section
+        id: relnotes
+        run: |
+          version="${GITHUB_REF_NAME#play-js-v}"
+          awk -v ver="$version" 'index($0, "## [" ver "]") == 1 {f=1; next} /^## \[/ {f=0} f' \
+            patter/packages/runtime/CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "no changelog section for ${version}"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Patterplay JS ${{ steps.relnotes.outputs.version }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          files: |
+            ${{ env.JS_ZIP }}
+            patter/packages/runtime/dist/patterplay.min.js
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

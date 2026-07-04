@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" fill="#478cb5"></rect>
+  <g transform="translate(212,212) scale(6)"><path fill="#fbf7f0" fill-rule="evenodd" d="M92 50 C70 64 52 78 36 78 A28 28 0 1 1 36 22 C52 22 70 36 92 50 Z M28 40 L50 50 L28 60 Z"></path></g>
+  <text x="934" y="940" text-anchor="end" font-family="&#39;IBM Plex Mono&#39;,&#39;SFMono-Regular&#39;,monospace" font-size="92" font-weight="500" fill="#dcecf5">G</text>
+</svg>

@@ -1,0 +1,9 @@
+# .NET build output (the TestHost compiles the Runtime/*.cs for corpus verification)
+bin/
+obj/
+
+# Unity-generated (the ports are imported as UPM packages; consumers' projects own these)
+Library/
+Temp/
+Logs/
+[Bb]uild/

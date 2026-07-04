@@ -1,0 +1,9 @@
+{
+  "name": "@patterkit/conformance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Patter conformance suite: a language-agnostic JSON corpus (expression + runtime playthrough cases) that every runtime - the JS reference and each port - must pass. The parity contract (Plan §8).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ian Thomas"
+}

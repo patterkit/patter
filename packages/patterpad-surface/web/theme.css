@@ -1,0 +1,226 @@
+/* ============================================================================
+   Patterpad design tokens - the APP-WIDE layer (design-language §4).
+   This is the single source of truth for palette, character colours, typography,
+   sizing, and motion for the WHOLE Patterpad app - NOT just this script surface.
+   The surface's component styles (styles.css) only ever *consume* these tokens;
+   the app shell (settings, dialogs, navigator, etc.) will consume the same file.
+   (Destined to move into a shared @patterkit/* tokens package when the app shell
+   lands; kept here for now as the surface is the only consumer.)
+
+   Theming axes, all driven from the root element so they apply everywhere:
+     - reading palette: Paper / Mist / Slate / Night / Follow-System  (data-theme; absent = follow OS)
+     - reading size  : Small / Medium / Large         (the base font-size below; future S/M/L UI)
+     - font set      : reading / UI / mono            (the --font-* tokens; the data-font axis below)
+   ============================================================================ */
+
+:root {
+  /* --- reading size (Medium default; a future S/M/L control swaps this one value) --- */
+  font-size: 110%; /* ~17.6px root; reading text + chrome scale together off rem */
+  color-scheme: light dark;
+
+  /* --- surface palette (LIGHT): warm, cosy, booklike - parchment + paper, a chocolate-caramel
+     accent (not a stark red), ink that reads like ink on paper rather than neutral black. --- */
+  --bg: #f1ebe0;       /* parchment */
+  --surface: #fbf7f0;  /* warm paper / vellum (not stark white) */
+  --ink: #312b22;      /* soft chocolate ink (warm near-black) */
+  --muted: #9c9286;    /* warm taupe-grey */
+  --line: #e6dccd;     /* parchment line */
+  --accent: #8a5a34;   /* chocolate / caramel - warm and cosy, not red */
+  /* --- semantic status colours: warm, theme-tuned (NOT stock web red/amber), so error + warning
+     surfaces sit with the parchment palette and track light/dark. Consumed by the validation
+     squiggles, the problem bar, VCS lock/stale badges, and invalid inputs (design-language §4
+     "coherent to the edges"). Two semantics only - "danger" covers error / lock / destructive. --- */
+  --danger: #b23b2f;   /* warm brick red - errors, locks, destructive actions */
+  --warn:   #a9772b;   /* warm amber / ochre - warnings, stale */
+  --ok:     #3f7d49;   /* warm green - success, live / in-sync (matches --char-4) */
+  /* derived reading inks (theme-agnostic: mix the live ink/muted) */
+  --ink-soft: color-mix(in oklab, var(--ink) 70%, var(--muted)); /* narration / authorial voice */
+  --ink-read: color-mix(in oklab, var(--ink) 82%, var(--muted)); /* dialogue body, eased off stark */
+
+  /* scrollbars (theme-agnostic: a translucent ink, so it adapts light/dark) - consumed by the global
+     ::-webkit-scrollbar rule below, applied to every window so the chrome reads as one piece, not OS default. */
+  --scroll-thumb: color-mix(in oklab, var(--ink) 20%, transparent);
+  --scroll-thumb-hover: color-mix(in oklab, var(--ink) 40%, transparent);
+
+  /* --- character palette (LIGHT): a curated, theme-fitted set; a name's slot is a hash INDEX into
+     these (colour.ts), so it's stable + storage-free. Hand-tuned to sit together and read on cream,
+     never raw primaries. Theme-aware: the dark block below redefines the same slots, lighter. --- */
+  --char-0:  #b23b3b;  /* red    */
+  --char-1:  #b5642b;  /* rust   */
+  --char-2:  #927524;  /* ochre  */
+  --char-3:  #6b7a31;  /* olive  */
+  --char-4:  #3f7d49;  /* green  */
+  --char-5:  #2c7d6e;  /* teal   */
+  --char-6:  #2d7791;  /* cyan   */
+  --char-7:  #3a6aa8;  /* blue   */
+  --char-8:  #5a5ba6;  /* indigo */
+  --char-9:  #7e4e9c;  /* violet */
+  --char-10: #9c4486;  /* plum   */
+  --char-11: #a83e5c;  /* berry  */
+
+  /* --- typography (the chosen font set; self-hosted via @fontsource in main.ts) --- */
+  --font-read: "Newsreader", Georgia, "Iowan Old Style", serif;
+  --font-ui: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- elevation (one shadow scale; design-language §4 "coherent to the edges"). Three tiers by how
+     far a surface floats: resting cards, floating menus/popovers, full overlays. Theme-agnostic black
+     so it deepens naturally on the dark palettes. Consumers say `box-shadow: var(--shadow-2)`. --- */
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.05);    /* resting: dialogue bubbles, cards */
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.14);   /* floating: menus, pickers, popovers, the toast */
+  --shadow-3: 0 16px 48px rgba(0, 0, 0, 0.28);  /* overlay: modal dialogs, the command palette, anchored editors */
+
+  /* --- motion (one easing curve + a small duration scale; design-language §4) --- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --dur-quick: 120ms;
+  --dur-base: 150ms;
+  --dur-settle: 200ms;
+  --dur-slow: 1s;       /* a slow, ambient beat: the scratch-recording pulse (design-language §4) */
+
+  /* The shared "panel enter" - every transient surface (anchored editors, menus, popups,
+     the command palette, modal dialogs) eases in with the SAME quick fade + small settle, so
+     nothing pops (design-language §4). Consumers just say `animation: var(--anim-panel-in)`;
+     prefers-reduced-motion neutralises it in one place (below). Enter-only: exits stay
+     immediate (teardown removes the node). */
+  --dur-panel: 260ms;   /* the panel-enter beat - long enough to read as motion, not a pop */
+  --dur-exit: 170ms;    /* exits are a touch quicker than enters - dismiss should feel responsive */
+  --anim-panel-in: panel-in var(--dur-panel) var(--ease-standard);
+  --anim-backdrop-in: backdrop-in var(--dur-settle) var(--ease-standard);
+  /* Top-level SCREEN swaps (welcome / project overview / workspace) cross-fade with a soft rise, so the
+     shell never hard-cuts between them - the same vocabulary the panels use, just gentler + longer. */
+  --anim-screen-in: screen-in var(--dur-panel) var(--ease-standard);
+  /* Exits mirror the enters in reverse. `forwards` holds the end (opacity 0) so there is no flash back
+     to full before the node is torn down. Applied via a `.closing` class the JS adds just before
+     teardown (see web/exit.ts) - the node must outlive the close, so this half can't be pure CSS. */
+  --anim-panel-out: panel-out var(--dur-exit) var(--ease-standard) forwards;
+  --anim-backdrop-out: backdrop-out var(--dur-exit) var(--ease-standard) forwards;
+
+  /* --- corner radius scale (design-language §4 "coherent to the edges"). Four steps cover every
+     surface: controls/chips, cards/menus/popovers, dialogs/bubbles, and the pill. --- */
+  --radius-sm: 6px;     /* buttons, inputs, chips, small controls */
+  --radius-md: 10px;    /* cards, menus, popovers, panels */
+  --radius-lg: 14px;    /* dialogs, snippet bubbles */
+  --radius-pill: 999px; /* fully rounded */
+}
+
+/* Themed scrollbars (design-language "coherent to the edges"): a slim translucent-ink thumb on a
+   transparent track, replacing the OS-default bar on EVERY window that imports this file - the editor,
+   the play window, and the search window - so the chrome reads as one piece. Chromium (Electron) uses
+   the ::-webkit-* pseudo-elements; `scrollbar-*` is the standards / Firefox fallback. The thumb colour
+   derives from --ink, so it adapts per palette. */
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 8px;
+  border: 3px solid transparent;       /* inset the thumb with a transparent ring so it reads slimmer */
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; }
+
+/* The two halves of the panel-enter vocabulary. Surfaces use left/top for placement (never a
+   resting transform), so animating transform here is safe - it lands at `none`. */
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(-9px) scale(0.965); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes panel-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-6px) scale(0.97); }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Respect the OS "reduce motion" setting: neutralise the shared enters + exits in one spot. With the
+   exit animation gone, closeWithExit() sees a 0s duration and tears down immediately - no lag. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --anim-panel-in: none; --anim-backdrop-in: none; --anim-screen-in: none;
+    --anim-panel-out: none; --anim-backdrop-out: none;
+  }
+}
+
+/* ============================================================================
+   CURATED READING PALETTES (the `data-theme` axis). A small, designed set rather than a raw
+   light/dark switch (design-language §4): two LIGHT (Paper, Mist) + two DARK (Slate, Night), plus
+   "Follow System" (no attr) which tracks the OS - light = Paper, dark = Night. The set spans a warm/cool
+   x light/dark matrix: Paper (warm light), Mist (cool light), Slate (cool dark), Night (warm dark).
+
+     Paper   - the warm vellum default (= the :root tokens above; no override block needed).
+     Mist    - a cool light blue-grey; the cool counterpart to Paper.
+     Slate   - a cool neutral dark (the high-contrast dark).
+     Night   - a warm brown-grey dark, dimmer and softer (also the follow-system dark).
+
+   Each block overrides only the surface palette + status colours; the character slots are shared by
+   tone (the LIGHT set above serves Paper + Mist; the lifted DARK set is defined once below for Slate
+   + Night + follow-system-dark). Keep the follow-system-dark block in sync with Night. --- */
+
+/* The lifted DARK character set + status colours + accent, shared by every dark palette. */
+:root[data-theme="slate"],
+:root[data-theme="night"] {
+  --accent: #cf9b6a;   /* warm caramel / tan */
+  --danger: #e6938a;   /* warm coral red, lifted for the dark surface */
+  --warn:   #d8aa63;   /* warm amber, lifted for the dark surface */
+  --ok:     #79bd80;   /* warm green, lifted for the dark surface (matches --char-4 dark) */
+  --char-0:  #e08282; --char-1:  #e0a064; --char-2:  #cdb061; --char-3:  #abb56b;
+  --char-4:  #79bd80; --char-5:  #5cb6a3; --char-6:  #61b1c9; --char-7:  #7ba6d9;
+  --char-8:  #9c9dd6; --char-9:  #b794d2; --char-10: #d389c2; --char-11: #de8298;
+}
+
+/* Night (warm dark) - the explicit pick AND the follow-system dark; the two MIRROR each other. */
+:root[data-theme="night"],
+:root[data-theme="slate"] { /* shared dark surface base; Slate re-cools its tones just below */
+  --bg: #1b1916;       /* warm near-black */
+  --surface: #272320;  /* warm dark brown-grey */
+  --ink: #e9e4da;      /* warm off-white */
+  --muted: #877f73;    /* warm grey */
+  --line: #38332c;     /* warm line */
+}
+:root[data-theme="slate"] {
+  --bg: #16181c;       /* cool near-black */
+  --surface: #202329;  /* cool neutral slate */
+  --ink: #e1e4e9;      /* cool off-white */
+  --muted: #828a95;    /* cool grey */
+  --line: #2d323a;     /* cool line */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #1b1916; --surface: #272320; --ink: #e9e4da; --muted: #877f73; --line: #38332c;
+    --accent: #cf9b6a; --danger: #e6938a; --warn: #d8aa63; --ok: #79bd80;
+    --char-0:  #e08282; --char-1:  #e0a064; --char-2:  #cdb061; --char-3:  #abb56b;
+    --char-4:  #79bd80; --char-5:  #5cb6a3; --char-6:  #61b1c9; --char-7:  #7ba6d9;
+    --char-8:  #9c9dd6; --char-9:  #b794d2; --char-10: #d389c2; --char-11: #de8298;
+  }
+}
+
+/* Mist (cool light blue-grey) - the COOL light counterpart to the warm Paper (we already have a warm
+   light theme, so the second light palette leans cool). Overrides only the surface tones; it inherits
+   the LIGHT character set + the warm caramel accent (a warm focal point reads well on a cool ground). */
+:root[data-theme="mist"] {
+  --bg: #e6ecf3;       /* cool light blue-grey */
+  --surface: #f6f9fc;  /* cool near-white */
+  --ink: #25303b;      /* cool slate-blue ink (not warm) */
+  --muted: #84919e;    /* cool blue-grey */
+  --line: #d9e1ea;     /* cool line */
+}
+
+/* --- FONT THEMES (data-font axis). Each is a cohesive reading / UI / mono set plus a per-face
+   base-size tweak (faces differ in x-height). Newsreader is the default (= the :root tokens). The
+   header "font:" toggle cycles these for testing; the real picker is future Patterpad (§7). All
+   faces are self-hosted via @fontsource (main.ts). --- */
+:root[data-font="newsreader"] { font-size: 110%; --font-read: "Newsreader", Georgia, serif;             --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+:root[data-font="literata"]   { font-size: 105%; --font-read: "Literata", Georgia, serif;               --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+:root[data-font="source"]     { font-size: 107%; --font-read: "Source Serif 4", Georgia, serif;         --font-ui: "IBM Plex Sans", system-ui, sans-serif; --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
+:root[data-font="script"]     { font-size: 100%; --font-read: "Courier Prime", ui-monospace, monospace; --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "Courier Prime", ui-monospace, monospace; }
