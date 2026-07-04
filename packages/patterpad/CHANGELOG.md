@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [34bdd67]
+  - @patterkit/ops@0.1.1
+
 All notable changes to **Patterpad**, the Patter desktop editor, are documented here.
 Patterpad is versioned by `npm run bump:pad` and released by tagging `patterpad-vX.Y.Z`
 (its own pipeline, separate from the Patterplay runtimes' lockstep version).
@@ -9,11 +16,13 @@ Patterpad is versioned by `npm run bump:pad` and released by tagging `patterpad-
 ## [0.1.1] - 2026-07-04
 
 ### Changed
+
 - Minor tweaks to terminology to get rid of references to bubbles instead of snippets.
 
 ## [0.1.0] - 2026-07-04
 
 ### Added
+
 - The Patterpad editor: a writer-first, screenplay-style surface for Patter projects -
   character cues, lines, directions, narration, and game events, edited directly on the
   source files on disk (id-stable, lossless round-trip).

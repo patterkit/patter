@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/ops",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The shared operations layer: every project operation (load, validate, export, format, play, ...) as a pure function, consumed by the patter CLI and Patterpad alike.",
   "type": "module",
   "license": "MIT",
