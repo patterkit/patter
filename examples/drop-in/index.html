@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Patterplay drop-in player</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 16px/1.6 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.2rem; }
+    .sub { color: #888; margin-top: -0.5rem; }
+    #stage > div { margin: 0.5rem 0; }
+    .line .who { font-weight: 600; }
+    .text { opacity: 0.9; }
+    .gameEvent { font-family: ui-monospace, monospace; font-size: 0.85rem; color: #888; }
+    .end { color: #888; font-style: italic; }
+    button { font: inherit; margin: 0.25rem 0.25rem 0.25rem 0; padding: 0.35rem 0.7rem; cursor: pointer; }
+    .bar { margin: 1rem 0; border-top: 1px solid #8884; padding-top: 0.75rem; }
+  </style>
+</head>
+<body>
+  <h1>Patterplay drop-in player</h1>
+  <p class="sub">A compiled Patter bundle, played by <code>patterplay.min.js</code> - no build step, no module loader.</p>
+
+  <div id="stage"></div>
+  <div id="controls"></div>
+
+  <div class="bar">
+    <button id="restart">Restart</button>
+    <button id="save">Save</button>
+    <button id="load">Load</button>
+  </div>
+
+  <!-- The self-contained Patterplay runtime (build it first: npm run build -w @patterkit/runtime). -->
+  <script src="../../packages/runtime/dist/patterplay.min.js"></script>
+  <!-- The pre-compiled demo bundle: window.PATTER_BUNDLE (regenerate with: node gen.mjs). -->
+  <script src="./bundle.js"></script>
+  <script>
+    const { Engine } = window.Patterplay;
+    const BUNDLE = window.PATTER_BUNDLE;
+    const SAVE_KEY = "patterplay.dropin.save";
+    const startScene = Object.keys(BUNDLE.scenes)[0];
+
+    const stage = document.getElementById("stage");
+    const controls = document.getElementById("controls");
+    const add = (cls, html) => { const d = document.createElement("div"); d.className = cls; d.innerHTML = html; stage.appendChild(d); };
+    const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+    let engine, flow;
+
+    function newGame() {
+      engine = new Engine(BUNDLE);
+      flow = engine.openFlow("main", { scene: startScene });
+      stage.innerHTML = ""; controls.innerHTML = "";
+      run();
+    }
+
+    // Advance until a choice or the end, rendering each beat.
+    function run() {
+      controls.innerHTML = "";
+      for (;;) {
+        const r = flow.advance();
+        if (r.type === "line") add("line", `<span class="who">${esc(r.characterName ?? r.character ?? "")}</span> ${esc(r.text)}`);
+        else if (r.type === "text") add("text", esc(r.text));
+        else if (r.type === "gameEvent") add("gameEvent", `[game event ${esc(r.id)}]`);
+        else if (r.type === "choice") { renderChoice(r); return; }
+        else if (r.type === "end") { add("end", "- The End -"); return; }
+      }
+    }
+
+    function renderChoice(r) {
+      for (const opt of r.options) {
+        const b = document.createElement("button");
+        b.textContent = opt.prompt?.text ?? "(continue)";
+        b.disabled = !opt.eligible;
+        b.onclick = () => { flow.choose(opt.id); run(); };
+        controls.appendChild(b);
+      }
+    }
+
+    document.getElementById("restart").onclick = newGame;
+    document.getElementById("save").onclick = () => {
+      // The whole game in one blob - this is exactly what @patterkit/play-helpers
+      // wraps as serializeState(engine).
+      localStorage.setItem(SAVE_KEY, JSON.stringify(engine.saveGame()));
+    };
+    document.getElementById("load").onclick = () => {
+      const blob = localStorage.getItem(SAVE_KEY);
+      if (!blob) return alert("No save yet.");
+      engine = new Engine(BUNDLE);
+      engine.loadGame(JSON.parse(blob));
+      flow = engine.getFlow("main");
+      stage.innerHTML = ""; add("text", "(resumed from save)");
+      run();
+    };
+
+    newGame();
+  </script>
+</body>
+</html>

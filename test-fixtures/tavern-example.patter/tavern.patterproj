@@ -1,0 +1,14 @@
+{
+  schema: "patter/project@0",
+  project: { id: "proj_tavern", name: "The Tavern" },
+  locales: { default: "en", all: ["en"] },
+  // Non-voiced: line text may interpolate, and this sample mixes spoken lines
+  // with prose narration and engine-instruction action beats in one scene.
+  voiced: false,
+  properties: [
+    { name: "gold", type: "number", shared: true, default: 5 },
+    { name: "strength", type: "number", shared: true, default: 2 },
+    { name: "knows_secret", type: "bool", shared: true, default: false },
+  ],
+  cast: [{ name: "BARKEEP" }, { name: "PLAYER" }],
+}

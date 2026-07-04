@@ -1,0 +1,177 @@
+{
+  "schema": "patter/bundle@0",
+  "content": {
+    "project": "demo",
+    "hash": "00p7ewq"
+  },
+  "voiced": false,
+  "locales": {
+    "default": "en",
+    "included": [
+      "en"
+    ]
+  },
+  "cast": [
+    {
+      "name": "GUIDE",
+      "displayName": "Guide"
+    }
+  ],
+  "properties": [
+    {
+      "name": "gold",
+      "type": "number",
+      "shared": true,
+      "default": 0
+    }
+  ],
+  "scenes": {
+    "demo": {
+      "id": "demo",
+      "type": "scene",
+      "name": "Demo",
+      "blocks": [
+        {
+          "id": "start",
+          "type": "block",
+          "name": "Start",
+          "children": [
+            {
+              "id": "s_intro",
+              "type": "snippet",
+              "beats": [
+                {
+                  "id": "L_welcome",
+                  "kind": "line",
+                  "character": "GUIDE"
+                },
+                {
+                  "id": "T_fork",
+                  "kind": "text"
+                }
+              ],
+              "jump": {
+                "to": "fork"
+              }
+            }
+          ]
+        },
+        {
+          "id": "fork",
+          "type": "block",
+          "name": "Fork",
+          "children": [
+            {
+              "id": "g_fork",
+              "type": "group",
+              "selector": "choice",
+              "children": [
+                {
+                  "id": "opt_left",
+                  "type": "group",
+                  "children": [
+                    {
+                      "id": "left_c",
+                      "type": "snippet",
+                      "beats": [
+                        {
+                          "id": "L_found",
+                          "kind": "line",
+                          "character": "GUIDE"
+                        }
+                      ],
+                      "onEnter": [
+                        {
+                          "kind": "set",
+                          "target": "@gold",
+                          "value": {
+                            "src": "@gold + 5",
+                            "ast": [
+                              "bin",
+                              "+",
+                              [
+                                "sv",
+                                "patter",
+                                "gold"
+                              ],
+                              [
+                                "n",
+                                5
+                              ]
+                            ]
+                          }
+                        }
+                      ],
+                      "jump": {
+                        "to": "outro"
+                      }
+                    }
+                  ],
+                  "prompt": {
+                    "id": "C_left",
+                    "kind": "text"
+                  }
+                },
+                {
+                  "id": "opt_right",
+                  "type": "group",
+                  "children": [
+                    {
+                      "id": "right_c",
+                      "type": "snippet",
+                      "beats": [
+                        {
+                          "id": "L_empty",
+                          "kind": "line",
+                          "character": "GUIDE"
+                        }
+                      ],
+                      "jump": {
+                        "to": "outro"
+                      }
+                    }
+                  ],
+                  "prompt": {
+                    "id": "C_right",
+                    "kind": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "outro",
+          "type": "block",
+          "name": "Outro",
+          "children": [
+            {
+              "id": "s_outro",
+              "type": "snippet",
+              "beats": [
+                {
+                  "id": "T_leave",
+                  "kind": "text"
+                }
+              ],
+              "jump": {
+                "to": "END"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "strings": {
+    "en": {
+      "L_welcome": "Welcome, traveller.",
+      "T_fork": "The road forks ahead.",
+      "C_left": "Take the left path",
+      "C_right": "Take the right path",
+      "L_found": "You find a pouch of 5 gold!",
+      "L_empty": "The path is quiet and empty.",
+      "T_leave": "You walk on, {@gold} gold the richer."
+    }
+  }
+}

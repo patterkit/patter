@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patterpad surface (S0)</title>
+    <link rel="stylesheet" href="./theme.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <strong>Patterpad surface</strong>
+      <div class="hdr-tools">
+        <button id="format-toggle" class="hdr-toggle" type="button" title="Inline formatting (project setting in the real app). Cmd-B / Cmd-I to bold / italic">format: on</button>
+        <button id="font-toggle" class="hdr-toggle" type="button" title="Font theme (test the sets; real picker is future Patterpad)">font: newsreader</button>
+        <button id="theme-toggle" class="hdr-toggle" type="button" title="Preview theme (temporary, this session only)">theme: system</button>
+      </div>
+    </header>
+    <main>
+      <section id="editor" aria-label="script"></section>
+      <aside>
+        <div class="aside-label">Patter source (live round-trip)</div>
+        <pre id="source"></pre>
+      </aside>
+    </main>
+    <footer id="hintbar" aria-label="keystroke hints"></footer>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

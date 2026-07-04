@@ -1,0 +1,58 @@
+name: Patterplay Unity release
+
+# Tagging `play-unity-vX.Y.Z` gates the C# port on the conformance corpus (the dotnet
+# TestHost replays corpus.json through the same Runtime/*.cs the UPM package ships), then
+# zips the package and attaches it to the matching GitHub Release. Users install it by
+# git-URL or by dropping the zip's Patterplay/ folder into their project's Packages/.
+on:
+  push:
+    tags: ["play-unity-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the plugin version (bump via `npm run bump:play`)
+        run: |
+          version="${GITHUB_REF_NAME#play-unity-v}"
+          manifest=$(node -p "require('./ports/unity/Patterplay/package.json').version")
+          [ "$manifest" = "$version" ] || { echo "package.json says $manifest but the tag says $version"; exit 1; }
+          grep -q "^## \[${version}\] - [0-9]" ports/unity/Patterplay/CHANGELOG.md \
+            || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Verify parity (corpus TestHost - gates the release)
+        run: dotnet run --project ports/unity/TestHost -- packages/conformance/corpus.json
+
+      - name: Package the UPM package
+        run: |
+          version="${GITHUB_REF_NAME#play-unity-v}"
+          echo "ASSET=patterplay-unity-${version}.zip" >> "$GITHUB_ENV"
+          ( cd ports/unity && zip -r "../../patterplay-unity-${version}.zip" Patterplay )
+
+      - name: Release notes = this version's changelog section
+        id: relnotes
+        run: |
+          version="${GITHUB_REF_NAME#play-unity-v}"
+          awk -v ver="$version" 'index($0, "## [" ver "]") == 1 {f=1; next} /^## \[/ {f=0} f' \
+            ports/unity/Patterplay/CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "no changelog section for ${version}"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Patterplay Unity ${{ steps.relnotes.outputs.version }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

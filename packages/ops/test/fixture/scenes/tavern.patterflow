@@ -1,0 +1,23 @@
+{
+  schema: "patter/flow@0",
+  scene: {
+    id: "scn_tavern",
+    type: "scene",
+    name: "Tavern",
+    blocks: [
+      {
+        id: "blk_intro",
+        type: "block",
+        name: "Intro",
+        children: [
+          {
+            id: "sn_hello",
+            type: "snippet",
+            condition: "@hp > 0",
+            beats: [{ id: "L_1", kind: "line", character: "BARKEEP" }],
+          },
+        ],
+      },
+    ],
+  },
+}

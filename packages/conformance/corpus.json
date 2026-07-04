@@ -1,0 +1,6326 @@
+{
+  "version": 2,
+  "expressions": [
+    {
+      "name": "number comparison",
+      "src": "@hp > 5",
+      "ast": [
+        "bin",
+        ">",
+        [
+          "sv",
+          "patter",
+          "hp"
+        ],
+        [
+          "n",
+          5
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "hp": 10
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "boolean and across scopes",
+      "src": "@hp >= 10 and @scene.locked == false",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "bin",
+          ">=",
+          [
+            "sv",
+            "patter",
+            "hp"
+          ],
+          [
+            "n",
+            10
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "scene",
+            "locked"
+          ],
+          [
+            "b",
+            false
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "hp": 10
+        },
+        "scene": {
+          "locked": false
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "string equality",
+      "src": "@mood == \"calm\"",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "patter",
+          "mood"
+        ],
+        [
+          "s",
+          "calm"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "mood": "calm"
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "arithmetic",
+      "src": "@gold + 5",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "patter",
+          "gold"
+        ],
+        [
+          "n",
+          5
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "gold": 3
+        }
+      },
+      "expected": 8
+    },
+    {
+      "name": "check_flags membership",
+      "src": "check_flags(@quests, +met, -done)",
+      "ast": [
+        "call",
+        "check_flags",
+        [
+          "sv",
+          "patter",
+          "quests"
+        ],
+        [
+          "fd",
+          "+",
+          "met"
+        ],
+        [
+          "fd",
+          "-",
+          "done"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "quests": [
+            "met"
+          ]
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "set_flags returns a new array",
+      "src": "set_flags(@quests, +done)",
+      "ast": [
+        "call",
+        "set_flags",
+        [
+          "sv",
+          "patter",
+          "quests"
+        ],
+        [
+          "fd",
+          "+",
+          "done"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "quests": [
+            "met"
+          ]
+        }
+      },
+      "expected": [
+        "met",
+        "done"
+      ]
+    },
+    {
+      "name": "not + or precedence",
+      "src": "not (@hp > 100 or @scene.locked)",
+      "ast": [
+        "u",
+        "not",
+        [
+          "bin",
+          "or",
+          [
+            "bin",
+            ">",
+            [
+              "sv",
+              "patter",
+              "hp"
+            ],
+            [
+              "n",
+              100
+            ]
+          ],
+          [
+            "sv",
+            "scene",
+            "locked"
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "hp": 10
+        },
+        "scene": {
+          "locked": false
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "arithmetic precedence",
+      "src": "2 + 3 * 4",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "n",
+          2
+        ],
+        [
+          "bin",
+          "*",
+          [
+            "n",
+            3
+          ],
+          [
+            "n",
+            4
+          ]
+        ]
+      ],
+      "scopes": {},
+      "expected": 14
+    },
+    {
+      "name": "division yields a float",
+      "src": "@a / @b",
+      "ast": [
+        "bin",
+        "/",
+        [
+          "sv",
+          "patter",
+          "a"
+        ],
+        [
+          "sv",
+          "patter",
+          "b"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 10,
+          "b": 4
+        }
+      },
+      "expected": 2.5
+    },
+    {
+      "name": "string concatenation",
+      "src": "@greet + \"!\"",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "patter",
+          "greet"
+        ],
+        [
+          "s",
+          "!"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "greet": "hi"
+        }
+      },
+      "expected": "hi!"
+    },
+    {
+      "name": "seeded random is deterministic",
+      "src": "random(1, 6)",
+      "ast": [
+        "call",
+        "random",
+        [
+          "n",
+          1
+        ],
+        [
+          "n",
+          6
+        ]
+      ],
+      "scopes": {},
+      "seed": 42,
+      "expected": 4
+    }
+  ],
+  "runtime": [
+    {
+      "name": "line then end",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "12hgllq",
+          "structureHash": "19rtpv7"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Welcome."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L",
+          "text": "Welcome.",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "choice with greyed option, pick the eligible",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0c18bj5",
+          "structureHash": "0tw80ur"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "hp",
+            "type": "number",
+            "shared": true,
+            "default": 10
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "yes",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "yes_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "after"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_yes",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "locked",
+                        "type": "group",
+                        "condition": {
+                          "src": "@hp > 100",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "sv",
+                              "patter",
+                              "hp"
+                            ],
+                            [
+                              "n",
+                              100
+                            ]
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "locked_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_locked",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "after",
+                "type": "block",
+                "name": "After",
+                "children": [
+                  {
+                    "id": "done",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_done",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_yes": "Continue",
+            "C_locked": "[locked]",
+            "L_done": "Done."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "yes"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "options": [
+            {
+              "id": "yes",
+              "text": "Continue",
+              "eligible": true
+            },
+            {
+              "id": "locked",
+              "text": "[locked]",
+              "eligible": false
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "L_done",
+          "text": "Done.",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "interpolation: line + text beats expand {@ref}",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0w095jy",
+          "structureHash": "0bhy1hz"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "shared": true,
+            "default": "Ada"
+          },
+          {
+            "name": "gold",
+            "type": "number",
+            "shared": true,
+            "default": 5
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L",
+                        "kind": "line",
+                        "character": "NPC"
+                      },
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Hello {@name}, you have {@gold} gold.",
+            "T": "{@name}'s ledger."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L",
+          "text": "Hello Ada, you have 5 gold.",
+          "character": "NPC"
+        },
+        {
+          "type": "text",
+          "id": "T",
+          "text": "Ada's ledger."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "set effects fire at snippet seams",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "078eh7z",
+          "structureHash": "0h87g4l"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "shared": true,
+            "default": 5
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b1",
+                "type": "block",
+                "name": "B1",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L1",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@gold",
+                        "value": {
+                          "src": "@gold + 10",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "gold"
+                            ],
+                            [
+                              "n",
+                              10
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "b2"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L2",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "gold is {@gold}",
+            "L2": "now {@gold}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L1",
+          "text": "gold is 5",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "L2",
+          "text": "now 15",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "game-event beat delivers its gameData",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1cenlbe",
+          "structureHash": "0s7rhoi"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": []
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "A",
+                        "kind": "gameEvent",
+                        "gameData": {
+                          "cmd": "shake",
+                          "intensity": 3
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {}
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "gameEvent",
+          "id": "A",
+          "gameData": {
+            "cmd": "shake",
+            "intensity": 3
+          }
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "cross-scene jump resets scene-local props",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "07yolpi",
+          "structureHash": "0xcc2qg"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s1": {
+            "id": "s1",
+            "type": "scene",
+            "name": "S1",
+            "sceneProps": [
+              {
+                "name": "mood",
+                "type": "string",
+                "default": "calm",
+                "shared": false
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b1",
+                "type": "block",
+                "name": "B1",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "s2"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "s2": {
+            "id": "s2",
+            "type": "scene",
+            "name": "S2",
+            "sceneProps": [
+              {
+                "name": "mood",
+                "type": "string",
+                "default": "tense",
+                "shared": false
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "a {@scene.mood} room",
+            "T2": "a {@scene.mood} room"
+          }
+        }
+      },
+      "start": {
+        "scene": "s1"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T1",
+          "text": "a calm room"
+        },
+        {
+          "type": "text",
+          "id": "T2",
+          "text": "a tense room"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "sequence (repeat) wraps (a, b, a)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1sscum2",
+          "structureHash": "1z02ynl"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "count",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "cyc",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "ca",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "La",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      },
+                      {
+                        "id": "cb",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "Lb",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "tick",
+                "type": "block",
+                "name": "Tick",
+                "children": [
+                  {
+                    "id": "stop",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@count >= 2",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "count"
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "go",
+                    "type": "snippet",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@count",
+                        "value": {
+                          "src": "@count + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "count"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "loop"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "La": "a",
+            "Lb": "b"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "La",
+          "text": "a"
+        },
+        {
+          "type": "line",
+          "id": "Lb",
+          "text": "b"
+        },
+        {
+          "type": "line",
+          "id": "La",
+          "text": "a"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "sequence (once) takes each child once then ends",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "15ir539",
+          "structureHash": "03dqssx"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "onc",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "oa",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "Oa",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "loop"
+                        }
+                      },
+                      {
+                        "id": "ob",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "Ob",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "loop"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "Oa": "first",
+            "Ob": "second"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "Oa",
+          "text": "first"
+        },
+        {
+          "type": "line",
+          "id": "Ob",
+          "text": "second"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "voiced project: line stays static, text still interpolates",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1km5wku",
+          "structureHash": "19dfh6k"
+        },
+        "voiced": true,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "shared": true,
+            "default": "Ada"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L",
+                        "kind": "line",
+                        "character": "NPC"
+                      },
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Hi {@name}",
+            "T": "{@name} writes"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L",
+          "text": "Hi {@name}",
+          "character": "NPC"
+        },
+        {
+          "type": "text",
+          "id": "T",
+          "text": "Ada writes"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "escaped braces unescape; {{@x}} stays literal",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0e2mvwj",
+          "structureHash": "1eytgbf"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "name",
+            "type": "string",
+            "shared": true,
+            "default": "Ada"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "use {{braces}} and {{@name}} but {@name}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T",
+          "text": "use {braces} and {@name} but Ada"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "seeded shuffle selects a deterministic child",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "015ujve",
+          "structureHash": "1wpdupu"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "shuffle",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "opt0",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O0",
+                            "kind": "line",
+                            "character": "NPC"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "opt1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O1",
+                            "kind": "line",
+                            "character": "NPC"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "opt2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O2",
+                            "kind": "line",
+                            "character": "NPC"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "O0": "alpha",
+            "O1": "beta",
+            "O2": "gamma"
+          }
+        }
+      },
+      "seed": 7,
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "O0",
+          "text": "alpha",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "sequence (stick) holds the last child after the pass",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "00ebqea",
+          "structureHash": "0ttg0g2"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "count",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "seq",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "stick"
+                    },
+                    "children": [
+                      {
+                        "id": "sa",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "L1",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      },
+                      {
+                        "id": "sb",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "L2",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "tick",
+                "type": "block",
+                "name": "Tick",
+                "children": [
+                  {
+                    "id": "stop",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@count >= 2",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "count"
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "go",
+                    "type": "snippet",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@count",
+                        "value": {
+                          "src": "@count + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "count"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "loop"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "one",
+            "L2": "two"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L1",
+          "text": "one"
+        },
+        {
+          "type": "line",
+          "id": "L2",
+          "text": "two"
+        },
+        {
+          "type": "line",
+          "id": "L2",
+          "text": "two"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "sequential block plays its children in order",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0t8arvz",
+          "structureHash": "0u6264q"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "a",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "A",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "b2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "B2",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "c",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "C",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "A": "one",
+            "B2": "two",
+            "C": "three"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "A",
+          "text": "one",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "B2",
+          "text": "two",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "C",
+          "text": "three",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "call jump tunnels out and returns to the next child",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1jdevrt",
+          "structureHash": "1q41vns"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "m1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "M1",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "sub",
+                      "mode": "call"
+                    }
+                  },
+                  {
+                    "id": "m2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "M2",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "sub",
+                "type": "block",
+                "name": "Sub",
+                "children": [
+                  {
+                    "id": "x",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "X",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "M1": "before",
+            "X": "tunnel",
+            "M2": "after"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "M1",
+          "text": "before",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "X",
+          "text": "tunnel",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "M2",
+          "text": "after",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "default run-group plays children in order, then gathers",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1lwbr72",
+          "structureHash": "1crodld"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "children": [
+                      {
+                        "id": "g1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "G1",
+                            "kind": "line",
+                            "character": "NPC"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "g2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "G2",
+                            "kind": "line",
+                            "character": "NPC"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "after",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "AF",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "G1": "one",
+            "G2": "two",
+            "AF": "three"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "G1",
+          "text": "one",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "G2",
+          "text": "two",
+          "character": "NPC"
+        },
+        {
+          "type": "line",
+          "id": "AF",
+          "text": "three",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "visits() gates first-vs-return content across a loop",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0li8xe5",
+          "structureHash": "1lxhe9r"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "room",
+                "type": "block",
+                "name": "Room",
+                "children": [
+                  {
+                    "id": "first",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('room') == 1",
+                      "ast": [
+                        "bin",
+                        "==",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "room"
+                          ]
+                        ],
+                        [
+                          "n",
+                          1
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "F",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "gate"
+                    }
+                  },
+                  {
+                    "id": "again",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('room') > 1",
+                      "ast": [
+                        "bin",
+                        ">",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "room"
+                          ]
+                        ],
+                        [
+                          "n",
+                          1
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "A",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "gate"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "gate",
+                "type": "block",
+                "name": "Gate",
+                "children": [
+                  {
+                    "id": "stop",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('room') >= 3",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "room"
+                          ]
+                        ],
+                        [
+                          "n",
+                          3
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "go",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "room"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "F": "first time here",
+            "A": "back again"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "F",
+          "text": "first time here"
+        },
+        {
+          "type": "text",
+          "id": "A",
+          "text": "back again"
+        },
+        {
+          "type": "text",
+          "id": "A",
+          "text": "back again"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "shared @scene prop: write, interpolate, persist across re-entry",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "055x7ph",
+          "structureHash": "0f346yv"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "room",
+                "type": "block",
+                "name": "Room",
+                "children": [
+                  {
+                    "id": "bump",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@scene.tally",
+                        "value": {
+                          "src": "@scene.tally + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "tally"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "gate"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "gate",
+                "type": "block",
+                "name": "Gate",
+                "children": [
+                  {
+                    "id": "stop",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@scene.tally >= 2",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "scene",
+                          "tally"
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "go",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "room"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "tally={@scene.tally}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T",
+          "text": "tally=1"
+        },
+        {
+          "type": "text",
+          "id": "T",
+          "text": "tally=2"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "temporary scene prop reseeds on re-entry; normal one persists",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1m7wcy8",
+          "structureHash": "1jecyij"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s1": {
+            "id": "s1",
+            "type": "scene",
+            "name": "S1",
+            "sceneProps": [
+              {
+                "name": "persist",
+                "type": "number",
+                "default": 0
+              },
+              {
+                "name": "temp",
+                "type": "number",
+                "default": 0,
+                "temporary": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b1",
+                "type": "block",
+                "name": "B1",
+                "children": [
+                  {
+                    "id": "bump",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@scene.persist",
+                        "value": {
+                          "src": "@scene.persist + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "persist"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.temp",
+                        "value": {
+                          "src": "@scene.temp + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "temp"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "gate"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "gate",
+                "type": "block",
+                "name": "Gate",
+                "children": [
+                  {
+                    "id": "again",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('s1') < 2",
+                      "ast": [
+                        "bin",
+                        "<",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "s1"
+                          ]
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "s2"
+                    }
+                  },
+                  {
+                    "id": "done",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "s2": {
+            "id": "s2",
+            "type": "scene",
+            "name": "S2",
+            "blocks": [
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "back",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "s1"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "persist={@scene.persist} temp={@scene.temp}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s1"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T",
+          "text": "persist=1 temp=1"
+        },
+        {
+          "type": "text",
+          "id": "T",
+          "text": "persist=2 temp=1"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "branch picks the first passing branch",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1hh70wj",
+          "structureHash": "0wuzqi2"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "hp",
+            "type": "number",
+            "shared": true,
+            "default": 7
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "hi",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@hp > 10",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "sv",
+                              "patter",
+                              "hp"
+                            ],
+                            [
+                              "n",
+                              10
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_hi",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "mid",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@hp > 5",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "sv",
+                              "patter",
+                              "hp"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_mid",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "low",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_low",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_hi": "high",
+            "T_mid": "mid",
+            "T_low": "low"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T_mid",
+          "text": "mid"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "shuffle draws without replacement and never repeats back-to-back",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1db3njf",
+          "structureHash": "1jq3th9"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "shuffle",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "a",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O0",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "b2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "c",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gate",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('loop') < 5",
+                      "ast": [
+                        "bin",
+                        "<",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "loop"
+                          ]
+                        ],
+                        [
+                          "n",
+                          5
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "loop"
+                    }
+                  },
+                  {
+                    "id": "done",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "O0": "alpha",
+            "O1": "beta",
+            "O2": "gamma"
+          }
+        }
+      },
+      "seed": 11,
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "O1",
+          "text": "beta"
+        },
+        {
+          "type": "text",
+          "id": "O2",
+          "text": "gamma"
+        },
+        {
+          "type": "text",
+          "id": "O0",
+          "text": "alpha"
+        },
+        {
+          "type": "text",
+          "id": "O2",
+          "text": "gamma"
+        },
+        {
+          "type": "text",
+          "id": "O1",
+          "text": "beta"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "seen() flips after the node has been entered",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1wpxvgh",
+          "structureHash": "09l41cr"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "g1",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "seen('sub')",
+                      "ast": [
+                        "call",
+                        "seen",
+                        [
+                          "s",
+                          "sub"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_yes",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "g2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_no",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "sub"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "sub",
+                "type": "block",
+                "name": "Sub",
+                "children": [
+                  {
+                    "id": "x",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_sub",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "main"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_yes": "been there",
+            "T_no": "not yet",
+            "T_sub": "in sub"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T_no",
+          "text": "not yet"
+        },
+        {
+          "type": "text",
+          "id": "T_sub",
+          "text": "in sub"
+        },
+        {
+          "type": "text",
+          "id": "T_yes",
+          "text": "been there"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "jump is absolute: it discards a pending call-return",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "172wrqt",
+          "structureHash": "1oi1z0r"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "m1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "M1",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "sub",
+                      "mode": "call"
+                    }
+                  },
+                  {
+                    "id": "m2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "M2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "sub",
+                "type": "block",
+                "name": "Sub",
+                "children": [
+                  {
+                    "id": "x",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "X",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "out"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "out",
+                "type": "block",
+                "name": "Out",
+                "children": [
+                  {
+                    "id": "o",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "O",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "M1": "before",
+            "M2": "NEVER",
+            "X": "tunnel",
+            "O": "out"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "M1",
+          "text": "before"
+        },
+        {
+          "type": "text",
+          "id": "X",
+          "text": "tunnel"
+        },
+        {
+          "type": "text",
+          "id": "O",
+          "text": "out"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "secretUntilEligible hides; default shows ineligible greyed",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1i9gpwd",
+          "structureHash": "1x87sg8"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "ok",
+            "type": "boolean",
+            "shared": true,
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_go",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "hidden",
+                        "type": "group",
+                        "condition": {
+                          "src": "@ok",
+                          "ast": [
+                            "sv",
+                            "patter",
+                            "ok"
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "hidden_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_hidden",
+                          "kind": "text"
+                        },
+                        "secretUntilEligible": true
+                      },
+                      {
+                        "id": "greyed",
+                        "type": "group",
+                        "condition": {
+                          "src": "@ok",
+                          "ast": [
+                            "sv",
+                            "patter",
+                            "ok"
+                          ]
+                        },
+                        "children": [
+                          {
+                            "id": "greyed_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_greyed",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_go": "Go",
+            "C_hidden": "Secret",
+            "C_greyed": "Locked"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "go"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "options": [
+            {
+              "id": "go",
+              "text": "Go",
+              "eligible": true
+            },
+            {
+              "id": "greyed",
+              "text": "Locked",
+              "eligible": false
+            }
+          ]
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "line carries the resolved character name (default locale -> authoring displayName)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "11tqeer",
+          "structureHash": "1yf6u9a"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          },
+          {
+            "name": "BO"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_anna",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "L_bo",
+                        "kind": "line",
+                        "character": "BO"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_anna": "Hi",
+            "L_bo": "Yo"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_anna",
+          "text": "Hi",
+          "character": "ANNA",
+          "characterName": "Anna"
+        },
+        {
+          "type": "line",
+          "id": "L_bo",
+          "text": "Yo",
+          "character": "BO"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "active locale resolves strings + cast name; a missing key falls back to the default locale",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0hkjzp6",
+          "structureHash": "0qrh7fw"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_anna",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "T_fb",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_anna": "Hi",
+            "T_fb": "english fallback"
+          },
+          "fr": {
+            "L_anna": "Salut",
+            "cast:ANNA": "Annette"
+          }
+        }
+      },
+      "locale": "fr",
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_anna",
+          "text": "Salut",
+          "character": "ANNA",
+          "characterName": "Annette"
+        },
+        {
+          "type": "text",
+          "id": "T_fb",
+          "text": "<Untranslated: T_fb> english fallback"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "IDs-only build emits beat IDs as text and omits the character name",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "00y9q18",
+          "structureHash": "0m8exbj"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_anna",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "T_room",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {},
+        "localisation": {
+          "mode": "ids"
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_anna",
+          "text": "L_anna",
+          "character": "ANNA"
+        },
+        {
+          "type": "text",
+          "id": "T_room",
+          "text": "T_room"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "beats carry accumulated author tags (scene/block/group/snippet/beat union)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "05q9r0z",
+          "structureHash": "0gy08uq"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "tags": [
+              "chapter1"
+            ],
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L1",
+                        "kind": "text",
+                        "tags": [
+                          "barked"
+                        ]
+                      },
+                      {
+                        "id": "L2",
+                        "kind": "text"
+                      }
+                    ],
+                    "tags": [
+                      "intro"
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "children": [
+                      {
+                        "id": "sn2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "L3",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ],
+                    "tags": [
+                      "combat",
+                      "chapter1"
+                    ]
+                  }
+                ],
+                "tags": [
+                  "hub"
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "Intro.",
+            "L2": "More.",
+            "L3": "Fight!"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "L1",
+          "text": "Intro.",
+          "tags": [
+            "chapter1",
+            "hub",
+            "intro",
+            "barked"
+          ]
+        },
+        {
+          "type": "text",
+          "id": "L2",
+          "text": "More.",
+          "tags": [
+            "chapter1",
+            "hub",
+            "intro"
+          ]
+        },
+        {
+          "type": "text",
+          "id": "L3",
+          "text": "Fight!",
+          "tags": [
+            "chapter1",
+            "hub",
+            "combat"
+          ]
+        },
+        {
+          "type": "end"
+        }
+      ]
+    }
+  ],
+  "scripted": [
+    {
+      "name": "flows share shared globals + shared scene props; per-flow state stays per-flow",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "107i1kb",
+          "structureHash": "07rwf2u"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "bell",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "mine",
+                "type": "number",
+                "default": 0
+              },
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@bell",
+                        "value": {
+                          "src": "@bell + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "bell"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.tally",
+                        "value": {
+                          "src": "@scene.tally + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "tally"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.mine",
+                        "value": {
+                          "src": "@scene.mine + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "mine"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "b={@bell} t={@scene.tally} m={@scene.mine}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "alice",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "b=1 t=1 m=1"
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "bob",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "b=2 t=2 m=1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "engine reset re-seeds every kind of shared state",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "107i1kb",
+          "structureHash": "07rwf2u"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "bell",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "mine",
+                "type": "number",
+                "default": 0
+              },
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@bell",
+                        "value": {
+                          "src": "@bell + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "bell"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.tally",
+                        "value": {
+                          "src": "@scene.tally + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "tally"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.mine",
+                        "value": {
+                          "src": "@scene.mine + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "mine"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "b={@bell} t={@scene.tally} m={@scene.mine}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "a",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "b=1 t=1 m=1"
+            }
+          ]
+        },
+        {
+          "op": "reset"
+        },
+        {
+          "op": "openFlow",
+          "flow": "b",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "b=1 t=1 m=1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "save/load mid-flow preserves the cursor, selector memory, and scene props",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0vpxcpn",
+          "structureHash": "03ibej8"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "laps",
+                "type": "number",
+                "default": 0
+              }
+            ],
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "seq",
+                    "type": "group",
+                    "selector": "sequence",
+                    "children": [
+                      {
+                        "id": "one",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "two",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gate",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('loop') < 2",
+                      "ast": [
+                        "bin",
+                        "<",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "loop"
+                          ]
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@scene.laps",
+                        "value": {
+                          "src": "@scene.laps + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "laps"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "loop"
+                    }
+                  },
+                  {
+                    "id": "done",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "TD",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second",
+            "TD": "laps={@scene.laps}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "first"
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "second"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TD",
+              "text": "laps=1"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "save/load at a pending choice replays the option set",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0fs4jz7",
+          "structureHash": "0fsmkaf"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "left",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "left_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_l",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "right",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "right_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "TR",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_r",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_l": "Left",
+            "C_r": "Right",
+            "TR": "went right"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "left",
+                  "text": "Left",
+                  "eligible": true
+                },
+                {
+                  "id": "right",
+                  "text": "Right",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "choose",
+          "id": "right"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TR",
+              "text": "went right"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "live setLocale swaps the language mid-flow; the cursor + state are untouched",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1symy5z",
+          "structureHash": "1ub62ka"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "GUIDE"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L",
+                        "kind": "line",
+                        "character": "GUIDE"
+                      },
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Welcome.",
+            "T1": "First.",
+            "T2": "Second.",
+            "cast:GUIDE": "Guide"
+          },
+          "fr": {
+            "L": "Bienvenue.",
+            "T1": "Premier.",
+            "T2": "Deuxième.",
+            "cast:GUIDE": "Guide"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L",
+              "text": "Welcome.",
+              "character": "GUIDE",
+              "characterName": "Guide"
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "Premier."
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "de"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "<Untranslated: T2> Second."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "closed captions off strips dialogue-line cues (not narration); live toggle, no state change",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0gqk6mm",
+          "structureHash": "1slrarl"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "closedCaptions": {
+          "open": "(",
+          "close": ")"
+        },
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "n1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L1",
+                        "kind": "line"
+                      },
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L2",
+                        "kind": "line"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "opt",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "o",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "L3",
+                                "kind": "line"
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P1",
+                          "kind": "line"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "after",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L5",
+                        "kind": "line",
+                        "character": "NPC"
+                      },
+                      {
+                        "id": "L6",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "L4",
+                        "kind": "line"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "Oh dear. (sigh) What now?",
+            "T1": "A door slams. (off-screen)",
+            "L2": "Wait. (pause) Listen.",
+            "P1": "Hello? (timid)",
+            "L3": "Coming. (footsteps)",
+            "L5": "(gasps)",
+            "L6": "Thunder rumbles in the distance.",
+            "L4": "Done. (smiles)"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L1",
+              "text": "Oh dear. (sigh) What now?"
+            }
+          ]
+        },
+        {
+          "op": "setClosedCaptions",
+          "on": false
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "A door slams. (off-screen)"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L2",
+              "text": "Wait. Listen."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "opt",
+                  "text": "Hello?",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "opt"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L3",
+              "text": "Coming."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L5",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L6",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "op": "setClosedCaptions",
+          "on": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L4",
+              "text": "Done. (smiles)"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "choosing an Option group plays its content run and gathers back",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0w639er",
+          "structureHash": "111fmp4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "talk",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "t1",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T1",
+                                "kind": "text"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "t2",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T2",
+                                "kind": "text"
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_talk",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "leave",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "lv",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_leave",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "after",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "TA",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_talk": "Talk",
+            "C_leave": "Leave",
+            "T1": "hello",
+            "T2": "there",
+            "TA": "gathered"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "talk",
+                  "text": "Talk",
+                  "eligible": true
+                },
+                {
+                  "id": "leave",
+                  "text": "Leave",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "talk"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "hello"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "there"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TA",
+              "text": "gathered"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "once-only option is consumed; sticky options persist across re-entry",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1sa8k45",
+          "structureHash": "0alqst6"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "hub",
+                "type": "block",
+                "name": "Hub",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "once",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "once_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_once",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "hub"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_once",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "keep",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "keep_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_keep",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "hub"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_keep",
+                          "kind": "text"
+                        },
+                        "sticky": true
+                      },
+                      {
+                        "id": "leave",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "leave_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_leave",
+                          "kind": "text"
+                        },
+                        "sticky": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_once": "Once",
+            "C_keep": "Keep",
+            "C_leave": "Leave",
+            "T_once": "played once",
+            "T_keep": "played keep"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "once",
+                  "text": "Once",
+                  "eligible": true
+                },
+                {
+                  "id": "keep",
+                  "text": "Keep",
+                  "eligible": true
+                },
+                {
+                  "id": "leave",
+                  "text": "Leave",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "once"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_once",
+              "text": "played once"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "keep",
+                  "text": "Keep",
+                  "eligible": true
+                },
+                {
+                  "id": "leave",
+                  "text": "Leave",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "keep"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_keep",
+              "text": "played keep"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "keep",
+                  "text": "Keep",
+                  "eligible": true
+                },
+                {
+                  "id": "leave",
+                  "text": "Leave",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "leave"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fallback option auto-follows when it is the only one left",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "081w8g0",
+          "structureHash": "0qds2vg"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "hub",
+                "type": "block",
+                "name": "Hub",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "real",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "real_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_real",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "hub"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_real",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "fb",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "fb_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_fb",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_fb",
+                          "kind": "text"
+                        },
+                        "fallback": true
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_real": "Real",
+            "C_fb": "Fallback",
+            "T_real": "did real",
+            "T_fb": "fallback fired"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "real",
+                  "text": "Real",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "real"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_real",
+              "text": "did real"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_fb",
+              "text": "fallback fired"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hotSwap: a reworded line under the cursor plays the NEW text",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1u79agj",
+          "structureHash": "0dq624h"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1vyn1vz",
+          "structureHash": "0dq624h"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second, reworded"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "first"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "second, reworded"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hotSwap: a sibling inserted BEFORE the cursor neither replays nor shifts the resume point",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1s8m1jh",
+          "structureHash": "1jf2tky"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T0": "inserted opener"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1xnkrm7",
+          "structureHash": "1r45388"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn0",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T0",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T0": "inserted opener"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hotSwap: a deleted ACTIVE snippet is skipped; play continues at the next survivor",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0qkyw6l",
+          "structureHash": "0min3k0"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1a",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T1b",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1a": "cut a",
+            "T1b": "cut b",
+            "T2": "survivor"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ljqtbf",
+          "structureHash": "0dz5wo6"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1a": "cut a",
+            "T1b": "cut b",
+            "T2": "survivor"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1a",
+              "text": "cut a"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "survivor"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hotSwap: a deleted option drops from the REPLAYED pending choice; survivors stay choosable",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1xxxen3",
+          "structureHash": "14rsdu2"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "left",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "left_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "TL",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_l",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "right",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "right_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "TR",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_r",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_l": "Left",
+            "C_r": "Right",
+            "TL": "went left",
+            "TR": "went right"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "09btt6l",
+          "structureHash": "1wvz02s"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "left",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "left_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "TL",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_l",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_l": "Left",
+            "C_r": "Right",
+            "TL": "went left",
+            "TR": "went right"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "left",
+                  "text": "Left",
+                  "eligible": true
+                },
+                {
+                  "id": "right",
+                  "text": "Right",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "options": [
+                {
+                  "id": "left",
+                  "text": "Left",
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "left"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TL",
+              "text": "went left"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hotSwap: the cursor's whole container emptied - the frame drops and the flow ends cleanly",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1homu6m",
+          "structureHash": "13uple6"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b1",
+                "type": "block",
+                "name": "B1",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "b2"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2a",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2b",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "intro",
+            "T2a": "deep a",
+            "T2b": "deep b"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1253pmp",
+          "structureHash": "0usgb1h"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b1",
+                "type": "block",
+                "name": "B1",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "b2"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b2",
+                "type": "block",
+                "name": "B2",
+                "children": []
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "intro",
+            "T2a": "deep a",
+            "T2b": "deep b"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "intro"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2a",
+              "text": "deep a"
+            }
+          ]
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "gameData": [
+    {
+      "name": "gameData: unset fields fall back to their declared defaults",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tagdj1",
+          "structureHash": "0fd4b4v"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": []
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "gameDataFields": {
+          "line": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "default": "calm"
+            },
+            {
+              "name": "vol",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        "scenes": {},
+        "strings": {}
+      },
+      "kind": "line",
+      "node": {
+        "vol": 3
+      },
+      "expected": {
+        "mood": "calm",
+        "vol": 3
+      }
+    },
+    {
+      "name": "gameData: override-only keys with no declared field are kept verbatim",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tagdj1",
+          "structureHash": "0fd4b4v"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": []
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "gameDataFields": {
+          "line": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "default": "calm"
+            },
+            {
+              "name": "vol",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        "scenes": {},
+        "strings": {}
+      },
+      "kind": "line",
+      "node": {
+        "vol": 3,
+        "extra": "x"
+      },
+      "expected": {
+        "mood": "calm",
+        "vol": 3,
+        "extra": "x"
+      }
+    },
+    {
+      "name": "gameData: a node with no overrides yields every default",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tagdj1",
+          "structureHash": "0fd4b4v"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": []
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "gameDataFields": {
+          "line": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "default": "calm"
+            },
+            {
+              "name": "vol",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        "scenes": {},
+        "strings": {}
+      },
+      "kind": "line",
+      "expected": {
+        "mood": "calm",
+        "vol": 1
+      }
+    }
+  ]
+}

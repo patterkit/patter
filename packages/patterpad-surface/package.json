@@ -1,0 +1,43 @@
+{
+  "name": "@patterkit/patterpad-surface",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Patterpad's structured-script editing surface: a framework-neutral ProseMirror component that edits Patter source directly (id-stable, lossless round-trip via @patterkit/core). Hosted by the Patterpad app shell.",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./surface": "./web/surface.ts",
+    "./styles.css": "./web/styles.css",
+    "./theme.css": "./web/theme.css",
+    "./views": "./web/views.ts",
+    "./exit": "./web/exit.ts",
+    "./colour": "./src/colour.ts"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build:web": "vite build"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource/courier-prime": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@fontsource/literata": "^5.2.8",
+    "@fontsource/newsreader": "^5.2.10",
+    "@fontsource/source-serif-4": "^5.2.9",
+    "@patterkit/core": "0.1.0",
+    "@patterkit/model": "0.1.0",
+    "prosemirror-commands": "^1.6.0",
+    "prosemirror-history": "^1.4.0",
+    "prosemirror-inputrules": "^1.4.0",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-model": "^1.23.0",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-transform": "^1.10.0",
+    "prosemirror-view": "^1.34.0"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0",
+    "vite": "^5.4.0"
+  }
+}

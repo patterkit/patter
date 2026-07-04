@@ -1,0 +1,235 @@
+/* PatterKit landing page (the marketing home, a standalone Astro page - NOT the docs
+ * chrome). Full-bleed, warm-paper, light-only by design. Brand colours come from the shared tokens in
+ * patter.css (--pt-teal-ink / --pt-teal-mid / --pt-teal-soft / --pt-ember / --pt-gold / --pt-stage);
+ * the neutral paper/ink/hairline scale is the design's exact light palette, declared once here.
+ */
+
+.pt-landing {
+  /* Neutral scale (design-exact; this page is light-only). */
+  --l-page: #f1ebe0;          /* page ground */
+  --l-paper: #f6f0e6;         /* section tint */
+  --l-paper-2: #fbf7f0;       /* cards */
+  --l-ink: #22201b;           /* headings */
+  --l-ink-2: #2a241c;         /* strong body ink */
+  --l-body: #4a4339;          /* body text */
+  --l-muted: #6b6256;         /* muted text */
+  --l-faint: #8a8072;         /* fine print */
+  --l-hair: #e4dacb;          /* card hairline */
+  --l-hair-2: #e7ddcd;        /* band hairline */
+  --l-hair-3: #ded3c1;        /* window border */
+  --l-cue: #3f7fb0;           /* screenplay cue blue */
+
+  color: var(--l-ink-2);
+  background: var(--l-page);
+  font-family: var(--sl-font, "Inter", ui-sans-serif, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.pt-landing *, .pt-landing *::before, .pt-landing *::after { box-sizing: border-box; }
+.pt-landing ::selection { background: color-mix(in srgb, var(--pt-ember) 20%, transparent); }
+
+.pt-wrap { max-width: 1160px; margin: 0 auto; padding-left: 32px; padding-right: 32px; }
+.pt-serif { font-family: var(--pt-read, "Newsreader", Georgia, serif); }
+.pt-em { font-style: italic; color: var(--pt-teal-ink); }
+
+/* Mono eyebrow / label */
+.pt-eye {
+  font-family: var(--sl-font-mono);
+  font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--pt-teal-mid);
+}
+
+/* CSS drop glyph (teal), sized via width/height. Height > width so the drop's bottom isn't clipped. */
+.pt-drop {
+  display: inline-block; background: var(--pt-teal-ink);
+  clip-path: path("M7.5 0 C11 5 15 10 15 13.5 A7.5 7.5 0 1 1 0 13.5 C0 10 4 5 7.5 0 Z");
+}
+
+/* ---- Buttons ---------------------------------------------------------------- */
+.pt-btn {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  font-weight: 600; border-radius: 11px; border: 1.5px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+.pt-btn-primary { background: var(--pt-ember); color: #fff; box-shadow: 0 2px 6px rgba(210, 96, 62, 0.28); }
+.pt-btn-primary:hover { background: #c0552f; }
+.pt-btn-outline { background: transparent; color: var(--pt-teal-ink); border-color: var(--pt-teal-ink); }
+.pt-btn-outline:hover { background: rgba(33, 79, 75, 0.05); }
+.pt-btn-ghost { background: transparent; color: #d7e8e3; border-color: #3c5551; }
+.pt-btn-ghost:hover { border-color: #6f938c; background: rgba(255, 255, 255, 0.04); }
+.pt-btn-lg { font-size: 15.5px; padding: 13px 24px; }
+.pt-btn-xl { font-size: 15.5px; padding: 14px 28px; }
+.pt-textlink {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  color: var(--pt-teal-ink); font-weight: 600; font-size: 15.5px;
+  border-bottom: 2px solid rgba(33, 79, 75, 0.33); padding-bottom: 2px;
+  transition: border-color 0.15s ease;
+}
+.pt-textlink:hover { border-bottom-color: var(--pt-teal-ink); }
+
+/* ---- Nav -------------------------------------------------------------------- */
+.pt-nav {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(251, 247, 240, 0.85); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--l-hair-2);
+}
+.pt-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 14px; padding-bottom: 14px; }
+.pt-brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+.pt-brand svg { display: block; }
+.pt-wordmark { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 600; font-size: 21px; letter-spacing: -0.02em; color: #312b22; }
+.pt-wordmark span { color: var(--pt-teal-ink); }
+.pt-navlinks { display: flex; align-items: center; gap: 6px; }
+.pt-navlink { text-decoration: none; color: var(--l-body); font-size: 14.5px; font-weight: 500; padding: 8px 12px; border-radius: 8px; transition: background 0.15s ease, color 0.15s ease; }
+.pt-navlink:hover { background: #efe6d6; color: var(--l-ink); }
+.pt-nav .pt-btn { margin-left: 8px; font-size: 14.5px; padding: 9px 18px; border-radius: 9px; box-shadow: 0 1px 2px rgba(21, 32, 30, 0.15); }
+
+/* ---- Hero ------------------------------------------------------------------- */
+.pt-hero { position: relative; background: linear-gradient(180deg, var(--l-paper) 0%, var(--l-page) 100%); }
+.pt-hero-glows { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.pt-glow { position: absolute; border-radius: 50%; }
+.pt-glow-a { top: -120px; right: -80px; width: 420px; height: 420px; background: radial-gradient(circle, rgba(210, 96, 62, 0.08), transparent 70%); }
+.pt-glow-b { bottom: -160px; left: -120px; width: 520px; height: 520px; background: radial-gradient(circle, rgba(33, 79, 75, 0.07), transparent 70%); }
+.pt-hero-grid { position: relative; display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 56px; align-items: center; padding-top: 84px; padding-bottom: 96px; }
+
+.pt-pill {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: var(--sl-font-mono); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--pt-teal-mid); background: #e7f0ed; border: 1px solid #d3e5df; padding: 6px 12px; border-radius: 999px;
+}
+.pt-pill .pt-pill-drop { width: 6px; height: 8px; display: inline-block; background: var(--pt-ember); clip-path: path("M3 0 C4.5 2 6 4 6 5.4 A3 3 0 1 1 0 5.4 C0 4 1.5 2 3 0 Z"); }
+.pt-h1 { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 500; font-size: clamp(2.6rem, 5.4vw, 4.2rem); line-height: 1.03; letter-spacing: -0.02em; color: var(--l-ink); margin: 22px 0 0; text-wrap: balance; }
+.pt-lead { font-size: 18.5px; line-height: 1.6; color: var(--l-body); max-width: 34em; margin: 22px 0 0; }
+.pt-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.pt-fineprint { font-family: var(--sl-font-mono); font-size: 12.5px; color: var(--l-faint); margin: 22px 0 0; letter-spacing: 0.01em; }
+
+.pt-hero-media { position: relative; }
+.pt-window { border-radius: 14px; overflow: hidden; background: var(--l-paper-2); border: 1px solid var(--l-hair-3); box-shadow: 0 2px 6px rgba(21, 32, 30, 0.06), 0 30px 60px -24px rgba(21, 32, 30, 0.32); transform: rotate(-1.2deg); }
+.pt-window-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; background: #efe7d9; border-bottom: 1px solid #e0d6c6; }
+.pt-dot { width: 11px; height: 11px; border-radius: 50%; }
+.pt-dot-r { background: #e0664e; } .pt-dot-y { background: #dcaa3a; } .pt-dot-g { background: #5fa392; }
+.pt-window-title { font-family: var(--sl-font-mono); font-size: 11px; color: #9c9286; margin-left: 8px; }
+.pt-window img { display: block; width: 100%; height: auto; }
+.pt-float-card { position: absolute; bottom: -34px; left: -28px; width: 240px; background: var(--pt-stage); border-radius: 12px; padding: 14px 16px; box-shadow: 0 20px 40px -14px rgba(21, 32, 30, 0.55); transform: rotate(2deg); }
+.pt-float-label { font-family: var(--sl-font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #f4efe6; }
+.pt-float-bundle { margin-top: 8px; font-family: var(--pt-read, "Newsreader", serif); color: #f4efe6; font-size: 15px; }
+.pt-float-bundle code { font-family: var(--sl-font-mono); font-size: 12px; color: #e0b257; }
+.pt-float-icons { margin-top: 10px; display: flex; gap: 6px; }
+.pt-float-icons img { border-radius: 6px; }
+
+/* ---- Engine strip ----------------------------------------------------------- */
+.pt-engine { background: var(--pt-stage); color: #e7ece9; }
+.pt-engine-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 28px; padding-top: 46px; padding-bottom: 46px; }
+.pt-engine-copy { max-width: 26em; }
+.pt-engine h2 { font-family: var(--pt-read, "Newsreader", serif); font-weight: 500; font-size: 26px; line-height: 1.2; margin: 0; color: #f4efe6; }
+.pt-engine h2 span { color: var(--pt-teal-soft); }
+.pt-engine p { font-size: 14.5px; color: #a9bbb6; margin: 8px 0 0; line-height: 1.55; }
+.pt-engine-tiles { display: flex; gap: 26px; flex-wrap: wrap; }
+.pt-engine-tile { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.pt-engine-tile img { border-radius: 12px; }
+.pt-engine-tile span { font-size: 12px; color: #a9bbb6; font-weight: 500; }
+
+/* ---- Writers / logic off the page ------------------------------------------- */
+.pt-writers { background: var(--l-page); }
+.pt-split { display: grid; grid-template-columns: 0.92fr 1.08fr; gap: 60px; align-items: center; padding-top: 100px; padding-bottom: 100px; }
+.pt-h2 { font-family: var(--pt-read, "Newsreader", serif); font-weight: 500; line-height: 1.1; letter-spacing: -0.01em; color: var(--l-ink); }
+.pt-writers .pt-h2 { font-size: clamp(2rem, 3.6vw, 2.9rem); margin: 14px 0 0; }
+.pt-writers-intro { font-size: 17px; line-height: 1.62; color: var(--l-body); margin: 18px 0 0; }
+.pt-list { list-style: none; margin: 26px 0 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.pt-list li { display: flex; gap: 13px; align-items: flex-start; }
+.pt-list-drop { flex: 0 0 auto; margin-top: 4px; width: 15px; height: 22px; }
+.pt-list strong { color: var(--l-ink); font-weight: 600; }
+.pt-list span { color: var(--l-body); }
+.pt-writers .pt-textlink { margin-top: 30px; }
+
+/* Recreated screenplay surface */
+/* overflow visible so the external "edited in a side panel" callout can hang off the right border. */
+.pt-screen { position: relative; background: var(--l-paper-2); border: 1px solid var(--l-hair); border-radius: 16px; box-shadow: 0 2px 5px rgba(21, 32, 30, 0.05), 0 26px 50px -28px rgba(21, 32, 30, 0.28); }
+.pt-screen-head { padding: 16px 20px; border-bottom: 1px solid #ece3d4; display: flex; align-items: center; justify-content: space-between; }
+.pt-screen-scene { font-family: var(--sl-font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #9c9286; }
+.pt-screen-meta { font-family: var(--sl-font-mono); font-size: 11px; color: #b6ac9c; }
+.pt-screen-body { padding: 26px 26px 30px; font-family: var(--pt-read, "Newsreader", Georgia, serif); }
+.pt-narration { margin: 0; font-size: 16.5px; line-height: 1.55; color: var(--l-body); font-style: italic; }
+.pt-lines { margin-top: 20px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline; }
+.pt-cue { font-family: var(--sl-font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--l-cue); text-transform: uppercase; padding-top: 3px; }
+.pt-line { font-size: 17px; line-height: 1.5; color: var(--l-ink-2); }
+.pt-cond { position: relative; margin-top: 24px; border-left: 2px solid var(--l-hair); padding-left: 18px; }
+.pt-cond-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pt-cond-pill { display: inline-flex; align-items: center; gap: 8px; background: #fbeee7; border: 1px solid #eecbba; border-radius: 8px; padding: 5px 11px; font-family: var(--sl-font-mono); font-size: 12px; color: #b04a28; }
+.pt-cond-pill .pt-square { width: 7px; height: 7px; background: var(--pt-ember); transform: rotate(45deg); display: inline-block; }
+/* An EXTERNAL "look at this" callout: floated off the card's right border with a shadow, so it reads as
+   an annotation pointing at the editor rather than a chip inside it. (Anchored to .pt-cond.) */
+.pt-cond-tag { position: absolute; top: 1px; right: -44px; background: var(--pt-teal-ink); color: #d7e8e3; font-family: var(--sl-font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 5px 10px; border-radius: 8px; white-space: nowrap; box-shadow: 0 8px 20px -8px rgba(21, 32, 30, 0.4); }
+.pt-cond-lines { margin-top: 12px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: baseline; }
+.pt-choice { margin-top: 22px; display: flex; align-items: center; gap: 11px; background: #f4f7f5; border: 1px solid #dce8e3; border-radius: 10px; padding: 12px 15px; }
+.pt-choice .pt-diamond { width: 13px; height: 13px; border: 1.5px solid var(--pt-ember); transform: rotate(45deg); display: inline-block; flex: 0 0 auto; }
+.pt-choice-label { font-size: 16px; color: var(--l-ink); }
+.pt-choice-jump { margin-left: auto; font-family: var(--sl-font-mono); font-size: 11px; color: #9c9286; }
+
+/* ---- Why / feature pillars -------------------------------------------------- */
+.pt-why { background: var(--l-paper); border-top: 1px solid var(--l-hair-2); border-bottom: 1px solid var(--l-hair-2); }
+.pt-why-inner { padding-top: 100px; padding-bottom: 100px; }
+.pt-why-intro { max-width: 40em; }
+.pt-why .pt-h2 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.08; margin: 14px 0 0; }
+.pt-why-lead { font-size: 17px; line-height: 1.62; color: var(--l-body); margin: 16px 0 0; }
+.pt-pillars { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.pt-pillar { background: var(--l-paper-2); border: 1px solid var(--l-hair); border-top: 3px solid var(--pt-teal-ink); border-radius: 14px; padding: 28px 26px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.pt-pillar:hover { transform: translateY(-3px); box-shadow: 0 18px 34px -22px rgba(21, 32, 30, 0.3); }
+.pt-pillar-2 { border-top-color: var(--pt-teal-mid); }
+.pt-pillar-3 { border-top-color: var(--pt-ember); }
+.pt-pillar-num { font-family: var(--sl-font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--pt-teal-mid); }
+.pt-pillar-3 .pt-pillar-num { color: #c0552f; }
+.pt-pillar h3 { font-family: var(--pt-read, "Newsreader", serif); font-weight: 600; font-size: 22px; line-height: 1.2; color: var(--l-ink); margin: 12px 0 0; }
+.pt-pillar p { font-size: 15px; line-height: 1.6; color: var(--l-body); margin: 12px 0 0; }
+
+.pt-builtins { margin-top: 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--l-hair); border: 1px solid var(--l-hair); border-radius: 14px; overflow: hidden; }
+.pt-builtin { background: var(--l-paper-2); padding: 22px; }
+.pt-builtin-t { font-family: var(--pt-read, "Newsreader", serif); font-weight: 600; font-size: 17px; color: var(--l-ink); }
+.pt-builtin p { font-size: 13.5px; line-height: 1.55; color: var(--l-muted); margin: 7px 0 0; }
+.pt-builtin code { font-family: var(--sl-font-mono); font-size: 12px; color: var(--pt-teal-ink); background: #e7f0ed; padding: 1px 5px; border-radius: 4px; }
+.pt-why .pt-textlink { margin-top: 30px; }
+
+/* ---- Differentiator --------------------------------------------------------- */
+.pt-diff { background: var(--l-page); }
+.pt-diff-inner { max-width: 960px; margin: 0 auto; padding: 100px 32px; text-align: center; }
+.pt-diff-drop { display: inline-block; }
+.pt-diff .pt-eye { margin: 22px 0 0; }
+.pt-diff .pt-h2 { font-size: clamp(2rem, 4.4vw, 3.2rem); line-height: 1.12; font-weight: 500; margin: 18px 0 0; text-wrap: balance; }
+.pt-diff-lead { font-size: 18px; line-height: 1.65; color: var(--l-body); margin: 22px auto 0; max-width: 40em; }
+.pt-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 30px; }
+.pt-chip { font-family: var(--sl-font-mono); font-size: 12.5px; color: var(--l-body); background: var(--l-paper-2); border: 1px solid var(--l-hair); border-radius: 999px; padding: 8px 16px; }
+
+/* ---- Closing CTA ------------------------------------------------------------ */
+.pt-cta { background: var(--pt-stage); position: relative; overflow: hidden; }
+.pt-cta-glows { position: absolute; inset: 0; pointer-events: none; }
+.pt-cta-glow-a { top: -100px; left: -60px; width: 380px; height: 380px; background: radial-gradient(circle, rgba(210, 96, 62, 0.12), transparent 70%); }
+.pt-cta-glow-b { bottom: -160px; right: -80px; width: 480px; height: 480px; background: radial-gradient(circle, rgba(79, 138, 130, 0.12), transparent 70%); }
+.pt-cta-inner { position: relative; padding: 100px 32px; text-align: center; }
+.pt-cta h2 { font-family: var(--pt-read, "Newsreader", serif); font-weight: 500; font-size: clamp(2.2rem, 4.6vw, 3.4rem); line-height: 1.1; letter-spacing: -0.01em; color: #f4efe6; margin: 0; text-wrap: balance; }
+.pt-cta p { font-size: 18px; line-height: 1.6; color: #a9bbb6; margin: 20px auto 0; max-width: 34em; }
+.pt-cta-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 34px; }
+.pt-cta-actions .pt-btn-primary { box-shadow: 0 4px 14px rgba(210, 96, 62, 0.35); }
+
+/* ---- Footer ----------------------------------------------------------------- */
+.pt-foot { background: #131c1a; color: #8a9b97; }
+.pt-foot-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; padding-top: 40px; padding-bottom: 40px; }
+.pt-foot-brand { display: flex; align-items: center; gap: 11px; }
+.pt-foot-brand span { font-family: var(--pt-read, "Newsreader", serif); font-weight: 600; font-size: 17px; color: #e7ece9; }
+.pt-foot-links { display: flex; flex-wrap: wrap; gap: 22px; font-size: 14px; }
+.pt-foot-links a { text-decoration: none; color: #8a9b97; transition: color 0.15s ease; }
+.pt-foot-links a:hover { color: #d7e8e3; }
+.pt-foot-legal { font-family: var(--sl-font-mono); font-size: 12px; color: #5d6f6b; }
+.pt-foot-legal a { color: #8a9b97; text-decoration: none; transition: color 0.15s ease; }
+.pt-foot-legal a:hover { color: #d7e8e3; }
+
+/* ---- Responsive ------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .pt-hero-grid, .pt-split, .pt-pillars { grid-template-columns: 1fr; }
+  .pt-float-card { position: static; transform: none; margin: 18px auto 0; width: 100%; }
+  .pt-navlink { display: none; }
+  /* The card is full-width now; keep the callout in the flow so the page's overflow clip can't hide it. */
+  .pt-cond-tag { position: static; right: auto; top: auto; box-shadow: none; }
+}
+@media (max-width: 560px) {
+  .pt-pillars { gap: 14px; }
+  .pt-wrap { padding-left: 20px; padding-right: 20px; }
+}

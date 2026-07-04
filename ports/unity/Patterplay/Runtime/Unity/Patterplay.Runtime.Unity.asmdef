@@ -1,0 +1,17 @@
+{
+  "name": "Patterplay.Runtime.Unity",
+  "rootNamespace": "Patterkit.Patterplay",
+  "references": [
+    "Patterplay.Runtime",
+    "Patterplay.Runtime.Json"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

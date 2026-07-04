@@ -1,0 +1,151 @@
+{
+  schema: "patter/flow@0",
+  scene: {
+    id: "scn_tavern",
+    type: "scene",
+    name: "The Tavern",
+    // Scene setup the host reads on entry (emission rides on gameData now, not effects - spec §15).
+    gameData: { music: "tavern_theme" },
+    blocks: [
+      {
+        id: "intro",
+        type: "block",
+        name: "Intro",
+        children: [
+          // A multi-line NARRATION snippet (several text beats in one bubble).
+          {
+            id: "sn_intro_scene",
+            type: "snippet",
+            beats: [
+              { id: "T_scene", kind: "text" },
+              { id: "T_room", kind: "text" },
+              { id: "T_patrons", kind: "text" },
+            ],
+          },
+          // A multi-line DIALOGUE snippet (two lines, one speaker), an engine cue, then to the menu.
+          {
+            id: "sn_intro_greet",
+            type: "snippet",
+            beats: [
+              { id: "L_greet", kind: "line", character: "BARKEEP" },
+              { id: "L_greet2", kind: "line", character: "BARKEEP", direction: "wiping a glass" },
+              { id: "A_focus", kind: "gameEvent", gameData: { cue: "camera_focus", target: "barkeep" } },
+            ],
+            jump: { to: "menu" },
+          },
+        ],
+      },
+      {
+        id: "menu",
+        type: "block",
+        name: "Menu",
+        children: [
+          {
+            id: "grp_choice",
+            type: "group",
+            selector: "choice",
+            // Each option is an Option group (groups §8): the choice-surface fields on the group,
+            // the option's content inside it. Most options here are POPULATED (a beat or two plays
+            // before the jump); the last is a bare pure-jump, for contrast.
+            children: [
+              { id: "opt_work", type: "group", prompt: { id: "C_work", kind: "text" }, children: [
+                { id: "sn_opt_work", type: "snippet", beats: [{ id: "T_work_lead", kind: "text" }], jump: { to: "work" } } ] },
+              // Ineligible by default (strength starts low) - shown greyed, not hidden.
+              { id: "opt_intimidate", type: "group", condition: "@strength >= 5", prompt: { id: "C_intim", kind: "text" }, children: [
+                { id: "sn_opt_intim", type: "snippet", beats: [
+                  { id: "T_intim_lead", kind: "text" },
+                  { id: "L_intim_warn", kind: "line", character: "BARKEEP" },
+                ], jump: { to: "intimidate" } } ] },
+              // Hidden until the player learns the secret (then it appears on revisit).
+              { id: "opt_secret", type: "group", condition: "@knows_secret", secretUntilEligible: true, prompt: { id: "C_secret", kind: "text" }, children: [
+                { id: "sn_opt_secret", type: "snippet", beats: [{ id: "L_secret_lead", kind: "line", character: "BARKEEP" }], jump: { to: "secret" } } ] },
+              { id: "opt_leave", type: "group", prompt: { id: "C_leave", kind: "text" }, children: [
+                { id: "sn_opt_leave", type: "snippet", jump: { to: "scn_street" } } ] },
+            ],
+          },
+        ],
+      },
+      {
+        id: "work",
+        type: "block",
+        name: "Work",
+        children: [
+          // Multi-line dialogue + a closing narration beat in one snippet.
+          {
+            id: "sn_work",
+            type: "snippet",
+            beats: [
+              { id: "L_work", kind: "line", character: "BARKEEP" },
+              { id: "L_work2", kind: "line", character: "BARKEEP" },
+              { id: "T_work_done", kind: "text" },
+            ],
+            // Learning the job unlocks the hidden "cellar" option back in the menu.
+            onExit: [{ kind: "set", target: "@knows_secret", value: "true" }],
+            jump: { to: "menu" },
+          },
+        ],
+      },
+      {
+        id: "intimidate",
+        type: "block",
+        name: "Intimidate",
+        children: [
+          {
+            id: "sn_intim",
+            type: "snippet",
+            beats: [
+              { id: "L_intim", kind: "line", character: "BARKEEP" },
+              { id: "L_intim2", kind: "line", character: "BARKEEP" },
+            ],
+            onExit: [{ kind: "set", target: "@gold", value: "@gold + 5" }],
+            jump: { to: "scn_street" },
+          },
+        ],
+      },
+      {
+        id: "secret",
+        type: "block",
+        name: "Secret",
+        children: [
+          {
+            id: "sn_secret",
+            type: "snippet",
+            beats: [
+              { id: "T_lean", kind: "text" },
+              { id: "L_secret", kind: "line", character: "BARKEEP" },
+              { id: "L_secret2", kind: "line", character: "BARKEEP" },
+            ],
+            jump: { to: "cellar" },
+          },
+        ],
+      },
+      {
+        id: "cellar",
+        type: "block",
+        name: "Cellar",
+        children: [
+          // A multi-line NARRATION snippet.
+          {
+            id: "sn_cellar_desc",
+            type: "snippet",
+            beats: [
+              { id: "T_cellar1", kind: "text" },
+              { id: "T_cellar2", kind: "text" },
+            ],
+          },
+          // A multi-line, MULTI-CHARACTER exchange (ANNA + BO) - shows character colours side by side.
+          {
+            id: "sn_cellar_talk",
+            type: "snippet",
+            beats: [
+              { id: "L_anna1", kind: "line", character: "ANNA" },
+              { id: "L_bo_reply", kind: "line", character: "BO" },
+              { id: "L_anna2", kind: "line", character: "ANNA" },
+            ],
+            jump: { to: "menu" },
+          },
+        ],
+      },
+    ],
+  },
+}

@@ -1,0 +1,28 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"FriendlyName": "Patterplay",
+	"Description": "Patterplay runtime for Unreal Engine. Loads compiled .patterc bundles and plays Patter branching narrative, exposed to Blueprint and C++. Every Patterplay runtime plays the same bundle with the same behaviour.",
+	"Category": "Gameplay",
+	"CreatedBy": "Ian Thomas",
+	"CreatedByURL": "https://patterkit.dev/",
+	"DocsURL": "https://patterkit.dev/",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/patterkit/patter",
+	"EngineVersion": "5.7.0",
+	"CanContainContent": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "PatterplayRuntime",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "PatterplayEditor",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}

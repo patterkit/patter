@@ -1,0 +1,13 @@
+; Minimal Godot project so the Patterplay addon's class_names register and the
+; demo / corpus TestHost run headless. Open in Godot 4.x.
+
+config_version=5
+
+[application]
+
+config/name="Patterplay (Godot port)"
+config/features=PackedStringArray("4.3")
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/patterplay/plugin.cfg")

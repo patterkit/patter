@@ -1,0 +1,21 @@
+# Patter source is UTF-8 + LF text (pinned; never let autocrlf touch it).
+*.patterflow text eol=lf
+*.patterloc  text eol=lf
+*.patterx    text eol=lf
+*.patterproj text eol=lf
+
+# Id-keyed structured merge for Patter source (the 'patter merge' driver).
+# Register it once per clone (see vcs-setup.md); until then git falls back to a
+# normal text merge for these - no harm, just not structure-aware.
+*.patterflow merge=patter
+*.patterloc  merge=patter
+*.patterx    merge=patter
+*.patterproj merge=patter
+
+# Generated artifacts (spec §11). The compiled bundle is committed but
+# REGENERATED, never hand-merged - keep ours on conflict and rebuild (the
+# validate staleness gate catches a stale one). Needs a one-time
+# 'git config merge.ours.driver true' (see vcs-setup.md).
+*.patterc    text eol=lf merge=ours
+# The packed document (.patterpack) is a binary zip envelope - kept out of VCS (.gitignore).
+*.patterpack binary

@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.7",
+	"Category": "Samples",
+	"Description": "Patterplay demos, as a ready-to-open sample project: the interactive Patter tour and the minimal shared flow. Finds the Patterplay plugin in the sibling folder (AdditionalPluginDirectories), so the release zip works as unpacked.",
+	"Modules": [
+		{
+			"Name": "PatterplayDemo",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "Patterplay",
+			"Enabled": true
+		}
+	],
+	"AdditionalPluginDirectories": [
+		".."
+	]
+}

@@ -1,0 +1,5 @@
+# Godot editor cache - regenerated on import, never committed.
+.godot/
+
+# Per-script .uid sidecars ARE committed (Godot 4.4+ convention): shipping them with the
+# addon keeps script UIDs stable in users' projects instead of regenerating as diff noise.

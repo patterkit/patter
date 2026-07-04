@@ -1,0 +1,42 @@
+{
+  "name": "@patterkit/ops",
+  "version": "0.1.0",
+  "description": "The shared operations layer: every project operation (load, validate, export, format, play, ...) as a pure function, consumed by the patter CLI and Patterpad alike.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ian Thomas",
+  "homepage": "https://patterkit.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patterkit/patter.git",
+    "directory": "packages/ops"
+  },
+  "bugs": "https://github.com/patterkit/patter/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "gen-runtime-blob": "node scripts/gen-runtime-blob.mjs",
+    "prebuild": "node scripts/gen-runtime-blob.mjs",
+    "build": "tsup src/index.ts --format esm --dts --clean"
+  },
+  "dependencies": {
+    "@patterkit/compiler": "0.1.0",
+    "@patterkit/core": "0.1.0",
+    "@patterkit/model": "0.1.0",
+    "@patterkit/runtime": "0.1.0",
+    "docx": "^9.7.1",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
+    "pdfkit": "^0.19.1"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.17.6"
+  }
+}
