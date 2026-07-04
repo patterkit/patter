@@ -28,9 +28,10 @@ The window is always on top, so it floats over the editor while you work.
 ## The controls
 
 - **▸ Step** plays one beat, a line, a piece of narration, or a game event.
-- **Auto-continue** (the **▸▸ Continue** toggle in the header, off by default) turns Step
+- **Auto-continue** (the **▸▸ Continue** toggle in the header, on by default) turns Step
   into **Continue to next stop**: it plays on to the next choice or the end, revealing one
-  line at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up.
+  line at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. Turn
+  it off to step one beat at a time.
 - **Speed** (Slow / Normal / Fast / Instant) sets how long each line is held before the
   next appears; **Instant** drops the wait entirely. It paces the reveal only, a voiced
   line always plays its full clip.

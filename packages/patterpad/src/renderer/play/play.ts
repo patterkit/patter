@@ -35,8 +35,9 @@ let audioOn = localStorage.getItem("patter.playAudio") !== "0";
 // Continue mode (a persistent header toggle): when on, advancing runs to the next natural stop (a choice or
 // the end) as a paced reveal instead of one beat at a time. It lives in the header rather than beside Step
 // because in Continue mode the per-beat Step row never appears (we run straight to the next choice), so an
-// inline checkbox would be unreachable once ticked. Remembered across runs.
-let continueMode = localStorage.getItem("patter.playContinue") === "1";
+// inline checkbox would be unreachable once ticked. Remembered across runs; like audio above, it defaults
+// ON for a fresh install (no stored value) while still honouring an explicit off.
+let continueMode = localStorage.getItem("patter.playContinue") !== "0";
 let runGen = 0; // bumped on start / restart / stale so a paced read bails the moment it's superseded
 // Stop / pause a paced run: `stopRequested` halts the reveal at the CURRENT line (the un-played rest waits
 // behind a resume control - it never rushes ahead); `skipFire` cuts short the current beat's delay; `stopClip`
