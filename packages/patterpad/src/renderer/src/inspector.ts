@@ -543,7 +543,7 @@ function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   let body: HTMLElement[];
   switch (lv.kind) {
     case "leaf": head = LEAF_HEAD[lv.beat]; body = leafBody(lv, h); break;
-    case "snippet": head = "Snippet"; body = snippetBody(lv, h); break; // always "Snippet" - a jump is a snippet property, not its identity (the body notes a jump-only bubble)
+    case "snippet": head = "Snippet"; body = snippetBody(lv, h); break; // always "Snippet" - a jump is a snippet property, not its identity (the body notes a jump-only snippet)
     case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" ? lv.label.replace(/^sequence · /, "") : ""; body = groupBody(lv, h); break;
     case "block": head = "Block"; sub = lv.name; body = addressBody(lv, h); break;
     case "scene": head = "Scene"; sub = lv.name; body = addressBody(lv, h); break;

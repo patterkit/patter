@@ -84,7 +84,7 @@ function zoneHints(s: ZoneState): Hint[] {
       if (s.zone.textLen === 0) {
         return [
           { key: "Enter", label: "next line" },
-          { key: "Shift-Enter", label: "end bubble" },
+          { key: "Shift-Enter", label: "end snippet" },
           { key: "(", label: "direction" },
           { key: "/", label: "insert" },
         ];
@@ -92,14 +92,14 @@ function zoneHints(s: ZoneState): Hint[] {
       if (s.zone.atStart) {
         return [
           { key: "Enter", label: "next line" },
-          { key: "Shift-Enter", label: "end bubble" },
+          { key: "Shift-Enter", label: "end snippet" },
           { key: "(", label: "direction" },
         ];
       }
       return [
         { key: "Enter", label: "next line" },
         { key: "Cmd-T", label: "→ free text" },
-        { key: "Shift-Enter", label: "end bubble" },
+        { key: "Shift-Enter", label: "end snippet" },
       ];
     }
 

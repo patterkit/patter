@@ -34,8 +34,8 @@ These keys have no menu entry; they're how you write on the page:
 
 | Key | Action |
 | --- | --- |
-| `Enter` | New line in the bubble |
-| `⇧Enter` / `⌘Enter` | New bubble |
+| `Enter` | New line in the snippet |
+| `⇧Enter` / `⌘Enter` | New snippet |
 | `Tab` | Turn a plain line into dialogue · accept a name · close a `(direction)` |
 | `⌘T` / `Alt-T` | Switch the line between dialogue and narration |
 | `Space` (empty name / start) | Turn the line into plain narration |
@@ -49,11 +49,11 @@ These keys have no menu entry; they're how you write on the page:
 
 | Gesture | Action |
 | --- | --- |
-| **⋯** button / **right-click** a bubble or group | Open the structural action menu |
-| **Shift-click** a bubble/group | Select a contiguous run |
-| **⌘/Ctrl-click** a bubble/group | Toggle it into a discontiguous selection |
+| **⋯** button / **right-click** a snippet or group | Open the structural action menu |
+| **Shift-click** a snippet/group | Select a contiguous run |
+| **⌘/Ctrl-click** a snippet/group | Toggle it into a discontiguous selection |
 | Click the empty background | Clear the selection |
-| Drag the **⠿** grip | Reorder a bubble, group, or block (**Esc** cancels) |
+| Drag the **⠿** grip | Reorder a snippet, group, or block (**Esc** cancels) |
 | Drag an option out of its choice | Ungroup it |
 | Double-click a **pane seam** | Reset that pane's width |
 | Click the **project name** in the top bar | Open the project overview |

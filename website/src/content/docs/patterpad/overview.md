@@ -60,7 +60,7 @@ Patterpad gets you working in one click:
 ## The workspace
 
 <figure class="doc-shot">
-  <img src="/doc-images/ThreeColumns.png" alt="The Patterpad workspace: a Scenes navigator on the left, the script surface in the centre showing dialogue bubbles for The Patter Tour, and the Inspector on the right." />
+  <img src="/doc-images/ThreeColumns.png" alt="The Patterpad workspace: a Scenes navigator on the left, the script surface in the centre showing dialogue snippets for The Patter Tour, and the Inspector on the right." />
   <figcaption>The three-column workspace: the Scenes navigator (left), the script surface (centre), and the Inspector (right). The script stays put; the side panes are guests you toggle with <code>⌘1</code> and <code>⌘2</code>.</figcaption>
 </figure>
 

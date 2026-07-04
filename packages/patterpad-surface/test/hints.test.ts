@@ -72,7 +72,7 @@ describe("hint content matches the state", () => {
   it("a direction offers close", () => {
     expect(keys(caret("L1", "paren"))).toEqual([")"]);
   });
-  it("empty dialogue content offers next-line / end-bubble / direction / insert", () => {
+  it("empty dialogue content offers next-line / end-snippet / direction / insert", () => {
     expect(keys(caret("L2", "say"))).toEqual(["Enter", "Shift-Enter", "(", "/"]);
   });
   it("a cue on an empty line offers insert (the / menu is reachable from the cue too)", () => {
@@ -83,7 +83,7 @@ describe("hint content matches the state", () => {
     expect(keys(caret("P2", "say", 0))).toContain("/"); // P2 has no text -> the / menu is reachable
     expect(keys(caret("P1", "say", 0))).not.toContain("/"); // P1 has text -> no insert
   });
-  it("Enter never ends the bubble in content (Shift-Enter does)", () => {
+  it("Enter never ends the snippet in content (Shift-Enter does)", () => {
     expect(keys(caret("L1", "say", 2))).toContain("Shift-Enter"); // content present
     expect(hintsFor(context(caret("L1", "say", 2))).find((h) => h.key === "Enter")?.label).toBe("next line");
   });

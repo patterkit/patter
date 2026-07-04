@@ -10,18 +10,18 @@ dialogue, and stage directions, and you type into it much like a good word proce
 A lot of what makes it fast stays out of sight until you want it; this page walks
 through the whole thing.
 
-## Bubbles, cues, and beats
+## Snippets, cues, and beats
 
 A run of dialogue and narration that plays together is a **snippet**, drawn as a soft
-rounded card, a "bubble". Quiet space sits between bubbles, so the shape of a scene
-reads at a glance without the page turning into boxes and lines.
+rounded card. Quiet space sits between snippets, so the shape of a scene reads at a
+glance without the page turning into boxes and lines.
 
 <figure class="doc-shot">
-  <img src="/doc-images/Bubble.png" alt="A snippet bubble showing the three beat kinds: dialogue lines with a coloured GUIDE cue, a speaker-less prose line, a line carrying a (warmly) direction, and a game-event chip, with a jump to The Crossroads at the foot." />
-  <figcaption>One snippet "bubble" holding all three beat kinds: <strong>lines</strong> (a coloured <code>GUIDE</code> cue beside the words), a <strong>text</strong> beat (prose with no speaker), a line carrying an inline <code>(warmly)</code> direction, and a silent <code>⚙ game event</code>. The <code>↪ The Crossroads</code> chip is a jump; the <code>⠿</code> grip reorders the bubble and <code>⋯</code> opens its action menu.</figcaption>
+  <img src="/doc-images/Bubble.png" alt="A snippet showing the three beat kinds: dialogue lines with a coloured GUIDE cue, a speaker-less prose line, a line carrying a (warmly) direction, and a game-event chip, with a jump to The Crossroads at the foot." />
+  <figcaption>One snippet holding all three beat kinds: <strong>lines</strong> (a coloured <code>GUIDE</code> cue beside the words), a <strong>text</strong> beat (prose with no speaker), a line carrying an inline <code>(warmly)</code> direction, and a silent <code>⚙ game event</code>. The <code>↪ The Crossroads</code> chip is a jump; the <code>⠿</code> grip reorders the snippet and <code>⋯</code> opens its action menu.</figcaption>
 </figure>
 
-Inside a bubble are **beats**, and there are only three kinds:
+Inside a snippet are **beats**, and there are only three kinds:
 
 - a **line**: someone speaks, with their name beside the words;
 - a **text** beat: narration or description, with no speaker;
@@ -50,8 +50,8 @@ Most of writing is just typing. These keys cover the rest:
 
 | Key | What it does |
 | --- | --- |
-| **Enter** | A new line in the same bubble |
-| **Shift-Enter** | Start a **new bubble** |
+| **Enter** | A new line in the same snippet |
+| **Shift-Enter** | Start a **new snippet** |
 | **Tab** | Turn a plain line into **dialogue** (and open the name picker); also finishes a name or a `(direction)` |
 | **`⌘T` / `Alt-T`** | Switch the current line between **dialogue and narration**, keeping the words |
 | **Space** at the start of a line | Turn it into plain narration |
@@ -85,14 +85,14 @@ Beyond the usual arrows and clicks, two things are worth knowing:
 - The **left and right arrows** walk through a line a piece at a time, name, direction,
   words, and carry on to the next line at the end.
 - **Undo and redo** (`⌘Z` / `⇧⌘Z`) cover everything, including structural changes like
-  splitting or reordering a bubble, so you can always step back cleanly.
+  splitting or reordering a snippet, so you can always step back cleanly.
 
 ## Building structure as you type
 
 You rarely need a menu to add something:
 
-- A **"+"** in the gap under a bubble adds another bubble.
-- An empty bubble shows a faint **"+"**; click it to start writing.
+- A **"+"** in the gap under a snippet adds another snippet.
+- An empty snippet shows a faint **"+"**; click it to start writing.
 - On a blank line, **`/`** opens a quick menu: add a game event or a jump, split here,
   or follow on with a snippet, a branch, a choice, or one of the sequence presets (once
   each, cycle, or shuffle).
@@ -102,7 +102,7 @@ The full set of structural tools, choices, selectors, jumps, and the ⋯ menu, l
 
 ## Selecting and moving whole chunks
 
-You can grab whole bubbles and groups, one or many:
+You can grab whole snippets and groups, one or many:
 
 - **Shift-click** to select a range.
 - **⌘ / Ctrl-click** to add or remove one at a time (so you can pick, say, the first,
@@ -111,9 +111,9 @@ You can grab whole bubbles and groups, one or many:
 - With something selected, **⌫** deletes it (with a quick confirm), and
   **right-click ▸ Wrap in** groups it.
 
-To **reorder**, grab the **⠿** grip on the left and drag a bubble, group, or block; the
+To **reorder**, grab the **⠿** grip on the left and drag a snippet, group, or block; the
 page opens a gap to show where it will land, and **Esc** cancels mid-drag. Dragging an
-option out of a choice turns it back into a plain bubble.
+option out of a choice turns it back into a plain snippet.
 
 ## Sections and titles
 

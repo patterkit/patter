@@ -12,7 +12,7 @@ without ever asking you to wire up a flow chart. You change the structure throug
 
 ## The action menu (⋯ / right-click)
 
-Every bubble and group has a quiet **⋯** button at its top-right, and
+Every snippet and group has a quiet **⋯** button at its top-right, and
 **right-clicking** anywhere on it opens the same menu. It holds the structural moves:
 
 - **Follow with ▸**: add something after this piece, a Snippet, a Branch, a Choice, or

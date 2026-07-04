@@ -20,7 +20,7 @@ A **condition** decides whether a piece of content shows. Click a snippet or gro
 - pick properties and built-ins from a menu, no need to remember names;
 - or flip to plain text and type the expression yourself.
 
-It checks as you build, and the finished test shows on the bubble as a quiet `if …`
+It checks as you build, and the finished test shows on the snippet as a quiet `if …`
 tag. With no condition, the content always shows.
 
 <figure class="doc-shot">
