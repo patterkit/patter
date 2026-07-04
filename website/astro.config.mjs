@@ -49,6 +49,13 @@ export default defineConfig({
         // all, and stray agents request /favicon.ico directly. Same mark, rasterised.
         { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "48x48" } },
         { tag: "link", attrs: { rel: "apple-touch-icon", href: "/apple-touch-icon.png" } },
+        // Link-preview card for every docs page (Starlight emits per-page title/description
+        // but no image). og:image must be an ABSOLUTE url; the landing page sets its own.
+        { tag: "meta", attrs: { property: "og:image", content: "https://patterkit.dev/social-card.png" } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1280" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "640" } },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: "https://patterkit.dev/social-card.png" } },
       ],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/patterkit/patter" }],
       // Role-routed IA: newcomers/evaluators start at the top; writers, the project lead who sets
