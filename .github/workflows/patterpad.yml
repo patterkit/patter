@@ -1,12 +1,18 @@
 name: Patterpad release
 
 # The desktop app has its own tag-driven pipeline (not Changesets): tagging
-# `patterpad-vX.Y.Z` builds + signs Patterpad on each OS and publishes the
-# installers + the electron-updater feeds (latest-mac.yml / latest.yml /
-# latest-linux.yml) to the matching GitHub Release.
+# `vX.Y.Z` builds + signs Patterpad on each OS and publishes the installers
+# + the electron-updater feeds (latest-mac.yml / latest.yml / latest-linux.yml)
+# to the matching GitHub Release.
+#
+# Patterpad is the ONE deliverable on bare `v*` tags, and that is load-bearing:
+# electron-builder's GitHub publisher can only target `v<version>` tags, and
+# electron-updater's GitHub provider walks the releases feed skipping any tag
+# that isn't plain semver (so cli-v* / play-*-v* / @patterkit/* releases are
+# invisible to it). Never give another deliverable a bare v* tag.
 on:
   push:
-    tags: ["patterpad-v*"]
+    tags: ["v*"]
 
 permissions:
   contents: write
@@ -23,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version="${GITHUB_REF_NAME#patterpad-v}"
+          version="${GITHUB_REF_NAME#v}"
           awk -v ver="$version" 'index($0, "## [" ver "]") == 1 {f=1; next} /^## \[/ {f=0} f' \
             packages/patterpad/CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "no changelog section for ${version}"; exit 1; }
@@ -65,7 +71,7 @@ jobs:
         working-directory: patter
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#patterpad-v}"
+          version="${GITHUB_REF_NAME#v}"
           manifest=$(node -p "require('./packages/patterpad/package.json').version")
           [ "$manifest" = "$version" ] || { echo "package.json says $manifest but the tag says $version"; exit 1; }
           grep -q "^## \[${version}\] - [0-9]" packages/patterpad/CHANGELOG.md \

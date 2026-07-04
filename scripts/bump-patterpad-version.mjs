@@ -2,7 +2,8 @@
 //
 //   npm run bump:pad -- 0.2.0
 //
-// Patterpad has its own tag-driven release pipeline (patterpad-v* -> .github/workflows/patterpad.yml),
+// Patterpad has its own tag-driven release pipeline (bare v* tags -> .github/workflows/patterpad.yml;
+// bare v* is Patterpad's alone - electron-builder/updater can only target plain semver tags),
 // separate from Changesets and from the runtimes' lockstep `bump:play`. This script:
 //   1. writes the version into packages/patterpad/package.json (electron-builder takes the
 //      installer file names, the app's About version, and the updater feed version from it)
@@ -73,7 +74,7 @@ console.log(`
 Next steps (review the diffs first):
   git add packages/patterpad/package.json packages/patterpad/CHANGELOG.md
   git commit -m "Patterpad ${version}"
-  git tag patterpad-v${version}
+  git tag v${version}
   git push && git push --tags          # the tag triggers the Patterpad release pipeline
                                        # (builds + signs mac/win/linux, publishes installers
                                        # + the electron-updater feeds to the GitHub Release)

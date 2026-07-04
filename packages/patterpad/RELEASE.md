@@ -50,7 +50,7 @@ Patterpad is versioned by the bump script (the same contract as the runtimes' `b
 # 1. write the changelog: fill CHANGELOG.md's "## [Unreleased]" section
 # 2. bump - writes package.json's version, dates the changelog, prints the tag command:
 npm run bump:pad -- 1.0.0        # from the repo root
-# 3. commit, then tag patterpad-v1.0.0 and push
+# 3. commit, then tag v1.0.0 and push
 ```
 
 The release workflow refuses a tag whose version does not match `package.json` and a dated
@@ -64,7 +64,7 @@ installer file names, the About-dialog version, and the updater-feed version fro
 uploads the installers plus the electron-updater feeds (`latest-mac.yml` / `latest.yml` /
 `latest-linux.yml`) to the matching GitHub Release. Locally, `npm run publish:mac` does the mac side;
 in CI the **Patterpad release** workflow (`.github/workflows/patterpad.yml`, triggered by a
-`patterpad-v*` tag) builds + publishes all three OSes, with signing creds from Actions secrets instead
+`v*` tag; bare v* tags are Patterpad's alone - electron-builder and electron-updater only understand plain semver tags) builds + publishes all three OSes, with signing creds from Actions secrets instead
 of `.env.local`.
 
 The app self-updates from that feed via **electron-updater** (`src/main/updater.ts`): a background check

@@ -56,7 +56,7 @@ cd website && npm install && npm run dev
 
 ## Releases (maintainers)
 
-Tag-driven: `play-*-v*` ships the four runtimes in lockstep, `patterpad-v*` the editor,
+Tag-driven: `play-*-v*` ships the four runtimes in lockstep, `v*` the editor (bare v* tags are Patterpad's alone),
 `cli-v*` the standalone CLI, `corpus-v*` the conformance corpus. The bump scripts write the
 manifests + changelogs and print the tag commands; the workflows refuse mismatched tags.
 
