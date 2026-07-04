@@ -10,7 +10,10 @@ const repo = "patterkit/patter";
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
-<div class="pt-dl" data-pt-dl={kind} data-repo={repo} data-base={base}>
+{/* not-content: Starlight's escape hatch - exempts this subtree from its markdown flow
+    styles (which otherwise stamp margin-top on every sibling and out-cascade our classes,
+    un-pinning the card buttons and making same-row cards ragged). */}
+<div class="pt-dl not-content" data-pt-dl={kind} data-repo={repo} data-base={base}>
   <p class="pt-dl-status">Loading the latest release…</p>
 </div>
 
@@ -21,9 +24,12 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
   .pt-dl-meta { color: var(--sl-color-gray-3); font-size: 0.82rem; margin: 0.55rem 0 0; }
   .pt-dl-meta a { color: var(--sl-color-text-accent); }
   .pt-dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 0.75rem; }
-  .pt-dl-card { display: flex; flex-direction: column; gap: 0.35rem; height: 100%; border: 1px solid var(--sl-color-gray-5);
+  .pt-dl-card { display: flex; flex-direction: column; gap: 0.4rem; height: 100%; border: 1px solid var(--sl-color-gray-5);
     border-top: 2px solid var(--pt-teal-ink, var(--sl-color-accent)); border-radius: 0.6rem;
     padding: 0.9rem 1rem 1rem; background: var(--sl-color-bg-sidebar); }
+  /* With not-content on the mount (see the markup), spacing inside a card is ours alone:
+     the flex gap plus the button's auto margin. */
+  .pt-dl-card > * { margin: 0; }
   .pt-dl-card-head { display: flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 1rem; }
   .pt-dl-card-head img { border-radius: 7px; }
   .pt-dl-sub { font-size: 0.8rem; color: var(--sl-color-gray-2); margin: 0; }
