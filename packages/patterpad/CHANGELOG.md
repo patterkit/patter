@@ -6,6 +6,9 @@ Patterpad is versioned by `npm run bump:pad` and released by tagging `patterpad-
 
 ## [Unreleased]
 
+### Changed
+- Minor tweaks to terminology to get rid of references to bubbles instead of snippets.
+
 ## [0.1.0] - 2026-07-04
 
 ### Added
