@@ -30,8 +30,11 @@ export interface DocumentManifest {
 }
 
 // A fixed timestamp keeps the zip byte-reproducible (no wall-clock mtimes), so
-// re-packing unchanged source yields an identical document.
+// re-packing unchanged source yields an identical document. createFolders must
+// stay off: JSZip stamps implicit folder entries with new Date() regardless of
+// the file's `date` option, which leaks wall-clock time into the bytes.
 const FIXED_DATE = new Date("2000-01-01T00:00:00Z");
+const ENTRY_OPTS = { date: FIXED_DATE, createFolders: false } as const;
 
 /** Pack a project's source shards into a `.patterpack` document (zip bytes). */
 export async function runPack(startPath: string): Promise<Buffer> {
@@ -51,8 +54,8 @@ export async function runPack(startPath: string): Promise<Buffer> {
   };
 
   const zip = new JSZip();
-  zip.file("patter.manifest.json", JSON.stringify(manifest, null, 2) + "\n", { date: FIXED_DATE });
-  for (const f of files) zip.file(f.rel, readFileSync(f.abs, "utf8"), { date: FIXED_DATE });
+  zip.file("patter.manifest.json", JSON.stringify(manifest, null, 2) + "\n", ENTRY_OPTS);
+  for (const f of files) zip.file(f.rel, readFileSync(f.abs, "utf8"), ENTRY_OPTS);
 
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", streamFiles: false });
 }

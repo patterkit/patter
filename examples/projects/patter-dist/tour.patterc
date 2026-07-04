@@ -1,0 +1,1196 @@
+{
+  "cast": [
+    {
+      "displayName": "Guide",
+      "name": "GUIDE"
+    },
+    {
+      "name": "SFX"
+    }
+  ],
+  "content": {
+    "hash": "0wno2m6",
+    "project": "proj_sa3v44hd",
+    "structureHash": "0z6x4me"
+  },
+  "locales": {
+    "default": "en",
+    "included": [
+      "en"
+    ]
+  },
+  "properties": [
+    {
+      "default": false,
+      "name": "brave",
+      "shared": true,
+      "type": "boolean"
+    },
+    {
+      "default": 0,
+      "name": "asks",
+      "shared": true,
+      "type": "number"
+    },
+    {
+      "default": 4,
+      "name": "torch",
+      "shared": true,
+      "type": "number"
+    }
+  ],
+  "scenes": {
+    "scn_8007kfrw": {
+      "blocks": [
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "id": "T_rwkunh2z",
+                  "kind": "text"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_uk56f61b",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_2ec5fwcx",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_lqnostww",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_tvw1751s",
+              "jump": {
+                "to": "blk_v0qnj91x"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_p8s3uws3",
+          "name": "Welcome",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_jjyt2npu",
+                  "kind": "line"
+                }
+              ],
+              "condition": {
+                "ast": [
+                  "bin",
+                  "==",
+                  [
+                    "call",
+                    "visits",
+                    [
+                      "s",
+                      "blk_v0qnj91x"
+                    ]
+                  ],
+                  [
+                    "n",
+                    1
+                  ]
+                ],
+                "src": "visits(blk_v0qnj91x) == 1"
+              },
+              "id": "sn_cxbjf67n",
+              "type": "snippet"
+            },
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_kqsapwb7",
+                  "kind": "line"
+                }
+              ],
+              "condition": {
+                "ast": [
+                  "bin",
+                  ">",
+                  [
+                    "call",
+                    "visits",
+                    [
+                      "s",
+                      "blk_v0qnj91x"
+                    ]
+                  ],
+                  [
+                    "n",
+                    1
+                  ]
+                ],
+                "src": "visits('blk_v0qnj91x') > 1"
+              },
+              "id": "sn_5w72vmcm",
+              "type": "snippet"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "id": "sn_e1lkhfmm",
+                      "jump": {
+                        "to": "blk_y1llsc95"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_0tjh8vev",
+                  "prompt": {
+                    "id": "L_kas0ve2p",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_88xj169v",
+                      "jump": {
+                        "to": "blk_1l08bk05"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_0gatjxka",
+                  "prompt": {
+                    "id": "L_ss3kdmht",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_4o0hu5qq",
+                      "jump": {
+                        "to": "blk_bdp47vq7"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_elrx5lii",
+                  "prompt": {
+                    "id": "L_g0o5prlt",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_eql8vx4k",
+                      "jump": {
+                        "to": "blk_96znfw0i"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_gks2cn82",
+                  "prompt": {
+                    "id": "L_yh2umlmo",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_z35mvg12",
+                      "jump": {
+                        "to": "blk_oca7w7sm"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_v59msxd7",
+                  "prompt": {
+                    "id": "L_54z9u1x9",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_kjctnoq9",
+                      "jump": {
+                        "to": "blk_gfsd8zkl"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_qbyoqcf2",
+                  "prompt": {
+                    "id": "L_sbio1pqk",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_wqq16jg2",
+                      "jump": {
+                        "to": "blk_of8ubwtp"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_c66yx5qw",
+                  "prompt": {
+                    "id": "L_gdllz7g4",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                }
+              ],
+              "id": "g_8f62bme8",
+              "selector": "choice",
+              "type": "group"
+            }
+          ],
+          "id": "blk_v0qnj91x",
+          "name": "The Crossroads",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_g3i592c7",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_t3xxeijy",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_i588fcvq",
+                  "kind": "text"
+                },
+                {
+                  "character": "GUIDE",
+                  "direction": "warmly",
+                  "id": "L_2rkpjkyq",
+                  "kind": "line"
+                },
+                {
+                  "id": "A_3fgbu7px",
+                  "kind": "gameEvent"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_gzze295b",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_z437j1m3",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_iskpf0cn",
+              "jump": {
+                "to": "blk_v0qnj91x"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_y1llsc95",
+          "name": "Lines & narration",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_0vvvty20",
+                  "kind": "line"
+                }
+              ],
+              "id": "sn_r28gh6jt",
+              "type": "snippet"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "beats": [
+                        {
+                          "character": "GUIDE",
+                          "id": "L_53ew1muy",
+                          "kind": "line"
+                        }
+                      ],
+                      "id": "sn_h5tw1gr4",
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_adrdhfrp",
+                  "prompt": {
+                    "id": "L_s3bqndtt",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "beats": [
+                        {
+                          "character": "GUIDE",
+                          "id": "L_s2ugg6fo",
+                          "kind": "line"
+                        }
+                      ],
+                      "id": "sn_fs4wtxba",
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_r6j3p3ui",
+                  "prompt": {
+                    "id": "L_639390f8",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                }
+              ],
+              "id": "g_yq6cvd0m",
+              "selector": "choice",
+              "type": "group"
+            },
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_dgowlmkp",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_5wcgi4ho",
+                  "kind": "text"
+                },
+                {
+                  "id": "L_hzy81x3w",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_s333gksp",
+              "jump": {
+                "to": "blk_v0qnj91x"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_1l08bk05",
+          "name": "Choices & options",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_8ndfou2l",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_2lqfp2j1",
+                  "kind": "line"
+                }
+              ],
+              "condition": {
+                "ast": [
+                  "bin",
+                  "==",
+                  [
+                    "call",
+                    "visits",
+                    [
+                      "s",
+                      "blk_bdp47vq7"
+                    ]
+                  ],
+                  [
+                    "n",
+                    1
+                  ]
+                ],
+                "src": "visits('blk_bdp47vq7') == 1"
+              },
+              "id": "sn_d2hwl0ft",
+              "type": "snippet"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "beats": [
+                            {
+                              "id": "T_waa8u9v5",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_7xxha1tt",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_v0bld3tg",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_1erm2ks0",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_73hre6sq",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_o6dq9erc",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_dwnh4047",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_mojh33gz",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_03dn26em",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_jx3l4mr6",
+                          "type": "snippet"
+                        }
+                      ],
+                      "id": "g_9zv3tj68",
+                      "options": {
+                        "exhaust": "repeat",
+                        "order": "shuffle"
+                      },
+                      "selector": "sequence",
+                      "type": "group"
+                    }
+                  ],
+                  "id": "opt_qpccf77s",
+                  "prompt": {
+                    "id": "L_pemg6t65",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "beats": [
+                            {
+                              "id": "T_58mu80lb",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_b87omwp2",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_5cx5v6nr",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_pv60qc6i",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_ok2kghqb",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_kxzgqbr0",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_zbj90uk1",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_bbuo7lsi",
+                          "type": "snippet"
+                        }
+                      ],
+                      "id": "g_yp35qf8q",
+                      "options": {
+                        "exhaust": "repeat",
+                        "order": "sequential"
+                      },
+                      "selector": "sequence",
+                      "type": "group"
+                    }
+                  ],
+                  "id": "opt_x2verxmb",
+                  "prompt": {
+                    "id": "L_ckfc2bb8",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "beats": [
+                        {
+                          "id": "T_c2qdt0pk",
+                          "kind": "text"
+                        },
+                        {
+                          "id": "L_6kk0egu8",
+                          "kind": "text"
+                        }
+                      ],
+                      "id": "sn_xy4cxs55",
+                      "onEnter": [
+                        {
+                          "kind": "set",
+                          "target": "@torch",
+                          "value": {
+                            "ast": [
+                              "bin",
+                              "-",
+                              [
+                                "sv",
+                                "patter",
+                                "torch"
+                              ],
+                              [
+                                "n",
+                                1
+                              ]
+                            ],
+                            "src": "@torch - 1"
+                          }
+                        }
+                      ],
+                      "type": "snippet"
+                    },
+                    {
+                      "children": [
+                        {
+                          "beats": [
+                            {
+                              "id": "T_08w6wcpc",
+                              "kind": "text"
+                            }
+                          ],
+                          "condition": {
+                            "ast": [
+                              "bin",
+                              ">=",
+                              [
+                                "sv",
+                                "patter",
+                                "torch"
+                              ],
+                              [
+                                "n",
+                                3
+                              ]
+                            ],
+                            "src": "@torch >= 3"
+                          },
+                          "id": "sn_veuns7ko",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_j5e1sdx5",
+                              "kind": "text"
+                            }
+                          ],
+                          "condition": {
+                            "ast": [
+                              "bin",
+                              ">=",
+                              [
+                                "sv",
+                                "patter",
+                                "torch"
+                              ],
+                              [
+                                "n",
+                                2
+                              ]
+                            ],
+                            "src": "@torch >= 2"
+                          },
+                          "id": "sn_jt4whv13",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_10kmsyzr",
+                              "kind": "text"
+                            }
+                          ],
+                          "condition": {
+                            "ast": [
+                              "bin",
+                              ">=",
+                              [
+                                "sv",
+                                "patter",
+                                "torch"
+                              ],
+                              [
+                                "n",
+                                1
+                              ]
+                            ],
+                            "src": "@torch >= 1"
+                          },
+                          "id": "sn_y70nsun2",
+                          "type": "snippet"
+                        },
+                        {
+                          "beats": [
+                            {
+                              "id": "T_gh7amer9",
+                              "kind": "text"
+                            }
+                          ],
+                          "id": "sn_86xpj1tb",
+                          "type": "snippet"
+                        }
+                      ],
+                      "id": "g_5drwabln",
+                      "selector": "branch",
+                      "type": "group"
+                    }
+                  ],
+                  "id": "opt_va5zymhx",
+                  "prompt": {
+                    "id": "L_2dmps0mq",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_rl9jp92j",
+                      "jump": {
+                        "to": "blk_v0qnj91x"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_vhykqu7o",
+                  "prompt": {
+                    "id": "L_jdoujgwq",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                }
+              ],
+              "id": "g_q21v9j2k",
+              "selector": "choice",
+              "type": "group"
+            },
+            {
+              "id": "sn_dfg3d6fu",
+              "jump": {
+                "to": "blk_bdp47vq7"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_bdp47vq7",
+          "name": "Selectors",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_mshi7u3l",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_fquoaxvh",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_yg3oomg9",
+              "onEnter": [
+                {
+                  "kind": "set",
+                  "target": "@asks",
+                  "value": {
+                    "ast": [
+                      "bin",
+                      "+",
+                      [
+                        "sv",
+                        "patter",
+                        "asks"
+                      ],
+                      [
+                        "n",
+                        1
+                      ]
+                    ],
+                    "src": "@asks + 1"
+                  }
+                }
+              ],
+              "type": "snippet"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "beats": [
+                        {
+                          "character": "GUIDE",
+                          "id": "L_l6w28hh0",
+                          "kind": "line"
+                        }
+                      ],
+                      "id": "sn_fhg7iypt",
+                      "onEnter": [
+                        {
+                          "kind": "set",
+                          "target": "@brave",
+                          "value": {
+                            "ast": [
+                              "b",
+                              true
+                            ],
+                            "src": "true"
+                          }
+                        }
+                      ],
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_ftollk2o",
+                  "prompt": {
+                    "id": "L_on8u43yq",
+                    "kind": "text"
+                  },
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "beats": [
+                        {
+                          "character": "GUIDE",
+                          "id": "L_jptgfwlx",
+                          "kind": "line"
+                        }
+                      ],
+                      "id": "sn_cpmfz3kv",
+                      "onEnter": [
+                        {
+                          "kind": "set",
+                          "target": "@brave",
+                          "value": {
+                            "ast": [
+                              "b",
+                              false
+                            ],
+                            "src": "false"
+                          }
+                        }
+                      ],
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_h2vr3kvg",
+                  "prompt": {
+                    "id": "L_2ndl4wd4",
+                    "kind": "text"
+                  },
+                  "type": "group"
+                }
+              ],
+              "id": "g_w5rfxbnf",
+              "selector": "choice",
+              "type": "group"
+            },
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_r1x3eof8",
+                  "kind": "line"
+                }
+              ],
+              "condition": {
+                "ast": [
+                  "sv",
+                  "patter",
+                  "brave"
+                ],
+                "src": "@brave"
+              },
+              "id": "sn_gwa6q8sf",
+              "type": "snippet"
+            },
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_begzzbls",
+                  "kind": "line"
+                }
+              ],
+              "condition": {
+                "ast": [
+                  "u",
+                  "not",
+                  [
+                    "sv",
+                    "patter",
+                    "brave"
+                  ]
+                ],
+                "src": "not @brave"
+              },
+              "id": "sn_p9psw82m",
+              "type": "snippet"
+            },
+            {
+              "beats": [
+                {
+                  "id": "T_eizaftpf",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_anosl5px",
+              "jump": {
+                "to": "blk_v0qnj91x"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_96znfw0i",
+          "name": "Memory",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_9lypohpy",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_navdbi88",
+                  "kind": "line"
+                },
+                {
+                  "character": "SFX",
+                  "id": "L_heik1go9",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_48la1il4",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_nazdfvyq",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_5hzzgwbc",
+              "type": "snippet"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "id": "sn_vtyv6lvu",
+                      "jump": {
+                        "to": "blk_oca7w7sm"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_cxn2lgv7",
+                  "prompt": {
+                    "id": "L_tuuanup5",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                },
+                {
+                  "children": [
+                    {
+                      "id": "sn_nb159mgc",
+                      "jump": {
+                        "to": "blk_v0qnj91x"
+                      },
+                      "type": "snippet"
+                    }
+                  ],
+                  "id": "opt_gg2wcyqx",
+                  "prompt": {
+                    "id": "L_4wvlp5r1",
+                    "kind": "text"
+                  },
+                  "sticky": true,
+                  "type": "group"
+                }
+              ],
+              "id": "g_s1ehw8dr",
+              "selector": "choice",
+              "type": "group"
+            }
+          ],
+          "id": "blk_oca7w7sm",
+          "name": "Closed captions",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_w7yp2n8k",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_afrv2qya",
+                  "kind": "text"
+                },
+                {
+                  "id": "T_1hm25b9c",
+                  "kind": "text"
+                },
+                {
+                  "id": "T_yugj2fx5",
+                  "kind": "text"
+                },
+                {
+                  "id": "T_pzvh33fc",
+                  "kind": "text"
+                },
+                {
+                  "id": "T_r6o7o5bt",
+                  "kind": "text"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_y6cp8bjw",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_4gw5bkrh",
+                  "kind": "line"
+                }
+              ],
+              "id": "sn_rqgtjlbs",
+              "jump": {
+                "to": "blk_v0qnj91x"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_gfsd8zkl",
+          "name": "Under the hood",
+          "type": "block"
+        },
+        {
+          "children": [
+            {
+              "beats": [
+                {
+                  "character": "GUIDE",
+                  "id": "L_jmnwski3",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_mhgjuksd",
+                  "kind": "text"
+                },
+                {
+                  "character": "GUIDE",
+                  "id": "L_02irf71j",
+                  "kind": "line"
+                },
+                {
+                  "id": "T_0yegn7g3",
+                  "kind": "text"
+                }
+              ],
+              "id": "sn_kavggzhr",
+              "jump": {
+                "to": "END"
+              },
+              "type": "snippet"
+            }
+          ],
+          "id": "blk_of8ubwtp",
+          "name": "The End",
+          "type": "block"
+        }
+      ],
+      "id": "scn_8007kfrw",
+      "name": "The Patter Tour",
+      "type": "scene"
+    }
+  },
+  "schema": "patter/bundle@0",
+  "strings": {
+    "en": {
+      "L_02irf71j": "Now go and build something wonderful. ",
+      "L_0vvvty20": "A choice hands control to the player. Pick one, then watch what happens next.",
+      "L_2dmps0mq": "Branch: first matching condition wins",
+      "L_2ec5fwcx": "Everything you're reading right now is a Patter story, the same kind your game would play.",
+      "L_2lqfp2j1": "You can add new groups, or wrap an existing snippet in a group, from the right-hand context menu.",
+      "L_2ndl4wd4": "Tell the guide: I'm being cautious",
+      "L_2rkpjkyq": "A  line can also carry a direction for the actor. Mine just whispered “warmly” to whoever voices me - players never see it.",
+      "L_48la1il4": "Turn closed captions OFF and the cue in my last line - and that whole sound-effect line - disappear. But their audio would still play.",
+      "L_4gw5bkrh": "And the editor watches your back: dead-end detection, coverage testing, spell-check, version control. You write; it checks.",
+      "L_4wvlp5r1": "Back to the menu",
+      "L_53ew1muy": "You went left. ",
+      "L_54z9u1x9": "Closed captions",
+      "L_639390f8": "Go right",
+      "L_6kk0egu8": "(Another thing to note here is that TEXT beats allow you to embed values using curly brackets.)",
+      "L_8ndfou2l": "Groups bundle beats together and pick from them. Three types do most of the work - poke each one a few times and watch how it behaves.",
+      "L_9lypohpy": "Some dialogue carries sounds rather than words.",
+      "L_begzzbls": "You're playing it cautious, so you get THIS line instead of the line about being brave. That's a condition at work.",
+      "L_ckfc2bb8": "Sequence: in order, then loop",
+      "L_dgowlmkp": "And whichever option you picked, we end up here - although you could have jumped away to a different part of the game.",
+      "L_g0o5prlt": "Selectors: shuffle, sequence, branch",
+      "L_g3i592c7": "Patter is built from just three kinds of beat.",
+      "L_gdllz7g4": " Finish the tour",
+      "L_gzze295b": "And between the last line and this one was a GAME EVENT - a custom signal to the game engine that something should happen. It is, of course, up to the game what that actually does.",
+      "L_heik1go9": "A distant door creaks slowly shut.",
+      "L_hzy81x3w": "Depending on your game setup, the option prompt will be either a spoken line, or simply text; that's up to you and your designers; Patter allows both.",
+      "L_jdoujgwq": "←  Back to the tour menu",
+      "L_jjyt2npu": "So where would you like to start? Pick anything; I'll bring you right back here afterwards.",
+      "L_jmnwski3": "That's the tour! You met lines and narration, choices that gather, the three selectors, memory, captions, and the machinery underneath.",
+      "L_jptgfwlx": "Cautious... wise. Noted.",
+      "L_kas0ve2p": "Lines, narration & directions",
+      "L_kqsapwb7": "Back at the crossroads. Where to next?",
+      "L_l6w28hh0": "Brave it is: I'll remember that.",
+      "L_mshi7u3l": "Patter remembers. Stories keep named values called properties, shared with your game.",
+      "L_navdbi88": "Oh, here we go again. [sighs heavily]",
+      "L_on8u43yq": "Tell the guide: I'm feeling brave",
+      "L_pemg6t65": "Shuffle: draw without repeats",
+      "L_r1x3eof8": "Because you told me you're brave, this line appeared. A CONDITION read that property and decided to show it.",
+      "L_s2ugg6fo": "You went right. ",
+      "L_s3bqndtt": "Go left",
+      "L_sbio1pqk": "Features you can't see here",
+      "L_ss3kdmht": "Choices and options",
+      "L_t3xxeijy": "This is a  LINE: someone speaks, and their name sits beside the words.",
+      "L_tuuanup5": "Play this again",
+      "L_uk56f61b": "Hello! Welcome to Patter. I'm your guide for this little tour.",
+      "L_w7yp2n8k": "A lot of Patter's power doesn't show up in the script. Let's go through a few hidden parts.",
+      "L_y6cp8bjw": "Scratch audio! These lines were recorded by Ian at his desk through a headset, in about five minutes.",
+      "L_yh2umlmo": "Memory: properties & conditions",
+      "T_03dn26em": "A card turns over: the Fool.",
+      "T_08w6wcpc": "🔥 The torch blazes. (Row 1 won: “fuel ≥ 3” is true.)",
+      "T_0yegn7g3": "* The End *",
+      "T_10kmsyzr": "🔥 The torch gutters, nearly out. (Only the last condition, “fuel ≥ 1”, still holds.)",
+      "T_1hm25b9c": "<b>Game Data</b>: typed fields you pin to any node (an emotion, a camera angle, a quest id) merged with sensible defaults at runtime.",
+      "T_58mu80lb": "Step one: the kettle boils.",
+      "T_5cx5v6nr": "Step two: the tea steeps.",
+      "T_5wcgi4ho": "Choice options can be set to be once-only (they vanish after one use) or repeatable if you come back to the same choices again. And one option can be a fallback the story takes automatically when nothing else is left.",
+      "T_73hre6sq": "A card turns over: the Moon.",
+      "T_afrv2qya": "<b>Tags</b>: invisible labels on any beat (“whisper”, “tutorial”, “boss”) that your game reads to drive audio, animation, or analytics.",
+      "T_c2qdt0pk": "You feed the torch and it burns down a notch. Fuel is now {@torch}. Branch reads its rows top-to-bottom and runs the FIRST whose condition is true.",
+      "T_dwnh4047": "A card turns over: the Sun.",
+      "T_eizaftpf": "<b>Conditions</b> <i>test</i> properties, and <b>effects</b> (such as On begin or On end) <i>change</i> properties. You can use these to<b> </b>power locks, inventories, relationships; anything a game narrative needs to track.",
+      "T_fquoaxvh": "You've wandered into this room {@asks} time(s), a number I just bumped using the <b>On begin</b> part of this snippet.",
+      "T_gh7amer9": "🌑 Darkness. (No condition matched, so Branch ran the final row, the one with NO condition. That's your catch-all, like an “else”. I'll refill the torch.)",
+      "T_i588fcvq": "This is TEXT: a prose beat with no speaker. You might know it as an action line in a script, but there are a few more things you can do with it.",
+      "T_j5e1sdx5": "🔥 A steady flame. (Row 1's “fuel ≥ 3” is now false, so Branch fell to row 2, “fuel ≥ 2”. Row 3, “fuel ≥ 1”, is ALSO true, but Branch stops at the first match, never both.)",
+      "T_lqnostww": "Use the choices to explore. You can come back and revisit any topic in any order.",
+      "T_mhgjuksd": "And all of it is just a folder of plain text files you own, diffable, mergeable, entirely yours.",
+      "T_nazdfvyq": "Try the CC button at the top of the play window: toggle it, then try playing this section again.",
+      "T_ok2kghqb": "Step three: the cup is poured.",
+      "T_pzvh33fc": "<b>Localisation</b>: write once, then ship translations inside the bundle or hand IDs to your own system. The language can even switch mid-game.",
+      "T_r6o7o5bt": "<b>Four Runtimes</b>: this  story plays identically on JavaScript, Unity, Unreal, and Godot, all held to one shared test corpus.",
+      "T_rwkunh2z": "A soft chime. A warm, paper-coloured room assembles itself around you.",
+      "T_v0bld3tg": "A card turns over: the Star.",
+      "T_waa8u9v5": "A card turns over: the Tower.",
+      "T_yugj2fx5": "<b>Save & Load</b>: the whole run (position, every property, visit counts, even the random seed) snapshots and restores in a single call.",
+      "T_z437j1m3": "That's all three - a LINE of speech, written TEXT, and silent engine cues called GAME EVENTS.",
+      "T_zbj90uk1": "Step four: you drink it down, and then we loop back to one."
+    }
+  },
+  "voiced": true
+}

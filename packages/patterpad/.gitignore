@@ -1,9 +1,9 @@
-# Document icons baked from branding/document-icons/square/*.png by
-# scripts/build-{mac,win}-icons. Regenerated as a prerequisite of every
-# `npm run dist*`, so they are build artifacts, not source.
+# Mac document icons baked from branding/document-icons/square/*.png by
+# scripts/build-mac-icons.sh, a prerequisite of every `npm run dist:mac` -
+# build artifacts, not source. The Windows .ico files are COMMITTED instead:
+# scripts/build-win-icons.mjs resizes with sips, which only exists on macOS,
+# so the windows CI runner can't regenerate them (regenerate on a Mac when
+# the branding changes).
 /build/doc-patter.icns
-/build/doc-patter.ico
 /build/doc-patterproj.icns
-/build/doc-patterproj.ico
 /build/doc-patterc.icns
-/build/doc-patterc.ico
