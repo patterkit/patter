@@ -29,6 +29,7 @@ const api: PatterApi = {
   onAudioIndex: (handler) => { ipcRenderer.on("audio:index", (_e, snap: Record<string, { status: string; path: string }>) => handler(snap)); },
   readAudio: (beatId) => ipcRenderer.invoke("audio:read", beatId),
   saveScratch: (beatId, bytes) => ipcRenderer.invoke("audio:saveScratch", beatId, bytes),
+  micAccess: () => ipcRenderer.invoke("audio:micAccess"),
   setRecordingMode: (on) => { void ipcRenderer.invoke("recording:setMode", on); },
   debugStart: () => ipcRenderer.invoke("debug:start"),
   debugStop: () => ipcRenderer.invoke("debug:stop"),

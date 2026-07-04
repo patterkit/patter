@@ -119,6 +119,8 @@ const stub = {
   onAudioIndex: () => undefined, // preview is static; no live folder watching
   readAudio: async () => null,   // no real audio files in the preview
   saveScratch: async () => ({ ok: true }), // #224: pretend the take saved (no fs in the preview)
+  micAccess: async () => true, // no TCC gate in the browser preview
+
   setRecordingMode: () => undefined,
   // Live debug link (#181): a fake server that "connects" a couple of flows so the panel UI is exercisable.
   debugStart: async () => ({ state: "connected", port: 4471, project: "The Tavern", build: "match", flows: ["main", "ambient"], following: "main" }),

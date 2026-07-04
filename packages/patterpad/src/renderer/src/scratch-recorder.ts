@@ -16,6 +16,9 @@ export interface ScratchLine { beatId: string; text: string; character?: string;
 export interface ScratchDeps {
   /** Save the encoded WAV into the scratch folder (lock-aware, in main). */
   saveScratch: (beatId: string, bytes: Uint8Array) => Promise<{ ok: boolean; error?: string }>;
+  /** OS-level mic permission (macOS TCC): checked before opening the stream; may show the system prompt.
+   *  False = the user denied it, so getUserMedia would "succeed" but capture silence. */
+  micAccess: () => Promise<boolean>;
   /** Strip / restore the native menu around the recording (so accelerators can't fire behind the overlay). */
   setRecordingMode: (on: boolean) => void;
   /** Called after each take is saved (so the caller can refresh the folder index / play it). */
@@ -210,8 +213,13 @@ export async function recordScratch(start: ScratchLine, deps: ScratchDeps): Prom
     deps.setRecordingMode(false);
   };
 
-  // Acquire the mic once, up front - reused across every take in the run.
+  // Acquire the mic once, up front - reused across every take in the run. The OS permission comes first:
+  // on macOS a missing TCC grant does NOT fail getUserMedia, it hands over a silent stream.
   overlay.setLine(start);
+  if (!(await deps.micAccess())) {
+    overlay.error("Microphone access denied. Allow Patterpad in System Settings › Privacy & Security › Microphone.");
+    await wait(3200); cleanup(); return;
+  }
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch { overlay.error("Microphone unavailable"); await wait(1600); cleanup(); return; }
 

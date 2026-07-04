@@ -706,6 +706,10 @@ export interface PatterApi {
   /** Scratch recording (#224): save an encoded WAV take into the scratch folder (lock-aware binary write);
    *  the indexer picks it up and the line's derived status updates on its own. */
   saveScratch(beatId: string, bytes: Uint8Array): Promise<SaveResult>;
+  /** Scratch recording (#224): is the OS letting us capture the microphone? On macOS this checks TCC and,
+   *  if the user hasn't been asked yet, triggers the system permission prompt; false = denied (the fix
+   *  lives in System Settings, not in the app). Always true elsewhere. */
+  micAccess(): Promise<boolean>;
   /** Strip / restore the native menu while a scratch recording is in progress (so accelerators can't fire
    *  behind the blocking overlay). */
   setRecordingMode(on: boolean): void;

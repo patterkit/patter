@@ -46,8 +46,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .aside-label { padding: 0.6rem 1rem; color: var(--muted); font: 0.72rem var(--font-ui); border-bottom: 1px solid var(--line); }
 #source { margin: 0; padding: 1rem; font: 12px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }
 
-/* the script surface */
-.ProseMirror { outline: none; max-width: 42rem; margin: 0 auto; line-height: 1.45; }
+/* the script surface. pre-wrap is load-bearing: prosemirror-view expects it on the editable element
+   (cursor placement around spaces goes wrong under normal collapsing, and it warns in the console). */
+.ProseMirror { outline: none; max-width: 42rem; margin: 0 auto; line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word; }
 .ProseMirror:focus { outline: none; }
 
 /* the document outline: scene Title + block H1 sections (groups §1/§3) - FLAT,

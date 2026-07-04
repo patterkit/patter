@@ -1195,6 +1195,7 @@ function startScratchRecording(id: string): void {
   const start = at ? { beatId: at.id, text: at.text, character: at.character } : { beatId: id, text: surface?.sayText(id) ?? "" };
   void recordScratch(start, {
     saveScratch: (beatId, bytes) => window.patter.saveScratch(beatId, bytes),
+    micAccess: () => window.patter.micAccess(),
     setRecordingMode: (on) => window.patter.setRecordingMode(on),
     onComplete: () => { void refreshAudioIndex(); },
     nextLine: (beatId) => nextScratchLine(beatId, lines),

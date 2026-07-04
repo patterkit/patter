@@ -78,6 +78,8 @@
       "category": "public.app-category.developer-tools",
       "icon": "../../branding/icons/png/icon-patterpad-1024.png",
       "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "gatekeeperAssess": false,
       "notarize": true,
       "target": [
@@ -131,7 +133,8 @@
               ]
             }
           }
-        ]
+        ],
+        "NSMicrophoneUsageDescription": "Patterpad uses the microphone to record scratch dialogue takes."
       }
     },
     "dmg": {

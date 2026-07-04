@@ -3,7 +3,7 @@
 // lifecycle + window + native dialogs + IPC wiring; the project session lives in project.ts and the
 // open-where-you-left-off / recents / identity store in store.ts.
 
-import { app, BrowserWindow, dialog, ipcMain, screen, shell, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, Menu } from "electron";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -620,6 +620,16 @@ function registerIpc(): void {
   // picks it up). recording:setMode strips the native menu while recording so accelerators can't fire
   // behind the blocking overlay (restored when it ends).
   ipcMain.handle("audio:saveScratch", (_e, beatId: string, bytes: Uint8Array) => project.saveScratchAudio(beatId, bytes));
+  // macOS gates the mic behind TCC: check (and if undecided, ask) BEFORE the renderer opens the stream,
+  // so a denied state surfaces as a clear message instead of a silently-silent recording. Not-darwin
+  // platforms have no such gate. Needs the audio-input hardened-runtime entitlement in packaged builds.
+  ipcMain.handle("audio:micAccess", async () => {
+    if (process.platform !== "darwin") return true;
+    const status = systemPreferences.getMediaAccessStatus("microphone");
+    if (status === "granted") return true;
+    if (status === "not-determined") return systemPreferences.askForMediaAccess("microphone");
+    return false; // denied or restricted - only the user can flip it, in System Settings
+  });
   ipcMain.handle("recording:setMode", (_e, on: boolean) => { if (on) Menu.setApplicationMenu(null); else refreshMenu(); });
   project.onAudioSnapshot((snap) => { if (win && !win.isDestroyed()) win.webContents.send("audio:index", snap); });
   ipcMain.handle("scene:readSuggestions", (_e, id: string) => project.readSceneSuggestions(id));
