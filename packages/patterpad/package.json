@@ -46,7 +46,7 @@
     "dictionary-en": "^4.0.0",
     "dictionary-en-gb": "^3.0.0",
     "dotenv-cli": "^11.0.0",
-    "electron": "31.7.7",
+    "electron": "39.8.5",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "png-to-ico": "^3.0.1",
