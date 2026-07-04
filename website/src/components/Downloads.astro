@@ -1,70 +1,132 @@
 ---
-// Reads the public, CORS-enabled GitHub Releases API in the BROWSER, so the list stays
-// current without rebuilding the static site. Renders newest-first, with each release's
-// downloadable assets (installers, AppImage, corpus.json, ...).
+// Curated download sections, read live from the public, CORS-enabled GitHub Releases
+// API in the BROWSER so they stay current without rebuilding the static site. Each
+// instance renders ONE section (`kind`): "patterpad" (per-platform installer cards),
+// "plugins" (the four Patterplay runtime zips, brand icons), or "cli" (the standalone
+// binaries). Only the curated tag families render at all - the conformance-corpus and
+// npm-package releases in the same repo are deliberately invisible here.
+const { kind = "patterpad" } = Astro.props;
 const repo = "patterkit/patter";
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
-<div id="pt-downloads" data-repo={repo} class="pt-downloads">
-  <p class="pt-dl-status">Loading the latest releases…</p>
+<div class="pt-dl" data-pt-dl={kind} data-repo={repo} data-base={base}>
+  <p class="pt-dl-status">Loading the latest release…</p>
 </div>
 
-<style>
-  .pt-downloads { margin-top: 1.5rem; }
-  .pt-dl-status { color: var(--sl-color-gray-3); }
-  .pt-release { border: 1px solid var(--sl-color-gray-5); border-radius: 0.6rem; padding: 1rem 1.25rem; margin: 0 0 1rem; background: var(--sl-color-bg-nav); }
-  .pt-release h3 { margin: 0 0 0.15rem; }
-  .pt-release .pt-meta { color: var(--sl-color-gray-3); font-size: 0.85rem; margin: 0 0 0.75rem; }
-  .pt-assets { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .pt-assets a { display: inline-block; padding: 0.3rem 0.7rem; border: 1px solid var(--sl-color-accent); border-radius: 0.4rem; color: var(--sl-color-text-accent); text-decoration: none; font-size: 0.9rem; }
-  .pt-assets a:hover { background: var(--sl-color-accent-low); }
-  .pt-empty a { color: var(--sl-color-text-accent); }
+<style is:global>
+  /* Global (not scoped): the markup below is injected with innerHTML. */
+  .pt-dl { margin: 1rem 0 1.5rem; }
+  .pt-dl-status, .pt-dl-empty { color: var(--sl-color-gray-3); }
+  .pt-dl-meta { color: var(--sl-color-gray-3); font-size: 0.82rem; margin: 0.55rem 0 0; }
+  .pt-dl-meta a { color: var(--sl-color-text-accent); }
+  .pt-dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 0.75rem; }
+  .pt-dl-card { display: flex; flex-direction: column; gap: 0.35rem; border: 1px solid var(--sl-color-gray-5);
+    border-top: 2px solid var(--pt-teal-ink, var(--sl-color-accent)); border-radius: 0.6rem;
+    padding: 0.9rem 1rem 1rem; background: var(--sl-color-bg-sidebar); }
+  .pt-dl-card-head { display: flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 1rem; }
+  .pt-dl-card-head img { border-radius: 7px; }
+  .pt-dl-sub { font-size: 0.8rem; color: var(--sl-color-gray-2); margin: 0; }
+  .pt-dl-btn { display: inline-block; margin-top: 0.45rem; padding: 0.38rem 0.8rem; border-radius: 0.45rem;
+    background: var(--sl-color-text-accent); color: var(--sl-color-black) !important; font-weight: 600;
+    font-size: 0.88rem; text-decoration: none; align-self: flex-start; }
+  .pt-dl-btn:hover { opacity: 0.88; }
+  .pt-dl-alt { font-size: 0.8rem; margin-top: 0.35rem; }
+  .pt-dl-alt a { color: var(--sl-color-text-accent); }
 </style>
 
 <script>
-  const root = document.getElementById("pt-downloads");
-  const repo = root?.dataset.repo;
+  // One fetch shared across every section on the page (the script is hoisted and runs once).
+  const mounts = Array.from(document.querySelectorAll<HTMLElement>("[data-pt-dl]"));
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
-  async function load() {
-    if (!root || !repo) return;
-    try {
-      const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=30`, {
-        headers: { Accept: "application/vnd.github+json" },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const releases = (await res.json()).filter((r: any) => !r.draft);
-      if (!releases.length) return empty();
+  type Release = { tag_name: string; html_url: string; published_at: string | null; draft: boolean; assets: { name: string; browser_download_url: string }[] };
 
-      root.innerHTML = releases.map((r: any) => {
-        const date = r.published_at ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
-        // Order assets so the main app comes first: Patterpad installers, then the CLI binaries,
-        // then the JS drop-in, then everything else (corpus.json, etc.).
-        const rank = (name: string): number => {
-          if (/\.(dmg|exe|appimage|deb)$/i.test(name)) return 0;   // Patterpad installers
-          if (/cli|patter-(macos|win|windows|linux)/i.test(name)) return 1; // CLI executables
-          if (/patterplay.*\.js$|\.min\.js$/i.test(name)) return 2; // JS drop-in
-          return 3;
-        };
-        const assets = (r.assets || [])
-          .filter((a: any) => !/\.(yml|blockmap)$/.test(a.name)) // hide the electron-updater feeds + blockmaps
-          .sort((a: any, b: any) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name))
-          .map((a: any) => `<li><a href="${esc(a.browser_download_url)}">${esc(a.name)}</a></li>`)
-          .join("");
-        return `<div class="pt-release">
-          <h3>${esc(r.name || r.tag_name)}</h3>
-          <p class="pt-meta">${esc(r.tag_name)}${date ? " · " + esc(date) : ""}${r.prerelease ? " · pre-release" : ""}</p>
-          ${assets ? `<ul class="pt-assets">${assets}</ul>` : `<p class="pt-meta">No downloadable assets.</p>`}
-        </div>`;
-      }).join("");
-    } catch {
-      empty();
-    }
+  function card(icon: string, title: string, sub: string, btn: string, extra = ""): string {
+    return `<div class="pt-dl-card">
+      <div class="pt-dl-card-head">${icon}<span>${esc(title)}</span></div>
+      <p class="pt-dl-sub">${sub}</p>
+      ${btn}${extra}
+    </div>`;
+  }
+  const button = (a: { name: string; browser_download_url: string } | undefined, label: string): string =>
+    a ? `<a class="pt-dl-btn" href="${esc(a.browser_download_url)}">${esc(label)}</a>` : `<p class="pt-dl-sub">coming soon</p>`;
+  const meta = (r: Release, ver: string): string => {
+    const date = r.published_at ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+    return `<p class="pt-dl-meta">Version ${esc(ver)}${date ? " · " + esc(date) : ""} · <a href="${esc(r.html_url)}">release notes</a></p>`;
+  };
+
+  function renderPatterpad(root: HTMLElement, releases: Release[]): void {
+    const r = releases.find((x) => /^v\d/.test(x.tag_name)); // bare v* = Patterpad
+    if (!r) return empty(root, "The Patterpad installers");
+    const ver = r.tag_name.replace(/^v/, "");
+    const find = (re: RegExp) => r.assets.find((a) => re.test(a.name));
+    root.innerHTML = `<div class="pt-dl-grid">
+      ${card("", "macOS", "Signed &amp; notarized <code>.dmg</code> (Apple silicon)", button(find(/\.dmg$/i), "Download for macOS"))}
+      ${card("", "Windows", "One-click installer", button(find(/\.exe$/i), "Download for Windows"))}
+      ${card("", "Linux", "Self-contained AppImage", button(find(/\.AppImage$/i), "Download for Linux"))}
+    </div>${meta(r, ver)}`;
   }
 
-  function empty() {
-    if (!root) return;
-    root.innerHTML = `<p class="pt-empty">No published releases yet: Patterpad installers, the CLI binaries, and the JS drop-in will appear here once the first release ships. In the meantime the runtime and CLI are on npm: <code>npm i @patterkit/runtime</code> · <code>npm i -g @patterkit/cli</code>.</p>`;
+  function renderPlugins(root: HTMLElement, releases: Release[], base: string): void {
+    const engines = [
+      { key: "js", tag: /^play-js-v\d/, icon: "plugin-javascript.svg", name: "JavaScript", sub: "Web games &amp; apps (TS/JS)" },
+      { key: "unity", tag: /^play-unity-v\d/, icon: "plugin-unity.svg", name: "Unity", sub: "C# package, drop into <code>Packages/</code>" },
+      { key: "unreal", tag: /^play-unreal-v\d/, icon: "plugin-unreal.svg", name: "Unreal", sub: "C++ plugin + sample project" },
+      { key: "godot", tag: /^play-godot-v\d/, icon: "plugin-godot.svg", name: "Godot", sub: "GDScript addon for <code>addons/</code>" },
+    ];
+    const cards = engines.map((e) => {
+      const r = releases.find((x) => e.tag.test(x.tag_name));
+      const icon = `<img src="${base}${e.icon}" alt="" width="28" height="28" />`;
+      if (!r) return card(icon, e.name, e.sub, `<p class="pt-dl-sub">coming soon</p>`);
+      const ver = r.tag_name.replace(/^play-[a-z]+-v/, "");
+      const zip = r.assets.find((a) => /\.zip$/i.test(a.name));
+      const loose = e.key === "js" ? r.assets.find((a) => a.name === "patterplay.min.js") : undefined;
+      const extra = loose ? `<p class="pt-dl-alt">or just <a href="${esc(loose.browser_download_url)}">patterplay.min.js</a> for a script tag</p>` : "";
+      return card(icon, `${e.name} ${ver}`, e.sub, button(zip, "Download zip"), extra);
+    });
+    root.innerHTML = `<div class="pt-dl-grid">${cards.join("")}</div>`;
+  }
+
+  function renderCli(root: HTMLElement, releases: Release[]): void {
+    const r = releases.find((x) => /^cli-v\d/.test(x.tag_name));
+    if (!r) return empty(root, "The CLI binaries");
+    const ver = r.tag_name.replace(/^cli-v/, "");
+    const plats = [
+      { re: /macos-arm64/i, label: "macOS (Apple silicon)" },
+      { re: /macos-x64/i, label: "macOS (Intel)" },
+      { re: /windows.*\.exe$/i, label: "Windows" },
+      { re: /linux-x64/i, label: "Linux (x64)" },
+      { re: /linux-arm64/i, label: "Linux (arm64)" },
+    ];
+    const btns = plats
+      .map((p) => ({ p, a: r.assets.find((a) => p.re.test(a.name)) }))
+      .filter((x) => x.a)
+      .map((x) => `<a class="pt-dl-btn" href="${esc(x.a!.browser_download_url)}">${esc(x.p.label)}</a>`)
+      .join(" ");
+    root.innerHTML = `${btns}${meta(r, ver)}`;
+  }
+
+  function empty(root: HTMLElement, what: string): void {
+    root.innerHTML = `<p class="pt-dl-empty">${what} will appear here once the first release ships - see <a href="https://github.com/patterkit/patter/releases">GitHub Releases</a>.</p>`;
+  }
+
+  async function load(): Promise<void> {
+    if (!mounts.length) return;
+    const repo = mounts[0]!.dataset.repo!;
+    const base = mounts[0]!.dataset.base || "/";
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=50`, { headers: { Accept: "application/vnd.github+json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const releases: Release[] = (await res.json()).filter((r: Release) => !r.draft); // newest-first
+      for (const m of mounts) {
+        if (m.dataset.ptDl === "patterpad") renderPatterpad(m, releases);
+        else if (m.dataset.ptDl === "plugins") renderPlugins(m, releases, base);
+        else if (m.dataset.ptDl === "cli") renderCli(m, releases);
+      }
+    } catch {
+      for (const m of mounts) empty(m, "The downloads");
+    }
   }
 
   load();

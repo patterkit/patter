@@ -52,7 +52,7 @@ export default defineConfig({
       sidebar: [
         {
           label: "Start here",
-          items: ["getting-started", "concepts", "architecture", "why"],
+          items: ["getting-started", "download", "concepts", "architecture", "why"],
         },
         {
           label: "Writing in Patterpad",
@@ -122,7 +122,7 @@ export default defineConfig({
           ],
         },
         { label: "Automation: the CLI", items: ["cli"] },
-        { label: "Reference", items: ["specification", "download", "licenses"] },
+        { label: "Reference", items: ["specification", "licenses"] },
       ],
     }),
   ],

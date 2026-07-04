@@ -19,14 +19,10 @@ underneath. Open it in Patterpad and **Play from Start**.
 
 ## 1. Get Patterpad
 
-Patterpad is the editor: the desktop app where you write. Download the installer for
-your platform from the [Download page](/download/):
-
-- **macOS**: a signed `.dmg`
-- **Windows**: an `.exe` installer
-- **Linux**: an `.AppImage`
-
-It's a self-contained app; nothing else to install.
+Patterpad is the editor: the desktop app where you write.
+**[Download it for your platform &rarr;](/download/)** - macOS, Windows, or Linux, one
+self-contained installer, nothing else needed. (The same page has the runtime plugins
+and the CLI.)
 
 ## 2. Write your story
 
