@@ -18,9 +18,10 @@ permissions:
   contents: write
 
 jobs:
-  # Pre-create the DRAFT release with the changelog section as its notes; the OS matrix then
-  # uploads installers into it (electron-builder reuses a draft whose tag matches). The draft
-  # stays unpublished until a human presses Publish - the final review gate.
+  # Pre-create the release as a DRAFT with the changelog section as its notes; the OS matrix
+  # uploads installers into it (electron-builder reuses a draft whose tag matches), and the
+  # final `publish` job flips it live once every OS build has uploaded - the draft is only a
+  # staging area so a half-built release is never visible.
   notes:
     runs-on: ubuntu-latest
     steps:
@@ -88,3 +89,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+  # All three OS builds uploaded -> publish. Straight-from-CI like every other deliverable;
+  # runs only when the whole matrix succeeded, so a partial release never goes live.
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
