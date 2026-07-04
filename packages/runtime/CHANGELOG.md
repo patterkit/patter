@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- e69a249: Patterplay JS: ship a self-contained `patterplay.min.js` drop-in (window.Patterplay)
+  alongside the ESM/CJS library, and add the new `@patterkit/play-helpers` companion
+  (save/load envelope, runtime property setters, external-locale loader, state logger).
+  Runtime: a string missing in the active locale now falls back to the default-locale
+  source text, flagged `<Untranslated: {id}> {source}`, instead of leaking the raw id.
+
 All notable changes to `@patterkit/runtime` (Patterplay JS) are documented here. The
 Patterplay runtimes - JS, Unity, Unreal, and Godot - are versioned in lockstep: the same
 version number always means the same runtime behaviour. This package is versioned by
@@ -10,6 +20,7 @@ version number always means the same runtime behaviour. This package is versione
 ## [0.1.0] - Unreleased
 
 ### Added
+
 - The Patter runtime in JS/TS: `Engine` + `Flow` over a compiled `.patterc` bundle - scenes,
   blocks, run/choice/branch/sequence selectors, sticky/fallback options, call-return jumps,
   conditions + effects, visit counts, `{@ref}` interpolation, game events, tags, gameData

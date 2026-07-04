@@ -1,14 +1,20 @@
 {
   "name": "@patterkit/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The `patter` CLI: validate, format, export, and play a Patter project.",
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",
   "homepage": "https://patterkit.dev",
-  "repository": { "type": "git", "url": "git+https://github.com/patterkit/patter.git", "directory": "packages/cli" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patterkit/patter.git",
+    "directory": "packages/cli"
+  },
   "bugs": "https://github.com/patterkit/patter/issues",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "patter": "./dist/cli.js"
   },
@@ -24,7 +30,7 @@
   },
   "dependencies": {
     "@patterkit/core": "0.1.0",
-    "@patterkit/ops": "0.1.0",
+    "@patterkit/ops": "0.1.1",
     "@wildwinter/simple-vc-lib": "^0.2.0"
   }
 }

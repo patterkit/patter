@@ -1,14 +1,20 @@
 {
   "name": "@patterkit/play-helpers",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Thin game-integration helpers around @patterkit/runtime: save/load serialisation, runtime property setters, a state logger, the Patterpad Live Link client + hot reload, a property inspector, and audio resolution. The Patterplay JS companion.",
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",
   "homepage": "https://patterkit.dev",
-  "repository": { "type": "git", "url": "git+https://github.com/patterkit/patter.git", "directory": "packages/play-helpers" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patterkit/patter.git",
+    "directory": "packages/play-helpers"
+  },
   "bugs": "https://github.com/patterkit/patter/issues",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,12 +25,15 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/runtime": "0.1.0"
+    "@patterkit/runtime": "0.2.0"
   }
 }
