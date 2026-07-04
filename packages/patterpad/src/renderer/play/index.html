@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patterpad · Play</title>
+  </head>
+  <body class="play">
+    <header class="play-head">
+      <div class="play-top">
+        <button id="play-rewind" class="play-rewind" type="button" title="Rewind to start: re-initialise and play again">↺</button>
+        <span class="play-from">Playing from</span>
+        <span id="play-addr" class="play-addr"></span>
+        <button id="play-pin" class="play-pin" type="button" title="Keep on top" aria-pressed="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="17" x2="12" y2="22"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.3V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.7a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+      </div>
+      <div class="play-bar">
+        <select id="play-locale" class="play-locale" title="Play language" hidden></select>
+        <select id="play-speed" class="play-speed" title="Reading speed: how long each line is held before the next appears">
+          <option value="slow">Slow</option>
+          <option value="normal">Normal</option>
+          <option value="fast">Fast</option>
+          <option value="instant">Instant</option>
+        </select>
+        <button id="play-continue" class="play-continue" type="button" title="Auto-continue: play through to the next choice or the end instead of stepping beat by beat" aria-pressed="false">▸▸ Continue</button>
+        <button id="play-cc" class="play-cc" type="button" title="Closed captions: show the non-spoken cues in dialogue" aria-pressed="true">CC</button>
+        <button id="play-audio" class="play-audio" type="button" title="Play with audio (table-read)" aria-pressed="false" hidden><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>Audio</button>
+      </div>
+    </header>
+    <main id="transcript" class="play-transcript"></main>
+    <footer id="choices" class="play-choices"></footer>
+    <script type="module" src="./play.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "@patterkit/example-drop-in",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zero-build <script> drop-in: play a compiled Patter bundle with patterplay.min.js, no module loader.",
+  "type": "module",
+  "scripts": {
+    "gen": "node gen.mjs"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "player",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["examples/player/serve.mjs", "8091"],
+      "port": 8091
+    },
+    {
+      "name": "drop-in",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["examples/drop-in/serve.mjs", "8092"],
+      "port": 8092
+    },
+    {
+      "name": "tour-web",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["examples/tour-web/serve.mjs", "8093"],
+      "port": 8093
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["website/node_modules/astro/astro.js", "preview", "--root", "website", "--port", "4322", "--host"],
+      "port": 4322
+    },
+    {
+      "name": "patterpad-surface",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--config", "packages/patterpad-surface/vite.config.ts", "--port", "5174"],
+      "port": 5174
+    },
+    {
+      "name": "patterpad-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--config", "packages/patterpad/preview.vite.config.ts", "--port", "5180"],
+      "port": 5180
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+name: Release
+
+# Changesets drives the npm side: on every push to main it either opens/updates a
+# "Version Packages" PR (consuming the accumulated changesets) or, once that PR is
+# merged, builds + publishes the bumped @patterkit/* packages to npm.
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write        # push the Version PR branch + git tags
+  pull-requests: write   # open/update the Version Packages PR
+  id-token: write        # npm provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+          fetch-depth: 0
+      - name: Checkout @wildwinter/expr (sibling source, aliased by tsconfig)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+        working-directory: patter
+      - name: Create Version PR or publish to npm
+        uses: changesets/action@v1
+        with:
+          cwd: patter
+          version: npm run version-packages
+          publish: npm run release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"

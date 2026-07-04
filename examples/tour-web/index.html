@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Patter · The Tour (web demo)</title>
+  <style>
+    :root { --paper: #f5efe3; --ink: #2a2419; --accent: #8a5a2b; --line: #d8cfba; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.55 Georgia, "Times New Roman", serif; }
+    main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 30vh; }
+    header { display: flex; align-items: baseline; gap: 0.8rem; border-bottom: 1px solid var(--line); padding-bottom: 0.6rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.1rem; margin: 0; letter-spacing: 0.02em; }
+    header label { margin-left: auto; font: 13px/1 system-ui, sans-serif; color: #6b5f49; display: inline-flex; gap: 0.35rem; align-items: center; }
+    .step { margin: 0 0 0.8rem; }
+    .step.line b { color: var(--accent); font-family: system-ui, sans-serif; font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 0.45em; }
+    .step.text { color: #55492f; }
+    .step.event { color: #8a8069; font: 13px/1.4 system-ui, sans-serif; }
+    .step.end { text-align: center; color: #8a8069; margin-top: 1.2rem; }
+    #controls { position: fixed; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--paper) 92%, white); border-top: 1px solid var(--line); padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 0.45rem; align-items: center; }
+    #controls button { font: 15px/1.2 system-ui, sans-serif; max-width: 40rem; width: 100%; padding: 0.55rem 0.9rem; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); cursor: pointer; }
+    #controls button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    #controls button:disabled { opacity: 0.45; cursor: default; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Patter · The Tour</h1>
+      <label><input type="checkbox" id="audio-toggle" checked /> audio</label>
+    </header>
+    <div id="transcript"></div>
+  </main>
+  <div id="controls"></div>
+  <audio id="clip"></audio>
+  <script src="dist/tour.js"></script>
+</body>
+</html>

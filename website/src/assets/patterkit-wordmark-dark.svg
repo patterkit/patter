@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 220" width="820" height="220">
+  
+  <defs></defs>
+  <g transform="translate(40,30) scale(0.98)">
+    <g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#6fa39c" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g>
+    <g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g></g>
+  <text x="232" y="150" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="120" letter-spacing="-2" fill="#fbf7f0">Patter<tspan fill="#6fa39c">Kit</tspan></text>
+</svg>

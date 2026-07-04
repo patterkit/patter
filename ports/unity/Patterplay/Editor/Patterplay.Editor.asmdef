@@ -1,0 +1,20 @@
+{
+  "name": "Patterplay.Editor",
+  "rootNamespace": "Patterkit.Patterplay.Editor",
+  "references": [
+    "Patterplay.Runtime",
+    "Patterplay.Runtime.Json",
+    "Patterplay.Runtime.Unity"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

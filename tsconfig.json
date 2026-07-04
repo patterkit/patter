@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@patterkit/model": ["packages/model/src/index.ts"],
+      "@patterkit/core": ["packages/core/src/index.ts"],
+      "@patterkit/dialect": ["packages/dialect/src/index.ts"],
+      "@patterkit/compiler": ["packages/compiler/src/index.ts"],
+      "@patterkit/runtime": ["packages/runtime/src/index.ts"],
+      "@patterkit/play-helpers": ["packages/play-helpers/src/index.ts"],
+      "@patterkit/ops": ["packages/ops/src/index.ts"],
+      "@wildwinter/expr": ["../expr/packages/expr/src/index.ts"],
+      "@wildwinter/scoperegistry": ["../expr/packages/scoperegistry/src/index.ts"],
+      "@wildwinter/expr-editor": ["../expr/packages/expr-editor/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src", "packages/*/test"],
+  "_comment": "The Patterpad app's web/electron source is DOM/Electron code with its own libs - it is typechecked by packages/patterpad/tsconfig.{web,node}.json, not this pure-Node root program.",
+  "exclude": ["node_modules", "packages/patterpad/src/main", "packages/patterpad/src/preload", "packages/patterpad/src/renderer"]
+}

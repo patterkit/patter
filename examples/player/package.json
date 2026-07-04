@@ -1,0 +1,11 @@
+{
+  "name": "@patterkit/example-player",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Game-agnostic browser player for compiled Patter bundles - a test app to play any bundle through @patterkit/runtime.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 108 128" width="864" height="1024">
+  <defs><filter id="ds" x="-25%" y="-20%" width="150%" height="145%"><feDropShadow dx="0" dy="7" stdDev="6" flood-color="#312b22" flood-opacity="0.16"></feDropShadow></filter></defs>
+  <g filter="url(#ds)">
+    <path d="M14 4 H62 L90 32 V106 a6 6 0 0 1 -6 6 H14 a6 6 0 0 1 -6 -6 V10 a6 6 0 0 1 6 -6 Z" fill="#fcf9f3"></path>
+    <path d="M14 4 H62 L90 32 V106 a6 6 0 0 1 -6 6 H14 a6 6 0 0 1 -6 -6 V10 a6 6 0 0 1 6 -6 Z" fill="none" stroke="#e0d3bd" stroke-width="1.5"></path>
+    <path d="M62 4 V26 a6 6 0 0 0 6 6 H90 Z" fill="#efe2cd"></path>
+    <g transform="translate(22,28) scale(0.52)"><path fill="#214f4b" fill-rule="evenodd" d="M8 50 C30 36 48 22 64 22 A28 28 0 1 1 64 78 C48 78 30 64 8 50 Z M51 39 h26 v5 h-26 Z M51 49 h21 v5 h-21 Z M51 59 h16 v5 h-16 Z"></path></g>
+    <text x="49" y="99" text-anchor="middle" font-family="&#39;IBM Plex Mono&#39;,&#39;SFMono-Regular&#39;,monospace" font-size="13" font-weight="500" fill="#9c9286">{ }</text>
+  </g>
+</svg>

@@ -1,0 +1,64 @@
+name: Patterpad release
+
+# The desktop app has its own tag-driven pipeline (not Changesets): tagging
+# `patterpad-vX.Y.Z` builds + signs Patterpad on each OS and publishes the
+# installers + the electron-updater feeds (latest-mac.yml / latest.yml /
+# latest-linux.yml) to the matching GitHub Release.
+on:
+  push:
+    tags: ["patterpad-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+          - os: windows-latest
+            script: dist:win
+          - os: ubuntu-latest
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+      - name: Checkout @wildwinter/expr (electron-vite bundles its source)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - run: npm ci
+        working-directory: patter
+      - name: Check the tag matches the app version (bump via `npm run bump:pad`)
+        working-directory: patter
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#patterpad-v}"
+          manifest=$(node -p "require('./packages/patterpad/package.json').version")
+          [ "$manifest" = "$version" ] || { echo "package.json says $manifest but the tag says $version"; exit 1; }
+          grep -q "^## \[${version}\] - [0-9]" packages/patterpad/CHANGELOG.md \
+            || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+      - name: Build, sign + publish
+        working-directory: patter
+        run: npm run -w @patterkit/patterpad ${{ matrix.script }} -- --publish always
+        env:
+          # electron-builder's GitHub publisher uploads to the release for this tag.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS signing + notarization (no-ops on win/linux). See packages/patterpad/RELEASE.md.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

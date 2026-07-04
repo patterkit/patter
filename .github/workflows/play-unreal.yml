@@ -1,0 +1,50 @@
+name: Patterplay Unreal release
+
+# Tagging `play-unreal-vX.Y.Z` gates the C++ port on the conformance corpus (the clang
+# TestHost compiles the same Public/Patter/*.h the UE plugin ships and replays corpus.json),
+# then zips TWO sibling folders - Patterplay (the runtime plugin) and PatterplayDemo (a
+# ready-to-open sample .uproject whose AdditionalPluginDirectories finds the plugin in the
+# sibling folder) - and attaches the zip to the matching GitHub Release. Users open the demo
+# project directly, or drop Patterplay/ into their own project's Plugins/. (UE itself is not
+# needed to verify parity - the engine core is std-only C++, so the gate runs on a plain
+# ubuntu runner. Everything ships source-only.)
+on:
+  push:
+    tags: ["play-unreal-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the plugin version (bump via `npm run bump:play`)
+        run: |
+          version="${GITHUB_REF_NAME#play-unreal-v}"
+          manifest=$(node -p "JSON.parse(require('fs').readFileSync('ports/unreal/Patterplay/Patterplay.uplugin','utf8')).VersionName")
+          [ "$manifest" = "$version" ] || { echo "Patterplay.uplugin says $manifest but the tag says $version"; exit 1; }
+          grep -q "^## \[${version}\] - [0-9]" ports/unreal/Patterplay/CHANGELOG.md \
+            || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+
+      - name: Verify parity (corpus TestHost - gates the release)
+        run: bash ports/unreal/TestHost/build.sh
+
+      - name: Package the UE plugin
+        run: |
+          version="${GITHUB_REF_NAME#play-unreal-v}"
+          echo "ASSET=patterplay-unreal-${version}.zip" >> "$GITHUB_ENV"
+          # Source-only, always: never ship engine build output, even if a checkout ever carries it.
+          ( cd ports/unreal && zip -r "../../patterplay-unreal-${version}.zip" Patterplay PatterplayDemo \
+              -x "*/Binaries/*" -x "*/Intermediate/*" -x "*/DerivedDataCache/*" -x "*/Saved/*" \
+              -x "*/.vs/*" -x "*.sln" -x "*/.DS_Store" )
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

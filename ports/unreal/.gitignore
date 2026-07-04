@@ -1,0 +1,8 @@
+# clang TestHost binary
+TestHost/patterplay_testhost
+*.o
+
+# Unreal-generated
+Patterplay/Binaries/
+Patterplay/Intermediate/
+Patterplay/Saved/

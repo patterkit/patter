@@ -1,0 +1,10 @@
+{
+  "name": "patter-example-tour-web",
+  "private": true,
+  "type": "module",
+  "description": "Web demo: play the interactive tour (with its scratch voice takes) in a browser.",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node serve.mjs"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "audioFolders": true,
+  "audioRoot": "../audio",
+  "autosave": true,
+  "cast": [
+    {
+      "displayName": "Guide",
+      "name": "GUIDE",
+    },
+    {
+      "name": "SFX",
+    },
+  ],
+  "dictionary": {
+    "ignore": [
+      "RUNTIMES",
+      "diffable",
+      "mergeable",
+      "Runtimes",
+    ],
+    "language": "en-GB",
+  },
+  "estimating": {
+    "defaultLines": 20,
+    "enabled": true,
+    "tagEstimates": [
+      {
+        "lines": 100,
+        "tag": "conversation",
+      },
+    ],
+  },
+  "formatting": true,
+  "locales": {
+    "all": [
+      "en",
+    ],
+    "default": "en",
+  },
+  "project": {
+    "id": "proj_sa3v44hd",
+    "name": "Patter: Interactive Tour",
+  },
+  "properties": [
+    {
+      "default": false,
+      "name": "brave",
+      "shared": true,
+      "type": "boolean",
+    },
+    {
+      "default": 0,
+      "name": "asks",
+      "shared": true,
+      "type": "number",
+    },
+    {
+      "default": 4,
+      "name": "torch",
+      "shared": true,
+      "type": "number",
+    },
+  ],
+  "schema": "patter/project@0",
+  "scratchStatus": "scratch",
+  "start": {
+    "scene": "scn_8007kfrw",
+  },
+  "trackAudioStatus": true,
+  "vcs": "git",
+  "voiced": true,
+}

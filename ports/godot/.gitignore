@@ -1,0 +1,7 @@
+# Godot editor cache - regenerated on import, never committed.
+.godot/
+
+# Per-script UID sidecars (Godot 4.4+). Machine-generated and engine-version-specific;
+# the addon wires itself by class_name + res:// path, not UID, so they add only noise.
+# Users' Godot regenerates them on import.
+*.gd.uid

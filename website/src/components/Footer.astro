@@ -1,0 +1,32 @@
+---
+// Starlight Footer override: the stock footer (edit link / pagination) plus a one-line site-wide
+// credit - license, author, and the PatterKit home. Registered in astro.config.mjs `components`.
+import Default from "@astrojs/starlight/components/Footer.astro";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a trailing slash
+---
+
+<Default><slot /></Default>
+<p class="pk-credit">
+  <a href={`${base}licenses/`}>MIT-licensed</a> open source &middot; Made by
+  <a href="https://wildwinter.bio.link" rel="author">Ian Thomas</a> &middot;
+  <a href="https://patterkit.com">patterkit.com</a>
+</p>
+
+<style>
+  .pk-credit {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sl-color-hairline);
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+  .pk-credit a {
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+  }
+  .pk-credit a:hover {
+    color: var(--sl-color-white);
+    text-decoration: underline;
+  }
+</style>

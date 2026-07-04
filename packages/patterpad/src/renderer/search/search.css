@@ -1,0 +1,107 @@
+/* The detached search tool window (#205): a light, frameless helper on the app theme. The OS title bar
+   is gone (frame:false) - the slim header below IS the drag handle (-webkit-app-region: drag). */
+* { box-sizing: border-box; }
+body.swin {
+  margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font: 0.9rem/1.4 var(--font-ui);
+  -webkit-user-select: none; user-select: none;
+  /* A transform-FREE fade entrance (not screen-in): translating a full-height body briefly pushes its
+     bottom past the viewport and flashes a scrollbar until the animation settles. The results list owns
+     the only scroll region (.swin-results), so the window itself stays overflow: hidden. */
+  animation: var(--anim-backdrop-in, none);
+}
+
+/* Every interactive element eases its hover/active/focus/selection change with the shared motion tokens,
+   so nothing in this window snaps (design-language §4 "motion is interpolation, never a jump"). */
+.swin-mode, .swin-pin, .swin-close, .swin-input, .swin-chip, .swin-row {
+  transition: background var(--dur-quick) var(--ease-standard),
+              border-color var(--dur-quick) var(--ease-standard),
+              color var(--dur-quick) var(--ease-standard);
+}
+
+/* The drag bar: thin, quiet, with the mode toggle on the left and pin + close on the right. */
+.swin-head {
+  -webkit-app-region: drag;
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.26rem 0.45rem; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.swin-head button, .swin-modes { -webkit-app-region: no-drag; }
+.swin-spacer { flex: 1; }
+
+/* segmented mode toggle: Text | Replace | Status | Recording | Property */
+.swin-modes { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.swin-mode {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font: 600 0.74rem var(--font-ui); padding: 0.2rem 0.6rem;
+}
+.swin-mode + .swin-mode { border-left: 1px solid var(--line); }
+.swin-mode:hover { color: var(--ink); }
+.swin-mode.active { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
+
+.swin-pin, .swin-close {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+  color: var(--muted); line-height: 0; padding: 0.22rem;
+}
+.swin-pin:hover, .swin-close:hover { border-color: var(--line); color: var(--ink); }
+.swin-pin svg { display: block; }
+.swin-pin.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.swin-close { font: 0.8rem var(--font-ui); width: 1.5rem; height: 1.5rem; }
+
+/* the query box: styled like every other text field in the app (the .gd-input vocabulary) - UI font on the
+   raised --surface, so it reads clearly as a "type here" field against the window's --bg body, not as text. */
+.swin-input {
+  margin: 0.4rem 0.5rem 0.3rem; padding: 0.35rem 0.5rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--ink); font: 0.9rem var(--font-ui); outline: none;
+}
+.swin-input::placeholder { color: var(--muted); }
+.swin-input:focus { border-color: var(--accent); }
+
+/* status chips */
+.swin-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0 0.5rem 0.3rem; }
+.swin-chips[hidden] { display: none; }
+.swin-chip {
+  display: inline-flex; align-items: center; gap: 0.32rem;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px; cursor: pointer;
+  color: var(--ink-soft); font: 600 0.72rem var(--font-ui); padding: 0.14rem 0.5rem;
+}
+.swin-chip:hover { border-color: var(--accent); }
+.swin-chip.active { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
+.swin-chip-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: none; }
+/* Tag chips carry a node count instead of a colour dot. */
+.swin-chip-count { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+.swin-chip.active .swin-chip-count { color: inherit; }
+
+/* the result list fills the rest of the window and scrolls */
+.swin-results { flex: 1; min-height: 0; overflow: auto; padding: 0 0.35rem 0.35rem; }
+.swin-row {
+  display: flex; align-items: baseline; gap: 0.45rem; width: 100%; text-align: left;
+  background: none; border: none; border-radius: 6px; cursor: pointer;
+  padding: 0.24rem 0.45rem; color: var(--ink); font: inherit;
+}
+.swin-row:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.swin-row.sel { background: color-mix(in oklab, var(--accent) 16%, transparent); }
+.swin-kind { flex: none; color: var(--muted); font: 600 0.64rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; min-width: 2.7rem; }
+.swin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swin-loc { flex: none; color: var(--muted); font: 0.74rem var(--font-ui); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swin-gid { flex: none; color: var(--ink-soft); font: 0.72rem var(--font-mono); }
+/* The opaque id, shown on every row so an id → line lookup is unambiguous. Quieter than the Game ID. */
+.swin-id { flex: none; color: var(--muted); font: 0.68rem var(--font-mono); opacity: 0.8; }
+
+/* Replace mode: the replacement field + the bulk apply button, and the before → after preview rows. */
+.swin-replace-row { display: flex; gap: 0.4rem; align-items: center; padding: 0 0.5rem 0.35rem; }
+.swin-replace-row[hidden] { display: none; } /* the `hidden` attr alone loses to the class's display:flex */
+.swin-replace { flex: 1; margin: 0; }
+.swin-replace-all { flex: none; padding: 0.32rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--accent); color: var(--on-accent, #fff); font: 0.8rem var(--font-ui); cursor: pointer; }
+.swin-replace-all:disabled { opacity: 0.45; cursor: default; background: var(--surface-2, var(--line)); color: var(--muted); }
+.swin-rrow { align-items: baseline; }
+.swin-before { color: var(--muted); } /* muted (not struck) - the → after + ink colour shows the change */
+.swin-arrow { color: var(--muted); }
+.swin-after { color: var(--ink); }
+.swin-rone { flex: none; padding: 0.15rem 0.5rem; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: var(--ink-soft); font: 0.72rem var(--font-ui); cursor: pointer; }
+.swin-rone:hover { border-color: var(--accent); color: var(--accent); }
+.swin-empty { color: var(--muted); font: 0.85rem var(--font-ui); padding: 0.6rem 0.5rem; }
+
+.swin-hint { border-top: 1px solid var(--line); padding: 0.26rem 0.55rem; color: var(--muted); font: 0.72rem var(--font-ui); background: var(--surface); }

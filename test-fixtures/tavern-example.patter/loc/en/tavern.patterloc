@@ -1,0 +1,18 @@
+{
+  "default": true,
+  "locale": "en",
+  "scene": "scn_tavern",
+  "schema": "patter/strings@0",
+  "strings": {
+    "C_intim": "Threaten him for coin",
+    "C_leave": "Leave",
+    "C_secret": "Mention the cellar",
+    "C_work": "Ask about work",
+    "L_greet": "What'll it be, stranger?",
+    "L_intim": "...fine, fine. Take five gold, just keep your blade sheathed.",
+    "L_secret": "...so you DO know. Good. We'll talk when it's quiet.",
+    "L_work": "Aye - rats in the cellar. Two gold if you clear them out.",
+    "T_lean": "You lean across the bar and murmur about the cellar.",
+    "T_scene": "The tavern is dim, thick with pipe-smoke and the smell of spilled ale.",
+  },
+}

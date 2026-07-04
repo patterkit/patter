@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patterpad</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <button id="toggle-nav" class="pane-toggle" type="button" data-tip="Show scenes (⌘1)" aria-label="Show scenes" aria-pressed="false" hidden>›</button>
+      <strong id="project-name">Patterpad</strong>
+      <span id="scene-suffix" class="scene-suffix"></span>
+      <span class="spacer"></span>
+      <span id="vcs-scene" class="vcs-scene" hidden></span>
+      <span id="dirty" class="dirty" hidden>● unsaved</span>
+      <button id="toggle-inspector" class="pane-toggle" type="button" data-tip="Show inspector (⌘2)" aria-label="Show inspector" aria-pressed="false" hidden>‹</button>
+    </header>
+
+    <main id="panes" class="panes" hidden>
+      <nav id="nav" class="nav" aria-label="scenes"><div id="nav-list" class="pane-inner nav-list"></div></nav>
+      <section id="editor" aria-label="script"></section>
+      <aside id="inspector" class="inspector" aria-label="inspector">
+        <div class="pane-inner">
+          <div class="inspector-label"><span>Inspector</span></div>
+          <div id="inspector-stack" class="inspector-stack"></div>
+        </div>
+      </aside>
+      <div id="nav-resizer" class="pane-resizer pane-resizer-nav" data-tip="Drag to resize" aria-hidden="true"></div>
+      <div id="insp-resizer" class="pane-resizer pane-resizer-insp" data-tip="Drag to resize" aria-hidden="true"></div>
+    </main>
+
+    <div id="problembar" class="problembar" aria-label="problems" hidden>
+      <span id="problem-count" class="problembar-count">0</span>
+      <button id="problem-prev" class="problembar-nav" type="button" data-tip="Previous problem" aria-label="previous problem">‹</button>
+      <button id="problem-next" class="problembar-nav" type="button" data-tip="Next problem" aria-label="next problem">›</button>
+      <button id="problem-cur" class="problembar-cur" type="button">
+        <span id="problem-cat" class="problembar-cat"></span>
+        <span id="problem-msg" class="problembar-msg"></span>
+      </button>
+      <button id="problem-fix" class="problembar-fix" type="button" hidden></button>
+    </div>
+
+    <!-- Review Feedback walk: a bottom bar stepping through every active comment + suggestion in the
+         whole script, looping. Mirrors the problems bar; shown only in Review Feedback mode. -->
+    <div id="reviewbar" class="reviewbar" aria-label="review feedback" hidden>
+      <span id="review-count" class="reviewbar-count">0</span>
+      <button id="review-prev" class="reviewbar-nav" type="button" data-tip="Previous feedback" aria-label="previous feedback">‹</button>
+      <button id="review-next" class="reviewbar-nav" type="button" data-tip="Next feedback" aria-label="next feedback">›</button>
+      <button id="review-cur" class="reviewbar-cur" type="button">
+        <span id="review-kind" class="reviewbar-kind"></span>
+        <span id="review-msg" class="reviewbar-msg"></span>
+      </button>
+      <button id="review-close" class="reviewbar-close" type="button" data-tip="Exit review feedback" aria-label="exit review feedback">×</button>
+    </div>
+
+    <section id="welcome" class="welcome">
+      <div class="welcome-card">
+        <h1 class="welcome-title">Patterpad</h1>
+        <p class="welcome-sub">Write the script. Play it in your game.</p>
+        <div class="welcome-actions">
+          <button id="welcome-open" class="btn primary" type="button">Open a project…</button>
+          <button id="welcome-new" class="btn" type="button">New project…</button>
+        </div>
+        <div class="welcome-recents">
+          <div class="welcome-recents-label" id="recents-label" hidden>Recent</div>
+          <ul id="recents" class="recents"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Project overview (#3a): a calm landing for a project opened with no remembered scene (and
+         reachable anytime via View ▸ Project Overview / clicking the project name). A clickable scene
+         index + headline stats, so you arrive at the shape of the work before diving into a scene. -->
+    <section id="overview" class="overview" hidden>
+      <div class="overview-card">
+        <h1 id="overview-title" class="overview-title"></h1>
+        <div id="overview-stats" class="overview-stats"></div>
+        <div id="overview-progress" class="overview-progress" hidden>
+          <div class="overview-bar"><i id="overview-bar-fill" class="overview-bar-fill"></i></div>
+          <span id="overview-progress-label" class="overview-progress-label"></span>
+        </div>
+        <div class="overview-scenes-label">Scenes</div>
+        <div id="overview-scenes" class="overview-scenes"></div>
+      </div>
+    </section>
+
+    <footer id="hintbar" aria-label="keystroke hints"></footer>
+
+    <!-- Transient feedback (e.g. a save the VCS refused, naming who holds the lock). -->
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <!-- Writing View exit affordance: the one piece of chrome that survives full-bleed. Recessive
+         (dim at rest, firms on hover); shown only in Writing View (CSS), click or Esc to leave. -->
+    <button id="writing-exit" class="writing-exit" type="button">Exit Writing View</button>
+
+    <dialog id="identity" class="identity">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">Welcome to Patterpad</h2>
+        <p class="identity-sub">Your name tags your edits in a project's history. You can change it later.</p>
+        <label class="identity-field">Name<input id="identity-name" type="text" autocomplete="name" /></label>
+        <label class="identity-field">Email (optional)<input id="identity-email" type="email" autocomplete="email" /></label>
+        <div class="identity-actions"><button id="identity-save" class="btn primary" value="save">Continue</button></div>
+      </form>
+    </dialog>
+
+    <!-- New-project dialog: collects the project name (and, later, project settings) in a themed
+         surface; the location is then chosen with the familiar system folder picker. PLACEHOLDER -
+         only the name field for now; further fields (voiced/non-voiced, formatting, template) land later. -->
+    <dialog id="create-project" class="identity create-dialog">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">New project</h2>
+        <p class="identity-sub">Name your story. Next, you'll choose where to keep it.</p>
+        <label class="identity-field">Project name<input id="create-name" type="text" placeholder="<e.g. The Tavern>" required /></label>
+        <label class="identity-field">Version control<select id="create-vcs" class="insp-select">
+          <option value="git">Git</option>
+          <option value="perforce">Perforce</option>
+          <option value="plastic">Plastic SCM</option>
+          <option value="svn">Subversion (SVN)</option>
+          <option value="none" selected>None</option>
+        </select></label>
+        <label class="identity-field">Publish output<input id="create-build" type="text" spellcheck="false" placeholder="../patter-dist/your-project.patterc" /><small class="identity-hint">Where “Publish Bundle” writes the compiled <code>.patterc</code>: by default a sibling <code>patter-dist/</code> folder (the project is a package, so builds go beside it, not inside). Editable later in Project Settings.</small></label>
+        <p class="create-preview">Saved as <code id="create-preview-name">your-project.patter</code></p>
+        <div class="identity-actions">
+          <button type="button" id="create-cancel" class="btn ghost" value="cancel">Cancel</button>
+          <button id="create-confirm" class="btn primary" value="create">Choose location…</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- New Scene (File > New Scene… / the nav's + row): name it, get the minimal playable scaffold. -->
+    <dialog id="new-scene" class="identity">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">New scene</h2>
+        <p class="identity-sub">A fresh scene file, ready to write into.</p>
+        <label class="identity-field">Scene name<input id="new-scene-name" type="text" placeholder="<e.g. The Docks>" required /></label>
+        <div class="identity-actions">
+          <button type="button" id="new-scene-cancel" class="btn ghost" value="cancel">Cancel</button>
+          <button id="new-scene-confirm" class="btn primary" value="create">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Delete Scene (File > Delete Scene… / right-click a nav row). The message + referring-scene
+         list are filled per scene; the button reads "Delete anyway" when references would dangle. -->
+    <dialog id="delete-scene" class="identity">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title" id="del-scene-title">Delete scene?</h2>
+        <p class="identity-sub" id="del-scene-msg"></p>
+        <div id="del-scene-refs" class="del-refs" hidden></div>
+        <p class="identity-sub del-warn" id="del-scene-warn" hidden></p>
+        <div class="identity-actions">
+          <button type="button" id="del-scene-cancel" class="btn ghost" value="cancel">Cancel</button>
+          <button id="del-scene-confirm" class="btn danger" value="delete">Delete</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Project Settings (File > Project Settings…). A themed modal of project-wide settings from the
+         .patterproj. v1 = General section; Properties / Cast / Game Data sections land later. -->
+    <dialog id="project-settings" class="identity settings-dialog">
+      <form method="dialog" class="identity-form settings-form">
+        <h2 class="identity-title">Project settings</h2>
+        <div class="settings-body">
+          <nav class="settings-tabs" id="settings-tabs">
+            <div class="settings-group">Project</div>
+            <button type="button" class="settings-tab active" data-tab="general">General</button>
+            <button type="button" class="settings-tab" data-tab="build">Publish</button>
+            <button type="button" class="settings-tab" data-tab="vcs">Version Control</button>
+            <div class="settings-group">Story data</div>
+            <button type="button" class="settings-tab" data-tab="properties">Properties</button>
+            <button type="button" class="settings-tab" data-tab="world">World Properties</button>
+            <button type="button" class="settings-tab" data-tab="gamedata">Game Data</button>
+            <button type="button" class="settings-tab" data-tab="cast">Cast</button>
+            <div class="settings-group">Writing &amp; audio</div>
+            <button type="button" class="settings-tab" data-tab="writing-status">Writing Status</button>
+            <button type="button" class="settings-tab" data-tab="estimating">Estimating</button>
+            <button type="button" class="settings-tab" data-tab="recording-status">Audio Status</button>
+            <button type="button" class="settings-tab" data-tab="captions">Closed Captions</button>
+            <button type="button" class="settings-tab" data-tab="dictionary">Dictionary</button>
+            <div class="settings-group">Localisation</div>
+            <button type="button" class="settings-tab" data-tab="language">Language</button>
+          </nav>
+          <div class="settings-panels">
+            <section class="settings-panel" data-panel="general">
+              <label class="identity-field">Project name<input id="set-name" type="text" required /></label>
+              <label class="identity-field">Start<select id="set-start"></select><small class="settings-fieldnote">Where the story begins: used by Play from Start and the Coverage test.</small></label>
+              <label class="settings-toggle"><input id="set-voiced" type="checkbox" /><span>Voiced<small>This story is voiced. Tracks recording status and voice scripts.</small></span></label>
+              <label class="settings-toggle"><input id="set-formatting" type="checkbox" /><span>Inline formatting<small>Authors can bold / italicise dialogue and narration (stored as tags in the strings).</small></span></label>
+              <label class="settings-toggle"><input id="set-autosave" type="checkbox" /><span>Autosave<small>Save the open scene automatically every 30 seconds while you write.</small></span></label>
+            </section>
+            <section class="settings-panel" data-panel="language" hidden>
+              <p class="settings-note">The project's languages. The <strong>default</strong> is the source language every string is authored in; the others are localisation targets.</p>
+              <div id="set-languages"></div>
+            </section>
+            <section class="settings-panel" data-panel="vcs" hidden>
+              <label class="identity-field">Version control system<select id="set-vcs" class="insp-select">
+                <option value="git">Git</option>
+                <option value="perforce">Perforce</option>
+                <option value="plastic">Plastic SCM</option>
+                <option value="svn">Subversion (SVN)</option>
+                <option value="none">None</option>
+              </select></label>
+              <p class="settings-note">Drives the lock-aware vs merge-based write path and the project's VCS config files (<code>vcs-setup.md</code>, ignore rules). Switching regenerates those config files for the new system.</p>
+            </section>
+            <section class="settings-panel" data-panel="properties" hidden>
+              <p class="settings-note">Project-global <code>@patter</code> properties: game state your conditions and effects read and write.</p>
+              <div id="set-properties"></div>
+            </section>
+            <section class="settings-panel" data-panel="world" hidden>
+              <p class="settings-note">World properties: the values your game engine owns and your story reads (referenced as <code>@world</code>), plus the inputs the coverage test feeds them.</p>
+              <div id="set-world"></div>
+            </section>
+            <section class="settings-panel" data-panel="cast" hidden>
+              <p class="settings-note">The master cast. A line's speaker must match a cast member's name.</p>
+              <div id="set-cast"></div>
+            </section>
+            <section class="settings-panel" data-panel="writing-status" hidden>
+              <div id="set-writing-status"></div>
+            </section>
+            <section class="settings-panel" data-panel="estimating" hidden>
+              <p class="settings-note">Estimating replaces a still-guesswork scene's line count with a guess in the production report, so a stub scene (a couple of placeholder lines) doesn't read as nearly finished. The estimate is shared across the characters in its placeholder lines. When off, reports show pure actuals.</p>
+              <div id="set-estimating"></div>
+            </section>
+            <section class="settings-panel" data-panel="recording-status" hidden>
+              <div id="set-recording-status"></div>
+            </section>
+            <section class="settings-panel" data-panel="captions" hidden>
+              <p class="settings-note">Closed captions describe non-spoken sounds inside dialogue. A game can turn captions <strong>off</strong> at runtime; Patterplay then removes every cue between these delimiters (and the surrounding space) from a line: <em>“Oh dear. [sigh] What now?”</em> → <em>“Oh dear. What now?”</em>. Lines spoken by the caption character are removed entirely. Captions don't affect audio playback.</p>
+              <div class="caption-delims">
+                <label class="identity-field">Caption start<input id="set-cc-open" type="text" spellcheck="false" maxlength="4" /></label>
+                <label class="identity-field">Caption end<input id="set-cc-close" type="text" spellcheck="false" maxlength="4" /></label>
+                <small class="settings-fieldnote caption-delims-note">The pair that wraps a caption cue inside a line; the default is <code>[</code> … <code>]</code>. With captions off, everything between them (and the surrounding space) is removed.</small>
+                <small id="cc-delim-warn" class="settings-fieldnote caption-delims-warn" hidden>Avoid <code>(</code> as the start: a <code>(</code> at the start of a line opens a performance direction, so a caption there won't work. Use <code>[</code> or another token.</small>
+              </div>
+              <label class="identity-field">Caption character<input id="set-cc-character" type="text" spellcheck="false" /><small class="settings-fieldnote">A cast member (default <code>SFX</code>) whose whole lines are pure captions: omitted entirely when captions are off, delimiters or not. The dialogue event still fires so its audio plays.</small></label>
+            </section>
+            <section class="settings-panel" data-panel="dictionary" hidden>
+              <div id="set-dictionary"></div>
+            </section>
+            <section class="settings-panel" data-panel="gamedata" hidden>
+              <p class="settings-note">Custom fields the host game reads off each node type. Define them here; edit each node's values in the inspector.</p>
+              <div id="set-gamedata"></div>
+            </section>
+            <section class="settings-panel" data-panel="build" hidden>
+              <p class="settings-note">Where <strong>Publish ▸ Publish Bundle</strong> writes the compiled runtime <code>.patterc</code> bundle.</p>
+              <label class="identity-field">Build output<input id="set-build" type="text" spellcheck="false" placeholder="../patter-dist/&lt;project&gt;.patterc" /><small class="identity-hint">Relative to the project root, or an absolute path. Defaults to a sibling <code>patter-dist/</code> folder (beside the package, not inside it).</small></label>
+              <label class="identity-field">Localisation<select id="set-build-locales" class="insp-select">
+                <option value="embedded">Embedded: strings inside the .patterc</option>
+                <option value="ids">IDs only: your game localises the line IDs</option>
+              </select><small class="identity-hint"><b>Embedded</b>: every language ships in the bundle; the runtime returns the right string (switch language live). <b>IDs only</b>: the bundle ships no text, the runtime returns the line ID and your game looks it up in its own system (use Export Localisation for the language files).</small></label>
+              <label class="settings-toggle settings-suboption" id="set-build-sourcedebug-row" hidden><input id="set-build-sourcedebug" type="checkbox" /><span>Embed source language for debug<small>Adds the source strings to an IDs-only build so it can be played for debugging. The runtime flags it as not shippable.</small></span></label>
+            </section>
+          </div>
+        </div>
+        <div class="identity-actions">
+          <p id="set-error" class="settings-error" hidden></p>
+          <button type="button" id="set-cancel" class="btn ghost" value="cancel">Cancel</button>
+          <button id="set-save" class="btn primary" value="save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Scene-local @scene properties (opened from the Scene section of the inspector). -->
+    <dialog id="scene-props" class="identity settings-dialog scene-props-dialog">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">Scene properties</h2>
+        <p class="settings-note">Scene-local <code>@scene</code> state: exists only within this scene (per-flow by default; tick Temporary to reset on every entry).</p>
+        <div id="sp-host"></div>
+        <div class="identity-actions">
+          <button type="button" id="sp-cancel" class="btn ghost" value="cancel">Cancel</button>
+          <button id="sp-save" class="btn primary" value="save">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Documentation Notes (opened from an inspector level's "Notes" row). A modal (not a cramped
+         anchored popover) so there's room to type; a text area per documentation class. -->
+    <dialog id="doc-notes" class="identity doc-dialog">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">Notes</h2>
+        <p class="settings-note">Notes for whoever works on this later. Choose who each note is for: a VO note travels with the voice script, a Localisation note with the localisation handoff. Leave it untyped to keep it here in the editor.</p>
+        <div id="doc-host" class="doc-host"></div>
+        <div class="identity-actions">
+          <button type="button" id="doc-close" class="btn primary" value="done">Done</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Voice script export (File > Export Voice Script…). A recording spreadsheet (spec §16). -->
+    <dialog id="vo-export" class="identity vo-dialog">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">Export voice script</h2>
+        <p class="settings-note">A recording spreadsheet: one row per spoken line, with its scope and VO notes.</p>
+        <label class="settings-toggle"><input id="vo-everything" type="checkbox" /><span>Export everything<small>Include every voiced line, not just those marked ready to record.</small></span></label>
+        <p class="settings-note" id="vo-status"></p>
+        <div class="identity-actions">
+          <button type="button" id="vo-cancel" class="btn ghost" value="cancel">Cancel</button>
+          <button type="button" id="vo-export-btn" class="btn primary">Export…</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Localisation (File > Export / Import Localisation…; also a button in the Language settings tab).
+         Export strings for translation and import the translated file back, over the shared loc engine. -->
+    <dialog id="loc" class="identity loc-dialog">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">Localisation</h2>
+        <p class="settings-note">Export strings for translation, then import the translated file back. Character display names ride along.</p>
+        <div class="loc-row">
+          <label class="identity-field">Format
+            <select id="loc-format" class="insp-select">
+              <option value="po">gettext PO / POT</option>
+              <option value="xlsx">Excel (.xlsx)</option>
+              <option value="json">JSON</option>
+            </select>
+          </label>
+          <label class="identity-field">Language
+            <select id="loc-locale" class="insp-select"></select>
+          </label>
+        </div>
+        <p class="settings-note" id="loc-status"></p>
+        <div class="identity-actions">
+          <button type="button" id="loc-import" class="btn">Import…</button>
+          <button type="button" id="loc-export" class="btn">Export…</button>
+          <button type="button" id="loc-close" class="btn primary" value="done">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Production Information (File > Production Information…). A read-only render of the production
+         report (spec §13); the same figures the CLI's `report` command produces. -->
+    <dialog id="report" class="identity report-dialog">
+      <div class="identity-form report-form">
+        <h2 class="identity-title">Production information</h2>
+        <!-- The report usually overflows its 70vh body; the wrapper carries edge scrims + a "More below"
+             pill so the cut-off is unmistakable (the thin app scrollbar alone is too quiet here). -->
+        <div id="report-scroll" class="report-scroll">
+          <div id="report-host" class="report-host"></div>
+          <button type="button" id="report-more" class="report-more" aria-label="Scroll for more" title="More below">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 6 L8 11 L13 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="identity-actions">
+          <button type="button" id="report-export" class="btn">Export to spreadsheet…</button>
+          <button type="button" id="report-close" class="btn primary" value="done">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="set-start-prompt" class="identity">
+      <form method="dialog" class="identity-form">
+        <h2 class="identity-title">Where does your story start?</h2>
+        <p class="settings-note">Pick the scene the story begins at. You can change this any time in Project Settings.</p>
+        <label class="identity-field">Start scene<select id="start-prompt-scene"></select></label>
+        <div class="identity-actions">
+          <button type="submit" value="cancel" class="btn">Cancel</button>
+          <button type="submit" value="set" class="btn primary">Set start</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="./src/renderer.ts"></script>
+  </body>
+</html>

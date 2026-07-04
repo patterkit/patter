@@ -1,0 +1,95 @@
+---
+title: Download
+description: Download Patterpad (the editor), the patter CLI, and the Patterplay runtimes, straight from GitHub Releases.
+---
+
+import Downloads from "../../components/Downloads.astro";
+
+## Patterpad: the editor
+
+**Patterpad is the main app**: the desktop editor where you write. Download the
+installer for your platform from the latest release:
+
+<div class="dl-platforms">
+  <div class="dl-platform"><b>macOS</b><span>Signed installer</span></div>
+  <div class="dl-platform"><b>Windows</b><span>Installer</span></div>
+  <div class="dl-platform"><b>Linux</b><span>AppImage</span></div>
+</div>
+
+Grab the file for your OS from the **[release list below](#all-releases)**: the
+Patterpad installers are listed first in each release.
+
+:::caution[Windows SmartScreen]
+The Windows installer is not code-signed yet, so SmartScreen shows a warning on first
+run. Choose **More info → Run anyway**. (macOS builds are signed and notarized.)
+:::
+
+## The CLI
+
+`patter` validates, compiles, plays, and localises projects from the terminal: handy
+for CI and automation.
+
+- **Standalone executable**: a single file per platform (macOS, Windows, Linux), with
+  **no Node.js required**. Download it from the [release list](#all-releases).
+- **From npm**, if you already have Node:
+
+  ```sh
+  npm install -g @patterkit/cli
+  patter validate ./my-project.patter
+  ```
+
+See the [CLI reference](/cli/) for every command.
+
+## Patterplay JS: the runtime
+
+Play a compiled `.patterc` bundle in a web game or app. No npm required:
+
+- **Release zip**: `patterplay-js-<version>.zip` from the
+  [release list](#all-releases) - the whole JS runtime as a plain download, symmetric
+  with the engine plugin zips: the drop-in, the module builds, and two bundled demos.
+- **Drop-in only**: `patterplay.min.js`, a single self-contained file for a plain
+  `<script>` tag (no bundler). Grab it loose from the [release list](#all-releases), or
+  load it from a CDN:
+
+  ```html
+  <script src="https://unpkg.com/@patterkit/runtime/dist/patterplay.min.js"></script>
+  ```
+
+- **From npm**: `npm install @patterkit/runtime` (plus the optional
+  `@patterkit/play-helpers`). Same version as the zip.
+
+See [The Engine API](/play/engine/) to get started.
+
+## Native runtimes
+
+The same bundle plays natively in your game engine. Pick the runtime for the engine
+you ship on; they ship as engine plugins (see the
+[Patterplay runtimes](/play/overview/) page):
+
+<div class="dl-runtimes">
+  <span class="dl-runtime"><img src="/plugin-javascript.svg" alt="" width="36" height="36" /> JavaScript / TypeScript</span>
+  <span class="dl-runtime"><img src="/plugin-unity.svg" alt="" width="36" height="36" /> Unity (C#)</span>
+  <span class="dl-runtime"><img src="/plugin-unreal.svg" alt="" width="36" height="36" /> Unreal (C++)</span>
+  <span class="dl-runtime"><img src="/plugin-godot.svg" alt="" width="36" height="36" /> Godot (GDScript)</span>
+</div>
+
+## All releases
+
+Every download (Patterpad installers, CLI binaries, and the JS drop-in) is read live
+from [GitHub Releases](https://github.com/patterkit/patter/releases), so this list is
+always current:
+
+<Downloads />
+
+<style>{`
+  .dl-platforms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin: 1rem 0 1.25rem; }
+  @media (max-width: 640px) { .dl-platforms { grid-template-columns: 1fr; } }
+  .dl-platform { display: flex; flex-direction: column; gap: 0.1rem; box-sizing: border-box; margin: 0;
+    border: 1px solid var(--sl-color-gray-5); border-top: 2px solid var(--pt-teal-ink); border-radius: 0.6rem;
+    padding: 0.85rem 1rem; background: var(--sl-color-bg-sidebar); }
+  .dl-platform b { font-size: 1rem; }
+  .dl-platform span { font-size: 0.82rem; color: var(--sl-color-gray-2); }
+  .dl-runtimes { display: flex; flex-wrap: wrap; gap: 0.6rem 1.1rem; margin: 0.9rem 0 1.25rem; }
+  .dl-runtime { display: inline-flex; align-items: center; gap: 0.45rem; font-weight: 600; }
+  .dl-runtime img { border-radius: 7px; }
+`}</style>

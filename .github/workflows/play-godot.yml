@@ -1,0 +1,58 @@
+name: Patterplay Godot release
+
+# Tagging `play-godot-vX.Y.Z` gates the GDScript port on the conformance corpus (a headless
+# Godot replays corpus.json through the addon's SceneTree TestHost), then zips the addon and
+# attaches it to the matching GitHub Release. Users drop the zip's patterplay/ folder into
+# their project's addons/ (demos + README + CHANGELOG ship inside it; the test scripts and
+# corpus material never do).
+on:
+  push:
+    tags: ["play-godot-v*"]
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.3-stable"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the addon version (bump via `npm run bump:play`)
+        run: |
+          version="${GITHUB_REF_NAME#play-godot-v}"
+          manifest=$(sed -n 's/^version="\(.*\)"$/\1/p' ports/godot/addons/patterplay/plugin.cfg)
+          [ "$manifest" = "$version" ] || { echo "plugin.cfg says $manifest but the tag says $version"; exit 1; }
+          grep -q "^## \[${version}\] - [0-9]" ports/godot/addons/patterplay/CHANGELOG.md \
+            || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        run: |
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fSL "$url" -o godot.zip
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+
+      - name: Import project (registers the class_name globals)
+        run: ./godot --headless --path ports/godot --import || true
+
+      - name: Verify parity (corpus TestHost - gates the release)
+        run: ./godot --headless --path ports/godot --script res://test/test_corpus.gd -- "$PWD/packages/conformance/corpus.json"
+
+      - name: Package the addon
+        run: |
+          version="${GITHUB_REF_NAME#play-godot-v}"
+          echo "ASSET=patterplay-godot-${version}.zip" >> "$GITHUB_ENV"
+          ( cd ports/godot/addons && zip -r "../../../patterplay-godot-${version}.zip" patterplay )
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

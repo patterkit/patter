@@ -1,0 +1,335 @@
+/* PatterKit documentation - brand pass.
+ * Re-anchors the site on the real brand palette: teal ink (the script: structural, the default accent),
+ * ember (the stage: reserved for action - primary CTAs + Patterplay/runtime contexts), gold (family /
+ * caution), stage-black (the shared dark ground + code). Teal is the default; ember is never
+ * promoted to a general link colour. Fonts are loaded via the Google Fonts <link> in astro.config.
+ * No em-dashes anywhere in this project's copy. */
+
+:root {
+  --pt-read: "Newsreader", Georgia, "Iowan Old Style", serif;
+  --sl-font: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --sl-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Widen the central reading column (Starlight default 45rem) so wide tables get room.
+   * Running prose is capped back to a comfortable measure below, so only tables, figures,
+   * code, and diagrams use the extra width. */
+  --sl-content-width: 54rem;
+  --pt-prose-measure: 46rem;
+
+  /* brand reference tokens (theme independent) */
+  --pt-teal-ink: #214f4b;
+  --pt-teal-mid: #2f6f66;
+  --pt-teal-soft: #4f8a82;
+  --pt-ember: #d2603e;
+  --pt-gold: #cf9433;
+  --pt-stage: #15201e;
+}
+
+/* ------------------------------------------------------------------ */
+/* DARK (Starlight default): teal-soft accent on a stage-black ground  */
+/* ------------------------------------------------------------------ */
+:root,
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #1c3b36;
+  --sl-color-accent: #57a294;
+  --sl-color-accent-high: #9fd0c4;
+  --sl-color-text-accent: #9fd0c4;
+
+  --sl-color-white: #f4efe6;
+  --sl-color-gray-1: #e7ece9;
+  --sl-color-gray-2: #c2cecb;
+  --sl-color-gray-3: #8a9b97;
+  --sl-color-gray-4: #5d6f6b;
+  --sl-color-gray-5: #2c3e3a;
+  --sl-color-gray-6: #1b2624;
+  --sl-color-black: #131c1a;
+
+  --sl-color-bg: #15201e;
+  --sl-color-bg-nav: #192724;
+  --sl-color-bg-sidebar: #192724;
+  --sl-color-bg-inline-code: #1f302d;
+
+  --pt-cta: #e0734f;
+}
+
+/* ------------------------------------------------------------------ */
+/* LIGHT: teal-ink accent on warm paper                                */
+/* ------------------------------------------------------------------ */
+:root[data-theme="light"] {
+  --sl-color-accent-low: #dbe6e2;
+  --sl-color-accent: #214f4b;
+  --sl-color-accent-high: #18403c;
+  --sl-color-text-accent: #214f4b;
+
+  /* in Starlight light mode the "white" and "black" tokens invert:
+     white = highest-contrast text, black = page background */
+  --sl-color-white: #2a241c;
+  --sl-color-gray-1: #312b22;
+  --sl-color-gray-2: #4a4339;
+  --sl-color-gray-3: #6b6256;
+  --sl-color-gray-4: #9c9286;
+  --sl-color-gray-5: #e0d6c6;
+  --sl-color-gray-6: #f6f0e6;
+  --sl-color-gray-7: #faf5ec;
+  --sl-color-black: #f1ebe0;
+
+  --sl-color-bg: #f1ebe0;
+  --sl-color-bg-nav: #fbf7f0;
+  --sl-color-bg-sidebar: #f6f0e6;
+  --sl-color-bg-inline-code: #e7f0ed;
+
+  --pt-cta: #d2603e;
+}
+
+/* Keep running prose to a comfortable measure inside the wider column; tables, figures, code
+ * blocks, and inline diagrams (top-level <svg>) are left to use the full --sl-content-width. */
+.sl-markdown-content > p,
+.sl-markdown-content > ul,
+.sl-markdown-content > ol,
+.sl-markdown-content > blockquote,
+.sl-markdown-content > h1,
+.sl-markdown-content > h2,
+.sl-markdown-content > h3,
+.sl-markdown-content > h4,
+.sl-markdown-content > h5,
+.sl-markdown-content > h6 { max-width: var(--pt-prose-measure); }
+
+/* ------------------------------------------------------------------ */
+/* Headings, wordmark, hero title: the warm reading face               */
+/* ------------------------------------------------------------------ */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+h1#_top,
+.hero h1,
+.hero .tagline,
+.site-title {
+  font-family: var(--pt-read);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.hero h1 { font-size: clamp(2.4rem, 6vw, 4rem); }
+
+/* Mono eyebrow utility for the hero + section labels */
+.pt-eyebrow {
+  font-family: var(--sl-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.75rem;
+  color: var(--pt-teal-mid);
+}
+
+/* ------------------------------------------------------------------ */
+/* Asides: off the default lilac, onto the brand                       */
+/* This Starlight version does NOT derive the aside fill from the      */
+/* border, so tint the fill explicitly from the (brand-mapped) border  */
+/* var - one rule covers every variant + both themes. The descendant   */
+/* selector out-specifies Starlight's own aside background rule.       */
+/* ------------------------------------------------------------------ */
+.sl-markdown-content .starlight-aside {
+  background-color: color-mix(in oklab, var(--sl-color-asides-border) 12%, var(--sl-color-bg));
+}
+.starlight-aside {
+  --sl-color-asides-text-accent: var(--pt-teal-ink);
+  --sl-color-asides-border: var(--pt-teal-ink);
+}
+:root[data-theme="dark"] .starlight-aside {
+  --sl-color-asides-text-accent: var(--pt-teal-soft);
+  --sl-color-asides-border: var(--pt-teal-soft);
+}
+.starlight-aside--caution {
+  --sl-color-asides-text-accent: #9a6e15;
+  --sl-color-asides-border: var(--pt-gold);
+}
+:root[data-theme="dark"] .starlight-aside--caution {
+  --sl-color-asides-text-accent: #e0b257;
+  --sl-color-asides-border: var(--pt-gold);
+}
+.starlight-aside--danger {
+  --sl-color-asides-text-accent: #b04a28;
+  --sl-color-asides-border: var(--pt-ember);
+}
+:root[data-theme="dark"] .starlight-aside--danger {
+  --sl-color-asides-text-accent: #e0734f;
+  --sl-color-asides-border: var(--pt-ember);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar: teal active page with a drop bullet, mono group labels     */
+/* ------------------------------------------------------------------ */
+#starlight__sidebar a[aria-current="page"] {
+  background: var(--pt-teal-ink);
+  color: #f1ebe0;
+  border-radius: 6px;
+  font-weight: 500;
+}
+#starlight__sidebar a[aria-current="page"]::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 9px;
+  margin-right: 8px;
+  vertical-align: -1px;
+  background: #8fc7bb;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E") no-repeat center / contain;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+/* group / section headings in the sidebar */
+#starlight__sidebar .sidebar-content summary span,
+#starlight__sidebar .group-label > span {
+  font-family: var(--sl-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--sl-color-gray-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Buttons (hero actions): ember primary, teal-outline secondary       */
+/* ------------------------------------------------------------------ */
+.sl-link-button.primary,
+a.action.primary {
+  background: var(--pt-cta);
+  border-color: var(--pt-cta);
+  color: #ffffff;
+}
+.sl-link-button.primary:hover,
+a.action.primary:hover {
+  background: #c0552f;
+  border-color: #c0552f;
+}
+.sl-link-button.secondary,
+a.action.secondary {
+  background: transparent;
+  color: var(--pt-teal-ink);
+  border: 1.5px solid var(--pt-teal-ink);
+}
+:root[data-theme="dark"] .sl-link-button.secondary,
+:root[data-theme="dark"] a.action.secondary {
+  color: var(--pt-teal-soft);
+  border-color: var(--pt-teal-soft);
+}
+.sl-link-button.minimal,
+a.action.minimal {
+  color: var(--sl-color-text-accent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Cards: hairline + product-colour top border, lift on hover.         */
+/* Grid layout (moved here from index.mdx) + the brand treatment.      */
+/* ------------------------------------------------------------------ */
+.win-cards, .brand-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-auto-rows: 1fr; align-items: stretch; gap: 1rem; margin-top: 1.5rem;
+}
+.win-card, .brand-card {
+  height: 100%; box-sizing: border-box; margin: 0; /* kill Starlight's * + * top margin so cells align */
+  background: var(--sl-color-bg-sidebar);
+  border: 1px solid var(--sl-color-gray-5);
+  border-top: 2px solid var(--pt-teal-ink);
+  border-radius: 0.6rem;
+  padding: 1.1rem 1.25rem;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.win-card:hover, .brand-card:hover {
+  border-color: var(--pt-teal-soft);
+  transform: translateY(-1px);
+}
+.win-card h3 { margin: 0 0 0.45rem; font-size: 1.02rem; }
+.win-card p { margin: 0; font-size: 0.9rem; color: var(--sl-color-gray-2); }
+.brand-card { display: flex; gap: 0.9rem; align-items: flex-start; }
+.brand-card img { flex: 0 0 auto; border-radius: 9px; }
+.brand-card h3 { margin: 0.1rem 0 0.4rem; font-size: 1.05rem; }
+.brand-card p { margin: 0; font-size: 0.9rem; color: var(--sl-color-gray-2); }
+/* product accents (classes added in index.mdx) */
+.brand-card.is-patterpad { border-top-color: var(--pt-teal-ink); }
+.brand-card.is-patterplay { border-top-color: var(--pt-ember); }
+.brand-card.is-cli { border-top-color: #312b22; }
+.brand-card.is-format { border-top-color: var(--pt-gold); }
+:root[data-theme="dark"] .brand-card.is-cli { border-top-color: var(--sl-color-gray-3); }
+
+/* ------------------------------------------------------------------ */
+/* Inline code: pale-teal chip                                         */
+/* ------------------------------------------------------------------ */
+.sl-markdown-content :not(pre) > code {
+  background: var(--sl-color-bg-inline-code);
+  color: var(--pt-teal-ink);
+}
+:root[data-theme="dark"] .sl-markdown-content :not(pre) > code {
+  color: #9fd0c4;
+}
+
+/* Code blocks sit on stage-black in BOTH themes (a deliberate constant that reads as "the runtime").
+   The syntax theme is forced dark in astro.config (expressiveCode) so tokens suit this ground; this is a
+   belt-and-braces background pin. */
+.expressive-code .frame pre,
+.expressive-code .frame .copy + pre {
+  --ec-codeBg: #15201e;
+  background: #15201e;
+}
+
+/* ------------------------------------------------------------------ */
+/* Three-door role router on the home page                             */
+/* ------------------------------------------------------------------ */
+.pt-doors {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1rem; margin-top: 1.75rem;
+}
+@media (max-width: 900px) { .pt-doors { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .pt-doors { grid-template-columns: 1fr; } }
+.pt-door {
+  display: block;
+  background: var(--sl-color-bg-sidebar);
+  border: 1px solid var(--sl-color-gray-5);
+  border-top: 3px solid var(--pt-teal-ink);
+  border-radius: 9px;
+  padding: 1rem 1.1rem 1.15rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.pt-door:hover { transform: translateY(-1px); border-color: var(--pt-teal-soft); }
+.pt-door .pt-door-eyebrow {
+  font-family: var(--sl-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  color: var(--pt-teal-mid);
+  margin-bottom: 0.5rem;
+}
+.pt-door h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.pt-door p { margin: 0; font-size: 0.85rem; color: var(--sl-color-gray-2); }
+.pt-door.is-writer { border-top-color: var(--pt-teal-ink); }
+.pt-door.is-writer .pt-door-eyebrow { color: var(--pt-teal-mid); }
+.pt-door.is-lead { border-top-color: var(--pt-teal-mid); }
+.pt-door.is-lead .pt-door-eyebrow { color: var(--pt-teal-mid); }
+:root[data-theme="dark"] .pt-door.is-lead { border-top-color: var(--pt-teal-soft); }
+.pt-door.is-dev { border-top-color: var(--pt-ember); }
+.pt-door.is-dev .pt-door-eyebrow { color: #c0552f; }
+.pt-door.is-eval { border-top-color: var(--pt-gold); }
+.pt-door.is-eval .pt-door-eyebrow { color: #a9781f; }
+:root[data-theme="dark"] .pt-door.is-dev .pt-door-eyebrow { color: #e0734f; }
+:root[data-theme="dark"] .pt-door.is-eval .pt-door-eyebrow { color: #e0b257; }
+
+/* Screenshots of the real Patterpad UI. Framed to read as a capture, not a diagram. */
+.doc-shot { margin: 1.5rem 0; }
+.doc-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(21, 32, 30, 0.08), 0 8px 24px rgba(21, 32, 30, 0.06);
+}
+:root[data-theme="dark"] .doc-shot img {
+  border-color: var(--sl-color-gray-4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+/* Small chrome captures (icons, chips) should not stretch full width. */
+.doc-shot.is-inset img { max-width: 320px; }
+.doc-shot figcaption {
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--sl-color-gray-2);
+}

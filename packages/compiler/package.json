@@ -1,0 +1,34 @@
+{
+  "name": "@patterkit/compiler",
+  "version": "0.1.0",
+  "description": "Patter compiler: compile condition/effect expressions, validate them, and export source to the runtime bundle.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Ian Thomas",
+  "homepage": "https://patterkit.dev",
+  "repository": { "type": "git", "url": "git+https://github.com/patterkit/patter.git", "directory": "packages/compiler" },
+  "bugs": "https://github.com/patterkit/patter/issues",
+  "publishConfig": { "access": "public" },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean"
+  },
+  "dependencies": {
+    "@patterkit/model": "0.1.0",
+    "@patterkit/core": "0.1.0",
+    "@patterkit/dialect": "0.1.0",
+    "@wildwinter/expr": "^0.3.0",
+    "@wildwinter/scoperegistry": "^0.1.0"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "baseUrl": ".",
+    "paths": {
+      "@patterkit/runtime": ["../../packages/runtime/src/index.ts"],
+      "@patterkit/compiler": ["../../packages/compiler/src/index.ts"],
+      "@patterkit/dialect": ["../../packages/dialect/src/index.ts"],
+      "@patterkit/model": ["../../packages/model/src/index.ts"],
+      "@patterkit/core": ["../../packages/core/src/index.ts"],
+      "@wildwinter/expr": ["../../../expr/packages/expr/src/index.ts"],
+      "@wildwinter/scoperegistry": ["../../../expr/packages/scoperegistry/src/index.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}

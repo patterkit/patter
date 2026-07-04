@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 108 128" width="864" height="1024">
+  <defs><filter id="ds" x="-25%" y="-20%" width="150%" height="145%"><feDropShadow dx="0" dy="7" stdDev="6" flood-color="#312b22" flood-opacity="0.16"></feDropShadow></filter></defs>
+  <g filter="url(#ds)">
+    <path d="M14 4 H62 L90 32 V106 a6 6 0 0 1 -6 6 H14 a6 6 0 0 1 -6 -6 V10 a6 6 0 0 1 6 -6 Z" fill="#21302e"></path>
+    <path d="M62 4 V26 a6 6 0 0 0 6 6 H90 Z" fill="#38514d"></path>
+    <g transform="translate(22,32) scale(0.52)"><path fill="#6fa39c" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g>
+    <text x="49" y="100" text-anchor="middle" font-family="&#39;IBM Plex Mono&#39;,&#39;SFMono-Regular&#39;,monospace" font-size="15" font-weight="500" fill="#6fa39c" letter-spacing="1">.c</text>
+  </g>
+</svg>

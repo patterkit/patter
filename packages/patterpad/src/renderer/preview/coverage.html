@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Patterpad · Coverage (UI preview)</title>
+  </head>
+  <body class="coverage-win">
+    <header class="cov-bar">
+      <div class="cov-opts">
+        <label class="cov-opt">Runs<input id="cov-runs" type="number" min="1" step="100" value="5000" /></label>
+        <label class="cov-opt">Max steps<input id="cov-maxsteps" type="number" min="1" step="50" value="200" /></label>
+        <label class="cov-opt">Seed<input id="cov-seed" type="number" min="0" value="0" /></label>
+        <label class="cov-opt">Start<select id="cov-scene"></select></label>
+        <span class="cov-bar-spacer"></span>
+        <button id="cov-pin" class="cov-pin" type="button" title="Keep on top" aria-pressed="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="17" x2="12" y2="22"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.3V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.7a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+        <button id="cov-world" class="btn" type="button">World Properties…</button>
+        <button id="cov-run" class="btn primary" type="button">Run test</button>
+      </div>
+    </header>
+    <p id="cov-drivers" class="cov-drivers"></p>
+    <p id="cov-status" class="cov-status" hidden></p>
+    <main id="cov-host" class="cov-results"></main>
+    <script type="module" src="./coverage-dev.ts"></script>
+  </body>
+</html>

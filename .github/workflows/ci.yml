@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+      # tsconfig + vitest alias @wildwinter/expr to a sibling ../expr checkout (dev tests
+      # against its source, not the published version). Mirror that here so CI sees the same.
+      - name: Checkout @wildwinter/expr (sibling source)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - run: npm ci
+        working-directory: patter
+      - run: npm run typecheck
+        working-directory: patter
+      - run: npm test
+        working-directory: patter
+      - run: npm run build
+        working-directory: patter
+
+  changeset-check:
+    # A nudge, not a gate: warns on PRs that touch a published package without a changeset.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: changeset status
+        run: npx changeset status --since=origin/${{ github.base_ref }} || echo "::warning::No changeset for this PR - add one with 'npm run changeset' if it touches a published package."

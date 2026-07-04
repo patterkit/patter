@@ -1,0 +1,234 @@
+---
+// The PatterKit marketing home. A STANDALONE page (its own nav + footer, full-bleed,
+// warm-paper, light-only), deliberately outside the Starlight docs chrome. Brand tokens come from
+// src/styles/patter.css; the landing's classes live in src/styles/landing.css. Copy is final and
+// paraphrased from Why Patter; no em-dashes.
+import "../styles/patter.css";
+import "../styles/landing.css";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a trailing slash
+const repo = "https://github.com/patterkit/patter";
+const title = "PatterKit - Write it, play it, test it, ship it.";
+const description =
+  "An open toolkit for dialogue and branching narrative in games. Your writers author in a calm, code-free editor; you drop one small file into Unity, Unreal, Godot, or the web and play it.";
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>{"html{scroll-behavior:smooth}body{margin:0}"}</style>
+  </head>
+  <body>
+    <div class="pt-landing">
+      <!-- NAV -->
+      <nav class="pt-nav">
+        <div class="pt-wrap pt-nav-inner">
+          <a class="pt-brand" href={base} aria-label="PatterKit home">
+            <svg viewBox="8 25 124 112" width="33" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#214f4b" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g>
+              <g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g>
+            </svg>
+            <span class="pt-wordmark">Patter<span>Kit</span></span>
+          </a>
+          <div class="pt-navlinks">
+            <a class="pt-navlink" href="#engine">Every engine</a>
+            <a class="pt-navlink" href={`${base}why/`}>Why Patter</a>
+            <a class="pt-navlink" href={repo}>GitHub</a>
+            <a class="pt-btn pt-btn-primary" href={`${base}getting-started/`}>Get started</a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- HERO -->
+      <header id="top" class="pt-hero">
+        <div class="pt-hero-glows"><div class="pt-glow pt-glow-a"></div><div class="pt-glow pt-glow-b"></div></div>
+        <div class="pt-wrap pt-hero-grid">
+          <div>
+            <div class="pt-pill"><span class="pt-pill-drop"></span>Open narrative toolkit</div>
+            <h1 class="pt-h1">Write it, play it, test it, <em class="pt-em">ship it</em>.</h1>
+            <p class="pt-lead">Patter takes the whole dialogue and branching-narrative layer off your plate. Your writers author in a calm, code-free editor. You drop one small file into your game and play it: the same story, on Unity, Unreal, Godot, or the web.</p>
+            <div class="pt-actions">
+              <a class="pt-btn pt-btn-primary pt-btn-lg" href={`${base}getting-started/`}>Get started</a>
+              <a class="pt-btn pt-btn-outline pt-btn-lg" href={`${base}why/`}>Why Patter &rarr;</a>
+            </div>
+            <p class="pt-fineprint">MIT-licensed &amp; free &middot; no server &middot; no lock-in &middot; no telemetry</p>
+          </div>
+
+          <div class="pt-hero-media">
+            <div class="pt-window">
+              <div class="pt-window-bar">
+                <span class="pt-dot pt-dot-r"></span><span class="pt-dot pt-dot-y"></span><span class="pt-dot pt-dot-g"></span>
+                <span class="pt-window-title">Patterpad &middot; the-patter-tour.patter</span>
+              </div>
+              <img src={`${base}doc-images/ThreeColumns.png`} alt="Patterpad editor showing a screenplay-style script with an inspector panel" />
+            </div>
+            <div class="pt-float-card">
+              <div class="pt-float-label">Plays in your engine</div>
+              <div class="pt-float-bundle">one <code>.patterc</code> bundle</div>
+              <div class="pt-float-icons">
+                <img src={`${base}plugin-javascript.svg`} alt="JavaScript" width="26" height="26" />
+                <img src={`${base}plugin-unity.svg`} alt="Unity" width="26" height="26" />
+                <img src={`${base}plugin-unreal.svg`} alt="Unreal" width="26" height="26" />
+                <img src={`${base}plugin-godot.svg`} alt="Godot" width="26" height="26" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ENGINE STRIP -->
+      <section id="engine" class="pt-engine">
+        <div class="pt-wrap pt-engine-inner">
+          <div class="pt-engine-copy">
+            <h2 class="pt-serif">One story. Every engine. <span>Tested to match.</span></h2>
+            <p>Pick the runtime for the engine you actually ship on. What plays in the editor plays in your build: choices, conditions, save/load, right down to the random draws.</p>
+          </div>
+          <div class="pt-engine-tiles">
+            <div class="pt-engine-tile"><img src={`${base}plugin-javascript.svg`} alt="" width="52" height="52" /><span>JavaScript</span></div>
+            <div class="pt-engine-tile"><img src={`${base}plugin-unity.svg`} alt="" width="52" height="52" /><span>Unity</span></div>
+            <div class="pt-engine-tile"><img src={`${base}plugin-unreal.svg`} alt="" width="52" height="52" /><span>Unreal</span></div>
+            <div class="pt-engine-tile"><img src={`${base}plugin-godot.svg`} alt="" width="52" height="52" /><span>Godot</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WRITERS -->
+      <section id="writers" class="pt-writers">
+        <div class="pt-wrap pt-split">
+          <div>
+            <div class="pt-eye">For your writers</div>
+            <h2 class="pt-h2">A screenplay, not a scripting language.</h2>
+            <p class="pt-writers-intro">No markup to memorise, no node graph to untangle. Writers work on a surface they already know: character cues, lines, directions. They are productive on day one.</p>
+            <ul class="pt-list">
+              <li><span class="pt-drop pt-list-drop"></span><div><strong>Logic made easy.</strong> <span>Conditions and variables are edited with a guided editor, kept clear from the actual writing.</span></div></li>
+              <li><span class="pt-drop pt-list-drop"></span><div><strong>See it the way the player will.</strong> <span>A live play window walks the real story as you write, so you pick choices and watch it branch. No compile-and-guess loop.</span></div></li>
+              <li><span class="pt-drop pt-list-drop"></span><div><strong>One tool for the whole job.</strong> <span>Review comments, draft status, translation and voice-recording scripts are all built in, not scattered across a doc, a spreadsheet and a tracker.</span></div></li>
+            </ul>
+            <a class="pt-textlink" href={`${base}patterpad/overview/`}>Tour Patterpad &rarr;</a>
+          </div>
+
+          <!-- Recreated screenplay surface -->
+          <div class="pt-screen">
+            <div class="pt-screen-head">
+              <span class="pt-screen-scene">The Crossroads</span>
+              <span class="pt-screen-meta">scene &middot; 3 blocks</span>
+            </div>
+            <div class="pt-screen-body">
+              <p class="pt-narration">A soft chime. A warm, paper-coloured room assembles itself around you.</p>
+              <div class="pt-lines">
+                <span class="pt-cue">Guide</span><span class="pt-line">Hello! Welcome to Patter. I'm your guide for this little tour.</span>
+                <span class="pt-cue">Guide</span><span class="pt-line">So, where would you like to start?</span>
+              </div>
+              <div class="pt-cond">
+                <div class="pt-cond-row">
+                  <div class="pt-cond-pill"><span class="pt-square"></span>if visits(The Crossroads) == 1</div>
+                  <div class="pt-cond-tag">edited in a side panel</div>
+                </div>
+                <div class="pt-cond-lines">
+                  <span class="pt-cue">Guide</span><span class="pt-line">Pick anything; I'll bring you right back here afterwards.</span>
+                </div>
+              </div>
+              <div class="pt-choice">
+                <span class="pt-diamond"></span>
+                <span class="pt-choice-label">Lines, narration &amp; directions</span>
+                <span class="pt-choice-jump">&#8618; jump</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WHY / PILLARS -->
+      <section id="why" class="pt-why">
+        <div class="pt-wrap pt-why-inner">
+          <div class="pt-why-intro">
+            <div class="pt-eye">Why teams reach for it</div>
+            <h2 class="pt-h2">Indie-first, built to scale up.</h2>
+            <p class="pt-why-lead">A whole team's edits that combine instead of colliding, and production tooling that catches problems before your players do.</p>
+          </div>
+
+          <div class="pt-pillars">
+            <div class="pt-pillar">
+              <h3>Files you own, in your VCS</h3>
+              <p>Plain text on disk (scenes, strings, and their notes) living in git or Perforce. No database, no server, no export step to get your data out.</p>
+            </div>
+            <div class="pt-pillar pt-pillar-2">
+              <h3>Merges by structure, not line</h3>
+              <p>A whole writing team's edits combine instead of clashing. Patter respects your locks and merges by structure, so growing the team doesn't turn into merge hell.</p>
+            </div>
+            <div class="pt-pillar pt-pillar-3">
+              <h3>Catch dead branches early</h3>
+              <p>Coverage testing walks the flow thousands of times and flags every beat a player can never reach. Narrative QA you can fail a build on, in CI rather than in a bug report.</p>
+            </div>
+          </div>
+
+          <div class="pt-builtins">
+            <div class="pt-builtin"><div class="pt-builtin-t">Localisation &amp; captions</div><p>Two modes, live language switch, and player-toggle caption cues. Built in, not bolted on.</p></div>
+            <div class="pt-builtin"><div class="pt-builtin-t">Save &amp; load, one call</div><p>Position, state, visit counts, and the random draws: restored exactly, through a single call.</p></div>
+            <div class="pt-builtin"><div class="pt-builtin-t">Automatable from CI</div><p>The <code>patter</code> CLI validates, compiles and plays, so you can gate a PR on it.</p></div>
+            <div class="pt-builtin"><div class="pt-builtin-t">Share with anyone</div><p>Send a stakeholder one playable HTML file, or a readable PDF screenplay. One click.</p></div>
+          </div>
+
+          <a class="pt-textlink" href={`${base}why/`}>See the full comparison with Ink, Yarn &amp; articy &rarr;</a>
+        </div>
+      </section>
+
+      <!-- DIFFERENTIATOR -->
+      <section id="why-more" class="pt-diff">
+        <div class="pt-diff-inner">
+          <svg class="pt-diff-drop" viewBox="0 0 100 100" width="44" height="56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="#214f4b" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></svg>
+          <p class="pt-eye">The reason Patter exists</p>
+          <h2 class="pt-h2">Every line has a permanent id, so translation and voice just <em class="pt-em">fall out of the model.</em></h2>
+          <p class="pt-diff-lead">Patter's deals in complete identified lines, not fragments of text. A translation is that line in another language; an audio take is that line's recording.<br/>Natively part of the format.</p>
+          <div class="pt-chips">
+            <span class="pt-chip">a stable id per line</span>
+            <span class="pt-chip">recording status &amp; scratch takes</span>
+            <span class="pt-chip">live production stats</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CLOSING CTA -->
+      <section id="start" class="pt-cta">
+        <div class="pt-cta-glows"><div class="pt-glow pt-cta-glow-a"></div><div class="pt-glow pt-cta-glow-b"></div></div>
+        <div class="pt-wrap pt-cta-inner">
+          <h2>Take the dialogue layer off your backlog.</h2>
+          <p>Open the interactive tour as a playable Patter story, or drop the runtime into your engine today. It's open source, MIT-licensed, and free.</p>
+          <div class="pt-cta-actions">
+            <a class="pt-btn pt-btn-primary pt-btn-xl" href={`${base}getting-started/`}>Get started</a>
+            <a class="pt-btn pt-btn-ghost pt-btn-xl" href={`${base}download/`}>Download Patterpad</a>
+            <a class="pt-btn pt-btn-ghost pt-btn-xl" href={repo}>GitHub &#8599;</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer class="pt-foot">
+        <div class="pt-wrap pt-foot-inner">
+          <div class="pt-foot-brand">
+            <svg viewBox="8 25 124 112" width="27" height="24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#57a294" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g><g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g></svg>
+            <span>PatterKit</span>
+          </div>
+          <div class="pt-foot-links">
+            <a href={`${base}why/`}>Why Patter</a>
+            <a href={`${base}patterpad/overview/`}>Patterpad</a>
+            <a href={`${base}play/overview/`}>Runtimes</a>
+            <a href={repo}>GitHub</a>
+          </div>
+          <div class="pt-foot-legal">MIT-licensed &middot; no telemetry &middot; Made by <a href="https://wildwinter.bio.link" rel="author">Ian Thomas</a> &middot; <a href="https://patterkit.com">patterkit.com</a></div>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

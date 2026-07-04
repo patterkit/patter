@@ -1,0 +1,90 @@
+name: CLI release
+
+# Standalone `patter` CLI executables (one per platform, no Node), attached to a GitHub
+# Release. Its own tag flow (not Changesets, which handles the npm packages): tagging
+# `cli-vX.Y.Z` builds the binaries via Bun --compile and uploads them as release assets -
+# which the website's Download page then lists live. The macOS binaries are Developer-ID
+# signed on the macOS runner; Linux + Windows cross-compile on Linux (Windows ships
+# unsigned by policy). One Bun could cross-compile everything from a single runner, but
+# only macOS can sign macOS, so the build is split in two. (The JS runtime - the
+# patterplay-js zip and the loose patterplay.min.js - ships on `play-js-v*` tags,
+# versioned in lockstep with the engine plugins.)
+on:
+  push:
+    tags: ["cli-v*"]
+
+permissions:
+  contents: write   # create / upload to the release for this tag
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+      - name: Checkout @wildwinter/expr (the CLI bundle inlines its source)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+        working-directory: patter
+      - name: Import Developer ID certificate
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}             # base64 .p12
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then echo "no CSC_LINK secret — binaries will be ad-hoc signed"; exit 0; fi
+          echo "$CSC_LINK" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p actions /tmp/build.keychain
+          security default-keychain -s /tmp/build.keychain
+          security unlock-keychain -p actions /tmp/build.keychain
+          security import /tmp/cert.p12 -k /tmp/build.keychain -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions /tmp/build.keychain
+          rm /tmp/cert.p12
+      - name: Build + sign the macOS binaries
+        working-directory: patter
+        run: npm run -w @patterkit/cli build:standalone:mac
+      - name: Upload to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: patter/packages/cli/dist/patter-macos-*
+
+  others:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout patter
+        uses: actions/checkout@v4
+        with:
+          path: patter
+      - name: Checkout @wildwinter/expr (the CLI bundle inlines its source)
+        uses: actions/checkout@v4
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: patter/package-lock.json
+      - uses: oven-sh/setup-bun@v2
+      - run: npm ci
+        working-directory: patter
+      - name: Cross-compile the Linux + Windows binaries
+        working-directory: patter
+        run: npm run -w @patterkit/cli build:standalone:others
+      - name: Upload to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            patter/packages/cli/dist/patter-linux-x64
+            patter/packages/cli/dist/patter-linux-arm64
+            patter/packages/cli/dist/patter-windows-x64.exe

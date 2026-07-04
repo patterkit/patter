@@ -1,0 +1,25 @@
+{
+  schema: "patter/flow@0",
+  scene: {
+    id: "scn_street",
+    type: "scene",
+    name: "The Street",
+    // A second scene: a cross-scene jump enters here; the host reads this setup (gameData, spec §15).
+    gameData: { music: "street_theme" },
+    blocks: [
+      {
+        id: "out",
+        type: "block",
+        name: "Outside",
+        children: [
+          {
+            id: "sn_street",
+            type: "snippet",
+            beats: [{ id: "T_street", kind: "text" }],
+            jump: { to: "END" },
+          },
+        ],
+      },
+    ],
+  },
+}

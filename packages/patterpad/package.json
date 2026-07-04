@@ -1,0 +1,217 @@
+{
+  "name": "@patterkit/patterpad",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Patterpad - the desktop app. An Electron shell that embeds the script-editing surface (@patterkit/patterpad-surface) over the shared @patterkit/ops core, so the editor, the CLI, and CI behave identically by construction. M0: open a project, edit a scene, save (lock-aware later), play.",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "build:mac-icons": "bash scripts/build-mac-icons.sh",
+    "build:win-icons": "node scripts/build-win-icons.mjs",
+    "dist": "npm run build:mac-icons && npm run build:win-icons && electron-vite build && electron-builder",
+    "dist:mac": "npm run build:mac-icons && electron-vite build && electron-builder --mac",
+    "dist:win": "npm run build:win-icons && electron-vite build && electron-builder --win nsis",
+    "dist:all": "npm run build:mac-icons && npm run build:win-icons && electron-vite build && electron-builder --mac --win nsis",
+    "dist:linux": "electron-vite build && electron-builder --linux AppImage",
+    "publish:mac": "npm run build:mac-icons && electron-vite build && dotenv -e .env.local -- electron-builder --mac --publish always",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/newsreader": "^5.2.10",
+    "@patterkit/core": "0.1.0",
+    "@patterkit/model": "0.1.0",
+    "@patterkit/ops": "0.1.0",
+    "@patterkit/patterpad-surface": "0.0.0",
+    "@patterkit/runtime": "0.1.0",
+    "@wildwinter/simple-vc-lib": "^0.2.0",
+    "electron-updater": "^6.3.9",
+    "exceljs": "^4.4.0",
+    "json5": "^2.2.3",
+    "jszip": "^3.10.1",
+    "nspell": "^2.1.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.12",
+    "dictionary-en": "^4.0.0",
+    "dictionary-en-gb": "^3.0.0",
+    "dotenv-cli": "^11.0.0",
+    "electron": "31.7.7",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "png-to-ico": "^3.0.1",
+    "vite": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.patterkit.patterpad",
+    "productName": "Patterpad",
+    "electronVersion": "31.7.7",
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/dictionaries",
+        "to": "dictionaries"
+      }
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "patterkit",
+      "repo": "patter"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "../../branding/icons/png/icon-patterpad-1024.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true,
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "patter",
+          "name": "Patter project",
+          "description": "Patter narrative project",
+          "role": "Editor",
+          "rank": "Owner",
+          "isPackage": true,
+          "icon": "doc-patter.icns"
+        },
+        {
+          "ext": "patterc",
+          "name": "Patter compiled bundle",
+          "description": "Patter compiled story bundle",
+          "role": "Viewer",
+          "icon": "doc-patterc.icns"
+        }
+      ],
+      "extendInfo": {
+        "UTExportedTypeDeclarations": [
+          {
+            "UTTypeIdentifier": "com.patterkit.patter",
+            "UTTypeDescription": "Patter narrative project",
+            "UTTypeConformsTo": [
+              "com.apple.package",
+              "public.composite-content"
+            ],
+            "UTTypeIconFile": "doc-patter.icns",
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "patter"
+              ]
+            }
+          },
+          {
+            "UTTypeIdentifier": "com.patterkit.patterc",
+            "UTTypeDescription": "Patter compiled story bundle",
+            "UTTypeConformsTo": [
+              "public.data"
+            ],
+            "UTTypeIconFile": "doc-patterc.icns",
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "patterc"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "dmg": {
+      "title": "${productName} ${version}"
+    },
+    "win": {
+      "icon": "../../branding/icons/png/icon-patterpad-1024.png",
+      "target": [
+        "nsis"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "patterproj",
+          "name": "Patter project file",
+          "description": "Patter project",
+          "role": "Editor",
+          "icon": "doc-patterproj.ico"
+        },
+        {
+          "ext": "patterflow",
+          "name": "Patter scene",
+          "description": "Patter scene",
+          "role": "Editor",
+          "icon": "doc-patterproj.ico"
+        },
+        {
+          "ext": "patterloc",
+          "name": "Patter localisation",
+          "description": "Patter localisation strings",
+          "role": "Editor",
+          "icon": "doc-patterproj.ico"
+        },
+        {
+          "ext": "patterx",
+          "name": "Patter authoring",
+          "description": "Patter authoring sidecar",
+          "role": "Editor",
+          "icon": "doc-patterproj.ico"
+        },
+        {
+          "ext": "patterc",
+          "name": "Patter compiled bundle",
+          "description": "Patter compiled story bundle",
+          "role": "Viewer",
+          "icon": "doc-patterc.ico"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "linux": {
+      "icon": "../../branding/icons/png/icon-patterpad-1024.png",
+      "category": "Development",
+      "target": [
+        "AppImage"
+      ],
+      "fileAssociations": [
+        {
+          "ext": "patterproj",
+          "name": "Patter project file",
+          "description": "Patter project"
+        },
+        {
+          "ext": "patterflow",
+          "name": "Patter scene",
+          "description": "Patter scene"
+        },
+        {
+          "ext": "patterloc",
+          "name": "Patter localisation",
+          "description": "Patter localisation strings"
+        },
+        {
+          "ext": "patterx",
+          "name": "Patter authoring",
+          "description": "Patter authoring sidecar"
+        },
+        {
+          "ext": "patterc",
+          "name": "Patter compiled bundle",
+          "description": "Patter compiled story bundle"
+        }
+      ]
+    }
+  }
+}

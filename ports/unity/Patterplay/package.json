@@ -1,0 +1,35 @@
+{
+  "name": "com.patterkit.patterplay",
+  "version": "0.1.0",
+  "displayName": "Patterplay",
+  "description": "Patterplay for Unity - the native C# runtime for Patter. Loads a compiled .patterc bundle and plays branching narrative directly in Unity (no web runtime, JS, or IPC). Every Patterplay runtime plays the same bundle with the same behaviour.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Ian Thomas"
+  },
+  "license": "MIT",
+  "documentationUrl": "https://patterkit.dev/",
+  "keywords": [
+    "patter",
+    "patterplay",
+    "narrative",
+    "interactive-fiction",
+    "branching-narrative",
+    "dialogue"
+  ],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "samples": [
+    {
+      "displayName": "Play-through demo",
+      "description": "Loads a compiled .patterc and plays a simple flow, logging each step (the shared Patterplay API demo).",
+      "path": "Samples~/PlayThrough"
+    },
+    {
+      "displayName": "Tour demo",
+      "description": "Plays the interactive Patter tour: an OnGUI transcript with clickable choices, plus optional per-line audio resolution via PatterAudioResolver.",
+      "path": "Samples~/TourDemo"
+    }
+  ]
+}
