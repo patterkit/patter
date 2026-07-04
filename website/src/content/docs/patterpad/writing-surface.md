@@ -17,7 +17,7 @@ rounded card. Quiet space sits between snippets, so the shape of a scene reads a
 glance without the page turning into boxes and lines.
 
 <figure class="doc-shot">
-  <img src="/doc-images/Bubble.png" alt="A snippet showing the three beat kinds: dialogue lines with a coloured GUIDE cue, a speaker-less prose line, a line carrying a (warmly) direction, and a game-event chip, with a jump to The Crossroads at the foot." />
+  <img src="/doc-images/Snippet.png" alt="A snippet showing the three beat kinds: dialogue lines with a coloured GUIDE cue, a speaker-less prose line, a line carrying a (warmly) direction, and a game-event chip, with a jump to The Crossroads at the foot." />
   <figcaption>One snippet holding all three beat kinds: <strong>lines</strong> (a coloured <code>GUIDE</code> cue beside the words), a <strong>text</strong> beat (prose with no speaker), a line carrying an inline <code>(warmly)</code> direction, and a silent <code>⚙ game event</code>. The <code>↪ The Crossroads</code> chip is a jump; the <code>⠿</code> grip reorders the snippet and <code>⋯</code> opens its action menu.</figcaption>
 </figure>
 
