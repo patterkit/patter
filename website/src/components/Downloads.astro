@@ -21,13 +21,15 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
   .pt-dl-meta { color: var(--sl-color-gray-3); font-size: 0.82rem; margin: 0.55rem 0 0; }
   .pt-dl-meta a { color: var(--sl-color-text-accent); }
   .pt-dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 0.75rem; }
-  .pt-dl-card { display: flex; flex-direction: column; gap: 0.35rem; border: 1px solid var(--sl-color-gray-5);
+  .pt-dl-card { display: flex; flex-direction: column; gap: 0.35rem; height: 100%; border: 1px solid var(--sl-color-gray-5);
     border-top: 2px solid var(--pt-teal-ink, var(--sl-color-accent)); border-radius: 0.6rem;
     padding: 0.9rem 1rem 1rem; background: var(--sl-color-bg-sidebar); }
   .pt-dl-card-head { display: flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 1rem; }
   .pt-dl-card-head img { border-radius: 7px; }
   .pt-dl-sub { font-size: 0.8rem; color: var(--sl-color-gray-2); margin: 0; }
-  .pt-dl-btn { display: inline-block; margin-top: 0.45rem; padding: 0.38rem 0.8rem; border-radius: 0.45rem;
+  /* margin-top:auto pins the button to the card's bottom edge, so the four
+     runtime cards' buttons align even when the blurbs wrap differently. */
+  .pt-dl-btn { display: inline-block; margin-top: auto; padding: 0.38rem 0.8rem; border-radius: 0.45rem;
     background: var(--sl-color-text-accent); color: var(--sl-color-black) !important; font-weight: 600;
     font-size: 0.88rem; text-decoration: none; align-self: flex-start; }
   .pt-dl-btn:hover { opacity: 0.88; }
@@ -75,17 +77,20 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
       { key: "unreal", tag: /^play-unreal-v\d/, icon: "plugin-unreal.svg", name: "Unreal", sub: "C++ plugin + sample project" },
       { key: "godot", tag: /^play-godot-v\d/, icon: "plugin-godot.svg", name: "Godot", sub: "GDScript addon for <code>addons/</code>" },
     ];
+    let loose: { name: string; browser_download_url: string } | undefined;
     const cards = engines.map((e) => {
       const r = releases.find((x) => e.tag.test(x.tag_name));
       const icon = `<img src="${base}${e.icon}" alt="" width="28" height="28" />`;
       if (!r) return card(icon, e.name, e.sub, `<p class="pt-dl-sub">coming soon</p>`);
       const ver = r.tag_name.replace(/^play-[a-z]+-v/, "");
       const zip = r.assets.find((a) => /\.zip$/i.test(a.name));
-      const loose = e.key === "js" ? r.assets.find((a) => a.name === "patterplay.min.js") : undefined;
-      const extra = loose ? `<p class="pt-dl-alt">or just <a href="${esc(loose.browser_download_url)}">patterplay.min.js</a> for a script tag</p>` : "";
-      return card(icon, `${e.name} ${ver}`, e.sub, button(zip, "Download zip"), extra);
+      if (e.key === "js") loose = r.assets.find((a) => a.name === "patterplay.min.js");
+      return card(icon, `${e.name} ${ver}`, e.sub, button(zip, "Download zip"));
     });
-    root.innerHTML = `<div class="pt-dl-grid">${cards.join("")}</div>`;
+    // The loose drop-in sits under the grid, not in the JS card - an extra line
+    // inside one card would break the four cards' shared height/button line.
+    const looseLine = loose ? `<p class="pt-dl-alt">Script-tag only? Grab <a href="${esc(loose.browser_download_url)}">patterplay.min.js</a> loose.</p>` : "";
+    root.innerHTML = `<div class="pt-dl-grid">${cards.join("")}</div>${looseLine}`;
   }
 
   function renderCli(root: HTMLElement, releases: Release[]): void {
