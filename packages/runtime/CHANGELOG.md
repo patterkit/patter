@@ -7,7 +7,7 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-07-04
 
 ### Added
 - The Patter runtime in JS/TS: `Engine` + `Flow` over a compiled `.patterc` bundle - scenes,

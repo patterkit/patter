@@ -6,7 +6,7 @@ Patterpad is versioned by `npm run bump:pad` and released by tagging `patterpad-
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-07-04
 
 ### Added
 - The Patterpad editor: a writer-first, screenplay-style surface for Patter projects -

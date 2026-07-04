@@ -6,7 +6,7 @@ same runtime behaviour.
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-07-04
 
 ### Added
 - The pure-GDScript Patter runtime: `PatterEngine` + `PatterFlow` over a compiled `.patterc`

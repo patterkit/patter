@@ -7,7 +7,7 @@ runtime behaviour.
 
 ## [Unreleased]
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-07-04
 
 ### Added
 - The native C++ Patter runtime (header-only, standard library only) wrapped in a Blueprint-
