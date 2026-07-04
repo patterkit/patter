@@ -1167,10 +1167,15 @@ window.patter.onAudioIndex((snap) => {
 
 // Fire-and-forget playback of a line's audio (the inspector ▶ button, folder mode). Fetches the bytes from
 // main, wraps them in a Blob, and plays - one clip at a time (a new click stops the previous). The clicked
-// button pulses (.playing) while its clip sounds, so it's clear which line you're hearing.
+// button pulses (.playing) while its clip sounds, so it's clear which line you're hearing - and clicking
+// it AGAIN while its clip is sounding stops it (the ▶ doubles as an abort).
 let inspectorAudio: HTMLAudioElement | null = null;
 let inspectorPlayBtn: HTMLButtonElement | null = null;
 async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<void> {
+  if (btn && btn === inspectorPlayBtn && inspectorAudio && !inspectorAudio.paused) {
+    inspectorAudio.pause(); // second click on the sounding clip's own button = stop, not restart
+    return;
+  }
   const data = await window.patter.readAudio(id);
   if (!data) return; // no file (shouldn't happen - the button only shows when one resolved)
   inspectorAudio?.pause();                       // stop any current clip...
@@ -1179,9 +1184,10 @@ async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<void>
   const audio = new Audio(url);
   inspectorAudio = audio; inspectorPlayBtn = btn ?? null;
   btn?.classList.add("playing");
-  const stop = (): void => { URL.revokeObjectURL(url); btn?.classList.remove("playing"); };
+  if (btn) btn.dataset.tip = "stop audio";
+  const stop = (): void => { URL.revokeObjectURL(url); btn?.classList.remove("playing"); if (btn) btn.dataset.tip = "play audio"; };
   audio.addEventListener("ended", stop);
-  audio.addEventListener("pause", () => btn?.classList.remove("playing")); // a new click pauses this one
+  audio.addEventListener("pause", stop); // a new click (or the abort above) pauses this one
   void audio.play().catch(stop);
 }
 
