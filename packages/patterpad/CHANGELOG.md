@@ -8,10 +8,19 @@
   - @patterkit/ops@0.1.1
 
 All notable changes to **Patterpad**, the Patter desktop editor, are documented here.
-Patterpad is versioned by `npm run bump:pad` and released by tagging `patterpad-vX.Y.Z`
-(its own pipeline, separate from the Patterplay runtimes' lockstep version).
+Patterpad is released with `npm run release:pad -- X.Y.Z` (a bare `vX.Y.Z` tag; its own
+pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
+
+### Changed
+- Updated to Electron 42: over a year of Chromium and security fixes under the editor
+  and the scratch recorder, plus the latest build toolchain.
+
+### Fixed
+- The first scratch take in a project now updates the line's recording status
+  immediately; previously a brand-new audio folder wasn't noticed until the app was
+  restarted.
 
 ## [0.1.1] - 2026-07-04
 
