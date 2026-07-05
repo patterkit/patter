@@ -275,8 +275,10 @@ export function audioBytesForBeat(beatId: string): { bytes: Buffer; mime: string
 }
 
 /** Save an in-app scratch take (#224): write the encoded WAV bytes to `<scratchRung.folder>/<beatId>.wav`,
- *  lock-aware (binary VC write). The indexer's watcher then picks the new file up and the line's derived
- *  status updates on its own. No-op unless the project is in folder mode with scratch recording enabled. */
+ *  lock-aware (binary VC write), then poke the indexer to rescan. The folder watcher usually catches the
+ *  new file anyway, but the explicit rescan makes the status refresh DETERMINISTIC: the very first take
+ *  CREATES its folder (which had no watcher yet), and fs.watch is unreliable on some Windows filesystems.
+ *  No-op unless the project is in folder mode with scratch recording enabled. */
 export function saveScratchAudio(beatId: string, bytes: Uint8Array): Promise<SaveResult> {
   return enqueueWrite(async () => {
     const p = loaded?.project;
@@ -287,9 +289,9 @@ export function saveScratchAudio(beatId: string, bytes: Uint8Array): Promise<Sav
     const dir = resolve(loaded!.root, folder);
     const path = join(dir, `${beatId}.wav`);
     try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
-    try { await writeBinaryFileAsync(path, Buffer.from(bytes)); return { ok: true }; }
+    try { await writeBinaryFileAsync(path, Buffer.from(bytes)); audioIndex?.rescan(); return { ok: true }; }
     catch {
-      try { writeFileSync(path, Buffer.from(bytes)); return { ok: true }; } // VC layer unavailable -> direct write
+      try { writeFileSync(path, Buffer.from(bytes)); audioIndex?.rescan(); return { ok: true }; } // VC layer unavailable -> direct write
       catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     }
   });

@@ -56,7 +56,7 @@ const AUDIO_EXT = [".wav", ".mp3"]; // .wav preferred when both exist for an id
 export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnapshot: (snap: AudioSnapshot) => void, scratchStatus?: string): AudioIndexHandle {
   let current = rungs;
   let scratch = scratchStatus; // the rung whose takes carry a text-hash we read back for staleness (#224)
-  let watchers: FSWatcher[] = [];
+  const watchers = new Map<string, FSWatcher>(); // absolute dir -> live watcher
   let debounce: NodeJS.Timeout | undefined;
   let disposed = false;
 
@@ -65,11 +65,18 @@ export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnaps
     current.filter((r) => r.folder?.trim()).reverse().map((r) => ({ name: r.name, dir: resolve(projectRoot, r.folder!.trim()) }));
 
   const scan = async (): Promise<void> => {
+    ensureWatchers(); // folders can appear AFTER start (the first scratch take creates its folder) - retry here
     const rs = folderRungs();
     const snap: AudioSnapshot = {};
     for (const { name, dir } of rs) {
       let files: string[];
-      try { files = await readdir(dir); } catch { continue; } // missing / unreadable folder -> treated as empty
+      try { files = await readdir(dir); } catch {
+        // Missing / unreadable folder -> treated as empty. Drop any watcher it had (a deleted-and-recreated
+        // folder needs a FRESH watch; the dead one would block re-attachment above).
+        const w = watchers.get(dir);
+        if (w) { try { w.close(); } catch { /* already gone */ } watchers.delete(dir); }
+        continue;
+      }
       // Within a folder, map id -> best file (wav beats mp3); a HIGHER rung already claimed wins overall.
       const byId = new Map<string, string>();
       for (const f of files) {
@@ -98,25 +105,31 @@ export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnaps
     debounce = setTimeout(() => { void scan(); }, 250); // coarse: changes needn't be instant
   };
 
-  const rewatch = (): void => {
-    for (const w of watchers) { try { w.close(); } catch { /* already gone */ } }
-    watchers = [];
-    for (const { dir } of folderRungs()) {
-      try { watchers.push(watch(dir, { persistent: false }, () => scheduleScan())); } catch { /* not yet present */ }
+  // (Re)align watchers with the current rung folders: close watchers for dirs no longer in the ladder,
+  // attach to any unwatched dir. A dir that doesn't exist yet fails quietly and is RETRIED on every scan -
+  // the first scratch take creates its folder after start, and without the retry that folder was never
+  // watched, so the derived status only refreshed on app reload (found on a fresh Windows project).
+  const ensureWatchers = (): void => {
+    const dirs = new Set(folderRungs().map((r) => r.dir));
+    for (const [dir, w] of watchers) {
+      if (!dirs.has(dir)) { try { w.close(); } catch { /* already gone */ } watchers.delete(dir); }
+    }
+    for (const dir of dirs) {
+      if (watchers.has(dir)) continue;
+      try { watchers.set(dir, watch(dir, { persistent: false }, () => scheduleScan())); } catch { /* not yet present - retried next scan */ }
     }
   };
 
-  rewatch();
-  void scan(); // initial
+  void scan(); // initial (attaches watchers on the way in)
 
   return {
-    update(next: AudioRung[], nextScratch?: string): void { current = next; scratch = nextScratch; rewatch(); scheduleScan(); },
+    update(next: AudioRung[], nextScratch?: string): void { current = next; scratch = nextScratch; scheduleScan(); },
     rescan(): void { scheduleScan(); },
     dispose(): void {
       disposed = true;
       if (debounce) clearTimeout(debounce);
-      for (const w of watchers) { try { w.close(); } catch { /* already gone */ } }
-      watchers = [];
+      for (const w of watchers.values()) { try { w.close(); } catch { /* already gone */ } }
+      watchers.clear();
     },
   };
 }

@@ -74,4 +74,25 @@ describe("audio-index: folder-derived recording status", () => {
     expect(snap["L_only"]).toEqual({ status: "scratch", path: join(root, "audio/scratch/L_only.wav") });
     rmSync(root, { recursive: true, force: true });
   });
+
+  it("a folder created AFTER start is picked up by rescan (the first scratch take creates its folder)", async () => {
+    // Regression: the watcher list was built once at start, so a rung folder that did not exist yet was
+    // never watched OR rescanned - the first-ever scratch take stayed "missing" until an app reload.
+    const root = mkdtempSync(join(tmpdir(), "patter-audio-"));
+    // NO audio folders exist at start.
+    const snapshots: AudioSnapshot[] = [];
+    let arrived: (() => void) | undefined;
+    handle = startAudioIndex(root, LADDER, (snap) => { snapshots.push(snap); arrived?.(); });
+    await new Promise<void>((res) => { arrived = res; }); // initial scan: empty
+    expect(snapshots[0]).toEqual({});
+
+    // The "first take": the folder is created and the WAV written only now, exactly like saveScratchAudio.
+    mkdirSync(join(root, "audio/scratch"), { recursive: true });
+    writeFileSync(join(root, "audio/scratch/L_new.wav"), "x");
+    const next = new Promise<void>((res) => { arrived = res; });
+    handle.rescan(); // the deterministic post-save poke
+    await next;
+    expect(snapshots.at(-1)?.["L_new"]).toEqual({ status: "scratch", path: join(root, "audio/scratch/L_new.wav") });
+    rmSync(root, { recursive: true, force: true });
+  });
 });
