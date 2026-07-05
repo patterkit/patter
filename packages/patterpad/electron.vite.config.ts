@@ -31,10 +31,23 @@ const alias: Record<string, string> = {
 // external in the Node main bundle - they load from node_modules at runtime if ever reached.
 const nodeExternal = ["exceljs", "jszip", "pdfkit", "docx", "@wildwinter/simple-vc-lib", "ws"];
 
+// The workspace packages, which MUST be bundled from source (via the alias), not externalized. See the
+// `build.externalizeDeps` note in the main config below.
+const workspacePkgs = ["@patterkit/core", "@patterkit/model", "@patterkit/ops", "@patterkit/runtime", "@patterkit/patterpad-surface"];
+
 export default defineConfig({
   main: {
     resolve: { alias },
-    build: { rollupOptions: { external: nodeExternal } },
+    // electron-vite 5 AUTO-externalizes everything in package.json `dependencies` (build.externalizeDeps
+    // defaults on) - a behaviour change from v2, which bundled the aliased workspace packages. Left as-is,
+    // `@patterkit/*` leak into out/main as runtime imports resolving to each package's `dist/`, which the
+    // release build never compiles, so the packaged app dies at LAUNCH with ERR_MODULE_NOT_FOUND. Exclude
+    // the workspace packages so the alias bundles them from source (matching the pre-upgrade behaviour);
+    // real third-party deps stay externalized and load from node_modules.
+    build: {
+      externalizeDeps: { exclude: workspacePkgs },
+      rollupOptions: { external: nodeExternal },
+    },
   },
   preload: {
     resolve: { alias },

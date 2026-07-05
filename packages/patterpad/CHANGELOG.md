@@ -13,6 +13,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- A packaging regression in the 0.1.2 build could make the app fail to launch. The
+  build now bundles its internal modules correctly, so packaged builds start reliably
+  on every platform.
+
 ## [0.1.2] - 2026-07-05
 
 ### Changed
