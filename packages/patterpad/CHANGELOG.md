@@ -13,6 +13,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-05
+
 ### Changed
 - Updated to Electron 42: over a year of Chromium and security fixes under the editor
   and the scratch recorder, plus the latest build toolchain.
