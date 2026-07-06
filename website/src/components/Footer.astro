@@ -7,11 +7,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a tr
 ---
 
 <Default><slot /></Default>
-<p class="pk-credit">
-  <a href={`${base}licenses/`}>MIT-licensed</a> open source &middot; Made by
-  <a href="https://wildwinter.bio.link" rel="author">Ian Thomas</a> &middot;
-  <a href="https://patterkit.dev">patterkit.dev</a>
-</p>
+{/* One line, no internal newlines: Astro collapses a newline between text and an adjacent
+    inline element to nothing, which ran "Made by" into the author link. */}
+<p class="pk-credit"><a href={`${base}licenses/`}>MIT-licensed</a> open source &middot; Made by <a href="https://wildwinter.bio.link" rel="author">Ian Thomas</a> &middot; <a href="https://patterkit.dev">patterkit.dev</a></p>
 
 <style>
   .pk-credit {
