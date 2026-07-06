@@ -122,8 +122,9 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     const r = releases.find((x) => /^tour-v\d/.test(x.tag_name));
     if (!r) return empty(root, "The tour download");
     const ver = r.tag_name.replace(/^tour-v/, "");
-    const zip = r.assets.find((a) => /\.zip$/i.test(a.name));
-    root.innerHTML = `${button(zip, "Download the Interactive Tour")}${meta(r, ver)}`;
+    // Prefer the single-file .patterpack; fall back to a legacy .zip on older tour releases.
+    const pack = r.assets.find((a) => /\.patterpack$/i.test(a.name)) ?? r.assets.find((a) => /\.zip$/i.test(a.name));
+    root.innerHTML = `${button(pack, "Download the Interactive Tour")}${meta(r, ver)}`;
   }
 
   function empty(root: HTMLElement, what: string): void {

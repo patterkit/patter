@@ -199,6 +199,8 @@ const stub = {
   exportVoiceScript: async (everything: boolean) => ({ ok: true, path: `The Tavern - voice script${everything ? " (all)" : ""}.xlsx` }),
   exportPlayableHtml: async () => ({ ok: true, path: "The Tavern.html" }),
   exportScript: async () => ({ ok: true, path: "The Tavern.pdf" }),
+  exportPatterpack: async () => ({ ok: true, path: "The Tavern.patterpack" }),
+  openPatterpack: async () => ({ project }),
   exportLoc: async (request: { format: string; locale?: string }) => ({ ok: true, path: `The Tavern - ${request.locale ?? "template"}.${request.format === "xlsx" ? "xlsx" : request.format === "po" ? "po" : "json"}` }),
   importLoc: async (fallbackLocale?: string) => ({ ok: true, locale: fallbackLocale ?? "fr", updated: 7, files: 2 }),
   setStart: async (start: { scene: string }) => ({ ok: true, project: { ...project, start } }),

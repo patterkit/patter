@@ -13,6 +13,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **Patterpack**: send a whole project as one file. **File ▸ Export as Patterpack…**
+  writes a `.patterpack` (source only, like Save As: no audio, no build output).
+  **File ▸ Open Patterpack…** (and double-clicking a `.patterpack`) asks where to unpack
+  it into a fresh `.patter` folder, then opens it. Files get a `.patterpack` association
+  and a document icon.
+
 ## [0.1.6] - 2026-07-06
 
 ### Fixed

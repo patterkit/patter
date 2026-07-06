@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, vcsConfigWrites, runValidate, applyWrites, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit } from "@patterkit/ops";
@@ -362,6 +362,32 @@ export function duplicateTo(dest: string): void {
     if (abs.startsWith(root + sep)) excluded.add(dirname(abs) === root ? abs : dirname(abs));
   }
   cpSync(root, dest, { recursive: true, filter: (src) => !excluded.has(resolve(src)) });
+}
+
+/** Export as Patterpack: zip the open project's source shards into a single `.patterpack` document,
+ *  the "send this to someone" file. Source only - `runPack` follows `SHARD_EXTENSIONS`, so recorded audio
+ *  and build artefacts never travel (same posture as `duplicateTo`). Returns the zip bytes for the caller
+ *  to write wherever the user chose. */
+export async function packBytes(): Promise<Buffer> {
+  if (!loaded) throw new Error("no project open");
+  return runPack(loaded.root);
+}
+
+/** Unpack a `.patterpack` document (chosen by the caller) into a fresh `.patter` folder at `destDir`, ready
+ *  to open. The shards are project-root-relative, so `destDir` IS the new project folder. Writes go through
+ *  the VC-aware path (like `createProject`), so unpacking inside a git working copy stages the new files.
+ *  `runUnpack` validates every entry path (no traversal / no escape). */
+export async function unpackTo(packPath: string, destDir: string): Promise<{ ok: boolean; error?: string }> {
+  return enqueueWrite(async () => {
+    try {
+      const bytes = readFileSync(packPath);
+      const writes = await runUnpack(bytes, destDir);
+      if (!writes.length) return { ok: false, error: "the patterpack has no project files" };
+      return await commitWrites(writes);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
 }
 
 /** The enclosing project root for a path, resolved cheaply (no scene parse) so the caller can look up the

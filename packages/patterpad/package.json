@@ -101,6 +101,13 @@
           "description": "Patter compiled story bundle",
           "role": "Viewer",
           "icon": "doc-patterc.icns"
+        },
+        {
+          "ext": "patterpack",
+          "name": "Patterpack",
+          "description": "Patter project package (single file)",
+          "role": "Editor",
+          "icon": "doc-patterpack.icns"
         }
       ],
       "extendInfo": {
@@ -129,6 +136,20 @@
             "UTTypeTagSpecification": {
               "public.filename-extension": [
                 "patterc"
+              ]
+            }
+          },
+          {
+            "UTTypeIdentifier": "com.patterkit.patterpack",
+            "UTTypeDescription": "Patter project package (single file)",
+            "UTTypeConformsTo": [
+              "public.data",
+              "public.zip-archive"
+            ],
+            "UTTypeIconFile": "doc-patterpack.icns",
+            "UTTypeTagSpecification": {
+              "public.filename-extension": [
+                "patterpack"
               ]
             }
           }
@@ -179,6 +200,13 @@
           "description": "Patter compiled story bundle",
           "role": "Viewer",
           "icon": "doc-patterc.ico"
+        },
+        {
+          "ext": "patterpack",
+          "name": "Patterpack",
+          "description": "Patter project package (single file)",
+          "role": "Editor",
+          "icon": "doc-patterpack.ico"
         }
       ]
     },
@@ -217,6 +245,11 @@
           "ext": "patterc",
           "name": "Patter compiled bundle",
           "description": "Patter compiled story bundle"
+        },
+        {
+          "ext": "patterpack",
+          "name": "Patterpack",
+          "description": "Patter project package (single file)"
         }
       ]
     },

@@ -160,6 +160,7 @@ let pendingOpenPath: string | null = null;
  *  renderer to load + render. Bad packages are ignored so a stray file can't wedge the open project. */
 function openInWindow(path: string): void {
   if (!win) { pendingOpenPath = path; return; }
+  if (/\.patterpack$/i.test(path)) { void unpackFromLaunch(path); return; } // a pack unpacks (with a destination prompt), it isn't opened in place
   try {
     const r = openAndRecord(path);
     win.webContents.send("project:open", r);
@@ -172,8 +173,13 @@ function openInWindow(path: string): void {
 function boot(): BootState {
   const opened = pendingOpenPath; pendingOpenPath = null;
   if (opened && existsSync(opened)) {
-    try { return bootState(openAndRecord(opened)); }
-    catch { /* bad package -> fall through to last/welcome */ }
+    // A double-clicked `.patterpack` can't stand in as the boot project: it must be unpacked to a NEW folder
+    // via a destination prompt. Defer it to run once the window's up, and fall through to last / welcome.
+    if (/\.patterpack$/i.test(opened)) setImmediate(() => openInWindow(opened));
+    else {
+      try { return bootState(openAndRecord(opened)); }
+      catch { /* bad package -> fall through to last/welcome */ }
+    }
   }
   const last = store.read().lastProject;
   if (last && existsSync(last)) {
@@ -242,6 +248,32 @@ async function exportPlayableHtml(): Promise<ExportResult> {
   const r = await dialog.showSaveDialog(win, { title: "Publish playable HTML", defaultPath: out.defaultName, filters: [{ name: "HTML page", extensions: ["html"] }] });
   if (r.canceled || !r.filePath) return { ok: false, canceled: true };
   return writeExport(r.filePath, out.content);
+}
+
+/** Export as Patterpack: bundle the whole project into a single `.patterpack` file to hand to someone -
+ *  they open it with "Open Patterpack…" or by double-clicking. Source only (like Save As): `runPack`
+ *  follows the shard extensions, so recorded audio and build output never travel. The renderer flushes any
+ *  pending edit first, so the packed bytes are current. */
+async function exportPatterpack(): Promise<ExportResult> {
+  if (!win) return { ok: false, error: "no window" };
+  const src = project.currentRoot();
+  if (!src) return { ok: false, error: "no project open" };
+  const base = basename(src).replace(/\.patter$/i, "");
+  const r = await dialog.showSaveDialog(win, {
+    title: "Export as Patterpack",
+    message: "Save a single-file copy of the project to send to someone.",
+    buttonLabel: "Export",
+    defaultPath: `${base}.patterpack`,
+    filters: [{ name: "Patterpack document", extensions: ["patterpack"] }],
+  });
+  if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+  let dest = r.filePath;
+  if (!/\.patterpack$/i.test(dest)) dest += ".patterpack"; // the save panel may drop the extension
+  try {
+    return writeExport(dest, await project.packBytes());
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 /** Publish for Web: pick a FOLDER; the harness (index.html + style.css) is written once and kept
@@ -351,6 +383,62 @@ async function saveAsDialog(): Promise<OpenResult | null> {
   if (existsSync(dest)) return null; // the picker confirms overwrite of a FILE, but our target is a folder - don't clobber
   project.duplicateTo(dest); // copy the authoring shards, skipping audio + build output (derived artefacts)
   return openAndRecord(dest); // open + record the copy; the renderer switches the editor to it
+}
+
+/** Open Patterpack…: pick a `.patterpack` FILE with a dedicated file picker. We can't overload the normal
+ *  Open here: on Windows / Linux that dialog falls back to a DIRECTORY selector (a `.patter` folder), which
+ *  greys out a lone `.patterpack` file. Once chosen, unpack it into a project folder the user picks. */
+async function openPatterpackDialog(): Promise<OpenResult | null> {
+  if (!win) return null;
+  const r = await dialog.showOpenDialog(win, {
+    title: "Open a Patterpack",
+    message: "Choose a .patterpack file to unpack into a project.",
+    buttonLabel: "Choose",
+    properties: ["openFile"],
+    filters: [{ name: "Patterpack document", extensions: ["patterpack"] }],
+  });
+  const pack = r.filePaths[0];
+  return r.canceled || !pack ? null : unpackAndOpen(pack);
+}
+
+/** Unpack a `.patterpack` (menu-chosen OR double-clicked) into a NEW `.patter` folder, ALWAYS asking where
+ *  to put it (default `<packname>.patter` beside the pack), then open the result. Shared by the menu open
+ *  and the file-association launch so both prompt for a destination rather than guessing one. */
+async function unpackAndOpen(packPath: string): Promise<OpenResult | null> {
+  if (!win) return null;
+  const base = basename(packPath).replace(/\.patterpack$/i, "");
+  const r = await dialog.showSaveDialog(win, {
+    title: "Unpack Patterpack",
+    message: "Choose where to create the project folder.",
+    buttonLabel: "Unpack",
+    defaultPath: join(dirname(packPath), patterFolderName(base)),
+  });
+  if (r.canceled || !r.filePath) return null;
+  let dest = r.filePath;
+  if (!/\.patter$/i.test(dest)) dest += ".patter"; // the save panel may drop the package extension
+  if (existsSync(dest)) { // our target is a folder; the picker only confirms overwrite of a FILE - don't clobber
+    await dialog.showMessageBox(win, { type: "error", message: "That project folder already exists.", detail: `${dest}\n\nChoose a different name or location.` });
+    return null;
+  }
+  const res = await project.unpackTo(packPath, dest);
+  if (!res.ok) {
+    await dialog.showMessageBox(win, { type: "error", message: "Could not unpack the Patterpack.", detail: res.error ?? "" });
+    return null;
+  }
+  return openAndRecord(dest); // open + record the unpacked project; the renderer switches the editor to it
+}
+
+/** A double-clicked `.patterpack` (cold-launch deferred, or a runtime open-file / second-instance): unpack
+ *  it to a user-chosen folder and switch the editor to the result, with the same restore/focus/send the
+ *  direct `.patter` open path uses. */
+async function unpackFromLaunch(packPath: string): Promise<void> {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+  try {
+    const r = await unpackAndOpen(packPath);
+    if (r) win.webContents.send("project:open", r);
+  } catch { /* dialog cancelled / bad pack -> leave the current project as-is */ }
 }
 
 /** Scaffold a new `<name>.patter`. The renderer collected `name` in the themed dialog; here we only
@@ -592,6 +680,8 @@ function registerIpc(): void {
   ipcMain.handle("project:exportPlayableHtml", () => exportPlayableHtml());
   ipcMain.handle("project:exportWeb", () => exportWeb());
   ipcMain.handle("project:exportScript", () => exportScript());
+  ipcMain.handle("patterpack:export", (): Promise<ExportResult> => exportPatterpack());
+  ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => exportLoc(request));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
@@ -797,7 +887,9 @@ function createWindow(): void {
 // command line - there's no "package folder" off-Mac, so the real files are what the OS associates.
 // Either way openProject -> loadProject walks UP from the path to the enclosing `.patterproj`, opening
 // the whole project. (`.patterc` is a build artifact, not associated, but still resolves if launched.)
-const PATTER_LAUNCH_EXTS = [".patter", ".patterproj", ".patterflow", ".patterloc", ".patterx", ".patterc"];
+// `.patterpack` is the odd one out: not an internal shard but a single-file document that gets UNPACKED to a
+// new folder (openInWindow / boot branch on it), never opened in place.
+const PATTER_LAUNCH_EXTS = [".patter", ".patterproj", ".patterflow", ".patterloc", ".patterx", ".patterc", ".patterpack"];
 function launchPathFromArgv(argv: string[]): string | null {
   for (const a of argv.slice(1)) {              // argv[0] is the executable itself
     if (!a || a.startsWith("-")) continue;       // skip electron / chromium switches

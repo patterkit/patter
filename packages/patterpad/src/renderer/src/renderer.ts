@@ -1924,6 +1924,27 @@ async function exportScript(): Promise<void> {
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
+/** File ▸ Export as Patterpack: flush pending edits (so the packed bytes are current), then ask main to zip
+ *  the whole project into one `.patterpack` file the writer can send to someone. Native Save dialog in main. */
+async function exportPatterpack(): Promise<void> {
+  if (!project) return;
+  if (surface && dirty) await save(); // pending text edits
+  await persistDocs();                // pending Notes
+  await persistComments();            // pending comments
+  const res = await window.patter.exportPatterpack();
+  if (res.ok) {
+    const where = res.path && res.path.startsWith(project.root) ? res.path.slice(project.root.length).replace(/^[/\\]/, "") : res.path;
+    toast(`Patterpack exported\n${where}`);
+  } else if (!res.canceled) toast(res.error ? `Export failed: ${res.error}` : "Export failed", "error");
+}
+
+/** File ▸ Open Patterpack: pick a `.patterpack` file, choose a destination folder, unpack, and switch to
+ *  the new project (main runs both dialogs). Null when either picker is cancelled. */
+async function openPatterpack(): Promise<void> {
+  const r = await window.patter.openPatterpack();
+  if (r) await showProject(r);
+}
+
 /** Publish ▸ Publish for Web: write the story to a FOLDER as a customisable page (index.html +
  *  style.css published once and then kept; story.js + patterplay.js refreshed every publish). */
 async function exportWeb(): Promise<void> {
@@ -2216,8 +2237,10 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "new-scene") newScenePrompt();
   else if (cmd === "delete-scene") void deleteScenePrompt();
   else if (cmd === "open") void openDialog();
+  else if (cmd === "open-patterpack") void openPatterpack();
   else if (cmd === "save") void save();
   else if (cmd === "save-as") void saveAs();
+  else if (cmd === "export-patterpack") void exportPatterpack();
   else if (cmd === "find") openSearch();
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "play") void play();

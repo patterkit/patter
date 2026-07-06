@@ -21,7 +21,7 @@ from PIL import Image
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SRC = REPO_ROOT / "branding/document-icons/png"
 OUT = REPO_ROOT / "branding/document-icons/square"
-NAMES = ("doc-patter", "doc-patterproj", "doc-patterc")
+NAMES = ("doc-patter", "doc-patterproj", "doc-patterc", "doc-patterpack")
 SIZE = 1024
 
 OUT.mkdir(parents=True, exist_ok=True)

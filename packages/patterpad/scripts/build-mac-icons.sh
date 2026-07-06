@@ -18,11 +18,12 @@
 # stretch a non-square source). Regenerate the squares with
 # scripts/build-doc-squares.py if the page-shaped PNGs change.
 #
-# Input  (repo root):    branding/document-icons/square/{doc-patter,doc-patterproj,doc-patterc}.png  (1024x1024)
-# Output (this package):  build/{doc-patter,doc-patterproj,doc-patterc}.icns
+# Input  (repo root):    branding/document-icons/square/{doc-patter,doc-patterproj,doc-patterc,doc-patterpack}.png  (1024x1024)
+# Output (this package):  build/{doc-patter,doc-patterproj,doc-patterc,doc-patterpack}.icns
 #   doc-patter      -> the .patter project package (macOS)
 #   doc-patterproj  -> the project shards (.patterproj/.patterflow/.patterloc/.patterx)
 #   doc-patterc     -> the compiled .patterc bundle
+#   doc-patterpack  -> the .patterpack single-file project package
 #
 # The app icon stays a PNG (branding/icons/png/icon-patterpad-1024.png;
 # electron-builder converts that one itself); only the doc associations need .icns.
@@ -90,3 +91,4 @@ generate_icns() {
 generate_icns doc-patter
 generate_icns doc-patterproj
 generate_icns doc-patterc
+generate_icns doc-patterpack

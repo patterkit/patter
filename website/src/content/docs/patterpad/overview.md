@@ -57,6 +57,26 @@ Patterpad gets you working in one click:
 - Double-click a `.patter` folder to reopen your last session, double-click a single
   scene file to open just that scene, or run `patterpad <path>` from a shell.
 
+## Sending a project (Patterpack)
+
+A `.patter` project is a folder of files, which is perfect for version control but awkward
+to email or drop in a chat. A **Patterpack** is that whole project squeezed into a single
+`.patterpack` file you can hand to someone.
+
+- **File ▸ Export as Patterpack…** writes a `<name>.patterpack`. Like **Save As**, it
+  carries the *source* only: your scenes, settings, notes, and translations travel;
+  recorded audio and the published `.patterc` bundle do not (they are large and rebuilt
+  anyway).
+- **File ▸ Open Patterpack…** takes a `.patterpack`, asks **where to create the project
+  folder** (defaulting to `<name>.patter` beside the pack), unpacks it there, and opens it.
+  Opening always makes a fresh folder: it never writes over an existing project.
+- **Double-click** a `.patterpack` (or drop it on the app) does the same: Patterpad asks
+  where to unpack it, then opens the result.
+
+Because a Patterpack is a real copy, the person you send it to can open it, write, and send
+one back. It is the friendly way to pass a project to a collaborator who is not on your
+version-control system.
+
 ## The workspace
 
 <figure class="doc-shot">

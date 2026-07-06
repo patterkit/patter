@@ -69,10 +69,14 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       submenu: [
         { label: "New Project…", accelerator: "CmdOrCtrl+N", click: () => send("new") },
         { label: "Open Project…", accelerator: "CmdOrCtrl+O", click: () => send("open") },
+        // A `.patterpack` is a single FILE (not a `.patter` folder), so it needs its own file picker: on
+        // Windows / Linux the Open Project dialog is a directory selector that would grey the file out.
+        { label: "Open Patterpack…", click: () => send("open-patterpack") },
         { label: "Open Recent", submenu: recentItems },
         { type: "separator" },
         { label: "Save", accelerator: "CmdOrCtrl+S", click: () => send("save") },
         { label: "Save As…", accelerator: "Shift+CmdOrCtrl+S", click: () => send("save-as") }, // duplicate the project folder
+        { label: "Export as Patterpack…", click: () => send("export-patterpack") }, // bundle the project into one sendable file
         { type: "separator" },
         // Scene-level actions: within the OPEN project (project-level New/Open live above).
         { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", click: () => send("new-scene") },

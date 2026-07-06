@@ -1,10 +1,11 @@
 name: Tour example release
 
-# The Interactive Tour as a standalone download: a zip of the `tour.patter` SOURCE project
-# that anyone who just installed Patterpad can grab and open (File > Open the .patter folder).
-# Tagging `tour-vX.Y.Z` zips it (source only - no audio, no build artifacts) and attaches it to
-# the matching GitHub Release. Download-only; not bundled in the app. No build needed - it's a
-# plain source zip; the tour's validity is covered by the main test suite.
+# The Interactive Tour as a standalone download: the `tour.patter` SOURCE project packed into
+# a single `tour.patterpack` file that anyone who just installed Patterpad can grab and open
+# (File > Open Patterpack, or double-click). Tagging `tour-vX.Y.Z` packs it (source only - no
+# audio, no build artifacts, exactly what `pack` carries) and attaches it to the matching GitHub
+# Release. Download-only; not bundled in the app. Packing needs the workspace built (the `patter`
+# CLI), unlike the old plain-zip step; the tour's validity is still covered by the main test suite.
 on:
   push:
     tags: ["tour-v*"]
@@ -17,9 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Zip the tour source (no audio, no build artifacts, no .DS_Store)
-        working-directory: examples/projects
-        run: zip -r "$GITHUB_WORKSPACE/tour.patter.zip" tour.patter -x '*.DS_Store'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack the tour into a .patterpack (source only - no audio, no build artifacts)
+        run: node packages/cli/dist/cli.js pack examples/projects/tour.patter -o "$GITHUB_WORKSPACE/tour.patterpack"
       - name: Attach the tour to the release
         uses: softprops/action-gh-release@v2
         with:
@@ -29,12 +35,13 @@ jobs:
             format by playing it: choices, the three selectors, properties and conditions,
             closed captions, and the machinery underneath.
 
-            **`tour.patter.zip`** is the source project. Unzip it, then open the `tour.patter`
-            folder in Patterpad (double-click on macOS, or **File > Open** on Windows / Linux)
-            and press **Play from Start**. Audio is not included; the tour plays fine without it.
+            **`tour.patterpack`** is the whole project in one file. In Patterpad, open it with
+            **File > Open Patterpack…** (or just double-click it); Patterpad asks where to unpack
+            the project, then opens it. Press **Play from Start**. Audio is not included; the tour
+            plays fine without it.
 
             New to Patter? Start at https://patterkit.dev/getting-started/
-          files: tour.patter.zip
+          files: tour.patterpack
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

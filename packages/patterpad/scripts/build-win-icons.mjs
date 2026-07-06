@@ -22,11 +22,12 @@
 // Sources are the SQUARE masters under branding/document-icons/square/ (the
 // page-shaped brand art pre-padded to 1024x1024; see build-doc-squares.py).
 //
-// Input  (repo root):    branding/document-icons/square/{doc-patter,doc-patterproj,doc-patterc}.png
-// Output (this package):  build/{doc-patter,doc-patterproj,doc-patterc}.ico
+// Input  (repo root):    branding/document-icons/square/{doc-patter,doc-patterproj,doc-patterc,doc-patterpack}.png
+// Output (this package):  build/{doc-patter,doc-patterproj,doc-patterc,doc-patterpack}.ico
 //   doc-patter      -> the .patter project package
 //   doc-patterproj  -> the project shards (.patterproj/.patterflow/.patterloc/.patterx)
 //   doc-patterc     -> the compiled .patterc bundle
+//   doc-patterpack  -> the .patterpack single-file project package
 
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
@@ -89,5 +90,6 @@ mkdirSync(OUT_DIR, { recursive: true });
 await generateIco("doc-patter");
 await generateIco("doc-patterproj");
 await generateIco("doc-patterc");
+await generateIco("doc-patterpack");
 // The app icon itself (window / shortcut / taskbar / search).
 await generateIco("icon", join(REPO_ROOT, "branding/icons/png/icon-patterpad-1024.png"));

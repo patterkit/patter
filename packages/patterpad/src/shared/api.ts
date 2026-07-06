@@ -636,6 +636,12 @@ export interface PatterApi {
   exportWeb(): Promise<ExportResult & { kept?: string[] }>;
   /** Export the readable screenplay (.pdf or .docx, chosen in the Save dialog) of the whole script + flow. */
   exportScript(): Promise<ExportResult>;
+  /** Export as Patterpack: bundle the whole project into one `.patterpack` file to send to someone (source
+   *  only, no audio / build output). Opens a native Save dialog; `canceled` when the picker is dismissed. */
+  exportPatterpack(): Promise<ExportResult>;
+  /** Open Patterpack: pick a `.patterpack` file, then a destination folder to unpack it into, and open the
+   *  result. Null if either picker is cancelled. A dedicated file picker (the normal Open is folder-oriented). */
+  openPatterpack(): Promise<OpenResult | null>;
   /** Export localisation strings (spec §14) in the chosen format: opens a native Save dialog, writes the file. */
   exportLoc(request: LocExportRequest): Promise<ExportResult>;
   /** Import a translated file: opens a native Open dialog, applies it (format by extension). `fallbackLocale`
