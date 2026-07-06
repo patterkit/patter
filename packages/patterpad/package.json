@@ -5,7 +5,7 @@
   "description": "Patterpad - the writer-first editor for Patter dialogue projects.",
   "author": {
     "name": "PatterKit",
-    "url": "https://patterkit.com"
+    "url": "https://patterkit.dev"
   },
   "type": "module",
   "main": "./out/main/index.js",

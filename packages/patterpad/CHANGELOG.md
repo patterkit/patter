@@ -13,6 +13,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+- The About dialog's PatterKit link now points at patterkit.dev.
+
 ## [0.1.3] - 2026-07-05
 
 ### Fixed

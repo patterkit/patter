@@ -2266,7 +2266,7 @@ window.patter.onMenu((cmd) => {
     message: "Patterpad",
     detail: `Version ${cmd.slice("about:".length)}\n\nA writer-first editor for branching game dialogue.\n\nPart of PatterKit. Open source under the MIT license.\nMade by Ian Thomas.`,
     links: [
-      { label: "patterkit.com", url: "https://patterkit.com" },
+      { label: "patterkit.dev", url: "https://patterkit.dev" },
       { label: "wildwinter.bio.link", url: "https://wildwinter.bio.link" },
     ],
     buttons: ["Close"],
