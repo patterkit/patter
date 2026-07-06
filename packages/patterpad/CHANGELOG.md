@@ -13,6 +13,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-06
+
 ### Changed
 - Actually ship on Electron 42. A stale build pin meant every prior build was still
   packaged on Electron 31 despite the toolchain upgrade, so the security fixes never
