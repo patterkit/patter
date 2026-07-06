@@ -13,6 +13,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- Windows auto-update could download forever without ever offering to restart. It now
+  downloads the update in one full pass instead of the flaky block-by-block method, and
+  writes an updater log for diagnosis.
+
 ## [0.1.5] - 2026-07-06
 
 ### Changed

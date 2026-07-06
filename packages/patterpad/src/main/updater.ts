@@ -8,6 +8,8 @@
 // ---------------------------------------------------------------------------
 
 import { app, BrowserWindow, ipcMain } from "electron";
+import { appendFileSync } from "node:fs";
+import { join } from "node:path";
 import type { UpdateDownloadedEvent } from "electron-updater";
 import electronUpdater from "electron-updater";
 import type { UpdaterPromptOptions } from "../shared/api.js";
@@ -20,8 +22,26 @@ let updateDownloaded: UpdateDownloadedEvent | null = null;
 // stays invisible and the user has no idea why updates never arrive.
 let lastBackgroundError: string | null = null;
 
+// Persistent updater log (userData/updater.log). electron-updater is silent by default; without a log a
+// Windows download that stalls without emitting `error` (found in 0.1.5) leaves nothing to diagnose.
+const logPath = join(app.getPath("userData"), "updater.log");
+const writeLog = (level: string, args: unknown[]): void => {
+  try { appendFileSync(logPath, `${new Date().toISOString()} [${level}] ${args.map((a) => (a instanceof Error ? a.stack || a.message : String(a))).join(" ")}\n`); } catch { /* logging must never throw */ }
+};
+autoUpdater.logger = {
+  info: (...a: unknown[]) => writeLog("info", a),
+  warn: (...a: unknown[]) => writeLog("warn", a),
+  error: (...a: unknown[]) => writeLog("error", a),
+  debug: (...a: unknown[]) => writeLog("debug", a),
+};
+
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+// Force a plain full download instead of the block-by-block differential. On Windows the differential
+// path stalled silently (0.1.5): across an Electron-major bump almost no blocks match, so it downloads
+// nearly everything anyway, and it's fragile for unsigned installers. Full download is one reliable
+// stream. No-op on macOS (Squirrel.Mac always fetches the whole zip).
+autoUpdater.disableDifferentialDownload = true;
 
 autoUpdater.on("error", (err) => {
   console.error("AutoUpdater error:", err?.message || err);
