@@ -2,8 +2,9 @@ name: Tour example release
 
 # The Interactive Tour as a standalone download: a zip of the `tour.patter` SOURCE project
 # that anyone who just installed Patterpad can grab and open (File > Open the .patter folder).
-# Tagging `tour-vX.Y.Z` validates the project, then zips it (source only - no audio, no build
-# artifacts) and attaches it to the matching GitHub Release. Download-only; not bundled in the app.
+# Tagging `tour-vX.Y.Z` zips it (source only - no audio, no build artifacts) and attaches it to
+# the matching GitHub Release. Download-only; not bundled in the app. No build needed - it's a
+# plain source zip; the tour's validity is covered by the main test suite.
 on:
   push:
     tags: ["tour-v*"]
@@ -15,31 +16,10 @@ jobs:
   tour:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout patter
-        uses: actions/checkout@v4
-        with:
-          path: patter
-      - name: Checkout @wildwinter/expr (sibling source, aliased by the build)
-        uses: actions/checkout@v4
-        with:
-          repository: wildwinter/expr
-          path: expr
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: patter/package-lock.json
-      - run: npm ci
-        working-directory: patter
-      - name: Build ops + CLI
-        run: npm run build -w @patterkit/ops -w @patterkit/cli
-        working-directory: patter
-      - name: Validate the tour project (never ship a broken example)
-        run: node packages/cli/dist/cli.js validate examples/projects/tour.patter
-        working-directory: patter
+      - uses: actions/checkout@v4
       - name: Zip the tour source (no audio, no build artifacts, no .DS_Store)
+        working-directory: examples/projects
         run: zip -r "$GITHUB_WORKSPACE/tour.patter.zip" tour.patter -x '*.DS_Store'
-        working-directory: patter/examples/projects
       - name: Attach the tour to the release
         uses: softprops/action-gh-release@v2
         with:
