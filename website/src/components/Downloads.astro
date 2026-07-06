@@ -118,6 +118,14 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     root.innerHTML = `${btns}${meta(r, ver)}`;
   }
 
+  function renderTour(root: HTMLElement, releases: Release[]): void {
+    const r = releases.find((x) => /^tour-v\d/.test(x.tag_name));
+    if (!r) return empty(root, "The tour download");
+    const ver = r.tag_name.replace(/^tour-v/, "");
+    const zip = r.assets.find((a) => /\.zip$/i.test(a.name));
+    root.innerHTML = `${button(zip, "Download the Interactive Tour")}${meta(r, ver)}`;
+  }
+
   function empty(root: HTMLElement, what: string): void {
     root.innerHTML = `<p class="pt-dl-empty">${what} will appear here once the first release ships - see <a href="https://github.com/patterkit/patter/releases">GitHub Releases</a>.</p>`;
   }
@@ -134,6 +142,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
         if (m.dataset.ptDl === "patterpad") renderPatterpad(m, releases);
         else if (m.dataset.ptDl === "plugins") renderPlugins(m, releases, base);
         else if (m.dataset.ptDl === "cli") renderCli(m, releases);
+        else if (m.dataset.ptDl === "tour") renderTour(m, releases);
       }
     } catch {
       for (const m of mounts) empty(m, "The downloads");
