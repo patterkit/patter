@@ -13,6 +13,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- Author **Best match** groups: a new sequence order (`specificity`) that plays the eligible child
+  whose condition most specifically fits the current state, falling back to a condition-less filler.
+  Available in the `/` insert menu and the action menu (Follow with / Wrap in), with **Best match**
+  in the inspector's Order control. A soft nudge flags a Best-match group that has no conditioned
+  children (it behaves like Shuffle). Plays identically on all four runtimes.
+
 ## [0.1.7] - 2026-07-06
 
 ### Added

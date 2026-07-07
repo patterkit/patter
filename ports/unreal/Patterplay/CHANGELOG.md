@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+- **Best match** selection (a new `sequence` order, `specificity`): among the eligible children,
+  play the one whose condition most specifically fits the current state; equally-specific ties break
+  by the seeded shuffle, and a condition-less child is the filler that wins only when nothing more
+  specific applies. Composes with the exhaust axis (re-pickable, or graceful degradation to the
+  filler). Locked by the conformance corpus, so all four runtimes agree.
+
 ## [0.1.0] - 2026-07-04
 
 ### Added
