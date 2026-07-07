@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/runtime",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Patter reference runtime: load a bundle and play dialogue - flows, selectors, choices, jumps, effects, properties. Built on @wildwinter/expr + scoperegistry.",
   "type": "module",
   "license": "MIT",

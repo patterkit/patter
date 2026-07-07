@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-07
+
 ### Added
 - **Best match** selection (a new `sequence` order, `specificity`): among the eligible children,
   play the one whose condition most specifically fits the current state; equally-specific ties break
