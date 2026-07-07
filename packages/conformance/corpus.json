@@ -3632,6 +3632,822 @@
           "type": "end"
         }
       ]
+    },
+    {
+      "name": "specificity prefers the more specific line (AND sums)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "04ihvih",
+          "structureHash": "1eciz88"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "x",
+            "type": "number",
+            "shared": true,
+            "default": 5
+          },
+          {
+            "name": "y",
+            "type": "number",
+            "shared": true,
+            "default": 4
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "specificity",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "a",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "x"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BA",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "b",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5 and @y > 3",
+                          "ast": [
+                            "bin",
+                            "and",
+                            [
+                              "bin",
+                              "==",
+                              [
+                                "sv",
+                                "patter",
+                                "x"
+                              ],
+                              [
+                                "n",
+                                5
+                              ]
+                            ],
+                            [
+                              "bin",
+                              ">",
+                              [
+                                "sv",
+                                "patter",
+                                "y"
+                              ],
+                              [
+                                "n",
+                                3
+                              ]
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BB",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "BA": "generic",
+            "BB": "specific"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "BB",
+          "text": "specific"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "specificity falls back to the filler when nothing specific is eligible",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "055nrc1",
+          "structureHash": "1rs9d1v"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "x",
+            "type": "number",
+            "shared": true,
+            "default": 1
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "specificity",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "a",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "x"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BA",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "f",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "BF",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "BA": "specific",
+            "BF": "filler"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "BF",
+          "text": "filler"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "specificity counts check_flags operands (3 flags beat one comparison)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1860dwm",
+          "structureHash": "0qtsgjz"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "q",
+            "type": "flags",
+            "shared": true,
+            "default": [
+              "a",
+              "b",
+              "c"
+            ]
+          },
+          {
+            "name": "z",
+            "type": "number",
+            "shared": true,
+            "default": 1
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "specificity",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "a",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "check_flags(@q, +a, +b, +c)",
+                          "ast": [
+                            "call",
+                            "check_flags",
+                            [
+                              "sv",
+                              "patter",
+                              "q"
+                            ],
+                            [
+                              "fd",
+                              "+",
+                              "a"
+                            ],
+                            [
+                              "fd",
+                              "+",
+                              "b"
+                            ],
+                            [
+                              "fd",
+                              "+",
+                              "c"
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BA",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "b",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@z == 1",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "z"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BB",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "BA": "three flags",
+            "BB": "one check"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "BA",
+          "text": "three flags"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "specificity breaks an equal-specificity tie by the seeded shuffle",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1c05lk0",
+          "structureHash": "14yqr3i"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "x",
+            "type": "number",
+            "shared": true,
+            "default": 5
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "specificity",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "a",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "x"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BA",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "b",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "x"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BB",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "BA": "first",
+            "BB": "second"
+          }
+        }
+      },
+      "seed": 7,
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "BA",
+          "text": "first"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "specificity with exhaust once degrades to the filler",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0jqgatu",
+          "structureHash": "00u9zoa"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "x",
+            "type": "number",
+            "shared": true,
+            "default": 5
+          },
+          {
+            "name": "y",
+            "type": "number",
+            "shared": true,
+            "default": 5
+          },
+          {
+            "name": "count",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "specificity",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "a",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5 and @y == 5",
+                          "ast": [
+                            "bin",
+                            "and",
+                            [
+                              "bin",
+                              "==",
+                              [
+                                "sv",
+                                "patter",
+                                "x"
+                              ],
+                              [
+                                "n",
+                                5
+                              ]
+                            ],
+                            [
+                              "bin",
+                              "==",
+                              [
+                                "sv",
+                                "patter",
+                                "y"
+                              ],
+                              [
+                                "n",
+                                5
+                              ]
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BA",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      },
+                      {
+                        "id": "b",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@x == 5",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "x"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "BB",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      },
+                      {
+                        "id": "f",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "BF",
+                            "kind": "line"
+                          }
+                        ],
+                        "jump": {
+                          "to": "tick"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "tick",
+                "type": "block",
+                "name": "Tick",
+                "children": [
+                  {
+                    "id": "stop",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@count >= 2",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "count"
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "go",
+                    "type": "snippet",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@count",
+                        "value": {
+                          "src": "@count + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "count"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "loop"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "BA": "most specific",
+            "BB": "less specific",
+            "BF": "filler"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "BA",
+          "text": "most specific"
+        },
+        {
+          "type": "line",
+          "id": "BB",
+          "text": "less specific"
+        },
+        {
+          "type": "line",
+          "id": "BF",
+          "text": "filler"
+        },
+        {
+          "type": "end"
+        }
+      ]
     }
   ],
   "scripted": [

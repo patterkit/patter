@@ -144,6 +144,110 @@ const sequence = {
   ],
 } satisfies RuntimeFixture;
 
+// --- Best match (order: "specificity"): the matched-specificity metric --------
+// State comes from property DEFAULTS (no host input), so every engine scores the
+// same conditions against the same values. A single draw resolves the group.
+const bestMatchGroup = (children: Scene["blocks"][number]["children"]): Scene => ({
+  id: "s", type: "scene", name: "S",
+  blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "sequence", options: { order: "specificity", exhaust: "repeat" }, children },
+  ] }],
+});
+
+// AND sums: `@x == 5 and @y > 3` (2) beats `@x == 5` (1) when both hold.
+const specAndSums = {
+  name: "specificity prefers the more specific line (AND sums)",
+  project: project({ properties: [{ name: "x", type: "number", shared: true, default: 5 }, { name: "y", type: "number", shared: true, default: 4 }] }),
+  scenes: [bestMatchGroup([
+    { id: "a", type: "snippet", condition: "@x == 5", beats: [{ id: "BA", kind: "line" }], jump: { to: "END" } },
+    { id: "b", type: "snippet", condition: "@x == 5 and @y > 3", beats: [{ id: "BB", kind: "line" }], jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { BA: "generic", BB: "specific" })],
+  expectedTranscript: [
+    { type: "line", id: "BB", text: "specific" }, // score 2 wins
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// The filler (no condition, score 0) wins only when nothing more specific is eligible.
+const specFiller = {
+  name: "specificity falls back to the filler when nothing specific is eligible",
+  project: project({ properties: [{ name: "x", type: "number", shared: true, default: 1 }] }),
+  scenes: [bestMatchGroup([
+    { id: "a", type: "snippet", condition: "@x == 5", beats: [{ id: "BA", kind: "line" }], jump: { to: "END" } }, // fails (x=1)
+    { id: "f", type: "snippet", beats: [{ id: "BF", kind: "line" }], jump: { to: "END" } },                        // filler
+  ])],
+  locales: [loc("s", { BA: "specific", BF: "filler" })],
+  expectedTranscript: [
+    { type: "line", id: "BF", text: "filler" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// check_flags counts its flag operands: check_flags(@q, +a, +b, +c) scores 3, beating a lone comparison.
+const specCheckFlags = {
+  name: "specificity counts check_flags operands (3 flags beat one comparison)",
+  project: project({ properties: [{ name: "q", type: "flags", shared: true, default: ["a", "b", "c"] }, { name: "z", type: "number", shared: true, default: 1 }] }),
+  scenes: [bestMatchGroup([
+    { id: "a", type: "snippet", condition: "check_flags(@q, +a, +b, +c)", beats: [{ id: "BA", kind: "line" }], jump: { to: "END" } }, // score 3
+    { id: "b", type: "snippet", condition: "@z == 1", beats: [{ id: "BB", kind: "line" }], jump: { to: "END" } },                       // score 1
+  ])],
+  locales: [loc("s", { BA: "three flags", BB: "one check" })],
+  expectedTranscript: [
+    { type: "line", id: "BA", text: "three flags" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// Equally-specific tie -> seeded shuffle (pins the PRNG). Both children score 1.
+const specTie = {
+  name: "specificity breaks an equal-specificity tie by the seeded shuffle",
+  project: project({ properties: [{ name: "x", type: "number", shared: true, default: 5 }] }),
+  seed: 7,
+  scenes: [bestMatchGroup([
+    { id: "a", type: "snippet", condition: "@x == 5", beats: [{ id: "BA", kind: "line" }], jump: { to: "END" } },
+    { id: "b", type: "snippet", condition: "@x == 5", beats: [{ id: "BB", kind: "line" }], jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { BA: "first", BB: "second" })],
+  expectedTranscript: [
+    { type: "line", id: "BA", text: "first" }, // seed 7 -> tier index 0 (verified against mulberry32)
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// exhaust "once": each pick is used up, so the group slides A (2) -> B (1) -> filler (0) over the pass.
+const specDegrades = {
+  name: "specificity with exhaust once degrades to the filler",
+  project: project({ properties: [
+    { name: "x", type: "number", shared: true, default: 5 },
+    { name: "y", type: "number", shared: true, default: 5 },
+    { name: "count", type: "number", shared: true, default: 0 },
+  ] }),
+  scenes: [{
+    id: "s", type: "scene", name: "S",
+    blocks: [
+      { id: "loop", type: "block", name: "Loop", children: [
+        { id: "g", type: "group", selector: "sequence", options: { order: "specificity", exhaust: "once" }, children: [
+          { id: "a", type: "snippet", condition: "@x == 5 and @y == 5", beats: [{ id: "BA", kind: "line" }], jump: { to: "tick" } }, // score 2
+          { id: "b", type: "snippet", condition: "@x == 5", beats: [{ id: "BB", kind: "line" }], jump: { to: "tick" } },              // score 1
+          { id: "f", type: "snippet", beats: [{ id: "BF", kind: "line" }], jump: { to: "tick" } },                                    // filler
+        ] },
+      ] },
+      { id: "tick", type: "block", name: "Tick", children: [
+        { id: "stop", type: "snippet", condition: "@count >= 2", jump: { to: "END" } },
+        { id: "go", type: "snippet", onEnter: [{ kind: "set", target: "@count", value: "@count + 1" }], jump: { to: "loop" } },
+      ] },
+    ],
+  }],
+  locales: [loc("s", { BA: "most specific", BB: "less specific", BF: "filler" })],
+  expectedTranscript: [
+    { type: "line", id: "BA", text: "most specific" },  // score 2
+    { type: "line", id: "BB", text: "less specific" },  // A used -> score 1
+    { type: "line", id: "BF", text: "filler" },         // A, B used -> filler
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
 // --- set effects fire (set-only; spec §15) at snippet seams ------------------
 // The mutation order is observed through interpolation: L1 reads @gold BEFORE sn1's
 // onExit set, L2 reads it AFTER. (Emit was removed - emission rides on gameData now.)
@@ -1153,6 +1257,7 @@ export const cases: Fixtures = {
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
     characterName, localeActive, idsMode, tagsAccumulate,
+    specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ],
   scripted: [scriptedMultiFlow, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,

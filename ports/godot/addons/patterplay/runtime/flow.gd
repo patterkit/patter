@@ -354,7 +354,11 @@ func _select_child(group: Dictionary):
 		var opts: Dictionary = group.get("options", {})
 		var order: String = opts.get("order", "sequential")
 		var exhaust: String = opts.get("exhaust", "once")
-		return _pick_shuffle(eligible, exhaust, st) if order == "shuffle" else _pick_sequential(eligible, exhaust, st)
+		if order == "shuffle":
+			return _pick_shuffle(eligible, exhaust, st)
+		if order == "specificity":
+			return _pick_specificity(eligible, exhaust, st)
+		return _pick_sequential(eligible, exhaust, st)
 	return null
 
 
@@ -400,6 +404,97 @@ func _pick_shuffle(eligible: Array, exhaust: String, st: Dictionary):
 		if c["id"] == pick:
 			return c
 	return null
+
+
+# order == "specificity" (Best match): keep the top matched-specificity tier, tie-break by the seeded
+# PRNG (no immediate repeat); a no-condition child scores 0 (the filler). Composes with exhaust like
+# shuffle: repeat re-scores every draw; once/stick draw without replacement (a bag of remaining ids).
+func _pick_specificity(eligible: Array, exhaust: String, st: Dictionary):
+	var repeat := exhaust == "repeat"
+	var pool: Array = []
+	if repeat:
+		pool = eligible
+	else:
+		if not st.has("bag_init"):
+			var ids: Array = []
+			for c in eligible:
+				ids.append(c["id"])
+			st["bag"] = ids
+			st["bag_init"] = true
+		var bag: Array = st["bag"] as Array
+		for c in eligible:
+			if bag.has(c["id"]):
+				pool.append(c)
+		if pool.is_empty():
+			if exhaust == "stick" and st.has("last"):
+				for c in eligible:
+					if c["id"] == st["last"]:
+						return c
+			return null
+	# Top specificity tier among the drawable pool.
+	var best := -1
+	var scores: Array = []
+	for c in pool:
+		var s := _spec_score(c)
+		scores.append(s)
+		if s > best:
+			best = s
+	var tier: Array = []
+	for k in pool.size():
+		if scores[k] == best:
+			tier.append(pool[k])
+	# A lone top-tier child is returned WITHOUT drawing, so a clear winner consumes no randomness.
+	var pick
+	if tier.size() == 1:
+		pick = tier[0]
+	else:
+		var p := -1
+		if st.has("last"):
+			for k in tier.size():
+				if tier[k]["id"] == st["last"]:
+					p = k
+					break
+		var span := (tier.size() - 1 if p >= 0 else tier.size())
+		var i := int(floor(_rng() * span))
+		if p >= 0 and i >= p:
+			i += 1
+		pick = tier[i]
+	if not repeat:
+		(st["bag"] as Array).erase(pick["id"])
+	st["last"] = pick["id"]
+	return pick
+
+
+# A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
+func _spec_score(node: Dictionary) -> int:
+	if not node.has("condition"):
+		return 0
+	return _matched_spec(node["condition"]["ast"], true)
+
+
+# matched-specificity: how many atomic constraints are actively holding this condition TRUE against the
+# live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
+func _matched_spec(node: Array, want: bool) -> int:
+	var tag = node[0]
+	if tag == "bin" and (node[1] == "and" or node[1] == "or"):
+		var behave_as_and: bool = (node[1] == "and") == want # De Morgan under negation
+		var l := _matched_spec(node[2], want)
+		var r := _matched_spec(node[3], want)
+		if behave_as_and:
+			return (l + r) if (l > 0 and r > 0) else 0
+		return l if l > r else r
+	if tag == "u" and node[1] == "not":
+		return _matched_spec(node[2], not want) # flip polarity
+	if tag == "call" and node[1] == "check_flags":
+		var operands := node.size() - 3 # ["call","check_flags",source,fd...]
+		if operands < 1:
+			operands = 1
+		var hit := PatterValues.truthy(PatterExpr.evaluate(node, _eval_ctx))
+		if want:
+			return operands if hit else 0
+		return 0 if hit else 1
+	# Atom: its truth matching the wanted polarity contributes one constraint.
+	return 1 if (PatterValues.truthy(PatterExpr.evaluate(node, _eval_ctx)) == want) else 0
 
 
 func _fill_ids(eligible: Array, stick: bool, ln: int) -> Array:

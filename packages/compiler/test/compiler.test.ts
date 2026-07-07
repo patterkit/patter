@@ -106,3 +106,33 @@ describe("author tags bake into the bundle (#215)", () => {
     expect(untagged.content.hash).toBe(alsoUntagged.content.hash);
   });
 });
+
+describe("Best match: the specificity selector order round-trips into the bundle", () => {
+  // A `sequence` group whose order is the new Best-match value, with one conditioned child + a filler.
+  const bestMatchScene = (order: "specificity" | "shuffle"): Scene => ({
+    id: "scn_1", type: "scene", name: "Scene",
+    blocks: [{ id: "blk_1", type: "block", name: "B", children: [
+      { id: "g_1", type: "group", selector: "sequence", options: { order, exhaust: "repeat" }, children: [
+        { id: "sn_a", type: "snippet", condition: "@hp > 0", beats: [{ id: "L_a", kind: "line", character: "BARKEEP" }] },
+        { id: "sn_f", type: "snippet", beats: [{ id: "L_f", kind: "line", character: "BARKEEP" }] },
+      ] },
+    ] }],
+  });
+  const strings: LocaleFile = { schema: "patter/strings@0", scene: "scn_1", locale: "en", default: true, strings: { L_a: "hi", L_f: "..." } };
+
+  it("carries selector + options { order: 'specificity' } through verbatim", () => {
+    const bundle = exportBundle({ project: project(), scenes: [bestMatchScene("specificity")], locales: [strings] });
+    const group = bundle.scenes.scn_1!.blocks[0]!.children[0]!;
+    expect(group.type).toBe("group");
+    if (group.type === "group") {
+      expect(group.selector).toBe("sequence");
+      expect(group.options).toEqual({ order: "specificity", exhaust: "repeat" });
+    }
+  });
+
+  it("changes the structure hash vs the same group as shuffle (a Tier-2 hot-reload change, not strings-only)", () => {
+    const spec = exportBundle({ project: project(), scenes: [bestMatchScene("specificity")], locales: [strings] });
+    const shuffle = exportBundle({ project: project(), scenes: [bestMatchScene("shuffle")], locales: [strings] });
+    expect(spec.content.structureHash).not.toBe(shuffle.content.structureHash);
+  });
+});

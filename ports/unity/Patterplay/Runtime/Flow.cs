@@ -296,7 +296,9 @@ namespace Patterkit.Patterplay
                 {
                     string order = group.Options?.Order ?? "sequential";
                     string exhaust = group.Options?.Exhaust ?? "once";
-                    return order == "shuffle" ? PickShuffle(eligible, exhaust, st) : PickSequential(eligible, exhaust, st);
+                    return order == "shuffle" ? PickShuffle(eligible, exhaust, st)
+                        : order == "specificity" ? PickSpecificity(eligible, exhaust, st)
+                        : PickSequential(eligible, exhaust, st);
                 }
                 default: return null;
             }
@@ -337,6 +339,74 @@ namespace Patterkit.Patterplay
             pool.RemoveAt(i); // draw without replacement, in place
             st.Last = pick;
             return eligible.First(c => c.Id == pick);
+        }
+
+        // order == "specificity" (Best match): keep the top matched-specificity tier, tie-break by the
+        // seeded PRNG (no immediate repeat); a no-condition child scores 0 (the filler). Composes with
+        // exhaust like shuffle: repeat re-scores every draw; once/stick draw without replacement.
+        private Node PickSpecificity(List<Node> eligible, string exhaust, SelectorState st)
+        {
+            bool repeat = exhaust == "repeat";
+            List<Node> pool;
+            if (repeat) { pool = eligible; }
+            else
+            {
+                if (st.Bag == null) st.Bag = eligible.Select(c => c.Id).ToList();
+                pool = eligible.Where(c => st.Bag.Contains(c.Id)).ToList();
+                if (pool.Count == 0)
+                    return exhaust == "stick" && st.Last != null ? eligible.FirstOrDefault(c => c.Id == st.Last) : null;
+            }
+
+            // Top specificity tier among the drawable pool.
+            int best = -1;
+            var scores = new int[pool.Count];
+            for (int k = 0; k < pool.Count; k++) { scores[k] = SpecScore(pool[k]); if (scores[k] > best) best = scores[k]; }
+            var tier = new List<Node>();
+            for (int k = 0; k < pool.Count; k++) if (scores[k] == best) tier.Add(pool[k]);
+
+            // A lone top-tier child is returned WITHOUT drawing, so a clear winner consumes no randomness.
+            Node pick;
+            if (tier.Count == 1) { pick = tier[0]; }
+            else
+            {
+                int p = st.Last != null ? tier.FindIndex(c => c.Id == st.Last) : -1;
+                int span = p >= 0 ? tier.Count - 1 : tier.Count;
+                int i = (int)Math.Floor(Rng() * span);
+                if (p >= 0 && i >= p) i++;
+                pick = tier[i];
+            }
+
+            if (!repeat) st.Bag.Remove(pick.Id);
+            st.Last = pick.Id;
+            return pick;
+        }
+
+        // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
+        private int SpecScore(Node node)
+        {
+            return node.Condition != null ? MatchedSpec(node.Condition.Ast, true) : 0;
+        }
+
+        // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
+        // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
+        private int MatchedSpec(AstNode node, bool want)
+        {
+            if (node is Binary bin && (bin.Op == "and" || bin.Op == "or"))
+            {
+                bool behaveAsAnd = (bin.Op == "and") == want; // De Morgan under negation
+                int l = MatchedSpec(bin.Left, want);
+                int r = MatchedSpec(bin.Right, want);
+                return behaveAsAnd ? (l > 0 && r > 0 ? l + r : 0) : Math.Max(l, r);
+            }
+            if (node is Unary u && u.Op == "not")
+                return MatchedSpec(u.Operand, !want); // flip polarity
+            if (node is Call call && call.Name == "check_flags")
+            {
+                int operands = Math.Max(1, call.Args.Length - 1); // Args[0] is the flags source
+                bool hit = Truthy(Expr.Evaluate(node, _evalCtx));
+                return want ? (hit ? operands : 0) : (hit ? 0 : 1);
+            }
+            return Truthy(Expr.Evaluate(node, _evalCtx)) == want ? 1 : 0; // atom
         }
 
         private SelectorState SelectorStateFor(Node group)

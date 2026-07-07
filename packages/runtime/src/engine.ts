@@ -1290,8 +1290,8 @@ export class Flow {
       case "sequence": {
         const order = group.options?.order ?? "sequential";
         const exhaust = group.options?.exhaust ?? "once";
-        return order === "shuffle"
-          ? this.pickShuffle(eligible, exhaust, st)
+        return order === "shuffle" ? this.pickShuffle(eligible, exhaust, st)
+          : order === "specificity" ? this.pickSpecificity(eligible, exhaust, st)
           : this.pickSequential(eligible, exhaust, st);
       }
 
@@ -1344,6 +1344,88 @@ export class Flow {
     return eligible.find((c) => c.id === id)!;
   }
 
+  /**
+   * `sequence` with `order: "specificity"` - **Best match**: score every eligible child by how
+   * specifically its condition fits the CURRENT state (`matchedSpec`), keep the top-scoring tier,
+   * and break ties with the seeded shuffle (no immediate repeat). A child with no condition scores
+   * 0, so it is the filler that wins only when nothing more specific is eligible.
+   *
+   * `exhaust` composes as it does for the other orders: `repeat` re-scores the full eligible set
+   * every draw (re-pickable - the character keeps preferring the on-topic line); `once` uses each
+   * pick up (a bag of remaining ids), so as specific lines are consumed the group slides down to
+   * less-specific ones and finally the filler, then yields null; `stick` degrades like `once` but
+   * holds the final pick forever instead of drying up.
+   */
+  private pickSpecificity(eligible: SelectableNode[], exhaust: string, st: SelectorState): SelectableNode | null {
+    let pool = eligible;
+    if (exhaust !== "repeat") {                       // once / stick: draw without replacement
+      if (st.bag === undefined) st.bag = eligible.map((c) => c.id);
+      const remaining = new Set(st.bag);
+      pool = eligible.filter((c) => remaining.has(c.id));
+      if (pool.length === 0) {                        // every child used up
+        return exhaust === "stick" && st.last !== undefined
+          ? eligible.find((c) => c.id === st.last) ?? null   // hold the last pick if still eligible
+          : null;
+      }
+    }
+
+    // Top specificity tier among the drawable pool.
+    let best = -1;
+    const scored = pool.map((c) => { const s = this.specScore(c); if (s > best) best = s; return { c, s }; });
+    const tier = scored.filter((x) => x.s === best).map((x) => x.c);
+
+    // Tie-break by the seeded PRNG, never repeating the immediately-previous pick (matches shuffle).
+    // A lone top-tier child is returned WITHOUT drawing, so a clear winner consumes no randomness.
+    let pick: SelectableNode;
+    if (tier.length === 1) {
+      pick = tier[0]!;
+    } else {
+      const p = st.last !== undefined ? tier.findIndex((c) => c.id === st.last) : -1;
+      let i = Math.floor(this.rng() * (p >= 0 ? tier.length - 1 : tier.length));
+      if (p >= 0 && i >= p) i++;
+      pick = tier[i]!;
+    }
+
+    if (exhaust !== "repeat") st.bag = st.bag!.filter((id) => id !== pick.id);
+    st.last = pick.id;
+    return pick;
+  }
+
+  /** A child's Best-match score against the current state: 0 when it has no condition (the filler
+   *  tier), else the specificity of its (already-passing) condition. */
+  private specScore(node: SelectableNode): number {
+    return node.condition ? this.matchedSpec(this.conditionAst(node.condition), true) : 0;
+  }
+
+  /**
+   * The **matched-specificity** metric (parity contract): how many atomic constraints are actively
+   * holding this condition TRUE against the live state. Evaluation-aware, not a static clause count -
+   * it walks the tree with a De-Morgan polarity flag so `or` and `not` score the branch that is
+   * actually carrying the truth. `want` = "does this subtree need to be true for the whole condition
+   * to hold?" (true at the root). Only `and`/`or`/`not`/`check_flags` are structural; every other
+   * node (comparisons, scoped vars, literals, other calls) is an atom, evaluated whole.
+   */
+  private matchedSpec(node: ExprNode, want: boolean): number {
+    if (node.kind === "binary" && (node.op === "and" || node.op === "or")) {
+      const behaveAsAnd = (node.op === "and") === want;   // De Morgan under negation
+      const l = this.matchedSpec(node.left, want);
+      const r = this.matchedSpec(node.right, want);
+      return behaveAsAnd ? (l > 0 && r > 0 ? l + r : 0) : Math.max(l, r);
+    }
+    if (node.kind === "unary" && node.op === "not") {
+      return this.matchedSpec(node.operand, !want);       // flip polarity
+    }
+    if (node.kind === "call" && node.name === "check_flags") {
+      // N-ary AND over the flag args (args[0] is the flags source). max(1, ...) keeps
+      // check_flags(q,a,b) == check_flags(q,a) and check_flags(q,b).
+      const operands = Math.max(1, node.args.length - 1);
+      const hit = truthy(evaluate(node, this.evalCtx, patterDialect));
+      return want ? (hit ? operands : 0) : (hit ? 0 : 1);
+    }
+    // Atom: its truth matching the wanted polarity contributes exactly one constraint.
+    return truthy(evaluate(node, this.evalCtx, patterDialect)) === want ? 1 : 0;
+  }
+
   /** A selector's cursor state - shared across flows (`group.shared`) or this flow's own. */
   private selectorState(group: CompiledGroup): SelectorState {
     const map = group.shared ? this.host.sharedSelectors : this.selectors;
@@ -1367,9 +1449,15 @@ export class Flow {
   }
 
   private evalExpr(expr: Expression): ScalarValue {
+    return evaluate(this.conditionAst(expr), this.evalCtx, patterDialect);
+  }
+
+  /** The deserialised (in-memory) AST for an expression, cached per Expression. Shared by the
+   *  evaluator and the Best-match specificity walker so both work off one parse. */
+  private conditionAst(expr: Expression): ExprNode {
     let ast = astCache.get(expr);
     if (!ast) { ast = deserialiseAst(expr.ast); astCache.set(expr, ast); }
-    return evaluate(ast, this.evalCtx, patterDialect);
+    return ast;
   }
 
   /** Record an entry of a node (entered-only; spec §7): bumps the flow + world counts. */

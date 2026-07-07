@@ -635,7 +635,9 @@ namespace patter
             {
                 std::string order = group->options && !group->options->order.empty() ? group->options->order : "sequential";
                 std::string exhaust = group->options && !group->options->exhaust.empty() ? group->options->exhaust : "once";
-                return order == "shuffle" ? pickShuffle(elig, exhaust, st) : pickSequential(elig, exhaust, st);
+                return order == "shuffle" ? pickShuffle(elig, exhaust, st)
+                    : order == "specificity" ? pickSpecificity(elig, exhaust, st)
+                    : pickSequential(elig, exhaust, st);
             }
             return nullptr;
         }
@@ -680,6 +682,81 @@ namespace patter
             st.hasLast = true; st.last = pick;
             for (const Node* c : elig) if (c->id == pick) return c;
             return nullptr;
+        }
+        // order == "specificity" (Best match): keep the top matched-specificity tier, tie-break by the
+        // seeded PRNG (no immediate repeat); a no-condition child scores 0 (the filler). Composes with
+        // exhaust exactly like shuffle: repeat re-scores every draw; once/stick draw without replacement.
+        const Node* pickSpecificity(std::vector<const Node*>& elig, const std::string& exhaust, SelectorState& st)
+        {
+            bool repeat = exhaust == "repeat";
+            std::vector<const Node*> pool;
+            if (repeat) { pool = elig; }
+            else
+            {
+                if (!st.bagInit) { for (const Node* c : elig) st.bag.push_back(c->id); st.bagInit = true; }
+                for (const Node* c : elig)
+                {
+                    bool inBag = false;
+                    for (const std::string& id : st.bag) if (id == c->id) { inBag = true; break; }
+                    if (inBag) pool.push_back(c);
+                }
+                if (pool.empty())
+                {
+                    if (exhaust == "stick" && st.hasLast) for (const Node* c : elig) if (c->id == st.last) return c;
+                    return nullptr;
+                }
+            }
+            // Top specificity tier among the drawable pool.
+            int best = -1;
+            std::vector<int> scores; scores.reserve(pool.size());
+            for (const Node* c : pool) { int s = specScore(c); scores.push_back(s); if (s > best) best = s; }
+            std::vector<const Node*> tier;
+            for (size_t k = 0; k < pool.size(); ++k) if (scores[k] == best) tier.push_back(pool[k]);
+            // A lone top-tier child is returned WITHOUT drawing, so a clear winner consumes no randomness.
+            const Node* pick = nullptr;
+            if (tier.size() == 1) { pick = tier[0]; }
+            else
+            {
+                int p = -1;
+                if (st.hasLast) for (size_t k = 0; k < tier.size(); ++k) if (tier[k]->id == st.last) { p = static_cast<int>(k); break; }
+                int span = p >= 0 ? static_cast<int>(tier.size()) - 1 : static_cast<int>(tier.size());
+                int i = static_cast<int>(std::floor(rng() * span));
+                if (p >= 0 && i >= p) ++i;
+                pick = tier[static_cast<size_t>(i)];
+            }
+            if (!repeat)
+                for (size_t k = 0; k < st.bag.size(); ++k) if (st.bag[k] == pick->id) { st.bag.erase(st.bag.begin() + k); break; }
+            st.hasLast = true; st.last = pick->id;
+            return pick;
+        }
+        // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
+        int specScore(const Node* node)
+        {
+            return node->condition ? matchedSpec(*node->condition->ast, true) : 0;
+        }
+        // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
+        // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
+        int matchedSpec(const AstNode& node, bool want)
+        {
+            if (node.tag == AstTag::Binary && (node.op == "and" || node.op == "or"))
+            {
+                bool behaveAsAnd = (node.op == "and") == want; // De Morgan under negation
+                int l = matchedSpec(*node.left, want);
+                int r = matchedSpec(*node.right, want);
+                if (behaveAsAnd) return (l > 0 && r > 0) ? l + r : 0;
+                return l > r ? l : r;
+            }
+            if (node.tag == AstTag::Unary && node.op == "not")
+                return matchedSpec(*node.operand, !want); // flip polarity
+            if (node.tag == AstTag::Call && node.fn == "check_flags")
+            {
+                int operands = static_cast<int>(node.args.size()) - 1; // args[0] is the flags source
+                if (operands < 1) operands = 1;
+                bool hit = truthy(evaluate(node, evalCtx_));
+                if (want) return hit ? operands : 0;
+                return hit ? 0 : 1;
+            }
+            return (truthy(evaluate(node, evalCtx_)) == want) ? 1 : 0; // atom
         }
         SelectorState& selectorStateFor(const Node* group)
         {

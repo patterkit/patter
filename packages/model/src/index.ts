@@ -98,8 +98,13 @@ export type Beat = LineBeat | TextBeat | GameEventBeat;
 export type Selector =
   | "run" | "branch" | "sequence" | "choice";
 
-/** How a `sequence` walks its children. */
-export type SelectorOrder = "sequential" | "shuffle";
+/** How a `sequence` walks its children. `specificity` = **Best match**: pick the eligible
+ *  child whose condition most specifically fits the current state (the most atomic constraints
+ *  actively holding it true); equally-specific ties break by the seeded shuffle. A child with no
+ *  condition scores zero, so it acts as the filler that wins only when nothing more specific is
+ *  eligible. Composes with `exhaust`: `repeat` re-scores every visit (re-pickable, the Best-match
+ *  default), `once` uses each pick up so the group slides down to the filler (graceful degradation). */
+export type SelectorOrder = "sequential" | "shuffle" | "specificity";
 /** What a `sequence` does after one full pass through its children. */
 export type SelectorExhaust = "once" | "repeat" | "stick";
 
