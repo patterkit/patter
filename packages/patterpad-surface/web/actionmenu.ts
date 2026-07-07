@@ -30,10 +30,11 @@ type Cmd = (state: EditorView["state"], pos: number) => ReturnType<typeof insert
 const ADD_KINDS: Array<{ label: string; kind: "snippet" | GroupKind }> = [
   { label: "Snippet", kind: "snippet" }, { label: "Branch", kind: "if" }, { label: "Choice", kind: "choice" },
   { label: "Once each", kind: "sequence" }, { label: "Cycle", kind: "cycle" }, { label: "Shuffle", kind: "shuffle" },
+  { label: "Best match", kind: "bestmatch" },
 ];
 const WRAP_KINDS: Array<{ label: string; kind: GroupKind }> = [
   { label: "Branch", kind: "if" }, { label: "Choice", kind: "choice" }, { label: "Once each", kind: "sequence" },
-  { label: "Cycle", kind: "cycle" }, { label: "Shuffle", kind: "shuffle" },
+  { label: "Cycle", kind: "cycle" }, { label: "Shuffle", kind: "shuffle" }, { label: "Best match", kind: "bestmatch" },
 ];
 
 /** When set, the menu's "Note…" targets THIS node (id + kind) rather than the node at `getPos` - lets a

@@ -16,10 +16,10 @@ Every snippet and group has a quiet **⋯** button at its top-right, and
 **right-clicking** anywhere on it opens the same menu. It holds the structural moves:
 
 - **Follow with ▸**: add something after this piece, a Snippet, a Branch, a Choice, or
-  a Sequence in one of its three ready-made shapes (**Once each**, **Cycle**, or
-  **Shuffle**).
+  a Sequence in one of its ready-made shapes (**Once each**, **Cycle**, **Shuffle**, or
+  **Best match**).
 - **Wrap in ▸**: wrap this piece (or several you've selected) in a Branch, a Choice, or
-  a Sequence (**Once each**, **Cycle**, or **Shuffle**).
+  a Sequence (**Once each**, **Cycle**, **Shuffle**, or **Best match**).
 - **Add option**: on a choice (the same as the inline **"+ option"** control).
 - **Ungroup**: undo a group, so its contents move up a level.
 - **Split here / Join with previous / Join with next**: for snippets, shown only when

@@ -17,12 +17,13 @@ A group's **selector** decides what happens with the children whose conditions p
   else, and your switch: ordered children with conditions, most specific first, and an
   unconditional last child as the "else".
 - **`sequence`**: a picker that remembers where it is, with two independent settings:
-  - **order**: `sequential` (the default) or `shuffle`;
+  - **order**: `sequential` (the default), `shuffle`, or `specificity` (**Best match**, below);
   - **exhaust**: `once` (the default), `repeat`, or `stick` (hold on the last child).
 
   Shuffle deals from the pack without repeats, and never plays the same line twice in
-  a row: that's built in, not an option. The six combinations cover the usual "each
-  line once", "cycle", "random with no repeats", and "stop on the last" patterns.
+  a row: that's built in, not an option. The `sequential` and `shuffle` combinations cover
+  the usual "each line once", "cycle", "random with no repeats", and "stop on the last"
+  patterns; `specificity` is the state-aware one, and gets [its own section](#best-match-lines-that-fit-the-moment).
 - **`choice`**: offer all children as options and wait for the player. This is the one
   selector that does **not** filter on conditions; it hands ineligible options to your
   game marked **unavailable** instead (see below).
@@ -30,6 +31,84 @@ A group's **selector** decides what happens with the children whose conditions p
 A sequence's memory can be **shared** across [flows](/concepts/#flows) rather than kept per-flow, so two
 characters never draw the same shuffled line, or a `once` is spent for everyone the
 first time it runs.
+
+## Best match: lines that fit the moment
+
+`sequence` with **order `specificity`** (shown as **Best match** in Patterpad) is the selector for
+lines that should *comment on the exact situation*, and quietly fall back to something generic when
+nothing more specific applies. In one sentence: **among the children whose conditions currently
+pass, play the one whose condition is the most specific to the present state; reach for a generic
+filler only when nothing more specific is eligible.**
+
+### What it's for
+
+Reactive one-liners - barks, ambient chatter, greetings - that feel canned if they ignore the
+state, and are laborious to hand-branch if you write an `if` for every combination:
+
+- **Companion banter** that reacts to what just happened: "You're bleeding, here, take this" when
+  the player is hurt *and* the companion has a potion; "Careful, it's slippery" when it's raining;
+  a plain "Keep moving" when nothing special is going on.
+- **A guard** who notices what you carry: a line for the stolen crown, a line for *any* drawn
+  weapon, a generic "Move along" for everyone else.
+- **A shopkeeper** whose greeting tracks your reputation or quest stage: the further along you are,
+  the more specific the line they have for you.
+- **Tiered filler**: three lines for the exact circumstance, two for the broad one, one catch-all.
+
+You write the specific lines and the filler, each with its condition, in one group; Best match picks
+the right tier every time, with no hand-built decision tree.
+
+### How it decides (the specificity score)
+
+Each eligible child gets a **specificity score**: roughly, *how many separate conditions are
+actively holding it true right now*. The highest score wins. A child with **no condition scores
+zero**, so it is the filler; it only wins when nothing more specific is eligible. When children
+tie, Best match breaks the tie with the same seeded shuffle as `shuffle`, so it stays reproducible
+and never repeats a line back-to-back.
+
+Walking a condition to score it:
+
+- `and` **adds** its two sides (both must hold, so both count).
+- `or` takes the **stronger** side (only one side is carrying the truth).
+- `not` flips the sense and looks inside.
+- `check_flags(@q, +a, +b)` counts **each flag** it checks.
+- anything else - a comparison, a property, a `visits()` check - counts as **one**.
+
+| Condition (all currently true) | Score |
+|---|---|
+| *(no condition)* | 0 |
+| `@hurt` | 1 |
+| `@hurt and @hasPotion` | 2 |
+| `check_flags(@quest, +metCaptain, +hasCrown, +nightfall)` | 3 |
+| `@rich or @generous` | 1 |
+
+So a group holding `@hurt and @hasPotion` (2), `@hurt` (1), and a no-condition filler (0) plays the
+first line when the player is hurt and the companion has a potion; the second when hurt but
+empty-handed; and the filler otherwise.
+
+### Repeating vs using lines up
+
+Best match composes with the sequence **exhaust** setting:
+
+- **`repeat`** (Patterpad's default for Best match): re-score and re-pick every time the group is
+  reached, so the character keeps preferring the most on-topic line as the state changes. This is
+  what you want for barks and ambient chatter.
+- **`once`**: each line is used up as it plays, so the group **slides down** the tiers, the most
+  specific first, then the next, and finally the filler. Good graceful degradation for a set of
+  first-time lines that shouldn't repeat.
+
+### Writing one
+
+Put the **specific lines first and the general ones last**, each with its condition, and leave
+**one child with no condition** as the filler at the end. You don't have to make the conditions
+mutually exclusive - that's the point: overlapping conditions are fine, the most specific eligible
+one wins, and the filler catches the rest. (A Best-match group with *no* conditions at all just
+behaves like `shuffle`; Patterpad points that out.)
+
+### Every engine agrees
+
+The score is a pure function of the condition and the current state, and ties use the shared seeded
+shuffle, so a Best-match group plays **identically on all four runtimes** (JavaScript, Unity,
+Unreal, Godot), the same as every other selector. It is locked by the conformance corpus.
 
 ## Choices and options
 
