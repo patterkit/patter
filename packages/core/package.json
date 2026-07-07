@@ -1,14 +1,20 @@
 {
   "name": "@patterkit/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Patter core: stable id generation, readable-handle computation, canonical (de)serialisation, and the structural validator.",
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",
   "homepage": "https://patterkit.dev",
-  "repository": { "type": "git", "url": "git+https://github.com/patterkit/patter.git", "directory": "packages/core" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patterkit/patter.git",
+    "directory": "packages/core"
+  },
   "bugs": "https://github.com/patterkit/patter/issues",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,13 +25,16 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/model": "0.1.0",
+    "@patterkit/model": "0.1.1",
     "json5": "^2.2.3"
   }
 }
