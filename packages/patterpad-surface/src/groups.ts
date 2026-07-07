@@ -23,7 +23,7 @@ import { canInsertSpecial } from "./special.js";
 import { SET_MULTI } from "./multiselect.js";
 
 /** The `/`-menu group presets (groups §4): the one model with selector/options pre-filled. */
-export type GroupKind = "choice" | "if" | "sequence" | "cycle" | "shuffle";
+export type GroupKind = "choice" | "if" | "sequence" | "cycle" | "shuffle" | "bestmatch";
 
 /**
  * Marks a transaction as a STRUCTURAL move (reorder / reparent) rather than a caret
@@ -57,6 +57,7 @@ function groupRaw(kind: GroupKind): Record<string, unknown> {
     case "sequence": return { ...base, selector: "sequence", options: { order: "sequential", exhaust: "once" } };
     case "cycle":    return { ...base, selector: "sequence", options: { order: "sequential", exhaust: "repeat" } };
     case "shuffle":  return { ...base, selector: "sequence", options: { order: "shuffle", exhaust: "repeat" } };
+    case "bestmatch": return { ...base, selector: "sequence", options: { order: "specificity", exhaust: "repeat" } };
   }
 }
 

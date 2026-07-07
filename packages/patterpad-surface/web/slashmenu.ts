@@ -25,6 +25,7 @@ type Entry = { kind: "head"; label: string } | { kind: "item"; label: string; ke
 const FOLLOW_KINDS: Array<{ label: string; kind: "snippet" | GroupKind; key: string }> = [
   { label: "Snippet", kind: "snippet", key: "s" }, { label: "Branch", kind: "if", key: "b" }, { label: "Choice", kind: "choice", key: "c" },
   { label: "Once each", kind: "sequence", key: "o" }, { label: "Cycle", kind: "cycle", key: "y" }, { label: "Shuffle", kind: "shuffle", key: "h" },
+  { label: "Best match", kind: "bestmatch", key: "m" },
 ];
 
 export interface SlashMenu {

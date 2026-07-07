@@ -283,6 +283,8 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 /* inspector inline editors: native select + checkbox + jump list */
 .insp-select { font: 0.76rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.1rem 0.3rem; max-width: 11rem; }
 .insp-select:focus { outline: none; border-color: var(--accent); }
+/* A soft, advisory note under a control (e.g. the Best-match degeneracy nudge). Never an error colour. */
+.insp-note { color: var(--muted); font: italic 0.74rem var(--font-ui); line-height: 1.3; padding: 0.05rem 0 0.1rem; }
 /* Status rows (Writing #196 / Audio #206): the ladder dropdown reads as a tinted chip - its background is
    the selected rung's palette colour, so it matches the read-only recording chip (no separate swatch dot). */
 /* Wrap when the row is crowded (e.g. the recording chip + "out of date" + ▶ + ● Record all at once) so a

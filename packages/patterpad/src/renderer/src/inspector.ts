@@ -344,6 +344,11 @@ function condRow(id: string | null, src: string | undefined, h: InspectorHandler
 }
 
 /** A label : <select> row. Commits on change (the native dropdown closes before the re-render). */
+/** A full-width advisory note under the controls (e.g. the Best-match degeneracy nudge). Muted, never an error. */
+function noteRow(text: string): HTMLElement {
+  return el("div", "insp-note", text);
+}
+
 function selectRow(label: string, value: string, opts: Array<[string, string]>, onChange: (v: string) => void): HTMLElement {
   const r = el("div", "insp-row");
   r.append(el("span", "insp-key", label));
@@ -476,8 +481,13 @@ function groupBody(lv: GroupLevel, h: InspectorHandlers): HTMLElement[] {
     const selector = (lv.selector ?? "run") as "run" | "branch" | "sequence" | "choice";
     rows.push(selectRow("Selector", selector, [["run", "Run (in order)"], ["branch", "Branch (first match)"], ["sequence", "Sequence"]], (v) => set({ selector: v as GroupPropsPatch["selector"] })));
     if (selector === "sequence") {
-      rows.push(selectRow("Order", lv.order ?? "sequential", [["sequential", "In order"], ["shuffle", "Shuffle"]], (v) => set({ order: v as GroupPropsPatch["order"] })));
+      rows.push(selectRow("Order", lv.order ?? "sequential", [["sequential", "In order"], ["shuffle", "Shuffle"], ["specificity", "Best match"]], (v) => set({ order: v as GroupPropsPatch["order"] })));
       rows.push(selectRow("Exhaust", lv.exhaust ?? "once", [["once", "Play once"], ["repeat", "Repeat"], ["stick", "Stick on last"]], (v) => set({ exhaust: v as GroupPropsPatch["exhaust"] })));
+      // Best match with no conditioned children just re-shuffles - nudge the author (the degeneracy hint;
+      // see the proposal §8.1). A soft note, never an error: the group is valid, only redundant.
+      if (lv.order === "specificity" && lv.conditionedChildren === 0) {
+        rows.push(noteRow("No conditions yet, so this behaves like Shuffle. Add a condition to a child to make it more specific."));
+      }
     }
   }
   rows.push(tagsRow(lv.id, lv.tags, h));

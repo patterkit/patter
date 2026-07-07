@@ -26,7 +26,8 @@ export function groupLabel(raw: Record<string, unknown>): string {
     case "branch": return "branch · first match";
     case "sequence": {
       const o = (raw.options as { order?: string; exhaust?: string } | undefined) ?? {};
-      return `sequence · ${o.order ?? "sequential"} · ${o.exhaust ?? "once"}`;
+      const order = o.order === "specificity" ? "best match" : (o.order ?? "sequential");
+      return `sequence · ${order} · ${o.exhaust ?? "once"}`;
     }
     case "conditional": return "conditional";
     default: return "group";

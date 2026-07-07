@@ -86,6 +86,9 @@ export interface GroupLevel {
   fallback?: boolean;
   /** For a `choice`: its options, in order (the consolidated options editor). */
   options?: OptionSummary[];
+  /** For a Best-match (`order: "specificity"`) sequence: how many direct children carry a condition.
+   *  Zero means the group degenerates to a plain shuffle (drives the inspector's soft nudge). */
+  conditionedChildren?: number;
   gameData?: GameData;
   /** Author tags (#215) on this group. */
   tags?: string[];
@@ -196,6 +199,16 @@ function groupLevel(node: PMNode, parent: PMNode | null): GroupLevel {
     const options: OptionSummary[] = [];
     node.forEach((child) => { if (child.type.name === "group") options.push(optionSummary(child)); });
     level.options = options;
+  }
+  // Best match degenerates to a plain shuffle with no conditioned children: count them for the nudge.
+  if (level.order === "specificity") {
+    let conditioned = 0;
+    node.forEach((child) => {
+      if (child.type.name !== "snippet" && child.type.name !== "group") return;
+      const cr = rawAttr(child);
+      if (typeof cr.condition === "string" && cr.condition) conditioned++;
+    });
+    level.conditionedChildren = conditioned;
   }
   return level;
 }

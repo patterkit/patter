@@ -54,11 +54,12 @@ describe("insertChunk - `/`-menu presets", () => {
     expect(context(s).zone?.role).toBe("say"); // ...in the prompt's text, ready to type the choice label
   });
 
-  it("Sequence / Cycle / Shuffle carry their order x exhaust", () => {
+  it("Sequence / Cycle / Shuffle / Best match carry their order x exhaust", () => {
     expect(topGroup(create("sequence")).options).toEqual({ order: "sequential", exhaust: "once" });
     expect(topGroup(create("cycle")).options).toEqual({ order: "sequential", exhaust: "repeat" });
     expect(topGroup(create("shuffle")).options).toEqual({ order: "shuffle", exhaust: "repeat" });
-    for (const k of ["sequence", "cycle", "shuffle"] as const) expect(topGroup(create(k)).selector).toBe("sequence");
+    expect(topGroup(create("bestmatch")).options).toEqual({ order: "specificity", exhaust: "repeat" }); // re-pickable default
+    for (const k of ["sequence", "cycle", "shuffle", "bestmatch"] as const) expect(topGroup(create(k)).selector).toBe("sequence");
   });
 
   it("If / Else seeds a branch group with a branch + an else", () => {
