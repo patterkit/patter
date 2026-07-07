@@ -13,6 +13,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-07
+
 ### Added
 - Author **Best match** groups: a new sequence order (`specificity`) that plays the eligible child
   whose condition most specifically fits the current state, falling back to a condition-less filler.
