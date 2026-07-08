@@ -53,10 +53,15 @@ per character in the [Production Information report](/production/tracking-and-re
 
 ## Getting the audio into your game
 
-Your game can play the right take for each line with no folder-search of its own. On **Publish Bundle** (or
-**Production ▸ Update Audio Manifest**), Patterpad writes a small `patteraudio.json` next to your audio
-listing each line's winning file. Ship the audio folder, point a tiny resolver at it, and the runtime
-maps a beat to its clip. → [Audio (runtime)](/play/audio/)
+Patter itself doesn't play audio: your engine and audio tooling do. The durable hook is the line
+**id** from the callout above - plenty of teams tie voice-over straight to that id through their own
+audio system or middleware and skip the rest of this section.
+
+If you'd rather have Patterpad do the file-picking for you, it's an **optional** convenience: on
+**Publish Bundle** (or **Production ▸ Update Audio Manifest**), Patterpad writes a small
+`patteraudio.json` next to your audio listing each line's winning file. Ship the audio folder, point a
+tiny resolver at it, and the runtime maps a beat to its clip (it finds the file; you still play it). →
+[Audio (runtime)](/play/audio/)
 
 ## Playing with audio
 

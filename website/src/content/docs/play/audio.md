@@ -1,15 +1,34 @@
 ---
 title: Audio
-description: Play the right voice-over file for each line at runtime on any Patterplay engine. Patterpad's Audio Folders bakes a patteraudio.json manifest of winning takes; a tiny resolver maps a beat id to its file path, with no folder search shipped and playback left to your engine.
+description: Patter doesn't play audio or dictate your pipeline - it gives every line a stable id you tie voice-over to, however your engine and audio tooling work. Patterpad also ships an optional Audio Folders + resolver convenience (a build-time patteraudio.json manifest that maps a beat id to its winning take) for teams who want batteries included.
 sidebar:
   label: Audio
 ---
 
-If you record voice-over, Patterpad's **[Audio Folders](/production/audio/)** lets you keep
-takes as `<beatId>.wav` (or `.mp3`) files, ranked by recording status (scratch < recorded < final). At runtime your game needs to play the **best available take** for each line, without
-reimplementing that folder-ranking search. Patterplay makes that turnkey.
+**Patter doesn't play audio, and it doesn't impose an audio pipeline** - your engine and your
+audio tooling own that (Wwise, FMOD, engine-native, whatever you already use). What Patter gives
+you is the hook every pipeline needs: **a stable [id](/format/gamedata-and-addressing/#the-two-ids)
+on every line** (the same id that keys [translations](/production/localisation/)). Tie your
+voice-over to that id however suits your project - an addressable, a middleware event, a filename,
+a lookup table - and play it your way.
 
-## How it works
+That id is all most teams need; the runtime hands it to you on every step:
+
+```js
+const step = flow.advance();
+if (step.type === "line") myAudioSystem.playFor(step.id);   // your pipeline, keyed on the id
+```
+
+If you'd rather not wire up your own asset lookup, Patterpad ships an **optional** batteries-included
+path on top of the id, described below. It's a convenience for teams who want it, not a requirement -
+you can ignore everything past here and just key off the id.
+
+## The built-in resolver (optional)
+
+For teams who don't want to build their own lookup, Patterpad's **[Audio Folders](/production/audio/)**
+lets you keep takes as `<beatId>.wav` (or `.mp3`) files, ranked by recording status
+(scratch < recorded < final), and Patterplay resolves the **best available take** for each line
+without you reimplementing that folder-ranking search.
 
 The ranking is resolved **at build time**, not in your game. When you Build (or run **Production ▸
 Update Audio Manifest**), Patterpad writes a small sidecar next to your audio, `patteraudio.json`:

@@ -44,8 +44,9 @@ notes and the local idiom.
   them to your own system; switch language live. → [Localisation](/play/localisation/)
 - **Closed captions**: let players turn off the non-spoken cues inside dialogue; the runtime strips
   them while the line still fires so audio plays. → [Closed captions](/play/closed-captions/)
-- **Audio**: if you record voice-over with Audio Folders, a tiny resolver maps each beat to its winning
-  take (from a build-time manifest), no folder search shipped. → [Audio](/play/audio/)
+- **Audio**: Patter doesn't play audio - every line carries a stable id you tie voice-over to, your
+  way. An optional resolver maps a beat to its winning take if you use Audio Folders; you still play
+  it. → [Audio](/play/audio/)
 - **A live state inspector**: watch and edit a running engine's `@patter` properties while you
   playtest, with type-aware editors and reset-to-default. Every engine ships one: an editor window
   in Unity and Unreal, an in-game panel in Godot, a drop-in DOM panel on the web. Like the debug
