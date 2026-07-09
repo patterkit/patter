@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-09
+
 ### Fixed
 - Publishing a playable HTML page now runs the current runtime. The inlined runtime had drifted
   behind, so an exported page played **Best match** groups as plain sequential; they now play
