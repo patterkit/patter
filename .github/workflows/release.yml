@@ -38,8 +38,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: patter/package-lock.json
-      - name: OIDC-aware npm (trusted publishing needs >= 11.5.1)
-        run: npm install -g npm@latest
+      # Needs >= 11.5.1 for OIDC trusted publishing. Pinned to the 11.x line on purpose:
+      # npm 12.0.0 ships a broken provenance path ("Cannot find module 'sigstore'"),
+      # which aborted every publish once `@latest` rolled over to it - npm/cli#9722.
+      - name: OIDC-aware npm (>= 11.5.1; pin off the broken npm 12.x)
+        run: npm install -g npm@11
       # Pre-seed ~/.npmrc so the changesets action doesn't write its own token line
       # (there is no token); npm's OIDC detection handles auth by itself.
       - run: echo "# auth via npm trusted publishing (OIDC) - no token" > ~/.npmrc
