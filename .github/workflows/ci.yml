@@ -33,6 +33,17 @@ jobs:
         working-directory: patter
       - run: npm run build
         working-directory: patter
+      # `npm run build` regenerates the inlined runtime blob (ops prebuild). If the committed
+      # copy drifted from the current runtime, playable-HTML exports would ship a stale engine
+      # (this is how Best match silently missed the blob once). Fail loudly instead.
+      - name: Generated runtime blob is up to date
+        working-directory: patter
+        run: |
+          if ! git diff --quiet -- packages/ops/src/playable-runtime.ts; then
+            echo "::error::packages/ops/src/playable-runtime.ts is stale - run 'npm run gen-runtime-blob -w @patterkit/ops' and commit the result."
+            git diff -- packages/ops/src/playable-runtime.ts | head -20
+            exit 1
+          fi
 
   changeset-check:
     # A nudge, not a gate: warns on PRs that touch a published package without a changeset.
