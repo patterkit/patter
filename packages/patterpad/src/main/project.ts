@@ -181,7 +181,6 @@ function summarise(p: LoadedProject): OpenedProject {
     root: p.root,
     formatting: p.project.formatting ?? true,
     autosave: p.project.autosave ?? true,
-    autoRebuild: p.project.autoRebuild ?? false,
     voiced: p.project.voiced ?? false,
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
@@ -329,7 +328,7 @@ export function openProject(path: string, preferLanding?: string): OpenedProject
   resetPlaySession();          // and no stale play state from the project we just left
   authoringCache.clear();      // and no parsed shards cached from the previous project
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // drop a pending rebuild for the old project
-  lastBuiltHash = null;        // the Auto-Rebuild dedup must not carry across projects
+  lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
   syncAudioIndex();            // start / stop the Audio Folders watcher for the new project (#206)
   return summarise(loaded);
 }
@@ -1240,7 +1239,7 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
     ensureHydrated(); // the bundle compiles every scene
     const path = resolveBundleOut(loaded);
     const writes: { path: string; content: string }[] = [];
-    let builtHash: string | null = null;
+    let builtHash: string | undefined;
     try {
       // runExport applies the project's localisation mode (embedded: strings inline; ids: none, the game
       // localises from beat IDs; +sourceDebug: source language embedded for debug). One self-contained file.
@@ -1266,8 +1265,8 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
 const AUTO_REBUILD_DEBOUNCE_MS = 1200;
 let autoRebuildTimer: ReturnType<typeof setTimeout> | null = null;
 // The content hash of the last bundle we wrote (manual OR auto). An auto-rebuild that would produce the same
-// bytes is skipped - no redundant write, no VCS churn. Reset when a different project opens.
-let lastBuiltHash: string | null = null;
+// bytes is skipped - no redundant write, no VCS churn. Reset (undefined) when a different project opens.
+let lastBuiltHash: string | undefined;
 
 /** Whether Auto Rebuild is on for the open project (drives the Build-menu checkbox). */
 export function autoRebuildEnabled(): boolean { return loaded?.project.autoRebuild === true; }
@@ -1350,6 +1349,7 @@ export function readSettings(): ProjectSettingsDto | null {
     trackAudioStatus: p.trackAudioStatus ?? false,
     formatting: p.formatting ?? true,
     autosave: p.autosave ?? true,
+    autoRebuild: p.autoRebuild ?? false,
     localeDefault: p.locales.default,
     locales: p.locales.all,
     gameDataFields: p.gameDataFields ?? {},
