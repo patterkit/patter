@@ -89,7 +89,7 @@ function refreshMenu(): void {
   // The "Live Link" checkbox is ticked while the localhost link is up (listening / connected).
   const dbg = debugServer?.status().state;
   const debugActive = dbg === "listening" || dbg === "connected";
-  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked());
+  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled());
 }
 
 // Ask the editor window to flush its open scene to disk, and resolve once it confirms (or after a short
@@ -676,6 +676,7 @@ function registerIpc(): void {
     return r;
   });
   ipcMain.handle("project:audioManifest", () => project.writeAudioManifest());
+  ipcMain.handle("project:toggleAutoRebuild", async () => { const on = await project.toggleAutoRebuild(); refreshMenu(); return on; }); // keep the Build-menu checkbox in sync
   ipcMain.handle("project:exportVoiceScript", (_e, everything: boolean) => exportVoiceScript(everything));
   ipcMain.handle("project:exportPlayableHtml", () => exportPlayableHtml());
   ipcMain.handle("project:exportWeb", () => exportWeb());

@@ -51,6 +51,7 @@ const api: PatterApi = {
   proposeCoverageDrivers: () => ipcRenderer.invoke("project:proposeCoverageDrivers"),
   exportReport: () => ipcRenderer.invoke("project:exportReport"),
   buildBundle: () => ipcRenderer.invoke("project:build"),
+  toggleAutoRebuild: () => ipcRenderer.invoke("project:toggleAutoRebuild"),
   buildAudioManifest: () => ipcRenderer.invoke("project:audioManifest"),
   exportVoiceScript: (everything) => ipcRenderer.invoke("project:exportVoiceScript", everything),
   exportPlayableHtml: () => ipcRenderer.invoke("project:exportPlayableHtml"),

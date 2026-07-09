@@ -181,6 +181,7 @@ function summarise(p: LoadedProject): OpenedProject {
     root: p.root,
     formatting: p.project.formatting ?? true,
     autosave: p.project.autosave ?? true,
+    autoRebuild: p.project.autoRebuild ?? false,
     voiced: p.project.voiced ?? false,
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
@@ -212,13 +213,14 @@ function enqueueWrite<T>(op: () => Promise<T>): Promise<T> {
 async function commitWrites(writes: { path: string; content: string }[]): Promise<SaveResult> {
   for (const w of writes) authoringCache.delete(w.path); // a shard we just wrote must be re-read, not served stale
   vcPathsMemo = null; // a write may have CREATED a shard (first loc / authoring write) - re-collect paths next poll
+  const ok = (): SaveResult => { maybeScheduleAutoRebuild(writes); return { ok: true }; };
   try {
     const batch = await writeTextFilesAsync(writes.map((w) => ({ filePath: w.path, content: w.content })));
-    if (batch.success) return { ok: true };
+    if (batch.success) return ok();
     const failed = batch.results.filter((r) => !r.success).map((r) => r.message ?? r.status).join("; ");
     return { ok: false, error: failed || "write failed" };
   } catch {
-    try { applyWrites(writes); return { ok: true }; } // VC layer unavailable -> direct write
+    try { applyWrites(writes); return ok(); } // VC layer unavailable -> direct write
     catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
   }
 }
@@ -326,6 +328,8 @@ export function openProject(path: string, preferLanding?: string): OpenedProject
   resetRemoteStatusThrottle(); // a new project's lock/out-of-date state must be re-queried, not inherited
   resetPlaySession();          // and no stale play state from the project we just left
   authoringCache.clear();      // and no parsed shards cached from the previous project
+  if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // drop a pending rebuild for the old project
+  lastBuiltHash = null;        // the Auto-Rebuild dedup must not carry across projects
   syncAudioIndex();            // start / stop the Audio Folders watcher for the new project (#206)
   return summarise(loaded);
 }
@@ -1236,10 +1240,12 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
     ensureHydrated(); // the bundle compiles every scene
     const path = resolveBundleOut(loaded);
     const writes: { path: string; content: string }[] = [];
+    let builtHash: string | null = null;
     try {
       // runExport applies the project's localisation mode (embedded: strings inline; ids: none, the game
       // localises from beat IDs; +sourceDebug: source language embedded for debug). One self-contained file.
       const bundle = runExport(loaded);
+      builtHash = bundle.content.hash;
       writes.push({ path, content: canonicalStringify(bundle, { trailingComma: false }) });
     } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     // Audio Folders (#206): also emit the sidecar `patteraudio.json` next to the audio, so a game can resolve
@@ -1251,7 +1257,67 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
       writes.push({ path: join(dir, AUDIO_MANIFEST_FILE), content: audioManifest(audioSnapshot, loaded!.root, p.audioRoot) });
     }
     const res = await commitWrites(writes);
+    if (res.ok) lastBuiltHash = builtHash; // prime the Auto-Rebuild dedup: no redundant auto-build after a manual one
     return res.ok ? { ok: true, path } : { ok: false, error: res.error };
+  });
+}
+
+// -- Auto Rebuild (opt-in): keep the on-disk .patterc current after edits, without a manual Publish. -----
+const AUTO_REBUILD_DEBOUNCE_MS = 1200;
+let autoRebuildTimer: ReturnType<typeof setTimeout> | null = null;
+// The content hash of the last bundle we wrote (manual OR auto). An auto-rebuild that would produce the same
+// bytes is skipped - no redundant write, no VCS churn. Reset when a different project opens.
+let lastBuiltHash: string | null = null;
+
+/** Whether Auto Rebuild is on for the open project (drives the Build-menu checkbox). */
+export function autoRebuildEnabled(): boolean { return loaded?.project.autoRebuild === true; }
+
+/** Flip ProjectFile.autoRebuild, persist it, and return the new state. The Build-menu checkbox and the
+ *  Project Settings ▸ General toggle share this; turning it on kicks an immediate rebuild. */
+export function toggleAutoRebuild(): Promise<boolean> {
+  return enqueueWrite(async () => {
+    if (!loaded) return false;
+    const on = loaded.project.autoRebuild !== true;
+    loaded.project = { ...loaded.project, autoRebuild: on ? true : undefined };
+    await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(loaded.project) }]);
+    if (on) scheduleAutoRebuild();
+    return on;
+  });
+}
+
+/** Called after every write (from commitWrites): when Auto Rebuild is on and the write was NOT the build's
+ *  own output, schedule a debounced rebuild. The bundle-path guard is what stops a rebuild from looping. */
+function maybeScheduleAutoRebuild(writes: { path: string; content: string }[]): void {
+  if (!loaded?.project.autoRebuild) return;
+  const out = resolve(resolveBundleOut(loaded));
+  if (writes.some((w) => resolve(w.path) === out)) return; // the build's own write - don't loop
+  scheduleAutoRebuild();
+}
+
+function scheduleAutoRebuild(): void {
+  if (autoRebuildTimer) clearTimeout(autoRebuildTimer);
+  autoRebuildTimer = setTimeout(() => { autoRebuildTimer = null; void runAutoRebuild(); }, AUTO_REBUILD_DEBOUNCE_MS);
+}
+
+/** The debounced rebuild: compile the in-memory project and write the .patterc (+ audio sidecar) ONLY when
+ *  the compiled bundle actually changed (deduped by content hash). A mid-edit invalid project silently keeps
+ *  the last good build. Serialised with saves via enqueueWrite so it always compiles the latest bytes. */
+async function runAutoRebuild(): Promise<void> {
+  await enqueueWrite(async () => {
+    if (!loaded?.project.autoRebuild) return;
+    ensureHydrated();
+    let bundle: ReturnType<typeof runExport>;
+    try { bundle = runExport(loaded); }
+    catch { return; } // temporarily invalid (half-written condition, dangling jump) - keep the last good build
+    if (bundle.content.hash === lastBuiltHash) return; // deduped: nothing changed
+    const writes: { path: string; content: string }[] = [{ path: resolveBundleOut(loaded), content: canonicalStringify(bundle, { trailingComma: false }) }];
+    const p = loaded.project;
+    if (audioActive() && p.audioRoot && Object.keys(audioSnapshot).length) {
+      const dir = resolve(loaded.root, p.audioRoot);
+      writes.push({ path: join(dir, AUDIO_MANIFEST_FILE), content: audioManifest(audioSnapshot, loaded.root, p.audioRoot) });
+    }
+    const res = await commitWrites(writes);
+    if (res.ok) lastBuiltHash = bundle.content.hash;
   });
 }
 
@@ -1364,6 +1430,8 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       trackAudioStatus: s.trackAudioStatus ? true : undefined,
       formatting: s.formatting,
       autosave: s.autosave,
+      // Auto Rebuild: default OFF, so store only when ticked ON (keeps a clean file).
+      autoRebuild: s.autoRebuild ? true : undefined,
       // The locale list is editable (Language tab); keep `default` a member of `all`.
       locales: { default: s.locales.includes(s.localeDefault) ? s.localeDefault : (s.locales[0] ?? "en"), all: s.locales.length ? s.locales : [s.localeDefault] },
       // Drop empty collections entirely, so a clean project file stays clean.

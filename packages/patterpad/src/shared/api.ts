@@ -132,6 +132,9 @@ export interface ProjectSettingsDto {
   formatting: boolean;
   /** Autosave: periodically save the edited scene (ProjectFile.autosave, default on). */
   autosave: boolean;
+  /** Auto Rebuild (ProjectFile.autoRebuild, default off): recompile the .patterc after edits, debounced +
+   *  deduped, so the on-disk bundle stays current without a manual Publish Bundle. Resolved value. */
+  autoRebuild: boolean;
   /** Build output: where Build Bundle writes the compiled `.patterc` (ProjectFile.export.bundle, relative
    *  to the project root or absolute). Always populated for display - the sibling default when unpinned. */
   buildBundle: string;
@@ -653,6 +656,9 @@ export interface PatterApi {
   /** Build Bundle (Build menu): compile the project to its runtime `.patterc` and write it to the output
    *  path configured in Project Settings ▸ Build (else the dist/ default). Returns where it landed. */
   buildBundle(): Promise<ExportResult>;
+  /** Toggle Auto Rebuild (Build menu checkbox): flip ProjectFile.autoRebuild, persist it, and return the
+   *  new state. Mirrors the Project Settings ▸ General toggle. */
+  toggleAutoRebuild(): Promise<boolean>;
   /** Update Audio Manifest (Production menu, #206): (re)write the sidecar `patteraudio.json` from the live
    *  Audio Folders index, without a full bundle rebuild. Returns where it landed. */
   buildAudioManifest(): Promise<ExportResult>;

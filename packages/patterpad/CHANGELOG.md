@@ -13,6 +13,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **Auto Rebuild** (opt-in): recompile the `.patterc` bundle a moment after you stop editing, so the
+  on-disk build stays current without pressing Publish Bundle. Toggle it from the **Publish** menu
+  checkbox or **Project Settings ▸ General**. It only writes when the compiled bundle actually
+  changed, and silently keeps the last good build if the project is momentarily invalid mid-edit.
+  Off by default (best left off if you commit the bundle to a lock-based VCS).
+
 ## [0.2.0] - 2026-07-07
 
 ### Added

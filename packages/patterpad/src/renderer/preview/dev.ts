@@ -195,6 +195,7 @@ const stub = {
   ]),
   exportReport: async () => ({ ok: true, path: "The Tavern - production.xlsx" }),
   buildBundle: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/dist/the_tavern.patterc" }),
+  toggleAutoRebuild: async () => true,
   buildAudioManifest: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/audio/patteraudio.json" }),
   exportVoiceScript: async (everything: boolean) => ({ ok: true, path: `The Tavern - voice script${everything ? " (all)" : ""}.xlsx` }),
   exportPlayableHtml: async () => ({ ok: true, path: "The Tavern.html" }),
@@ -232,7 +233,7 @@ const stub = {
   openCoverageWindow: async () => undefined,
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,
-  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, autosave: true, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
+  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, autosave: true, autoRebuild: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
     gameDataFields: {
       scene: [{ name: "music", type: "text", default: "tavern-loop", purpose: "Background music cue id for this scene." }],
       line: [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"], purpose: "Facial-animation mood for this line." }],

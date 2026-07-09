@@ -115,6 +115,7 @@ const setVcsSel = $<HTMLSelectElement>("set-vcs");
 const setVoicedInput = $<HTMLInputElement>("set-voiced");
 const setFormattingInput = $<HTMLInputElement>("set-formatting");
 const setAutosaveInput = $<HTMLInputElement>("set-autosave");
+const setAutoRebuildInput = $<HTMLInputElement>("set-autorebuild");
 const setCcOpenInput = $<HTMLInputElement>("set-cc-open");
 const setCcCloseInput = $<HTMLInputElement>("set-cc-close");
 const setCcCharacterInput = $<HTMLInputElement>("set-cc-character");
@@ -1980,6 +1981,7 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   syncAudioSettingsTab(); // gate the Audio tab on the project's Voiced state (#206)
   setFormattingInput.checked = s.formatting;
   setAutosaveInput.checked = s.autosave;
+  setAutoRebuildInput.checked = s.autoRebuild;
   setCcOpenInput.value = s.closedCaptions.open;
   setCcCloseInput.value = s.closedCaptions.close;
   setCcCharacterInput.value = s.closedCaptions.character;
@@ -2047,6 +2049,7 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
     void saveProjectSettings({
       name, vcs: setVcsSel.value as VcsKind, ...(setStartSel.value ? { start: { scene: setStartSel.value } } : {}),
       voiced: setVoicedInput.checked, formatting: setFormattingInput.checked, autosave: setAutosaveInput.checked,
+      autoRebuild: setAutoRebuildInput.checked,
       closedCaptions: { open: setCcOpenInput.value, close: setCcCloseInput.value, character: setCcCharacterInput.value.trim() },
       buildBundle: setBuildInput.value.trim(), buildLocalisation: setBuildLocalesSel.value as "embedded" | "ids", buildSourceDebug: setBuildSourceDebug.checked,
       ...langs.value(), gameDataFields: gd.value(),
@@ -2272,6 +2275,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "project-settings") void openProjectSettings();
   else if (cmd === "user-info") void window.patter.getIdentity().then((id) => showIdentityDialog(id, "edit"));
   else if (cmd === "build-bundle") void buildBundle();
+  else if (cmd === "toggle-auto-rebuild") void window.patter.toggleAutoRebuild();
   else if (cmd === "publish-web") void exportWeb();
   else if (cmd === "audio-manifest") void buildAudioManifest();
   else if (cmd === "production-report") void openReport();

@@ -20,7 +20,7 @@ const DOC_CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voi
  *  mirrors the Dictionary settings tab). */
 export interface SpellingMenu { hasProject: boolean; enabled: boolean; language: string; dictionaries: Array<{ id: string; label: string }> }
 
-export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false): void {
+export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false, autoRebuild = false): void {
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
 
@@ -210,6 +210,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Publish Readable Script…", click: () => send("export-script") },
         { type: "separator" },
         { label: "Publish Bundle", accelerator: "Shift+CmdOrCtrl+B", click: () => send("build-bundle") },
+        // Auto Rebuild: recompile the bundle after edits (debounced + deduped). Mirrors the same project
+        // setting as the Project Settings ▸ General toggle.
+        { label: "Auto Rebuild", type: "checkbox", checked: autoRebuild, click: () => send("toggle-auto-rebuild") },
       ],
     },
     {

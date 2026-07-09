@@ -615,6 +615,12 @@ export interface ProjectFile {
   /** Autosave: periodically persist the edited scene without an explicit Save. Default ON (omitted ===
    *  enabled); set `false` to require manual saves. */
   autosave?: boolean;
+  /** Auto Rebuild: recompile the `.patterc` bundle automatically after edits (debounced), so the on-disk
+   *  build stays current without a manual Publish Bundle. Editor-only; never reaches the bundle. Default OFF
+   *  (omitted === off) - opt-in, since it writes the bundle on every real change (poor fit if you commit the
+   *  bundle to a lock-based VCS). The rebuild is deduped (skipped when the compiled bundle is unchanged) and
+   *  a mid-edit invalid project silently keeps the last good build. */
+  autoRebuild?: boolean;
   /** Closed captions (#214): the delimiter pair that wraps non-spoken caption cues inside DIALOGUE
    *  lines (e.g. `(sigh)` in `Oh dear. (sigh) What now?`). A game can turn captions off at runtime
    *  (`setClosedCaptions(false)`), and the runtime then strips every `open…close` span - delimiters and

@@ -16,7 +16,8 @@ sidebar:
 
 - **General**: project name, the **Start** scene (where the story begins, used by
   **Play ▸ Play from Start** and the coverage test), your version-control system, the
-  **voiced** flag, the **formatting** (bold/italic) toggle, **autosave**, the **Build
+  **voiced** flag, the **formatting** (bold/italic) toggle, **autosave**, **Auto Rebuild**
+  (recompile the bundle as you edit, see [below](#building-a-bundle)), the **Build
   output** path, and how strings are handled (**localisation mode**: Embedded or
   IDs-only, with a source-debug option).
 - **Language**: the languages your project supports and which one is the source.
@@ -76,6 +77,23 @@ loads (a toast confirms where it landed). This is what you ship to a
 
 The same build runs from the terminal with `patter export`, so you can compile it in a script or a
 CI pipeline without opening the app. See [Automation: the CLI](/cli/).
+
+### Auto Rebuild
+
+Turn on **Auto Rebuild** (the **Publish** menu's checkbox, or **Project Settings ▸ General**) and
+Patterpad recompiles the bundle for you a moment after you stop editing, so the `.patterc` on disk
+stays current without you pressing **Publish Bundle**. Handy when your game reads the bundle straight
+from disk and you want to see changes without a manual build.
+
+It's careful about it: the rebuild only writes when the compiled bundle actually **changed** (so it
+won't churn the file on cosmetic edits), and if the project is momentarily invalid mid-edit (a
+half-written condition, say) it quietly **keeps the last good build** rather than failing. The
+existing [stale-bundle check](/setup/building-and-shipping/) still flags a bundle that has fallen
+behind.
+
+It's **off by default**, and best left off if you **commit the `.patterc`** to a lock-based version
+control system (Perforce or Plastic): rebuilding on every change would keep checking the file out.
+With git (or none), and the default gitignored `patter-dist/` output, it's free of side effects.
 
 ## Spell-check
 
