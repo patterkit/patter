@@ -1,5 +1,11 @@
 # @patterkit/model
 
+## 0.1.2
+
+### Patch Changes
+
+- 65f6ccb: Add the `autoRebuild` field to `ProjectFile` (Patterpad's opt-in auto-recompile setting). Editor-only, never reaches the bundle; this just lets the published model types describe it.
+
 ## 0.1.1
 
 ### Patch Changes
