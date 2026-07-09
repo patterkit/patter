@@ -1,17 +1,15 @@
 # Changelog
 
-## 0.1.2
-
-### Patch Changes
-
-- Updated dependencies [34bdd67]
-  - @patterkit/ops@0.1.1
-
 All notable changes to **Patterpad**, the Patter desktop editor, are documented here.
 Patterpad is released with `npm run release:pad -- X.Y.Z` (a bare `vX.Y.Z` tag; its own
 pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
+
+### Fixed
+- Publishing a playable HTML page now runs the current runtime. The inlined runtime had drifted
+  behind, so an exported page played **Best match** groups as plain sequential; they now play
+  correctly (matching the editor and all four engines).
 
 ## [0.3.1] - 2026-07-09
 
