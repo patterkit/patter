@@ -16,15 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout patter
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: patter
       - name: Checkout @wildwinter/expr (sibling source, aliased by vitest)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: wildwinter/expr
           path: expr
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

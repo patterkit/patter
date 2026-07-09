@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout patter
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: patter
       # tsconfig + vitest alias @wildwinter/expr to a sibling ../expr checkout (dev tests
       # against its source, not the published version). Mirror that here so CI sees the same.
       - name: Checkout @wildwinter/expr (sibling source)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: wildwinter/expr
           path: expr
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -39,10 +39,10 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
