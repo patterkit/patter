@@ -13,6 +13,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-09
+
 ### Added
 - **Auto Rebuild** (opt-in): recompile the `.patterc` bundle a moment after you stop editing, so the
   on-disk build stays current without pressing Publish Bundle. Toggle it from the **Publish** menu
