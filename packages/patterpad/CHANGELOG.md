@@ -13,6 +13,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-09
+
 ### Fixed
 - The **Auto Rebuild** toggle in Project Settings ▸ General now reflects the saved value (in 0.3.0
   it always showed off, and saving the dialog could switch Auto Rebuild off). The Build-menu
