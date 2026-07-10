@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-10
+
 ### Added
 - **Grammatical gender** on each cast member (Project Settings ▸ Cast, behind the row's ▸ expander):
   Male / Female / Neuter / Not specified. It is carried into every localisation export so a gendered
