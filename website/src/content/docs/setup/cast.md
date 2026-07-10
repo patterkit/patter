@@ -1,6 +1,6 @@
 ---
 title: Cast
-description: "Set up a Patter project's character roster: script names, translatable display names, actors and notes, and the cue colours writers see everywhere."
+description: "Set up a Patter project's character roster: script names, translatable display names, grammatical gender, actors and notes, and the cue colours writers see everywhere."
 sidebar:
   label: Cast
 ---
@@ -11,15 +11,27 @@ The cast is the project's character roster, in **Project Settings ▸ Cast**. Ea
   identity;
 - an optional **display name**: the name the player sees, which can be **translated** (so
   `BARKEEP` shows as "The Barkeep" in English and "Le tavernier" in French);
+- a **grammatical gender** (Male / Female / Neuter / Not specified), sent to translators;
 - optional **notes** and an **actor**, for production;
 - a **cue colour**, drawn from the name rather than picked, so the same character is the same
   colour everywhere: the editor and the play window alike.
+
+Gender, notes and actor sit behind the ▸ expander on each row.
 
 You don't have to fill the cast in first: when a writer types a new cue, the character **joins
 the roster automatically**. Set it up ahead of time only when you want display names, notes, or
 actors ready before writing starts. The script name is what runs through the story; the display
 name is presentation, chosen per language.
 
-Two things here feed the rest of production: display names are translated as part of
-[Languages & translation](/setup/languages/), and the **actor** you assign feeds the
-[voice-recording pipeline](/production/audio/).
+Three things here feed the rest of production: display names are translated as part of
+[Languages & translation](/setup/languages/), the **grammatical gender** travels with every
+localisation export so a gendered language can inflect that character's lines (see
+[Localisation](/production/localisation/#who-is-speaking-grammatical-gender)), and the **actor**
+you assign feeds the [voice-recording pipeline](/production/audio/).
+
+## What reaches the game
+
+Only the **script name** and the **display name** are compiled into the published `.patterc`
+bundle. Grammatical gender, notes, and the actor's name are project-side context for translators
+and the production team; they are deliberately left out, so a game you ship never contains a real
+person's name or a writer's private notes about a character.

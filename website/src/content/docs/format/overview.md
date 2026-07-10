@@ -44,8 +44,13 @@ repairs it).
 `patter export` (or **Publish Bundle** in Patterpad) compiles the whole project into a
 single **`.patterc`** file: plain UTF-8 JSON, never a zip. It carries exactly what a
 runtime needs and nothing more: the scene structure, compiled conditions and effects,
-the assembled locale strings (or none, in IDs-only mode), the cast, the Game Data
-schema, resolved addresses, and a content hash.
+the assembled locale strings (or none, in IDs-only mode), the cast (player-facing names
+only), the Game Data schema, resolved addresses, and a content hash.
+
+Authoring context is deliberately left behind. A [cast member's](/setup/cast/) notes,
+grammatical gender, and the **voice actor's name** belong to your team, your translators, and
+your recording pipeline; only the script name and display name are compiled in. A game you ship
+therefore carries no real person's name, and no private notes about a character.
 
 The bundle is what you ship, and what every [Patterplay runtime](/play/overview/)
 plays. By default it's committed to your repo and regenerated rather than merged;

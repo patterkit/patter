@@ -400,11 +400,19 @@ export interface CoverageDriver {
   values: ScalarValue[];
 }
 
+/** A character's grammatical gender, for localisation. Translators need it to inflect the speaker's own
+ *  lines in gendered languages (adjectives, participles, pronouns), which the source text alone often
+ *  cannot tell them. Absent means "not specified". Authoring-only: it never reaches the runtime bundle,
+ *  but it IS carried into the localisation handoff formats as translator context (spec §14). */
+export type GrammaticalGender = "male" | "female" | "neuter";
+
 export interface CastMember {
   /** Canonical speaker name (matched by a beat's `character`); language-neutral key. */
   name: string;
   /** Localised player-facing name - a localisation id (project-level strings). */
   displayName?: string;
+  /** Grammatical gender for translators (see `GrammaticalGender`); absent = not specified. */
+  gender?: GrammaticalGender;
   /** Free-text production notes about the character (casting, voice, intent) - authoring only. */
   notes?: string;
   /** The voice actor cast for this character, if known - surfaced in the VO script export (spec §16).
@@ -412,6 +420,13 @@ export interface CastMember {
   actor?: string;
   gameData?: GameData;
 }
+
+/** The cast as it reaches a compiled bundle: the player-facing fields only. `notes`, `actor` and
+ *  `gender` are authoring / production / translation context, and the compiler drops them, so a shipped
+ *  game never carries a real person's name or a writer's private notes. The compiler copies the shipping
+ *  fields across explicitly (an allow-list), which is what actually keeps a new authoring field out of
+ *  the bundle; this type states the resulting contract for anyone reading a bundle. */
+export type BundleCastMember = Omit<CastMember, "notes" | "actor" | "gender">;
 
 /** A node TYPE that can carry author-defined gameData fields (the gameData schema, project-level).
  *  Beat kinds map straight through: dialogue = `line`, narration = `text`, game event = `gameEvent`. */
@@ -897,7 +912,8 @@ export interface Bundle {
   content: { project: string; version?: string; hash?: string; structureHash?: string };
   voiced: boolean;                 // project-wide VO mode (spec §16)
   locales: { default: string; included: string[] };
-  cast?: CastMember[];
+  /** Player-facing cast only: the compiler strips notes / actor / gender (see `BundleCastMember`). */
+  cast?: BundleCastMember[];
   properties?: PropertyDecl[];
   /** Host / world scope declarations, baked from the project so the runtime can self-back a declared
    *  scope (`@world`, ...) when no host resolver claims its token. Absent = no host scopes. */

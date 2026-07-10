@@ -76,6 +76,21 @@ describe("exportBundle", () => {
   it("assembles the selected locales' strings", () => {
     expect(bundle.strings.en!.L_1).toBe("Hello.");
   });
+
+  it("strips the cast's authoring-only fields (notes, actor, grammatical gender) from the bundle", () => {
+    const authored = project({ cast: [{ name: "BARKEEP", displayName: "Barkeep", gender: "male", notes: "gruff, ex-soldier", actor: "Jane Doe" }] });
+    const b = exportBundle({ project: authored, scenes: [sceneWith("@hp > 0")], locales: [en] });
+    const member = b.cast![0]!;
+    // Notes are production chatter, gender is translator context (it rides the localisation formats),
+    // and `actor` is a real person's name - a shipped game must not carry any of them. Only the
+    // player-facing fields survive.
+    expect(member).toEqual({ name: "BARKEEP", displayName: "Barkeep" });
+    expect(member).not.toHaveProperty("notes");
+    expect(member).not.toHaveProperty("gender");
+    expect(member).not.toHaveProperty("actor");   // the VO script export is where the actor belongs
+    // Nothing anywhere in the serialised bundle names the actor (not in cast, not in gameData).
+    expect(JSON.stringify(b)).not.toContain("Jane Doe");
+  });
 });
 
 describe("author tags bake into the bundle (#215)", () => {

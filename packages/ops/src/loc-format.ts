@@ -61,6 +61,9 @@ export function catalogToPo(catalog: LocCatalog): string {
     if (e.context?.character || e.context?.kind) {
       out.push(`#. [${[e.context.kind, e.context.character].filter(Boolean).join(" ")}]`);
     }
+    // The speaker's grammatical gender, on its own extracted-comment line so a translator (or a CAT tool
+    // reading `#.`) can spot it without parsing the bracketed context.
+    if (e.context?.gender) out.push(`#. Gender: ${e.context.gender}`);
     out.push(`#: ${e.scene}`);              // the machine anchor: which scene this id belongs to
     if (e.stale) out.push("#, fuzzy");
     out.push(poField("msgctxt", e.id), poField("msgid", e.source), poField("msgstr", e.translation), "");

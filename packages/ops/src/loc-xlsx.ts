@@ -1,17 +1,20 @@
 // ---------------------------------------------------------------------------
 // The Excel localisation format (spec §14): one sheet per scene (+ an `@project`
-// sheet for display names), columns ID / Source / Translation / Comments / Status.
-// A view of the LocCatalog, like loc-format.ts's JSON/PO. exceljs is lazy-loaded
-// (heavy; only this path needs it), mirroring report-xlsx.ts.
+// sheet for display names), columns ID / Source / Translation / Comments / Status
+// / Gender. A view of the LocCatalog, like loc-format.ts's JSON/PO. exceljs is
+// lazy-loaded (heavy; only this path needs it), mirroring report-xlsx.ts.
 //
 // Round-trips: the sheet name carries the scene; Status "stale" carries the
 // staleness flag. Source / Comments are read back for completeness but applyLoc
-// only consumes id + scene + translation + stale.
+// only consumes id + scene + translation + stale. Gender is export-only translator
+// context (regenerated from the cast each export), so the reader ignores it - which
+// is also why it is APPENDED: the reader indexes columns 1-5 positionally, so a
+// sheet exported by an older Patterpad still imports unchanged.
 // ---------------------------------------------------------------------------
 
 import type { LocCatalog, LocEntry } from "./localisation.js";
 
-const HEADERS = ["ID", "Source", "Translation", "Comments", "Status"] as const;
+const HEADERS = ["ID", "Source", "Translation", "Comments", "Status", "Gender"] as const;
 /** exceljs forbids : \ / ? * [ ] in sheet names and caps them at 31 chars. */
 const sheetName = (scene: string): string => scene.replace(/[:\\/?*[\]]/g, "-").slice(0, 31);
 
@@ -33,11 +36,13 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
       { header: "Translation", key: "translation", width: 40 },
       { header: "Comments", key: "comments", width: 30 },
       { header: "Status", key: "status", width: 10 },
+      { header: "Gender", key: "gender", width: 12 },
     ];
     ws.getRow(1).font = { bold: true };
     for (const e of entries) {
       ws.addRow({ id: e.id, source: e.source, translation: e.translation,
-        comments: e.comments.join("\n"), status: e.stale ? "stale" : (e.translation ? "translated" : "") });
+        comments: e.comments.join("\n"), status: e.stale ? "stale" : (e.translation ? "translated" : ""),
+        gender: e.context?.gender ?? "" });
     }
   }
   return Buffer.from(await wb.xlsx.writeBuffer());

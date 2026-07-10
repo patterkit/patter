@@ -155,14 +155,47 @@ function bootState(open: OpenResult | null): BootState {
  *  during cold launch). boot() consumes it in place of the last project. */
 let pendingOpenPath: string | null = null;
 
+/** A `--at <where>` launch location from the command line, captured alongside the path. boot() /
+ *  openInWindow consume it to land on the node it names instead of where the author last left off. */
+let pendingOpenAt: string | null = null;
+
+/** Aim a freshly-opened project at a launch location. `showProject` already lands on `lastScene` and
+ *  reveals `lastCaret`, so a resolved location simply overrides those two: no new renderer channel, and
+ *  no race against the scene mounting. A scene target opens that scene with the caret at its top; a
+ *  block / group / beat target also takes the caret. An unresolvable location is reported on stderr and
+ *  ignored - the project still opens, exactly where it otherwise would have. */
+function withLaunchLocation(r: OpenResult, query: string): OpenResult {
+  const hit = project.resolveLaunchLocation(query);
+  if (!hit) { console.error(`--at: nothing in this project matches '${query}'`); return r; }
+  const out: OpenResult = { project: r.project, lastScene: hit.sceneId };
+  if (hit.kind !== "scene") out.lastCaret = hit.id;
+  return out;
+}
+
+/** Open a project, honouring a `--at` location when one rode in on the command line. */
+function openAt(path: string, at: string | null): OpenResult {
+  const r = openAndRecord(path);
+  return at ? withLaunchLocation(r, at) : r;
+}
+
+/** A bare `patterpad --at <where>` while we're already running: send the open project to that location
+ *  down the same go-to-anything channel the search window uses (loads its scene, reveals the node). */
+function navigateInWindow(query: string): void {
+  if (!win) return;
+  const hit = project.resolveLaunchLocation(query);
+  if (!hit) { console.error(`--at: nothing in this project matches '${query}'`); return; }
+  win.webContents.send("search:navigate", hit);
+}
+
 /** Open an OS-provided `.patter` path (Finder double-click / `open` command) in the running window: it's
  *  a path the user just chose, so record it (it joins recents + becomes "known") and hand it to the
  *  renderer to load + render. Bad packages are ignored so a stray file can't wedge the open project. */
-function openInWindow(path: string): void {
-  if (!win) { pendingOpenPath = path; return; }
+function openInWindow(path: string, at: string | null = null): void {
+  // Never clear a location already captured at cold launch: an OS open-file carries a path but no `--at`.
+  if (!win) { pendingOpenPath = path; if (at) pendingOpenAt = at; return; }
   if (/\.patterpack$/i.test(path)) { void unpackFromLaunch(path); return; } // a pack unpacks (with a destination prompt), it isn't opened in place
   try {
-    const r = openAndRecord(path);
+    const r = openAt(path, at);
     win.webContents.send("project:open", r);
     if (win.isMinimized()) win.restore();
     win.focus();
@@ -172,18 +205,20 @@ function openInWindow(path: string): void {
 /** Launch: open a Finder-passed project if any, else restore the last project, else a clean welcome. */
 function boot(): BootState {
   const opened = pendingOpenPath; pendingOpenPath = null;
+  const at = pendingOpenAt; pendingOpenAt = null;
   if (opened && existsSync(opened)) {
     // A double-clicked `.patterpack` can't stand in as the boot project: it must be unpacked to a NEW folder
     // via a destination prompt. Defer it to run once the window's up, and fall through to last / welcome.
-    if (/\.patterpack$/i.test(opened)) setImmediate(() => openInWindow(opened));
+    if (/\.patterpack$/i.test(opened)) setImmediate(() => openInWindow(opened, at));
     else {
-      try { return bootState(openAndRecord(opened)); }
+      try { return bootState(openAt(opened, at)); }
       catch { /* bad package -> fall through to last/welcome */ }
     }
   }
   const last = store.read().lastProject;
   if (last && existsSync(last)) {
-    try { return bootState(openAndRecord(last)); }
+    // A bare `patterpad --at <where>` (no path) reopens the last project straight at that location.
+    try { return bootState(openAt(last, at)); }
     catch { store.forget(last); } // moved / deleted / unreadable -> drop it, show welcome
   }
   return bootState(null);
@@ -892,9 +927,29 @@ function createWindow(): void {
 // new folder (openInWindow / boot branch on it), never opened in place.
 const PATTER_LAUNCH_EXTS = [".patter", ".patterproj", ".patterflow", ".patterloc", ".patterx", ".patterc", ".patterpack"];
 function launchPathFromArgv(argv: string[]): string | null {
-  for (const a of argv.slice(1)) {              // argv[0] is the executable itself
-    if (!a || a.startsWith("-")) continue;       // skip electron / chromium switches
+  const args = argv.slice(1);                    // argv[0] is the executable itself
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (!a) continue;
+    if (a === "--at") { i++; continue; }          // the token after `--at` is a location, never a path
+    if (a.startsWith("-")) continue;              // skip electron / chromium switches (and `--at=…`)
     if (PATTER_LAUNCH_EXTS.some((e) => a.toLowerCase().endsWith(e)) && existsSync(a)) return a;
+  }
+  return null;
+}
+
+/** `patterpad <project> --at <where>` (or `--at=<where>`): open straight at a location instead of where
+ *  the author last left off. `<where>` is a beat id, or a scene / block Game ID or title - the same query
+ *  the `patter resolve` CLI takes, so an id from a locale table, an audio filename, or a runtime log
+ *  pastes straight in. With no path it re-opens the last project at that location. */
+function launchLocationFromArgv(argv: string[]): string | null {
+  const args = argv.slice(1);
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (!a) continue;
+    if (a === "--at") return args[i + 1]?.trim() || null;
+    const inline = /^--at=(.*)$/.exec(a);
+    if (inline) return inline[1]?.trim() || null;
   }
   return null;
 }
@@ -912,11 +967,17 @@ if (!app.requestSingleInstanceLock()) {
   // Windows / Linux cold launch via a file association: the path rides in OUR argv. (macOS uses open-file,
   // which can fire before whenReady - so both feed the same pendingOpenPath that boot() consumes.)
   pendingOpenPath = launchPathFromArgv(process.argv);
+  pendingOpenAt = launchLocationFromArgv(process.argv); // `--at <where>`: land on that node, not the last caret
 
   app.on("second-instance", (_event, argv) => {
     const p = launchPathFromArgv(argv);
-    if (p) openInWindow(p);                      // a file double-clicked while we're running
-    else if (win) { if (win.isMinimized()) win.restore(); win.focus(); } // bare re-launch: just surface us
+    const at = launchLocationFromArgv(argv);
+    if (p) openInWindow(p, at);                  // a file double-clicked (or `patterpad proj --at x`) while we're running
+    else if (win) {
+      if (at) navigateInWindow(at);              // bare `patterpad --at x`: jump the project already open
+      if (win.isMinimized()) win.restore();
+      win.focus();                               // bare re-launch: just surface us
+    }
   });
 
   app.on("open-file", (event, path) => { event.preventDefault(); openInWindow(path); }); // macOS Finder

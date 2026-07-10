@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit } from "@patterkit/ops";
@@ -426,6 +426,23 @@ export function searchProject(query: string, focus?: SearchFocus): SearchEntry[]
   ensureHydrated(); // search spans every scene
   if (!loaded) return [];
   return runSearch(loaded, query, focus).slice(0, 50);
+}
+
+/** Resolve a launch location (`patterpad <project> --at <where>`) to the node it names: an opaque beat
+ *  id, or a scene / block Game ID or title. Same matching ladder as the `patter resolve` CLI (exact id,
+ *  then Game ID, then name, then substring), so an id copied out of a locale table, an audio filename, or
+ *  a runtime log lands the caret on the line it refers to. The first hit wins; null when nothing matches. */
+export function resolveLaunchLocation(query: string): SearchEntry | null {
+  if (!query.trim()) return null;
+  ensureHydrated(); // a location can name any scene, so the lazy landing-only parse is not enough
+  if (!loaded) return null;
+  const hit = runResolve(loaded, query)[0];
+  if (!hit) return null;
+  const entry: SearchEntry = { id: hit.id, kind: hit.kind, location: hit.location, sceneId: hit.sceneId };
+  if (hit.name !== undefined) entry.name = hit.name;
+  if (hit.gameId !== undefined) entry.gameId = hit.gameId;
+  if (hit.text !== undefined) entry.text = hit.text;
+  return entry;
 }
 
 /** Status browse (#205 / #206): every line (+ text, for writing) beat at `status` across the project

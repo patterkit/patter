@@ -19,15 +19,17 @@ function makeProject(): string {
   w("game.patterproj", {
     schema: "patter/project@0", project: { id: "loc", name: "Loc Game" },
     locales: { default: "en", all: ["en", "fr"] },
-    cast: [{ name: "ANNA", displayName: "Anna" }, { name: "BO" }], // BO has no display name -> no @project entry
+    // ANNA declares a grammatical gender (translator context); BO leaves it unspecified.
+    cast: [{ name: "ANNA", displayName: "Anna", gender: "female" }, { name: "BO" }], // BO has no display name -> no @project entry
   });
 
-  // s1: a line (ANNA), a narration text, and a choice with one prompted option.
+  // s1: a line (ANNA), a line by an ungendered speaker (BO), a narration text, and a choice with one prompted option.
   w("scenes/one.patterflow", { schema: "patter/flow@0", scene: {
     id: "s1", type: "scene", name: "Opening", blocks: [
       { id: "b1", type: "block", name: "Main", children: [
         { id: "n1", type: "snippet", beats: [
           { id: "L1", kind: "line", character: "ANNA" },
+          { id: "L2", kind: "line", character: "BO" },
           { id: "T1", kind: "text" },
         ] },
         { id: "g1", type: "group", selector: "choice", children: [
@@ -37,7 +39,7 @@ function makeProject(): string {
     ] } });
 
   w("loc/en/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", default: true,
-    strings: { L1: "Hello", T1: "Narration", CT1: "Pick me" } });
+    strings: { L1: "Hello", L2: "Yes", T1: "Narration", CT1: "Pick me" } });
   w("loc/fr/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "fr",
     strings: { L1: "Bonjour", CT1: "Choisis" } }); // T1 missing -> not yet translated
 
@@ -60,11 +62,27 @@ describe("extractLoc", () => {
     const byId = Object.fromEntries(cat.entries.map((e) => [e.id, e]));
     expect(byId["L1"]).toMatchObject({ source: "Hello", translation: "", scene: "s1", stale: false });
     expect(byId["L1"]!.comments).toEqual(["Keep it short"]);          // vo note excluded
-    expect(byId["L1"]!.context).toEqual({ character: "ANNA", kind: "line" });
+    expect(byId["L1"]!.context).toEqual({ character: "ANNA", kind: "line", gender: "female" });
     expect(byId["CT1"]).toMatchObject({ source: "Pick me", translation: "", scene: "s1" });
     // @project display name, seeded from CastMember.displayName; BO (no displayName) absent.
     expect(byId["cast:ANNA"]).toMatchObject({ source: "Anna", translation: "", scene: "@project" });
     expect(byId["cast:BO"]).toBeUndefined();
+  });
+
+  it("stamps the speaker's grammatical gender onto the translator context, and only when declared", () => {
+    const cat = extractLoc(loaded);
+    const byId = Object.fromEntries(cat.entries.map((e) => [e.id, e]));
+
+    // ANNA declares female: her line, and her @project display name, both carry it.
+    expect(byId["L1"]!.context?.gender).toBe("female");
+    expect(byId["cast:ANNA"]!.context).toEqual({ character: "ANNA", gender: "female" });
+
+    // BO is in the cast but declares no gender -> the key is absent, not an empty string.
+    expect(byId["L2"]!.context).toEqual({ character: "BO", kind: "line" });
+    expect(byId["L2"]!.context).not.toHaveProperty("gender");
+
+    // Narration has no speaker at all, so there is nothing to inflect.
+    expect(byId["T1"]!.context?.gender).toBeUndefined();
   });
 
   it("for a target locale: translations fill in, missing stays empty, stale is flagged", () => {

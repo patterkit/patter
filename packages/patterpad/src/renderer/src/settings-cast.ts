@@ -1,8 +1,9 @@
 // The Cast editor (Project Settings > Cast tab). The master cast: each member has a canonical name
-// (matched by a beat's speaker), an optional player-facing display name, and free-text production
-// notes. value() returns a clean list (blank names pruned) for the save round-trip.
+// (matched by a beat's speaker), an optional player-facing display name, a grammatical gender for
+// translators, and free-text production notes. value() returns a clean list (blank names pruned) for
+// the save round-trip.
 
-import type { CastMember } from "@patterkit/model";
+import type { CastMember, GrammaticalGender } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem } from "./dom.js";
 import { dupGuard, expandableRow, focusNewRow } from "./settings-list.js";
 
@@ -44,11 +45,21 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
       iconBtn("✕", "remove from cast", () => { state.splice(i, 1); render(); }, false, true),
     );
 
+    // Grammatical gender: translator context, exported into the localisation formats. "Not specified"
+    // is the absent value, so a project that never sets it carries nothing.
+    const gender = el("select", "insp-select") as HTMLSelectElement;
+    gender.dataset.tip = "Grammatical gender, sent to translators so gendered languages can inflect this character's lines.";
+    for (const [v, l] of [["", "Not specified"], ["male", "Male"], ["female", "Female"], ["neuter", "Neuter"]] as const) {
+      const o = el("option", undefined, l) as HTMLOptionElement;
+      o.value = v; if (v === (m.gender ?? "")) o.selected = true; gender.append(o);
+    }
+    gender.addEventListener("change", () => { m.gender = (gender.value || undefined) as GrammaticalGender | undefined; });
+
     const notes = el("input", "gd-input") as HTMLInputElement;
     notes.type = "text"; notes.placeholder = "<casting / voice / intent notes>"; notes.value = m.notes ?? "";
     notes.addEventListener("input", () => { m.notes = notes.value.trim() || undefined; });
 
-    return expandableRow({ line: [name, display, actor, acts], details: [labelled("Notes", notes)] });
+    return expandableRow({ line: [name, display, actor, acts], details: [labelled("Grammatical gender", gender), labelled("Notes", notes)] });
   };
 
   const render = (): void => {
@@ -71,6 +82,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
       return state.filter((m) => m.name.trim()).map((m): CastMember => {
         const c: CastMember = { name: m.name.trim().toUpperCase() };
         if (m.displayName) c.displayName = m.displayName;
+        if (m.gender) c.gender = m.gender;
         if (m.actor) c.actor = m.actor;
         if (m.notes) c.notes = m.notes;
         if (m.gameData) c.gameData = m.gameData; // preserve any host gameData on the member

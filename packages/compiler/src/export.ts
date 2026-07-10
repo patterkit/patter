@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import type {
-  Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
+  Bundle, BundleCastMember, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
   ProjectFile, Scene, Block, Group, Snippet, Effect, LocaleFile,
 } from "@patterkit/model";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
@@ -148,7 +148,17 @@ export function exportBundle(input: ExportInput): Bundle {
     },
     voiced: project.voiced ?? false,
     locales: { default: project.locales.default, included: Object.keys(strings) },
-    cast: project.cast?.map(({ notes, ...c }) => c), // strip authoring-only notes from the runtime
+    // The cast is copied field by field, on purpose. Most of a CastMember is authoring context that must
+    // never reach players: `notes` are production chatter, `gender` is translator context (it rides the
+    // localisation formats), and `actor` is a real person's name (it belongs in the VO script). Listing
+    // what ships, rather than subtracting what doesn't, means a field added to CastMember tomorrow stays
+    // out of the bundle until someone deliberately adds it here.
+    cast: project.cast?.map((c): BundleCastMember => {
+      const m: BundleCastMember = { name: c.name };
+      if (c.displayName !== undefined) m.displayName = c.displayName;
+      if (c.gameData !== undefined) m.gameData = c.gameData;
+      return m;
+    }),
 
     properties: project.properties,
     scopeRegistry: project.scopeRegistry,

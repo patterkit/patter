@@ -226,6 +226,27 @@ describe("project session: create -> open -> read -> save -> play", () => {
     expect(project.searchProject("thuds").some((e) => e.id === "T_street")).toBe(true);
   });
 
+  it("resolves a `--at` launch location: beat id, block Game ID, or scene name", () => {
+    project.openProject(TAVERN); // lazy: only the landing scene is parsed until a whole-project op hydrates
+
+    // A beat id (the kind pasted out of a locale table / audio filename / runtime log) names its scene.
+    expect(project.resolveLaunchLocation("L_greet")).toMatchObject({ id: "L_greet", kind: "beat", sceneId: "scn_tavern" });
+    // ...and a beat in the OTHER scene resolves too - the location must survive the landing-only open.
+    expect(project.resolveLaunchLocation("T_street")).toMatchObject({ id: "T_street", kind: "beat", sceneId: "scn_street" });
+
+    // A block by its Game ID (derived from the name "Outside" when none is declared).
+    expect(project.resolveLaunchLocation("outside")).toMatchObject({ id: "out", kind: "block", sceneId: "scn_street" });
+
+    // A scene by name (case-insensitive) and by its derived Game ID. `kind: "scene"` is what tells the
+    // launcher to open the scene with the caret at the top rather than revealing a node.
+    expect(project.resolveLaunchLocation("the street")).toMatchObject({ id: "scn_street", kind: "scene" });
+    expect(project.resolveLaunchLocation("the-street")).toMatchObject({ id: "scn_street", kind: "scene" });
+
+    // Nothing matches -> null, so the launcher opens the project where it normally would.
+    expect(project.resolveLaunchLocation("no-such-node")).toBeNull();
+    expect(project.resolveLaunchLocation("   ")).toBeNull();
+  });
+
   it("search floats the caret's scene above other scenes (focus)", () => {
     project.openProject(TAVERN);
     const here = project.searchProject("stranger").find((e) => e.id === "L_greet")?.sceneId; // L_greet's scene

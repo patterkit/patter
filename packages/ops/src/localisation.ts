@@ -19,7 +19,7 @@
 import { basename, dirname, join, sep } from "node:path";
 import { canonicalStringify } from "@patterkit/core";
 import { walkNodes, castStringKey, PROJECT_LOCALE_SCENE } from "@patterkit/model";
-import type { AuthoringFile, Group, LocaleFile, Snippet } from "@patterkit/model";
+import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
 import type { PlannedWrite } from "./write.js";
@@ -36,8 +36,10 @@ export interface LocEntry {
   translation: string;
   /** Localiser-channel notes for this id (DocLine text, ancestors outermost-first). */
   comments: string[];
-  /** Best-effort context for the translator. */
-  context?: { character?: string; kind?: string };
+  /** Best-effort context for the translator. `gender` is the speaker's grammatical gender, looked up
+   *  from the cast - what a gendered language needs to inflect the line. Export-only: `applyLoc` never
+   *  reads it back, it is regenerated from the cast on every export. */
+  context?: { character?: string; kind?: string; gender?: GrammaticalGender };
   /** Translated, but the source changed since (source modifiedAt > localisedAt[locale]). */
   stale: boolean;
 }
@@ -80,12 +82,22 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
     return !!(e?.modifiedAt && localised && e.modifiedAt > localised);
   };
 
+  // A speaker's grammatical gender is translator context: a gendered language inflects the line itself.
+  // Keyed on the canonical cast name, exactly as a beat's `character` names it (see voice-script.ts).
+  const genderOf = new Map<string, GrammaticalGender>();
+  for (const c of loaded.project.cast ?? []) if (c.gender) genderOf.set(c.name, c.gender);
+  /** Stamp the speaker's gender onto a context, if we know one. Absent = not specified. */
+  const withGender = (context?: LocEntry["context"]): LocEntry["context"] => {
+    const g = context?.character ? genderOf.get(context.character) : undefined;
+    return g ? { ...context, gender: g } : context;
+  };
+
   const entries: LocEntry[] = [];
   const push = (id: string, scene: string, context?: LocEntry["context"]): void => {
     const src = source[id];
     if (src === undefined) return; // only strings that exist in the source language are localisable
     const translation = isTemplate ? "" : (target[id] ?? "");
-    entries.push({ id, scene, source: src, translation, comments: commentsOf(id), context, stale: staleFor(id, translation) });
+    entries.push({ id, scene, source: src, translation, comments: commentsOf(id), context: withGender(context), stale: staleFor(id, translation) });
   };
 
   // Scene strings: line / text beats + option prompts (the same population report.ts counts).
@@ -110,7 +122,7 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
     const id = castStringKey(c.name);
     const src = source[id] ?? c.displayName; // default shard if present, else the authoring displayName
     const translation = isTemplate ? "" : (target[id] ?? "");
-    entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: commentsOf(id), context: { character: c.name }, stale: staleFor(id, translation) });
+    entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: commentsOf(id), context: withGender({ character: c.name }), stale: staleFor(id, translation) });
   }
 
   return { project: loaded.project.project.id, defaultLocale, locale: targetLocale, entries };

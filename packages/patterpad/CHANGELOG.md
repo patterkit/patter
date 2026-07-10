@@ -6,6 +6,27 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **Grammatical gender** on each cast member (Project Settings ▸ Cast, behind the row's ▸ expander):
+  Male / Female / Neuter / Not specified. It is carried into every localisation export so a gendered
+  language can inflect that character's lines: a **Gender** column in Excel, a `#. Gender: female`
+  comment in PO / POT, and `context.gender` in JSON. Export-only context, regenerated from the cast on
+  each export, never read back on import and never shipped in the compiled bundle.
+- Launch straight at a line: `patterpad <project> --at <where>` opens the project at a location instead
+  of where you left off, where `<where>` is a beat id, or a scene / block Game ID or name (the same query
+  `patter resolve` takes). Paste an id from a locale table, an audio filename, or a runtime log and the
+  cursor lands on the line it names. With no path it reopens the last project there; if Patterpad is
+  already running the same command jumps the open window. An unmatched location opens the project as
+  normal and says so on the terminal.
+
+### Fixed
+- **Voice actors' names no longer ship inside the published bundle.** The **Actor** you record against a
+  cast member was meant to stay in the project (it feeds the VO script export), but every `.patterc` you
+  published carried it. Building now emits only the player-facing cast, so a shipped game contains no
+  actor names, casting notes, or grammatical gender. Rebuild to clear it from an existing bundle. If your
+  project names actors the rebuilt bundle's hash changes, so an in-progress playthrough saved against the
+  old bundle may be flagged as stale.
+
 ## [0.3.2] - 2026-07-09
 
 ### Fixed

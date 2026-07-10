@@ -75,7 +75,7 @@ outdated translation. (PO files carry the same signal as the standard `#, fuzzy`
 All three carry the same IDs and the same staleness signal; pick by who's receiving the file:
 
 - **Excel (.xlsx)** - for human translators working by hand: one sheet per scene, columns
-  ID / Source / Translation / Comments / Status. The friendliest to non-technical folk.
+  ID / Source / Translation / Comments / Status / Gender. The friendliest to non-technical folk.
 - **PO / POT** - for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …).
   Exporting with no language gives a blank **POT** template; staleness is `#, fuzzy`.
 - **JSON** - for pipelines and engines: plain ID → string tables, easy to transform or feed
@@ -83,6 +83,29 @@ All three carry the same IDs and the same staleness signal; pick by who's receiv
 
 Translator-facing **comments** come from your documentation notes routed to the `loc`
 channel - see [Reviewing & feedback](/patterpad/reviewing/).
+
+### Who is speaking: grammatical gender
+
+A gendered language often has to inflect the line itself to match its **speaker** - adjectives,
+participles, sometimes the verb. English source text rarely reveals which, so a translator working
+line by line is left guessing, and guessing wrong is a bug you only find in a late language pass.
+
+Set a character's **Grammatical gender** in **Project Settings ▸ Cast** (Male, Female, Neuter, or
+Not specified) and every export carries it alongside that character's lines:
+
+| Format | Where it appears |
+| --- | --- |
+| Excel | a **Gender** column |
+| PO / POT | an extracted comment, `#. Gender: female` |
+| JSON | `context.gender` on the entry |
+
+It rides the character's own dialogue and their display name. Lines with no speaker (narration) and
+characters left as *Not specified* carry nothing, so you only send what you actually know.
+
+Gender is **export-only context**: it is regenerated from the cast on every export, never read back
+on import, and never shipped in the compiled `.patterc` bundle. Change a character's gender and the
+next export simply tells translators the truth. It describes the character as a grammatical subject
+for translation purposes; it is not shipped to, or read by, your game.
 
 ## How the strings ship: two approaches
 

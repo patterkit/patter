@@ -89,7 +89,9 @@ shows.
 
 ### `patter loc-export [path] -o file`
 Export strings for translation. `--format json|xlsx|po` (required) · `--locale xx`
-(omit for a blank template / POT).
+(omit for a blank template / POT). Each string carries its translator context, including
+the speaker's [grammatical
+gender](/production/localisation/#who-is-speaking-grammatical-gender).
 
 ### `patter loc-import <file> [path]`
 Import a translated file back; the format is read from the extension, and `--locale xx`

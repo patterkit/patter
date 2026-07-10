@@ -57,6 +57,31 @@ Patterpad gets you working in one click:
 - Double-click a `.patter` folder to reopen your last session, double-click a single
   scene file to open just that scene, or run `patterpad <path>` from a shell.
 
+### Opening at a particular line
+
+Launching from a shell, `--at` opens the project straight at a location instead of
+where you left off:
+
+```sh
+patterpad my-game.patter --at L_greet         # a line, by its beat id
+patterpad my-game.patter --at tavern-intro    # a scene or block, by its Game ID
+patterpad my-game.patter --at "The Street"    # a scene or block, by its name
+patterpad --at L_greet                        # no path: reopen the last project there
+```
+
+`--at=<where>` works too. `<where>` takes the same query as
+[`patter resolve`](/cli/#patter-resolve-query-path): it tries an exact beat id first,
+then a [Game ID](/format/gamedata-and-addressing/#the-two-ids), then a name, then a
+partial match. So an id lifted straight out of a locale table, an audio filename, or a
+runtime log pastes in and lands the cursor on the line it names, which is the quickest
+way to answer "a tester reported a problem with *this* line".
+
+A scene target opens that scene at the top. A block, group, or line target opens its
+scene and puts the cursor on it. If nothing in the project matches, Patterpad prints
+that on the terminal and opens the project as it normally would, so a stale id in a bug
+report can't stop you getting in. If Patterpad is already running, the same command
+jumps the open window rather than starting a second copy.
+
 ## Sending a project (Patterpack)
 
 A `.patter` project is a folder of files, which is perfect for version control but awkward
