@@ -1,0 +1,19 @@
+#!/bin/sh
+# Keep the inlined playable-runtime blob in lockstep with the JS runtime.
+#
+# `packages/ops/src/playable-runtime.ts` is a GENERATED snapshot of the minified `@patterkit/runtime`
+# (so `runExportHtml` can build a single self-contained playable HTML file). It is easy to change the
+# runtime and forget to regenerate it - which ships an outdated engine in playable exports and is caught
+# only later by the CI "Generated runtime blob is up to date" guard. This hook closes that gap: when a
+# commit touches the runtime source, it rebuilds the runtime, regenerates the blob, and stages it, so the
+# blob can never drift into a push. (CI stays the backstop for anyone who bypasses hooks with --no-verify.)
+#
+# Wired via `core.hooksPath = scripts/git-hooks` (set by the root `prepare` script on install).
+set -e
+
+if git diff --cached --name-only --diff-filter=ACMR | grep -q '^packages/runtime/src/'; then
+  echo "pre-commit: runtime source changed -> refreshing the playable-runtime blob"
+  npm run --silent build -w @patterkit/runtime >/dev/null
+  npm run --silent gen-runtime-blob -w @patterkit/ops >/dev/null
+  git add packages/ops/src/playable-runtime.ts
+fi

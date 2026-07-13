@@ -9,6 +9,7 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath scripts/git-hooks || true",
     "typecheck": "tsc --noEmit && tsc --noEmit -p examples/player/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
