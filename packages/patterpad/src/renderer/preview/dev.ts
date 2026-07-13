@@ -115,6 +115,8 @@ const stub = {
   saveWriting: async (_sceneId: string, map: Record<string, string>) => { (window as unknown as { __writing?: unknown }).__writing = map; return { ok: true }; },
   readRecording: async () => (window as unknown as { __recording?: Record<string, string> }).__recording ?? {},
   saveRecording: async (_sceneId: string, map: Record<string, string>) => { (window as unknown as { __recording?: unknown }).__recording = map; return { ok: true }; },
+  readRerecord: async () => (window as unknown as { __rerecord?: Record<string, boolean> }).__rerecord ?? {},
+  saveRerecord: async (_sceneId: string, map: Record<string, boolean>) => { (window as unknown as { __rerecord?: unknown }).__rerecord = map; return { ok: true }; },
   audioCurrent: async () => (project.audioFolders ? FAKE_AUDIO_INDEX : {}), // folder-derived status snapshot (#206)
   onAudioIndex: () => undefined, // preview is static; no live folder watching
   readAudio: async () => null,   // no real audio files in the preview

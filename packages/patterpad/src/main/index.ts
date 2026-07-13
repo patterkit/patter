@@ -736,6 +736,8 @@ function registerIpc(): void {
   ipcMain.handle("scene:saveWriting", (_e, id: string, map: Record<string, string>) => project.saveSceneWriting(id, map));
   ipcMain.handle("scene:readRecording", (_e, id: string) => project.readSceneRecording(id));
   ipcMain.handle("scene:saveRecording", (_e, id: string, map: Record<string, string>) => project.saveSceneRecording(id, map));
+  ipcMain.handle("scene:readRerecord", (_e, id: string) => project.readSceneRerecord(id));
+  ipcMain.handle("scene:saveRerecord", (_e, id: string, map: Record<string, boolean>) => project.saveSceneRerecord(id, map));
   // Audio Folders index (#206): the renderer pulls the current snapshot on load, then receives pushes as
   // the folders change on disk. The indexer lives in the main process (off the event loop).
   ipcMain.handle("audio:current", () => project.audioCurrentSnapshot());

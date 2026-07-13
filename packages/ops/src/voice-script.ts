@@ -15,7 +15,7 @@
 
 import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 import type { Block, Group, Snippet } from "@patterkit/model";
-import { sourceStrings, mergeAuthoring } from "./loaded-helpers.js";
+import { sourceStrings, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
 import { classesForChannel } from "./documentation.js";
 import type { LoadedProject } from "./load.js";
 
@@ -75,10 +75,12 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
   const recordThreshold = ladderDecls.findIndex((s) => s.readyToRecord);
   const writingIndex = new Map(writingLadder.map((name, i) => [name, i]));
 
-  // Merge authoring shards: writing / recording status, cut set, and per-node documentation (own notes).
-  const { writing: writingOf, recording: manualRecordingOf, cut: cutSet, documentation: docsOf } = mergeAuthoring(loaded);
-  // An Audio Folders project derives status from the takes on disk, not the manual map (#206).
-  const recordingOf = opts.recordingOverride ?? manualRecordingOf;
+  // Merge authoring shards: writing / recording status, cut set, re-record flags, and per-node documentation.
+  const { writing: writingOf, recording: manualRecordingOf, cut: cutSet, rerecord: rerecordSet, documentation: docsOf } = mergeAuthoring(loaded);
+  // An Audio Folders project derives status from the takes on disk, not the manual map (#206). Either way a
+  // line flagged "needs re-record" (#227) masks to the reserved `rerecord` status, so the session redoes it.
+  const recordingBase = opts.recordingOverride ?? manualRecordingOf;
+  const recordingOf = (id: string): string => effectiveRecording(id, recordingBase, rerecordSet, recordingLadder[0]!);
 
   // Source text (default locale) + cast actors.
   const source = sourceStrings(loaded);
@@ -116,7 +118,7 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
         actor: beat.character ? actorOf.get(beat.character) : undefined,
         text: plainVoice(source[beat.id] ?? ""),
         comments: leading ? [...ancestorVo, ...own] : own, // first line of the run gets the enclosing context
-        recordingStatus: recordingOf.get(beat.id) ?? recordingLadder[0]!,
+        recordingStatus: recordingOf(beat.id),
       });
       leading = false;
     }

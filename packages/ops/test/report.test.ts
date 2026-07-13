@@ -22,7 +22,7 @@ function makeProject(voiced = true, estimating = true): string {
   w("game.patterproj", {
     schema: "patter/project@0", project: { id: "rep", name: "Report Game" },
     locales: { default: "en", all: ["en", "fr"] },
-    ...(voiced ? { voiced: true } : {}),
+    ...(voiced ? { voiced: true, trackAudioStatus: true } : {}),
     cast: [{ name: "ANNA" }, { name: "BO" }],
     // Estimating: threshold omitted (= lowest rung, "stub"); default 20 lines; two tags, largest wins.
     estimating: { enabled: estimating, defaultLines: 20, tagEstimates: [{ tag: "cutscene", lines: 5 }, { tag: "big", lines: 10 }] },
@@ -85,6 +85,7 @@ function makeProject(voiced = true, estimating = true): string {
   w("authoring/statuses.patterx", { schema: "patter/authoring@0",
     writing: { L1: "final", L2: "draft 1" },
     recording: { L1: "recorded" },
+    rerecord: { L1: true }, // a recorded take that must be redone (#227) -> masks to "rerecord"
     cut: { s3: true },
     edits: { L1: { modifiedAt: "2026-02-01T00:00:00Z", localisedAt: { fr: "2026-01-01T00:00:00Z" } } } });
   return dir;
@@ -189,6 +190,39 @@ describe("runReportXlsx", () => {
     expect(openingRow[2]).toBe("stub");
     const charHeaders = (wb.getWorksheet("Characters")!.getRow(1).values as string[]).filter(Boolean);
     expect(charHeaders).toContain("Est. lines");
+  });
+});
+
+describe("a line flagged needs-re-record masks its recording status (#227)", () => {
+  it("counts the flagged line as the reserved 'rerecord' status, not its on-disk rung", () => {
+    // L1 is "recorded" on disk but flagged rerecord, so the recorded bucket loses it and rerecord gains it.
+    expect(data.totals.voiced.byRecording["rerecord"]).toBe(1);
+    expect(data.totals.voiced.byRecording["recorded"] ?? 0).toBe(0);
+    // Its speaker's per-character breakdown moves too.
+    const anna = data.characters.find((c) => c.character === "ANNA")!;
+    expect(anna.recording["rerecord"]).toBe(1);
+  });
+
+  it("appends the reserved 'rerecord' bucket to the report ladder, last", () => {
+    expect(data.recordingLadder).toContain("rerecord");
+    expect(data.recordingLadder[data.recordingLadder.length - 1]).toBe("rerecord");
+  });
+
+  it("shows the rerecord figure in the console report's recording line", () => {
+    expect(renderReportText(data).join("\n")).toMatch(/^recording:.*rerecord 1/m);
+  });
+
+  it("leaves the ladder untouched when NO line is flagged (no stray reserved column)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "patter-rerec-"));
+    for (const d of ["scenes", "loc/en", "authoring"]) mkdirSync(join(dir, d), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+    w("game.patterproj", { schema: "patter/project@0", project: { id: "clean", name: "Clean" }, locales: { default: "en", all: ["en"] }, voiced: true, trackAudioStatus: true, cast: [{ name: "ANNA" }] });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "S", blocks: [{ id: "b1", type: "block", name: "M", children: [{ id: "n1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }], jump: { to: "END" } }] }] } });
+    w("loc/en/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", strings: { L1: "hi" } });
+    w("authoring/a.patterx", { schema: "patter/authoring@0", recording: { L1: "recorded" } }); // recorded, NOT flagged
+    const clean = runReport(loadProject(dir));
+    expect(clean.recordingLadder).not.toContain("rerecord");
+    expect(clean.totals.voiced.byRecording["recorded"]).toBe(1); // stays "recorded" - nothing masked
   });
 });
 

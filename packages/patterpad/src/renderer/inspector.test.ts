@@ -19,6 +19,7 @@ const handlers: InspectorHandlers = {
   recordingStatuses: () => [], recordingStatus: () => null, setRecordingStatus: noop,
   audioFoldersOn: () => false, recordingFolderStatus: () => null, playRecording: noop,
   scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,
+  needsRerecord: () => false, setNeedsRerecord: noop,
 };
 const ctx = (level: unknown): InspectorContext => ({ levels: [level] }) as InspectorContext;
 
@@ -144,6 +145,37 @@ describe("inspector: surfaced line ID + copy", () => {
     const text = document.createElement("div");
     renderInspector(text, ctx({ kind: "leaf", beat: "prose", id: "T_room" }), folder);
     expect(recRow(text)).toBeUndefined();
+  });
+
+  it("the Re-record row: a checkbox that reflects the flag and shows a pill when set (#227)", () => {
+    const ladder = [{ name: "missing", colour: 0 }, { name: "recorded", colour: 4 }];
+    const rrRow = (host: HTMLElement): HTMLElement | undefined =>
+      [...host.querySelectorAll(".insp-row")].find((r) => r.querySelector(".insp-key")?.textContent === "Re-record") as HTMLElement | undefined;
+
+    // Unflagged: an unchecked checkbox, no pill.
+    const off = { ...handlers, recordingStatuses: () => ladder, needsRerecord: () => false };
+    const a = document.createElement("div");
+    renderInspector(a, ctx({ kind: "leaf", beat: "line", id: "L_greet" }), off);
+    const box = rrRow(a)?.querySelector("input[type=checkbox]") as HTMLInputElement | undefined;
+    expect(box?.checked).toBe(false);
+    expect(rrRow(a)?.querySelector(".insp-rec-chip")).toBeFalsy();
+
+    // Flagged: checked, plus a "re-record" pill echoing the masked status.
+    const on = { ...handlers, recordingStatuses: () => ladder, needsRerecord: (id: string) => id === "L_greet" };
+    const b = document.createElement("div");
+    renderInspector(b, ctx({ kind: "leaf", beat: "line", id: "L_greet" }), on);
+    expect((rrRow(b)?.querySelector("input[type=checkbox]") as HTMLInputElement).checked).toBe(true);
+    expect(rrRow(b)?.querySelector(".insp-rec-chip")?.textContent).toBe("re-record");
+
+    // Gated with the recording row: no ladder (recording untracked) -> no Re-record row.
+    const untracked = document.createElement("div");
+    renderInspector(untracked, ctx({ kind: "leaf", beat: "line", id: "L_greet" }), { ...handlers, recordingStatuses: () => [] });
+    expect(rrRow(untracked)).toBeUndefined();
+
+    // Dialogue-only: a prose beat never gets it.
+    const prose = document.createElement("div");
+    renderInspector(prose, ctx({ kind: "leaf", beat: "prose", id: "T_room" }), on);
+    expect(rrRow(prose)).toBeUndefined();
   });
 
   it("Record scratch is offered only for lines at or below the scratch rung (#224)", () => {

@@ -81,6 +81,30 @@ describe("runVoiceScript", () => {
     const partial = Object.fromEntries(runVoiceScript(loaded, { recordingOverride: new Map() }).lines.map((l) => [l.id, l]));
     expect(partial["L1"]!.recordingStatus).toBe("missing");
   });
+
+  it("a line flagged needs-re-record shows as 'rerecord' in the script, masking recorded/final (#227)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "patter-vo-rerec-"));
+    for (const d of ["scenes", "loc/en", "authoring"]) mkdirSync(join(dir, d), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+    w("game.patterproj", { schema: "patter/project@0", project: { id: "vr", name: "VR" }, locales: { default: "en", all: ["en"] }, voiced: true, cast: [{ name: "ANNA" }] });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "S", blocks: [{ id: "b1", type: "block", name: "M", children: [
+      { id: "n1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }, { id: "L2", kind: "line", character: "ANNA" }], jump: { to: "END" } },
+    ] }] } });
+    w("loc/en/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", strings: { L1: "one", L2: "two" } });
+    // L1: recorded on disk + flagged rerecord. L2: recorded, not flagged.
+    w("authoring/a.patterx", { schema: "patter/authoring@0", recording: { L1: "recorded", L2: "recorded" }, rerecord: { L1: true } });
+    const loc = loadProject(dir);
+
+    // Manual mode: the flag masks the "recorded" rung.
+    const manual = Object.fromEntries(runVoiceScript(loc, { everything: true }).lines.map((l) => [l.id, l]));
+    expect(manual["L1"]!.recordingStatus).toBe("rerecord");
+    expect(manual["L2"]!.recordingStatus).toBe("recorded"); // unflagged line is untouched
+
+    // Audio Folders mode: the flag still wins over the folder-derived rung ("final").
+    const folder = Object.fromEntries(runVoiceScript(loc, { everything: true, recordingOverride: new Map([["L1", "final"], ["L2", "final"]]) }).lines.map((l) => [l.id, l]));
+    expect(folder["L1"]!.recordingStatus).toBe("rerecord");
+    expect(folder["L2"]!.recordingStatus).toBe("final");
+  });
 });
 
 describe("runVoiceScript: plain text for the booth", () => {

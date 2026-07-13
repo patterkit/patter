@@ -307,6 +307,9 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .insp-rec-record:hover { background: color-mix(in oklab, var(--danger) 14%, transparent); border-color: var(--danger); }
 /* stale scratch take (#224): the recording predates an edit to the line */
 .insp-rec-stale { flex: none; font: 0.66rem var(--font-ui); color: var(--warn); white-space: nowrap; }
+/* "Needs re-record" toggle (#227): a compact checkbox + label, sitting in the inspector status row. */
+.insp-rerecord { display: inline-flex; align-items: center; gap: 0.3rem; font: 0.72rem var(--font-ui); color: var(--ink); cursor: pointer; }
+.insp-rerecord input { margin: 0; cursor: pointer; }
 
 /* Live debug link (#181): a compact status control fixed in the bottom-right corner (over the hint bar).
    One coloured "connect" icon toggles the localhost link (off → start listening → stop); the colour is the

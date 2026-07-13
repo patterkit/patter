@@ -504,6 +504,14 @@ export const DEFAULT_RECORDING_STATUSES: RecordingStatusDecl[] = [
   { name: "final", colour: 9 },      // purple
 ];
 
+/** The reserved recording status a line takes when it is flagged **needs re-record** (#227): a recorded
+ *  take exists but is unusable (bad quality, wrong take), so it must be redone. It is NOT a ladder rung -
+ *  it is a regression flag that MASKS the derived / manual rung for the recording script, the production
+ *  report, and status browse, so a line "recorded" on disk still shows up as work to do. Reserved so it
+ *  can't collide with an author-declared rung; carries its own alert colour. */
+export const RERECORD_STATUS = "rerecord";
+export const RERECORD_STATUS_DECL: RecordingStatusDecl = { name: RERECORD_STATUS, colour: 1 }; // orange alert
+
 /** One recording rung mapped to the folder its audio files live in (Audio Folders mode). */
 export interface RecordingFolder {
   name: string;
@@ -825,6 +833,14 @@ export interface AuthoringFile {
    * it as a separate "cut: N" figure so a removal is visible, not vanished.
    */
   cut?: Record<string, boolean>;
+  /**
+   * **Needs re-record** (#227): dialogue-line ids whose recorded take is unusable and must be redone
+   * (bad quality, wrong take, misread). Orthogonal to the recording ladder - a flagged line keeps its
+   * audio on disk, but its recording status is MASKED to the reserved `rerecord` status for the recording
+   * script / report / status browse (see `RERECORD_STATUS`), so a "recorded" line still reads as work.
+   * Authoring-only; never compiled into a bundle.
+   */
+  rerecord?: Record<string, boolean>;
 }
 
 // ---------------------------------------------------------------------------

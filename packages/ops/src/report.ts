@@ -28,10 +28,10 @@
 // separately.
 // ---------------------------------------------------------------------------
 
-import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES } from "@patterkit/model";
+import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS } from "@patterkit/model";
 import type { Group, Snippet, EditRecord } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
-import { stringsByLocale, mergeAuthoring } from "./loaded-helpers.js";
+import { stringsByLocale, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
 
 /** Fallback words-per-line for deriving an estimated scene's word count when the project has no real
  *  written lines yet to average from. */
@@ -168,8 +168,10 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
 
   // The authoring shards flattened to project-wide lookups. In Audio Folders mode the host passes
   // `recordingOverride` (status derived from files on disk), which replaces the manual recording map (#206).
-  const { writing: writingOf, recording: manualRecordingOf, cut: cutSet, edits: editsOf } = mergeAuthoring(loaded);
-  const recordingOf = recordingOverride ?? manualRecordingOf;
+  const { writing: writingOf, recording: manualRecordingOf, cut: cutSet, rerecord: rerecordSet, edits: editsOf } = mergeAuthoring(loaded);
+  const recordingBase = recordingOverride ?? manualRecordingOf;
+  // A line flagged "needs re-record" (#227) counts as the reserved `rerecord` status, not its rung on disk.
+  const recordingOf = (id: string): string => effectiveRecording(id, recordingBase, rerecordSet, recordingLadder[0]!);
 
   // Per-locale id -> text; the default locale drives counts.
   const byLocale = stringsByLocale(loaded);
@@ -268,7 +270,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
       const wi = writingIndex.get(ws) ?? 0;
       if (recordThreshold !== -1 && wi >= recordThreshold) voiced.readyToRecord++;
       if (shipThreshold !== -1 && wi >= shipThreshold) voiced.readyToShip++;
-      const rec = recordingOf.get(u.id) ?? recordingLadder[0]!;
+      const rec = recordingOf(u.id);
       voiced.byRecording[rec] = (voiced.byRecording[rec] ?? 0) + 1;
       const speaker = u.character ?? "(narrator)";
       const ch = getChar(speaker);
@@ -296,13 +298,18 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
   const scenesByStatus: Record<string, number> = Object.fromEntries(writingLadder.map((s) => [s, 0]));
   for (const s of reports) if (s.status) scenesByStatus[s.status] = (scenesByStatus[s.status] ?? 0) + 1;
   const coverage = { totalScenes: reports.length, estimated: reports.filter((s) => s.estimated).length };
+  // Surface the reserved `rerecord` bucket only when some line is actually flagged, so a clean project's
+  // report is unchanged. The counts already accumulated under the reserved key; this just gives the views
+  // (bars + per-character breakdown + xlsx column) a ladder slot to render it in.
+  const reportedRecordingLadder = (totals.voiced.byRecording[RERECORD_STATUS] ?? 0) > 0
+    ? [...recordingLadder, RERECORD_STATUS] : recordingLadder;
 
   return {
     project: { id: project.project.id, name: project.project.name },
     voiced: project.voiced ?? false,
     // Recording tracking is opt-in (default off) even for a voiced project (#206).
     recordingTracked: (project.voiced ?? false) && (project.trackAudioStatus ?? false),
-    writingLadder, recordingLadder,
+    writingLadder, recordingLadder: reportedRecordingLadder,
     scenes: reports,
     characters: [...characters.values()].sort((a, b) => (b.lines + b.estimatedLines) - (a.lines + a.estimatedLines)),
     locales, cut, estimating: estimatingOn, scenesByStatus, coverage, totals,

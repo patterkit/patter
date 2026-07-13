@@ -11,7 +11,7 @@ import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runE
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
-import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import type { ReviewItem } from "../shared/api.js";
 import { writeTextFilesAsync, writeBinaryFileAsync, fileStatusAsync, deleteFileAsync } from "@wildwinter/simple-vc-lib";
@@ -525,10 +525,11 @@ export function writingStatusLadder(): Array<{ name: string; colour?: number }> 
   return ladder.map((s) => ({ name: s.name, colour: s.colour }));
 }
 
-/** The project's recording-status ladder (name + palette colour), for the search window's status chips (#206). */
+/** The project's recording-status ladder (name + palette colour), for the search window's status chips
+ *  (#206), plus the reserved `rerecord` bucket (#227) so you can browse for lines flagged to redo. */
 export function recordingStatusLadder(): Array<{ name: string; colour?: number }> {
   const ladder = loaded?.project.recordingStatuses ?? DEFAULT_RECORDING_STATUSES;
-  return ladder.map((s) => ({ name: s.name, colour: s.colour }));
+  return [...ladder.map((s) => ({ name: s.name, colour: s.colour })), { name: RERECORD_STATUS_DECL.name, colour: RERECORD_STATUS_DECL.colour }];
 }
 
 export function readScene(sceneId: string): SceneSource {
@@ -718,6 +719,19 @@ export function saveSceneRecording(sceneId: string, map: Record<string, string>)
   const kept: Record<string, string> = {};
   for (const [id, name] of Object.entries(map)) if (name) kept[id] = name;
   return saveAuthoringField(sceneId, (af) => { af.recording = Object.keys(kept).length ? kept : undefined; });
+}
+
+/** A scene's "needs re-record" flags (#227): beat id -> true, from the authoring shard. */
+export function readSceneRerecord(sceneId: string): Record<string, boolean> {
+  return readAuthoringField(sceneId, (af) => af.rerecord, {});
+}
+
+/** Persist a scene's "needs re-record" flags, MERGING over the rest of the shard. Only `true` is kept
+ *  (an unticked line drops out), and an empty map removes the field entirely. */
+export function saveSceneRerecord(sceneId: string, map: Record<string, boolean>): Promise<SaveResult> {
+  const kept: Record<string, boolean> = {};
+  for (const [id, on] of Object.entries(map)) if (on) kept[id] = true;
+  return saveAuthoringField(sceneId, (af) => { af.rerecord = Object.keys(kept).length ? kept : undefined; });
 }
 
 /** Read a scene's "suggest a rewrite" proposals (open + resolved alike). */

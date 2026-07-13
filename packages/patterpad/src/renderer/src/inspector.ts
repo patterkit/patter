@@ -7,6 +7,7 @@ import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch,
 } from "@patterkit/patterpad-surface/surface";
 import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, WritingStatusDecl, RecordingStatusDecl } from "@patterkit/model";
+import { RERECORD_STATUS_DECL } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
 
@@ -123,6 +124,7 @@ function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
   const rows: Array<HTMLElement | null> = [];
   if (lv.beat !== "gameEvent") rows.push(statusRow(lv.id, h)); // writing status, line + text only (#196); game events aren't tracked
   if (lv.beat === "line") rows.push(recordingStatusRow(lv.id, h)); // recording status, dialogue lines only (#206)
+  if (lv.beat === "line") rows.push(rerecordRow(lv.id, h));         // "needs re-record" override, dialogue lines only (#227)
   if (lv.beat === "line") {
     rows.push(row("Character", lv.character ?? "—"));
     rows.push(row("Direction", lv.direction));
@@ -240,6 +242,34 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
   r.append(el("span", "insp-key", "Audio"));
   const wrap = el("div", "insp-status");
   wrap.append(statusSelect(ladder, effective, lowest, (status) => h.setRecordingStatus(id, status)));
+  r.append(wrap);
+  return r;
+}
+
+/** The "needs re-record" toggle (#227) for a dialogue line: a checkbox flagging an existing take for a
+ *  retake. When set, the line's recording status is MASKED to the reserved "re-record" status in the
+ *  recording script, the report, and status browse - a coloured pill echoes that here, and the underlying
+ *  chip / take stays visible and playable above. Shares the recording row's gate (shown only when the
+ *  project tracks recording status); null otherwise. */
+function rerecordRow(id: string | null, h: InspectorHandlers): HTMLElement | null {
+  if (!h.recordingStatuses().length || !id) return null;
+  const on = h.needsRerecord(id);
+  const r = el("div", "insp-row");
+  r.append(el("span", "insp-key", "Re-record"));
+  const wrap = el("div", "insp-status");
+  const label = el("label", "insp-rerecord") as HTMLLabelElement;
+  const cb = el("input") as HTMLInputElement;
+  cb.type = "checkbox"; cb.checked = on;
+  cb.addEventListener("change", () => h.setNeedsRerecord(id, cb.checked));
+  label.append(cb, document.createTextNode(" Needs re-record"));
+  label.dataset.tip = 'The take exists but must be redone (bad quality, wrong take). Masks the recording status as "re-record".';
+  wrap.append(label);
+  if (on) {
+    const pill = el("span", "insp-rec-chip", "re-record");
+    pill.style.background = statusTint(RERECORD_STATUS_DECL.colour);
+    pill.dataset.tip = "this line is flagged for a retake";
+    wrap.append(pill);
+  }
   r.append(wrap);
   return r;
 }
@@ -642,6 +672,10 @@ export interface InspectorHandlers {
   audioFoldersOn: () => boolean;
   /** In Audio Folders mode, the folder-derived recording status for a line (rung name), or null = missing. */
   recordingFolderStatus: (id: string) => string | null;
+  /** Whether a dialogue line is flagged "needs re-record" (#227) - an existing take that must be redone. */
+  needsRerecord: (id: string) => boolean;
+  /** Tick / untick a dialogue line's "needs re-record" flag. Ticking with no VO note prompts for the reason. */
+  setNeedsRerecord: (id: string, on: boolean) => void;
   /** Play a line's audio file (Audio Folders mode, fire-and-forget) - the inspector's ▶ button. `btn` (the
    *  clicked button) pulses while the clip sounds. */
   playRecording: (id: string, btn?: HTMLButtonElement) => void;

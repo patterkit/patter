@@ -704,6 +704,10 @@ export interface PatterApi {
   /** Persist a scene's per-beat writing status back to its authoring shard (lock-aware; merges over the rest). */
   saveWriting(sceneId: string, map: Record<string, string>): Promise<SaveResult>;
   /** Read a scene's per-beat MANUAL recording status (#206): beat id -> status name (the ladder rung). */
+  /** A scene's "needs re-record" flags (#227): beat id -> true. */
+  readRerecord(sceneId: string): Promise<Record<string, boolean>>;
+  /** Persist a scene's "needs re-record" flags (only true kept; empty clears the field). */
+  saveRerecord(sceneId: string, map: Record<string, boolean>): Promise<SaveResult>;
   readRecording(sceneId: string): Promise<Record<string, string>>;
   /** Persist a scene's per-beat recording status back to its authoring shard (lock-aware; merges over the rest). */
   saveRecording(sceneId: string, map: Record<string, string>): Promise<SaveResult>;

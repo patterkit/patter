@@ -51,6 +51,24 @@ Recording status feeds the same places as writing status: **filter by it** with 
 Find Lines by Recording…** (or the search window's **Recording** mode), and it's broken down
 per character in the [Production Information report](/production/tracking-and-reports/#the-writing-status-rollup).
 
+### Flagging a line for a retake
+
+Sometimes a line is recorded but the take is no good: poor quality, a fluff, the wrong
+pronunciation. The file is there, so its recording status (whether you set it by hand or derive it
+from Audio Folders) reads as **recorded** or **final**, and the line would quietly be skipped next
+session. To catch it, tick **Needs re-record** on the line in the inspector.
+
+A re-record flag is a **separate status that overrides the normal one**: wherever recording status
+is shown or counted, a flagged line reads as **re-record** instead of its rung on disk. So it
+reappears in the recording script as work to do, and the production report pulls it into its own
+**re-record** tally rather than leaving it hidden in "recorded". The audio file itself is untouched
+(you can still play the bad take from the inspector) until a new one replaces it.
+
+When you tick it and the line has no [VO note](/patterpad/reviewing/) yet, Patterpad opens the note
+editor so you can jot down **why** it needs redoing. That note travels with the line into the
+recording script, so whoever records the retake sees the reason. The flag lives in your project, not
+in the shipped game.
+
 ## Getting the audio into your game
 
 Patter itself doesn't play audio: your engine and audio tooling do. The durable hook is the line

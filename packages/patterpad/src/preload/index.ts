@@ -25,6 +25,8 @@ const api: PatterApi = {
   saveWriting: (sceneId, map) => ipcRenderer.invoke("scene:saveWriting", sceneId, map),
   readRecording: (sceneId) => ipcRenderer.invoke("scene:readRecording", sceneId),
   saveRecording: (sceneId, map) => ipcRenderer.invoke("scene:saveRecording", sceneId, map),
+  readRerecord: (sceneId) => ipcRenderer.invoke("scene:readRerecord", sceneId),
+  saveRerecord: (sceneId, map) => ipcRenderer.invoke("scene:saveRerecord", sceneId, map),
   audioCurrent: () => ipcRenderer.invoke("audio:current"),
   onAudioIndex: (handler) => { ipcRenderer.on("audio:index", (_e, snap: Record<string, { status: string; path: string }>) => handler(snap)); },
   readAudio: (beatId) => ipcRenderer.invoke("audio:read", beatId),

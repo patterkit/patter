@@ -4,6 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { loadProject, runResolve, runSearch, runStatusBrowse } from "../src/index.js";
 import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES } from "@patterkit/model";
 
@@ -64,6 +67,22 @@ describe("runStatusBrowse (status filter #205/#206)", () => {
 
   it("a recording rung nobody is set to returns nothing", () => {
     expect(runStatusBrowse(loaded, "recorded", "recording")).toEqual([]);
+  });
+
+  it("browsing by 'rerecord' finds flagged lines, and their on-disk rung no longer does (#227)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "patter-browse-rerec-"));
+    for (const d of ["scenes", "loc/en", "authoring"]) mkdirSync(join(dir, d), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+    w("game.patterproj", { schema: "patter/project@0", project: { id: "b", name: "B" }, locales: { default: "en", all: ["en"] }, voiced: true, cast: [{ name: "ANNA" }] });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "S", blocks: [{ id: "b1", type: "block", name: "M", children: [
+      { id: "n1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }, { id: "L2", kind: "line", character: "ANNA" }], jump: { to: "END" } },
+    ] }] } });
+    w("loc/en/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", strings: { L1: "one", L2: "two" } });
+    w("authoring/a.patterx", { schema: "patter/authoring@0", recording: { L1: "recorded", L2: "recorded" }, rerecord: { L1: true } });
+    const loc = loadProject(dir);
+
+    expect(runStatusBrowse(loc, "rerecord", "recording").map((e) => e.id)).toEqual(["L1"]);
+    expect(runStatusBrowse(loc, "recorded", "recording").map((e) => e.id)).toEqual(["L2"]); // L1 masked out
   });
 });
 

@@ -9,7 +9,7 @@
 import { walkNodes, effectiveGameId, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES } from "@patterkit/model";
 import type { Group, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
-import { sourceStrings, mergeAuthoring } from "./loaded-helpers.js";
+import { sourceStrings, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
 
 /** The editor's caret context, so a search can float the current scene's hits (from the caret onwards) to
  *  the top. Omit for a context-free search (the CLI). */
@@ -115,6 +115,10 @@ export function runStatusBrowse(loaded: LoadedProject, status: string, dimension
   const statusOf = recording ? (recordingOverride ?? merged.recording) : merged.writing; // beat id -> rung, merged across shards
   const ladder = recording ? (loaded.project.recordingStatuses ?? DEFAULT_RECORDING_STATUSES) : (loaded.project.writingStatuses ?? DEFAULT_WRITING_STATUSES);
   const lowest = ladder[0]?.name; // unset == lowest
+  // Recording status is masked by the "needs re-record" flag (#227): a flagged line reads as the reserved
+  // `rerecord` status, so browsing by `rerecord` finds it and browsing by its on-disk rung does not.
+  const statusAt = (id: string): string | undefined =>
+    recording ? effectiveRecording(id, statusOf, merged.rerecord, lowest ?? "") : (statusOf.get(id) ?? lowest);
 
   const out: ResolveEntry[] = [];
   for (const scene of loaded.scenes) {
@@ -124,7 +128,7 @@ export function runStatusBrowse(loaded: LoadedProject, status: string, dimension
       const consider = (beat: { id: string; kind: string }): void => {
         const tracked = recording ? beat.kind === "line" : (beat.kind === "line" || beat.kind === "text");
         if (!tracked) return; // recording is dialogue-only; writing covers line + text
-        if ((statusOf.get(beat.id) ?? lowest) !== status) return;
+        if (statusAt(beat.id) !== status) return;
         out.push({ id: beat.id, kind: "beat", text: strings[beat.id], location: segments, sceneId: scene.id, file });
       };
       walkNodes<Group | Snippet>(block.children, (node) => {

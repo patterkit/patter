@@ -6,6 +6,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **Needs re-record**: a checkbox on a dialogue line (inspector, when recording status is tracked) for a
+  take that exists but must be redone (bad quality, wrong take, misread). It acts as a separate status
+  that overrides the normal one: wherever recording status is shown or counted, the line reads as
+  **re-record** instead of its rung on disk, so it reappears in the recording script, gets its own tally
+  in the production report, and its own **Recording** browse filter. The audio file is left alone (you can
+  still play the bad take). Ticking a line with no VO note opens the note editor so you can record *why* it
+  needs redoing; that note rides the recording script to the session. Authoring-only, never in the bundle.
+
 ## [0.4.0] - 2026-07-10
 
 ### Added

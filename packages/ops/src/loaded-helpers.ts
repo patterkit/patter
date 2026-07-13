@@ -5,6 +5,15 @@
 
 import type { LoadedProject } from "./load.js";
 import type { DocLine, EditRecord } from "@patterkit/model";
+import { RERECORD_STATUS } from "@patterkit/model";
+
+/** The effective recording status of a dialogue line: the reserved `rerecord` status when the line is
+ *  flagged needs-re-record (it masks everything, so a "recorded" take still reads as work), else the
+ *  folder-derived / manual rung, else the lowest ("missing") rung. Shared by the recording script, the
+ *  production report, and status browse so all three agree with the inspector (#227). */
+export function effectiveRecording(id: string, base: Map<string, string>, rerecord: Set<string>, lowest: string): string {
+  return rerecord.has(id) ? RERECORD_STATUS : (base.get(id) ?? lowest);
+}
 
 /** Merge every shard of one locale into a single id -> text table (strings are one shard per scene). */
 export function tableFor(loaded: LoadedProject, locale: string): Record<string, string> {
@@ -48,6 +57,8 @@ export interface MergedAuthoring {
   recording: Map<string, string>;
   /** ids flagged cut (union across shards). */
   cut: Set<string>;
+  /** dialogue-line ids flagged "needs re-record" (union across shards) - masks recording status. */
+  rerecord: Set<string>;
   /** node/scene id -> its documentation notes (CONCATENATED across shards). */
   documentation: Map<string, DocLine[]>;
   /** scene id -> edit-trail record (last shard wins). */
@@ -59,17 +70,19 @@ export function mergeAuthoring(loaded: LoadedProject): MergedAuthoring {
   const writing = new Map<string, string>();
   const recording = new Map<string, string>();
   const cut = new Set<string>();
+  const rerecord = new Set<string>();
   const documentation = new Map<string, DocLine[]>();
   const edits = new Map<string, EditRecord>();
   for (const a of loaded.authoring) {
     for (const [id, v] of Object.entries(a.writing ?? {})) writing.set(id, v);
     for (const [id, v] of Object.entries(a.recording ?? {})) recording.set(id, v);
     for (const [id, v] of Object.entries(a.cut ?? {})) if (v) cut.add(id);
+    for (const [id, v] of Object.entries(a.rerecord ?? {})) if (v) rerecord.add(id);
     for (const [id, lines] of Object.entries(a.documentation ?? {})) {
       const cur = documentation.get(id);
       if (cur) cur.push(...lines); else documentation.set(id, [...lines]);
     }
     for (const [id, v] of Object.entries(a.edits ?? {})) edits.set(id, v);
   }
-  return { writing, recording, cut, documentation, edits };
+  return { writing, recording, cut, rerecord, documentation, edits };
 }

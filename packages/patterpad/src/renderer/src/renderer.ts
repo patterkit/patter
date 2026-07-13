@@ -1153,6 +1153,11 @@ function toggleLineStatus(name: string): void {
 // dropdown on dialogue (line) beats, and persisted immediately (source-only metadata, no dirty flag).
 let recordingMap: Record<string, string> = {};
 
+// "Needs re-record" flags (#227): beat id -> true. Ticking one masks the line's recording status (folder-
+// derived or manual) to the reserved "rerecord" status in the recording script / report / status browse.
+// Loaded from the .patterx per scene; persisted immediately like recordingMap. Authoring-only.
+let rerecordMap: Record<string, boolean> = {};
+
 // Audio Folders mode (#206): the folder-derived index pushed from the main process (beat id -> resolved
 // status + file path), held as a cached copy so the inspector reads it O(1) without touching disk. The
 // indexer lives off-thread in main; when it rescans, `audio:index` arrives and we repaint a shown line.
@@ -1268,6 +1273,23 @@ function setRecordingStatus(id: string, status: string | null): void {
   void window.patter.saveRecording(currentSceneId, recordingMap);
   const ctx = lastInspectorCtx;
   if (ctx && ctx.levels.some((l) => (l as { id?: string }).id === id)) { lastInspectorSig = null; showInspector(ctx); }
+}
+
+/** Whether a beat carries a VO-channel documentation note (the reason the retake feeds to the session). */
+function hasVoNote(id: string): boolean {
+  return (docMap[id] ?? []).some((l) => l.type === "vo");
+}
+
+/** Tick / untick "needs re-record" (#227) on a dialogue line, from the inspector checkbox. Persists to the
+ *  .patterx and repaints the row. On TICKING a line that has no VO note yet, open the notes editor so the
+ *  reason for the retake (bad take, wrong pronunciation, ...) rides the recording script to the session. */
+function setNeedsRerecord(id: string, on: boolean): void {
+  if (!currentSceneId) return;
+  if (on) rerecordMap[id] = true; else delete rerecordMap[id];
+  void window.patter.saveRerecord(currentSceneId, rerecordMap);
+  const ctx = lastInspectorCtx;
+  if (ctx && ctx.levels.some((l) => (l as { id?: string }).id === id)) { lastInspectorSig = null; showInspector(ctx); }
+  if (on && !hasVoNote(id)) openNoteEditor(id, document.body, "line"); // prompt for the "why", pre-focused on VO
 }
 
 // --- "suggest a rewrite" proposals (review flow) -----------------------------
@@ -1484,6 +1506,8 @@ function showInspector(ctx: InspectorContext): void {
     setRecordingStatus: (id, status) => setRecordingStatus(id, status),
     audioFoldersOn: () => audioOn(),                          // folder mode (voiced only) -> recording status is read-only
     recordingFolderStatus: (id) => audioIndex[id]?.status ?? null, // folder-derived status (null = missing)
+    needsRerecord: (id) => !!rerecordMap[id],                 // "needs re-record" flag (#227)
+    setNeedsRerecord: (id, on) => setNeedsRerecord(id, on),
     playRecording: (id, btn) => void playLineAudio(id, btn),  // ▶ play the line's audio (folder mode)
     scratchStatus: () => (project?.trackAudioStatus ? project.scratchStatus ?? null : null), // the rung scratch records into (null = off, #224)
     recordScratch: (id) => void startScratchRecording(id),    // ● record a scratch take for this line
@@ -1523,6 +1547,7 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   suggestions = await window.patter.readSuggestions(sceneId); suggestionsDirty = false; // rewrite proposals for this scene
   writingMap = await window.patter.readWriting(sceneId); // per-beat writing status for this scene (#196)
   recordingMap = await window.patter.readRecording(sceneId); // per-beat manual recording status (#206)
+  rerecordMap = await window.patter.readRerecord(sceneId);    // per-line "needs re-record" flags (#227)
   if (project?.audioFolders) audioIndex = await window.patter.audioCurrent(); // folder-derived status (#206)
   sceneEdited = false;  // fresh scene: not edited until the user touches it
   mountingScene = true; // the mount's initial-mirror onChange is not a user edit
