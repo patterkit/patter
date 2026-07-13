@@ -7,6 +7,11 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+- Internal: the Best match (`specificity`) selection metric now uses the shared
+  `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is
+  unchanged and conformance-verified across all four engines.
+
 ## [0.2.0] - 2026-07-07
 
 ### Added
