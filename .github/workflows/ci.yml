@@ -44,6 +44,11 @@ jobs:
             git diff -- packages/ops/src/playable-runtime.ts | head -20
             exit 1
           fi
+      # The four Patterplay runtimes (JS + Unity/Unreal/Godot) must share one version. A Changesets
+      # cascade can bump @patterkit/runtime alone and break lockstep with the ports - catch that here.
+      - name: Patterplay runtimes are in lockstep
+        working-directory: patter
+        run: node scripts/check-runtime-lockstep.mjs
 
   changeset-check:
     # A nudge, not a gate: warns on PRs that touch a published package without a changeset.
