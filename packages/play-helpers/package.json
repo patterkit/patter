@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/play-helpers",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Thin game-integration helpers around @patterkit/runtime: save/load serialisation, runtime property setters, a state logger, the Patterpad Live Link client + hot reload, a property inspector, and audio resolution. The Patterplay JS companion.",
   "type": "module",
   "license": "MIT",
