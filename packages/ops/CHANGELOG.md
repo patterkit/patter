@@ -1,5 +1,22 @@
 # @patterkit/ops
 
+## 0.2.0
+
+### Minor Changes
+
+- 34429f0: Add `CastMember.gender` (a new `GrammaticalGender` type: `male` / `female` / `neuter`, absent = not specified) and carry it into the localisation handoff as translator context, so gendered languages can inflect a character's own lines: a `Gender` column in the Excel export, a `#. Gender: <g>` extracted comment in PO/POT, and `context.gender` on each JSON `LocEntry`. It is export-only (regenerated from the cast each export, never read back by `applyLoc`) and the compiler strips it from the runtime bundle alongside `notes`.
+- c61c146: Add a per-line "needs re-record" flag (#227). `AuthoringFile.rerecord` (beat id -> true) marks a dialogue take that exists but must be redone; the new reserved `RERECORD_STATUS` masks the line's recording status everywhere it is read, so a "recorded" line still surfaces as work. `mergeAuthoring` now returns the `rerecord` set and ops exposes `effectiveRecording()`, which the recording script (`runVoiceScript`), the production report (`runReport`, with its own re-record bucket), and status browse (`runStatusBrowse`, filterable by `rerecord`) all resolve through. Authoring-only; never compiled into a bundle.
+
+### Patch Changes
+
+- Updated dependencies [34429f0]
+- Updated dependencies [34429f0]
+- Updated dependencies [c61c146]
+  - @patterkit/compiler@0.2.0
+  - @patterkit/model@0.2.0
+  - @patterkit/core@0.1.3
+  - @patterkit/runtime@0.2.1
+
 ## 0.1.3
 
 ### Patch Changes

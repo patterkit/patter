@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [34429f0]
+- Updated dependencies [34429f0]
+- Updated dependencies [c61c146]
+  - @patterkit/model@0.2.0
+  - @patterkit/dialect@0.1.3
+
 All notable changes to `@patterkit/runtime` (Patterplay JS) are documented here. The
 Patterplay runtimes - JS, Unity, Unreal, and Godot - are versioned in lockstep: the same
 version number always means the same runtime behaviour. This package is versioned by
@@ -10,6 +20,7 @@ version number always means the same runtime behaviour. This package is versione
 ## [0.2.0] - 2026-07-07
 
 ### Added
+
 - **Best match** selection (a new `sequence` order, `specificity`): among the eligible children,
   play the one whose condition most specifically fits the current state; equally-specific ties break
   by the seeded shuffle, and a condition-less child is the filler that wins only when nothing more
@@ -19,6 +30,7 @@ version number always means the same runtime behaviour. This package is versione
 ## [0.1.0] - 2026-07-04
 
 ### Added
+
 - The Patter runtime in JS/TS: `Engine` + `Flow` over a compiled `.patterc` bundle - scenes,
   blocks, run/choice/branch/sequence selectors, sticky/fallback options, call-return jumps,
   conditions + effects, visit counts, `{@ref}` interpolation, game events, tags, gameData

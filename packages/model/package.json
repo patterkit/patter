@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/model",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Patter data-model types: source (scene/block/group/snippet/beat/jump), project, locale, authoring. The shape source-of-truth.",
   "type": "module",
   "license": "MIT",
