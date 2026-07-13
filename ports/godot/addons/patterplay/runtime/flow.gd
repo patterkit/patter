@@ -469,32 +469,33 @@ func _pick_specificity(eligible: Array, exhaust: String, st: Dictionary):
 func _spec_score(node: Dictionary) -> int:
 	if not node.has("condition"):
 		return 0
-	return _matched_spec(node["condition"]["ast"], true)
+	return _matched_spec(node["condition"]["ast"], _eval_ctx, true)
 
 
 # matched-specificity: how many atomic constraints are actively holding this condition TRUE against the
 # live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
-func _matched_spec(node: Array, want: bool) -> int:
+# Static + ctx-parameterised so the conformance runner can score a bare AST against injected scopes.
+static func _matched_spec(node: Array, ctx: Dictionary, want: bool) -> int:
 	var tag = node[0]
 	if tag == "bin" and (node[1] == "and" or node[1] == "or"):
 		var behave_as_and: bool = (node[1] == "and") == want # De Morgan under negation
-		var l := _matched_spec(node[2], want)
-		var r := _matched_spec(node[3], want)
+		var l := _matched_spec(node[2], ctx, want)
+		var r := _matched_spec(node[3], ctx, want)
 		if behave_as_and:
 			return (l + r) if (l > 0 and r > 0) else 0
 		return l if l > r else r
 	if tag == "u" and node[1] == "not":
-		return _matched_spec(node[2], not want) # flip polarity
+		return _matched_spec(node[2], ctx, not want) # flip polarity
 	if tag == "call" and node[1] == "check_flags":
 		var operands := node.size() - 3 # ["call","check_flags",source,fd...]
 		if operands < 1:
 			operands = 1
-		var hit := PatterValues.truthy(PatterExpr.evaluate(node, _eval_ctx))
+		var hit := PatterValues.truthy(PatterExpr.evaluate(node, ctx))
 		if want:
 			return operands if hit else 0
 		return 0 if hit else 1
 	# Atom: its truth matching the wanted polarity contributes one constraint.
-	return 1 if (PatterValues.truthy(PatterExpr.evaluate(node, _eval_ctx)) == want) else 0
+	return 1 if (PatterValues.truthy(PatterExpr.evaluate(node, ctx)) == want) else 0
 
 
 func _fill_ids(eligible: Array, stick: bool, ln: int) -> Array:

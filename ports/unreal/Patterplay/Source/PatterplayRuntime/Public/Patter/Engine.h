@@ -142,6 +142,33 @@ namespace patter
         }
     }
 
+    // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
+    // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
+    // Free function + ctx-parameterised so the conformance TestHost can score a bare AST against injected
+    // scopes; Flow::specScore calls it with the live flow eval context.
+    inline int matchedSpec(const AstNode& node, const EvalContext& ctx, bool want)
+    {
+        if (node.tag == AstTag::Binary && (node.op == "and" || node.op == "or"))
+        {
+            bool behaveAsAnd = (node.op == "and") == want; // De Morgan under negation
+            int l = matchedSpec(*node.left, ctx, want);
+            int r = matchedSpec(*node.right, ctx, want);
+            if (behaveAsAnd) return (l > 0 && r > 0) ? l + r : 0;
+            return l > r ? l : r;
+        }
+        if (node.tag == AstTag::Unary && node.op == "not")
+            return matchedSpec(*node.operand, ctx, !want); // flip polarity
+        if (node.tag == AstTag::Call && node.fn == "check_flags")
+        {
+            int operands = static_cast<int>(node.args.size()) - 1; // args[0] is the flags source
+            if (operands < 1) operands = 1;
+            bool hit = truthy(evaluate(node, ctx));
+            if (want) return hit ? operands : 0;
+            return hit ? 0 : 1;
+        }
+        return (truthy(evaluate(node, ctx)) == want) ? 1 : 0; // atom
+    }
+
     // ----- save records --------------------------------------------------------
 
     // `nextId` is SNAPSHOT-ONLY (never set on a live frame): the id of the child at `index` when the
@@ -729,34 +756,11 @@ namespace patter
             st.hasLast = true; st.last = pick->id;
             return pick;
         }
-        // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
+        // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's
+        // specificity. Scored against this flow's live eval context via the free matchedSpec.
         int specScore(const Node* node)
         {
-            return node->condition ? matchedSpec(*node->condition->ast, true) : 0;
-        }
-        // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
-        // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
-        int matchedSpec(const AstNode& node, bool want)
-        {
-            if (node.tag == AstTag::Binary && (node.op == "and" || node.op == "or"))
-            {
-                bool behaveAsAnd = (node.op == "and") == want; // De Morgan under negation
-                int l = matchedSpec(*node.left, want);
-                int r = matchedSpec(*node.right, want);
-                if (behaveAsAnd) return (l > 0 && r > 0) ? l + r : 0;
-                return l > r ? l : r;
-            }
-            if (node.tag == AstTag::Unary && node.op == "not")
-                return matchedSpec(*node.operand, !want); // flip polarity
-            if (node.tag == AstTag::Call && node.fn == "check_flags")
-            {
-                int operands = static_cast<int>(node.args.size()) - 1; // args[0] is the flags source
-                if (operands < 1) operands = 1;
-                bool hit = truthy(evaluate(node, evalCtx_));
-                if (want) return hit ? operands : 0;
-                return hit ? 0 : 1;
-            }
-            return (truthy(evaluate(node, evalCtx_)) == want) ? 1 : 0; // atom
+            return node->condition ? matchedSpec(*node->condition->ast, evalCtx_, true) : 0;
         }
         SelectorState& selectorStateFor(const Node* group)
         {

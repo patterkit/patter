@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
-import { buildCorpus, runExpressionCase, runRuntimeCase, runScriptedCase, runGameDataCase, cases } from "../src/index.js";
+import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runGameDataCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -25,6 +25,14 @@ describe("expression cases", () => {
   for (const c of corpus.expressions) {
     it(c.name, () => {
       expect(runExpressionCase(c)).toEqual(c.expected);
+    });
+  }
+});
+
+describe("specificity cases", () => {
+  for (const c of corpus.specificity) {
+    it(c.name, () => {
+      expect(runSpecificityCase(c)).toEqual(c.expected);
     });
   }
 });

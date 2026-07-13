@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { compileExpression, exportBundle } from "@patterkit/compiler";
-import type { Corpus, ExpressionCase, Fixtures, GameDataCase, RuntimeCase, ScriptedCase } from "./types.js";
+import type { Corpus, ExpressionCase, Fixtures, GameDataCase, RuntimeCase, ScriptedCase, SpecificityCase } from "./types.js";
 
 export function buildCorpus(fixtures: Fixtures): Corpus {
   const expressions: ExpressionCase[] = fixtures.expressions.map((f) => ({
@@ -18,6 +18,14 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     ast: compileExpression(f.src).ast,
     scopes: f.scopes,
     ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    expected: f.expected,
+  }));
+
+  const specificity: SpecificityCase[] = fixtures.specificity.map((f) => ({
+    name: f.name,
+    src: f.src,
+    ast: compileExpression(f.src).ast,
+    scopes: f.scopes,
     expected: f.expected,
   }));
 
@@ -59,5 +67,5 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     expected: f.expected, // hand-authored contract, carried through unchanged
   }));
 
-  return { version: 2, expressions, runtime, scripted, gameData };
+  return { version: 2, expressions, specificity, runtime, scripted, gameData };
 }

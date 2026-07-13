@@ -1251,6 +1251,28 @@ export const cases: Fixtures = {
     // Pins the mulberry32 PRNG: seed 42's first draw -> random(1, 6) == 4.
     { name: "seeded random is deterministic", src: "random(1, 6)", scopes: {}, seed: 42, expected: 4 },
   ],
+  // Matched-specificity scores for the `order: "specificity"` selector's ranking
+  // key. AST-in, integer-score-out; scores hand-derived from the shared scorer
+  // (De-Morgan walk; AND sums, OR takes the max branch, check_flags counts
+  // operands, atom = 1). Every port scores these with its own matchedSpec.
+  specificity: [
+    { name: "single matching atom scores 1", src: "@x == 5", scopes: { patter: { x: 5 } }, expected: 1 },
+    { name: "a non-matching atom scores 0", src: "@x == 5", scopes: { patter: { x: 1 } }, expected: 0 },
+    { name: "AND of two holding atoms sums to 2", src: "@x == 5 and @y > 3", scopes: { patter: { x: 5, y: 4 } }, expected: 2 },
+    { name: "AND with one side not holding scores 0", src: "@x == 5 and @y > 3", scopes: { patter: { x: 5, y: 1 } }, expected: 0 },
+    { name: "AND of three holding atoms sums to 3", src: "@x == 5 and @y > 3 and @z < 10", scopes: { patter: { x: 5, y: 4, z: 2 } }, expected: 3 },
+    { name: "OR takes the max branch: both holding scores 1", src: "@a == 1 or @b == 1", scopes: { patter: { a: 1, b: 1 } }, expected: 1 },
+    { name: "OR takes the max branch: one holding scores 1", src: "@a == 1 or @b == 1", scopes: { patter: { a: 1, b: 0 } }, expected: 1 },
+    { name: "OR with neither branch holding scores 0", src: "@a == 1 or @b == 1", scopes: { patter: { a: 0, b: 0 } }, expected: 0 },
+    { name: "nested OR matched via the 3-atom left branch scores 3", src: "(@a == 1 and @b == 1 and @c == 1) or @x == 1", scopes: { patter: { a: 1, b: 1, c: 1, x: 0 } }, expected: 3 },
+    { name: "nested OR matched via the single-atom right branch scores 1", src: "(@a == 1 and @b == 1 and @c == 1) or @x == 1", scopes: { patter: { a: 0, b: 0, c: 0, x: 1 } }, expected: 1 },
+    { name: "not(atom) holding scores 1 via flipped polarity", src: "not (@x == 5)", scopes: { patter: { x: 1 } }, expected: 1 },
+    { name: "not(a and b) holding: De-Morgan max scores 1", src: "not (@a == 1 and @b == 1)", scopes: { patter: { a: 1, b: 0 } }, expected: 1 },
+    { name: "check_flags with three holding operands scores 3", src: "check_flags(@q, +a, +b, +c)", scopes: { patter: { q: ["a", "b", "c"] } }, expected: 3 },
+    { name: "check_flags with one operand scores 1", src: "check_flags(@q, +a)", scopes: { patter: { q: ["a"] } }, expected: 1 },
+    { name: "check_flags(+a, -b) holding scores 2 (operand count)", src: "check_flags(@q, +a, -b)", scopes: { patter: { q: ["a"] } }, expected: 2 },
+    { name: "(a and b) or c: left AND holds at 2, OR max scores 2", src: "(@a == 1 and @b == 1) or @c == 1", scopes: { patter: { a: 1, b: 1, c: 0 } }, expected: 2 },
+  ],
   runtime: [
     lineThenEnd, choicePick, interpolation, effectsSet, gameEventBeat,
     crossScene, cycle, once, voiced, escaped, shuffle, sequence,

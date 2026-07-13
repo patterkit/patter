@@ -31,6 +31,7 @@
     "@patterkit/model": "^0.1.0",
     "@patterkit/dialect": "^0.1.0",
     "@wildwinter/expr": "^0.3.0",
+    "@wildwinter/expr-specificity": "^0.1.0",
     "@wildwinter/scoperegistry": "^0.1.0"
   }
 }

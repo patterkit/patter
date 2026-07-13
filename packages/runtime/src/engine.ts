@@ -27,6 +27,7 @@
 
 import { evaluate, deserialiseAst } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
+import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import type { ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
@@ -1406,24 +1407,11 @@ export class Flow {
    * node (comparisons, scoped vars, literals, other calls) is an atom, evaluated whole.
    */
   private matchedSpec(node: ExprNode, want: boolean): number {
-    if (node.kind === "binary" && (node.op === "and" || node.op === "or")) {
-      const behaveAsAnd = (node.op === "and") === want;   // De Morgan under negation
-      const l = this.matchedSpec(node.left, want);
-      const r = this.matchedSpec(node.right, want);
-      return behaveAsAnd ? (l > 0 && r > 0 ? l + r : 0) : Math.max(l, r);
-    }
-    if (node.kind === "unary" && node.op === "not") {
-      return this.matchedSpec(node.operand, !want);       // flip polarity
-    }
-    if (node.kind === "call" && node.name === "check_flags") {
-      // N-ary AND over the flag args (args[0] is the flags source). max(1, ...) keeps
-      // check_flags(q,a,b) == check_flags(q,a) and check_flags(q,b).
-      const operands = Math.max(1, node.args.length - 1);
-      const hit = truthy(evaluate(node, this.evalCtx, patterDialect));
-      return want ? (hit ? operands : 0) : (hit ? 0 : 1);
-    }
-    // Atom: its truth matching the wanted polarity contributes exactly one constraint.
-    return truthy(evaluate(node, this.evalCtx, patterDialect)) === want ? 1 : 0;
+    // Delegates to the shared @wildwinter/expr-specificity scorer (same walk,
+    // shared with Storylet Studio). We supply Patter's truthiness rule and keep
+    // check_flags counting via the package's default counting call.
+    const evalTruthy: EvalTruthy = (n) => truthy(evaluate(n, this.evalCtx, patterDialect));
+    return scoreSpecificity(node, evalTruthy, { want });
   }
 
   /** A selector's cursor state - shared across flows (`group.shared`) or this flow's own. */

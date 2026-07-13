@@ -15,11 +15,12 @@
 
 import { evaluate, deserialiseAst } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
+import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
 import type { StepResult } from "@patterkit/runtime";
 import type { GameData } from "@patterkit/model";
-import type { ExpressionCase, GameDataCase, RuntimeCase, ScriptedCase, TranscriptStep } from "./types.js";
+import type { ExpressionCase, GameDataCase, RuntimeCase, ScriptedCase, SpecificityCase, TranscriptStep } from "./types.js";
 
 /** Evaluate one expression case; returns the actual value to compare with `expected`. */
 export function runExpressionCase(c: ExpressionCase): ScalarValue {
@@ -28,6 +29,25 @@ export function runExpressionCase(c: ExpressionCase): ScalarValue {
     host: c.seed !== undefined ? { nextRandom: mulberry32(c.seed) } : undefined,
   };
   return evaluate(deserialiseAst(c.ast), ctx, patterDialect);
+}
+
+/**
+ * Truthiness coercion; mirrors the runtime's `truthy`
+ * (packages/runtime/src/engine.ts) so specificity atoms score identically to
+ * the `order: "specificity"` selector at play time.
+ */
+function truthy(v: ScalarValue): boolean {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") return v !== "";
+  return v.length > 0; // string[]
+}
+
+/** Score one specificity case; returns the actual matched-specificity score. */
+export function runSpecificityCase(c: SpecificityCase): number {
+  const ctx: EvalContext = { scopes: c.scopes };
+  const node = deserialiseAst(c.ast);
+  return matchedSpecificity(node, (n) => truthy(evaluate(n, ctx, patterDialect)), { want: true });
 }
 
 /** Play one runtime case; returns the actual transcript to compare with `expectedTranscript`. */

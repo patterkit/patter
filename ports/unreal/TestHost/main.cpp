@@ -345,6 +345,40 @@ static int runExpressions(const JsonValue& arr)
     return pass;
 }
 
+static int runSpecificity(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            AstPtr node = parseAst(c.at("ast"));
+            EvalContext ctx;
+            auto bags = std::make_shared<std::map<std::string, std::map<std::string, PatterValue>>>();
+            for (const auto& scope : c.at("scopes").obj)
+            {
+                std::map<std::string, PatterValue> bag;
+                for (const auto& p : scope.second.obj) bag[p.first] = toValue(p.second);
+                (*bags)[scope.first] = bag;
+            }
+            for (auto& kv : *bags)
+            {
+                const std::string token = kv.first;
+                ctx.scopes[token] = [bags, token](const std::string& n) -> const PatterValue* {
+                    auto& bag = (*bags)[token]; auto it = bag.find(n); return it != bag.end() ? &it->second : nullptr;
+                };
+            }
+            int actual = matchedSpec(*node, ctx, true);
+            int expected = static_cast<int>(c.at("expected").num);
+            if (actual == expected) ++pass;
+            else fail("spec", name, "expected " + std::to_string(expected) + ", got " + std::to_string(actual));
+        }
+        catch (const std::exception& ex) { fail("spec", name, ex.what()); }
+    }
+    return pass;
+}
+
 static int runRuntime(const JsonValue& arr)
 {
     int pass = 0;
@@ -549,13 +583,15 @@ int main(int argc, char** argv)
     JsonValue root = JsonParser(ss.str()).parse();
 
     int e = runExpressions(root.at("expressions"));
+    const JsonValue* specArr = root.find("specificity");
+    int sp = specArr ? runSpecificity(*specArr) : 0;
     int r = runRuntime(root.at("runtime"));
     int s = runScripted(root.at("scripted"));
     int g = runGameData(root.at("gameData"));
     runInspectorSmoke();
     runOutlineSmoke();
 
-    std::cout << "expressions: " << e << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
+    std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
     std::cout << (g_fails == 0 ? "ALL PASS" : (std::to_string(g_fails) + " FAILED")) << "\n";
     return g_fails == 0 ? 0 : 1;
 }

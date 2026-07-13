@@ -306,6 +306,698 @@
       "expected": 4
     }
   ],
+  "specificity": [
+    {
+      "name": "single matching atom scores 1",
+      "src": "@x == 5",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "patter",
+          "x"
+        ],
+        [
+          "n",
+          5
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "x": 5
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "a non-matching atom scores 0",
+      "src": "@x == 5",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "patter",
+          "x"
+        ],
+        [
+          "n",
+          5
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "x": 1
+        }
+      },
+      "expected": 0
+    },
+    {
+      "name": "AND of two holding atoms sums to 2",
+      "src": "@x == 5 and @y > 3",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "x"
+          ],
+          [
+            "n",
+            5
+          ]
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "sv",
+            "patter",
+            "y"
+          ],
+          [
+            "n",
+            3
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "x": 5,
+          "y": 4
+        }
+      },
+      "expected": 2
+    },
+    {
+      "name": "AND with one side not holding scores 0",
+      "src": "@x == 5 and @y > 3",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "x"
+          ],
+          [
+            "n",
+            5
+          ]
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "sv",
+            "patter",
+            "y"
+          ],
+          [
+            "n",
+            3
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "x": 5,
+          "y": 1
+        }
+      },
+      "expected": 0
+    },
+    {
+      "name": "AND of three holding atoms sums to 3",
+      "src": "@x == 5 and @y > 3 and @z < 10",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "bin",
+          "and",
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "x"
+            ],
+            [
+              "n",
+              5
+            ]
+          ],
+          [
+            "bin",
+            ">",
+            [
+              "sv",
+              "patter",
+              "y"
+            ],
+            [
+              "n",
+              3
+            ]
+          ]
+        ],
+        [
+          "bin",
+          "<",
+          [
+            "sv",
+            "patter",
+            "z"
+          ],
+          [
+            "n",
+            10
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "x": 5,
+          "y": 4,
+          "z": 2
+        }
+      },
+      "expected": 3
+    },
+    {
+      "name": "OR takes the max branch: both holding scores 1",
+      "src": "@a == 1 or @b == 1",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "a"
+          ],
+          [
+            "n",
+            1
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "b"
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 1,
+          "b": 1
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "OR takes the max branch: one holding scores 1",
+      "src": "@a == 1 or @b == 1",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "a"
+          ],
+          [
+            "n",
+            1
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "b"
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 1,
+          "b": 0
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "OR with neither branch holding scores 0",
+      "src": "@a == 1 or @b == 1",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "a"
+          ],
+          [
+            "n",
+            1
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "b"
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 0,
+          "b": 0
+        }
+      },
+      "expected": 0
+    },
+    {
+      "name": "nested OR matched via the 3-atom left branch scores 3",
+      "src": "(@a == 1 and @b == 1 and @c == 1) or @x == 1",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "and",
+          [
+            "bin",
+            "and",
+            [
+              "bin",
+              "==",
+              [
+                "sv",
+                "patter",
+                "a"
+              ],
+              [
+                "n",
+                1
+              ]
+            ],
+            [
+              "bin",
+              "==",
+              [
+                "sv",
+                "patter",
+                "b"
+              ],
+              [
+                "n",
+                1
+              ]
+            ]
+          ],
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "c"
+            ],
+            [
+              "n",
+              1
+            ]
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "x"
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 1,
+          "b": 1,
+          "c": 1,
+          "x": 0
+        }
+      },
+      "expected": 3
+    },
+    {
+      "name": "nested OR matched via the single-atom right branch scores 1",
+      "src": "(@a == 1 and @b == 1 and @c == 1) or @x == 1",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "and",
+          [
+            "bin",
+            "and",
+            [
+              "bin",
+              "==",
+              [
+                "sv",
+                "patter",
+                "a"
+              ],
+              [
+                "n",
+                1
+              ]
+            ],
+            [
+              "bin",
+              "==",
+              [
+                "sv",
+                "patter",
+                "b"
+              ],
+              [
+                "n",
+                1
+              ]
+            ]
+          ],
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "c"
+            ],
+            [
+              "n",
+              1
+            ]
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "x"
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 0,
+          "b": 0,
+          "c": 0,
+          "x": 1
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "not(atom) holding scores 1 via flipped polarity",
+      "src": "not (@x == 5)",
+      "ast": [
+        "u",
+        "not",
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "x"
+          ],
+          [
+            "n",
+            5
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "x": 1
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "not(a and b) holding: De-Morgan max scores 1",
+      "src": "not (@a == 1 and @b == 1)",
+      "ast": [
+        "u",
+        "not",
+        [
+          "bin",
+          "and",
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "a"
+            ],
+            [
+              "n",
+              1
+            ]
+          ],
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "b"
+            ],
+            [
+              "n",
+              1
+            ]
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 1,
+          "b": 0
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "check_flags with three holding operands scores 3",
+      "src": "check_flags(@q, +a, +b, +c)",
+      "ast": [
+        "call",
+        "check_flags",
+        [
+          "sv",
+          "patter",
+          "q"
+        ],
+        [
+          "fd",
+          "+",
+          "a"
+        ],
+        [
+          "fd",
+          "+",
+          "b"
+        ],
+        [
+          "fd",
+          "+",
+          "c"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "q": [
+            "a",
+            "b",
+            "c"
+          ]
+        }
+      },
+      "expected": 3
+    },
+    {
+      "name": "check_flags with one operand scores 1",
+      "src": "check_flags(@q, +a)",
+      "ast": [
+        "call",
+        "check_flags",
+        [
+          "sv",
+          "patter",
+          "q"
+        ],
+        [
+          "fd",
+          "+",
+          "a"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "q": [
+            "a"
+          ]
+        }
+      },
+      "expected": 1
+    },
+    {
+      "name": "check_flags(+a, -b) holding scores 2 (operand count)",
+      "src": "check_flags(@q, +a, -b)",
+      "ast": [
+        "call",
+        "check_flags",
+        [
+          "sv",
+          "patter",
+          "q"
+        ],
+        [
+          "fd",
+          "+",
+          "a"
+        ],
+        [
+          "fd",
+          "-",
+          "b"
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "q": [
+            "a"
+          ]
+        }
+      },
+      "expected": 2
+    },
+    {
+      "name": "(a and b) or c: left AND holds at 2, OR max scores 2",
+      "src": "(@a == 1 and @b == 1) or @c == 1",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "and",
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "a"
+            ],
+            [
+              "n",
+              1
+            ]
+          ],
+          [
+            "bin",
+            "==",
+            [
+              "sv",
+              "patter",
+              "b"
+            ],
+            [
+              "n",
+              1
+            ]
+          ]
+        ],
+        [
+          "bin",
+          "==",
+          [
+            "sv",
+            "patter",
+            "c"
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "patter": {
+          "a": 1,
+          "b": 1,
+          "c": 0
+        }
+      },
+      "expected": 2
+    }
+  ],
   "runtime": [
     {
       "name": "line then end",

@@ -23,11 +23,12 @@ func _initialize() -> void:
 		return
 
 	var e := _run_expressions(root["expressions"])
+	var sp := _run_specificity(root.get("specificity", []))
 	var r := _run_runtime(root["runtime"])
 	var s := _run_scripted(root["scripted"])
 	var g := _run_gamedata(root["gameData"])
 
-	print("expressions: %d  runtime: %d  scripted: %d  gameData: %d" % [e, r, s, g])
+	print("expressions: %d  specificity: %d  runtime: %d  scripted: %d  gameData: %d" % [e, sp, r, s, g])
 	print("ALL PASS" if _fails == 0 else ("%d FAILED" % _fails))
 	quit(0 if _fails == 0 else 1)
 
@@ -62,6 +63,27 @@ func _run_expressions(arr: Array) -> int:
 			pass_count += 1
 		else:
 			_fail("expr", name, "expected %s, got %s" % [str(expected), str(actual)])
+	return pass_count
+
+
+# -- specificity ---------------------------------------------------------------
+
+func _run_specificity(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var ctx := {"scopes": {}}
+		for scope in c["scopes"].keys():
+			var bag := {}
+			for prop in c["scopes"][scope].keys():
+				bag[prop] = PatterValues.to_value(c["scopes"][scope][prop])
+			ctx["scopes"][scope] = func(n): return bag.get(n)
+		var actual := PatterFlow._matched_spec(c["ast"], ctx, true)
+		var expected := int(c["expected"])
+		if actual == expected:
+			pass_count += 1
+		else:
+			_fail("spec", name, "expected %d, got %d" % [expected, actual])
 	return pass_count
 
 

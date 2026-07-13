@@ -384,29 +384,30 @@ namespace Patterkit.Patterplay
         // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
         private int SpecScore(Node node)
         {
-            return node.Condition != null ? MatchedSpec(node.Condition.Ast, true) : 0;
+            return node.Condition != null ? MatchedSpec(node.Condition.Ast, _evalCtx, true) : 0;
         }
 
         // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
         // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
-        private int MatchedSpec(AstNode node, bool want)
+        // Static + ctx-parameterised so the conformance runner can score a bare AST against injected scopes.
+        internal static int MatchedSpec(AstNode node, EvalContext ctx, bool want)
         {
             if (node is Binary bin && (bin.Op == "and" || bin.Op == "or"))
             {
                 bool behaveAsAnd = (bin.Op == "and") == want; // De Morgan under negation
-                int l = MatchedSpec(bin.Left, want);
-                int r = MatchedSpec(bin.Right, want);
+                int l = MatchedSpec(bin.Left, ctx, want);
+                int r = MatchedSpec(bin.Right, ctx, want);
                 return behaveAsAnd ? (l > 0 && r > 0 ? l + r : 0) : Math.Max(l, r);
             }
             if (node is Unary u && u.Op == "not")
-                return MatchedSpec(u.Operand, !want); // flip polarity
+                return MatchedSpec(u.Operand, ctx, !want); // flip polarity
             if (node is Call call && call.Name == "check_flags")
             {
                 int operands = Math.Max(1, call.Args.Length - 1); // Args[0] is the flags source
-                bool hit = Truthy(Expr.Evaluate(node, _evalCtx));
+                bool hit = Truthy(Expr.Evaluate(node, ctx));
                 return want ? (hit ? operands : 0) : (hit ? 0 : 1);
             }
-            return Truthy(Expr.Evaluate(node, _evalCtx)) == want ? 1 : 0; // atom
+            return Truthy(Expr.Evaluate(node, ctx)) == want ? 1 : 0; // atom
         }
 
         private SelectorState SelectorStateFor(Node group)

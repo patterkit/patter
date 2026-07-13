@@ -43,6 +43,23 @@ export interface ExpressionCase {
   expected: ScalarValue;
 }
 
+/**
+ * A compiled matched-specificity case: score a bare condition AST against
+ * injected scopes with the shared best-match specificity metric (the
+ * `order: "specificity"` selector's ranking key). AST-in, integer-score-out.
+ * See docs (Storylets docs/developer/specificity.md describes the identical
+ * shared scorer). Scored at the root polarity `want = true`.
+ */
+export interface SpecificityCase {
+  name: string;
+  /** Human-readable source (informational; ports score `ast`). */
+  src: string;
+  ast: AstNode;
+  scopes: Record<string, ScopeBag>;
+  /** Expected matched-constraint specificity score. */
+  expected: number;
+}
+
 /** A compiled runtime-playthrough case in the portable corpus. */
 export interface RuntimeCase {
   name: string;
@@ -118,6 +135,7 @@ export interface GameDataCase {
 export interface Corpus {
   version: number;
   expressions: ExpressionCase[];
+  specificity: SpecificityCase[];
   runtime: RuntimeCase[];
   scripted: ScriptedCase[];
   gameData: GameDataCase[];
@@ -131,6 +149,15 @@ export interface ExpressionFixture {
   scopes: Record<string, ScopeBag>;
   seed?: number;
   expected: ScalarValue;
+}
+
+/** An authored specificity fixture (source form; compiled by buildCorpus). */
+export interface SpecificityFixture {
+  name: string;
+  src: string;
+  scopes: Record<string, ScopeBag>;
+  /** Expected matched-constraint specificity score (hand-derived from the spec). */
+  expected: number;
 }
 
 export interface RuntimeFixture {
@@ -173,6 +200,7 @@ export interface ScriptedFixture {
 
 export interface Fixtures {
   expressions: ExpressionFixture[];
+  specificity: SpecificityFixture[];
   runtime: RuntimeFixture[];
   scripted: ScriptedFixture[];
   gameData: GameDataFixture[];

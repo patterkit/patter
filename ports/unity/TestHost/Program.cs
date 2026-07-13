@@ -35,6 +35,7 @@ namespace Patterkit.Patterplay.TestHost
             var root = doc.RootElement;
 
             int e = RunExpressions(root.GetProperty("expressions"));
+            int sp = root.TryGetProperty("specificity", out var specArr) ? RunSpecificity(specArr) : 0;
 
             int r = 0, s = 0, g = 0;
             foreach (var (label, loader) in new (string, Func<JsonElement, Bundle>)[]
@@ -59,7 +60,7 @@ namespace Patterkit.Patterplay.TestHost
             _jsonSaveLoad = false;
             Console.WriteLine($"  [PatterSave JSON] scripted save/load: {sj}");
 
-            Console.WriteLine($"expressions: {e}  runtime: {r}  scripted: {s}  gameData: {g}");
+            Console.WriteLine($"expressions: {e}  specificity: {sp}  runtime: {r}  scripted: {s}  gameData: {g}");
             Console.WriteLine(_fails == 0 ? "ALL PASS" : $"{_fails} FAILED");
             return _fails == 0 ? 0 : 1;
         }
@@ -95,6 +96,34 @@ namespace Patterkit.Patterplay.TestHost
                     else Fail("expr", name, $"expected {expected}, got {actual}");
                 }
                 catch (Exception ex) { Fail("expr", name, ex.Message); }
+            }
+            return pass;
+        }
+
+        // -- specificity --------------------------------------------------------
+
+        private static int RunSpecificity(JsonElement arr)
+        {
+            int pass = 0;
+            foreach (var c in arr.EnumerateArray())
+            {
+                string name = c.GetProperty("name").GetString();
+                try
+                {
+                    var node = ParseAst(c.GetProperty("ast"));
+                    var ctx = new EvalContext();
+                    foreach (var scope in c.GetProperty("scopes").EnumerateObject())
+                    {
+                        var bag = new Dictionary<string, PatterValue>();
+                        foreach (var p in scope.Value.EnumerateObject()) bag[p.Name] = ToValue(p.Value);
+                        ctx.Scopes[scope.Name] = new BagScope(bag);
+                    }
+                    int actual = Flow.MatchedSpec(node, ctx, true);
+                    int expected = c.GetProperty("expected").GetInt32();
+                    if (actual == expected) pass++;
+                    else Fail("spec", name, $"expected {expected}, got {actual}");
+                }
+                catch (Exception ex) { Fail("spec", name, ex.Message); }
             }
             return pass;
         }
