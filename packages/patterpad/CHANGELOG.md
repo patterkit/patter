@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-13
+
 ### Added
 - **Needs re-record**: a checkbox on a dialogue line (inspector, when recording status is tracked) for a
   take that exists but must be redone (bad quality, wrong take, misread). It acts as a separate status
