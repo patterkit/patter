@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/dialect",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "The Patter dialect for @wildwinter/expr (scopes shared/scene/flow, built-in functions), an ExpressionSchema builder from property declarations, and the inline {@ref} interpolation helpers (spec §16).",
   "type": "module",
   "license": "MIT",
@@ -34,7 +34,7 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/model": "0.1.2",
+    "@patterkit/model": "0.2.0",
     "@wildwinter/expr": "^0.3.0",
     "@wildwinter/scoperegistry": "^0.1.0"
   }
