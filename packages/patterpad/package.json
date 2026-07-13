@@ -32,7 +32,7 @@
     "@patterkit/model": "0.2.0",
     "@patterkit/ops": "0.2.0",
     "@patterkit/patterpad-surface": "0.0.0",
-    "@patterkit/runtime": "0.2.1",
+    "@patterkit/runtime": "0.2.2",
     "@wildwinter/simple-vc-lib": "^0.2.0",
     "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0",

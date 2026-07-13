@@ -17,6 +17,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-07-13
+
 ### Changed
 - Internal: the Best match (`specificity`) selection metric now uses the shared
   `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is
