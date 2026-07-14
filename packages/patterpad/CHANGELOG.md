@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-07-14
+
 ### Changed
 - **Grammatical gender** (Project Settings ▸ Cast) is now a free-text field with auto-suggest, instead
   of a fixed Male / Female / Neuter dropdown. Three genders don't cover every language (common, animate,
