@@ -1,6 +1,6 @@
 ---
 title: Choices & logic
-description: Selectors, choices and options, conditions, effects, properties, and the expression language.
+description: Selectors, choices and options, conditions, effects, properties, the expression language, and embedding property values in text.
 sidebar:
   label: Choices & logic
 ---
@@ -195,9 +195,40 @@ files or building tooling, not something an author has to learn:
   generator so every engine gets the same result), and the flag helpers
   `check_flags(@prop, +x, -y)` / `set_flags(...)`.
 
-### Interpolation
+## Embedding property values in text
 
-A `text` beat (and any non-voiced line) can drop a property value into the text with
-`{…}`, where the body is a bare property reference: `You have {@gold} gold.` Only a
-`{…}` whose body starts with `@` counts as a slot; to write a literal brace, double it
-(`{{`). Voiced lines never interpolate: they have to stay fixed so they can be recorded.
+You can drop a live game value straight into a beat's text by wrapping a property
+reference in braces (sometimes called *interpolation*). At runtime the braces are
+replaced with the property's current value:
+
+> `You have {@gold} gold.`  →  `You have 42 gold.`
+
+- The body is a **bare property reference** - the same `@` reference you'd use in a
+  [condition](#conditions-and-effects): a project property `{@gold}`, a scene property
+  `{@scene.threat}`, a host value `{@world.faction}`. It's a reference, not a formula:
+  you can't write `{@gold + 1}`.
+- Only a `{…}` whose body starts with `@` is a slot. To print a literal brace, double it:
+  `{{` shows as `{`.
+- Values render as you'd expect: a number or string as-is, a true/false property as
+  `true` / `false`, a flags set as a comma-separated list. An unset property shows as
+  nothing. A `{@…}` naming a property you haven't declared is flagged as an error.
+
+### Where it works: the voiced-project wrinkle
+
+| Text | Embedding a value |
+| --- | --- |
+| **Narration** (`text` beats) | always |
+| **Choice options** | always |
+| **Dialogue** (`line` beats) | **only when the project is not voiced** |
+
+Narration and choice options are always on-screen, so a value can always be substituted in.
+
+Dialogue is the exception, and it comes down to whether the project is
+[**Voiced**](/patterpad/projects-and-settings/). A voiced line ships as **recorded audio**,
+and you can't splice a runtime value into a fixed recording - so **a voiced project rejects a
+`{…}` slot in a dialogue line, as a build error**. If the project is **not** voiced, its
+dialogue is just on-screen text like narration, so embedding works there too.
+
+Put simply: narration and choices always; spoken lines only when there is no voice audio to
+contradict them. If you switch a project to Voiced later, any `{…}` already sitting in a
+dialogue line will surface as a build error to clean up.
