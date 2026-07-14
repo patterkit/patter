@@ -1,5 +1,14 @@
 # @patterkit/ops
 
+## 0.2.1
+
+### Patch Changes
+
+- 087ceca: `applyLoc` now counts only strings whose translation actually changed in `stats.updated`, instead of every non-empty string in the imported catalog. Re-importing an unedited file reports `0 updated` rather than the full line count.
+- Updated dependencies [178967e]
+  - @patterkit/core@0.1.4
+  - @patterkit/compiler@0.2.1
+
 ## 0.2.0
 
 ### Minor Changes
