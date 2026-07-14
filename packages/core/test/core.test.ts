@@ -259,9 +259,19 @@ describe("validateProject", () => {
     expect(validateProject({ project: project(), scenes: [s], authoring })).toEqual([]);
   });
 
-  it("still flags a writing status set on a genuinely unknown id", () => {
-    const authoring: AuthoringFile[] = [{ schema: "patter/authoring@0", writing: { nope_xyz: "final" } }];
-    expect(validateProject({ project: project(), scenes: [scene()], authoring }).map((i) => i.code)).toContain("unknown-status-id");
+  it("IGNORES per-beat metadata on an orphaned id (deleting a beat leaves harmless residue)", () => {
+    // writing + recording + cut + a documentation note, all keyed on a beat that no longer exists.
+    const authoring: AuthoringFile[] = [{ schema: "patter/authoring@0",
+      writing: { nope_xyz: "final" }, recording: { nope_xyz: "recorded" }, cut: { nope_xyz: true },
+      documentation: { nope_xyz: [{ type: "loc", text: "no loc" }] } }];
+    // None of it is flagged - the project still validates clean (so `patter validate` stays green and
+    // Patterpad's problems bar doesn't show an unnavigable "set on unknown id" error).
+    expect(validateProject({ project: project(), scenes: [scene()], authoring })).toEqual([]);
+  });
+
+  it("still flags a status value not in the ladder on a LIVE beat", () => {
+    const authoring: AuthoringFile[] = [{ schema: "patter/authoring@0", writing: { L_1: "nonesuch" } }];
+    expect(validateProject({ project: project(), scenes: [scene()], authoring }).map((i) => i.code)).toContain("invalid-status-value");
   });
 
   // --- mixed beat kinds in a scene (spec §2) ---

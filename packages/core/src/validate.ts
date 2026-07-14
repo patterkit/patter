@@ -43,7 +43,6 @@ export interface ValidationIssue {
     | "multiple-fallbacks"
     | "choice-can-empty"
     | "invalid-status-value"
-    | "unknown-status-id"
     | "unknown-doc-class"
     | "invalid-tag"
     | "invalid-gamedata-field";
@@ -353,10 +352,10 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
 
 
 /**
- * Stored authoring metadata against the project's ladders, scene-type defaults,
- * and real ids (spec §13): every status is a ladder member, every estimate /
- * cut / status key is a live id (an orphaned key is stale metadata - flagged,
- * not dropped), every scene-type resolves to a declared default. `planned`
+ * Stored authoring metadata against the project's ladders and scene-type defaults
+ * (spec §13): every status on a LIVE beat is a ladder member, every doc class is
+ * declared. Metadata keyed on an id that no longer exists is harmless residue from
+ * deleting a beat (like an orphaned comment) - it is ignored, not flagged. `planned`
  * entries need only a name (they have no id yet).
  */
 function validateAuthoring(
@@ -385,24 +384,25 @@ function validateAuthoring(
     for (const tg of est.tagEstimates ?? []) checkLines(tg.lines, `estimating tag '${tg.tag}'`);
   }
 
+  // Per-beat authoring metadata keyed on an id that no longer exists is harmless RESIDUE - deleting a
+  // beat leaves its writing/recording status, cut flag, or notes behind, exactly like an orphaned comment
+  // (kept as a gutter bubble). It never ships and has no runtime effect, so it is IGNORED here, not
+  // flagged: skip an orphaned id entirely (don't even value-check it). Only LIVE ids are validated.
   for (const file of files) {
     for (const [id, value] of Object.entries(file.writing ?? {})) {
-      if (!allIds.has(id)) issues.push({ code: "unknown-status-id", message: `writing status set on unknown id '${id}'`, id });
+      if (!allIds.has(id)) continue;
       if (!writingLadder.has(value)) {
         issues.push({ code: "invalid-status-value", message: `writing status '${value}' on '${id}' is not in the project ladder`, id });
       }
     }
     for (const [id, value] of Object.entries(file.recording ?? {})) {
-      if (!allIds.has(id)) issues.push({ code: "unknown-status-id", message: `recording status set on unknown id '${id}'`, id });
+      if (!allIds.has(id)) continue;
       if (!recordingLadder.has(value)) {
         issues.push({ code: "invalid-status-value", message: `recording status '${value}' on '${id}' is not in the project ladder`, id });
       }
     }
-    for (const id of Object.keys(file.cut ?? {})) {
-      if (!allIds.has(id)) issues.push({ code: "unknown-status-id", message: `cut flag set on unknown id '${id}'`, id });
-    }
     for (const [id, lines] of Object.entries(file.documentation ?? {})) {
-      if (!allIds.has(id)) issues.push({ code: "unknown-status-id", message: `documentation set on unknown id '${id}'`, id });
+      if (!allIds.has(id)) continue;
       for (const line of lines) {
         // Untyped = editor-only (allowed); a named class must be declared.
         if (line.type !== undefined && !docClasses.has(line.type)) {

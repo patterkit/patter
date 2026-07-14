@@ -7,6 +7,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 ## [Unreleased]
 
 ### Fixed
+- A deleted line no longer leaves an unfixable problem behind. Removing a beat that carried a writing /
+  recording status, a cut flag, or a documentation note used to leave that metadata orphaned and reported
+  as a **"… set on unknown id"** error in the problems bar - one you couldn't jump to (the beat is gone)
+  or clear. Orphaned per-beat metadata is now treated as harmless residue and ignored, like an orphaned
+  comment. (Status-value and doc-class checks still apply to lines that exist.)
 - Editing project (`@patter`) properties in **Project Settings ▸ Properties** now takes effect
   immediately. Adding, renaming, retyping, or editing the values of a property used to leave the
   **condition editor**'s property list stale until you restarted Patterpad; it now updates on save. A
