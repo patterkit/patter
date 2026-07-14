@@ -58,6 +58,7 @@ jobs:
       - name: Upload to the release
         uses: softprops/action-gh-release@v2
         with:
+          make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
           name: patter CLI ${{ steps.ver.outputs.version }}
           body: |
             The standalone `patter` command-line tool - one self-contained executable per
@@ -96,6 +97,7 @@ jobs:
       - name: Upload to the release
         uses: softprops/action-gh-release@v2
         with:
+          make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
           files: |
             patter/packages/cli/dist/patter-linux-x64
             patter/packages/cli/dist/patter-linux-arm64

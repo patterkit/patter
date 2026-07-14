@@ -54,5 +54,11 @@ jobs:
           cwd: patter
           version: npm run version-packages
           publish: npm run release
+          # Publish to npm + push git tags, but do NOT create GitHub Release objects for the @patterkit/*
+          # packages. Those empty releases (npm is the real artifact) kept stealing GitHub's "Latest"
+          # badge, which is what electron-updater reads - breaking Patterpad's Check for Updates (a
+          # non-Patterpad "Latest" has no latest.yml -> 404). Only patterpad.yml's vX.Y.Z release should
+          # ever be "Latest".
+          createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

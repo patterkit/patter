@@ -53,6 +53,7 @@ jobs:
       - name: Attach to the release
         uses: softprops/action-gh-release@v2
         with:
+          make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
           name: Patterplay Unreal ${{ steps.relnotes.outputs.version }}
           body_path: ${{ runner.temp }}/release-notes.md
           files: ${{ env.ASSET }}

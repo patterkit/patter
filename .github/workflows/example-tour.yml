@@ -29,6 +29,7 @@ jobs:
       - name: Attach the tour to the release
         uses: softprops/action-gh-release@v2
         with:
+          make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
           name: Interactive Tour ${{ github.ref_name }}
           body: |
             **The Patter Interactive Tour** - a small, playable Patter story that teaches the

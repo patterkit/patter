@@ -37,6 +37,7 @@ jobs:
       - name: Attach corpus.json to the release
         uses: softprops/action-gh-release@v2
         with:
+          make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
           name: Conformance corpus ${{ github.ref_name }}
           body: |
             `corpus.json` - the language-agnostic conformance corpus (expression and
