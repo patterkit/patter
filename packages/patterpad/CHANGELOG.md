@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-07-14
+
 ### Fixed
 - A deleted line no longer leaves an unfixable problem behind. Removing a beat that carried a writing /
   recording status, a cut flag, or a documentation note used to leave that metadata orphaned and reported
