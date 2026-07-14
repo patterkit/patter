@@ -1,5 +1,14 @@
 # @patterkit/ops
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [b14eadf]
+  - @patterkit/model@0.2.1
+  - @patterkit/compiler@0.2.2
+  - @patterkit/core@0.1.5
+
 ## 0.2.1
 
 ### Patch Changes
