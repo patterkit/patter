@@ -17,6 +17,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   **condition editor**'s property list stale until you restarted Patterpad; it now updates on save. A
   changed default (or any settings change) also live-refreshes an open **Play** window, instead of the
   run staying on the old values until restart.
+- Localisation staleness now works. Editing a source line used to leave its existing translations marked
+  **translated** on the next export; they now correctly flip to **stale**, because saving a scene stamps a
+  fresh `modifiedAt` on each source string that actually changed (previously only a scene-level author
+  timestamp moved, which the per-string staleness check never read). Importing a translation file also
+  reports how many translations **changed** rather than every filled-in row, so re-importing an unedited
+  file honestly reads **0 updated**.
 
 ## [0.5.0] - 2026-07-13
 

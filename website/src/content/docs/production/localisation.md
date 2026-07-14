@@ -49,9 +49,10 @@ both halves:
 1. **Export** writes the source text - and, for a chosen language, its current translations -
    in the translator's preferred format (below). Hand the file over.
 2. The translator fills in the Translation column/fields and sends it back.
-3. **Import** reads the language from the file (or you set it) and reports how many lines
-   landed. Translations go into that language's own file; the source is untouched, and the
-   writing surface still shows only the source language.
+3. **Import** reads the language from the file (or you set it) and reports how many
+   translations **changed** (re-importing an unedited file reports **0** - unchanged rows
+   aren't counted). Translations go into that language's own file; the source is untouched,
+   and the writing surface still shows only the source language.
 
 Run the loop as often as you like - it's incremental, not a one-shot. Which brings us to:
 
@@ -65,10 +66,13 @@ The Excel export shows it as a **Status** column:
 - **stale** - has a translation, but the **source line was edited after it was translated**:
   it needs re-checking against the new wording.
 
-On import, unflagged rows are accepted as fresh. A row still marked **stale** has its text
-imported but **stays flagged**: the translator confirms a re-check by *clearing the "stale"
-cell*, not by re-sending the file - so an old spreadsheet can never silently bless an
-outdated translation. (PO files carry the same signal as the standard `#, fuzzy` flag.)
+Import writes back **every filled-in translation**, whatever its Status (an empty Translation
+cell is left alone). The Status doesn't decide *whether* a row imports - only what happens to its
+staleness: an unflagged row is accepted as fresh (its translation is now current for the source as
+it stands), while a row still marked **stale** has its text imported but **stays flagged**. The
+translator confirms a re-check by *clearing the "stale" cell*, not by re-sending the file - so an
+old spreadsheet can never silently bless an outdated translation. (PO files carry the same signal
+as the standard `#, fuzzy` flag.)
 
 ## The formats
 

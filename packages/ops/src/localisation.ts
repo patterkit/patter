@@ -207,7 +207,9 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     const path = targetLocPath(loaded, scene, locale, loaded.project.locales.default);
     const existing = findFile<LocaleFile>(loaded.localeFiles, loaded.locales, path);
     const merged: Record<string, string> = { ...(existing?.strings ?? {}) };
-    for (const [id, text] of strings) { merged[id] = text; updated++; }
+    // Count only strings whose translation actually CHANGED (not every string in the sheet), so a
+    // re-import of an unedited file honestly reads "0 updated" instead of "N updated".
+    for (const [id, text] of strings) { if (merged[id] !== text) updated++; merged[id] = text; }
     const file: LocaleFile = { schema: existing?.schema ?? "patter/strings@0", scene, locale, strings: merged };
     writes.push({ path, content: canonicalStringify(file) });
 

@@ -139,11 +139,30 @@ async function commitAuthoring(s: SceneShards, write: { path: string; content: s
   return res;
 }
 
-/** Build the planned write that stamps `edits[sceneId] = { modifiedAt, by }` into the scene's authoring
- *  shard (merged over any existing authoring, so comments / docs / status are untouched). */
-function editTrailWrite(s: SceneShards, sceneId: string, author: string): { path: string; content: string } {
+/** The ids of the SOURCE strings whose text changed between two default-locale loc shards (added or
+ *  edited; deletions are moot - a gone string has no translation to stale). This is the signal loc
+ *  staleness + the production report read: a translated line goes stale when its source `modifiedAt`
+ *  postdates the last import's `localisedAt`. Best-effort: a shard that won't parse yields no ids. */
+function changedSourceStringIds(prevLocSource: string | null, nextLocSource: string): string[] {
+  const strings = (src: string | null): Record<string, string> => {
+    if (!src) return {};
+    try { return (parseSource(src) as LocaleFile)?.strings ?? {}; } catch { return {}; }
+  };
+  const before = strings(prevLocSource), after = strings(nextLocSource);
+  return Object.keys(after).filter((id) => after[id] !== before[id]);
+}
+
+/** Build the planned write that stamps the edit trail into the scene's authoring shard (merged over any
+ *  existing authoring, so comments / docs / status are untouched): the scene-level author trail plus a
+ *  per-STRING `modifiedAt` for each source string whose text changed - the latter is what makes a
+ *  translated line go stale on the next localisation export (loc / report read `modifiedAt` per id). */
+function editTrailWrite(s: SceneShards, sceneId: string, author: string | undefined, changedStringIds: string[]): { path: string; content: string } {
   return authoringWrite(s, (af) => {
-    af.edits = { ...af.edits, [sceneId]: { ...af.edits?.[sceneId], modifiedAt: new Date().toISOString(), by: author } };
+    const now = new Date().toISOString();
+    const edits = { ...af.edits };
+    if (author) edits[sceneId] = { ...edits[sceneId], modifiedAt: now, by: author }; // scene author trail
+    for (const id of changedStringIds) edits[id] = { ...edits[id], modifiedAt: now }; // per-string staleness signal
+    af.edits = edits;
   });
 }
 
@@ -563,9 +582,12 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     const prevLoc = prev ? prev.loc : (s.locPath ? onDisk(s.locPath) : "");
     const writes: { path: string; content: string }[] = [];
     if (prevFlow !== flowSource) writes.push({ path: s.flowPath, content: flowSource });
-    if (s.locPath && prevLoc !== locSource) writes.push({ path: s.locPath, content: locSource });
+    const locChanged = !!s.locPath && prevLoc !== locSource;
+    if (locChanged) writes.push({ path: s.locPath!, content: locSource });
     if (!writes.length) return { ok: true }; // nothing changed -> leave the shards (and the edit-trail) untouched
-    if (author) writes.push(editTrailWrite(s, sceneId, author)); // stamp the author only when a real change lands
+    // Which SOURCE strings changed - so each gets a fresh `modifiedAt` (the localisation-staleness signal).
+    const changedStringIds = locChanged ? changedSourceStringIds(prevLoc, locSource) : [];
+    if (author || changedStringIds.length) writes.push(editTrailWrite(s, sceneId, author, changedStringIds));
     const res = await commitWrites(writes);
     if (res.ok) {
       sourceMirror.set(sceneId, { flow: flowSource, loc: locSource }); // the mirror now matches what we wrote

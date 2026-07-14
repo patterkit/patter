@@ -126,4 +126,15 @@ describe("applyLoc", () => {
     const sourceCat = { ...cat, locale: "en" };
     expect(applyLoc(loaded, sourceCat).writes).toEqual([]);
   });
+
+  it("counts only strings whose translation actually changed (a no-op re-import reads 0 updated)", () => {
+    const fresh = loadProject(dir); // current on-disk state
+    const cat = extractLoc(fresh, { locale: "fr" });
+    // Re-applying the catalog unchanged writes the same values back -> nothing counts as updated.
+    expect(applyLoc(fresh, cat, { now: "2026-06-01T00:00:00Z" }).stats.updated).toBe(0);
+    // Editing exactly one existing translation -> exactly one update.
+    const one = cat.entries.find((e) => e.translation.trim())!;
+    one.translation += " (edit)";
+    expect(applyLoc(fresh, cat, { now: "2026-06-02T00:00:00Z" }).stats.updated).toBe(1);
+  });
 });

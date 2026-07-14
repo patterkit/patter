@@ -7,7 +7,7 @@ import { mkdtempSync, existsSync, readFileSync, cpSync, mkdirSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadProject } from "@patterkit/ops";
+import { loadProject, extractLoc } from "@patterkit/ops";
 import { walkNodes } from "@patterkit/model";
 import { parseSource, canonicalStringify } from "@patterkit/core";
 import * as project from "../src/main/project.js";
@@ -537,6 +537,35 @@ describe("project session: create -> open -> read -> save -> play", () => {
     const rec = reloaded.authoring.map((a) => a.edits?.[id]).find(Boolean);
     expect(rec?.by).toBe("Ian Writer");
     expect(typeof rec?.modifiedAt).toBe("string");
+  });
+
+  it("bumps a source string's modifiedAt on save, so a translated line goes stale (#loc)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pp-stale-"));
+    for (const d of ["scenes", "loc/en", "loc/ko", "authoring"]) mkdirSync(join(dir, d), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+    w("g.patterproj", { schema: "patter/project@0", project: { id: "g", name: "G" }, locales: { default: "en", all: ["en", "ko"] } });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "S", blocks: [{ id: "b1", type: "block", name: "M", children: [
+      { id: "n1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "A" }], jump: { to: "END" } }] }] } });
+    w("loc/en/one.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", default: true, strings: { L1: "Hello" } });
+    w("loc/ko/one.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "ko", strings: { L1: "annyeong" } });
+    // A Korean translation was imported back in 2020 (localisedAt on the STRING id).
+    w("authoring/one.patterx", { schema: "patter/authoring@0", edits: { L1: { localisedAt: { ko: "2020-01-01T00:00:00Z" } } } });
+
+    project.openProject(dir);
+    const src = project.readScene("s1");
+    // Baseline: source unchanged since the import, so the Korean line is NOT stale.
+    expect(extractLoc(loadProject(dir), { locale: "ko" }).entries.find((e) => e.id === "L1")!.stale).toBe(false);
+
+    // Edit the SOURCE text of L1 and save.
+    const newLoc = src.locSource.replace("Hello", "Hello, world");
+    expect(newLoc).not.toBe(src.locSource);
+    expect((await project.saveScene("s1", src.flowSource, newLoc, "Ian")).ok).toBe(true);
+
+    const reloaded = loadProject(dir);
+    // The per-STRING modifiedAt is stamped (not just the scene-level trail)...
+    expect(typeof reloaded.authoring.map((a) => a.edits?.["L1"]?.modifiedAt).find(Boolean)).toBe("string");
+    // ...so the Korean line now reads STALE (source changed after the 2020 import).
+    expect(extractLoc(reloaded, { locale: "ko" }).entries.find((e) => e.id === "L1")!.stale).toBe(true);
   });
 
   it("an unchanged saveScene is a no-op - shards and the .patterx edit-trail are left untouched", async () => {
