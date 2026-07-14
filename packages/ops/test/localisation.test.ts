@@ -138,3 +138,22 @@ describe("applyLoc", () => {
     expect(applyLoc(fresh, cat, { now: "2026-06-02T00:00:00Z" }).stats.updated).toBe(1);
   });
 });
+
+describe("grammatical gender is free text", () => {
+  // Gender is not a closed set (real languages have common / animate / inanimate, etc). A value
+  // outside male/female/neuter must survive extraction verbatim as translator context.
+  it("carries a non-standard gender value through to the translator context", () => {
+    const d = mkdtempSync(join(tmpdir(), "patter-loc-gender-"));
+    for (const sub of ["scenes", "loc/en"]) mkdirSync(join(d, sub), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(d, p), JSON.stringify(o));
+    w("game.patterproj", { schema: "patter/project@0", project: { id: "g", name: "G" },
+      locales: { default: "en", all: ["en"] }, cast: [{ name: "SEA", gender: "inanimate" }] });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "S", blocks: [
+      { id: "b1", type: "block", name: "M", children: [
+        { id: "n1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "SEA" }] }] }] } });
+    w("loc/en/strings.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", default: true, strings: { L1: "The tide turns." } });
+
+    const byId = Object.fromEntries(extractLoc(loadProject(d)).entries.map((e) => [e.id, e]));
+    expect(byId["L1"]!.context?.gender).toBe("inanimate");
+  });
+});

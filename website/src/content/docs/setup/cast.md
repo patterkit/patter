@@ -11,7 +11,9 @@ The cast is the project's character roster, in **Project Settings ▸ Cast**. Ea
   identity;
 - an optional **display name**: the name the player sees, which can be **translated** (so
   `BARKEEP` shows as "The Barkeep" in English and "Le tavernier" in French);
-- a **grammatical gender** (Male / Female / Neuter / Not specified), sent to translators;
+- a **grammatical gender**, sent to translators: free text (blank means not specified), with
+  auto-suggest for the everyday values (male / female / neuter) plus any others already used in the
+  cast, so a project can name whatever gender a language needs while keeping spellings consistent;
 - optional **notes** and an **actor**, for production;
 - a **cue colour**, drawn from the name rather than picked, so the same character is the same
   colour everywhere: the editor and the play window alike.

@@ -94,8 +94,8 @@ A gendered language often has to inflect the line itself to match its **speaker*
 participles, sometimes the verb. English source text rarely reveals which, so a translator working
 line by line is left guessing, and guessing wrong is a bug you only find in a late language pass.
 
-Set a character's **Grammatical gender** in **Project Settings ▸ Cast** (Male, Female, Neuter, or
-Not specified) and every export carries it alongside that character's lines:
+Set a character's **Grammatical gender** in **Project Settings ▸ Cast** and every export carries it
+alongside that character's lines:
 
 | Format | Where it appears |
 | --- | --- |
@@ -103,8 +103,11 @@ Not specified) and every export carries it alongside that character's lines:
 | PO / POT | an extracted comment, `#. Gender: female` |
 | JSON | `context.gender` on the entry |
 
-It rides the character's own dialogue and their display name. Lines with no speaker (narration) and
-characters left as *Not specified* carry nothing, so you only send what you actually know.
+The field is **free text**, because three genders don't cover every language: it auto-suggests the
+everyday values (*male*, *female*, *neuter*) plus any others already used in the cast, so you can name
+a common, animate, or inanimate gender while keeping spellings consistent. Whatever you type is passed
+to translators verbatim. It rides the character's own dialogue and their display name. Lines with no
+speaker (narration) and characters left blank carry nothing, so you only send what you actually know.
 
 Gender is **export-only context**: it is regenerated from the cast on every export, never read back
 on import, and never shipped in the compiled `.patterc` bundle. Change a character's gender and the

@@ -403,8 +403,16 @@ export interface CoverageDriver {
 /** A character's grammatical gender, for localisation. Translators need it to inflect the speaker's own
  *  lines in gendered languages (adjectives, participles, pronouns), which the source text alone often
  *  cannot tell them. Absent means "not specified". Authoring-only: it never reaches the runtime bundle,
- *  but it IS carried into the localisation handoff formats as translator context (spec §14). */
-export type GrammaticalGender = "male" | "female" | "neuter";
+ *  but it IS carried into the localisation handoff formats as translator context (spec §14).
+ *
+ *  Free text, not a closed set: real languages need more than three genders (common/utrum, animate/
+ *  inanimate, and so on) and translators name them differently. `COMMON_GENDERS` seeds the editor's
+ *  auto-suggest so the everyday values stay spelled consistently; anything else is still valid. */
+export type GrammaticalGender = string;
+
+/** The everyday grammatical genders the Cast editor offers as auto-suggest defaults. Not exhaustive and
+ *  not enforced - a project may use any string (see `GrammaticalGender`). */
+export const COMMON_GENDERS = ["male", "female", "neuter"] as const;
 
 export interface CastMember {
   /** Canonical speaker name (matched by a beat's `character`); language-neutral key. */

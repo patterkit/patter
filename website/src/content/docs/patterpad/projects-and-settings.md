@@ -30,8 +30,9 @@ sidebar:
   plus the **coverage drivers** that stand in for them during a
   [coverage test](/production/coverage-testing/#input-drivers).
 - **Cast**: your characters: script name, an optional display name for translation, and an
-  actor. Expand a row (▸) for **Grammatical gender** - Male / Female / Neuter / Not specified,
-  sent to translators so a gendered language can inflect that character's lines (see
+  actor. Expand a row (▸) for **Grammatical gender** - free text (blank = not specified) with
+  auto-suggest for the everyday values (male / female / neuter) and any others already used in the
+  cast, sent to translators so a gendered language can inflect that character's lines (see
   [Localisation](/production/localisation/#who-is-speaking-grammatical-gender)) - and free-text
   **Notes** on casting, voice, or intent. Each character's colour is shown but chosen for you.
 - **Writing Status** / **Audio Status**: the status ladders, each stage with its own

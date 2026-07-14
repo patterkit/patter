@@ -3,16 +3,34 @@
 // translators, and free-text production notes. value() returns a clean list (blank names pruned) for
 // the save round-trip.
 
-import type { CastMember, GrammaticalGender } from "@patterkit/model";
+import type { CastMember } from "@patterkit/model";
+import { COMMON_GENDERS } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem } from "./dom.js";
 import { dupGuard, expandableRow, focusNewRow } from "./settings-list.js";
 
 export interface CastHandle { value(): CastMember[]; firstDuplicate(): HTMLInputElement | null; }
 
+let genderListSeq = 0; // unique <datalist> ids so each gender input binds to its own suggestion list
 
 export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle {
   const state: CastMember[] = structuredClone(initial ?? []);
   const guard = dupGuard();
+
+  // Auto-suggest values for the gender field: the everyday defaults plus any gender already used
+  // elsewhere in this project's cast, so a second Latin-common or "animate" character reuses the exact
+  // spelling of the first. Deduped case-insensitively (first spelling wins), defaults listed first.
+  const genderSuggestions = (self: CastMember): string[] => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const add = (v: string): void => {
+      const key = v.toLowerCase();
+      if (!v || seen.has(key)) return;
+      seen.add(key); out.push(v);
+    };
+    for (const g of COMMON_GENDERS) add(g);
+    for (const m of state) if (m !== self && m.gender) add(m.gender.trim());
+    return out;
+  };
 
   const memberRow = (m: CastMember, i: number): HTMLElement => {
     // Main line: the canonical name, the player-facing display name, and the voice actor. Notes (longer
@@ -45,21 +63,30 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
       iconBtn("✕", "remove from cast", () => { state.splice(i, 1); render(); }, false, true),
     );
 
-    // Grammatical gender: translator context, exported into the localisation formats. "Not specified"
-    // is the absent value, so a project that never sets it carries nothing.
-    const gender = el("select", "insp-select") as HTMLSelectElement;
-    gender.dataset.tip = "Grammatical gender, sent to translators so gendered languages can inflect this character's lines.";
-    for (const [v, l] of [["", "Not specified"], ["male", "Male"], ["female", "Female"], ["neuter", "Neuter"]] as const) {
-      const o = el("option", undefined, l) as HTMLOptionElement;
-      o.value = v; if (v === (m.gender ?? "")) o.selected = true; gender.append(o);
-    }
-    gender.addEventListener("change", () => { m.gender = (gender.value || undefined) as GrammaticalGender | undefined; });
+    // Grammatical gender: translator context, exported into the localisation formats. Free text with
+    // auto-suggest (blank = "not specified", so a project that never sets it carries nothing). The
+    // suggestion list offers the everyday genders plus any already used in this cast, keeping spellings
+    // consistent without locking out languages that need other values.
+    const gender = el("input", "gd-input") as HTMLInputElement;
+    gender.type = "text"; gender.placeholder = "<gender (optional)>"; gender.value = m.gender ?? ""; gender.spellcheck = false;
+    gender.dataset.tip = "Grammatical gender, sent to translators so gendered languages can inflect this character's lines. Free text; suggestions keep common values spelled consistently.";
+    const genderList = el("datalist") as HTMLDataListElement;
+    genderList.id = `gender-list-${genderListSeq++}`;
+    gender.setAttribute("list", genderList.id);
+    const fillGenderList = (): void => genderList.replaceChildren(
+      ...genderSuggestions(m).map((v) => { const o = el("option") as HTMLOptionElement; o.value = v; return o; }),
+    );
+    fillGenderList();
+    gender.addEventListener("focus", fillGenderList); // refresh in case other rows changed since render
+    gender.addEventListener("input", () => { m.gender = gender.value.trim() || undefined; });
 
     const notes = el("input", "gd-input") as HTMLInputElement;
     notes.type = "text"; notes.placeholder = "<casting / voice / intent notes>"; notes.value = m.notes ?? "";
     notes.addEventListener("input", () => { m.notes = notes.value.trim() || undefined; });
 
-    return expandableRow({ line: [name, display, actor, acts], details: [labelled("Grammatical gender", gender), labelled("Notes", notes)] });
+    const genderField = labelled("Grammatical gender", gender);
+    genderField.append(genderList); // a <datalist> renders nothing; it just needs to be in the DOM
+    return expandableRow({ line: [name, display, actor, acts], details: [genderField, labelled("Notes", notes)] });
   };
 
   const render = (): void => {
