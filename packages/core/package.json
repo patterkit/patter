@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/core",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Patter core: stable id generation, readable-handle computation, canonical (de)serialisation, and the structural validator.",
   "type": "module",
   "license": "MIT",
@@ -34,7 +34,7 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/model": "0.2.0",
+    "@patterkit/model": "0.2.1",
     "json5": "^2.2.3"
   }
 }
