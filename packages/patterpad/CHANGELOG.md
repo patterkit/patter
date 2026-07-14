@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- Editing project (`@patter`) properties in **Project Settings ▸ Properties** now takes effect
+  immediately. Adding, renaming, retyping, or editing the values of a property used to leave the
+  **condition editor**'s property list stale until you restarted Patterpad; it now updates on save. A
+  changed default (or any settings change) also live-refreshes an open **Play** window, instead of the
+  run staying on the old values until restart.
+
 ## [0.5.0] - 2026-07-13
 
 ### Added

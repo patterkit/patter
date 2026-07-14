@@ -721,7 +721,22 @@ function registerIpc(): void {
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => exportLoc(request));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
-  ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => { const r = await project.saveSettings(s); refreshMenu(); if (r.ok) scheduleDebugPush(); return r; }); // dictionary tab may change spell-check on/off + language; settings shape the bundle, so refresh a connected game too
+  ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
+    const r = await project.saveSettings(s);
+    refreshMenu(); // dictionary tab may change spell-check on/off + language
+    if (r.ok) {
+      scheduleDebugPush(); // settings shape the bundle, so refresh a connected external game too
+      // ...and a running PLAY WINDOW: properties / defaults / locales / captions all shape the compiled
+      // bundle, so live-refresh the run in place (same path as an editor scene edit) rather than leaving
+      // it stale until restart.
+      if (playWin && !playWin.isDestroyed()) {
+        const pr = project.refreshPlay();
+        if (pr.kind === "stale") { playWin.webContents.send("play:stale"); win?.webContents.send("play:reset"); }
+        else if (pr.kind !== "none") playWin.webContents.send("play:refreshed", pr.kind, pr.options ?? []);
+      }
+    }
+    return r;
+  });
   ipcMain.handle("project:setStart", (_e, start: { scene: string; block?: string }) => project.setStart(start));
   ipcMain.handle("project:reorderScenes", (_e, ids: string[]) => project.reorderScenes(ids));
   ipcMain.handle("project:createScene", (_e, name: string) => project.createScene(name));

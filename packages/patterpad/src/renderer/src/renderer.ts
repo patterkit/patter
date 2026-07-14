@@ -2093,10 +2093,18 @@ async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
   if (!res.ok) { console.error("Save settings failed:", res.error); return; }
   if (res.project) {
     project = res.project; projectNameEl.textContent = project.name; autosaveOn = project.autosave;
+    // The project's @patter properties may have changed (added / renamed / re-typed / enum values edited):
+    // rebuild the condition-editor catalogue so they're selectable immediately, without a scene reload or a
+    // restart. Mirrors openSceneProps for the scene scope; keeps the load-time order (@patter first). New
+    // default values reach the run through the play window's live refresh (the main process triggers it).
+    sceneProps = [
+      ...s.properties.map((d): ConditionProperty => ({ scope: "patter", name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) })),
+      ...sceneProps.filter((p) => p.scope !== "patter"),
+    ];
     await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
     void refreshProblems();  // refresh the spelling entries in the problems panel for the new setup
     pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
-    lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // refresh the status dropdown
+    lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // refresh the status dropdown + condition pills
   }
 }
 
