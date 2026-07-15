@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- Arrow-key navigation past a dialogue line works again. The character-name cast popup used to open the
+  moment the caret entered a cue and then swallowed **Up / Down**, so you couldn't move to the line above
+  (its popup ate the key) and moving down meant escaping the popup on every line. Vertical arrows now pass
+  straight through cues to move between lines; the cast popup opens only on a deliberate act - typing a
+  letter, a sideways Left / Right move into the cue, or a click - and once it's open, Up / Down navigate
+  its suggestions as before. (#20)
+
 ## [0.5.2] - 2026-07-14
 
 ### Changed

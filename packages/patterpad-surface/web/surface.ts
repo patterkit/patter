@@ -440,6 +440,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // transaction flushes asynchronously.
   let lastInputWasPointer = false;
   let lastPointerOnCue = false;
+  let lastKeyWasVertical = false; // the last keydown was Up/Down - such a move passes THROUGH cues (#20)
   // The beat the caret last sat in; when it changes (click / arrow / entering a prompt) we recentre.
   let lastBeatPos: number | null = null;
   let recenterScheduled = false; // coalesce recentres, and defer the layout read out of dispatch
@@ -567,6 +568,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     },
     handleKeyDown: (v, event) => {
       lastInputWasPointer = false;
+      lastKeyWasVertical = event.key === "ArrowUp" || event.key === "ArrowDown";
       if (slash.handleKeyDown(v, event)) return true;
       if (popup.handleKeyDown(v, event)) return true;
       if (event.key === " ") { const tr = flipToFreeText(v.state); if (tr) { v.dispatch(tr); popup.close(); return true; } }
@@ -591,7 +593,10 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (tr.docChanged) scheduleChange();
       if (tr.selectionSet) scenePinned = false; // a real selection move (beat / block / group) un-pins the scene
       if (tr.selectionSet || tr.docChanged) { slash.close(); scheduleSelect(); }
-      if (tr.getMeta(STRUCTURAL_MOVE) || fromStrayClick) popup.close(); else popup.update(view, ctx);
+      // A vertical (Up/Down) move only passes THROUGH a cue, so it must not raise the cast popup; a
+      // sideways move or a click into the cue may (#20). A click off the cue is already a stray-click close.
+      const mayOpenCue = lastInputWasPointer ? lastPointerOnCue : !lastKeyWasVertical;
+      if (tr.getMeta(STRUCTURAL_MOVE) || fromStrayClick) popup.close(); else popup.update(view, ctx, mayOpenCue);
       // Hints depend only on the selection context, which changes only when the selection or doc does
       // (multi-select dispatches also set the selection) - so skip the rebuild on metadata-only
       // transactions (problem-mark updates), matching the scheduleSelect gate above.

@@ -121,4 +121,41 @@ describe("cast popup - field with dropdown", () => {
     expect(popup.isOpen()).toBe(false);
     view.destroy();
   });
+
+  it("a vertical move THROUGH a cue does not open the popup (#20)", () => {
+    const { view, popup } = mount("ANNA");
+    popup.update(view, context(view.state), false); // mayOpen=false: reached the cue by Up/Down
+    expect(popup.isOpen()).toBe(false);
+    // ...and with the popup shut, Up/Down are left for the spine to move between lines.
+    expect(popup.handleKeyDown(view, key("ArrowUp"))).toBe(false);
+    expect(popup.handleKeyDown(view, key("ArrowDown"))).toBe(false);
+    view.destroy();
+  });
+
+  it("a sideways move / click into a cue DOES open it (#20)", () => {
+    const { view, popup, labels } = mount("ANNA");
+    popup.update(view, context(view.state), true); // mayOpen=true: Left/Right or a click landed here
+    expect(popup.isOpen()).toBe(true);
+    expect(labels()).toEqual(["ANNA", "ANDREW", "BO"]);
+    view.destroy();
+  });
+
+  it("typing on a cue the caret passed through opens the popup and filters (#20)", () => {
+    const { view, popup, labels, cueOf } = mount("ANNA");
+    popup.update(view, context(view.state), false); // passed through: shut
+    expect(popup.isOpen()).toBe(false);
+    expect(popup.handleKeyDown(view, key("b"))).toBe(true); // a keystroke is a deliberate act -> open + seed
+    expect(popup.isOpen()).toBe(true);
+    expect(labels()).toEqual(["BO"]); // filtered by "b"
+    expect(cueOf()).toBe("ANNA");     // the document is untouched while filtering
+    view.destroy();
+  });
+
+  it("once open, Up/Down own the suggestion list (even with an empty buffer)", () => {
+    const { view, popup } = mount("ANNA");
+    popup.update(view); // opened deliberately (mayOpen defaults true), buffer empty
+    expect(popup.handleKeyDown(view, key("ArrowDown"))).toBe(true);
+    expect(popup.isOpen()).toBe(true);
+    view.destroy();
+  });
 });

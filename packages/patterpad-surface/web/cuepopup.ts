@@ -23,6 +23,13 @@ export interface CuePopup {
 
 type Row = { kind: "pick"; name: string } | { kind: "add"; name: string };
 
+/** A single printable character that starts / extends the search - excluding the structural punctuation
+ *  the surface owns ("(" opens a direction, ")" closes it, "/" the special-insert menu). */
+const isFilterKey = (event: KeyboardEvent): boolean => {
+  const k = event.key;
+  return k.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && k !== "(" && k !== ")" && k !== "/";
+};
+
 /**
  * @param getCast    recency-ordered project cast (the shell owns ordering).
  * @param addToCast  register a brand-new character in the project cast (rare).
@@ -92,14 +99,30 @@ export function createCuePopup(getCast: () => readonly string[], addToCast: (nam
     close(); view.focus();
   };
 
-  const update = (view: EditorView, ctx: ZoneState = context(view.state)): void => {
+  // Render, anchor to the caret, and wire click-away dismissal. Idempotent.
+  const present = (view: EditorView): void => {
+    render(view);
+    floating.show(() => anchorBelowCaret(viewRef!, el)); // show + glue to the caret on scroll
+    floating.dismissOnOutside(() => { if (viewRef) dismiss(viewRef); });
+  };
+
+  /**
+   * React to a selection / doc change. `mayOpen` says whether THIS caret move is allowed to raise the
+   * popup on a freshly-entered cue: true for a sideways (Left/Right) move or a click into the cue, false
+   * for vertical (Up/Down) navigation, which only passes THROUGH cues on its way between lines. Reaching a
+   * cue never opens the popup on its own - a deliberate act does (this, or a keystroke in handleKeyDown).
+   * Without the gate an empty cue stole the arrow keys and trapped keyboard line-navigation (#20).
+   */
+  const update = (view: EditorView, ctx: ZoneState = context(view.state), mayOpen = true): void => {
     viewRef = view;
     const c = ctx;
     // The popup belongs to an ACTIVE cue edit: closed whenever the editor is not focused
     // (clicked away), or the caret is not in a cue. So a stray transaction after a blur
     // never re-opens it over a lingering cue selection.
     if (!view.hasFocus() || c.zone?.role !== "cue" || !c.beat) return close();
-    if (!open || c.beat.id !== activeBeat) {
+    const fresh = !open || c.beat.id !== activeBeat;
+    if (fresh && !mayOpen) return close(); // arrived by vertical navigation: leave the popup shut
+    if (fresh) {
       // Freshly entering a cue: open with the full cast, the buffer empty, and the
       // current speaker (if any) pre-highlighted - "pick a replacement".
       activeBeat = c.beat.id; query = ""; open = true; computeRows();
@@ -107,15 +130,27 @@ export function createCuePopup(getCast: () => readonly string[], addToCast: (nam
       const idx = rows.findIndex((r) => r.kind === "pick" && r.name.toLowerCase() === cur);
       highlight = idx >= 0 ? idx : 0;
     }
-    render(view);
-    floating.show(() => anchorBelowCaret(viewRef!, el)); // show + glue to the caret on scroll
-    // Click-away dismisses AND clears the cue highlight (the caret moves off the token). Idempotent.
-    floating.dismissOnOutside(() => { if (viewRef) dismiss(viewRef); });
+    present(view);
   };
 
   const handleKeyDown = (view: EditorView, event: KeyboardEvent): boolean => {
-    if (!open) return false;
+    viewRef = view;
     const k = event.key;
+    if (!open) {
+      // Closed: the caret may be resting on a cue it reached by VERTICAL navigation, where the popup
+      // deliberately stayed shut (see update()). Typing is the author starting to filter, so open now and
+      // seed the buffer with that char. Everything else is left for the spine, so ↑/↓ keep moving between
+      // lines and never provoke the popup (#20).
+      if (isFilterKey(event)) {
+        const c = context(view.state);
+        if (c.zone?.role === "cue" && c.beat) {
+          activeBeat = c.beat.id; open = true; query = k; highlight = 0; computeRows();
+          present(view); event.preventDefault(); return true;
+        }
+      }
+      return false;
+    }
+    // Open (raised by a click / sideways move / keystroke): the arrows now own the suggestion list.
     if (k === "ArrowDown") { if (rows.length) { highlight = (highlight + 1) % rows.length; render(view); } return true; }
     if (k === "ArrowUp") { if (rows.length) { highlight = (highlight - 1 + rows.length) % rows.length; render(view); } return true; }
     if (k === "Enter" || k === "Tab") { event.preventDefault(); choose(view, highlight); return true; }
@@ -129,9 +164,7 @@ export function createCuePopup(getCast: () => readonly string[], addToCast: (nam
       if (query.length === 0) { close(); return false; } // empty buffer + Space = "free text" (handled upstream)
       query += " "; computeRows(); render(view); return true; // names can have spaces ("OLD MAN")
     }
-    // A printable key narrows the search - but NOT the structural punctuation the
-    // surface owns ("(" opens a direction, "/" the special-insert menu).
-    if (k.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && k !== "(" && k !== ")" && k !== "/") {
+    if (isFilterKey(event)) {
       event.preventDefault(); query += k; highlight = 0; computeRows(); render(view); return true;
     }
     return false;
