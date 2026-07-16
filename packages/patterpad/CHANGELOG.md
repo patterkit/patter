@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-07-16
+
 ### Fixed
 - `patterpad <project> --at <where>` now lands correctly when Patterpad is already running. Two problems:
   on Windows the `--at` switch could be dropped as the launch was handed to the running window (the
