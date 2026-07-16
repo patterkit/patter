@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- `patterpad <project> --at <where>` now lands correctly when Patterpad is already running. Two problems:
+  on Windows the `--at` switch could be dropped as the launch was handed to the running window (the
+  location is now forwarded over a reliable channel); and re-launching the project that was already open
+  reloaded it from disk - resetting the editor to the landing scene and discarding unsaved in-memory
+  state - instead of just jumping. Patterpad now jumps in place when the requested project is already
+  open, and only loads when it is a different one. Cold-start `--at` was unaffected.
+
 ## [0.5.3] - 2026-07-15
 
 ### Fixed

@@ -129,6 +129,7 @@ function openAndRecord(path: string): OpenResult {
   const remembered = root ? store.read().lastScene[root] : undefined;
   const proj = project.openProject(path, remembered);
   store.recordOpen(proj.root, proj.name);
+  currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
   refreshMenu();
   // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene; otherwise
   // (the project root / `.patter` package) fall back to where the author last left off.
@@ -158,6 +159,14 @@ let pendingOpenPath: string | null = null;
 /** A `--at <where>` launch location from the command line, captured alongside the path. boot() /
  *  openInWindow consume it to land on the node it names instead of where the author last left off. */
 let pendingOpenAt: string | null = null;
+
+/** Root of the project currently shown in the window (set on every open, cleared back to welcome). Lets a
+ *  second-instance launch tell "same project, jump in place" from "different project, load it". */
+let currentRoot: string | null = null;
+
+/** Two filesystem paths that resolve to the same location (used for the already-open project check). */
+const samePath = (a: string | null | undefined, b: string | null | undefined): boolean =>
+  !!a && !!b && resolve(a) === resolve(b);
 
 /** Aim a freshly-opened project at a launch location. `showProject` already lands on `lastScene` and
  *  reveals `lastCaret`, so a resolved location simply overrides those two: no new renderer channel, and
@@ -677,7 +686,7 @@ function registerIpc(): void {
     return openAndRecord(path);
   });
   ipcMain.handle("project:createDialog", (_e, name: string, vcs: VcsKind, buildBundle?: string): Promise<OpenResult | null> => createDialog(name, vcs, buildBundle));
-  ipcMain.handle("project:forget", (_e, path: string): BootState => { store.forget(path); refreshMenu(); return bootState(null); });
+  ipcMain.handle("project:forget", (_e, path: string): BootState => { store.forget(path); if (samePath(path, currentRoot)) currentRoot = null; refreshMenu(); return bootState(null); });
   ipcMain.handle("project:report", () => project.report());
   ipcMain.handle("project:coverage", (_e, options: import("../shared/api.js").CoverageRunOptions) => project.coverage(options));
   ipcMain.handle("project:proposeCoverageDrivers", () => project.proposeCoverageDrivers());
@@ -978,7 +987,10 @@ function launchLocationFromArgv(argv: string[]): string | null {
 app.setAppUserModelId("com.patterkit.patterpad");
 
 // the RUNNING window (second-instance), not spawn a rival. The non-primary launch quits immediately.
-if (!app.requestSingleInstanceLock()) {
+// Forward this process's argv to the primary instance via additionalData. On Windows the `argv` Chromium
+// delivers to the 'second-instance' event can drop or reorder user switches (it owns that array), so the
+// custom `--at` location could vanish; additionalData is the reliable channel for forwarding it.
+if (!app.requestSingleInstanceLock({ argv: process.argv })) {
   app.quit();
 } else {
   // Windows / Linux cold launch via a file association: the path rides in OUR argv. (macOS uses open-file,
@@ -986,11 +998,23 @@ if (!app.requestSingleInstanceLock()) {
   pendingOpenPath = launchPathFromArgv(process.argv);
   pendingOpenAt = launchLocationFromArgv(process.argv); // `--at <where>`: land on that node, not the last caret
 
-  app.on("second-instance", (_event, argv) => {
-    const p = launchPathFromArgv(argv);
-    const at = launchLocationFromArgv(argv);
-    if (p) openInWindow(p, at);                  // a file double-clicked (or `patterpad proj --at x`) while we're running
-    else if (win) {
+  app.on("second-instance", (_event, argv, _wd, additionalData) => {
+    // Prefer the argv we forwarded via additionalData (survives Windows switch-stripping); fall back to the
+    // raw event argv if it's absent (an older second instance that didn't forward it).
+    const forwarded = (additionalData as { argv?: string[] } | undefined)?.argv;
+    const eff = forwarded?.length ? forwarded : argv;
+    const p = launchPathFromArgv(eff);
+    const at = launchLocationFromArgv(eff);
+    if (p && win && samePath(project.peekRoot(p), currentRoot)) {
+      // The requested project is ALREADY the open one: jump in place, never reload it. A reload resets the
+      // editor to the landing scene (and drops unsaved in-memory state), which the `--at` jump then races -
+      // so `patterpad proj --at x` on the running window used to flicker back to the top instead of landing.
+      if (at) navigateInWindow(at);
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    } else if (p) {
+      openInWindow(p, at);                       // a DIFFERENT project (or nothing open): load it, honouring --at
+    } else if (win) {
       if (at) navigateInWindow(at);              // bare `patterpad --at x`: jump the project already open
       if (win.isMinimized()) win.restore();
       win.focus();                               // bare re-launch: just surface us
