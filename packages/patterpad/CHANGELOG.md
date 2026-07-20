@@ -17,6 +17,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   two blocks in a scene cannot share one. Undoable like any other edit.
 
 ### Changed
+- Flag checks read more compactly in the condition / effects **preview** above a snippet or group:
+  `check_flags(@p, +a, -b)` now shows as `@p: +a -b`, dropping the function name and brackets. The
+  editable condition editor is unchanged, and so is what the expression actually means.
 - A new project's starter line no longer talks about files and terminal commands. The scaffolded Start
   scene read "Welcome to <project>. Edit scenes/start.patterflow, then run: patter play", which means
   nothing when you created the project in Patterpad and are typing straight into the editor. It now reads
