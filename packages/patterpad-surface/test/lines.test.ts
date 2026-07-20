@@ -46,6 +46,42 @@ const snippets = (state: EditorState) => state.doc.type === undefined ? [] :
   (docToScene(state.doc).scene.blocks[0]!.children as unknown as Array<Record<string, unknown>>);
 const beatsOf = (snip: Record<string, unknown>) => (snip.beats ?? []) as Array<{ id: string; kind: string; character?: string }>;
 
+describe("ending a bubble never copies the snippet's authored logic", () => {
+  /** A conditioned, tagged snippet carrying host data - everything that must stay on the FIRST half. */
+  function conditioned(): EditorState {
+    const scene: Scene = {
+      id: "s", type: "scene", name: "S", blocks: [
+        { id: "b", type: "block", name: "M", children: [
+          { id: "sn", type: "snippet", condition: "@hp > 5", tags: ["combat"], gameData: { mood: "tense" }, beats: [
+            { id: "L1", kind: "line", character: "ANNA" },
+            { id: "L2", kind: "line", character: "ANNA" },
+          ] },
+        ] },
+      ],
+    };
+    return EditorState.create({ doc: sceneToDoc(scene, { L1: "Hello", L2: "" }) });
+  }
+
+  it("gives the NEW bubble a clean snippet - the condition stays on the original", () => {
+    const s = run(caretInSay(conditioned(), "L1", 5), endBubble); // Shift-Enter at the end of "Hello"
+    const snips = snippets(s);
+    expect(snips).toHaveLength(2);
+    const [a, b] = snips as Array<Record<string, unknown>>;
+
+    // The original keeps what the author put on it...
+    expect(a!.condition).toBe("@hp > 5");
+    expect(a!.tags).toEqual(["combat"]);
+
+    // ...and the new bubble inherits none of it: a copied condition would silently re-gate the new
+    // lines, and copied effects / host data would ride along unnoticed.
+    expect(b!.condition).toBeUndefined();
+    expect(b!.tags).toBeUndefined();
+    expect(b!.gameData).toBeUndefined();
+    expect(b!.id).not.toBe(a!.id);                    // ...on a fresh id
+    expect(beatsOf(b!).map((x) => x.id)).toEqual(["L2"]); // only the BEATS moved down
+  });
+});
+
 describe("Enter - continuation (content present)", () => {
   it("adds a mirrored line with the speaker pre-filled and SELECTED in the cue", () => {
     const s = run(caretInSay(build(), "L1", 5), enter); // end of "Hello"

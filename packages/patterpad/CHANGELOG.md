@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- Dragging across a **block title** to select it could dump a wall of the block's own lines into the
+  name. The title is a plain text field sitting inside the editing surface, so the browser treated it as
+  a drop target and the drag ended by *dropping* editor content into it. The field no longer starts or
+  accepts a drag, so selecting the title by dragging just selects it.
+- Ending a snippet with **Shift-Enter** (and **Split here**) no longer copies the snippet's condition
+  onto the new one. Splitting carried the whole snippet across, so the new bubble silently inherited the
+  original's condition - and its effects, tags and game data with it. Only the lines move down now; the
+  new bubble starts clean, and the original keeps what you wrote on it. (A terminal jump still moves down
+  with the tail, as before.)
+
 ## [0.6.0] - 2026-07-20
 
 ### Added

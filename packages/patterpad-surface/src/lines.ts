@@ -202,8 +202,11 @@ function splitSnippetPair(tr: import("prosemirror-state").Transaction, snippetPo
   const bPos = aPos + a.nodeSize;
   const b = tr.doc.nodeAt(bPos);
   if (!b || b.type.name !== "snippet") return null;
-  const bRaw = JSON.parse(b.attrs.raw) as Record<string, unknown>;
-  bRaw.id = newId("sn");
-  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: JSON.stringify(bRaw) });
+  // split() copies the WHOLE snippet onto B, so B would inherit A's authored logic - its condition and
+  // its effects. B is a NEW snippet that merely receives the tail beats: only the BEATS move down, never
+  // the gating or the state changes (a copied condition silently re-gates the new bubble; copied effects
+  // would fire twice). Give B a fresh snippet raw and nothing else. The terminal `jump` is a separate
+  // attr and DOES belong to B - endBubble clears it on A.
+  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: JSON.stringify({ id: newId("sn"), type: "snippet" }) });
   return { aPos, bPos };
 }

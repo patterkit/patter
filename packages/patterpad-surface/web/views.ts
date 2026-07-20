@@ -489,6 +489,14 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
   };
   name.addEventListener("change", () => { const pos = getPos(); if (pos == null) return; const tr = setBlockName(view.state, pos, name.value); if (tr) { view.dispatch(tr); refreshJumpLabels(); } }); // renaming a block updates every jump chip that targets it
   name.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); name.blur(); } });
+  // The rename field is a plain <input> sitting INSIDE the contentEditable surface, so the browser's
+  // native drag-and-drop treats it as a drop target: dragging across the title to select it could end up
+  // DROPPING the editor's current selection (a whole block's worth of lines) into the name. Nothing here
+  // inserts text on purpose - change/keydown only read it - so refuse both ends of that gesture: never
+  // start a drag from the field, and never accept one into it. Selecting by dragging then behaves normally.
+  name.addEventListener("dragstart", (e) => { e.preventDefault(); e.stopPropagation(); });
+  name.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = "none"; });
+  name.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); });
   sync(node);
   return {
     dom, contentDOM: body, ignoreMutation: ignoreChrome(body),
