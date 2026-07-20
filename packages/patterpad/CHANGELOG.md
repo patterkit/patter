@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-20
+
 ### Added
 - **Duplicate** a whole snippet, group, option or block, contents and all: on the piece's **⋯** menu
   (or right-click), and on **Edit ▸ Duplicate** (`⌘D` / `Ctrl+D`), which copies whatever is selected or
