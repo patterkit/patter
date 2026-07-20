@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-07-20
+
 ### Fixed
 - Dragging across a **block title** to select it could dump a wall of the block's own lines into the
   name. The title is a plain text field sitting inside the editing surface, so the browser treated it as
