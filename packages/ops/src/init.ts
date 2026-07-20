@@ -77,7 +77,10 @@ export function runInit(opts: InitOptions): InitResult {
   };
   const locale: LocaleFile = {
     schema: "patter/strings@0", scene: sceneId, locale: "en", default: true,
-    strings: { [beatId]: `Welcome to ${name}. Edit scenes/start.patterflow, then run: patter play` },
+    // The starter line is STORY content the writer replaces, so it must read the same however the
+    // project was made: no file paths, no commands. (Front-ends give their own next step - `patter init`
+    // prints "try: patter play <dir>" on the terminal, and Patterpad just opens the scene for editing.)
+    strings: { [beatId]: `Welcome to ${name}. This is the first line of your story - replace it with your own.` },
   };
 
   const bundle: BundlePosture = opts.bundle ?? "commit";

@@ -10,6 +10,7 @@
 
 import type { EditorView } from "prosemirror-view";
 import { insertAfter, wrapChunk, wrapChunksAt, insertOption, insertOptionAfter, unwrapGroup, deleteChunk, deleteChunksAt, deleteBlock, joinSnippet, chunkIsEmpty, type GroupKind } from "../src/groups.js";
+import { duplicateChunk, notifyDuplicated } from "../src/duplicate.js";
 import { multiSelectPositions } from "../src/multiselect.js";
 import { splitSnippetHere } from "../src/lines.js";
 import { createFloating } from "./floating.js";
@@ -91,6 +92,15 @@ export function createActionMenu(): ActionMenu {
     if (!ctx) return; const pos = ctx.getPos(); if (pos == null) return;
     const tr = cmd(ctx.view.state, pos); if (tr) ctx.view.dispatch(tr);
     ctx.view.focus(); close();
+  };
+
+  /** Duplicate the chunk (with its children) as the next sibling. Every copied node gets a fresh id, and
+   *  the host is handed the old -> new map so it can carry the sidecar metadata (status, notes) across. */
+  const duplicateCmd: Cmd = (s, p) => {
+    const res = duplicateChunk(s, p);
+    if (!res) return null;
+    notifyDuplicated(res.idMap);
+    return res.tr;
   };
 
   /** A leaf menu item: label + a click that runs `cmd`. */
@@ -267,8 +277,13 @@ export function createActionMenu(): ActionMenu {
       // Refused when it is the scene's last block - the doc must keep at least one - so it is hidden then.
       const bPos = ctx.getPos();
       const bNode = bPos != null ? ctx.view.state.doc.nodeAt(bPos) : null;
-      if (bNode?.type.name === "block" && ctx.view.state.doc.childCount > 1) {
+      if (bNode?.type.name === "block") {
+        // Duplicate the whole block + everything in it. Always available (unlike Delete, which is
+        // refused on the last block): the copy is named "<name> copy" and takes fresh ids throughout.
         el.appendChild(sepEl());
+        el.appendChild(leaf("Duplicate", "", duplicateCmd));
+      }
+      if (bNode?.type.name === "block" && ctx.view.state.doc.childCount > 1) {
         const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete block";
         del.addEventListener("mouseenter", closeSub);
         del.addEventListener("mousedown", (e) => {
@@ -339,6 +354,10 @@ export function createActionMenu(): ActionMenu {
         if (joinSnippet(ctx.view.state, pos, "down")) el.appendChild(leaf("Join with next", "", (s, p) => joinSnippet(s, p, "down")));
       }
     }
+
+    // Duplicate: the chunk AND everything inside it, dropped in as the next sibling with fresh ids
+    // throughout (an option duplicates too - a quick way to add a variant of a choice).
+    el.appendChild(leaf("Duplicate", "", duplicateCmd));
 
     // Play Block: start an interactive run ENTERING this node's block (not the whole scene). A host
     // action (opens the play window), not a doc edit - gated on the host wiring a handler.

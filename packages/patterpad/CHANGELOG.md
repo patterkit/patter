@@ -6,6 +6,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **Duplicate** a whole snippet, group, option or block, contents and all: on the piece's **⋯** menu
+  (or right-click), and on **Edit ▸ Duplicate** (`⌘D` / `Ctrl+D`), which copies whatever is selected or
+  the piece the cursor is in. The copy lands right after the original and is genuinely separate: every
+  line in it takes a new identity, so editing the copy never touches the original, while the text comes
+  with it. Writing status and notes are carried over (the copy is at the same stage of drafting); review
+  comments are not (a comment is a conversation about the original line), and neither is recording status
+  (the copy has no take yet). A duplicated block is named "<name> copy" and takes a fresh address, since
+  two blocks in a scene cannot share one. Undoable like any other edit.
+
+### Changed
+- A new project's starter line no longer talks about files and terminal commands. The scaffolded Start
+  scene read "Welcome to <project>. Edit scenes/start.patterflow, then run: patter play", which means
+  nothing when you created the project in Patterpad and are typing straight into the editor. It now reads
+  "Welcome to <project>. This is the first line of your story - replace it with your own."
+
 ## [0.5.4] - 2026-07-16
 
 ### Fixed

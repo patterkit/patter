@@ -107,6 +107,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { role: "paste" },
         { role: "selectAll" },
         { type: "separator" },
+        // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
+        // inside it - the copy takes fresh ids throughout, so it never aliases the original.
+        { label: "Duplicate", accelerator: "CmdOrCtrl+D", click: () => send("duplicate") },
+        { type: "separator" },
         // Open the detached search window (#205) in the right mode. The accelerators ARE the shortcuts:
         // Find = Cmd/Ctrl+F; Replace = Cmd+Alt+F on macOS, Ctrl+H elsewhere (the platform conventions).
         { label: "Find…", accelerator: "CmdOrCtrl+F", click: () => send("find") },

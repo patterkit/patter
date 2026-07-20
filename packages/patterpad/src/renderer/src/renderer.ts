@@ -1132,6 +1132,28 @@ function setLineStatus(ids: string[], status: string | null): void {
   }
 }
 
+/**
+ * Carry the sidecar authoring metadata from a duplicated subtree's originals to its copies. The copy has
+ * fresh ids throughout, so anything keyed by id starts empty unless it is copied across here: writing
+ * status and documentation notes follow the copy (it is the same drafting stage, and a VO note still
+ * describes the line). Two things deliberately do NOT follow: threaded review COMMENTS (a conversation
+ * about the original line, not its copy), and recording status (derived from the audio on disk - the copy
+ * has no take yet, so it correctly reads as unrecorded).
+ */
+function carryDuplicatedMetadata(idMap: Record<string, string>): void {
+  if (!currentSceneId) return;
+  let writing = false;
+  let docs = false;
+  for (const [from, to] of Object.entries(idMap)) {
+    const status = writingMap[from];
+    if (status) { writingMap[to] = status; writing = true; }
+    const notes = docMap[from];
+    if (notes?.length) { docMap[to] = notes.map((n) => ({ ...n })); docs = true; }
+  }
+  if (writing) { surface?.setWritingStatus(writingMap); void window.patter.saveWriting(currentSceneId, writingMap); }
+  if (docs) { pushDocNotes(); void window.patter.saveDocs(currentSceneId, docMap); }
+}
+
 /** Review > Line Status: set which writing-status rungs show a gutter pill (remembered in
  *  panes.lineStatusShown; the menu rebuilds off it, so its checks reflect the new set). */
 function setLineStatusShown(names: string[]): void {
@@ -1572,6 +1594,7 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
     onAddToDictionary: (word) => void addWordToDictionary(word), // "Add to dictionary" on a misspelling (#177)
     onIgnoreWord: (word) => void ignoreWord(word), // "Ignore" on a misspelling: persist + refresh the problems bar (#177)
     onSetWritingStatus: (ids, status) => setLineStatus(ids, status), // "Status" submenu sets the writing status (#196)
+    onDuplicate: (idMap) => carryDuplicatedMetadata(idMap), // Duplicate: carry status + notes to the copies
     onAddCharacter: (name) => void registerCharacter(name), // "+ Add" in the cue popup persists to the master cast
   });
   mountingScene = false; // any onChange from here on is a real edit
@@ -2281,6 +2304,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "play") void play();
   else if (cmd === "play-from-start") void playFromStart();
+  else if (cmd === "duplicate") surface?.duplicate();
   else if (cmd === "undo") surface?.undo();
   else if (cmd === "redo") surface?.redo();
   else if (cmd === "toggle-nav") togglePane("nav");

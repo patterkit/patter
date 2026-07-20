@@ -24,9 +24,29 @@ Every snippet and group has a quiet **⋯** button at its top-right, and
 - **Ungroup**: undo a group, so its contents move up a level.
 - **Split here / Join with previous / Join with next**: for snippets, shown only when
   they make sense.
+- **Duplicate**: copy this piece *and everything inside it* in just after itself. Also on
+  **Edit ▸ Duplicate** (`⌘D`), which copies whatever you have selected, or the piece the
+  cursor is in. See below.
 - **Delete**: remove the piece (with a quick confirm unless it's already empty).
 
 All of it is undoable.
+
+### Duplicating a piece
+
+**Duplicate** copies a whole snippet, group, option, or **block** along with its contents,
+dropping the copy in right after the original. It is the quick way to make a variant: build
+one option the way you want it, duplicate it, and reword the copy.
+
+The copy is a genuinely separate piece, never a shadow of the original:
+
+- Every line in it gets its **own identity**, so editing the copy never changes the original
+  (identities are what the text, the recordings and the translations hang off).
+- The **text comes with it**, so you start from what you had rather than a blank.
+- **Writing status** and any **notes** come across too, since the copy is at the same stage
+  of drafting. **Review comments** don't: a comment is a conversation about the original
+  line. **Recording status** doesn't either, because the copy has no recording yet.
+- Duplicating a **block** also names the copy `<name> copy` (then `copy 2`, and so on) and
+  lets it take a fresh address, since two blocks in a scene can't share one.
 
 ## Choices and options
 

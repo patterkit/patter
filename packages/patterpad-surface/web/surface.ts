@@ -23,7 +23,8 @@ import { backspace, deleteSelectionGuarded } from "../src/delete.js";
 import { toggleLineType, flipToFreeText, promoteToDialogue } from "../src/linetype.js";
 import { context } from "../src/context.js";
 import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js";
-import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt } from "../src/groups.js";
+import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
+import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining } from "../src/groups.js";
 import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
 import { setSnippetJump, insertJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, type JumpData } from "./targetpicker.js";
@@ -105,6 +106,9 @@ export interface MountOptions {
    *  submenu (one beat, or a container / selection rippled to its line + prose beats). The host edits
    *  AuthoringFile.writing. Omit (with no ladder) to disable the status submenu. */
   onSetWritingStatus?: (ids: string[], status: string | null) => void;
+  /** A chunk was duplicated: old id -> new id for every node in the copy, so the host can carry the
+   *  sidecar authoring metadata (status, notes) from the originals to the copies. */
+  onDuplicate?: (idMap: Record<string, string>) => void;
   /** Called when the author adds a BRAND-NEW character via the cue popup's "+ Add" row, with the (upper-cased)
    *  name - the host registers it in the project master cast (ProjectFile.cast) so it persists beyond this
    *  session. Omit and a new character lives only in the surface's session cast. */
@@ -190,6 +194,10 @@ export interface SurfaceHandle {
   addPrompt(optionId: string): boolean;
   /** Delete the chunk (snippet / group / option) with this id. */
   deleteChunk(id: string): boolean;
+  /** Duplicate what's currently selected - the node-selected block / group / snippet, else the chunk
+   *  holding the caret - as its next sibling, children and all, with fresh ids throughout (Edit >
+   *  Duplicate). False when the selection isn't inside a duplicable chunk. */
+  duplicate(): boolean;
   /** Reorder the chunk with this id up / down within its container. */
   moveChunk(id: string, dir: "up" | "down"): boolean;
   /** Move the play PLAYHEAD to the node with this id (a running highlight, scrolled into view). The
@@ -423,6 +431,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   setSpellAddHandler(opts.onAddToDictionary ?? null); // "Add to dictionary" on a misspelling routes here (#177)
   setSpellIgnoreHandler(opts.onIgnoreWord ?? null); // "Ignore" on a misspelling routes here (persist + refresh, #177)
   setWritingStatusHandler(opts.onSetWritingStatus ?? null); // the "Status" submenu routes here (#196)
+  setDuplicateHandler(opts.onDuplicate ?? null);            // Duplicate hands the host its old -> new id map
   // `/jump`: open the shared picker BELOW THE CARET; on pick, insert (replace / split per special.ts).
   const slash = createSlashMenu((view) => {
     openTargetPicker({
@@ -940,6 +949,21 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       const tr = deleteChunkCmd(view.state, at);
       if (!tr) return false;
       view.dispatch(tr);
+      return true;
+    },
+    duplicate() {
+      // A node-selected block / group / snippet duplicates itself; otherwise duplicate the chunk the
+      // caret sits in (so Edit > Duplicate works while typing, without selecting the bubble first).
+      const sel = view.state.selection;
+      const at = sel instanceof NodeSelection && DUPLICABLE_KINDS.has(sel.node.type.name)
+        ? sel.from
+        : chunkContaining(view.state.doc, sel.from);
+      if (at == null) return false;
+      const res = duplicateChunk(view.state, at);
+      if (!res) return false;
+      notifyDuplicated(res.idMap); // the host carries status / notes across to the copies
+      view.dispatch(res.tr);
+      view.focus();
       return true;
     },
     moveChunk(id, dir) {

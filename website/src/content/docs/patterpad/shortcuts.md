@@ -18,6 +18,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⌘S` | Save |
 | `⌘,` | Project Settings |
 | `⌘Z` / `⇧⌘Z` | Undo / Redo |
+| `⌘D` | Duplicate the selected snippet, group, option or block (contents and all) |
 | `⌘P` | Play |
 | `⌘F` | Search (go to anything) |
 | `⌘⌥F` / `Ctrl-H` | Replace text across the project |
