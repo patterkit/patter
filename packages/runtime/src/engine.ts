@@ -318,6 +318,10 @@ interface FlowHost {
   nodeIndex: Map<string, SelectableNode>;
   blockIndex: Map<string, { sceneId: string }>;
   blockById: Map<string, CompiledBlock>;
+  /** Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id (project-wide),
+   *  and per-scene block gameId -> internal id. A flow needs them to resolve `goto` by address. */
+  sceneGameIdToId: Map<string, string>;
+  blockGameIdToId: Map<string, Map<string, string>>;
   /** Author tags (#215): node id -> accumulated tags (own + every ancestor's, deduped). Built once. */
   tagIndex: Map<string, string[]>;
   /** The SHARED `@patter` globals (owned scope "patter") + world properties (`@world`). */
@@ -457,6 +461,7 @@ export class Engine {
 
     this.host = {
       bundle, emitIds, strings, defaultStrings, castDisplay, nodeIndex, blockIndex, blockById,
+      sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
       tagIndex: buildTagIndex(bundle), shared,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
       sharedVisits: new Map(),
@@ -560,15 +565,56 @@ export class Engine {
   /**
    * Open (and start) a named flow. Each flow has its own cursor, PRNG, and per-flow
    * half of the scopes (not-shared `@patter`/`@scene`); all flows share the shared
-   * half. Re-opening an existing id replaces it with a fresh flow.
+   * half.
+   *
+   * Re-opening an existing id REPLACES it with a fresh flow, and CLOSES the old one
+   * ({@link Flow.close}) so a host still holding it cannot keep driving the shared world. Replacing is
+   * therefore a reset: that name's cursor, visit counts, selector cursors (so any shuffle / once-each
+   * position) and per-flow properties all start over.
+   *
+   * Contrast {@link runFlow}, which REUSES a flow of the same name instead of replacing it - that is the
+   * call to reach for when you want a speaker's variation state to carry on.
    */
   openFlow(id: string, opts: OpenFlowOptions = {}): Flow {
     const sceneId = this.resolveSceneRef(opts.scene);
     const blockId = this.resolveBlockRef(sceneId, opts.block);
+    this.flowsById.get(id)?.close(); // finish the flow this name used to mean
     const flow = new Flow(id, this.host, opts.seed ?? this.defaultSeed);
     this.flowsById.set(id, flow);
     flow.start(sceneId, blockId);
     return flow;
+  }
+
+  /**
+   * "Play this address and give me everything it produced" - the one-call form of the bark / one-shot
+   * pattern. The NAMED flow is reused if it already exists (moved with {@link Flow.goto}) and opened at
+   * the address if not, then run to its next stop, returning every beat it played.
+   *
+   * Calling it again with the SAME NAME does NOT replace the flow - it reuses it, and that is the whole
+   * point. A flow owns its selector cursors, visit counts and per-flow properties, so reusing one lets a
+   * **shuffle keep its bag** and an **"once each" list keep its place**: successive calls give the next
+   * variation instead of replaying the first forever. (A fresh flow each time would reset all of it,
+   * unless every such group happened to be authored `shared`.) Use one name per independent speaker;
+   * different names never share per-flow state.
+   *
+   * This is exactly where it differs from {@link openFlow}, which REPLACES a flow of the same name and
+   * so resets that variation state. Never mix the two on one name unless you mean to start over.
+   *
+   * Returns the played beats in order - `[]` means the address had nothing left to give (an exhausted
+   * variation list, say), which is the signal to fall back to other content. It THROWS on an address
+   * that does not resolve: unlike `goto` (a navigation primitive, where probing is legitimate), naming a
+   * location here asserts it exists, and keeping `[]` unambiguous is worth more than a soft failure.
+   *
+   * A run that stops at a CHOICE returns the beats up to it and leaves the choice pending on the flow -
+   * fetch it with `engine.getFlow(name)?.getChoices()`.
+   */
+  runFlow(flow: string, scene: string, block?: string): AdvanceToStopResult["played"] {
+    const existing = this.flowsById.get(flow);
+    if (!existing) return this.openFlow(flow, { scene, block }).advanceToStop().played; // start() reports a bad address
+    if (!existing.goto(scene, block)) {
+      throw new Error(`runFlow: address not found: ${scene}${block === undefined ? "" : ` / ${block}`}`);
+    }
+    return existing.advanceToStop().played;
   }
 
   /** Resolve a scene reference (a gameId address OR an internal id) to its internal id. */
@@ -716,8 +762,10 @@ export class Engine {
     return [...this.flowsById.values()];
   }
 
-  /** Close (remove) a flow. */
+  /** Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
+   *  holding it cannot keep advancing it into the shared world (see {@link Flow.close}). */
   closeFlow(id: string): void {
+    this.flowsById.get(id)?.close();
     this.flowsById.delete(id);
   }
 
@@ -728,6 +776,7 @@ export class Engine {
    * After reset, open fresh flows with `openFlow`.
    */
   reset(): void {
+    for (const flow of this.flowsById.values()) flow.close(); // finish them, don't just forget them
     this.flowsById.clear();
     this.host.shared.reseedOwned("patter", this.host.patterSharedDecls);
     this.host.sharedVisits.clear();
@@ -829,6 +878,9 @@ export class Flow {
   // `activeSnippet`/`beatIndex`.
   private started = false;
   private flowEnded = false;
+  /** Closed by the engine (see `close()`). Terminal, and distinct from `flowEnded`: an ENDED flow is
+   *  merely out of content and `goto` revives it; a CLOSED one is finished for good. */
+  private closed = false;
   private currentSceneId: string | null = null;
   private stack: StackFrame[] = [];
   private activeSnippet: CompiledSnippet | null = null;
@@ -943,6 +995,75 @@ export class Flow {
     this.start(sceneId, blockId);
   }
 
+  /**
+   * Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
+   * `onEntry` effects run, entering counts as a visit, and the callstack is REPLACED - any pending
+   * `call` returns are discarded, just as a goto inside a call does.
+   *
+   * `scene` and `block` are host-facing gameIds (spec §6) or internal ids; `block` is scene-scoped, so
+   * it is looked up within `scene`. `"END"` ends the flow. To move within the current scene, pass the
+   * current scene's address again (`flow.currentScene` -> `engine.sceneAddress`).
+   *
+   * This is HOST navigation, not authoring, and it takes effect IMMEDIATELY: any beats left in the
+   * snippet being delivered are abandoned, and a pending choice is dropped. The format stops an AUTHOR
+   * writing a divert into the middle of a snippet; a host teleport is out-of-band, like `reset()` or
+   * `loadGame()`. A flow that never started starts here; one that already ended resumes here.
+   *
+   * Returns false - leaving the cursor exactly where it was - if the address does not resolve. Per-flow
+   * state (properties, visit counts, selector cursors) is untouched either way: this MOVES, never resets.
+   */
+  goto(scene: string, block?: string): boolean {
+    if (this.closed) return false; // closed is terminal: unlike "ended", a goto cannot revive it
+    if (scene === "END") {
+      this.started = true; this.pendingChoice = null; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null;
+      this.activeSnippet = null; this.beatIndex = 0;
+      this.flowEnded = true; this.stack = [];
+      return true;
+    }
+    // Resolve BOTH addresses before touching any state, so a bad one is a no-op rather than a half-move.
+    const sceneId = this.host.sceneGameIdToId.get(scene) ?? (this.host.bundle.scenes[scene] ? scene : undefined);
+    if (sceneId === undefined) return false;
+    let blockId: string | undefined;
+    if (block !== undefined) {
+      blockId = this.host.blockGameIdToId.get(sceneId)?.get(block)
+        ?? (this.host.blockIndex.get(block)?.sceneId === sceneId ? block : undefined);
+      if (blockId === undefined) return false; // a block address is scene-scoped: unknown HERE is unknown
+    }
+    // Never started: start() does the same landing plus the one-time per-flow setup.
+    if (!this.started) { this.start(sceneId, blockId); return true; }
+
+    this.pendingChoice = null; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null;
+    this.activeSnippet = null; this.beatIndex = 0; // abandon the rest of the snippet being delivered
+    this.flowEnded = false;                        // an ended flow resumes at the target
+    this.enterTarget(blockId ?? sceneId, "jump");  // "jump" = replace the stack, exactly like an authored goto
+    this.settle();
+    return true;
+  }
+
+  /**
+   * Finish this flow for good. Engine-managed: `engine.closeFlow(id)`, `engine.reset()`, and re-opening
+   * a name with `engine.openFlow` all call it on the flow being dropped.
+   *
+   * A dropped flow used to stay fully live: unregistered and invisible to `engine.flows()`, but a host
+   * still holding the object could keep advancing it, and every scene `onEntry`, shared property, world
+   * visit count and shared selector cursor it touched still landed on the engine. Closing makes that
+   * stale reference inert - `advance()` reports the end and `goto()` refuses - so a forgotten reference
+   * cannot quietly mutate the world. Terminal: unlike ending, a close is never revived.
+   */
+  close(): void {
+    this.closed = true;
+    this.flowEnded = true;
+    this.stack = [];
+    this.activeSnippet = null;
+    this.beatIndex = 0;
+    this.pendingChoice = null;
+    this.pendingPromptBeat = null;
+    this.pendingPromptOwnerId = null;
+  }
+
+  /** True once the engine has closed this flow (closed, dropped by `reset()`, or replaced by name). */
+  get isClosed(): boolean { return this.closed; }
+
   /** The scene the cursor is currently in - set on entry and whenever a jump crosses scenes. Read
    *  right after `advance()` to know which scene the just-played beat lives in (tooling that mirrors
    *  the playhead, e.g. an editor following a cross-scene jump). `null` before the flow has started. */
@@ -950,6 +1071,7 @@ export class Flow {
 
   /** Run until the next line, game event, choice, or the end of the flow. */
   advance(): StepResult {
+    if (this.closed) return { type: "end" }; // a stale reference to a closed flow drives nothing
     if (!this.started) throw new Error("flow has not been started");
     // A replayed prompt (replayPromptOnChoose) is delivered first, before the option's content.
     if (this.pendingPromptBeat) { const b = this.pendingPromptBeat; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null; return this.beatResult(b); }

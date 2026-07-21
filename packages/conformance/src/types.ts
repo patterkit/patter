@@ -94,6 +94,14 @@ export type ScriptOp =
   | { op: "useFlow"; flow: string }
   | { op: "advance"; expect: TranscriptStep[] }
   | { op: "choose"; id: string; expect?: TranscriptStep[] }
+  // Host navigation by ADDRESS (spec §6 gameIds): move the current flow as an authored `go` jump would -
+  // target scene onEntry runs, the entry counts as a visit, the callstack is REPLACED (pending call-returns
+  // discarded). Out-of-band, so it lands immediately: the rest of the snippet being delivered is abandoned,
+  // as is a pending choice. An unstarted flow starts there, an ENDED one revives; a CLOSED one refuses.
+  // Produces no transcript of its own (the following `advance` shows where it landed). `expectResult`
+  // pins the BOOLEAN it returns - false = address did not resolve, cursor untouched - which a runner
+  // asserts directly rather than through the transcript. Every port must agree on all of it.
+  | { op: "goto"; scene: string; block?: string; expectResult?: boolean }
   | { op: "saveLoad" }
   | { op: "setLocale"; locale: string } // live language switch: re-points the active string table, no state change
   | { op: "setClosedCaptions"; on: boolean } // live caption toggle (#214): strip dialogue cues when off; no state change

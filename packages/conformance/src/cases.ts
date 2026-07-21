@@ -719,6 +719,67 @@ const scriptedMultiFlow = {
   ],
 } satisfies ScriptedFixture;
 
+// Host navigation by address. Pins every part of the contract in one script: a scene-address hop that
+// runs the target's onEntry, a scene-SCOPED block address, an unknown address that must NOT move the
+// cursor, abandonment of both the rest of a snippet and a pending call-return, and revival of an ended
+// flow with per-flow selector memory intact (the bark loop). Addresses are DERIVED from names, so a port
+// that forgets the name-slug fallback fails here.
+const scriptedGoto = {
+  name: "goto: address navigation, immediate landing, and move-without-reset",
+  project: project({ properties: [{ name: "entered", type: "number", shared: true, default: 0 }] }),
+  scenes: [
+    { id: "scn_hub", type: "scene", name: "Hub", blocks: [
+      { id: "b_main", type: "block", name: "Main", children: [
+        // Calls Far, so a return frame is pending while Far plays; a goto must discard it.
+        { id: "sn_call", type: "snippet", beats: [{ id: "L_a", kind: "text" }], jump: { to: "b_far", mode: "call" } },
+        { id: "sn_after", type: "snippet", beats: [{ id: "L_after", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "b_far", type: "block", name: "Far", children: [
+        { id: "sn_far", type: "snippet", beats: [{ id: "L_f1", kind: "text" }, { id: "L_f2", kind: "text" }] },
+      ] },
+      { id: "b_var", type: "block", name: "Var", children: [
+        { id: "g_var", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "once" }, children: [
+          { id: "sn_v1", type: "snippet", beats: [{ id: "V1", kind: "text" }] },
+          { id: "sn_v2", type: "snippet", beats: [{ id: "V2", kind: "text" }] },
+        ] },
+      ] },
+    ] },
+    { id: "scn_side", type: "scene", name: "Side Room",
+      onEntry: [{ kind: "set", target: "@entered", value: "@entered + 1" }],
+      blocks: [{ id: "b_talk", type: "block", name: "Talk", children: [
+        { id: "sn_talk", type: "snippet", beats: [{ id: "L_talk", kind: "text" }], jump: { to: "END" } },
+      ] }] },
+  ],
+  locales: [
+    loc("scn_hub", { L_a: "a", L_after: "returned", L_f1: "f1", L_f2: "f2", V1: "v1", V2: "v2" }),
+    loc("scn_side", { L_talk: "talk {@entered}" }),
+  ],
+  script: [
+    { op: "openFlow", flow: "f", scene: "hub" },
+    { op: "advance", expect: [{ type: "text", id: "L_a", text: "a" }] },   // then the CALL into Far
+    { op: "advance", expect: [{ type: "text", id: "L_f1", text: "f1" }] }, // mid-snippet, return pending
+
+    // Unknown addresses must not move the cursor. A block address is SCENE-SCOPED, so "talk" (which
+    // lives in the side scene) must not resolve against hub.
+    { op: "goto", scene: "no-such-scene", expectResult: false },
+    { op: "goto", scene: "hub", block: "no-such-block", expectResult: false },
+    { op: "goto", scene: "hub", block: "talk", expectResult: false },
+
+    // A real hop: onEntry runs (entered 0 -> 1), the rest of Far's snippet (f2) is abandoned, and the
+    // pending call-return ("returned") is discarded because a goto REPLACES the stack.
+    { op: "goto", scene: "side-room", block: "talk", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "L_talk", text: "talk 1" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+
+    // The flow has ENDED; goto revives it, and per-flow selector memory survived the hop.
+    { op: "goto", scene: "hub", block: "var", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "V1", text: "v1" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "goto", scene: "hub", block: "var", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "V2", text: "v2" }] }, // resumes: a reset would replay v1
+  ],
+} satisfies ScriptedFixture;
+
 const scriptedReset = {
   name: "engine reset re-seeds every kind of shared state",
   project: sharedStateProject, scenes: sharedStateScenes, locales: sharedStateLoc,
@@ -1281,7 +1342,7 @@ export const cases: Fixtures = {
     characterName, localeActive, idsMode, tagsAccumulate,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ],
-  scripted: [scriptedMultiFlow, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
+  scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock],

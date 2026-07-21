@@ -5316,6 +5316,307 @@
       ]
     },
     {
+      "name": "goto: address navigation, immediate landing, and move-without-reset",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0rzj0zx",
+          "structureHash": "17y6zar"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "entered",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "scn_hub": {
+            "id": "scn_hub",
+            "type": "scene",
+            "name": "Hub",
+            "blocks": [
+              {
+                "id": "b_main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "sn_call",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_a",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "b_far",
+                      "mode": "call"
+                    }
+                  },
+                  {
+                    "id": "sn_after",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_after",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_far",
+                "type": "block",
+                "name": "Far",
+                "children": [
+                  {
+                    "id": "sn_far",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_f1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L_f2",
+                        "kind": "text"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_var",
+                "type": "block",
+                "name": "Var",
+                "children": [
+                  {
+                    "id": "g_var",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_v1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "V1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_v2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "V2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_side": {
+            "id": "scn_side",
+            "type": "scene",
+            "name": "Side Room",
+            "onEntry": [
+              {
+                "kind": "set",
+                "target": "@entered",
+                "value": {
+                  "src": "@entered + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "patter",
+                      "entered"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b_talk",
+                "type": "block",
+                "name": "Talk",
+                "children": [
+                  {
+                    "id": "sn_talk",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_talk",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_a": "a",
+            "L_after": "returned",
+            "L_f1": "f1",
+            "L_f2": "f2",
+            "V1": "v1",
+            "V2": "v2",
+            "L_talk": "talk {@entered}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "hub"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "L_a",
+              "text": "a"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "L_f1",
+              "text": "f1"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "no-such-scene",
+          "expectResult": false
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "no-such-block",
+          "expectResult": false
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "talk",
+          "expectResult": false
+        },
+        {
+          "op": "goto",
+          "scene": "side-room",
+          "block": "talk",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "L_talk",
+              "text": "talk 1"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "var",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "V1",
+              "text": "v1"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "var",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "V2",
+              "text": "v2"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "engine reset re-seeds every kind of shared state",
       "bundle": {
         "schema": "patter/bundle@0",

@@ -34,6 +34,26 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	FString CurrentScene() const;
 
+	// Advance repeatedly, collecting every beat played, until a choice or the end. The terminal
+	// choice / end is returned in OutStop; the return value is what played on the way to it.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	TArray<FPatterStep> AdvanceToStop(FPatterStep& OutStop);
+
+	// Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
+	// onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
+	// discarded). Scene/Block are host-facing Game IDs (or internal ids); Block is scene-scoped, so it is
+	// looked up inside Scene. "END" ends the flow. HOST navigation, so it lands IMMEDIATELY: any beats
+	// left in the snippet being delivered are abandoned, and a pending choice is dropped. An unstarted
+	// flow starts here; an ended one resumes. Returns false - cursor untouched - if the address does not
+	// resolve. It MOVES the cursor; it never resets the flow's state.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	bool Goto(const FString& Scene, const FString& Block);
+
+	// True once the engine has closed this flow (closed, dropped by Reset, or replaced by name). A closed
+	// flow is inert: Advance reports the end and Goto refuses.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool IsClosed() const;
+
 	void Init(UPatterEngine* InOwner, const FString& InId, patter::Flow* InFlow);
 	// Live bundle refresh: point this wrapper at the flow of the SAME id inside a swapped engine
 	// (nullptr when the flow did not survive - the wrapper then no-ops).
@@ -61,6 +81,14 @@ public:
 	// Open (and start) a named flow at a scene (its id or gameId; empty = the first scene).
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	UPatterFlow* OpenFlow(const FString& Id, const FString& Scene);
+
+	// "Play this address and give me everything it produced" - the one-call bark form. The NAMED flow is
+	// reused if it already exists (moved with Goto) and opened at the address if not, then run to its next
+	// stop. Reuse is the point: a flow owns its selector cursors, so a shuffle keeps its bag and a
+	// "once each" list keeps its place from call to call. An empty array means the address had nothing
+	// left to give. Contrast OpenFlow, which REPLACES a flow of the same name and so resets that state.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	TArray<FPatterStep> RunFlow(const FString& FlowName, const FString& Scene, const FString& Block);
 
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	float GetPropertyNumber(const FString& Ref) const;
@@ -119,6 +147,18 @@ public:
 	// The authored structure as a nested tree: scenes -> blocks -> children (groups + snippets, groups
 	// preserved) -> a snippet's beats, each carrying its static data. Static (no flow). For editor / dev
 	// tooling that builds against the writer's structure, e.g. a Sequencer of subsequences per beat.
+	// A beat's accumulated author tags (its own plus every ancestor's), the same value its step carries.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	TArray<FString> TagsForBeat(const FString& BeatId) const;
+
+	// Switch language live, mid-game: subsequent beats render in the new locale. No state changes.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void SetLocale(const FString& Locale);
+
+	// Closed captions: when off, cue spans are stripped from dialogue line text. No state changes.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void SetClosedCaptions(bool bOn);
+
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Structure")
 	TArray<FPatterOutlineScene> GetOutline() const;
 

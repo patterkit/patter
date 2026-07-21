@@ -44,6 +44,12 @@ jobs:
             git diff -- packages/ops/src/playable-runtime.ts | head -20
             exit 1
           fi
+      # The conformance corpus pins BEHAVIOUR, but only of the calls a case actually makes - an API that
+      # no case exercises can live on ONE runtime alone (advanceToStop did exactly that). This proves all
+      # four surfaces HAVE the same members; the corpus proves they agree on what they do.
+      - name: Patterplay runtimes expose the same API
+        working-directory: patter
+        run: node scripts/check-runtime-api-parity.mjs
       # The four Patterplay runtimes (JS + Unity/Unreal/Godot) must share one version. A Changesets
       # cascade can bump @patterkit/runtime alone and break lockstep with the ports - catch that here.
       - name: Patterplay runtimes are in lockstep

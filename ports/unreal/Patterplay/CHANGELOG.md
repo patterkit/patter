@@ -7,6 +7,26 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+- **Host navigation.** `Goto` (BlueprintCallable) sends a running flow to a Game ID address, behaving exactly like a jump
+  the writer could have written: the destination scene's on-entry effects run, arriving counts as a
+  visit, and the call stack is replaced. Being a game action rather than a written one it lands
+  immediately (any remaining lines of the snippet being delivered are abandoned, and a pending choice is
+  dropped), and it MOVES the cursor without resetting the flow - variation, visit counts and properties
+  all carry on. Returns false, cursor untouched, on an address that does not resolve.
+- **`RunFlow`** (BlueprintCallable) plays an address in one call: it opens the named flow if it does not exist, moves it if it
+  does, runs to the next stop and returns what played. Reusing the name is the point - a flow owns its
+  selector cursors, so a shuffle keeps its bag and a "once each" list keeps its place from call to call.
+  Use one name per speaker. An empty result means that address has nothing left to give.
+- **`AdvanceToStop`** (BlueprintCallable) (parity): advance repeatedly, collecting every beat played, until a choice or the end.
+  Previously only the JS runtime had this.
+
+### Changed
+- Dropping a flow now FINISHES it. Closing a flow, resetting the engine, or re-opening a name all leave
+  the old flow object inert, so a reference a game still holds cannot keep advancing it and quietly move
+  shared state. Re-opening a name still replaces (and so resets) that flow - use `RunFlow` when you
+  want a speaker's variation state to carry on instead.
+
 ## [0.2.2] - 2026-07-13
 
 ### Changed

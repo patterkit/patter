@@ -61,6 +61,10 @@ namespace Patterkit.Patterplay
         public Dictionary<string, Node> NodeIndex;
         public Dictionary<string, string> BlockToScene;   // block id -> scene id
         public Dictionary<string, Block> BlockById;
+        // Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id,
+        // and per-scene block gameId -> internal id. A flow needs them to resolve Goto by address.
+        public Dictionary<string, string> SceneGameIdToId;
+        public Dictionary<string, Dictionary<string, string>> BlockGameIdToId;
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
         public Dictionary<string, PatterValue> SharedPatter;
         public List<PropertyDecl> PatterSharedDecls;
@@ -163,6 +167,7 @@ namespace Patterkit.Patterplay
             {
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
+                SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
                 SharedPatter = sharedPatter, PatterSharedDecls = sharedDecls, PatterLocalDecls = localDecls,
                 PatterSharedNames = sharedNames, SceneSharedNames = sceneSharedNames,
                 CustomRng = options.Rng, ReplayPromptOnChoose = options.ReplayPromptOnChoose,
@@ -243,6 +248,9 @@ namespace Patterkit.Patterplay
         {
             string sceneId = ResolveSceneRef(scene);
             string blockId = ResolveBlockRef(sceneId, block);
+            // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
+            // driving the shared world. Replacing is a reset - contrast RunFlow, which reuses.
+            if (_flows.TryGetValue(id, out var previous)) previous.Close();
             var flow = new Flow(id, _host, seed ?? _defaultSeed);
             _flows[id] = flow;
             flow.Start(sceneId, blockId);
@@ -250,7 +258,42 @@ namespace Patterkit.Patterplay
         }
 
         public Flow GetFlow(string id) => _flows.TryGetValue(id, out var f) ? f : null;
-        public void CloseFlow(string id) => _flows.Remove(id);
+        /// <summary>Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a
+        /// host still holding it cannot keep advancing it into the shared world.</summary>
+        public void CloseFlow(string id)
+        {
+            if (_flows.TryGetValue(id, out var f)) f.Close();
+            _flows.Remove(id);
+        }
+
+        /// <summary>"Play this address and give me everything it produced" - the one-call bark form.
+        /// The NAMED flow is reused if it exists (moved with Goto) and opened at the address if not, then
+        /// run to its next stop. Reuse is the point: a flow owns its selector cursors, so a shuffle keeps
+        /// its bag and an "once each" list keeps its place across calls. Empty list = nothing left to play.
+        /// Throws if the address does not resolve.</summary>
+        public List<StepResult> RunFlow(string flow, string scene, string block = null)
+        {
+            Flow f;
+            if (_flows.TryGetValue(flow, out var existing))
+            {
+                if (!existing.Goto(scene, block))
+                    throw new Exception($"runFlow: address not found: {scene}{(block == null ? "" : " / " + block)}");
+                f = existing;
+            }
+            else f = OpenFlow(flow, scene, block);
+
+            return f.AdvanceToStop().Played;
+        }
+
+        /// <summary>The host-facing address (Game ID) of a scene by internal id, or null if unknown. The
+        /// inverse of the address resolution OpenFlow / Goto do - for a host that wants to display, log, or
+        /// pass back the address of where it currently is.</summary>
+        public string SceneAddress(string sceneId)
+            => _host.Bundle.Scenes.TryGetValue(sceneId, out var scene) ? EffectiveGameId(scene.GameId, scene.Name) : null;
+
+        /// <summary>The host-facing address (Game ID) of a block by internal id, or null if unknown.</summary>
+        public string BlockAddress(string blockId)
+            => _host.BlockById.TryGetValue(blockId, out var block) ? EffectiveGameId(block.GameId, block.Name) : null;
 
         // -- author tags (#215) -------------------------------------------------
 
@@ -384,6 +427,7 @@ namespace Patterkit.Patterplay
 
         public void Reset()
         {
+            foreach (var f in _flows.Values) f.Close(); // finish them, don't just forget them
             _flows.Clear();
             foreach (var d in _host.PatterSharedDecls) _host.SharedPatter[d.Name.ToLowerInvariant()] = PropDefault(d);
             _host.SharedVisits.Clear();

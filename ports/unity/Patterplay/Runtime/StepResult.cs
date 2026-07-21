@@ -25,6 +25,14 @@ namespace Patterkit.Patterplay
         public GameData GameData;
     }
 
+    /// <summary>The result of AdvanceToStop: every beat played on the way to a stop, plus the terminal
+    /// choice / end that stopped it.</summary>
+    public sealed class AdvanceToStopResult
+    {
+        public List<StepResult> Played = new List<StepResult>();
+        public StepResult Stop;
+    }
+
     public sealed class StepResult
     {
         public StepType Type;

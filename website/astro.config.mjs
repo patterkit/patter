@@ -126,6 +126,7 @@ export default defineConfig({
             "play/formatting",
             "play/closed-captions",
             "play/audio",
+            "play/navigation",
             "play/live-debug",
             "play/structure",
             "play/play-helpers",

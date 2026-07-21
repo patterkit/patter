@@ -147,6 +147,30 @@ bool UPatterFlow::IsEnded() const { return Flow ? Flow->isEnded() : true; }
 
 FString UPatterFlow::CurrentScene() const { return Flow ? Ue(Flow->currentScene()) : FString(); }
 
+TArray<FPatterStep> UPatterFlow::AdvanceToStop(FPatterStep& OutStop)
+{
+	TArray<FPatterStep> Played;
+	OutStop = FPatterStep();
+	if (!Flow) return Played;
+	try
+	{
+		patter::AdvanceToStopResult Res = Flow->advanceToStop();
+		for (const patter::StepResult& S : Res.played) Played.Add(Convert(S));
+		OutStop = Convert(Res.stop);
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Played;
+}
+
+bool UPatterFlow::Goto(const FString& Scene, const FString& Block)
+{
+	if (!Flow) return false;
+	try { return Flow->gotoAddress(Std(Scene), Std(Block)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
+
 // ----- UPatterEngine ----------------------------------------------------------
 
 UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle)
@@ -175,6 +199,38 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
 		return Flow;
 	}
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+}
+
+TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FString& Scene, const FString& Block)
+{
+	TArray<FPatterStep> Played;
+	if (!Engine) return Played;
+	try
+	{
+		for (const patter::StepResult& S : Engine->runFlow(Std(FlowName), Std(Scene), Std(Block))) Played.Add(Convert(S));
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Played;
+}
+
+TArray<FString> UPatterEngine::TagsForBeat(const FString& BeatId) const
+{
+	TArray<FString> Out;
+	if (!Engine) return Out;
+	for (const std::string& T : Engine->tagsForBeat(Std(BeatId))) Out.Add(Ue(T));
+	return Out;
+}
+
+void UPatterEngine::SetLocale(const FString& Locale)
+{
+	if (!Engine) return;
+	try { Engine->setLocale(Std(Locale)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
+void UPatterEngine::SetClosedCaptions(bool bOn)
+{
+	if (Engine) Engine->setClosedCaptions(bOn);
 }
 
 float UPatterEngine::GetPropertyNumber(const FString& Ref) const

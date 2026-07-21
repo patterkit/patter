@@ -457,6 +457,15 @@ static int runScripted(const JsonValue& arr)
                 else if (kind == "useFlow") current = op.at("flow").str;
                 else if (kind == "advance") chunk.push(normalize(engine->getFlow(current)->advance()));
                 else if (kind == "choose") engine->getFlow(current)->choose(op.at("id").str);
+                // Host navigation by address. No transcript of its own; the next advance shows where it
+                // landed. expectResult pins the returned bool.
+                else if (kind == "goto")
+                {
+                    const bool moved = engine->getFlow(current)->gotoAddress(
+                        op.at("scene").str, op.has("block") ? op.at("block").str : std::string());
+                    if (op.has("expectResult") && moved != op.at("expectResult").b)
+                        throw std::runtime_error("goto " + op.at("scene").str + ": unexpected result");
+                }
                 else if (kind == "saveLoad") { SaveGame blob = engine->saveGame(); engine = std::make_shared<Engine>(bundle, opts); engine->loadGame(blob); }
                 // Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
                 else if (kind == "hotSwap") { SaveGame blob = engine->saveGame(); engine = std::make_shared<Engine>(bundleB, opts); engine->loadGame(blob); }

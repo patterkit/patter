@@ -104,6 +104,14 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
       case "choose":
         engine.getFlow(current)!.choose(op.id);
         break;
+      case "goto": {
+        // Host navigation by address. No transcript of its own; the next `advance` shows where it landed.
+        const moved = engine.getFlow(current)!.goto(op.scene, op.block);
+        if (op.expectResult !== undefined && moved !== op.expectResult) {
+          throw new Error(`goto ${op.scene}${op.block === undefined ? "" : `/${op.block}`}: expected ${op.expectResult}, got ${moved}`);
+        }
+        break;
+      }
       case "saveLoad": {
         const blob = JSON.parse(JSON.stringify(engine.saveGame()));
         engine = new Engine(c.bundle, options);

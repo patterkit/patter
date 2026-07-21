@@ -224,6 +224,10 @@ namespace patter
         std::map<std::string, const Node*> nodeIndex;
         std::map<std::string, std::string> blockToScene;
         std::map<std::string, const Block*> blockById;
+        // Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id, and
+        // per-scene block gameId -> internal id. A flow needs them to resolve goto by address.
+        std::map<std::string, std::string> sceneGameIdToId;
+        std::map<std::string, std::map<std::string, std::string>> blockGameIdToId;
         std::map<std::string, std::vector<std::string>> tagIndex;   // author tags (#215): node id -> accumulated
         std::map<std::string, PatterValue> sharedPatter;
         std::vector<PropertyDecl> patterSharedDecls;
@@ -254,6 +258,14 @@ namespace patter
 
     // ----- Flow ----------------------------------------------------------------
 
+    // The result of advanceToStop: every beat played on the way to a stop, plus the terminal
+    // choice / end that stopped it.
+    struct AdvanceToStopResult
+    {
+        std::vector<StepResult> played;
+        StepResult stop;
+    };
+
     class Flow
     {
     public:
@@ -271,6 +283,92 @@ namespace patter
         Flow& operator=(const Flow&) = delete;
 
         const std::string& currentScene() const { return currentSceneId_; }
+
+        // The options of the choice currently waiting for the player, empty when none is pending. The same
+        // list the `choice` step carries - re-readable, e.g. after restoring a save.
+        std::vector<ChoiceOption> getChoices() const { return hasPendingChoice_ ? pendingOptions_ : std::vector<ChoiceOption>{}; }
+
+        // Advance repeatedly, collecting every played beat, until a choice or the end - the "play to the
+        // next stop" a host's play UI / tooling wants. The terminal choice / end is returned as `stop`;
+        // `played` holds the line / text / game-event results walked on the way to it. Termination is
+        // guaranteed (each advance makes progress, or settle throws on a contentless jump cycle).
+        AdvanceToStopResult advanceToStop()
+        {
+            AdvanceToStopResult res;
+            for (;;)
+            {
+                StepResult r = advance();
+                if (r.type == StepType::Choice || r.type == StepType::End) { res.stop = r; return res; }
+                res.played.push_back(r);
+            }
+        }
+
+        // Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
+        // onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
+        // discarded). `scene`/`block` are host-facing gameIds (spec §6) or internal ids; `block` is
+        // scene-scoped. "END" ends the flow. HOST navigation, so it lands IMMEDIATELY: the rest of the
+        // snippet being delivered is abandoned and a pending choice dropped. An unstarted flow starts here;
+        // an ended one resumes. Returns false - cursor untouched - if the address does not resolve.
+        // MOVES, never resets.
+        bool gotoAddress(const std::string& scene, const std::string& block = "")
+        {
+            if (closed_) return false; // closed is terminal: unlike "ended", a goto cannot revive it
+            if (scene == "END")
+            {
+                started_ = true; clearPending(); pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear();
+                activeSnippet_ = nullptr; beatIndex_ = 0;
+                flowEnded_ = true; stack_.clear();
+                return true;
+            }
+            // Resolve BOTH addresses before touching state, so a bad one is a no-op, not a half-move.
+            std::string sceneId;
+            auto sit = host_->sceneGameIdToId.find(scene);
+            if (sit != host_->sceneGameIdToId.end()) sceneId = sit->second;
+            else if (host_->bundle->scenes.count(scene)) sceneId = scene;
+            if (sceneId.empty()) return false;
+
+            std::string blockId;
+            if (!block.empty())
+            {
+                auto ait = host_->blockGameIdToId.find(sceneId);
+                if (ait != host_->blockGameIdToId.end())
+                {
+                    auto bit = ait->second.find(block);
+                    if (bit != ait->second.end()) blockId = bit->second;
+                }
+                if (blockId.empty())
+                {
+                    auto owner = host_->blockToScene.find(block);
+                    if (owner != host_->blockToScene.end() && owner->second == sceneId) blockId = block;
+                }
+                if (blockId.empty()) return false; // a block address is scene-scoped: unknown HERE is unknown
+            }
+            if (!started_) { start(sceneId, blockId); return true; }
+
+            clearPending(); pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear();
+            activeSnippet_ = nullptr; beatIndex_ = 0; // abandon the rest of the snippet being delivered
+            flowEnded_ = false;                       // an ended flow resumes at the target
+            enterTarget(blockId.empty() ? sceneId : blockId, "jump"); // replace the stack, like an authored goto
+            settle();
+            return true;
+        }
+
+        // Finish this flow for good. Engine-managed (closeFlow, reset, and the openFlow replace path). A
+        // dropped flow used to stay fully live, so a host still holding it could keep advancing it and move
+        // shared state. Closing makes that stale reference inert. Terminal: never revived.
+        void close()
+        {
+            closed_ = true;
+            flowEnded_ = true;
+            stack_.clear();
+            activeSnippet_ = nullptr;
+            beatIndex_ = 0;
+            clearPending();
+            pendingPromptBeat_ = nullptr;
+            pendingPromptOwnerId_.clear();
+        }
+
+        bool isClosed() const { return closed_; }
         bool isEnded() const { return flowEnded_; }
 
         void start(const std::string& sceneId, const std::string& blockId)
@@ -314,6 +412,7 @@ namespace patter
 
         StepResult advance()
         {
+            if (closed_) { StepResult r; r.type = StepType::End; return r; } // a stale reference drives nothing
             if (!started_) throw std::runtime_error("flow has not been started");
             if (pendingPromptBeat_) { const Beat* b = pendingPromptBeat_; pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear(); return beatResult(*b); }
             settle();
@@ -464,6 +563,9 @@ namespace patter
         std::map<std::string, std::map<std::string, PatterValue>> sceneBags_;
         uint32_t rngState_ = 0;
         bool started_ = false, flowEnded_ = false;
+        // Closed by the engine (see close()). Terminal, and distinct from flowEnded_: an ENDED flow is
+        // merely out of content and goto revives it; a CLOSED one is finished for good.
+        bool closed_ = false;
         std::string currentSceneId_;
         std::vector<StackFrame> stack_;
         const Node* activeSnippet_ = nullptr;
@@ -953,6 +1055,7 @@ namespace patter
             {
                 const std::string& sceneId = kv.first; const Scene& scene = kv.second;
                 sceneGameIdToId_[effectiveGameId(scene.gameId, scene.name)] = sceneId;
+                host_.sceneGameIdToId[effectiveGameId(scene.gameId, scene.name)] = sceneId;
                 std::map<std::string, std::string> blockAddrs;
                 // Author tags (#215): accumulate scene -> block -> node (own + ancestors), deduped, outermost-first.
                 std::vector<std::string> sceneTags = dedupeTags(scene.tags, {});
@@ -968,6 +1071,7 @@ namespace patter
                     indexTags(block.children, blockTags);
                 }
                 blockGameIdToId_[sceneId] = blockAddrs;
+                host_.blockGameIdToId[sceneId] = blockAddrs;
             }
 
             for (const auto& p : bundle.properties)
@@ -1055,6 +1159,9 @@ namespace patter
         {
             std::string sceneId = resolveSceneRef(scene);
             std::string blockId = resolveBlockRef(sceneId, block);
+            // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
+            // driving the shared world. Replacing is a reset - contrast runFlow, which reuses.
+            { auto prev = flows_.find(id); if (prev != flows_.end()) prev->second->close(); }
             auto flow = std::unique_ptr<Flow>(new Flow(id, &host_, seed ? *seed : static_cast<int64_t>(defaultSeed_)));
             Flow* raw = flow.get();
             flows_[id] = std::move(flow);
@@ -1062,7 +1169,32 @@ namespace patter
             return raw;
         }
         Flow* getFlow(const std::string& id) { auto it = flows_.find(id); return it != flows_.end() ? it->second.get() : nullptr; }
-        void closeFlow(const std::string& id) { flows_.erase(id); }
+        // Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
+        // holding it cannot keep advancing it into the shared world.
+        void closeFlow(const std::string& id)
+        {
+            auto it = flows_.find(id);
+            if (it != flows_.end()) it->second->close();
+            flows_.erase(id);
+        }
+
+        // "Play this address and give me everything it produced" - the one-call bark form. The NAMED flow
+        // is reused if it exists (moved with gotoAddress) and opened at the address if not, then run to its
+        // next stop. Reuse is the point: a flow owns its selector cursors, so a shuffle keeps its bag and an
+        // "once each" list keeps its place across calls. Empty vector = nothing left to play. Throws if the
+        // address does not resolve.
+        std::vector<StepResult> runFlow(const std::string& flow, const std::string& scene, const std::string& block = "")
+        {
+            Flow* f = getFlow(flow);
+            if (f)
+            {
+                if (!f->gotoAddress(scene, block))
+                    throw std::runtime_error("runFlow: address not found: " + scene + (block.empty() ? "" : " / " + block));
+            }
+            else f = openFlow(flow, scene, block);
+
+            return f->advanceToStop().played;
+        }
 
         // Author tags (#215): a beat's accumulated tags (own + every ancestor's), the same value its step
         // carries. Empty for an unknown id or a beat with no tags anywhere up the chain.
@@ -1077,6 +1209,20 @@ namespace patter
             auto it = host_.tagIndex.find(resolveSceneRef(sceneRef));
             return it != host_.tagIndex.end() ? it->second : std::vector<std::string>{};
         }
+        // The host-facing address (gameId) of a scene by internal id, empty if unknown. The inverse of the
+        // address resolution openFlow / gotoAddress do - for a host that wants to display, log, or pass
+        // back the address of where it currently is.
+        std::string sceneAddress(const std::string& sceneId) const
+        {
+            auto it = host_.bundle->scenes.find(sceneId);
+            return it != host_.bundle->scenes.end() ? effectiveGameId(it->second.gameId, it->second.name) : std::string();
+        }
+        // The host-facing address (gameId) of a block by internal id, empty if unknown.
+        std::string blockAddress(const std::string& blockId) const
+        {
+            auto it = host_.blockById.find(blockId);
+            return it != host_.blockById.end() ? effectiveGameId(it->second->gameId, it->second->name) : std::string();
+        }
         // A block's accumulated tags (scene + block), by scene + block ref (id or gameId).
         std::vector<std::string> tagsForBlock(const std::string& sceneRef, const std::string& blockRef)
         {
@@ -1086,6 +1232,7 @@ namespace patter
 
         void reset()
         {
+            for (auto& kv : flows_) kv.second->close(); // finish them, don't just forget them
             flows_.clear();
             host_.sharedPatter.clear();
             for (const auto& d : host_.patterSharedDecls) host_.sharedPatter[toLower(d.name)] = propDefault(d);

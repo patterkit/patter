@@ -217,6 +217,17 @@ namespace Patterkit.Patterplay.TestHost
                             case "choose":
                                 engine.GetFlow(current).Choose(op.GetProperty("id").GetString());
                                 break;
+                            case "goto":
+                            {
+                                // Host navigation by address. No transcript of its own; the next advance
+                                // shows where it landed. expectResult pins the returned bool.
+                                bool moved = engine.GetFlow(current).Goto(
+                                    op.GetProperty("scene").GetString(),
+                                    op.TryGetProperty("block", out var gb) ? gb.GetString() : null);
+                                if (op.TryGetProperty("expectResult", out var ger) && moved != ger.GetBoolean())
+                                    throw new Exception($"goto {op.GetProperty("scene").GetString()}: expected {ger.GetBoolean()}, got {moved}");
+                                break;
+                            }
                             case "saveLoad":
                             {
                                 if (_jsonSaveLoad)

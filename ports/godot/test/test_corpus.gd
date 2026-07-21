@@ -153,6 +153,13 @@ func _run_scripted(arr: Array) -> int:
 					chunk.append(engine.get_flow(current).advance())
 				"choose":
 					engine.get_flow(current).choose(op["id"])
+				"goto":
+					# Host navigation by address. No transcript of its own; the next advance shows where
+					# it landed. expectResult pins the returned bool.
+					var moved: bool = engine.get_flow(current).goto(op["scene"], op.get("block", ""))
+					if op.has("expectResult") and moved != bool(op["expectResult"]):
+						push_error("goto %s: expected %s, got %s" % [op["scene"], op["expectResult"], moved])
+						return false
 				"saveLoad":
 					var blob := engine.save_game()
 					engine = PatterEngine.new(c["bundle"], options)

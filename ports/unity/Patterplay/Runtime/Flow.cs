@@ -18,6 +18,9 @@ namespace Patterkit.Patterplay
 
         private bool _started;
         private bool _flowEnded;
+        // Closed by the engine (see Close()). Terminal, and distinct from _flowEnded: an ENDED flow is
+        // merely out of content and Goto revives it; a CLOSED one is finished for good.
+        private bool _closed;
         private string _currentSceneId;
         private List<StackFrame> _stack = new List<StackFrame>();
         private Node _activeSnippet;
@@ -50,6 +53,76 @@ namespace Patterkit.Patterplay
         }
 
         public string CurrentScene => _currentSceneId;
+
+        /// <summary>Advance repeatedly, collecting every played beat, until a choice or the end - the
+        /// "play to the next stop" a host's play UI / tooling wants. The terminal choice / end is returned
+        /// as Stop; Played holds the line / text / game-event results walked on the way to it. Termination
+        /// is guaranteed (each Advance makes progress, or Settle throws on a contentless jump cycle).</summary>
+        public AdvanceToStopResult AdvanceToStop()
+        {
+            var res = new AdvanceToStopResult();
+            while (true)
+            {
+                var r = Advance();
+                if (r.Type == StepType.Choice || r.Type == StepType.End) { res.Stop = r; return res; }
+                res.Played.Add(r);
+            }
+        }
+
+        /// <summary>Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target
+        /// scene's onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
+        /// discarded). `scene`/`block` are host-facing gameIds (spec §6) or internal ids; `block` is scene-scoped.
+        /// "END" ends the flow. HOST navigation, so it lands IMMEDIATELY: the rest of the snippet being delivered
+        /// is abandoned and a pending choice dropped. An unstarted flow starts here; an ended one resumes.
+        /// Returns false - cursor untouched - if the address does not resolve. MOVES, never resets.</summary>
+        public bool Goto(string scene, string block = null)
+        {
+            if (_closed) return false; // closed is terminal: unlike "ended", a goto cannot revive it
+            if (scene == "END")
+            {
+                _started = true; _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptOwnerId = null;
+                _activeSnippet = null; _beatIndex = 0;
+                _flowEnded = true; _stack = new List<StackFrame>();
+                return true;
+            }
+            // Resolve BOTH addresses before touching state, so a bad one is a no-op rather than a half-move.
+            string sceneId = _host.SceneGameIdToId.TryGetValue(scene, out var sid) ? sid
+                : (_host.Bundle.Scenes.ContainsKey(scene) ? scene : null);
+            if (sceneId == null) return false;
+            string blockId = null;
+            if (block != null)
+            {
+                if (_host.BlockGameIdToId.TryGetValue(sceneId, out var addrs) && addrs.TryGetValue(block, out var bid)) blockId = bid;
+                else if (_host.BlockToScene.TryGetValue(block, out var owner) && owner == sceneId) blockId = block;
+                if (blockId == null) return false; // a block address is scene-scoped: unknown HERE is unknown
+            }
+            if (!_started) { Start(sceneId, blockId); return true; }
+
+            _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptOwnerId = null;
+            _activeSnippet = null; _beatIndex = 0; // abandon the rest of the snippet being delivered
+            _flowEnded = false;                    // an ended flow resumes at the target
+            EnterTarget(blockId ?? sceneId, "jump"); // "jump" = replace the stack, exactly like an authored goto
+            Settle();
+            return true;
+        }
+
+        /// <summary>Finish this flow for good. Engine-managed (CloseFlow, Reset, and the OpenFlow replace path).
+        /// A dropped flow used to stay fully live, so a host still holding it could keep advancing it and move
+        /// shared state. Closing makes that stale reference inert. Terminal: never revived.</summary>
+        public void Close()
+        {
+            _closed = true;
+            _flowEnded = true;
+            _stack = new List<StackFrame>();
+            _activeSnippet = null;
+            _beatIndex = 0;
+            _pendingChoice = null;
+            _pendingPromptBeat = null;
+            _pendingPromptOwnerId = null;
+        }
+
+        /// <summary>True once the engine has closed this flow.</summary>
+        public bool IsClosed => _closed;
         public bool IsEnded() => _flowEnded;
 
         // -- scope resolvers ----------------------------------------------------
@@ -120,6 +193,7 @@ namespace Patterkit.Patterplay
 
         public StepResult Advance()
         {
+            if (_closed) return new StepResult { Type = StepType.End }; // a stale reference drives nothing
             if (!_started) throw new Exception("flow has not been started");
             if (_pendingPromptBeat != null) { var b = _pendingPromptBeat; _pendingPromptBeat = null; _pendingPromptOwnerId = null; return BeatResult(b); }
             Settle();

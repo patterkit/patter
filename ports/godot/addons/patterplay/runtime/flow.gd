@@ -13,6 +13,9 @@ var _prng := Mulberry32.new(0)  # the seeded PRNG; its `a` is the saved rng_stat
 
 var _started := false
 var _flow_ended := false
+# Closed by the engine (see close()). Terminal, and distinct from _flow_ended: an ENDED flow is
+# merely out of content and goto() revives it; a CLOSED one is finished for good.
+var _closed := false
 var _current_scene_id := ""           # "" = none
 var _stack: Array = []                # of { "scene":, "container":, "index": }
 var _active_snippet = null            # node Dictionary or null
@@ -42,6 +45,98 @@ func _init(host: Dictionary, seed_value: int) -> void:
 
 func current_scene() -> String:
 	return _current_scene_id
+
+
+# Advance repeatedly, collecting every played beat, until a choice or the end - the "play to the next
+# stop" a host's play UI / tooling wants. Returns { "played": [step,...], "stop": step }, where stop is
+# the terminal choice / end. Termination is guaranteed (each advance() makes progress, or _settle()
+# errors on a contentless jump cycle).
+func advance_to_stop() -> Dictionary:
+	var played: Array = []
+	while true:
+		var r: Dictionary = advance()
+		var t: String = r.get("type", "end")
+		if t == "choice" or t == "end":
+			return {"played": played, "stop": r}
+		played.append(r)
+	return {"played": played, "stop": {"type": "end"}}
+
+
+# Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
+# onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
+# discarded). `scene`/`block` are host-facing gameIds (spec §6) or internal ids; `block` is scene-scoped.
+# "END" ends the flow. HOST navigation, so it lands IMMEDIATELY: the rest of the snippet being delivered
+# is abandoned and a pending choice dropped. An unstarted flow starts here; an ended one resumes.
+# Returns false - cursor untouched - if the address does not resolve. MOVES, never resets.
+func goto(scene: String, block: String = "") -> bool:
+	if _closed:
+		return false  # closed is terminal: unlike "ended", a goto cannot revive it
+	if scene == "END":
+		_started = true
+		_pending = null
+		_pending_prompt_beat = null
+		_pending_prompt_owner = ""
+		_active_snippet = null
+		_beat_index = 0
+		_flow_ended = true
+		_stack = []
+		return true
+	# Resolve BOTH addresses before touching state, so a bad one is a no-op rather than a half-move.
+	var bundle: Dictionary = _host["bundle"]
+	var scene_id: String = ""
+	if _host["scene_gameid_to_id"].has(scene):
+		scene_id = _host["scene_gameid_to_id"][scene]
+	elif bundle["scenes"].has(scene):
+		scene_id = scene
+	if scene_id == "":
+		return false
+	var block_id: String = ""
+	if block != "":
+		var addrs: Dictionary = _host["block_gameid_to_id"].get(scene_id, {})
+		if addrs.has(block):
+			block_id = addrs[block]
+		elif _host["block_to_scene"].get(block, "") == scene_id:
+			block_id = block
+		if block_id == "":
+			return false  # a block address is scene-scoped: unknown HERE is unknown
+	if not _started:
+		start(scene_id, block_id)
+		return true
+
+	_pending = null
+	_pending_prompt_beat = null
+	_pending_prompt_owner = ""
+	_active_snippet = null
+	_beat_index = 0        # abandon the rest of the snippet being delivered
+	_flow_ended = false    # an ended flow resumes at the target
+	_enter_target(block_id if block_id != "" else scene_id, "jump")  # replace the stack, like an authored goto
+	_settle()
+	return true
+
+
+# Finish this flow for good. Engine-managed (close_flow, reset, and the open_flow replace path). A
+# dropped flow used to stay fully live, so a host still holding it could keep advancing it and move
+# shared state. Closing makes that stale reference inert. Terminal: never revived.
+func close() -> void:
+	_closed = true
+	_flow_ended = true
+	_stack = []
+	_active_snippet = null
+	_beat_index = 0
+	_pending = null
+	_pending_prompt_beat = null
+	_pending_prompt_owner = ""
+
+
+# True once the engine has closed this flow.
+func is_closed() -> bool:
+	return _closed
+
+
+# The options of the choice currently waiting for the player, or [] when none is pending. The same
+# list the `choice` step carries - re-readable, e.g. after restoring a save.
+func get_choices() -> Array:
+	return _pending["options"] if _pending != null else []
 
 
 func is_ended() -> bool:
@@ -88,6 +183,8 @@ func start(scene_id: String, block_id: String) -> void:
 
 
 func advance() -> Dictionary:
+	if _closed:
+		return {"type": "end"}  # a stale reference to a closed flow drives nothing
 	if not _started:
 		push_error("flow has not been started")
 		return {"type": "end"}

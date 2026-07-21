@@ -39,6 +39,10 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		"cast_display": {},
 		"node_index": {},
 		"block_to_scene": {},
+		# Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id, and
+		# per-scene block gameId -> internal id. A flow needs them to resolve goto() by address.
+		"scene_gameid_to_id": _scene_gameid_to_id,
+		"block_gameid_to_id": _block_gameid_to_id,
 		"block_by_id": {},
 		"tag_index": {},
 		"shared_patter": {},
@@ -141,6 +145,10 @@ func _dedupe_tags(tags: Array) -> Array:
 func open_flow(id: String, scene: String = "", block: String = "", seed_value = null) -> PatterFlow:
 	var scene_id := _resolve_scene_ref(scene)
 	var block_id := _resolve_block_ref(scene_id, block)
+	# Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep driving
+	# the shared world. Replacing is a reset - contrast run_flow(), which reuses.
+	if _flows.has(id):
+		_flows[id].close()
 	var flow := PatterFlow.new(_host, int(seed_value) if seed_value != null else _default_seed)
 	_flows[id] = flow
 	flow.start(scene_id, block_id)
@@ -151,11 +159,48 @@ func get_flow(id: String) -> PatterFlow:
 	return _flows.get(id)
 
 
+# The host-facing address (Game ID) of a scene by internal id, or "" if unknown. The inverse of the
+# address resolution open_flow / goto do - for a host that wants to display, log, or pass back the
+# address of where it currently is.
+func scene_address(scene_id: String) -> String:
+	var scenes: Dictionary = _host["bundle"]["scenes"]
+	return PatterBundle.effective_game_id(scenes[scene_id]) if scenes.has(scene_id) else ""
+
+
+# The host-facing address (Game ID) of a block by internal id, or "" if unknown.
+func block_address(block_id: String) -> String:
+	var blocks: Dictionary = _host["block_by_id"]
+	return PatterBundle.effective_game_id(blocks[block_id]) if blocks.has(block_id) else ""
+
+
 func close_flow(id: String) -> void:
+	# The flow object is FINISHED, not merely unregistered, so a host still holding it cannot keep
+	# advancing it into the shared world.
+	if _flows.has(id):
+		_flows[id].close()
 	_flows.erase(id)
 
 
+# "Play this address and give me everything it produced" - the one-call bark form. The NAMED flow is
+# reused if it exists (moved with goto) and opened at the address if not, then run to its next stop.
+# Reuse is the point: a flow owns its selector cursors, so a shuffle keeps its bag and a "once each"
+# list keeps its place across calls. Empty array = nothing left to play. Pushes an error and returns
+# [] if the address does not resolve.
+func run_flow(flow_name: String, scene: String, block: String = "") -> Array:
+	var f: PatterFlow
+	if _flows.has(flow_name):
+		f = _flows[flow_name]
+		if not f.goto(scene, block):
+			push_error("run_flow: address not found: %s%s" % [scene, "" if block == "" else " / " + block])
+			return []
+	else:
+		f = open_flow(flow_name, scene, block)
+	return f.advance_to_stop()["played"]
+
+
 func reset() -> void:
+	for fid in _flows:
+		_flows[fid].close()  # finish them, don't just forget them
 	_flows = {}
 	_host["shared_patter"] = {}
 	for d in _host["patter_shared_decls"]:
