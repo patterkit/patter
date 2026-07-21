@@ -58,6 +58,23 @@ both default sensibly (first scene, first block). Re-opening an existing id repl
 it. Other engine methods: `getFlow(id)`, `flows()`, `closeFlow(id)`, and `reset()`
 (drop all flows and re-seed shared state).
 
+Dropping a flow **finishes** it: after `closeFlow(id)`, a `reset()`, or having its name
+re-opened, a reference you are still holding is inert (advancing reports the end, `goto`
+refuses to move it), so a forgotten reference cannot keep running scene entry effects
+behind your back.
+
+### Playing an address in one call
+
+```ts
+engine.runFlow(name, scene?, block?)      // -> the steps that played
+```
+
+Opens the named flow if it does not exist, moves it if it does, plays to the next stop,
+and returns what played. Unlike `openFlow`, it **reuses** the named flow rather than
+replacing it, so variation state (shuffles, once-each lists, visit counts) keeps its place
+across calls. An empty array means the address had nothing left to give; an address that
+does not resolve throws. See [Host navigation](/play/navigation/).
+
 ## Walking a flow
 
 - **`flow.advance()`** → the next step (line, text, game event, choice, or end).
@@ -69,6 +86,13 @@ it. Other engine methods: `getFlow(id)`, `flows()`, `closeFlow(id)`, and `reset(
 - **`flow.isEnded()`**, **`flow.currentScene`**: state for tooling that follows the
   story across scenes.
 - **`flow.reset(scene?, block?)`**: forget this flow's position, keep shared state.
+- **`flow.goto(scene, block?)`** → `boolean`: move the cursor to an address, exactly as an
+  authored jump would (on-entry effects run, arriving counts as a visit, the call stack is
+  replaced). It moves rather than resets, so variation and visit counts carry on; it lands
+  immediately, abandoning any part-delivered snippet or pending choice. Returns `false` and
+  leaves the cursor alone if the address does not resolve; the block is scene-scoped. See
+  [Host navigation](/play/navigation/).
+- **`flow.isClosed`**: whether this flow has been finished (see above).
 
 ### Step shapes
 

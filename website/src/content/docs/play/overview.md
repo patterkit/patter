@@ -36,6 +36,8 @@ notes and the local idiom.
   pick options. → [The play loop](/play/concepts/)
 - **Properties**: read and write the story's `@patter` / `@scene` state; supply your game's
   `@world` values.
+- **Host navigation**: send a running flow to any address when the *game* decides where the story
+  goes, or play an address in one call for barks and one-liners. → [Host navigation](/play/navigation/)
 - **Game Data & tags on every step**: your typed cues, merged with defaults, ready to drive
   audio, animation, and quests. → [Save/load & Game Data](/play/integration/)
 - **Save / load**: serialise the whole run (position, state, visit counts, even the PRNG) and

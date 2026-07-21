@@ -151,4 +151,5 @@ values while you playtest. Leave it out of your shipping build.
 
 This page gets you playing. For the full method-by-method reference: `advance`,
 `advanceToStop`, `getChoices`, property access, multiple flows: see
-[The Engine API](/play/engine/).
+[The Engine API](/play/engine/). To send a flow somewhere from the game (`goto`, and `runFlow`
+for barks), see [Host navigation](/play/navigation/).

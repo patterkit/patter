@@ -56,6 +56,24 @@ shows per-line audio resolution via `UPatterAudio`; audio files are not bundled 
 your platform call), so point its **Audio Root** at a Patter audio folder to hear it, or leave
 it empty to play silently.
 
+## Send the story somewhere
+
+The game can also decide where the story goes. `RunFlow` plays an
+[address](/format/gamedata-and-addressing/) in one call, which is all a bark needs. Both of
+these are BlueprintCallable, so a designer can wire them without C++:
+
+```cpp
+// Reuses the "guard-42" flow, so its shuffles and once-each lists keep their place
+TArray<FPatterStep> Lines = Engine->RunFlow(TEXT("guard-42"), TEXT("npc-barks"), TEXT("greet"));
+
+// Or move a flow you are already driving, exactly as an authored jump would
+bool bMoved = Flow->Goto(TEXT("throne-room"), TEXT("audience"));   // false = cursor unmoved
+```
+
+Give each independent speaker its own flow name. Full rules, and why `OpenFlow` behaves
+differently: [Host navigation](/play/navigation/). (In the underlying std C++ core the method
+is `gotoAddress`, because `goto` is a reserved word; the Blueprint-facing name is `Goto`.)
+
 ## Inspect live state
 
 The plugin's editor module adds a **Window ▸ Tools ▸ Patterplay Runtime State** panel. Register a
@@ -109,5 +127,6 @@ snippets → beats) as Blueprint structs, without playing. Walk the flat beat li
 ## Next
 
 - The shared model: [The play loop](/play/concepts/).
+- Driving the story from the game: [Host navigation](/play/navigation/).
 - Reading Game Data/tags, host events, localisation: [Save/load & Game Data](/play/integration/).
 - Why it matches the other engines exactly: [Compatibility & conformance](/compatibility/).

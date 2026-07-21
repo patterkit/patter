@@ -89,6 +89,23 @@ resolution via `PatterAudioResolver`; audio files are not bundled (playback is y
 call), so point its **Audio Root** at a Patter audio folder to hear it, or leave it empty to
 play silently.
 
+## Send the story somewhere
+
+The game can also decide where the story goes. `RunFlow` plays an
+[address](/format/gamedata-and-addressing/) in one call, which is all a bark needs:
+
+```csharp
+// Reuses the "guard-42" flow, so its shuffles and once-each lists keep their place
+List<StepResult> lines = engine.RunFlow("guard-42", "npc-barks", "greet");
+foreach (var line in lines) Debug.Log($"{line.CharacterName ?? line.Character}: {line.Text}");
+
+// Or move a flow you are already driving, exactly as an authored jump would
+if (!flow.Goto("throne-room", "audience")) { /* did not resolve; the cursor has not moved */ }
+```
+
+Give each independent speaker its own flow name. Full rules, and why `OpenFlow` behaves
+differently: [Host navigation](/play/navigation/).
+
 ## Inspect live state
 
 The package adds **Window ▸ Patterplay ▸ Runtime State**: register a running engine with
@@ -125,5 +142,6 @@ keep saves. → [Save/load & Game Data](/play/integration/)
 ## Next
 
 - The shared model: [The play loop](/play/concepts/).
+- Driving the story from the game: [Host navigation](/play/navigation/).
 - Reading Game Data/tags, host events, localisation: [Save/load & Game Data](/play/integration/).
 - Why it matches the other engines exactly: [Compatibility & conformance](/compatibility/).

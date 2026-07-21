@@ -50,6 +50,24 @@ buttons. The tour also shows per-line audio resolution via `PatterAudio`; audio 
 bundled (playback is your platform call), so point its **audio base** at a Patter audio folder
 to hear it, or leave it unset to play silently.
 
+## Send the story somewhere
+
+The game can also decide where the story goes. `run_flow` plays an
+[address](/format/gamedata-and-addressing/) in one call, which is all a bark needs:
+
+```gdscript
+# Reuses the "guard-42" flow, so its shuffles and once-each lists keep their place
+var lines: Array = engine.run_flow("guard-42", "npc-barks", "greet")
+for line in lines:
+    print("%s: %s" % [line.get("characterName", ""), line["text"]])
+
+# Or move a flow you are already driving, exactly as an authored jump would
+var moved: bool = flow.goto("throne-room", "audience")   # false = did not resolve, cursor unmoved
+```
+
+Give each independent speaker its own flow name. Full rules, and why `open_flow` behaves
+differently: [Host navigation](/play/navigation/).
+
 ## Live property inspector
 
 A Godot game runs in its own process, so the live state inspector ships as an **in-game
@@ -93,5 +111,6 @@ byte-identical across them).
 ## Next
 
 - The shared model: [The play loop](/play/concepts/).
+- Driving the story from the game: [Host navigation](/play/navigation/).
 - Reading Game Data/tags, host events, localisation: [Save/load & Game Data](/play/integration/).
 - Why it matches the other engines exactly: [Compatibility & conformance](/compatibility/).

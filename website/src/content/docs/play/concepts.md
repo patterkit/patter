@@ -16,7 +16,9 @@ and local naming.
   save and load.
 - A **Flow** is one position cursor walking through the story. You open a flow at a starting
   address (a scene, optionally a block); most games run one flow, but you can run several (a
-  main thread plus a side conversation) off the same engine.
+  main thread plus a side conversation) off the same engine. Usually the writing decides where
+  the cursor goes next, but the game can move it to any address too:
+  [Host navigation](/play/navigation/).
 
 ```
 engine = Engine(bundle)              // shared state
@@ -130,4 +132,5 @@ where the words come from changes. → [Localisation](/play/localisation/)
 - Get it running on your engine: [JavaScript](/play/javascript/) ·
   [Unity](/play/unity/) · [Unreal](/play/unreal/) · [Godot](/play/godot/).
 - The deep JavaScript API: [The Engine API](/play/engine/).
+- Moving a flow from the game: [Host navigation](/play/navigation/).
 - Save/load, Game Data, tags, host events: [Save/load & Game Data](/play/integration/).
