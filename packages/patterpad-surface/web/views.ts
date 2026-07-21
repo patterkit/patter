@@ -507,6 +507,14 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
     // consults before handling any event from a node view - returning true makes it ignore everything from
     // the heading, so the input edits its own text natively and PM never touches the block.
     stopEvent: (e: Event) => head.contains(e.target as Node),
+    // PM's DEFAULT selectNode sets `draggable = true` on any node view that has a contentDOM, turning the
+    // whole block into a native drag source. Clicking the title node-selects the block (the focus handler
+    // above), so from then on dragging inside the title started a drag of the entire block instead of
+    // selecting the text - the title was effectively unselectable by mouse (#23). A block is reordered
+    // with its ⠿ grip, a mousedown gesture that never uses native drag-and-drop, so the block itself never
+    // needs to be draggable. Keep the selected CLASS (what PM's default is really for) and drop the flag.
+    selectNode: () => { dom.classList.add("ProseMirror-selectednode"); },
+    deselectNode: () => { dom.classList.remove("ProseMirror-selectednode"); },
     update: (n) => { if (n.type.name !== "block") return false; sync(n); return true; },
   };
 };

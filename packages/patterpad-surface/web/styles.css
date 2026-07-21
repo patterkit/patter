@@ -88,8 +88,10 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .block:hover > .block-head > .block-drag, .block:focus-within > .block-head > .block-drag { opacity: 1; }
 .block-dots { margin-left: auto; } /* the quiet ⋯ sits at the right end of the heading */
 .block:hover > .block-head > .block-dots, .block:focus-within > .block-head > .block-dots { opacity: 1; }
+/* Grow into the whole heading: an <input> is otherwise only as wide as its default size (~20 chars),
+   which cut long section names off with the rest of the row sitting empty (#23). It runs up to the ⋯. */
 .block-name {
-  flex: 0 1 auto; min-width: 6rem; background: none; border: 0; padding: 0;
+  flex: 1 1 auto; min-width: 6rem; background: none; border: 0; padding: 0;
   font: 700 1.05rem var(--font-ui); color: var(--ink); letter-spacing: 0.01em;
 }
 .block-name:focus { outline: none; border-bottom: 1px solid var(--accent); }

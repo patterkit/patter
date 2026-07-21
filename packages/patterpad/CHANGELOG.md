@@ -6,6 +6,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- You can select a **block title** with the mouse again. Clicking the title selects the block, which made
+  the whole block a drag source, so dragging across the words dragged the block instead of selecting the
+  text. A block now moves only by its **⠿** grip, never by its title, so the title behaves like the plain
+  text field it looks like. (#23)
+
+### Changed
+- The **block title** field now runs the full width of the heading, up to the **⋯** button, instead of
+  stopping short and cutting long section names off. (#23)
+
 ## [0.6.1] - 2026-07-20
 
 ### Fixed
