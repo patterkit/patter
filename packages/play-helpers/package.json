@@ -34,6 +34,6 @@
     "build": "tsup src/index.ts --format esm,cjs --dts --clean"
   },
   "dependencies": {
-    "@patterkit/runtime": "0.2.2"
+    "@patterkit/runtime": "0.3.0"
   }
 }

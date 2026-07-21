@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-21
+
 ### Added
 - **Host navigation.** `Flow.Goto(scene, block)` sends a running flow to a Game ID address, behaving exactly like a jump
   the writer could have written: the destination scene's on-entry effects run, arriving counts as a

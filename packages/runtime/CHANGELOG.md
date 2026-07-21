@@ -17,6 +17,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-21
+
 ### Added
 - **Host navigation.** `flow.goto(scene, block?)` sends a running flow to a Game ID address, behaving
   exactly like an authored `go` jump: the target scene's `onEntry` runs, arriving counts as a visit, and

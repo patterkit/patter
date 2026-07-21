@@ -1,6 +1,6 @@
 {
   "name": "com.patterkit.patterplay",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "displayName": "Patterplay",
   "description": "Patterplay for Unity - the native C# runtime for Patter. Loads a compiled .patterc bundle and plays branching narrative directly in Unity (no web runtime, JS, or IPC). Every Patterplay runtime plays the same bundle with the same behaviour.",
   "unity": "2021.3",
