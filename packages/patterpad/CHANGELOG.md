@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- The **View** menu no longer lists two full-screen commands on macOS. macOS adds its own **Enter Full
+  Screen** item to the View menu automatically, and Patterpad was adding a second one beside it. The
+  system's item (with the usual ⌃⌘F) is now the only one on macOS; Windows and Linux, which get no such
+  item, keep Patterpad's.
+
 ## [0.6.2] - 2026-07-21
 
 ### Fixed

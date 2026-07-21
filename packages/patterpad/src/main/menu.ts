@@ -264,7 +264,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { type: "separator" },
         { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" },
         { type: "separator" },
-        { role: "togglefullscreen" },
+        // macOS appends its OWN "Enter Full Screen" item to the View menu of every full-screen-capable
+        // window, so declaring the role here too listed it TWICE. Let the system own it there (it carries
+        // the standard Ctrl-Cmd-F); Windows / Linux get no such item, so they still need ours.
+        ...(isMac ? [] : [{ role: "togglefullscreen" } as const]),
         { role: "reload" }, { role: "toggleDevTools" },
       ],
     },
