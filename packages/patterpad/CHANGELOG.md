@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-07-21
+
 ### Fixed
 - You can select a **block title** with the mouse again. Clicking the title selects the block, which made
   the whole block a drag source, so dragging across the words dragged the block instead of selecting the

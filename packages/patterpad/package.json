@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/patterpad",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "Patterpad - the writer-first editor for Patter dialogue projects.",
   "author": {
