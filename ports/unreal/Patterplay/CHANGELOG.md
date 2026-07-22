@@ -7,6 +7,16 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+- The plugin no longer refuses to load on Unreal 5.7 point releases. The `.uplugin` pinned
+  `EngineVersion` to `5.7.0`, an exact-patch lock that made 5.7.4 (the only 5.7 the Epic launcher
+  offers) reject it as built for a different engine version. It ships as source and builds against
+  any 5.7 release, so the pin is gone. (#25)
+- Made the header-only engine core compile under MSVC, not only Clang. `Expression.h` used
+  `std::vector` without including `<vector>`, and `PatterValue.h` / `Bundle.h` / `Engine.h` used
+  `std::move` / `std::pair` without `<utility>`. Clang supplied these transitively so Mac builds
+  passed, but MSVC does not, producing "is not a member of std" errors on Windows. (#25)
+
 ## [0.3.0] - 2026-07-21
 
 ### Added

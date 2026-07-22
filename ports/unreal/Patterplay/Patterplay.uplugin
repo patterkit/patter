@@ -10,7 +10,6 @@
 	"DocsURL": "https://patterkit.dev/",
 	"MarketplaceURL": "",
 	"SupportURL": "https://github.com/patterkit/patter",
-	"EngineVersion": "5.7.0",
 	"CanContainContent": true,
 	"Installed": false,
 	"Modules": [

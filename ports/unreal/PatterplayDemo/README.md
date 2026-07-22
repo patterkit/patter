@@ -15,7 +15,7 @@ copy into another project first.
      PatterplayDemo.uproject       # <- open this
    ```
 
-2. Open `PatterplayDemo.uproject` (Unreal Engine 5.7, and a C++ toolchain - everything
+2. Open `PatterplayDemo.uproject` (any Unreal Engine 5.7 release, verified on 5.7.4, and a C++ toolchain - everything
    ships source-only; confirm the build prompt on first open). The very first open takes a
    few minutes while Unreal compiles the code and warms its shader caches - that's a
    one-time cost, not a hang.
