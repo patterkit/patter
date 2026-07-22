@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-22
+
 ### Fixed
 - The plugin no longer refuses to load on Unreal 5.7 point releases. The `.uplugin` pinned
   `EngineVersion` to `5.7.0`, an exact-patch lock that made 5.7.4 (the only 5.7 the Epic launcher

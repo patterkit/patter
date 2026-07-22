@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-22
+
 ### Changed
 - Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes
   Unreal-only build issues (see the Unreal changelog and #25); the Godot addon is unchanged.

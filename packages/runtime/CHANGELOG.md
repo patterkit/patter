@@ -17,6 +17,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-22
+
 ### Changed
 - Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes
   Unreal-only build issues (see the Unreal changelog and #25); the JavaScript runtime is unchanged.
