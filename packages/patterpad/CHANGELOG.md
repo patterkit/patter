@@ -6,6 +6,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- **Jump list** entries no longer get crushed into unreadable (but still clickable) slivers in a
+  project with many scenes and blocks. The picker lists one row per scene and block, and once the list
+  outgrew its height cap, the layout squeezed the rows to fit instead of scrolling - a flex quirk where
+  button rows have no minimum height. Rows now always keep their full height and the list scrolls. The
+  same guard is applied to the scene nav, the Settings tab column, and (via expr-editor 0.10.2) the
+  condition editor's property picker, which could all squish the same way. (Candidate fix for #30:
+  the squeeze is reproduced and fixed in isolation; please reopen if your project still shows it.)
+
 ## [0.6.3] - 2026-07-23
 
 ### Fixed

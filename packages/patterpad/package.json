@@ -33,7 +33,7 @@
     "@patterkit/ops": "0.2.3",
     "@patterkit/patterpad-surface": "0.0.0",
     "@patterkit/runtime": "0.3.1",
-    "@wildwinter/expr-editor": "^0.10.1",
+    "@wildwinter/expr-editor": "^0.10.2",
     "@wildwinter/simple-vc-lib": "^0.2.1",
     "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0",

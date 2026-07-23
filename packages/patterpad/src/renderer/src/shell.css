@@ -57,6 +57,14 @@ main.panes.no-inspector { --insp-w: 0px; }
 main.panes.no-nav > .nav, main.panes.no-inspector > .inspector { opacity: 0; }
 .pane-inner { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; }
 .nav .pane-inner { width: var(--nav-open-w); overflow-y: auto; padding: 0.5rem; gap: 0.1rem; }
+/* Every nav row keeps its natural height. The pane is a flex column, so once the list outgrows it,
+   flex SHRINKS the rows instead of scrolling: <button> flex items get no automatic content-based
+   minimum size (unlike divs, which refuse to shrink below their content), and the open scene's block
+   sub-list sets min-height:0 for its accordion - so rows crush to clipped, unreadable slivers before
+   the scrollbar ever engages. Pinning children to flex:none makes the content overflow instead, which
+   is what the pane's own scrollbar is for. Same hazard + same fix on every capped flex column of
+   buttons: see .jump-list and .settings-tabs. (#30) */
+.nav-list > * { flex: none; }
 .inspector .pane-inner { width: var(--insp-open-w); }
 main.panes.no-nav > .nav { border-right-color: transparent; }
 main.panes.no-inspector > .inspector { border-left-color: transparent; }
@@ -398,6 +406,11 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .insp-gd-cap { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.1rem; }
 .insp-check { accent-color: var(--accent); cursor: pointer; }
 .jump-list { display: flex; flex-direction: column; gap: 0.1rem; max-height: 60vh; overflow: auto; }
+/* THE #30 fix. One row per scene/block, so a big project overflows the 60vh cap - and flex then
+   SHRINKS the rows rather than scrolling, because <button> flex items have no automatic minimum size.
+   Every option crushed to an unreadable (still clickable) sliver. flex:none restores natural heights,
+   letting the overflow reach this list's own scrollbar. (Same fix on .nav-list and .settings-tabs.) */
+.jump-list > * { flex: none; }
 .jump-list .exed-opt { font: 0.82rem var(--font-ui); padding: 0.3rem 0.45rem; border-radius: var(--radius-sm); cursor: pointer; background: none; border: 0; text-align: left; color: var(--ink); }
 .jump-list .exed-opt:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 .jump-list .exed-opt.sel { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
@@ -542,6 +555,7 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
    (Game Data, Cast) never blows out the dialog (#214 settings revise). */
 .settings-body { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 1.1rem; min-height: 30rem; max-height: 74vh; }
 .settings-tabs { display: flex; flex-direction: column; gap: 0.1rem; border-right: 1px solid var(--line); padding-right: 0.6rem; overflow-y: auto; }
+.settings-tabs > * { flex: none; } /* tab BUTTONS would crush on a short window instead of scrolling (#30) */
 /* Section heading in the tab rail (Project / Story data / ...): a quiet label, not a tab. */
 .settings-group { margin: 0.75rem 0 0.15rem; padding: 0 0.6rem; font: 700 0.66rem var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
 .settings-group:first-child { margin-top: 0; }
