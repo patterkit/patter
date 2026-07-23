@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-07-23
+
 ### Added
 - A **Play button in the topbar**. The core loop (write, play, tweak) had no visible affordance in the
   window - Play lived only in the menu. A quiet workspace-only button beside the pane toggles now runs
