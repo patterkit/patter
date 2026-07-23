@@ -7,7 +7,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 ## [Unreleased]
 
 ### Fixed
+- A project with **no version control** no longer triggers a repeating GitHub sign-in window (or, on
+  Windows, an autosave error after that window is dismissed). If the project folder happened to sit inside
+  a larger git checkout, Patterpad was letting the version-control layer auto-detect that enclosing `.git`
+  and treat the project as a git repo, so its background status poll ran a git-lfs lock check against the
+  remote (the credential prompt) and autosave would have staged the story files into that unrelated repo.
+  Patterpad now pins the version-control layer to the system you actually chose in Settings, so a "None"
+  project does plain file writes and never runs git. (#26)
 - The **View** menu no longer lists two full-screen commands on macOS. macOS adds its own **Enter Full
+  Screen** item to the View menu automatically, and Patterpad was adding a second one beside it. The
+  system's item (with the usual ⌃⌘F) is now the only one on macOS; Windows and Linux, which get no such
+  item, keep Patterpad's. macOS adds its own **Enter Full
   Screen** item to the View menu automatically, and Patterpad was adding a second one beside it. The
   system's item (with the usual ⌃⌘F) is now the only one on macOS; Windows and Linux, which get no such
   item, keep Patterpad's.

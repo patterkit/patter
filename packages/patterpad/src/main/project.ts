@@ -14,7 +14,8 @@ import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import type { ReviewItem } from "../shared/api.js";
-import { writeTextFilesAsync, writeBinaryFileAsync, fileStatusAsync, deleteFileAsync } from "@wildwinter/simple-vc-lib";
+import { writeTextFilesAsync, writeBinaryFileAsync, fileStatusAsync, deleteFileAsync,
+  setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
 import { startAudioIndex, audioManifest, AUDIO_MANIFEST_FILE, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
@@ -337,8 +338,25 @@ function syncAudioIndex(): void {
  *  shard, else `preferLanding`, else the first scene) so the window comes up fast; the rest streams in on
  *  the renderer's `hydrate()` call (or the first whole-project operation). `path` may be the project root,
  *  the `.patter` package, or an internal shard - either way the enclosing `.patterproj` is resolved. */
+/** Pin simple-vc-lib to the project's CONFIGURED version control, so it never auto-detects one the author
+ *  didn't pick. Without this, the lib walks UP the tree from each file and treats any enclosing `.git` as
+ *  the project's VCS: a "none" project living inside a larger git checkout would then have its status poll
+ *  run `git lfs locks --verify` (a remote round-trip that pops the Windows credential window on a loop,
+ *  #26) and its autosave `git add` the story shards into that unrelated repo. Pinning the exact configured
+ *  system also fixes the subtler case of, say, a Perforce project that happens to sit under a `.git`. */
+function pinVcProvider(vcs: VcsKind | undefined): void {
+  switch (vcs) {
+    case "git": setProvider(new GitProvider()); break;
+    case "perforce": setProvider(new PerforceProvider()); break;
+    case "plastic": setProvider(new PlasticProvider()); break;
+    case "svn": setProvider(new SvnProvider()); break;
+    default: setProvider(new FilesystemProvider()); break; // "none" / unset: plain writes, no VCS calls
+  }
+}
+
 export function openProject(path: string, preferLanding?: string): OpenedProject {
   loaded = loadProjectLanding(path, { launchPath: path, preferId: preferLanding });
+  pinVcProvider(loaded.project.vcs); // honour the configured VCS; never auto-detect an enclosing repo (#26)
   shards = buildShards(loaded);
   playLocale = null;           // a fresh project starts in its own source language (#195)
   playCaptionsOn = true;       // closed captions default ON in the play window (#214)
@@ -1531,6 +1549,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       }
     }
     loaded.project = next; // reflect in the cached project
+    if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)
     syncAudioIndex();      // audio config may have changed (mode toggle / rung folders) (#206)
     return { ok: true, project: summarise(loaded) };
   });
