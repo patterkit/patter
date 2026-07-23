@@ -31,6 +31,6 @@
   "dependencies": {
     "@patterkit/core": "0.1.5",
     "@patterkit/ops": "0.2.3",
-    "@wildwinter/simple-vc-lib": "^0.2.0"
+    "@wildwinter/simple-vc-lib": "^0.2.1"
   }
 }
