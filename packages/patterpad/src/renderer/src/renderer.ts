@@ -45,6 +45,7 @@ import { mountDebugLink } from "./debug-panel.js";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const panesEl = $("panes");
+const playTopEl = $<HTMLButtonElement>("play-topbtn");
 const welcomeEl = $("welcome");
 const editorEl = $("editor");
 const navEl = $("nav");
@@ -1640,6 +1641,8 @@ async function play(): Promise<void> {
   await window.patter.openPlay(currentSceneId);  // opens the separate interactive play window
 }
 
+playTopEl.addEventListener("click", () => { void play(); });
+
 /** Play from Start (⇧⌘P): run from the project's start point, prompting to set one if unset. */
 async function playFromStart(): Promise<void> {
   if (!project) return;
@@ -1725,6 +1728,7 @@ async function showProject(open: OpenResult): Promise<void> {
 function enterWorkspace(): void {
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
   toggleNavEl.hidden = false; toggleInspectorEl.hidden = false; // pane toggles only matter in the workspace
+  playTopEl.hidden = false;   // the primary loop's visible door: play what you wrote
   applyPanes();
 }
 
@@ -1739,7 +1743,7 @@ async function showOverview(): Promise<void> {
   if (!project) return;
   if (surface && dirty) await save(); // files are the truth - persist before leaving the editor
   welcomeEl.hidden = true; panesEl.hidden = true; overviewEl.hidden = false;
-  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true;
+  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true; // the overview is a calm screen, no bars
   projectNameEl.textContent = project.name;
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = "";
@@ -1830,7 +1834,7 @@ function showWelcome(state: BootState): void {
   reviewItems = []; reviewbarEl.hidden = true; // no project -> no feedback walk
   panesEl.hidden = true; overviewEl.hidden = true; welcomeEl.hidden = false;
   problembarEl.hidden = true; inspectorStackEl.replaceChildren(); lastInspectorCtx = null; lastInspectorSig = null; // no script -> nothing to inspect
-  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true;
+  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   projectNameEl.textContent = "Patterpad";
   renderRecents(state.recents);
   signalReady(); // the welcome screen is up - safe to reveal the window (no-op if already revealed)

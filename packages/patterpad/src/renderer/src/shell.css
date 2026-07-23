@@ -31,6 +31,10 @@
 }
 .pane-toggle:hover { color: var(--accent); }
 .pane-toggle[hidden] { display: none; }
+/* the topbar Play affordance: quiet chrome, the accent on hover */
+.topbtn { font: 600 0.75rem var(--font-ui); color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; cursor: pointer; white-space: nowrap; }
+.topbtn:hover { color: var(--accent); border-color: var(--accent); }
+.topbtn[hidden] { display: none; }
 
 /* Three panes: navigator | editor | inspector (Patterpad.md §4). The two side columns SLIDE to 0 so
    the editor goes full-bleed; the panes hold a FIXED-width inner so they clip (a clean wipe) instead
