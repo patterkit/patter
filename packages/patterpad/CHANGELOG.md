@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-07-23
+
 ### Fixed
 - A project with **no version control** no longer triggers a repeating GitHub sign-in window (or, on
   Windows, an autosave error after that window is dismissed). If the project folder happened to sit inside
