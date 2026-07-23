@@ -73,6 +73,10 @@ afterEach(() => { clearProvider(); }); // never leak the override into other sui
 async function freshProject(): Promise<{ dir: string; sceneId: string }> {
   const dir = mkdtempSync(join(tmpdir(), "pp-vcs-write-"));
   const opened = await project.createProject(dir, "VCS Project", "perforce");
+  // Patterpad now pins simple-vc-lib to the project's configured system at open (#26), which replaces
+  // our injected fake with a real PerforceProvider. Re-install the fake so the assertions below - about
+  // how Patterpad routes writes / reads status - run against the controllable provider, not real `p4`.
+  setProvider(vcs);
   vcs.events = [];
   return { dir, sceneId: opened.scenes[0]!.id };
 }
