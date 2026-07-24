@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-07-24
+
 ### Fixed
 - The **jump picker** (the "Jump to…" popup on a snippet's Jump row, `/jump`, and node references) no
   longer crushes its rows into unreadable ~10px slivers in a project with enough scenes and blocks.
