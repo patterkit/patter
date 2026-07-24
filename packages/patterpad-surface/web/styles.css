@@ -707,6 +707,11 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
   padding: 0.28rem 0.55rem; border-radius: var(--radius-sm); color: var(--ink); font: 0.8rem var(--font-ui);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* flex:none is LOAD-BEARING (#30). .tp-list is a flex column with a definite height once the panel
+     hits its cap, and these rows have no minimum flex size (they are buttons, AND overflow:hidden for
+     the ellipsis zeroes the automatic minimum) - so with enough scenes/blocks, flex crushed every row
+     to its ~10px padding shell, clipping the text to a sliver, instead of letting the list scroll. */
+  flex: none;
 }
 .tp-end { font: 600 0.7rem var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
 .tp-scene { font-weight: 600; color: var(--accent); }

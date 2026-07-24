@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- The **jump picker** (the "Jump to…" popup on a snippet's Jump row, `/jump`, and node references) no
+  longer crushes its rows into unreadable ~10px slivers in a project with enough scenes and blocks.
+  This is the real fix for #30: 0.6.4 guarded three lookalike popups but missed the one actually in
+  the screenshots - the type-to-filter picker, whose rows clip their text for ellipsis and so had no
+  minimum height once the list outgrew its cap. Reproduced with the real component before fixing:
+  92 rows measured at ~10px each before, ~25px (natural height, scrolling) after.
+
 ## [0.6.4] - 2026-07-23
 
 ### Added
