@@ -108,6 +108,32 @@ round-trips through its own save format (semantically equivalent to the other en
 byte-identical across them).
 → [Save/load & Game Data](/play/integration/)
 
+## Exporting your game
+
+One Godot setting catches almost everyone on their first export: Godot only packs files it
+recognises as *resources* (scenes, scripts, imported assets), and **silently drops everything
+else** - including your `.patterc` bundle - from the exported `.pck`. The game then runs fine in
+the editor (which reads loose project files) but the bundle is missing from the export, on every
+platform: desktop, mobile, and web alike.
+
+The fix is a filter on the export preset. In **Project ▸ Export... ▸ your preset ▸ Resources ▸
+"Filters to export non-resource files/folders"**, add:
+
+```
+*.patterc
+```
+
+Also add **`patteraudio.json`** if you use [Audio Folders](/play/audio/) (the audio files
+themselves are imported resources and export fine; the manifest is plain JSON and is not). The
+same applies to any other loose data files you read at runtime, like `*.json` save templates.
+
+Once the file is in the pack, `FileAccess.get_file_as_string("res://...")` works exactly as it
+does in the editor, web export included. To sanity-check a build before you ship it:
+
+```gdscript
+print(FileAccess.file_exists("res://story.patterc"))   # must print true in the EXPORTED build
+```
+
 ## Next
 
 - The shared model: [The play loop](/play/concepts/).
