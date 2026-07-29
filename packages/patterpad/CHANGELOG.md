@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-07-29
+
 ### Fixed
 - An update download that **stalls is now noticed, killed, and retried** instead of sitting
   "downloading in the background" forever. A hung download reports neither progress nor an error, so
