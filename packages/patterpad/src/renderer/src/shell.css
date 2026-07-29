@@ -533,6 +533,11 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .um-wordmark { display: flex; justify-content: center; margin: 0.2rem 0 0.4rem; }
 .um-wordmark svg { height: 2.6rem; width: auto; }
 /* The About dialog's web links (opened externally via the main-process allow-list). */
+/* Live download progress in the updater dialog (Check for Updates while a download runs, #33). */
+.um-progress-track { height: 0.4rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--ink) 12%, transparent); overflow: hidden; }
+.um-progress-bar { height: 100%; width: 0%; border-radius: inherit; background: var(--accent); transition: width var(--dur-quick) var(--ease-standard); }
+.um-progress-label { margin: 0.3rem 0 0; font: 0.78rem var(--font-mono); color: var(--muted); }
+
 .um-links { margin: 0; display: flex; gap: 1rem; font-size: 0.85rem; }
 .um-links a { color: var(--accent); text-decoration: none; }
 .um-links a:hover { text-decoration: underline; }

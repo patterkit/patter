@@ -830,6 +830,9 @@ export interface PatterApi {
   /** The auto-updater asks the renderer to show a THEMED prompt (never a stock OS dialog); the handler
    *  resolves the chosen button index, the same contract as Electron's showMessageBox `response`. */
   onUpdaterPrompt(handler: (opts: UpdaterPromptOptions) => Promise<number>): void;
+  /** Live download progress from the auto-updater, fired while an update downloads. The open updater
+   *  dialog (when shown with `progress: true`) renders it as a bar; otherwise it is ignored. */
+  onUpdaterDownloadProgress(handler: (p: UpdaterDownloadProgress) => void): void;
 }
 
 /** A themed auto-update prompt (the in-app replacement for dialog.showMessageBox). */
@@ -845,10 +848,21 @@ export interface UpdaterPromptOptions {
   links?: { label: string; url: string }[];
   /** Centre the PatterKit wordmark above the title (the About dialog's branding). */
   wordmark?: boolean;
+  /** Show a live download-progress bar under the copy, fed by onUpdaterDownloadProgress. */
+  progress?: boolean;
   /** The highlighted / Enter-default button (defaults to 0). */
   defaultId?: number;
   /** The button Esc maps to (defaults to the last). */
   cancelId?: number;
+}
+
+/** One download-progress tick (electron-updater's ProgressInfo, plus the version being fetched). */
+export interface UpdaterDownloadProgress {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+  version: string;
 }
 
 declare global {

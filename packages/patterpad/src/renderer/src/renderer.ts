@@ -17,7 +17,7 @@ import "@fontsource/ibm-plex-mono/400.css";
 import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";
 import { closeWithExit } from "@patterkit/patterpad-surface/exit";
-import { showUpdaterDialog } from "./updater-dialog.js";
+import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, SceneVcStatus, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector } from "./inspector.js";
 import { openConditionEditor, closeConditionEditor, renderConditionPills } from "./cond-editor.js";
@@ -2396,6 +2396,7 @@ window.patter.onUpdaterCheckDirty(() => dirty);
 window.patter.onUpdaterSaveBeforeInstall(async () => { await save(); return { ok: !dirty }; });
 // Auto-update prompts wear the app's themed dialog chrome, never a stock OS box.
 window.patter.onUpdaterPrompt((opts) => showUpdaterDialog(opts));
+window.patter.onUpdaterDownloadProgress(feedUpdaterDownloadProgress);
 
 // A `.patter` document package opened from Finder while the app is running: render the delivered project.
 window.patter.onOpenProject((result) => void showProject(result));

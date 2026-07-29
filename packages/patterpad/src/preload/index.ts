@@ -3,7 +3,7 @@
 // leaked to the page. Each method is a typed wrapper over one ipcMain.handle channel.
 
 import { contextBridge, ipcRenderer } from "electron";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions } from "../shared/api.js";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -98,6 +98,7 @@ const api: PatterApi = {
   onUpdaterCheckDirty: (handler) => { ipcRenderer.on("updater:check-dirty", () => ipcRenderer.send("updater:dirty-reply", handler())); },
   onUpdaterSaveBeforeInstall: (handler) => { ipcRenderer.on("updater:save-before-install", () => { void handler().then((r) => ipcRenderer.send("updater:save-done", r)); }); },
   onUpdaterPrompt: (handler) => { ipcRenderer.on("updater:prompt", (_e, opts: UpdaterPromptOptions) => { void handler(opts).then((idx) => ipcRenderer.send("updater:prompt-reply", idx)); }); },
+  onUpdaterDownloadProgress: (handler) => { ipcRenderer.on("updater:download-progress", (_e, p: UpdaterDownloadProgress) => handler(p)); },
 };
 
 // The play window's bridge (drives the interactive walk + the editor step-marker).

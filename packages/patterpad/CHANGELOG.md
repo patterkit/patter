@@ -6,6 +6,18 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- An update download that **stalls is now noticed, killed, and retried** instead of sitting
+  "downloading in the background" forever. A hung download reports neither progress nor an error, so
+  nothing ever recovered it - the state a Windows user hit for a whole day (#33) - and only restarting
+  Patterpad would clear it. A watchdog now cancels any download that reports no progress for 3 minutes
+  and retries (up to 3 attempts; the next update check starts a fresh round). If it still can't get
+  through, **Help ▸ Check for Updates** says so instead of staying silent. All platforms.
+
+### Added
+- **Help ▸ Check for Updates shows live download progress** - a real bar with percent, size, and
+  speed - while an update is downloading, instead of just promising a background download. (#33)
+
 ## [0.6.5] - 2026-07-24
 
 ### Fixed

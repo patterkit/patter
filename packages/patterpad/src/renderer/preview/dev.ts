@@ -328,6 +328,7 @@ const stub = {
   onUpdaterCheckDirty: () => undefined,
   onUpdaterSaveBeforeInstall: () => undefined,
   onUpdaterPrompt: () => undefined,
+  onUpdaterDownloadProgress: () => undefined,
 };
 
 (window as unknown as { patter: unknown }).patter = stub;

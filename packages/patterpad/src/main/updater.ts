@@ -1,6 +1,11 @@
 // ---------------------------------------------------------------------------
 // In-app auto-update (electron-updater over the GitHub Release feed).
 //
+// Downloads are managed here (autoDownload off): a watchdog kills and retries a
+// download that stops reporting progress, because a hung stream emits neither
+// progress nor `error` and would otherwise sit "downloading" forever (#33).
+// Progress is broadcast to the renderer so Check for Updates can show it live.
+//
 // Wired through Patterpad's curated
 // IPC: before installing, we ask the renderer whether the open scene is dirty
 // and, if so, give the user Save / Discard / Cancel so "Restart Now" can never
@@ -10,11 +15,11 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
-import type { UpdateDownloadedEvent } from "electron-updater";
+import type { ProgressInfo, UpdateDownloadedEvent, UpdateInfo } from "electron-updater";
 import electronUpdater from "electron-updater";
-import type { UpdaterPromptOptions } from "../shared/api.js";
+import type { UpdaterDownloadProgress, UpdaterPromptOptions } from "../shared/api.js";
 
-const { autoUpdater } = electronUpdater;
+const { autoUpdater, CancellationToken } = electronUpdater;
 
 let updateDownloaded: UpdateDownloadedEvent | null = null;
 // Remember the last background error so the manual "Check for Updates" dialog can
@@ -35,7 +40,11 @@ autoUpdater.logger = {
   debug: (...a: unknown[]) => writeLog("debug", a),
 };
 
-autoUpdater.autoDownload = true;
+// Downloads are driven by the download manager below, NOT electron-updater's autoDownload: holding
+// the CancellationToken ourselves is what lets the stall watchdog kill and retry a download that
+// hangs without ever erroring (#33 - a Windows user's download sat "in the background" all day; a
+// hung stream emits neither progress nor `error`, so nothing built on events alone can recover it).
+autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = true;
 // Force a plain full download instead of the block-by-block differential. On Windows the differential
 // path stalled silently (0.1.5): across an Electron-major bump almost no blocks match, so it downloads
@@ -46,6 +55,89 @@ autoUpdater.disableDifferentialDownload = true;
 autoUpdater.on("error", (err) => {
   console.error("AutoUpdater error:", err?.message || err);
   lastBackgroundError = err?.message || String(err);
+});
+
+// ---------------------------------------------------------------------------
+// Download manager: start, watch, retry. Platform-agnostic - it rides
+// electron-updater's shared events, identical for NSIS (win), zip (mac), and
+// AppImage (linux) feeds.
+// ---------------------------------------------------------------------------
+
+const STALL_MS = 3 * 60 * 1000;   // no progress event for this long = the download is hung
+const WATCH_EVERY_MS = 30 * 1000; // how often the watchdog looks at the clock
+const RETRY_DELAY_MS = 15 * 1000; // pause before re-attempting a killed/failed download
+const MAX_ATTEMPTS = 3;           // per check cycle; the 6-hourly background check starts a fresh cycle
+
+type DownloadState = {
+  info: UpdateInfo;
+  token: InstanceType<typeof CancellationToken>;
+  attempts: number;        // attempts consumed this cycle, including the running one
+  lastProgressAt: number;
+  cancelledByWatchdog: boolean;
+  watchdog: NodeJS.Timeout;
+};
+let download: DownloadState | null = null;
+
+function broadcastProgress(p: UpdaterDownloadProgress): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed() && !w.webContents.isDestroyed()) w.webContents.send("updater:download-progress", p);
+  }
+}
+
+function clearDownload(): void {
+  if (download) clearInterval(download.watchdog);
+  download = null;
+}
+
+/** Begin (or re-attempt) downloading `info`. One state machine for every platform. */
+function beginDownload(info: UpdateInfo, attempts: number): void {
+  clearDownload();
+  const token = new CancellationToken();
+  const state: DownloadState = {
+    info, token, attempts: attempts + 1, lastProgressAt: Date.now(), cancelledByWatchdog: false,
+    watchdog: setInterval(() => {
+      if (download !== state) return;
+      const quiet = Date.now() - state.lastProgressAt;
+      if (quiet < STALL_MS) return;
+      // Hung: no progress and no error for STALL_MS. Kill it; the download promise's catch retries.
+      writeLog("warn", [`watchdog: no download progress for ${Math.round(quiet / 1000)}s - cancelling (attempt ${state.attempts}/${MAX_ATTEMPTS})`]);
+      state.cancelledByWatchdog = true;
+      state.token.cancel();
+    }, WATCH_EVERY_MS),
+  };
+  download = state;
+  writeLog("info", [`download: starting ${info.version} (attempt ${state.attempts}/${MAX_ATTEMPTS})`]);
+
+  autoUpdater.downloadUpdate(token).then(() => {
+    // Success is reported via the update-downloaded event; it clears the state.
+  }).catch((err: unknown) => {
+    if (download !== state) return; // superseded by a newer attempt/cycle
+    const why = state.cancelledByWatchdog ? "stalled (killed by the watchdog)"
+      : (err instanceof Error ? err.message : String(err));
+    clearDownload();
+    if (state.attempts < MAX_ATTEMPTS) {
+      writeLog("warn", [`download: attempt ${state.attempts} failed - ${why}; retrying in ${RETRY_DELAY_MS / 1000}s`]);
+      setTimeout(() => { if (!download && !updateDownloaded) beginDownload(info, state.attempts); }, RETRY_DELAY_MS);
+    } else {
+      // Out of attempts for this cycle. Record it where the manual check surfaces it; the next
+      // background check (6-hourly, or Help > Check for Updates) starts a fresh cycle.
+      lastBackgroundError = `Downloading ${info.version} failed ${MAX_ATTEMPTS} times (last: ${why}). Will retry on the next check.`;
+      writeLog("error", [`download: giving up on ${info.version} this cycle - ${why}`]);
+    }
+  });
+}
+
+autoUpdater.on("update-available", (info: UpdateInfo) => {
+  if (download || updateDownloaded) return; // already downloading it, or already have it
+  beginDownload(info, 0);
+});
+
+autoUpdater.on("download-progress", (p: ProgressInfo) => {
+  if (download) download.lastProgressAt = Date.now();
+  broadcastProgress({
+    percent: p.percent, transferred: p.transferred, total: p.total,
+    bytesPerSecond: p.bytesPerSecond, version: download?.info.version ?? "",
+  });
 });
 
 function activeWindow(): BrowserWindow | null {
@@ -130,7 +222,10 @@ async function quitAndInstallSafely(): Promise<void> {
 }
 
 autoUpdater.on("update-downloaded", (info: UpdateDownloadedEvent) => {
+  clearDownload();
   updateDownloaded = info;
+  lastBackgroundError = null; // it got here in the end; stale retry noise would only mislead
+  writeLog("info", [`download: ${info.version} downloaded and ready to install`]);
   const win = activeWindow();
   if (!win) return;
   void themedPrompt(win, {
@@ -176,15 +271,41 @@ export async function manualCheckForUpdates(win?: BrowserWindow | null): Promise
     return;
   }
 
+  if (download) {
+    // A download is already in flight: show it, live (the dialog subscribes to progress events).
+    await themedPrompt(parent, {
+      message: "Update available",
+      detail: `Patterpad ${download.info.version} is downloading. You'll be prompted to restart when it's ready.`,
+      buttons: ["OK"],
+      progress: true,
+    });
+    return;
+  }
+
   try {
-    const result = await autoUpdater.checkForUpdates();
-    if (result?.downloadPromise) {
+    // A manual check starts a fresh retry cycle: if the last one gave up, this is the user asking again.
+    await autoUpdater.checkForUpdates();
+    // With autoDownload off, `update-available` (fired during the await) starts the managed download,
+    // so by here `download` is set iff the feed had something newer. (Read through locals: TS narrows the
+    // module-level `download` to null after the guard above and cannot see the event handler mutate it.)
+    const started = download as DownloadState | null;
+    const ready = updateDownloaded as UpdateDownloadedEvent | null;
+    if (started) {
       await themedPrompt(parent, {
         message: "Update available",
-        detail: `Patterpad ${result.updateInfo.version} is downloading in the background. You'll be prompted to restart when it's ready.`,
+        detail: `Patterpad ${started.info.version} is downloading. You'll be prompted to restart when it's ready.`,
         buttons: ["OK"],
+        progress: true,
       });
       lastBackgroundError = null;
+    } else if (ready) {
+      // The check completed a download between our earlier guard and now (tiny window, but free to handle).
+      const response = await themedPrompt(parent, {
+        buttons: ["Restart Now", "Later"], defaultId: 0, cancelId: 1,
+        message: "Update ready to install",
+        detail: `Patterpad ${ready.version} has been downloaded. Restart now to apply.`,
+      });
+      if (response === 0) await quitAndInstallSafely();
     } else if (lastBackgroundError) {
       await themedPrompt(parent, {
         message: "You're on the latest version, but updates have had errors.",

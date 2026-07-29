@@ -4,7 +4,22 @@
 // over `updater:prompt` and reads back the chosen button index - the same contract as showMessageBox.
 
 import { el } from "./dom.js";
-import type { UpdaterPromptOptions } from "../../shared/api.js";
+import type { UpdaterDownloadProgress, UpdaterPromptOptions } from "../../shared/api.js";
+
+// The progress row of the currently open `progress: true` dialog, if any. One dialog at a time (they're
+// modal), so a single slot is enough; feedUpdaterDownloadProgress writes into it, closing clears it.
+let liveProgress: { bar: HTMLElement; label: HTMLElement } | null = null;
+
+/** Route a download-progress tick into the open updater dialog's bar (no-op when none is showing).
+ *  Registered once at boot on window.patter.onUpdaterDownloadProgress. */
+export function feedUpdaterDownloadProgress(p: UpdaterDownloadProgress): void {
+  if (!liveProgress) return;
+  const pct = Math.max(0, Math.min(100, p.percent));
+  liveProgress.bar.style.width = `${pct}%`;
+  const mb = (n: number): string => (n / (1024 * 1024)).toFixed(1);
+  liveProgress.label.textContent =
+    `${pct.toFixed(0)}% - ${mb(p.transferred)} of ${mb(p.total)} MB (${mb(p.bytesPerSecond)} MB/s)`;
+}
 
 /** Show the prompt as a modal themed dialog; resolve the index of the clicked button (Esc → cancelId). */
 export function showUpdaterDialog(opts: UpdaterPromptOptions): Promise<number> {
@@ -30,6 +45,15 @@ export function showUpdaterDialog(opts: UpdaterPromptOptions): Promise<number> {
     }
     form.append(el("h2", "identity-title", opts.message));
     if (opts.detail) form.append(el("p", "identity-sub", opts.detail));
+    if (opts.progress) {
+      // Live download progress (fed by feedUpdaterDownloadProgress until this dialog closes).
+      const track = el("div", "um-progress-track");
+      const bar = el("div", "um-progress-bar");
+      track.append(bar);
+      const label = el("p", "um-progress-label", "Starting download…");
+      form.append(track, label);
+      liveProgress = { bar, label };
+    }
     if (opts.links?.length) {
       // The About dialog's web links; main only opens allow-listed URLs, so a bad label/url pair is inert.
       const row = el("p", "um-links");
@@ -47,6 +71,7 @@ export function showUpdaterDialog(opts: UpdaterPromptOptions): Promise<number> {
     const finish = (idx: number): void => {
       if (done) return;
       done = true;
+      if (opts.progress) liveProgress = null; // stop feeding a dialog that's gone
       try { dlg.close(); } catch { /* already closed */ }
       dlg.remove();
       resolve(idx);
