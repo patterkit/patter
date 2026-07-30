@@ -17,6 +17,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-30
+
 ### Added
 - **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
   globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
