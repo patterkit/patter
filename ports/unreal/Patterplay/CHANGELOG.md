@@ -7,6 +7,23 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
+  globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
+  between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so
+  what the logger sees is exactly what a save persists. Identical flattened-path and line format on
+  every runtime.
+- **`patter::serializeState` / `deserializeState`: the tagged `patter/save@0` envelope** in the
+  std core (parity with the JS and Unity save helpers) - the whole game to a JSON string and back,
+  with foreign blobs refused. **`UPatterSave`** exposes it to Blueprint (`SaveStateToJson` /
+  `LoadStateFromJson`), so a Blueprint-only game can save and load without C++.
+- The **Runtime State panel gains Save State... / Load State...** buttons (`.patterstate` files via
+  native dialogs) - the parity of Unity's window and Godot's panel.
+
+### Fixed
+- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence
+  text at all.
+
 ## [0.3.1] - 2026-07-22
 
 ### Fixed

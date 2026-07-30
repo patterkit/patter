@@ -292,7 +292,7 @@ func _do_save(path: String, e, dlg: FileDialog) -> void:
 	if f == null:
 		push_error("Patter: cannot write " + path)
 		return
-	f.store_string(JSON.stringify(e.save_game(), "\t"))
+	f.store_string(PatterSave.serialize_state(e, "\t")) # the tagged patter/save@0 envelope
 	f.close()
 
 
@@ -302,9 +302,9 @@ func _do_load(path: String, e, dlg: FileDialog) -> void:
 	if text == "":
 		push_error("Patter: cannot read " + path)
 		return
-	var data = JSON.parse_string(text)
-	if typeof(data) != TYPE_DICTIONARY:
+	# PatterSave accepts the patter/save@0 envelope AND the bare snapshots this panel
+	# used to write, so old .patterstate files keep loading; a foreign blob is refused.
+	if not PatterSave.deserialize_state(e, text):
 		push_error("Patter: not a valid state file: " + path)
 		return
-	e.load_game(data)
 	_rebuild()

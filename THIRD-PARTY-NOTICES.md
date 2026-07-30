@@ -21,6 +21,13 @@ The font binaries are not stored in the repository; they are inlined (gzip + bas
   [`packages/patterpad/resources/dictionaries/en-US/license`](./packages/patterpad/resources/dictionaries/en-US/license)
   and [`.../en-GB/license`](./packages/patterpad/resources/dictionaries/en-GB/license).
 
+## Runtime ports (bundled with or required by the engine plugins)
+
+- **Json.NET (Newtonsoft.Json)** - the Patterplay Unity package depends on Unity's
+  `com.unity.nuget.newtonsoft-json` (3.2.1) for bundle and save parsing. MIT License,
+  © James Newton-King. Full text: <https://github.com/JamesNK/Newtonsoft.Json/blob/master/LICENSE.md>.
+  The library itself is delivered by the Unity Package Manager, not inside the Patterplay zip.
+
 ## Bundled npm dependencies
 
 Patter and Patterpad build on the open-source packages below. All are MIT-licensed unless noted;

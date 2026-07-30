@@ -17,6 +17,17 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
+  globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
+  between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so
+  what the logger sees is exactly what a save persists. Identical flattened-path and line format on
+  every runtime.
+
+### Fixed
+- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence
+  text at all.
+
 ## [0.3.1] - 2026-07-22
 
 ### Changed

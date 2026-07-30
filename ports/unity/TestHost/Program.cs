@@ -232,10 +232,15 @@ namespace Patterkit.Patterplay.TestHost
                             {
                                 if (_jsonSaveLoad)
                                 {
-                                    // Round-trip through the Unity save helper (Newtonsoft JSON string).
+                                    // Round-trip through the Unity save helper (Newtonsoft JSON string),
+                                    // asserting the flattened state survives - which exercises the
+                                    // StateLogger's snapshot/diff too (parity brief B1/B2).
+                                    var before = PatterStateLogger.SnapshotState(engine);
                                     string json = PatterSave.SerializeState(engine);
                                     engine = new Engine(bundle, opts);
                                     PatterSave.DeserializeState(engine, json);
+                                    if (PatterStateLogger.DiffState(before, PatterStateLogger.SnapshotState(engine)).Count != 0)
+                                        throw new Exception("envelope round-trip changed flattened state");
                                 }
                                 else
                                 {

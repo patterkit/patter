@@ -116,6 +116,12 @@ Something not covered here, or a use you're not sure about? Ask, and the answer 
 Patter and its tools are MIT-licensed. They also bundle a few third-party components that keep
 their own licences; the notable ones are collected here.
 
+### Json.NET (Unity runtime)
+
+The Patterplay Unity package depends on Unity's `com.unity.nuget.newtonsoft-json` package
+([Json.NET](https://www.newtonsoft.com/json), MIT, © James Newton-King) for bundle and save
+parsing. Unity's Package Manager delivers it; it is not bundled inside the Patterplay download.
+
 ### Spell-check dictionaries and engine
 
 The built-in English dictionaries come from [SCOWL / the English Speller

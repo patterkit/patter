@@ -1,0 +1,393 @@
+// Save / load: wrap the Engine's whole-game snapshot in the tagged `patter/save@0` envelope so a
+// host can drop it into a file and restore it safely (a foreign blob throws instead of corrupting
+// a run). The envelope keys (`schema`, `save`) are the cross-runtime contract; the save body is
+// this runtime's own shape, like every other port (Unity's PatterSave, play-helpers' save.ts).
+//
+// std-only, and deliberately self-contained: the core is JSON-library-agnostic (Bundle.h), so this
+// header carries its own compact JSON writer + reader for the SaveGame shape - which also makes the
+// envelope testable in the clang TestHost, where Unreal's FJson does not exist. Reading accepts a
+// bare version-2 snapshot (no envelope) for compatibility with files written before the envelope.
+#pragma once
+
+#include <cstdio>
+#include <map>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+#include "Engine.h"
+#include "StateLogger.h"   // loggerdetail::jsonQuote + formatStateValue (the shared value rendering)
+
+namespace patter
+{
+    inline const char* SAVE_SCHEMA = "patter/save@0";
+
+    // ----- writing ---------------------------------------------------------
+
+    namespace savedetail
+    {
+        using loggerdetail::jsonQuote;
+
+        inline std::string valueJson(const PatterValue& v) { return formatStateValue(v); }
+
+        inline std::string valueMapJson(const std::map<std::string, PatterValue>& m)
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueJson(kv.second); }
+            return out + "}";
+        }
+
+        inline std::string intMapJson(const std::map<std::string, int>& m)
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + std::to_string(kv.second); }
+            return out + "}";
+        }
+
+        inline std::string stringListJson(const std::vector<std::string>& v)
+        {
+            std::string out = "["; for (size_t i = 0; i < v.size(); ++i) { if (i) out += ","; out += jsonQuote(v[i]); } return out + "]";
+        }
+
+        inline std::string selectorJson(const SelectorState& s)
+        {
+            return "{\"seq\":" + std::to_string(s.seq)
+                 + ",\"bagInit\":" + (s.bagInit ? "true" : "false")
+                 + ",\"bag\":" + stringListJson(s.bag)
+                 + ",\"hasLast\":" + (s.hasLast ? "true" : "false")
+                 + ",\"last\":" + jsonQuote(s.last) + "}";
+        }
+
+        inline std::string selectorMapJson(const std::map<std::string, SelectorState>& m)
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + selectorJson(kv.second); }
+            return out + "}";
+        }
+
+        inline std::string bagMapJson(const std::map<std::string, std::map<std::string, PatterValue>>& m)
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueMapJson(kv.second); }
+            return out + "}";
+        }
+
+        inline std::string optionJson(const ChoiceOption& o)
+        {
+            std::string out = "{\"id\":" + jsonQuote(o.id) + ",\"eligible\":" + (o.eligible ? "true" : "false");
+            if (o.prompt)
+            {
+                out += ",\"prompt\":{\"kind\":" + jsonQuote(o.prompt->kind)
+                     + ",\"text\":" + jsonQuote(o.prompt->text)
+                     + ",\"character\":" + jsonQuote(o.prompt->character)
+                     + ",\"characterName\":" + jsonQuote(o.prompt->characterName)
+                     + ",\"direction\":" + jsonQuote(o.prompt->direction) + "}";
+            }
+            if (o.gameData) out += ",\"gameData\":" + valueMapJson(*o.gameData);
+            return out + "}";
+        }
+
+        inline std::string flowJson(const FlowSnapshot& f)
+        {
+            std::string out = "{";
+            out += "\"scopes\":" + valueMapJson(f.scopes);
+            out += ",\"sceneBags\":" + bagMapJson(f.sceneBags);
+            out += ",\"rngState\":" + std::to_string(static_cast<unsigned long long>(f.rngState));
+            out += ",\"visits\":" + intMapJson(f.visits);
+            out += std::string(",\"flowEnded\":") + (f.flowEnded ? "true" : "false");
+            out += ",\"currentSceneId\":" + jsonQuote(f.currentSceneId);
+            out += ",\"stack\":[";
+            for (size_t i = 0; i < f.stack.size(); ++i)
+            {
+                if (i) out += ",";
+                const StackFrame& fr = f.stack[i];
+                out += "{\"sceneId\":" + jsonQuote(fr.sceneId) + ",\"containerId\":" + jsonQuote(fr.containerId)
+                     + ",\"index\":" + std::to_string(fr.index) + ",\"nextId\":" + jsonQuote(fr.nextId) + "}";
+            }
+            out += "]";
+            out += ",\"activeSnippetId\":" + jsonQuote(f.activeSnippetId);
+            out += ",\"beatIndex\":" + std::to_string(f.beatIndex);
+            out += ",\"pendingGroupId\":" + jsonQuote(f.pendingGroupId);
+            out += ",\"pendingOptions\":[";
+            for (size_t i = 0; i < f.pendingOptions.size(); ++i) { if (i) out += ","; out += optionJson(f.pendingOptions[i]); }
+            out += "]";
+            out += ",\"pendingPromptOwnerId\":" + jsonQuote(f.pendingPromptOwnerId);
+            out += ",\"selectors\":" + selectorMapJson(f.selectors);
+            return out + "}";
+        }
+    }
+
+    /// Serialise the whole game (shared state, visits, every live flow) to a tagged JSON string.
+    inline std::string serializeState(Engine& engine)
+    {
+        using namespace savedetail;
+        SaveGame s = engine.saveGame();
+        std::string out = "{\"schema\":" + jsonQuote(SAVE_SCHEMA) + ",\"save\":{";
+        out += "\"version\":" + std::to_string(s.version);
+        out += ",\"shared\":" + valueMapJson(s.shared);
+        out += ",\"sharedVisits\":" + intMapJson(s.sharedVisits);
+        out += ",\"sharedSelectors\":" + selectorMapJson(s.sharedSelectors);
+        out += ",\"stageBags\":" + bagMapJson(s.stageBags);
+        out += ",\"flows\":{";
+        bool first = true;
+        for (const auto& kv : s.flows) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + flowJson(kv.second); }
+        out += "}}}";
+        return out;
+    }
+
+    // ----- reading ---------------------------------------------------------
+
+    namespace savedetail
+    {
+        // A compact JSON value + recursive-descent parser, just for the save shape (the same
+        // pattern as the TestHost's Json.h; the runtime core stays JSON-library-agnostic).
+        struct JV
+        {
+            enum class T { Null, Bool, Num, Str, Arr, Obj } t = T::Null;
+            bool b = false; double n = 0; std::string s;
+            std::vector<JV> arr;
+            std::vector<std::pair<std::string, JV>> obj;
+
+            const JV* get(const std::string& key) const
+            {
+                for (const auto& kv : obj) if (kv.first == key) return &kv.second;
+                return nullptr;
+            }
+            std::string str(const std::string& key) const { const JV* v = get(key); return v && v->t == T::Str ? v->s : ""; }
+            double num(const std::string& key) const { const JV* v = get(key); return v && v->t == T::Num ? v->n : 0; }
+            bool boolean(const std::string& key) const { const JV* v = get(key); return v && v->t == T::Bool && v->b; }
+        };
+
+        class JParse
+        {
+        public:
+            explicit JParse(const std::string& src) : s_(src) {}
+            JV parse() { JV v = value(); ws(); if (i_ != s_.size()) fail("trailing data"); return v; }
+
+        private:
+            [[noreturn]] void fail(const std::string& m) { throw std::runtime_error("save JSON: " + m); }
+            void ws() { while (i_ < s_.size() && (s_[i_] == ' ' || s_[i_] == '\t' || s_[i_] == '\n' || s_[i_] == '\r')) ++i_; }
+            char peek() { ws(); if (i_ >= s_.size()) fail("unexpected end"); return s_[i_]; }
+            void expect(char c) { if (peek() != c) fail(std::string("expected '") + c + "'"); ++i_; }
+
+            JV value()
+            {
+                char c = peek();
+                if (c == '{') return object();
+                if (c == '[') return array();
+                if (c == '"') { JV v; v.t = JV::T::Str; v.s = string(); return v; }
+                if (c == 't') { lit("true"); JV v; v.t = JV::T::Bool; v.b = true; return v; }
+                if (c == 'f') { lit("false"); JV v; v.t = JV::T::Bool; v.b = false; return v; }
+                if (c == 'n') { lit("null"); return JV{}; }
+                return number();
+            }
+            void lit(const char* w) { ws(); for (const char* p = w; *p; ++p, ++i_) { if (i_ >= s_.size() || s_[i_] != *p) fail("bad literal"); } }
+            JV number()
+            {
+                ws(); size_t start = i_;
+                while (i_ < s_.size() && (s_[i_] == '-' || s_[i_] == '+' || s_[i_] == '.' || s_[i_] == 'e' || s_[i_] == 'E' || (s_[i_] >= '0' && s_[i_] <= '9'))) ++i_;
+                if (i_ == start) fail("expected number");
+                JV v; v.t = JV::T::Num; v.n = std::stod(s_.substr(start, i_ - start)); return v;
+            }
+            std::string string()
+            {
+                expect('"');
+                std::string out;
+                while (true)
+                {
+                    if (i_ >= s_.size()) fail("unterminated string");
+                    char c = s_[i_++];
+                    if (c == '"') return out;
+                    if (c != '\\') { out += c; continue; }
+                    if (i_ >= s_.size()) fail("bad escape");
+                    char e = s_[i_++];
+                    switch (e)
+                    {
+                        case '"': out += '"'; break;
+                        case '\\': out += '\\'; break;
+                        case '/': out += '/'; break;
+                        case 'n': out += '\n'; break;
+                        case 'r': out += '\r'; break;
+                        case 't': out += '\t'; break;
+                        case 'b': out += '\b'; break;
+                        case 'f': out += '\f'; break;
+                        case 'u':
+                        {
+                            if (i_ + 4 > s_.size()) fail("bad \\u escape");
+                            unsigned code = 0;
+                            for (int k = 0; k < 4; ++k)
+                            {
+                                char h = s_[i_++]; code <<= 4;
+                                if (h >= '0' && h <= '9') code += h - '0';
+                                else if (h >= 'a' && h <= 'f') code += 10 + h - 'a';
+                                else if (h >= 'A' && h <= 'F') code += 10 + h - 'A';
+                                else fail("bad \\u escape");
+                            }
+                            // BMP only (the writer never emits surrogate pairs; save keys/values are UTF-8 already).
+                            if (code < 0x80) out += static_cast<char>(code);
+                            else if (code < 0x800) { out += static_cast<char>(0xC0 | (code >> 6)); out += static_cast<char>(0x80 | (code & 0x3F)); }
+                            else { out += static_cast<char>(0xE0 | (code >> 12)); out += static_cast<char>(0x80 | ((code >> 6) & 0x3F)); out += static_cast<char>(0x80 | (code & 0x3F)); }
+                            break;
+                        }
+                        default: fail("bad escape");
+                    }
+                }
+            }
+            JV object()
+            {
+                expect('{'); JV v; v.t = JV::T::Obj;
+                if (peek() == '}') { ++i_; return v; }
+                while (true)
+                {
+                    std::string key = string(); expect(':');
+                    v.obj.emplace_back(std::move(key), value());
+                    char c = peek();
+                    if (c == ',') { ++i_; continue; }
+                    expect('}'); return v;
+                }
+            }
+            JV array()
+            {
+                expect('['); JV v; v.t = JV::T::Arr;
+                if (peek() == ']') { ++i_; return v; }
+                while (true)
+                {
+                    v.arr.push_back(value());
+                    char c = peek();
+                    if (c == ',') { ++i_; continue; }
+                    expect(']'); return v;
+                }
+            }
+
+            const std::string& s_;
+            size_t i_ = 0;
+        };
+
+        inline PatterValue toValue(const JV& v)
+        {
+            switch (v.t)
+            {
+                case JV::T::Bool: return PatterValue::Bool(v.b);
+                case JV::T::Num: return PatterValue::Num(v.n);
+                case JV::T::Str: return PatterValue::Str(v.s);
+                case JV::T::Arr:
+                {
+                    std::vector<std::string> flags;
+                    for (const auto& e : v.arr) if (e.t == JV::T::Str) flags.push_back(e.s);
+                    return PatterValue::Flags(flags);
+                }
+                default: return PatterValue::Bool(false);
+            }
+        }
+
+        inline std::map<std::string, PatterValue> toValueMap(const JV* o)
+        {
+            std::map<std::string, PatterValue> m;
+            if (o && o->t == JV::T::Obj) for (const auto& kv : o->obj) m[kv.first] = toValue(kv.second);
+            return m;
+        }
+
+        inline std::map<std::string, int> toIntMap(const JV* o)
+        {
+            std::map<std::string, int> m;
+            if (o && o->t == JV::T::Obj) for (const auto& kv : o->obj) m[kv.first] = static_cast<int>(kv.second.n);
+            return m;
+        }
+
+        inline SelectorState toSelector(const JV& v)
+        {
+            SelectorState s;
+            s.seq = static_cast<int>(v.num("seq"));
+            s.bagInit = v.boolean("bagInit");
+            if (const JV* bag = v.get("bag")) for (const auto& e : bag->arr) s.bag.push_back(e.s);
+            s.hasLast = v.boolean("hasLast");
+            s.last = v.str("last");
+            return s;
+        }
+
+        inline std::map<std::string, SelectorState> toSelectorMap(const JV* o)
+        {
+            std::map<std::string, SelectorState> m;
+            if (o && o->t == JV::T::Obj) for (const auto& kv : o->obj) m[kv.first] = toSelector(kv.second);
+            return m;
+        }
+
+        inline std::map<std::string, std::map<std::string, PatterValue>> toBagMap(const JV* o)
+        {
+            std::map<std::string, std::map<std::string, PatterValue>> m;
+            if (o && o->t == JV::T::Obj) for (const auto& kv : o->obj) m[kv.first] = toValueMap(&kv.second);
+            return m;
+        }
+
+        inline FlowSnapshot toFlow(const JV& v)
+        {
+            FlowSnapshot f;
+            f.scopes = toValueMap(v.get("scopes"));
+            f.sceneBags = toBagMap(v.get("sceneBags"));
+            f.rngState = static_cast<uint32_t>(v.num("rngState"));
+            f.visits = toIntMap(v.get("visits"));
+            f.flowEnded = v.boolean("flowEnded");
+            f.currentSceneId = v.str("currentSceneId");
+            if (const JV* stack = v.get("stack"))
+                for (const auto& e : stack->arr)
+                {
+                    StackFrame fr;
+                    fr.sceneId = e.str("sceneId"); fr.containerId = e.str("containerId");
+                    fr.index = static_cast<int>(e.num("index")); fr.nextId = e.str("nextId");
+                    f.stack.push_back(std::move(fr));
+                }
+            f.activeSnippetId = v.str("activeSnippetId");
+            f.beatIndex = static_cast<int>(v.num("beatIndex"));
+            f.pendingGroupId = v.str("pendingGroupId");
+            if (const JV* opts = v.get("pendingOptions"))
+                for (const auto& e : opts->arr)
+                {
+                    ChoiceOption o;
+                    o.id = e.str("id"); o.eligible = e.boolean("eligible");
+                    if (const JV* p = e.get("prompt"))
+                    {
+                        auto prompt = std::make_shared<ChoicePrompt>();
+                        prompt->kind = p->str("kind"); prompt->text = p->str("text");
+                        prompt->character = p->str("character"); prompt->characterName = p->str("characterName");
+                        prompt->direction = p->str("direction");
+                        o.prompt = prompt;
+                    }
+                    if (const JV* gd = e.get("gameData"))
+                        o.gameData = std::make_shared<GameData>(toValueMap(gd));
+                    f.pendingOptions.push_back(std::move(o));
+                }
+            f.pendingPromptOwnerId = v.str("pendingPromptOwnerId");
+            f.selectors = toSelectorMap(v.get("selectors"));
+            return f;
+        }
+    }
+
+    /// Parse + restore a serializeState string (or a bare version-2 snapshot from before the
+    /// envelope existed). Throws on malformed JSON or a foreign envelope.
+    inline void deserializeState(Engine& engine, const std::string& json)
+    {
+        using namespace savedetail;
+        JV root = JParse(json).parse();
+        const JV* saveObj = nullptr;
+        if (root.get("schema"))
+        {
+            if (root.str("schema") != SAVE_SCHEMA) throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
+            saveObj = root.get("save");
+            if (!saveObj) throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
+        }
+        else if (root.get("version")) saveObj = &root;  // bare snapshot (pre-envelope file)
+        else throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
+
+        SaveGame s;
+        s.version = static_cast<int>(saveObj->num("version"));
+        s.shared = toValueMap(saveObj->get("shared"));
+        s.sharedVisits = toIntMap(saveObj->get("sharedVisits"));
+        s.sharedSelectors = toSelectorMap(saveObj->get("sharedSelectors"));
+        s.stageBags = toBagMap(saveObj->get("stageBags"));
+        if (const JV* flows = saveObj->get("flows"))
+            if (flows->t == JV::T::Obj)
+                for (const auto& kv : flows->obj) s.flows[kv.first] = toFlow(kv.second);
+        engine.loadGame(s);
+    }
+}

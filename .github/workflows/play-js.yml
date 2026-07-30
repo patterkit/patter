@@ -70,7 +70,7 @@ jobs:
           cp packages/runtime/dist/index.js packages/runtime/dist/index.js.map \
              packages/runtime/dist/index.cjs packages/runtime/dist/index.cjs.map \
              packages/runtime/dist/index.d.ts packages/runtime/dist/index.d.cts "${out}/dist/"
-          cp packages/runtime/README.md packages/runtime/CHANGELOG.md "${out}/"
+          cp packages/runtime/README.md packages/runtime/CHANGELOG.md LICENSE "${out}/"
 
           # Demo 1: the zero-build drop-in page (own runtime copy so it opens from anywhere).
           mkdir -p "${out}/demos/drop-in"

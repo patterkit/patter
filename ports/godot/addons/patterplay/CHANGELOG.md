@@ -6,6 +6,21 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+- **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
+  globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
+  between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so
+  what the logger sees is exactly what a save persists. Identical flattened-path and line format on
+  every runtime.
+- **`PatterSave`: the tagged `patter/save@0` envelope** (parity with the JS and Unity save
+  helpers): `serialize_state` / `deserialize_state` wrap `save_game()` in a schema-tagged envelope, so
+  a foreign blob is refused instead of corrupting a run. The state panel now writes the envelope;
+  `.patterstate` files written before this release (bare snapshots) still load.
+
+### Fixed
+- The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence
+  text at all.
+
 ## [0.3.1] - 2026-07-22
 
 ### Changed

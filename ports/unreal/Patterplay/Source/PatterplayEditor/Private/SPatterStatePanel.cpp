@@ -15,6 +15,12 @@
 #include "Widgets/Layout/SBox.h"
 #include "Styling/CoreStyle.h"
 
+#include "DesktopPlatformModule.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Misc/FileHelper.h"
+#include "Misc/MessageDialog.h"
+#include "Patter/Save.h"
+
 #define LOCTEXT_NAMESPACE "PatterStatePanel"
 
 void SPatterStatePanel::Construct(const FArguments& InArgs)
@@ -104,6 +110,24 @@ void SPatterStatePanel::Rebuild()
 			SNew(STextBlock)
 			.Text(FText::FromString(E.Label))
 			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 11))
+		];
+		// Save/Load the whole run to a .patterstate file (the tagged patter/save@0 envelope) - the
+		// parity of Unity's PatterStateWindow buttons and Godot's state-panel FileDialog pair.
+		Body->AddSlot().AutoHeight().Padding(10.f, 2.f, 10.f, 2.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(SButton)
+				.Text(LOCTEXT("SaveState", "Save State..."))
+				.OnClicked_Lambda([WeakEngine = E.Engine]() { SPatterStatePanel::SaveStateToFile(WeakEngine.Get()); return FReply::Handled(); })
+			]
+			+ SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SButton)
+				.Text(LOCTEXT("LoadState", "Load State..."))
+				.OnClicked_Lambda([WeakEngine = E.Engine]() { SPatterStatePanel::LoadStateFromFile(WeakEngine.Get()); return FReply::Handled(); })
+			]
 		];
 		Body->AddSlot().AutoHeight().Padding(10.f, 0.f, 10.f, 4.f)
 		[
@@ -282,6 +306,53 @@ TSharedRef<SWidget> SPatterStatePanel::BuildRow(TWeakObjectPtr<UPatterEngine> En
 				SNew(STextBlock).Text(FText::FromString(TEXT("↺"))) // circular reset arrow
 			]
 		];
+}
+
+void SPatterStatePanel::SaveStateToFile(UPatterEngine* Engine)
+{
+	if (!Engine || !Engine->Raw()) return;
+	IDesktopPlatform* Desktop = FDesktopPlatformModule::Get();
+	if (!Desktop) return;
+	TArray<FString> Files;
+	const void* Parent = FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr);
+	if (!Desktop->SaveFileDialog(Parent, TEXT("Save Patter State"), FPaths::ProjectSavedDir(), TEXT("save.patterstate"),
+	                             TEXT("Patter state (*.patterstate)|*.patterstate"), EFileDialogFlags::None, Files) || Files.Num() == 0)
+	{
+		return;
+	}
+	const std::string Json = patter::serializeState(*Engine->Raw());
+	FFileHelper::SaveStringToFile(FString(UTF8_TO_TCHAR(Json.c_str())), *Files[0],
+	                              FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+}
+
+void SPatterStatePanel::LoadStateFromFile(UPatterEngine* Engine)
+{
+	if (!Engine || !Engine->Raw()) return;
+	IDesktopPlatform* Desktop = FDesktopPlatformModule::Get();
+	if (!Desktop) return;
+	TArray<FString> Files;
+	const void* Parent = FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr);
+	if (!Desktop->OpenFileDialog(Parent, TEXT("Load Patter State"), FPaths::ProjectSavedDir(), TEXT(""),
+	                             TEXT("Patter state (*.patterstate)|*.patterstate"), EFileDialogFlags::None, Files) || Files.Num() == 0)
+	{
+		return;
+	}
+	FString Text;
+	if (!FFileHelper::LoadFileToString(Text, *Files[0]))
+	{
+		FMessageDialog::Open(EAppMsgType::Ok, LOCTEXT("LoadReadFail", "Could not read the state file."));
+		return;
+	}
+	try
+	{
+		patter::deserializeState(*Engine->Raw(), std::string(TCHAR_TO_UTF8(*Text)));
+	}
+	catch (const std::exception& Err)
+	{
+		FMessageDialog::Open(EAppMsgType::Ok,
+			FText::Format(LOCTEXT("LoadParseFail", "Not a valid Patter state file: {0}"),
+			              FText::FromString(UTF8_TO_TCHAR(Err.what()))));
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

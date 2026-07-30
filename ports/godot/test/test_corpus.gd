@@ -161,9 +161,16 @@ func _run_scripted(arr: Array) -> int:
 						push_error("goto %s: expected %s, got %s" % [op["scene"], op["expectResult"], moved])
 						return false
 				"saveLoad":
-					var blob := engine.save_game()
+					# Round-trip through the patter/save@0 envelope (runtime/save.gd), asserting the
+					# flattened state survives - which exercises the StateLogger's snapshot/diff too
+					# (parity brief B1/B2).
+					var before := PatterStateLogger.snapshot_state(engine)
+					var json := PatterSave.serialize_state(engine)
 					engine = PatterEngine.new(c["bundle"], options)
-					engine.load_game(blob)
+					if not PatterSave.deserialize_state(engine, json):
+						_fail("scripted", c.get("name", "?"), "envelope refused its own serialization")
+					if not PatterStateLogger.diff_state(before, PatterStateLogger.snapshot_state(engine)).is_empty():
+						_fail("scripted", c.get("name", "?"), "envelope round-trip changed flattened state")
 				"hotSwap":
 					# Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
 					var swap_blob := engine.save_game()

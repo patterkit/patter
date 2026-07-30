@@ -19,6 +19,11 @@ public:
 	void Construct(const FArguments& InArgs);
 	virtual ~SPatterStatePanel() override;
 
+	// Save/Load the whole run to a .patterstate file (the tagged patter/save@0 envelope; loading
+	// also accepts a bare version-2 snapshot). Static: the buttons capture only a weak engine.
+	static void SaveStateToFile(UPatterEngine* Engine);
+	static void LoadStateFromFile(UPatterEngine* Engine);
+
 private:
 	// Repopulate the whole list from the current registry. Cheap: run only when the set of engines or
 	// property refs changes; steady-state value updates ride on the per-widget bound getters.

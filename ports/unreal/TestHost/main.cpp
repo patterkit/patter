@@ -11,6 +11,8 @@
 #include <iostream>
 #include <queue>
 #include "Json.h"
+#include "Patter/Save.h"
+#include "Patter/StateLogger.h"
 #include "Patter/Engine.h"
 #include "Patter/Mulberry32.h"
 
@@ -424,7 +426,9 @@ static int runRuntime(const JsonValue& arr)
     return pass;
 }
 
-static int runScripted(const JsonValue& arr)
+static int envelopeRoundTrips = 0;
+
+int runScripted(const JsonValue& arr)
 {
     int pass = 0;
     for (const auto& c : arr.arr)
@@ -466,7 +470,19 @@ static int runScripted(const JsonValue& arr)
                     if (op.has("expectResult") && moved != op.at("expectResult").b)
                         throw std::runtime_error("goto " + op.at("scene").str + ": unexpected result");
                 }
-                else if (kind == "saveLoad") { SaveGame blob = engine->saveGame(); engine = std::make_shared<Engine>(bundle, opts); engine->loadGame(blob); }
+                else if (kind == "saveLoad")
+                {
+                    // Round-trip through the patter/save@0 envelope (Patter/Save.h), asserting the
+                    // flattened state survives byte-for-byte - which exercises the StateLogger's
+                    // snapshot/diff at the same time (parity brief B1/B2).
+                    auto before = snapshotState(*engine);
+                    std::string json = serializeState(*engine);
+                    engine = std::make_shared<Engine>(bundle, opts);
+                    deserializeState(*engine, json);
+                    if (!diffState(before, snapshotState(*engine)).empty())
+                        throw std::runtime_error("envelope round-trip changed flattened state");
+                    ++envelopeRoundTrips;
+                }
                 // Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
                 else if (kind == "hotSwap") { SaveGame blob = engine->saveGame(); engine = std::make_shared<Engine>(bundleB, opts); engine->loadGame(blob); }
                 else if (kind == "setLocale") engine->setLocale(op.at("locale").str);
@@ -600,6 +616,7 @@ int main(int argc, char** argv)
     runInspectorSmoke();
     runOutlineSmoke();
 
+    std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
     std::cout << (g_fails == 0 ? "ALL PASS" : (std::to_string(g_fails) + " FAILED")) << "\n";
     return g_fails == 0 ? 0 : 1;

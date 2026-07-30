@@ -25,18 +25,18 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 
 /** The surfaces we hold to parity. `bp` (the Unreal Blueprint wrapper) is the API Unreal USERS see. */
 const SURFACES = {
-  js: { label: "JS (packages/runtime)", files: ["packages/runtime/src/engine.ts"] },
-  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs"] },
-  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h"] },
-  bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h"] },
+  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
+  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
+  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/logger.gd", "ports/godot/addons/patterplay/runtime/save.gd"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
+  bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h"] },
 };
 
 /** How a declaration of `name` looks in each language. */
 const DECL = {
-  js: (n) => new RegExp(`(^|\\n)\\s*(get\\s+)?${n}\\s*[(<]`),          // class method / getter
+  js: (n) => new RegExp(`(^|\\n)\\s*(export\\s+function\\s+|get\\s+)?${n}\\s*[(<]`), // class method / getter / exported function
   unity: (n) => new RegExp(`\\b(public|internal)\\b[^;\\n]*\\b${n}\\s*[({=]`), // method or expression-bodied property
-  godot: (n) => new RegExp(`\\nfunc\\s+${n}\\s*\\(`),
+  godot: (n) => new RegExp(`\\n(static\\s+)?func\\s+${n}\\s*\\(`),
   unreal: (n) => new RegExp(`\\b${n}\\s*\\(`),
   bp: (n) => new RegExp(`\\b${n}\\s*\\(`),
 };
@@ -93,6 +93,16 @@ const API = [
     why: "not yet surfaced to Blueprint" },
   { on: "Engine", js: "tagsForBlock", unity: "TagsForBlock", godot: "tags_for_block", unreal: "tagsForBlock", bp: null,
     why: "not yet surfaced to Blueprint" },
+
+  // --- save envelope + state logger (dev tools; parity brief B1/B2) ---------
+  { on: "Save", js: "serializeState", unity: "SerializeState", godot: "serialize_state", unreal: "serializeState", bp: "SaveStateToJson" },
+  { on: "Save", js: "deserializeState", unity: "DeserializeState", godot: "deserialize_state", unreal: "deserializeState", bp: "LoadStateFromJson" },
+  { on: "Logger", js: "snapshotState", unity: "SnapshotState", godot: "snapshot_state", unreal: "snapshotState", bp: null,
+    why: "dev tool; Blueprint users watch state in the editor panel" },
+  { on: "Logger", js: "diffState", unity: "DiffState", godot: "diff_state", unreal: "diffState", bp: null,
+    why: "dev tool; Blueprint users watch state in the editor panel" },
+  { on: "Logger", js: "createStateLogger", unity: "CreateStateLogger", godot: null, unreal: null, bp: null,
+    godotWhy: true, why: "Godot: PatterStateLogger.new() IS the constructor; Unreal: patter::StateLogger(engine, sink, label) likewise; Blueprint as above" },
 
   // --- live refresh + presentation -----------------------------------------
   { on: "Engine", js: "setLocale", unity: "SetLocale", godot: "set_locale", unreal: "setLocale", bp: "SetLocale" },

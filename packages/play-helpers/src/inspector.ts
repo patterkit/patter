@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Engine, PropertyRow } from "@patterkit/runtime";
+import { serializeState, deserializeState } from "./save.js";
 import type { PropertyValue } from "./properties.js";
 
 export interface PropertyInspectorOptions {
@@ -39,7 +40,9 @@ const CSS = `
 .pp-insp{font:13px/1.4 ui-sans-serif,system-ui,sans-serif;color:#15201e;background:#f4efe6;border:1px solid #cfc7b8;border-radius:10px;padding:.6rem .7rem;max-width:22rem;box-shadow:0 6px 20px rgba(21,32,30,.12)}
 .pp-insp h4{margin:0 0 .4rem;font:600 .72rem/1 ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#5c6b62}
 .pp-insp-empty{color:#8a9691;font-style:italic}
-.pp-insp-row{display:flex;align-items:center;gap:.4rem;margin:.18rem 0}
+.pp-insp-io { display: flex; gap: 6px; margin: 0 0 8px; }
+  .pp-insp-io button { font: inherit; padding: 2px 8px; cursor: pointer; }
+  .pp-insp-row{display:flex;align-items:center;gap:.4rem;margin:.18rem 0}
 .pp-insp-ref{flex:0 0 8rem;font-family:ui-monospace,monospace;font-size:.78rem;color:#214f4b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pp-insp-ctl{flex:1;min-width:0;display:flex}
 .pp-insp-ctl input[type=text],.pp-insp-ctl input[type=number],.pp-insp-ctl select{width:100%;box-sizing:border-box;font:inherit;padding:.15rem .3rem;border:1px solid #cfc7b8;border-radius:6px;background:#fff;color:inherit}
@@ -70,7 +73,41 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
   const heading = doc.createElement("h4");
   heading.textContent = opts.title ?? "Runtime state";
   const list = doc.createElement("div");
-  el.append(heading, list);
+
+  // Save/Load the whole run as a patter/save@0 envelope file - the parity of Unity's
+  // PatterStateWindow buttons, Godot's state-panel dialogs, and Unreal's Slate panel.
+  const io = doc.createElement("div");
+  io.className = "pp-insp-io";
+  const saveBtn = doc.createElement("button");
+  saveBtn.type = "button";
+  saveBtn.textContent = "Save state\u2026";
+  saveBtn.addEventListener("click", () => {
+    const blob = new Blob([serializeState(engine)], { type: "application/json" });
+    const a = doc.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "save.patterstate";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  const loadBtn = doc.createElement("button");
+  loadBtn.type = "button";
+  loadBtn.textContent = "Load state\u2026";
+  loadBtn.addEventListener("click", () => {
+    const input = doc.createElement("input");
+    input.type = "file";
+    input.accept = ".patterstate,application/json";
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      void file.text().then((text) => {
+        try { deserializeState(engine, text); refresh(); }
+        catch (err) { console.error("Load state failed:", err instanceof Error ? err.message : err); }
+      });
+    });
+    input.click();
+  });
+  io.append(saveBtn, loadBtn);
+  el.append(heading, io, list);
 
   const rowRefreshers: Array<() => void> = [];
 
