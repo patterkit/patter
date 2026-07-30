@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 0.2.0
+
+### Minor Changes
+
+- 97f56aa: The property inspector gains Save/Load state buttons: download the run as a tagged `patter/save@0` envelope file, or restore one - the parity of the Unity, Godot, and Unreal examiner panels.
+
 ## 0.1.2
 
 ### Patch Changes
