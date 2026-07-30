@@ -42,4 +42,4 @@ Misspellings also show up in the **problems panel** for the open scene, as "Spel
 through like any other problem. They're advisory: they never block a build or export.
 
 The dictionary and engine licenses are listed on the
-[Third-party licenses](/licenses/) page.
+[Licensing & credit](/licensing/) page.

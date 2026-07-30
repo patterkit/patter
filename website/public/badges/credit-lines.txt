@@ -1,0 +1,19 @@
+PatterKit credit lines
+https://patterkit.dev/licensing/
+
+Voluntary, but appreciated! Use whichever fits.
+
+1. Single line (credits, readme)
+Dialogue made with Patter - patterkit.dev
+
+2. Credits block
+NARRATIVE TOOLS
+Dialogue authored and played with Patter
+patterkit.dev
+
+3. HTML (website, itch.io footer)
+<a href="https://patterkit.dev">Dialogue made with Patter</a>
+
+Patter is free and MIT-licensed. The name, the drop mark and these badges
+are not covered by that licence; see https://patterkit.dev/licensing/ for
+what you can and can't do with them.

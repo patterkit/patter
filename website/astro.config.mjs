@@ -10,7 +10,12 @@ export default defineConfig({
   base: "/",
   // The localisation page moved from the flat Reference list into the role tracks; shipped plugin
   // READMEs link the old absolute URL, so keep it alive as a redirect (integrators were its audience).
-  redirects: { "/localisation": "/play/localisation" },
+  redirects: {
+    "/localisation": "/play/localisation",
+    // The licensing page grew credit lines + made-with badges and took the /licensing/ slug
+    // (which the badge kit's credit-lines.txt cites); keep the old URL alive.
+    "/licenses": "/licensing",
+  },
   integrations: [
     starlight({
       title: "Patter",
@@ -134,7 +139,7 @@ export default defineConfig({
           ],
         },
         { label: "Automation: the CLI", items: ["cli"] },
-        { label: "Reference", items: ["specification", "licenses"] },
+        { label: "Reference", items: ["specification", "licensing"] },
       ],
     }),
   ],
