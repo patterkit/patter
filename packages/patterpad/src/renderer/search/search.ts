@@ -10,6 +10,7 @@ import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
 import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js";
+import { confirmDialog } from "@patterkit/patterpad-surface/confirm";
 
 const search = window.patterSearch!;
 
@@ -189,7 +190,12 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
   if (n === 0) return;
   if (!onlyId) {
     const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
-    if (!confirm(`Replace ${n} occurrence${n === 1 ? "" : "s"} across ${scenes} scene${scenes === 1 ? "" : "s"}?\n\n“${input.value}” → “${replaceInput.value}”`)) return;
+    const ok = await confirmDialog({
+      title: `Replace ${n} occurrence${n === 1 ? "" : "s"} across ${scenes} scene${scenes === 1 ? "" : "s"}?`,
+      body: `“${input.value}” → “${replaceInput.value}”`,
+      confirmLabel: "Replace",
+    });
+    if (!ok) return;
   }
   const res = await search.replaceApply({ ...replaceOpts(), onlyId });
   if (!res.ok) { hintEl.textContent = `Replace failed: ${res.error ?? "unknown error"}`; return; }

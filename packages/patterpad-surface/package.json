@@ -11,6 +11,7 @@
     "./theme.css": "./web/theme.css",
     "./views": "./web/views.ts",
     "./exit": "./web/exit.ts",
+    "./confirm": "./web/confirm.ts",
     "./colour": "./src/colour.ts"
   },
   "scripts": {

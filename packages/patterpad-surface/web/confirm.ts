@@ -17,9 +17,11 @@ export function confirmDialog(opts: { title: string; body: string; confirmLabel:
     dialog.append(title, body, actions);
     overlay.append(dialog);
 
+    // Enter is NOT globally bound to confirm: it activates the focused button (native <button>
+    // behaviour), and focus starts on Cancel - a destructive default must be chosen, not stumbled
+    // into by a stray Enter (the same behaviour app-shell's confirmDialog codified).
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === "Escape") { e.preventDefault(); close(false); }
-      else if (e.key === "Enter") { e.preventDefault(); close(true); }
     };
     function close(v: boolean): void {
       document.removeEventListener("keydown", onKey, true);
@@ -33,6 +35,6 @@ export function confirmDialog(opts: { title: string; body: string; confirmLabel:
     overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) close(false); });
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(overlay);
-    ok.focus();
+    cancel.focus();
   });
 }

@@ -642,7 +642,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   transition: background var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), filter var(--dur-quick) var(--ease-standard);
 }
 .confirm-btn.cancel:hover { background: color-mix(in oklab, var(--line) 30%, transparent); }
-.confirm-btn.danger { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.confirm-btn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
 /* Solid-accent primary: the one shared hover idiom (matches .btn.primary) - an eased brightness lift, not a
    bespoke darken-mix (design-language §4 "one default"). */
 .confirm-btn.danger:hover { filter: brightness(1.06); }

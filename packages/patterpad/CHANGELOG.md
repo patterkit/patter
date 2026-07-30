@@ -6,6 +6,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- **Rescue Windows** now genuinely re-pins the Search and Coverage windows. It recorded them as
+  pinned but only re-floated the Play window, so the setting lied until the windows were reopened.
+- Closing the editor now also **closes the Coverage window**; an orphaned coverage window could keep
+  the app alive on Windows and Linux.
+- The bulk find-and-replace confirmation is now the app's **themed dialog** instead of a stock
+  browser popup. Confirm dialogs also stop pre-selecting the destructive button (focus starts on
+  Cancel, so a stray Enter can no longer delete or replace), and the destructive button now wears
+  the danger colour rather than the accent.
+
 ## [0.6.6] - 2026-07-29
 
 ### Fixed

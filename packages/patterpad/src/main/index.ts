@@ -589,12 +589,14 @@ function rescueWindows(): void {
   store.setSearch({ pinned: true });
   if (searchWin && !searchWin.isDestroyed()) {
     if (searchWin.isMinimized()) searchWin.restore();
+    searchWin.setAlwaysOnTop(true); // the store says pinned; the live window must agree
     searchWin.setBounds({ ...SEARCH_DEFAULT, ...centeredOnPrimary(SEARCH_DEFAULT) });
     searchWin.show();
   }
   store.setCoverage({ pinned: true });
   if (coverageWin && !coverageWin.isDestroyed()) {
     if (coverageWin.isMinimized()) coverageWin.restore();
+    coverageWin.setAlwaysOnTop(true); // as above
     coverageWin.setBounds({ ...COVERAGE_DEFAULT, ...centeredOnPrimary(COVERAGE_DEFAULT) });
     coverageWin.show();
   }
@@ -937,7 +939,7 @@ function createWindow(): void {
   };
   ipcMain.on("app:ready", reveal);
   setTimeout(reveal, 4000);
-  win.on("closed", () => { win = null; playWin?.close(); searchWin?.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
+  win.on("closed", () => { win = null; playWin?.close(); searchWin?.close(); coverageWin?.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
 
   if (process.env["ELECTRON_RENDERER_URL"]) void win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   else void win.loadFile(join(here, "../renderer/index.html"));
