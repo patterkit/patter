@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-07-30
+
 ### Fixed
 - **Rescue Windows** now genuinely re-pins the Search and Coverage windows. It recorded them as
   pinned but only re-floated the Play window, so the setting lied until the windows were reopened.
