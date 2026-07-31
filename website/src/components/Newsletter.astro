@@ -1,0 +1,237 @@
+---
+/* Storytools mailing-list sign-up: one quiet line of copy and an inline email field.
+ * Shared by the landing page footer and the Starlight docs footer (registered in
+ * astro.config.mjs via Footer.astro), so every page on the site feeds the same
+ * MailerLite group as storytools.co.uk.
+ *
+ * Deliberately NOT MailerLite's universal.js embed: this posts straight to their form
+ * endpoint, so no third-party script loads on any page and the field inherits the site's
+ * own type and colour.
+ *
+ * The two ids come from the MailerLite form's own embed code (Forms > Storytools Newsletter >
+ * Embed > HTML tab): its action url reads .../jsonp/<ACCOUNT_ID>/forms/<FORM_ID>/subscribe.
+ * The storytools.co.uk site posts to this same pair.
+ */
+const ACCOUNT_ID = "2547332";
+const FORM_ID = "194494502057019185";
+
+interface Props {
+  /* "docs" sits on Starlight chrome and follows the light/dark theme;
+     "landing" sits on the landing page's dark stage-black footer. */
+  variant?: "docs" | "landing";
+}
+const { variant = "docs" } = Astro.props;
+
+const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_ID}/subscribe`;
+---
+
+{/* target="_blank" mirrors MailerLite's own embed: the script below intercepts the submit, so it
+    never fires in practice, but if the script fails the post still works and the raw JSON reply
+    lands in a new tab instead of replacing the page. */}
+<form class:list={["nl", `nl-${variant}`]} method="post" action={action} target="_blank">
+  <p class="nl-copy">
+    <strong>Tool updates by email.</strong> Emails when I add new features or new tools
+    across Storytools, including Patter.
+  </p>
+  <div class="nl-controls">
+    <label class="nl-hidden" for={`nl-email-${variant}`}>Email address</label>
+    <input
+      class="nl-input"
+      id={`nl-email-${variant}`}
+      type="email"
+      name="fields[email]"
+      placeholder="you@example.com"
+      autocomplete="email"
+      required
+    />
+    <button class="nl-button" type="submit">Sign up</button>
+  </div>
+  <p class="nl-status" role="status" aria-live="polite"></p>
+
+  {/* Bot trap: hidden from people and from assistive tech, so anything that fills it is a bot. */}
+  <input class="nl-hidden" type="text" name="nl-company" tabindex="-1" autocomplete="off" aria-hidden="true" />
+  <input type="hidden" name="ml-submit" value="1" />
+  <input type="hidden" name="anticsrf" value="true" />
+</form>
+
+<style>
+  .nl {
+    /* Palette hooks; each variant fills these in. */
+    --nl-text: var(--sl-color-gray-3);
+    --nl-strong: var(--sl-color-white);
+    --nl-field-bg: var(--sl-color-bg);
+    --nl-field-ink: var(--sl-color-white);
+    --nl-hair: var(--sl-color-gray-5);
+    --nl-hair-strong: var(--sl-color-gray-4);
+    --nl-accent: var(--sl-color-text-accent);
+
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px 24px;
+    font-size: var(--sl-text-xs, 0.8125rem);
+    color: var(--nl-text);
+  }
+
+  .nl-copy {
+    margin: 0;
+    flex: 1 1 20rem;
+    line-height: 1.5;
+  }
+  .nl-copy strong {
+    color: var(--nl-strong);
+    font-weight: 600;
+  }
+
+  .nl-controls {
+    display: flex;
+    gap: 8px;
+    flex: 0 1 auto;
+  }
+
+  .nl-input {
+    font: inherit;
+    font-size: 0.875rem;
+    color: var(--nl-field-ink);
+    background: var(--nl-field-bg);
+    border: 1px solid var(--nl-hair);
+    border-radius: 7px;
+    padding: 7px 11px;
+    min-width: 0;
+    width: 14rem;
+  }
+  .nl-input::placeholder {
+    color: var(--nl-text);
+    opacity: 0.7;
+  }
+  .nl-input:focus-visible {
+    outline: 2px solid var(--nl-accent);
+    outline-offset: 1px;
+    border-color: transparent;
+  }
+
+  .nl-button {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--nl-strong);
+    background: transparent;
+    border: 1px solid var(--nl-hair-strong);
+    border-radius: 7px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    white-space: nowrap;
+  }
+  .nl-button:hover:not(:disabled) {
+    border-color: var(--nl-accent);
+    background: color-mix(in srgb, var(--nl-accent) 10%, transparent);
+  }
+  .nl-button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .nl-status {
+    margin: 0;
+    flex-basis: 100%;
+    line-height: 1.5;
+  }
+  .nl-status:empty {
+    display: none;
+  }
+
+  /* The landing page footer is stage-black regardless of theme, so it pins its own values
+     rather than following the Starlight tokens. */
+  .nl-landing {
+    --nl-text: #8a9b97;
+    --nl-strong: #e7ece9;
+    --nl-field-bg: #1b2624;
+    --nl-field-ink: #e7ece9;
+    --nl-hair: #2c3e3a;
+    --nl-hair-strong: #3c5551;
+    --nl-accent: #57a294;
+  }
+
+  /* Visually hidden, but still reachable by screen readers (the label) — and the honeypot,
+     which additionally carries aria-hidden so it is skipped entirely. */
+  .nl-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 30rem) {
+    .nl-controls {
+      width: 100%;
+    }
+    .nl-input {
+      width: auto;
+      flex: 1 1 auto;
+    }
+  }
+</style>
+
+<script>
+  /* MailerLite's form endpoint answers with `access-control-allow-origin: *`, so this is an
+   * ordinary CORS fetch and the JSON reply is readable:
+   *   { "success": true }
+   *   { "success": false, "errors": { "fields": { "email": ["...message..."] } } }
+   * which means a rejected address gets MailerLite's own wording rather than a guess. */
+  const DONE = "Thanks! Check your inbox for the confirmation link.";
+  const FAILED = "That didn’t go through? Please try again.";
+
+  /** First field-level message MailerLite returned, if any. */
+  function firstError(payload: any): string | null {
+    const fields = payload?.errors?.fields;
+    for (const key in fields) {
+      const messages = fields[key];
+      if (Array.isArray(messages) && messages.length) return messages[0];
+    }
+    return null;
+  }
+
+  document.querySelectorAll<HTMLFormElement>("form.nl").forEach((form) => {
+    const status = form.querySelector<HTMLParagraphElement>(".nl-status")!;
+    const controls = form.querySelector<HTMLDivElement>(".nl-controls")!;
+    const button = form.querySelector<HTMLButtonElement>(".nl-button")!;
+
+    const succeed = () => {
+      controls.hidden = true;
+      status.textContent = DONE;
+    };
+    const fail = (message: string) => {
+      button.disabled = false;
+      status.textContent = message;
+    };
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+
+      // Silently accept the bot without troubling MailerLite with it.
+      if (data.get("nl-company")) {
+        succeed();
+        return;
+      }
+      data.delete("nl-company");
+
+      button.disabled = true;
+      status.textContent = "Signing you up…";
+
+      fetch(form.action, { method: "POST", body: data })
+        .then((response) => response.json())
+        .then((payload) => {
+          if (payload?.success) succeed();
+          else fail(firstError(payload) ?? FAILED);
+        })
+        .catch(() => fail(FAILED));
+    });
+  });
+</script>

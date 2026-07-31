@@ -1,17 +1,32 @@
 ---
-// Starlight Footer override: the stock footer (edit link / pagination) plus a one-line site-wide
-// credit - license, author, and the PatterKit home. Registered in astro.config.mjs `components`.
+// Starlight Footer override: the stock footer (edit link / pagination), the Storytools mailing-list
+// sign-up, then a one-line site-wide credit - license, author, and the PatterKit home. Registered in
+// astro.config.mjs `components`.
 import Default from "@astrojs/starlight/components/Footer.astro";
+import Newsletter from "./Newsletter.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a trailing slash
 ---
 
 <Default><slot /></Default>
+{/* pagefind-ignore: Starlight puts data-pagefind-body on <main>, which encloses this footer, so
+    without it the sign-up copy would match a site search on all 57 pages. */}
+<div class="pk-signup" data-pagefind-ignore><Newsletter /></div>
 {/* One line, no internal newlines: Astro collapses a newline between text and an adjacent
     inline element to nothing, which ran "Made by" into the author link. */}
 <p class="pk-credit"><a href={`${base}licensing/`}>MIT-licensed</a> open source &middot; Made by <a href="https://wildwinter.bio.link" rel="author">Ian Thomas</a> &middot; <a href="https://patterkit.dev">patterkit.dev</a></p>
 
 <style>
+  .pk-signup {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sl-color-hairline);
+  }
+  /* The sign-up already supplies the rule above it, so the credit line only needs its spacing. */
+  .pk-signup + .pk-credit {
+    padding-top: 0;
+    border-top: 0;
+  }
   .pk-credit {
     margin-top: 1.5rem;
     padding-top: 1rem;
