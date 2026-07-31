@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-07-31
+
 ### Fixed
 - **Windows auto-update works again.** Since 0.6.0, the Windows installer was accidentally signed
   with the macOS Developer ID certificate (the mac signing secrets leaked into the Windows build
