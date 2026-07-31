@@ -5,6 +5,7 @@
 // paraphrased from Why Patter.
 import "../styles/patter.css";
 import "../styles/landing.css";
+import Newsletter from "../components/Newsletter.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a trailing slash
 const repo = "https://github.com/patterkit/patter";
@@ -227,6 +228,7 @@ const description =
 
       <!-- FOOTER -->
       <footer class="pt-foot">
+        <div class="pt-wrap pt-foot-signup"><Newsletter variant="landing" /></div>
         <div class="pt-wrap pt-foot-inner">
           <div class="pt-foot-brand">
             <svg viewBox="8 25 124 112" width="27" height="24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#57a294" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g><g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g></svg>

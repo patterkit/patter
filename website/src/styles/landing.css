@@ -213,6 +213,10 @@
 
 /* ---- Footer ----------------------------------------------------------------- */
 .pt-foot { background: #131c1a; color: #8a9b97; }
+/* Mailing-list sign-up: its own quiet row above the credit row, hairlined off from it.
+   The form's own colours come from Newsletter.astro's "landing" variant. */
+.pt-foot-signup { padding-top: 34px; padding-bottom: 26px; }
+.pt-foot-signup + .pt-foot-inner { border-top: 1px solid #22302d; }
 .pt-foot-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; padding-top: 40px; padding-bottom: 40px; }
 .pt-foot-brand { display: flex; align-items: center; gap: 11px; }
 .pt-foot-brand span { font-family: var(--pt-read, "Newsreader", serif); font-weight: 600; font-size: 17px; color: #e7ece9; }
