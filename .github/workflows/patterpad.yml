@@ -83,12 +83,19 @@ jobs:
         env:
           # electron-builder's GitHub publisher uploads to the release for this tag.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing + notarization (no-ops on win/linux). See packages/patterpad/RELEASE.md.
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # macOS signing + notarization - scoped to the mac job ONLY. These are NOT no-ops
+          # elsewhere: on Windows, electron-builder treats CSC_LINK as an Authenticode cert and
+          # SIGNED the NSIS installer with the Apple Developer ID cert, baking its CN into
+          # app-update.yml as the expected publisher - so every Windows auto-update downloaded,
+          # failed signature verification, and silently gave up (#33). Windows ships genuinely
+          # unsigned by policy (an Authenticode cert is not currently obtainable for a non-US
+          # individual developer); unsigned + no publisherName = verification skipped = updates
+          # install. See packages/patterpad/RELEASE.md.
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
 
   # All three OS builds uploaded -> publish. Straight-from-CI like every other deliverable;
   # runs only when the whole matrix succeeded, so a partial release never goes live.

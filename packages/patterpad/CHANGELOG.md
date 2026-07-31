@@ -6,6 +6,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- **Windows auto-update works again.** Since 0.6.0, the Windows installer was accidentally signed
+  with the macOS Developer ID certificate (the mac signing secrets leaked into the Windows build
+  job), so every downloaded update failed signature verification and was silently discarded - the
+  real cause of #33. Windows builds are now genuinely unsigned (by policy; Authenticode signing is
+  not currently available to us), so updates verify and install again.
+  **One manual step for Windows users on 0.6.0-0.6.7:** the copy you are running still expects the
+  wrong signature, so this one update must be installed by downloading the installer from
+  https://patterkit.dev/download/ - auto-update works again from this version onward.
+
 ## [0.6.7] - 2026-07-30
 
 ### Fixed
