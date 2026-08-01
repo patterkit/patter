@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+- **Window ▸ Patterplay ▸ Runtime State now opens docked** (beside the Inspector) instead of
+  floating. A floating editor window slides behind the main Unity window the moment you click the
+  Game view - exactly when you want to be watching properties change - so a play session meant
+  constant alt-tabbing. It is still an ordinary dockable window: drag it wherever you like and Unity
+  remembers. (If you have one open from a previous version, close it before reopening; Unity restores
+  the old floating position otherwise.)
+
 ## [0.4.0] - 2026-07-30
 
 ### Added

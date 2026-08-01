@@ -19,8 +19,26 @@ namespace Patterkit.Patterplay.Editor
         [MenuItem("Window/Patterplay/Runtime State")]
         public static void Open()
         {
-            var w = GetWindow<PatterStateWindow>("Patter State");
+            // Dock it on first open rather than letting it float: a floating EditorWindow slides
+            // behind the main window the moment you click the Game view, which is exactly when you
+            // want to be watching it. (A utility window would stay on top but could never be
+            // docked - the worse trade for a panel you keep beside a running game.)
+            var w = GetWindow<PatterStateWindow>("Patter State", DockNextTo());
             w.minSize = new Vector2(360, 280);
+            w.Show();
+            w.Focus();
+        }
+
+        /// <summary>The windows we would like to dock beside, best first. The Inspector is internal,
+        /// so it is looked up by name and quietly skipped if a future Unity renames it; SceneView is
+        /// the public fallback. A docking preference must never be the thing that breaks the window.</summary>
+        private static Type[] DockNextTo()
+        {
+            var wanted = new List<Type>();
+            var inspector = Type.GetType("UnityEditor.InspectorWindow,UnityEditor");
+            if (inspector != null) wanted.Add(inspector);
+            wanted.Add(typeof(SceneView));
+            return wanted.ToArray();
         }
 
         private void OnInspectorUpdate() => Repaint(); // live-refresh while playing
