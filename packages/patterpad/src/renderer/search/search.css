@@ -105,34 +105,3 @@ body.swin {
 .swin-empty { color: var(--muted); font: 0.85rem var(--font-ui); padding: 0.6rem 0.5rem; }
 
 .swin-hint { border-top: 1px solid var(--line); padding: 0.26rem 0.55rem; color: var(--muted); font: 0.72rem var(--font-ui); background: var(--surface); }
-
-/* The surface's themed confirm modal (confirm.ts), mirrored so the bulk-replace confirmation
-   wears the app's dialog rather than window.confirm. Retires with the app-shell migration. */
-.confirm-overlay {
-  position: fixed; inset: 0; z-index: 50;
-  display: flex; align-items: center; justify-content: center;
-  background: color-mix(in oklab, var(--ink) 28%, transparent);
-  backdrop-filter: blur(3px); /* the shared modal-scrim treatment (design-language §4): ink scrim + soft blur */
-  animation: var(--anim-backdrop-in);
-}
-.confirm-dialog {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-3); padding: 1.1rem 1.2rem; max-width: 22rem;
-  display: flex; flex-direction: column; gap: 0.5rem;
-  font-family: var(--font-ui);
-  animation: var(--anim-panel-in);
-}
-.confirm-title { font: 700 0.95rem var(--font-ui); color: var(--ink); }
-.confirm-body { font: 0.82rem/1.45 var(--font-ui); color: var(--muted); }
-.confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
-.confirm-btn {
-  border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; padding: 0.35rem 0.8rem;
-  font: 600 0.78rem var(--font-ui); background: var(--bg); color: var(--ink);
-  transition: background var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), filter var(--dur-quick) var(--ease-standard);
-}
-.confirm-btn.cancel:hover { background: color-mix(in oklab, var(--line) 30%, transparent); }
-.confirm-btn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
-/* Solid-accent primary: the one shared hover idiom (matches .btn.primary) - an eased brightness lift, not a
-   bespoke darken-mix (design-language §4 "one default"). */
-.confirm-btn.danger:hover { filter: brightness(1.06); }
-.group-rail-body > .bubble:last-child, .group-rail-body > .group-rail:last-child { margin-bottom: 0; }
