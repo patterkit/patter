@@ -21,7 +21,7 @@ function renderLadder(host: HTMLElement, hint: string, rows: HTMLElement[], addL
 }
 
 // The status badge colour (#196 / #206) is drawn from the theme's 12-slot character palette, so it adapts
-// to light / dark + the reading palettes. To keep each status row to a single line, the palette lives in a
+// to light / dark + the colour themes. To keep each status row to a single line, the palette lives in a
 // POPOVER opened by one swatch button on the row (showing the current colour); picking a slot re-renders.
 let popCleanup: (() => void) | null = null;
 function closeColourPop(): void {

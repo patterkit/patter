@@ -27,7 +27,7 @@ uses these to tell you how much of the script has crossed each line.
 
 Edit the ladder in **Project Settings ▸ Status**: rename stages, reorder them, add or remove
 them, and move the two readiness markers. Each stage carries a **colour** drawn from your
-project's theme, so it adapts on its own to light and dark and to the reading palettes. A beat
+project's theme, so it adapts on its own to light and dark and to the colour themes. A beat
 with no status set reads as the first stage (`stub`) in the report.
 
 <figure class="doc-shot">

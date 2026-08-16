@@ -476,7 +476,7 @@ export interface WritingStatusDecl {
   /** Threshold marker: this status and every later one classify as "ready to ship". */
   readyToShip?: boolean;
   /** Theme character-palette slot (0-11) for the per-line status badge / inspector swatch (Patterpad #196).
-   *  A slot (not a hex) so it adapts to light/dark + the reading palettes. Absent = no colour (neutral). */
+   *  A slot (not a hex) so it adapts to light/dark + the colour themes. Absent = no colour (neutral). */
   colour?: number;
 }
 

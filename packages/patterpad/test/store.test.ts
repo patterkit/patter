@@ -23,7 +23,7 @@ describe("session store", () => {
     expect(s.read().panes).toEqual({ nav: false, inspector: true });
   });
 
-  it("remembers the reading palette / font theme", () => {
+  it("remembers the colour theme / font theme", () => {
     const s = createStore(tmpFile());
     expect(s.read().theme).toEqual({ colour: "system", font: "newsreader" }); // first-run default
     s.setTheme({ colour: "slate", font: "literata" });

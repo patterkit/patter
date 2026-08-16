@@ -137,7 +137,7 @@ function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
 
 /** A soft, READABLE fill for a status chip: the rung's palette colour mixed heavily toward the theme
  *  background, so the chip carries the colour's identity while `--ink` text stays legible on ANY palette
- *  (light, dark, or a reading palette) - a saturated `--char-N` fill left the text unreadable. No colour ->
+ *  (light, dark, or a colour theme) - a saturated `--char-N` fill left the text unreadable. No colour ->
  *  a neutral muted tint. Shared by the manual status selects + the folder-derived recording chip so they match. */
 export function statusTint(slot: number | undefined): string {
   const base = slot != null ? `var(--char-${slot})` : "var(--muted)";

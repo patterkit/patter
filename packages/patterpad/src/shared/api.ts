@@ -232,14 +232,14 @@ export interface PaneState {
   lineStatusShown?: string[];
 }
 
-/** A curated reading palette (the `data-theme` axis): two light (Paper warm, Mist cool), two dark
+/** A curated colour theme (the `data-theme` axis): two light (Paper warm, Mist cool), two dark
  *  (Slate cool, Night warm), plus "system" (follow the OS - light = Paper, dark = Night). Replaces the
  *  old raw light/dark switch; older sessions migrate "light"/"dark" -> "paper"/"night" and the retired
  *  "sepia" -> "mist" on read. */
 export type ColourTheme = "system" | "paper" | "mist" | "slate" | "night";
 export type FontTheme = "newsreader" | "literata" | "source" | "script";
 
-/** The author's chosen look (View > Reading Palette / Font Theme), remembered across launches. Applied
+/** The author's chosen look (View > Colour Theme / Font Theme), remembered across launches. Applied
  *  as `data-theme` / `data-font` on the renderer root; "system" colour follows the OS. */
 export interface ThemePrefs {
   colour: ColourTheme;

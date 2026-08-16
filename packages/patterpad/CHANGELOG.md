@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+- **View ▸ Reading Palette is now View ▸ Colour Theme.** Same control, same five choices; the name
+  is the one the Patter family uses across its apps, so the setting is called the same thing
+  wherever you meet it. **Font Theme** is unchanged and stays Patterpad's own. (The code has always
+  called this `ColourTheme` internally, so only the label moved.)
+
 ## [0.6.8] - 2026-07-31
 
 ### Fixed
