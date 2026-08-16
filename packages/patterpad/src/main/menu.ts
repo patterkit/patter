@@ -10,7 +10,15 @@ import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 // The suite-standard Edit items. Their LABELS and ACCELERATORS are family grammar and come from
 // the shell so both apps spell them the same; the click handlers stay Patterpad's, because the
 // undo MECHANISM is per app (ProseMirror history here, file-byte replay in Storyletter).
-import { EDIT_MENU } from "@wildwinter/app-shell/menu";
+import { EDIT_MENU, HELP_MENU, APP_MENU, namedMenuItems } from "@wildwinter/app-shell/menu";
+
+// The family-standard named items (About / Documentation), so this app spells them the way
+// every app in the suite does. The URLs are Patterpad's; the labels are not.
+const NAMED = namedMenuItems({
+  appName: "Patterpad",
+  docsUrl: "https://patterkit.dev/patterpad/overview/",
+  suiteDocsUrl: "https://patterkit.dev/",
+});
 import { manualCheckForUpdates } from "./updater.js";
 import type { PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
@@ -54,9 +62,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
   const macAppMenu: MenuItemConstructorOptions = {
     label: "Patterpad",
     submenu: [
-      { label: "About Patterpad", click: () => send(`about:${app.getVersion()}`) },
+      { ...NAMED.about, click: () => send(`about:${app.getVersion()}`) },
       { type: "separator" },
-      { label: "User Information…", click: () => send("user-info") }, // name + optional email (signs edits/comments)
+      { ...APP_MENU.userInfo, click: () => send("user-info") }, // name + optional email (signs edits/comments)
       { type: "separator" },
       { role: "services" },
       { type: "separator" },
@@ -280,12 +288,12 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       role: "help",
       submenu: [
         // The documentation site: the writers' guide first (the audience in this app), then the site home.
-        { label: "Patterpad Documentation", click: () => void shell.openExternal("https://patterkit.dev/patterpad/overview/") },
-        { label: "Patter Documentation Home", click: () => void shell.openExternal("https://patterkit.dev/") },
+        { label: NAMED.docs.label, enabled: NAMED.docs.ready, click: () => void shell.openExternal(NAMED.docs.url!) },
+        { label: NAMED.suiteDocs.label, enabled: NAMED.suiteDocs.ready, click: () => void shell.openExternal(NAMED.suiteDocs.url!) },
         { type: "separator" },
-        { label: "Check for Updates…", click: () => void manualCheckForUpdates(win) },
+        { ...HELP_MENU.checkForUpdates, click: () => void manualCheckForUpdates(win) },
         // macOS keeps About in the app menu (above); Windows/Linux get it here, the conventional home.
-        ...(isMac ? [] : [{ type: "separator" } as MenuItemConstructorOptions, { label: "About Patterpad", click: () => send(`about:${app.getVersion()}`) } as MenuItemConstructorOptions]),
+        ...(isMac ? [] : [{ type: "separator" } as MenuItemConstructorOptions, { ...NAMED.about, click: () => send(`about:${app.getVersion()}`) } as MenuItemConstructorOptions]),
       ],
     },
   ];
