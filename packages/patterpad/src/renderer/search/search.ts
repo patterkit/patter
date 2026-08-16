@@ -10,7 +10,8 @@ import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
 import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js";
-import { confirmDialog } from "@patterkit/patterpad-surface/confirm";
+import { confirmDialog } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 
 const search = window.patterSearch!;
 

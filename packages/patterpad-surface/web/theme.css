@@ -224,3 +224,15 @@
 :root[data-font="literata"]   { font-size: 105%; --font-read: "Literata", Georgia, serif;               --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
 :root[data-font="source"]     { font-size: 107%; --font-read: "Source Serif 4", Georgia, serif;         --font-ui: "IBM Plex Sans", system-ui, sans-serif; --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
 :root[data-font="script"]     { font-size: 100%; --font-read: "Courier Prime", ui-monospace, monospace; --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "Courier Prime", ui-monospace, monospace; }
+
+/* --- @wildwinter/app-shell aliases -------------------------------------------------------------
+   The shell's CSS consumes a handful of token names Patterpad's palette does not define. They are
+   aliased HERE rather than by editing the shell (shared-shell.md: the app reconciles names, the
+   package does not learn about apps). Declared once, deriving from the live palette: custom
+   properties resolve lazily against the element's cascaded value, so these follow whichever
+   :root[data-theme] block is active without being repeated per theme. --- */
+:root {
+  --line-soft: color-mix(in oklab, var(--line) 55%, transparent);  /* a quieter rule than --line */
+  --card: var(--surface);                                          /* Patterpad cards ARE the surface */
+  --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent); /* accent wash behind a selection */
+}
