@@ -24,6 +24,12 @@
     "version-packages": "changeset version",
     "release": "npm run build && changeset publish"
   },
+  "overrides": {
+    "esbuild": "^0.28.2",
+    "electron-vite": {
+      "esbuild": "^0.25.11"
+    }
+  },
   "devDependencies": {
     "@changesets/cli": "^2.27.0",
     "@types/node": "^22.10.0",
