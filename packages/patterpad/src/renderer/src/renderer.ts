@@ -2355,7 +2355,7 @@ window.patter.onMenu((cmd) => {
     detail: `Version ${cmd.slice("about:".length)}\n\nA writer-first editor for branching game dialogue.\n\nPart of PatterKit. Open source under the MIT license.\nMade by Ian Thomas.`,
     links: [
       { label: "patterkit.dev", url: "https://patterkit.dev" },
-      { label: "wildwinter.bio.link", url: "https://wildwinter.bio.link" },
+      { label: "ian.wildwinter.net", url: "https://ian.wildwinter.net" },
     ],
     buttons: ["Close"],
   });
