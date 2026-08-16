@@ -239,7 +239,7 @@ export const optionpromptView: NodeViewConstructor = () => {
 // --- the action atom, with a delete affordance (spec §10) --------------------
 
 function atomDeleteButton(view: import("prosemirror-view").EditorView, getPos: () => number | undefined): HTMLButtonElement {
-  const del = document.createElement("button"); del.className = "atom-del"; del.textContent = "×"; del.dataset.tip = "delete"; del.setAttribute("aria-label", "delete");
+  const del = document.createElement("button"); del.className = "atom-del"; del.textContent = "\u2715"; // app-shell icon.close; a literal until the surface takes the shell dep del.dataset.tip = "delete"; del.setAttribute("aria-label", "delete");
   del.addEventListener("mousedown", (e) => {
     e.preventDefault();
     const pos = getPos();
