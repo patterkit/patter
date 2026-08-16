@@ -7,6 +7,10 @@
 import { app, shell, Menu, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
 import { resolve, sep } from "node:path";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
+// The suite-standard Edit items. Their LABELS and ACCELERATORS are family grammar and come from
+// the shell so both apps spell them the same; the click handlers stay Patterpad's, because the
+// undo MECHANISM is per app (ProseMirror history here, file-byte replay in Storyletter).
+import { EDIT_MENU } from "@wildwinter/app-shell/menu";
 import { manualCheckForUpdates } from "./updater.js";
 import type { PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
@@ -99,8 +103,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       submenu: [
         // Undo / redo route to the surface's ProseMirror history (not the native role, which would
         // run a DOM undo the editor doesn't track).
-        { label: "Undo", accelerator: "CmdOrCtrl+Z", click: () => send("undo") },
-        { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", click: () => send("redo") },
+        { ...EDIT_MENU.undo, click: () => send("undo") },
+        { ...EDIT_MENU.redo, click: () => send("redo") },
         { type: "separator" },
         { role: "cut" },
         { role: "copy" },
@@ -109,11 +113,11 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { type: "separator" },
         // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
         // inside it - the copy takes fresh ids throughout, so it never aliases the original.
-        { label: "Duplicate", accelerator: "CmdOrCtrl+D", click: () => send("duplicate") },
+        { ...EDIT_MENU.duplicate, click: () => send("duplicate") },
         { type: "separator" },
         // Open the detached search window (#205) in the right mode. The accelerators ARE the shortcuts:
         // Find = Cmd/Ctrl+F; Replace = Cmd+Alt+F on macOS, Ctrl+H elsewhere (the platform conventions).
-        { label: "Find…", accelerator: "CmdOrCtrl+F", click: () => send("find") },
+        { ...EDIT_MENU.find, click: () => send("find") },
         { label: "Replace…", accelerator: isMac ? "Cmd+Alt+F" : "Ctrl+H", click: () => send("replace") },
       ],
     },

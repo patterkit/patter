@@ -3,6 +3,7 @@
 // surface's `onSelect` context; a header click jumps to that node (revealNode). The snippet / group
 // CONDITION rows are editable - clicking opens the visual expression editor (M1, editCondition).
 
+import { icon } from "@wildwinter/app-shell"; // one spelling of close across the suite
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch,
 } from "@patterkit/patterpad-surface/surface";
@@ -298,7 +299,7 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
       const chip = el("span", "insp-tag");
       chip.style.setProperty("--tag-c", `var(--char-${colourIndex(t)})`);
       chip.append(el("span", "insp-tag-text", t));
-      const x = el("button", "insp-tag-x", "×");
+      const x = el("button", "insp-tag-x", icon.close);
       x.type = "button"; x.dataset.tip = "remove tag"; x.setAttribute("aria-label", `remove tag ${t}`);
       x.addEventListener("click", () => { current.splice(i, 1); repaint(); commit(); input.focus(); });
       chip.append(x);
