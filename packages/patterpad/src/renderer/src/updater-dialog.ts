@@ -29,20 +29,9 @@ export function showUpdaterDialog(opts: UpdaterPromptOptions): Promise<number> {
 
     const dlg = el("dialog", "identity um-dialog");
     const form = el("div", "identity-form");
-    if (opts.wordmark) {
-      // The PatterKit wordmark (same geometry as the website's), inline so the text renders in the
-      // app's own Newsreader and the word colours follow the theme; the leaf marks keep the fixed
-      // brand teal + ember (readable on every palette, like the site footer's mark).
-      const brand = el("div", "um-wordmark");
-      brand.innerHTML =
-        '<svg viewBox="0 0 820 220" role="img" aria-label="PatterKit" xmlns="http://www.w3.org/2000/svg">' +
-        '<g transform="translate(40,30) scale(0.98)">' +
-        '<g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#57a294" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g>' +
-        '<g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"/></g></g>' +
-        '<text x="232" y="150" font-family="Newsreader, Georgia, serif" font-weight="500" font-size="120" letter-spacing="-2" fill="var(--ink)">Patter<tspan fill="var(--accent)">Kit</tspan></text>' +
-        "</svg>";
-      form.append(brand);
-    }
+    // No wordmark branch: About was its only user and About is the shell's now
+    // (`showAbout`, fed `PATTERKIT_WORDMARK`). What is left here is the updater's
+    // own prompts, which are plain.
     form.append(el("h2", "identity-title", opts.message));
     if (opts.detail) form.append(el("p", "identity-sub", opts.detail));
     if (opts.progress) {

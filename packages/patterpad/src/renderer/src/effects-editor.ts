@@ -8,7 +8,9 @@ import { mountEffectsEditor, renderEffectsPreview, type EffectsEditorHandle, typ
 import { patterDialect } from "@patterkit/dialect";
 import type { ConditionProperty } from "../../shared/api.js";
 import { SCOPE_ORDER, catalogueFrom, schemaFrom, patterFunctions } from "./expr-shared.js";
-import { el, openAnchoredPanel, type AnchoredPanel } from "./dom.js";
+import { el } from "./dom.js";
+import { openPanel } from "./panel.js";
+import type { AnchoredPanel } from "@wildwinter/app-shell";
 
 export type Phase = "onEnter" | "onExit";
 
@@ -57,8 +59,8 @@ export function openEffectsEditor(opts: {
   const title = opts.phase === "onEnter" ? "On begin" : opts.phase === "onExit" ? "On end" : "Effects";
   // The global pills/text toggle (.insp-textmode-toggle) flips the value editors in place (setEffectsEditorText), so a click on it must not close the panel.
   const myHandles: EffectsEditorHandle[] = [];
-  const panel = openAnchoredPanel({
-    anchor: opts.anchor, className: "cond-editor effects-editor", title, width: 380,
+  const panel = openPanel({
+    anchor: opts.anchor, className: "effects-editor", title, width: 380,
     ignoreDown: ".exed-pop, .insp-textmode-toggle", deferEscape: ".exed-pop",
     // Runs AFTER the exit fade; guard the singletons so a panel opened meanwhile isn't clobbered.
     onClose: () => { for (const h of myHandles) h.destroy(); if (handles === myHandles) handles = []; if (active === panel) active = null; },

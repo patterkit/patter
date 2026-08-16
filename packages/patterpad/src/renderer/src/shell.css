@@ -160,17 +160,9 @@ body.resizing main.panes { transition: none; }
    non-editable in JS. Reading stays available. */
 main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; }
 
-/* Threaded comments (#148): the anchored thread popover (rides the shared .cond-editor panel chrome). */
-.comments-popover .cmt-quote { margin: 0 0 0.5rem; padding: 0.2rem 0.5rem; border-left: 2px solid var(--accent); color: var(--muted); font: italic 0.8rem var(--font-ui); }
-.comments-popover .cmt-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 16rem; overflow-y: auto; margin-bottom: 0.6rem; }
-.comments-popover .cmt-list.resolved { opacity: 0.7; }
-.cmt-msg { border-left: 2px solid color-mix(in oklab, var(--accent) 40%, var(--line)); padding: 0.1rem 0 0.1rem 0.5rem; }
-.cmt-msg-head { display: flex; align-items: baseline; gap: 0.5rem; }
-.cmt-author { font: 600 0.78rem var(--font-ui); color: var(--ink); }
-.cmt-ts { font: 0.66rem var(--font-ui); color: var(--muted); }
-.cmt-body { font: 0.82rem var(--font-ui); color: var(--ink); white-space: pre-wrap; margin-top: 0.1rem; }
-.cmt-empty { font: italic 0.8rem var(--font-ui); color: var(--muted); }
-.cmt-input { width: 100%; box-sizing: border-box; resize: vertical; font: 0.82rem var(--font-ui); padding: 0.35rem 0.45rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
+/* Threaded comments (#148) are the shell's popover now (openComments), and its
+   `.shell-cmt-*` styles come with it in comments.css. What survives here is the
+   action row, which the SUGGESTION popover borrowed and still uses. */
 .cmt-actions { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
 .cmt-actions .btn { font: 600 0.75rem var(--font-ui); padding: 0.25rem 0.6rem; }
 
@@ -210,8 +202,7 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .nav-search-kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); font: 0.64rem var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 0.25rem; color: var(--muted); }
 
 /* project search palette (⌘F) */
-/* Exit motion: closeWithExit() adds `.closing` before teardown - swap the enter for its reverse. */
-.cond-editor.closing { animation: var(--anim-panel-out); pointer-events: none; }
+/* The anchored panels' exit motion is the shell's now (anchored.css). */
 
 /* (#205 search / status browse now lives in its own detached window - see renderer/search/search.css.) */
 
@@ -277,21 +268,19 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .insp-seg-opt:hover { color: var(--accent); }
 .insp-seg-opt.on { color: var(--ink); background: color-mix(in oklab, var(--accent) 16%, var(--surface)); cursor: default; }
 
-/* the floating condition-editor panel (mounts @wildwinter/expr-editor) */
-.cond-editor { position: fixed; z-index: 900; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-3); display: flex; flex-direction: column; max-height: 70vh; animation: var(--anim-panel-in); }
-.cond-editor-head { display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--line); }
-.cond-editor-title { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.cond-editor-close { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; }
-.cond-editor-close:hover { color: var(--accent); }
-.cond-editor-body { padding: 0.6rem; overflow: auto; }
-/* effects editor: reuses .cond-editor chrome; one section per phase (On enter / On exit) */
+/* The panel CHROME (position, border, shadow, header, body, enter/exit motion) is
+   the shell's `.shell-anchored` now: see panel.ts. What stays here is only what is
+   this app's, which is the z-index it sits at above the editor surface, and the
+   body being a plain block rather than the shell's gapped column, because these
+   panels mount editors that do their own spacing. */
+.shell-anchored { z-index: 900; }
+.shell-anchored-body { display: block; padding: 0.6rem; }
+/* effects editor: one section per phase (On enter / On exit) */
 .effects-section + .effects-section { margin-top: 0.7rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
 .effects-section-cap { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.35rem; }
-/* gameId (address) editor: reuses .cond-editor chrome */
-.id-input { width: 100%; box-sizing: border-box; font-family: var(--font-mono); }
-.id-hint { margin: 0.35rem 0; color: var(--muted); font: 0.7rem var(--font-ui); }
-.id-hint.bad { color: var(--accent); }
-.id-actions { display: flex; justify-content: space-between; gap: 0.4rem; }
+/* The gameId editor is the shell's (openGameIdEditor); its `.shell-id-*` styles
+   come with it in anchored.css. Ours reused the expr-editor input look and the
+   app's btn classes; the shell's are the family's, which is the point. */
 /* inspector inline editors: native select + checkbox + jump list */
 .insp-select { font: 0.76rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.1rem 0.3rem; max-width: 11rem; }
 .insp-select:focus { outline: none; border-color: var(--accent); }

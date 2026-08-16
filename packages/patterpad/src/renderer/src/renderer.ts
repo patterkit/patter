@@ -6,6 +6,7 @@
 import "@patterkit/patterpad-surface/theme.css"; // app-wide design tokens
 import "@patterkit/patterpad-surface/styles.css"; // surface component styles
 import "@wildwinter/expr-editor/styles.css"; // the visual condition editor
+import "@wildwinter/app-shell/anchored.css"; // the shared anchored-panel chrome (a shared module carries its own CSS)
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";
@@ -20,9 +21,21 @@ import { closeWithExit } from "@patterkit/patterpad-surface/exit";
 import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, SceneVcStatus, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector } from "./inspector.js";
-import { openConditionEditor, closeConditionEditor, renderConditionPills } from "./cond-editor.js";
-import { openEffectsEditor, closeEffectsEditor, renderEffectsPills } from "./effects-editor.js";
-import { openGameIdEditor, closeGameIdEditor } from "./id-editor.js";
+// No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
+// open, because they are all the one panel.
+import { openConditionEditor, renderConditionPills } from "./cond-editor.js";
+import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
+// The gameId editor is the shell's now: it IS this app's, generalised, and it
+// gained a stopPropagation on keydown that ours lacked (a Delete typed into an
+// address could reach the surface underneath). The RULES stay Patterpad's, passed
+// in from the model, because the compiler, the CLI and the shipped runtime all
+// address content by them and none may depend on a UI kit. `id-parity.test.ts`
+// asserts our copy still matches the shell's default.
+import { openGameIdEditor, closeAnchoredPanel, showAbout } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
+import { PATTERKIT_WORDMARK } from "./wordmark.js";
+import { gameIdify, isValidGameId } from "@patterkit/core";
+import { PANEL_KEEP_CLEAR } from "./panel.js";
 import { mountGameDataFields } from "./gamedata-fields.js";
 import { mountProperties } from "./settings-properties.js";
 import { mountCast } from "./settings-cast.js";
@@ -33,11 +46,14 @@ import { mountDictionary } from "./settings-dictionary.js";
 import { mountLanguages } from "./settings-languages.js";
 import { renderReport } from "./report-view.js";
 import { mountDocEditor } from "./doc-editor.js";
-import { openCommentThread } from "./comments-popover.js";
+// The comment popover is the shell's. Aliased because this module already has an
+// `openComments` of its own, which is the thing that decides WHICH threads it gets.
+import { openComments as shellComments } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/comments.css"; // a shared module carries its own CSS
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
-import { openJumpPicker, closeJumpPicker } from "./jump-picker.js";
+import { openJumpPicker } from "./jump-picker.js";
 import type { SearchEntry, AudioEntry } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
@@ -1062,13 +1078,19 @@ function pushCommentMarks(): void {
   surface?.setComments(
     comments
       .filter((t) => showResolved || !t.resolved)
-      .map((t) => ({
-        id: t.id, nodeId: t.anchor, from: t.range?.from, to: t.range?.to, quote: t.range?.quote,
-        count: t.messages.length, resolved: !!t.resolved,
-        // The thread rendered for the in-script hover tooltip (capped so it stays readable). The
-        // commenter's name is bolded (the tooltip turns the markers into <strong>).
-        preview: t.messages.map((m) => `${tipBold(`${m.author || "Someone"}:`)} ${m.body}`).join("\n").slice(0, 400),
-      })),
+      .map((t) => {
+        // Tombstones count for nothing OUT HERE: a withdrawn message keeps its place
+        // inside the thread, but a bubble reading "2" for one real comment and one
+        // deletion, or a tooltip with a blank line in it, would just be wrong.
+        const said = t.messages.filter((m) => m.deleted !== true);
+        return {
+          id: t.id, nodeId: t.anchor, from: t.range?.from, to: t.range?.to, quote: t.range?.quote,
+          count: said.length, resolved: !!t.resolved,
+          // The thread rendered for the in-script hover tooltip (capped so it stays readable). The
+          // commenter's name is bolded (the tooltip turns the markers into <strong>).
+          preview: said.map((m) => `${tipBold(`${m.author || "Someone"}:`)} ${m.body}`).join("\n").slice(0, 400),
+        };
+      }),
   );
 }
 
@@ -1076,23 +1098,60 @@ function pushCommentMarks(): void {
  *  starts a RANGE thread; the ⋯ menu / inspector row opens the node's active whole-beat thread (or a
  *  fresh one). A new thread is only committed to `comments` once its first message is posted. */
 function openComments(req: CommentOpenRequest): void {
-  let thread = req.threadId ? comments.find((c) => c.id === req.threadId) : undefined;
-  if (!thread && req.range) thread = { id: newCommentId(), anchor: req.nodeId, range: req.range, messages: [] };
-  if (!thread) {
-    thread = comments.find((c) => c.anchor === req.nodeId && !c.range && !c.resolved)
-      ?? (showResolved ? comments.find((c) => c.anchor === req.nodeId && !c.range && c.resolved) : undefined)
-      ?? { id: newCommentId(), anchor: req.nodeId, messages: [] };
-  }
-  const t = thread;
-  openCommentThread({
-    anchor: req.anchor, thread: t, me: authorName,
-    onPost: (b) => {
-      t.messages.push({ author: authorName || "Me", ts: new Date().toISOString(), body: b });
-      if (!comments.includes(t)) comments.push(t); // first message commits the new thread
+  // WHICH threads the popover is given, which decides whether its picker appears.
+  // Patterpad usually knows the answer already and should keep saying so:
+  //   - a bubble click names its thread, so hand over exactly that one;
+  //   - a selection starts a NEW range thread, so hand over none (the shell opens
+  //     a composer and focuses it), and the range rides in `pending` below;
+  //   - the inspector row and the ⋯ menu mean "this beat's whole-beat comments",
+  //     which is where the picker earns its place: there is at most one UNRESOLVED
+  //     by construction, but with Show Resolved on there can be several archived,
+  //     and the old code silently opened whichever it found first.
+  // Range threads are deliberately NOT gathered by node: they are pinned to
+  // different spans and each has its own highlight, so the highlight IS the
+  // picker, and a list would offer you a thread about a phrase you did not click.
+  const named = req.threadId ? comments.find((c) => c.id === req.threadId) : undefined;
+  const threads = named ? [named]
+    : req.range ? []
+    : comments.filter((c) => c.anchor === req.nodeId && !c.range);
+  const pending = req.range;
+
+  shellComments({
+    anchor: req.anchor, subject: "this line", threads, showResolved,
+    prefer: "left", keepClear: PANEL_KEEP_CLEAR,
+    // The span a thread is pinned to, quoted above it. Whole-beat threads have
+    // none, and get no quotation.
+    quoteFor: (t) => (t as Comment).range?.quote,
+    newThreadId: newCommentId,
+    post: (threadId, body) => {
+      let t = comments.find((c) => c.id === threadId);
+      if (!t) {
+        // First message commits the thread: a composer somebody thought better of
+        // leaves nothing behind.
+        t = { id: threadId, anchor: req.nodeId, ...(pending ? { range: pending } : {}), messages: [] };
+        comments.push(t);
+      }
+      t.messages.push({ author: authorName || "Me", ts: new Date().toISOString(), body });
       commentsDirty = true; pushCommentMarks(); void flushReview();
     },
-    onResolve: () => { t.resolved = true; commentsDirty = true; pushCommentMarks(); void flushReview(); },
-    onReopen: () => { t.resolved = false; commentsDirty = true; pushCommentMarks(); void flushReview(); },
+    setResolved: (threadId, resolved) => {
+      const t = comments.find((c) => c.id === threadId);
+      if (!t) return;
+      t.resolved = resolved;
+      commentsDirty = true; pushCommentMarks(); void flushReview();
+    },
+    // One rule, per comment-delete.md: the message becomes a tombstone, and the
+    // thread goes when nothing readable would be left. The body is EMPTIED here
+    // rather than on save, because "deleted" has to mean gone from the file.
+    deleteMessage: (threadId, index) => {
+      const t = comments.find((c) => c.id === threadId);
+      const m = t?.messages[index];
+      if (!t || !m) return;
+      m.deleted = true;
+      m.body = "";
+      if (t.messages.every((x) => x.deleted === true)) comments.splice(comments.indexOf(t), 1);
+      commentsDirty = true; pushCommentMarks(); void flushReview();
+    },
   });
 }
 
@@ -1506,7 +1565,7 @@ function showInspector(ctx: InspectorContext): void {
     }),
     condPreview: (src) => renderConditionPills(src, sceneProps, nodeLabel),
     effectsPreview: (effects) => renderEffectsPills(effects, sceneProps, nodeLabel),
-    editGameId: (id, gameId, address, anchor) => openGameIdEditor({ anchor, value: gameId, derived: address, onCommit: (g) => { surface?.setGameId(id, g); } }),
+    editGameId: (id, gameId, address, anchor) => { openGameIdEditor({ anchor, value: gameId, derived: address, onCommit: (g) => { surface?.setGameId(id, g); }, slugify: gameIdify, validate: isValidGameId, prefer: "left", keepClear: PANEL_KEEP_CLEAR }); },
     editGroupProps: (id, patch) => { surface?.setGroupProps(id, patch); },
     editJump: (id, _current, anchor) => surface?.editJump(id, anchor),
     setJumpMode: (id, mode) => { surface?.setJumpMode(id, mode); },
@@ -1557,7 +1616,9 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   if (surface && dirty) await save();           // files are the truth - persist before switching
   await persistDocs();                          // flush any pending Notes edits before leaving the scene
   await persistComments();                      // flush any pending comment edits too
-  closeConditionEditor(); closeEffectsEditor(); closeGameIdEditor(); closeJumpPicker();
+  // One call, because all four editors ARE the one anchored panel: closing it
+  // fires whichever onClose is registered, which clears that module's singleton.
+  closeAnchoredPanel();
   surface?.destroy();
   surface = null;
   editorEl.replaceChildren();
@@ -1824,7 +1885,9 @@ function renderRecents(recents: RecentProject[]): void {
 }
 
 function showWelcome(state: BootState): void {
-  closeConditionEditor(); closeEffectsEditor(); closeGameIdEditor(); closeJumpPicker();
+  // One call, because all four editors ARE the one anchored panel: closing it
+  // fires whichever onClose is registered, which clears that module's singleton.
+  closeAnchoredPanel();
   surface?.destroy(); surface = null; project = null; currentSceneId = null;
   debugLink.setVisible(false); // no project -> hide the live-debug-link control
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene -> no suffix
@@ -2348,16 +2411,21 @@ window.patter.onMenu((cmd) => {
   else if (cmd.startsWith("theme:colour:")) setTheme({ colour: cmd.slice("theme:colour:".length) as ColourTheme });
   else if (cmd.startsWith("theme:font:")) setTheme({ font: cmd.slice("theme:font:".length) as FontTheme });
   else if (cmd.startsWith("open-recent:")) void openPath(cmd.slice("open-recent:".length));
-  // Themed About surface (reuses the update-dialog chrome) - never the stock OS panel. Version rides in the cmd.
-  else if (cmd.startsWith("about:")) void showUpdaterDialog({
-    wordmark: true,
-    message: "Patterpad",
-    detail: `Version ${cmd.slice("about:".length)}\n\nA writer-first editor for branching game dialogue.\n\nPart of PatterKit. Open source under the MIT license.\nMade by Ian Thomas.`,
+  // The family's About surface, never the stock OS panel. The shell draws it; the
+  // wordmark, the words and the URLs are ours. Version rides in the cmd.
+  // Links go out through `openExternal`, which main allow-lists (ABOUT_LINKS), so
+  // a bad label/url pair here is inert rather than dangerous.
+  else if (cmd.startsWith("about:")) void showAbout({
+    appName: "Patterpad",
+    version: cmd.slice("about:".length),
+    blurb: "A writer-first editor for branching game dialogue.",
+    credits: "Part of PatterKit. Open source under the MIT license.\nMade by Ian Thomas.",
+    wordmark: PATTERKIT_WORDMARK,
     links: [
       { label: "patterkit.dev", url: "https://patterkit.dev" },
       { label: "ian.wildwinter.net", url: "https://ian.wildwinter.net" },
     ],
-    buttons: ["Close"],
+    onOpenLink: (url) => { window.patter.openExternal(url); },
   });
 });
 

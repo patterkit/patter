@@ -5,7 +5,8 @@
 //   - REVIEW: the beat's open proposals, each showing current -> proposed (re-diffed against the live text;
 //     a stale proposal - the line changed since it was made - is banner-flagged), with Accept / Reject.
 
-import { el, openAnchoredPanel } from "./dom.js";
+import { el } from "./dom.js";
+import { openPanel } from "./panel.js";
 
 const fmtTs = (ts: string): string => {
   try { return new Date(ts).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); }
@@ -19,7 +20,7 @@ export function openSuggestionCompose(opts: {
   onSubmit: (proposed: string) => void;
   onClose?: () => void;
 }): void {
-  const panel = openAnchoredPanel({ anchor: opts.anchor, className: "cond-editor suggestion-popover", title: "Suggest a rewrite", width: 340, onClose: opts.onClose });
+  const panel = openPanel({ anchor: opts.anchor, className: "suggestion-popover", title: "Suggest a rewrite", width: 340, onClose: opts.onClose });
   if (!panel) return; // re-click on the same anchor toggled it off
   const { body, close } = panel;
 
@@ -60,7 +61,7 @@ export function openSuggestionReview(opts: {
   onReject: (id: string) => void;
   onClose?: () => void;
 }): void {
-  const panel = openAnchoredPanel({ anchor: opts.anchor, className: "cond-editor suggestion-popover", title: opts.rows.length > 1 ? `${opts.rows.length} suggested rewrites` : "Suggested rewrite", width: 340, onClose: opts.onClose });
+  const panel = openPanel({ anchor: opts.anchor, className: "suggestion-popover", title: opts.rows.length > 1 ? `${opts.rows.length} suggested rewrites` : "Suggested rewrite", width: 340, onClose: opts.onClose });
   if (!panel) return;
   const { body, close } = panel;
 
