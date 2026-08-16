@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-16
+
 ### Changed
 - **Patterpad now sits on a shared foundation for Patter's desktop apps.** The furniture that is
   not specific to writing dialogue, meaning menu wording and keyboard shortcuts, dialogs, and
