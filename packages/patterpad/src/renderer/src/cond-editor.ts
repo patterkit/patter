@@ -7,7 +7,8 @@ import { mountExpressionEditor, renderConditionPreview, type ExpressionEditorHan
 import { patterDialect } from "@patterkit/dialect";
 import type { ConditionProperty } from "../../shared/api.js";
 import { SCOPE_ORDER, catalogueFrom, schemaFrom, patterFunctions } from "./expr-shared.js";
-import { openAnchoredPanel, type AnchoredPanel } from "./dom.js";
+import { openPanel } from "./panel.js";
+import type { AnchoredPanel } from "@wildwinter/app-shell";
 
 /** A read-only PILL rendering of a condition (name-form `src`), for the inspector's Condition row -
  *  the same pills the editor shows, so non-coders read pills everywhere. `nodeLabel` resolves
@@ -43,7 +44,7 @@ export function openConditionEditor(opts: {
   // The node picker (.target-picker) is body-appended outside the panel; the global pills/text toggle
   // (.insp-textmode-toggle) re-themes the panel in place. Neither should close it.
   let myHandle: ExpressionEditorHandle | null = null;
-  const panel = openAnchoredPanel({
+  const panel = openPanel({
     anchor: opts.anchor, className: "cond-editor", title: "Condition", width: 440,
     ignoreDown: ".exed-pop, .target-picker, .insp-textmode-toggle",
     deferEscape: ".exed-pop, .target-picker",

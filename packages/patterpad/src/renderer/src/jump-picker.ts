@@ -2,7 +2,9 @@
 // its blocks, cross-scene targets) for a snippet's terminal jump. Body-level (survives inspector
 // re-renders), mirroring cond-editor / id-editor. Picking commits via onPick; "No jump" clears.
 
-import { el, openAnchoredPanel, type AnchoredPanel } from "./dom.js";
+import { el } from "./dom.js";
+import { openPanel } from "./panel.js";
+import type { AnchoredPanel } from "@wildwinter/app-shell";
 
 let active: AnchoredPanel | null = null;
 
@@ -13,8 +15,8 @@ export function closeJumpPicker(): void {
 export function openJumpPicker(opts: {
   anchor: HTMLElement; current: string; targets: Array<{ id: string; label: string }>; onPick: (target: string | null) => void;
 }): void {
-  const panel = openAnchoredPanel({
-    anchor: opts.anchor, className: "cond-editor jump-picker", title: "Jump to", width: 220,
+  const panel = openPanel({
+    anchor: opts.anchor, className: "jump-picker", title: "Jump to", width: 220,
     onClose: () => { if (active === panel) active = null; }, // runs after the exit fade
   });
   if (!panel) return; // re-clicked the same row: toggled closed

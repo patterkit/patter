@@ -843,11 +843,10 @@ export interface UpdaterPromptOptions {
   detail?: string;
   /** Button labels, left to right; the resolved index matches this array. */
   buttons: string[];
-  /** Optional links shown between the copy and the buttons (the About dialog's website / credit
-   *  links). Clicks route through openExternal, so only allow-listed URLs actually open. */
+  /** Optional links shown between the copy and the buttons. Clicks route through
+   *  openExternal, so only allow-listed URLs actually open. (The About dialog was
+   *  the original user of this and of the wordmark; both are the shell's now.) */
   links?: { label: string; url: string }[];
-  /** Centre the PatterKit wordmark above the title (the About dialog's branding). */
-  wordmark?: boolean;
   /** Show a live download-progress bar under the copy, fed by onUpdaterDownloadProgress. */
   progress?: boolean;
   /** The highlighted / Enter-default button (defaults to 0). */
