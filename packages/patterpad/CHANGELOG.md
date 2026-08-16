@@ -7,10 +7,27 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 ## [Unreleased]
 
 ### Changed
+- **Patterpad now sits on a shared foundation for Patter's desktop apps.** The furniture that is
+  not specific to writing dialogue, meaning menu wording and keyboard shortcuts, dialogs, and
+  icons, now comes from one shared package instead of being spelled out separately in each app.
+  Nothing has moved and nothing has been removed: the point is that what you learn in one Patter
+  app keeps working the same way in the next, and stays that way as they grow. In this release
+  that shows up as:
+  - **Undo**, **Redo**, **Duplicate** and **Find…** in the Edit menu, and **About Patterpad**,
+    **Patterpad Documentation**, **Patter Documentation Home**, **Check for Updates…** and
+    **User Information…** in the Help and app menus, now take their wording and their shortcuts
+    from that shared source. Every label and key is identical to 0.6.8; they have simply stopped
+    being Patterpad's private choice, so they cannot drift apart later.
+  - **One close button.** Patterpad drew its close affordance two ways: ✕ in most places, and the
+    multiplication sign × in four others, including tag chips and the review bar. They are all ✕
+    now.
+  - The bulk **find-and-replace confirmation** is the shared dialog rather than Patterpad's own
+    copy of it. It looks and behaves as it did.
 - **View ▸ Reading Palette is now View ▸ Colour Theme.** Same control, same five choices; the name
   is the one the Patter family uses across its apps, so the setting is called the same thing
   wherever you meet it. **Font Theme** is unchanged and stays Patterpad's own. (The code has always
   called this `ColourTheme` internally, so only the label moved.)
+- The author link in the **About** dialog now points to `ian.wildwinter.net`.
 
 ## [0.6.8] - 2026-07-31
 
