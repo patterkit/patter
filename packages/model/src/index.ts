@@ -753,6 +753,17 @@ export interface CommentMessage {
   author: string;
   ts: string;
   body: string;
+  /** A TOMBSTONE: the words are gone, the turn in the conversation is not.
+   *
+   *  Removing a reply outright would renumber the argument around it, so what is
+   *  left records who spoke and when, and that they withdrew it. The `body` is
+   *  EMPTIED rather than kept and hidden, because "deleted" has to mean gone from
+   *  a file that lives in version control.
+   *
+   *  This is the one message allowed an empty body: `saveSceneComments` prunes
+   *  empty messages so a cancelled composer leaves nothing behind, and without
+   *  this flag a tombstone would be pruned on the way to disk. */
+  deleted?: boolean;
 }
 
 /** A sub-text range a comment is pinned to, within its anchor node's say text (#148). Offsets are

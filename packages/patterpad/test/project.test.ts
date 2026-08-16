@@ -615,6 +615,50 @@ describe("project session: create -> open -> read -> save -> play", () => {
     expect(project.readSceneComments(id).length).toBe(0);
   });
 
+  it("keeps a TOMBSTONE through a save, and drops the thread when only tombstones are left", async () => {
+    // A withdrawn message keeps its author and timestamp and loses its words, so the
+    // plain "no body, prune it" rule would have erased every deletion on the way to
+    // disk: correct in the window, gone on the next open. Silent data loss, and the
+    // reason the delete verb could not be wired until this existed.
+    const dir = mkdtempSync(join(tmpdir(), "pp-tomb-"));
+    const opened = await project.createProject(dir, "Tombstones");
+    const id = opened.scenes[0]!.id;
+
+    await project.saveSceneComments(id, [{
+      id: "t1", anchor: "beat1", messages: [
+        { author: "Ian", ts: "2026-08-16T09:00:00.000Z", body: "", deleted: true },
+        { author: "Bo", ts: "2026-08-16T09:05:00.000Z", body: "Still stands though." },
+      ],
+    }]);
+
+    const back = project.readSceneComments(id);
+    expect(back.length).toBe(1);
+    expect(back[0]?.messages.length).toBe(2);           // the turn in the conversation survives
+    expect(back[0]?.messages[0]?.deleted).toBe(true);
+    expect(back[0]?.messages[0]?.body).toBe("");        // and "deleted" means gone from the file
+    expect(back[0]?.messages[1]?.body).toBe("Still stands though.");
+
+    // Withdraw the reply too: nothing readable is left, so the whole thread goes
+    // rather than leaving tombstones nobody can clear.
+    await project.saveSceneComments(id, [{
+      id: "t1", anchor: "beat1", messages: [
+        { author: "Ian", ts: "2026-08-16T09:00:00.000Z", body: "", deleted: true },
+        { author: "Bo", ts: "2026-08-16T09:05:00.000Z", body: "", deleted: true },
+      ],
+    }]);
+    expect(project.readSceneComments(id).length).toBe(0);
+
+    // An ordinary empty message is still pruned: the exception is for tombstones,
+    // not for anything blank.
+    await project.saveSceneComments(id, [{
+      id: "t2", anchor: "beat1", messages: [
+        { author: "Ian", ts: "t", body: "  " },
+        { author: "Bo", ts: "t", body: "real" },
+      ],
+    }]);
+    expect(project.readSceneComments(id)[0]?.messages.length).toBe(1);
+  });
+
   it("round-trips rewrite suggestions through the authoring shard, prunes empties, keeps comments", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pp-sg-"));
     const opened = await project.createProject(dir, "Suggestions");

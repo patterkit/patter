@@ -729,11 +729,17 @@ export function readSceneComments(sceneId: string): Comment[] {
 }
 
 /** Persist a scene's comment threads, MERGING over the rest of the shard. Threads with no real message text
- *  are pruned, so a cancelled "add comment" leaves the file clean. */
+ *  are pruned, so a cancelled "add comment" leaves the file clean.
+ *
+ *  TOMBSTONES are the exception, and they have to be: a withdrawn message keeps its author and timestamp
+ *  but is emptied of words, so the plain "no body, drop it" rule would have erased every deletion on the
+ *  way to disk - looking right until the next load. A thread survives while it still has something
+ *  READABLE in it, and goes when only tombstones would be left, which is the common case of withdrawing
+ *  a comment nobody had replied to. */
 export function saveSceneComments(sceneId: string, comments: Comment[]): Promise<SaveResult> {
   const kept = comments
-    .map((c) => ({ ...c, messages: c.messages.filter((m) => m.body.trim()) }))
-    .filter((c) => c.messages.length);
+    .map((c) => ({ ...c, messages: c.messages.filter((m) => m.deleted === true || m.body.trim()) }))
+    .filter((c) => c.messages.some((m) => m.deleted !== true));
   return saveAuthoringField(sceneId, (af) => { af.comments = kept.length ? kept : undefined; });
 }
 
