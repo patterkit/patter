@@ -1,6 +1,6 @@
 ---
 title: Reading & focus
-description: "Writing View, reading palettes, and fonts: the tools that let you read your script back, not just write it."
+description: "Writing View, colour themes, and fonts: the tools that let you read your script back, not just write it."
 sidebar:
   label: Reading & focus
 ---
@@ -17,11 +17,11 @@ never the words. Nothing is lost; it puts your exact layout back the moment you 
 by the same shortcut, **Esc**, or the quiet "Exit Writing View" pill at the
 bottom-left.
 
-## Reading palettes and fonts
+## Colour themes and fonts
 
 The **View** menu carries two reading controls, both remembered:
 
-- **Reading Palette**: Follow System, Paper, Mist, Slate, or Night. Each is a
+- **Colour Theme**: Follow System, Paper, Mist, Slate, or Night. Each is a
   hand-tuned set where the background, accents, and character colours all sit well
   together, not a plain light/dark flip.
 - **Font Theme**: Newsreader, Literata, Source Serif, or Courier (for a typewriter,

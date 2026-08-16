@@ -254,7 +254,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         },
         { type: "separator" },
         {
-          label: "Reading Palette",
+          label: "Colour Theme",
           submenu: COLOURS.map(([v, label]) => ({
             label, type: "radio" as const, checked: theme.colour === v, click: () => send(`theme:colour:${v}`),
           })),

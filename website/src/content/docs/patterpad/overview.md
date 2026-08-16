@@ -147,7 +147,7 @@ update.
 - [The writing surface](/patterpad/writing-surface/): cues, beats, and every keystroke.
 - [Structure & branching](/patterpad/structure-and-branching/): choices, selectors, jumps.
 - [Conditions, effects & data](/patterpad/conditions-and-data/): the inspector and the expression editor.
-- [Reading & focus](/patterpad/reading-and-focus/): Writing View, reading palettes, and fonts.
+- [Reading & focus](/patterpad/reading-and-focus/): Writing View, colour themes, and fonts.
 - [Search & navigation](/search/): find any line by text, title, address, or id, and replace across the project.
 - [Playtesting](/patterpad/playtesting/): walk the story live on the real engine.
 - [Reviewing & feedback](/patterpad/reviewing/): comments, suggested rewrites, and delivery-routed notes. (Tracking and reports live under [Running the project](/production/tracking-and-reports/).)

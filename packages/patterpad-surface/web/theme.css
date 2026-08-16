@@ -8,7 +8,7 @@
    lands; kept here for now as the surface is the only consumer.)
 
    Theming axes, all driven from the root element so they apply everywhere:
-     - reading palette: Paper / Mist / Slate / Night / Follow-System  (data-theme; absent = follow OS)
+     - colour theme: Paper / Mist / Slate / Night / Follow-System  (data-theme; absent = follow OS)
      - reading size  : Small / Medium / Large         (the base font-size below; future S/M/L UI)
      - font set      : reading / UI / mono            (the --font-* tokens; the data-font axis below)
    ============================================================================ */
@@ -153,7 +153,7 @@
 }
 
 /* ============================================================================
-   CURATED READING PALETTES (the `data-theme` axis). A small, designed set rather than a raw
+   CURATED COLOUR THEMES (the `data-theme` axis). A small, designed set rather than a raw
    light/dark switch (design-language §4): two LIGHT (Paper, Mist) + two DARK (Slate, Night), plus
    "Follow System" (no attr) which tracks the OS - light = Paper, dark = Night. The set spans a warm/cool
    x light/dark matrix: Paper (warm light), Mist (cool light), Slate (cool dark), Night (warm dark).
