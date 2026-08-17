@@ -12,7 +12,7 @@
   transition: color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), filter var(--dur-quick) var(--ease-standard);
 }
 .btn:hover { color: var(--accent); border-color: var(--accent); }
-.dirty { color: var(--accent); font: 600 0.75rem var(--font-ui); }
+/* The save indicator is the shell's (save.css): three states, always shown. */
 /* "<project>: <scene>" - the scene name fades in beside the project name only when the scene's title has
    scrolled out of the edit pane (so you always know where you are). Recessive (secondary to the name). */
 .scene-suffix {

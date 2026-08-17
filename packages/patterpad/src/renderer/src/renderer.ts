@@ -36,7 +36,8 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // in from the model, because the compiler, the CLI and the shipped runtime all
 // address content by them and none may depend on a UI kit. `id-parity.test.ts`
 // asserts our copy still matches the shell's default.
-import { openGameIdEditor, closeAnchoredPanel, showAbout } from "@wildwinter/app-shell";
+import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
@@ -108,7 +109,7 @@ const reviewNextEl = $<HTMLButtonElement>("review-next");
 const reviewCloseEl = $<HTMLButtonElement>("review-close");
 const projectNameEl = $("project-name");
 const sceneSuffixEl = $("scene-suffix");
-const dirtyEl = $("dirty");
+const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
 const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
 const toastEl = $("toast");        // transient feedback (a save refused by the VCS)
 const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bottom-left exit pill
@@ -305,11 +306,23 @@ let mountingScene = false;
 // Has the user edited the open scene since it loaded? Gates playEdited so a programmatic (re)load -
 // like following a cross-scene jump - never reads as an edit.
 let sceneEdited = false;
-let dirty = false;
-// Autosave: the open project's setting (default on, from ProjectFile.autosave). A single interval (boot)
-// fires save() when this is on; save() self-guards on dirty / no-scene, so an idle tick is a no-op.
-let autosaveOn = true;
-const AUTOSAVE_MS = 30_000;
+// Autosave is the shell's `createSaveController`. It replaces a 30-second interval,
+// and the difference is not cosmetic: an interval survives continuous typing but
+// leaves a SINGLE edit unwritten for up to a whole period, so one word typed
+// before the laptop closes was gone. The controller debounces AND caps the age of
+// unwritten work, so a lone edit lands promptly and steady typing still gets
+// written. It also guards re-entrancy, which the interval never did.
+//
+// The three states it computes are drawn by `saveIndicator` beside it. The old
+// span said nothing at all while clean, which left "did that get written?"
+// unanswered at the moment it is asked.
+const saveInd = saveIndicator();
+saveIndicatorHost.replaceWith(saveInd.el);
+// `write` returns false on refusal, which keeps the controller "unsaved" so the
+// next touch or flush tries again rather than reporting a success that did not
+// happen. Autosave on/off is the project's setting (ProjectFile.autosave) and
+// stops the CLOCK only: every transition below still flushes.
+const saver = createSaveController({ write: writeScene, onStatus: saveInd.set });
 
 // Open-where-you-left-off, to the LINE: the node id the caret is on, persisted (debounced) alongside the
 // scene so a reopen can reveal it. Captured on every selection move; flushed on a short timer and before
@@ -325,7 +338,7 @@ function scheduleRemember(): void {
   rememberTimer = window.setTimeout(flushRemember, 1000);
 }
 
-function setDirty(on: boolean): void { dirty = on; dirtyEl.hidden = !on; }
+
 
 // --- the project workspace ---------------------------------------------------
 
@@ -463,7 +476,7 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   }
 
   // The info reads the SAVED truth; unsaved edits in the open scene count as content too.
-  const unsaved = id === currentSceneId && dirty;
+  const unsaved = id === currentSceneId && saver.pending;
 
   // Frictionless undo of an accidental create: nothing at stake, nothing to confirm.
   if (info.untouched && !unsaved && !info.startsHere && info.referrers.length === 0) { await doDeleteScene(id); return; }
@@ -511,7 +524,7 @@ async function doDeleteScene(id: string): Promise<void> {
   if (currentSceneId === id) {
     // The files are gone: there is nothing left to persist. Drop the editor's dirty state so the
     // switch below doesn't try to save (and toast a refusal on) the scene we just deleted.
-    setDirty(false);
+    saver.cancel();
     docsDirty = false; commentsDirty = false;
     if (neighbour) await loadScene(neighbour);
   } else if (currentSceneId) highlightNav(currentSceneId);
@@ -1608,17 +1621,23 @@ function showInspector(ctx: InspectorContext): void {
   });
 }
 
-async function save(): Promise<void> {
-  if (!surface || !currentSceneId || !dirty) return; // nothing edited -> nothing to write (no .patterx bump)
+/** The write itself. The controller decides WHEN; this only decides what. */
+async function writeScene(): Promise<boolean> {
+  if (!surface || !currentSceneId) return true; // no scene open: nothing to write, and not a failure
   const { flow, loc } = surface.getSource({ prune: true }); // a real save tidies stray blank text lines
   const res = await window.patter.saveScene(currentSceneId, flow, loc);
-  if (res.ok) { setDirty(false); void refreshProblems(); void refreshVcStatus(); } // re-validate + re-badge what's on disk
-  else { toast(res.error ? `Save refused: ${res.error}` : "Save failed", "error"); void refreshVcStatus(); }
+  if (res.ok) { void refreshProblems(); void refreshVcStatus(); return true; } // re-validate + re-badge what's on disk
+  toast(res.error ? `Save refused: ${res.error}` : "Save failed", "error");
+  void refreshVcStatus();
+  return false; // stays unsaved, and the next touch or flush tries again
 }
+
+/** Write now and wait. Every transition that must see current bytes calls this. */
+async function save(): Promise<void> { await saver.flush(); }
 
 async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
   if (!project || sceneId === currentSceneId) return;
-  if (surface && dirty) await save();           // files are the truth - persist before switching
+  if (surface) await save();           // files are the truth - persist before switching
   await persistDocs();                          // flush any pending Notes edits before leaving the scene
   await persistComments();                      // flush any pending comment edits too
   // One call, because all four editors ARE the one anchored panel: closing it
@@ -1650,7 +1669,7 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
     jumpTargets: project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })),
     showTitle: true,
-    onChange: () => { if (!mountingScene) { setDirty(true); sceneEdited = true; refreshStaleBadge(); } scheduleValidate(); refreshNavBlocks(); },
+    onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); } scheduleValidate(); refreshNavBlocks(); },
     onSelect: showInspector, // drive the detail inspector off the caret's container stack
     onPlayBlock: (blockId) => { if (currentSceneId) void window.patter.openPlay(currentSceneId, blockId); },
     onOpenTarget: (targetId) => void openTarget(targetId), // double-click a jump chip -> follow the divert
@@ -1666,7 +1685,7 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   });
   mountingScene = false; // any onChange from here on is a real edit
   currentSceneId = sceneId;
-  setDirty(false); // mount fires onChange once (the initial mirror); not a user edit
+  saver.cancel(); // mount fires onChange once (the initial mirror); not a user edit
   highlightNav(sceneId);
   applySceneVc(); // read-only + topbar chip if this scene is locked by another (from the cached snapshot)
   surface.focus();
@@ -1703,7 +1722,7 @@ function watchSceneTitle(): void {
 
 async function play(): Promise<void> {
   if (!currentSceneId) return;
-  if (dirty) await save();                       // play reflects what's on disk
+  await save();                       // play reflects what's on disk
   await window.patter.openPlay(currentSceneId);  // opens the separate interactive play window
 }
 
@@ -1714,7 +1733,7 @@ async function playFromStart(): Promise<void> {
   if (!project) return;
   const start = await ensureProjectStart();
   if (!start) return; // cancelled / no scenes
-  if (dirty) await save();
+  await save();
   await window.patter.openPlay(start.scene, start.block);
 }
 
@@ -1771,7 +1790,7 @@ function openTagBrowse(): void {
 async function showProject(open: OpenResult): Promise<void> {
   project = open.project;
   debugLink.setVisible(true); // the bottom-right live-debug-link control is available once a project is open
-  autosaveOn = project.autosave; // honour the project's autosave setting (default on)
+  saver.setAuto(project.autosave); // the project's setting (default on); off stops the clock, not the flushes
   projectNameEl.textContent = project.name;
   currentSceneId = null;
   await buildSpellcheck(); // build the spell engine before the first scene mounts (#177); it pushes on mount
@@ -1807,7 +1826,7 @@ function enterWorkspace(): void {
  *  production report (which also hydrates the rest of the project for the full scene list). */
 async function showOverview(): Promise<void> {
   if (!project) return;
-  if (surface && dirty) await save(); // files are the truth - persist before leaving the editor
+  if (surface) await save(); // files are the truth - persist before leaving the editor
   welcomeEl.hidden = true; panesEl.hidden = true; overviewEl.hidden = false;
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true; // the overview is a calm screen, no bars
@@ -1919,7 +1938,7 @@ async function openDialog(): Promise<void> { const r = await window.patter.openD
  *  the project folder to a name / location the user picks and open the copy. Carries on in the duplicate. */
 async function saveAs(): Promise<void> {
   if (!project) return; // nothing open
-  if (surface && dirty) await save(); // pending text edits
+  if (surface) await save(); // pending text edits
   await persistDocs();                // pending Notes
   await persistComments();            // pending comments
   const r = await window.patter.saveAs();
@@ -1933,7 +1952,7 @@ async function saveAs(): Promise<void> {
  *  then shows it in a themed modal. */
 async function openReport(): Promise<void> {
   if (!project) return; // nothing open
-  if (surface && dirty) await save(); // persist pending edits so the report reflects them, not the last save
+  if (surface) await save(); // persist pending edits so the report reflects them, not the last save
   const data = await window.patter.report();
   if (!data) return;
   renderReport(reportHost, data);
@@ -2004,7 +2023,7 @@ async function localisationImport(): Promise<void> {
  *  save it through a native dialog. On success, briefly confirms on the button it was triggered from. */
 async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
   if (!project) return; // nothing open
-  if (surface && dirty) await save(); // flush pending edits so the exported figures are current
+  if (surface) await save(); // flush pending edits so the exported figures are current
   const res = await window.patter.exportReport();
   if (res.ok) {
     if (btn) { const prev = btn.textContent; btn.textContent = "Exported ✓"; btn.disabled = true;
@@ -2049,7 +2068,7 @@ async function exportScript(): Promise<void> {
  *  the whole project into one `.patterpack` file the writer can send to someone. Native Save dialog in main. */
 async function exportPatterpack(): Promise<void> {
   if (!project) return;
-  if (surface && dirty) await save(); // pending text edits
+  if (surface) await save(); // pending text edits
   await persistDocs();                // pending Notes
   await persistComments();            // pending comments
   const res = await window.patter.exportPatterpack();
@@ -2187,7 +2206,7 @@ async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
   const res = await window.patter.saveSettings(s);
   if (!res.ok) { console.error("Save settings failed:", res.error); return; }
   if (res.project) {
-    project = res.project; projectNameEl.textContent = project.name; autosaveOn = project.autosave;
+    project = res.project; projectNameEl.textContent = project.name; saver.setAuto(project.autosave);
     // The project's @patter properties may have changed (added / renamed / re-typed / enum values edited):
     // rebuild the condition-editor catalogue so they're selectable immediately, without a scene reload or a
     // restart. Mirrors openSceneProps for the scene scope; keeps the load-time order (@patter first). New
@@ -2332,8 +2351,7 @@ async function boot(): Promise<void> {
   // the shell knows nothing about either app's modes: chrome rollovers would
   // break the point of a view that hides the chrome.
   initTooltips({ suppressed: () => document.body.classList.contains("writing-view") });
-  // Autosave: one timer for the app's life; save() no-ops when idle (no dirty scene) or autosave is off.
-  window.setInterval(() => { if (autosaveOn) void save(); }, AUTOSAVE_MS);
+  // No autosave timer: the controller runs its own clock off the edits themselves.
   window.addEventListener("beforeunload", flushRemember); // closing mid-debounce still records caret + scene
   const state = await window.patter.boot();
   panes = state.panes; // restore the remembered slide/pin state
@@ -2455,7 +2473,7 @@ window.patter.onPlayReset(() => surface?.resetPlay());
 window.patter.onSearchNavigate((entry) => void jumpTo(entry));
 // Project-wide Replace (driven from the search window): main asks us to flush the open scene before it
 // rewrites the shards, then to reload once it's done.
-window.patter.onEditorFlush(() => void (async () => { if (dirty) await save(); window.patter.editorFlushed(); })());
+window.patter.onEditorFlush(() => void (async () => { await save(); window.patter.editorFlushed(); })());
 window.patter.onReplaceApplied(() => void (async () => {
   if (currentSceneId) await loadScene(currentSceneId); // re-read the open scene with the replaced text
   await refreshProblems();
@@ -2469,8 +2487,10 @@ window.patter.onCoverageNavigate((sceneId, beatId) => void (async () => {
 window.patter.onOpenWorldSettings(() => void openProjectSettings("world"));
 
 // Auto-update guard: report the live dirty flag, and persist on demand before an install restart.
-window.patter.onUpdaterCheckDirty(() => dirty);
-window.patter.onUpdaterSaveBeforeInstall(async () => { await save(); return { ok: !dirty }; });
+// `pending` is true while a write is in FLIGHT as well as while work is queued,
+// which is what an updater asking "may I restart?" needs to know.
+window.patter.onUpdaterCheckDirty(() => saver.pending);
+window.patter.onUpdaterSaveBeforeInstall(async () => { await save(); return { ok: !saver.pending }; });
 // Auto-update prompts wear the app's themed dialog chrome, never a stock OS box.
 window.patter.onUpdaterPrompt((opts) => showUpdaterDialog(opts));
 window.patter.onUpdaterDownloadProgress(feedUpdaterDownloadProgress);
