@@ -31,6 +31,8 @@ export interface SessionState {
   panes: PaneState;
   /** Remembered colour / font theme choice. */
   theme: ThemePrefs;
+  /** "Follow in the editor" on the play window (default off). */
+  playFollow: boolean;
   /** Remembered play-window bounds + always-on-top pin (default pinned). */
   play: PlayWindowState;
   /** Remembered search-tool-window bounds + always-on-top pin (default pinned). */
@@ -56,6 +58,10 @@ interface Place {
  *  in a later version arrives with its default rather than being absent for existing authors. */
 interface AppSlice {
   theme: ThemePrefs;
+  /** "Follow in the editor" (play-follow): each played beat is revealed in the editor as the run goes.
+   *  A user preference rather than window geometry, so it lives in the app slice beside the theme.
+   *  OFF by default: marking is the default behaviour and following is the author asking for it. */
+  playFollow: boolean;
 }
 
 /** The old hand-rolled file, kept only for the one-time fold-in below. */
@@ -96,6 +102,7 @@ export interface Store {
   setIdentity(identity: Identity): void;
   setPanes(panes: PaneState): void;
   setTheme(theme: ThemePrefs): void;
+  setPlayFollow(on: boolean): void;
   setPlay(play: PlayWindowState): void;
   setSearch(search: PlayWindowState): void;
   setCoverage(coverage: PlayWindowState): void;
@@ -139,7 +146,7 @@ function foldInLegacySession(dir: string): void {
       search: { ...old.search },
       coverage: { ...old.coverage },
     },
-    app: { theme: migrateTheme({ ...DEFAULT_THEME, ...old.theme }) },
+    app: { theme: migrateTheme({ ...DEFAULT_THEME, ...old.theme }), playFollow: false },
   };
   try {
     mkdirSync(dir, { recursive: true });
@@ -156,7 +163,7 @@ export function createStore(dir: string): Store {
   const app = createAppStore<Place, AppSlice>({
     dir,
     fileName: SETTINGS_FILE,
-    defaults: { theme: { ...DEFAULT_THEME } },
+    defaults: { theme: { ...DEFAULT_THEME }, playFollow: false },
     panes: { ...DEFAULT_PANES },
   });
 
@@ -193,6 +200,7 @@ export function createStore(dir: string): Store {
       // into it, so the extra fields round-trip untouched; only the static type is narrower.
       panes: { ...DEFAULT_PANES, ...(s.panes as PaneState) },
       theme: migrateTheme({ ...DEFAULT_THEME, ...s.app.theme }),
+      playFollow: s.app.playFollow ?? false,
       play: windowState(s.windows.play),
       search: windowState(s.windows.search),
       coverage: windowState(s.windows.coverage),
@@ -225,6 +233,9 @@ export function createStore(dir: string): Store {
     },
     setTheme(theme) {
       app.patchApp({ theme });
+    },
+    setPlayFollow(on) {
+      app.patchApp({ playFollow: on });
     },
     setPlay(play) {
       setWindow("play", play);

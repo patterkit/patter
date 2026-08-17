@@ -265,6 +265,7 @@ const stub = {
   hydrate: async () => project, // lazy-open phase 2 (#171): the full scene list is already complete here
   openPlay: async () => undefined,
   onPlayMark: () => undefined,
+  onPlayFollow: () => undefined,
   onPlayReset: () => undefined,
   // The search tool window is a separate Electron window (#205); inert in the browser preview.
   openSearchWindow: async () => undefined,
