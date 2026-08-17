@@ -24,7 +24,7 @@ import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type Inspector
 import { buildSpellEngine } from "./spellcheck.js";
 import { closeWithExit } from "@patterkit/patterpad-surface/exit";
 import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
-import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, SceneVcStatus, ThemePrefs, VcsKind } from "../../shared/api.js";
+import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
@@ -37,7 +37,9 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // address content by them and none may depend on a UI kit. `id-parity.test.ts`
 // asserts our copy still matches the shell's default.
 import { el } from "./dom.js";
-import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar } from "@wildwinter/app-shell";
+import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
+  paintVcBadges, lockControls, type ShardVc } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
@@ -391,6 +393,7 @@ function renderNav(): void {
     row.className = "nav-scene"; row.dataset["id"] = s.id;
     const b = document.createElement("button");
     b.className = "nav-item"; b.type = "button"; b.dataset["id"] = s.id;
+    b.dataset["vc"] = s.id; // the shard key `paintVcBadges` folds and badges this row from
     b.append(Object.assign(document.createElement("span"), { className: "nav-item-name", textContent: s.name }));
     b.addEventListener("click", () => void loadScene(s.id));
     b.addEventListener("contextmenu", (e) => { e.preventDefault(); sceneContextMenu(s.id, e.clientX, e.clientY); });
@@ -609,33 +612,22 @@ async function commitSceneReorder(movedId: string, targetId: string, before: boo
 // topbar chip for the current one, and a scene locked by ANOTHER author makes the editor read-only (the
 // save would be refused anyway). Refreshed on open / save / window-focus and polled (state changes
 // externally - someone else grabs a lock, a newer revision lands).
-let vcMap = new Map<string, SceneVcStatus>();
+// Keyed by scene id, in the shell's `ShardVc` shape. The DTO crossing the preload boundary keeps
+// saying `sceneId`, which is this app's word for the key; the adaptation is one line below.
+let vcMap: Map<string, ShardVc> = new Map();
+
+/** What keeps working in an inspector for a scene somebody else holds: the section disclosures, and
+ *  the copy buttons that put an id on the clipboard. Both are reading, and reading is never locked. */
+const STAYS_LIVE = ".insp-head, .insp-copy, .insp-rec-play";
 
 /** A scene is read-only to us only when someone ELSE holds it. A not-yet-checked-out (read-only on
  *  disk) file with no other holder is still editable - simple-vc-lib checks it out on save. */
-function isReadOnly(st?: SceneVcStatus): boolean { return !!st?.lockedBy?.length; }
+function isReadOnly(st?: ShardVc): boolean { return !!st?.lockedBy?.length; }
 
-/** The one badge to fly on a scene's nav row, by priority (most actionable first), or null if clean. */
-// Monochrome typographic glyphs (NOT colour emoji), so they inherit the badge's themed colour and sit
-// in the app's restrained icon family (⧉ ✓ ↪ ↓ …).
-function navBadgeFor(st: SceneVcStatus | undefined): { glyph: string; cls: string; title: string } | null {
-  if (st?.lockedBy?.length) return { glyph: "⊘", cls: "vcs-locked", title: `Locked by ${st.lockedBy.join(", ")}` };
-  if (st?.outOfDate) return { glyph: "↓", cls: "vcs-stale", title: "Out of date - a newer version is on the server" };
-  if (st?.checkedOutByMe) return { glyph: "✎", cls: "vcs-mine", title: "Checked out by you" };
-  if (st?.dirty) return { glyph: "●", cls: "vcs-dirty", title: "Modified - uncommitted local changes" };
-  if (st?.untracked) return { glyph: "+", cls: "vcs-new", title: "New - not yet committed" };
-  return null;
-}
-
+/** Repaint every scene row's badge from the current snapshot. In place, so a poll never disturbs the
+ *  nav: the shell's painter removes and re-adds only the badge span. */
 function paintNavBadges(): void {
-  navListEl.querySelectorAll<HTMLElement>(".nav-item").forEach((el) => {
-    el.querySelector(".nav-badge")?.remove();
-    const b = navBadgeFor(vcMap.get(el.dataset["id"] ?? ""));
-    if (!b) return;
-    const s = document.createElement("span");
-    s.className = `nav-badge ${b.cls}`; s.textContent = b.glyph; s.dataset.tip = b.title; s.setAttribute("aria-label", b.title);
-    el.appendChild(s);
-  });
+  paintVcBadges(navListEl, vcMap);
 }
 
 /** Reflect the CURRENT scene's VC state: read-only the surface + dim the inspector when locked by
@@ -644,7 +636,11 @@ function applySceneVc(): void {
   const st = currentSceneId ? vcMap.get(currentSceneId) : undefined;
   const ro = isReadOnly(st);
   surface?.setEditable(!ro);
-  panesEl.classList.toggle("vcs-readonly", ro);
+  // The shell's per-control lock, in place of the blanket `pointer-events: none` this used to drop over
+  // the whole inspector. Reading a scene somebody else holds has to stay fully possible, and the old
+  // version killed that too: you could not expand a section or copy an address to go and ask them about
+  // it. Storyletter's version won this one, and STAYS_LIVE is the part only this app can supply.
+  lockControls(inspectorStackEl, ro, STAYS_LIVE);
   const chip = st?.lockedBy?.length ? `⊘ Locked by ${st.lockedBy.join(", ")}`
     : st?.outOfDate ? "↓ Out of date" : "";
   vcsSceneEl.textContent = chip;
@@ -658,7 +654,7 @@ async function refreshVcStatus(): Promise<void> {
   if (!project) return;
   const dto = await window.patter.vcStatus();
   if (!dto || !project) return; // project may have closed while we awaited
-  vcMap = new Map(dto.scenes.map((s) => [s.sceneId, s]));
+  vcMap = new Map(dto.scenes.map((s) => [s.sceneId, { key: s.sceneId, ...s }]));
   paintNavBadges();
   applySceneVc();
 }
