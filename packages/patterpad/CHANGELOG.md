@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **"Follow in the editor" on the Play window.** The play window has always marked the line it is on
+  and left your place alone, which stays the default. If you would rather read the script as it runs,
+  the new toggle beside the pin asks the editor to reveal each line as it plays. **Off until you turn
+  it on, and remembered after that.** It never takes focus: the editor moves behind the play window,
+  so the keyboard stays where you are playing.
+
 ### Fixed
 - **Hover tooltips are back in the Play, Search and Coverage windows.** Several controls in those
   windows explained themselves on hover and had quietly stopped: the Search window's pin has had no
