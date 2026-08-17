@@ -257,12 +257,19 @@ function sortValues(values: ScalarValue[]): ScalarValue[] {
   });
 }
 
+/** Default sweep size. Named because both drivers below need it to report a total. */
+const DEFAULT_RUNS = 5000;
+
 /**
- * Run narrative coverage over a loaded project. Pure (compiles once, then N
- * independent playthroughs); optional progress + cancel via `hooks`.
+ * The sweep itself, as a generator that yields the completed-run count after each run.
+ *
+ * ONE loop body, two drivers over it (`runCoverage` and `runCoverageAsync` below), so the synchronous
+ * path the CLI takes and the yielding path Patterpad's job host takes can never drift apart. The yield
+ * is what makes cancellation possible at all: `hooks.signal` is checked at the top of every run, and in
+ * a single-threaded host nothing can flip that flag unless the loop hands the event loop back first.
  */
-export function runCoverage(loaded: LoadedProject, options: CoverageOptions = {}, hooks: CoverageHooks = {}): CoverageReport {
-  const runs = options.runs ?? 5000;
+function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: CoverageHooks = {}): Generator<number, CoverageReport, void> {
+  const runs = options.runs ?? DEFAULT_RUNS;
   const maxSteps = options.maxSteps ?? 200;
   const seed = options.seed ?? 0;
   const start = resolveStart(loaded, options);
@@ -365,6 +372,7 @@ export function runCoverage(loaded: LoadedProject, options: CoverageOptions = {}
     termination[term]++;
     executed++;
     if ((run & 0xff) === 0) hooks.onProgress?.(executed, runs); // ~every 256 runs
+    yield executed; // the driver's chance to report and, on the async path, to hand back the loop
   }
   hooks.onProgress?.(executed, runs);
 
@@ -399,6 +407,49 @@ export function runCoverage(loaded: LoadedProject, options: CoverageOptions = {}
     totals: { beats: beats.length, covered, neverHit, coveragePct: beats.length ? (covered / beats.length) * 100 : 100 },
     termination, drivers, unwrittenInputs: [...unwrittenInputs].sort(), dryChoices, cancelled,
   };
+}
+
+/**
+ * Run narrative coverage over a loaded project, synchronously. Pure (compiles once, then N independent
+ * playthroughs); optional progress via `hooks.onProgress`.
+ *
+ * `hooks.signal` is honoured but can only ever fire from OUTSIDE this thread of execution (a worker, a
+ * test that pre-aborts). A host that wants a Cancel button its own user can press wants
+ * `runCoverageAsync`, which yields between runs so the flag can actually change.
+ */
+export function runCoverage(loaded: LoadedProject, options: CoverageOptions = {}, hooks: CoverageHooks = {}): CoverageReport {
+  const it = sweep(loaded, options, hooks);
+  let step = it.next();
+  while (!step.done) step = it.next();
+  return step.value;
+}
+
+export interface CoverageAsyncHooks extends CoverageHooks {
+  /** Awaited after every completed run. This is both the progress report and the yield point: whatever
+   *  it awaits on is when the host gets its event loop back, so IPC flows and a Cancel can be heard.
+   *  app-shell's `JobContext.step(done, total)` fits it exactly. */
+  onRun?: (done: number, total: number) => void | Promise<void>;
+}
+
+/**
+ * Run narrative coverage without hogging the thread: the same sweep, awaiting `hooks.onRun` between
+ * runs. A cancelled sweep resolves with the PARTIAL report rather than throwing, and that report's
+ * `runs` is the count actually executed with `cancelled: true` set, so nothing downstream can mistake
+ * it for a full sample.
+ */
+export async function runCoverageAsync(
+  loaded: LoadedProject,
+  options: CoverageOptions = {},
+  hooks: CoverageAsyncHooks = {},
+): Promise<CoverageReport> {
+  const total = options.runs ?? DEFAULT_RUNS;
+  const it = sweep(loaded, options, hooks);
+  let step = it.next();
+  while (!step.done) {
+    await hooks.onRun?.(step.value, total);
+    step = it.next();
+  }
+  return step.value;
 }
 
 /** Render a coverage report as the CLI's readable text: a summary, then a per-scene beat table with

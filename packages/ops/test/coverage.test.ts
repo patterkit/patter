@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadProject, runCoverage, resolveStart } from "../src/index.js";
+import { loadProject, runCoverage, runCoverageAsync, resolveStart } from "../src/index.js";
 
 // A tiny branching story: L1 always plays, then a choice routes to L2 OR L3,
 // then a jump to END, so L4 (a snippet AFTER the END jump) is unreachable.
@@ -91,6 +91,52 @@ describe("runCoverage", () => {
     expect(partial.cancelled).toBe(true);
     expect(partial.runs).toBeLessThan(200);
     expect(partial.runs).toBeGreaterThan(0);
+  });
+});
+
+describe("runCoverageAsync", () => {
+  const loaded = loadProject(makeProject());
+
+  it("matches the synchronous driver run for run", async () => {
+    // The whole point of the generator is that there is one loop body. If these two ever disagree, the
+    // two drivers have drifted and the CLI and the editor are reporting different things.
+    const sync = runCoverage(loaded, { runs: 100, seed: 3 });
+    const async_ = await runCoverageAsync(loaded, { runs: 100, seed: 3 });
+    expect(async_).toEqual(sync);
+  });
+
+  it("reports progress after every run, ending at the total", async () => {
+    const seen: Array<[number, number]> = [];
+    const report = await runCoverageAsync(loaded, { runs: 20, seed: 0 }, {
+      onRun: (done, total) => { seen.push([done, total]); },
+    });
+    expect(seen.length).toBe(20);
+    expect(seen[0]).toEqual([1, 20]);
+    expect(seen.at(-1)).toEqual([20, 20]);
+    expect(report.runs).toBe(20);
+    expect(report.cancelled).toBe(false);
+  });
+
+  it("stops at the next run when cancelled mid-flight, and reports the runs it took", async () => {
+    // The realistic shape: the flag flips during an await, exactly as a Cancel arriving over IPC would.
+    // The run in flight completes; the sweep stops at the top of the next one.
+    let cancelled = false;
+    const report = await runCoverageAsync(loaded, { runs: 500, seed: 0 }, {
+      signal: { get aborted() { return cancelled; } },
+      onRun: async (done) => { if (done >= 5) cancelled = true; await Promise.resolve(); },
+    });
+    expect(report.cancelled).toBe(true);
+    expect(report.runs).toBe(5); // honest: the sample it actually took, not the 500 asked for
+    expect(report.totals.beats).toBeGreaterThan(0); // a partial report is still a whole report
+  });
+
+  it("a sweep that is never cancelled reports the full count", async () => {
+    const report = await runCoverageAsync(loaded, { runs: 30, seed: 0 }, {
+      signal: { get aborted() { return false; } },
+      onRun: () => Promise.resolve(),
+    });
+    expect(report.cancelled).toBe(false);
+    expect(report.runs).toBe(30);
   });
 });
 

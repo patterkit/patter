@@ -5,10 +5,10 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
-  type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit } from "@patterkit/ops";
+  type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
@@ -1132,9 +1132,22 @@ export function compileForDebugPush(): { hash: string; json: string } | null {
 export function coverage(options: CoverageRunOptions): CoverageResult | null {
   if (!loaded) return null;
   ensureHydrated(); // coverage walks every scene, so the whole project must be parsed in
-  const report = runCoverage(loaded, options);
+  return withSceneNames(runCoverage(loaded, options), loaded);
+}
+
+/** The same sweep, yielding between runs so the app stays responsive and a Cancel can be heard. Used by
+ *  the coverage window through the shell's job host; `coverage` above stays for any caller with nothing
+ *  to paint. A cancelled sweep still returns a result: the report says so and counts only what it ran. */
+export async function coverageAsync(options: CoverageRunOptions, hooks: CoverageAsyncHooks): Promise<CoverageResult | null> {
+  if (!loaded) return null;
+  ensureHydrated();
+  return withSceneNames(await runCoverageAsync(loaded, options, hooks), loaded);
+}
+
+/** The report holds scene IDs; the window renders names. */
+function withSceneNames(report: CoverageReport, project: LoadedProject): CoverageResult {
   const sceneNames: Record<string, string> = {};
-  for (const s of loaded.scenes) sceneNames[s.id] = s.name;
+  for (const s of project.scenes) sceneNames[s.id] = s.name;
   return { report, sceneNames };
 }
 

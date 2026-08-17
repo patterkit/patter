@@ -44,6 +44,10 @@ export function renderCoverage(
 
   const term = report.termination;
   const meta = el("div", "cov-meta");
+  // A cancelled sweep reports the runs it ACTUALLY took, so the percentages above are real but the
+  // sample is smaller than the one that was asked for. Say so beside them, or a stopped sweep reads as
+  // a finished one and a thin sample gets trusted like a thick one.
+  if (report.cancelled) meta.append(el("span", "cov-stopped", "stopped early"));
   meta.append(el("span", undefined, `${num(report.runs)} run${report.runs === 1 ? "" : "s"} · ${report.maxSteps} max steps · seed ${report.seed}`));
   meta.append(el("span", "cov-meta-sep", `${num(term.ended)} ended · ${num(term.stalled)} stalled · ${num(term.capped)} capped${term.evalError ? ` · ${num(term.evalError)} errored` : ""}`));
   host.append(meta);

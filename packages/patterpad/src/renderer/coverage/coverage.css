@@ -30,13 +30,27 @@ body.coverage-win {
 .cov-drivers { flex: 0 0 auto; margin: 0; padding: 0.4rem 0.9rem 0; font: 0.74rem var(--font-ui); color: var(--ink-soft); }
 .cov-status { flex: 0 0 auto; margin: 0; padding: 0.5rem 0.9rem; color: var(--muted); font: 0.82rem var(--font-ui); }
 
+/* The long-job strip sits between the drivers note and the results (app-shell's job.css draws it). */
+#cov-job { flex: 0 0 auto; padding: 0 0.9rem; }
+
 /* Results area (the renderCoverage output) */
 .cov-results { flex: 1 1 auto; overflow: auto; padding: 0.6rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+/* A sweep is running: the PREVIOUS results stay readable but dimmed, so nobody reads a stale number as
+   the live one. Kept non-interactive for the same reason. */
+.cov-results.stale { opacity: 0.5; pointer-events: none; transition: opacity var(--dur-fast, 120ms) ease; }
 .cov-stats { display: flex; gap: 1.6rem; }
 .cov-stat-big { font: 700 1.6rem var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
 .cov-stat-label { font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .cov-meta { display: flex; flex-direction: column; gap: 0.1rem; font: 0.76rem var(--font-ui); color: var(--ink-soft); }
 .cov-meta-sep { color: var(--muted); }
+/* A cancelled sweep: the numbers are real, the sample is short. Said as a pill so it is not read as
+   part of the run parameters underneath it. */
+.cov-stopped {
+  align-self: flex-start; margin-bottom: 0.15rem; padding: 0.05rem 0.4rem;
+  border: 1px solid var(--warn, var(--accent)); border-radius: var(--radius-sm, 4px);
+  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--warn, var(--accent));
+}
 .cov-note { margin: 0; font: 0.78rem var(--font-ui); color: var(--ink-soft); }
 .cov-note-input { color: var(--warn, var(--accent)); }
 .cov-note-dry { color: var(--danger); }
