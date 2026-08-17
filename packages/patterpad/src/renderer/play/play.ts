@@ -6,11 +6,13 @@
 
 import "@patterkit/patterpad-surface/theme.css"; // app-wide design tokens (same look as the editor)
 import "./play.css";
+import "@wildwinter/app-shell/stale.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";
 import "@fontsource/newsreader/600.css";
 import "@fontsource-variable/inter";
 
+import { staleBar } from "@wildwinter/app-shell";
 import { colourFor } from "@patterkit/patterpad-surface/colour";
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
 
@@ -110,7 +112,7 @@ function fakeDuration(text: string | undefined): number {
 async function playClip(beatId: string, lineEl?: HTMLElement): Promise<boolean> {
   const data = await play.audioBytes(beatId);
   if (!data) return false;
-  const url = URL.createObjectURL(new Blob([data.bytes], { type: data.mime }));
+  const url = URL.createObjectURL(new Blob([data.bytes as BlobPart], { type: data.mime }));
   const audio = new Audio(url);
   lineEl?.classList.add("pline-playing");
   await audio.play().catch(() => undefined);
@@ -249,10 +251,10 @@ function showEnd(error?: string): void {
 function showStale(): void {
   trayShown = false;
   runGen++; // freeze any in-flight table-read - the script changed underneath it
-  const note = document.createElement("div");
-  note.className = "pnote stale";
-  note.textContent = "Scene changed in the editor: restart to play the new version.";
-  controlsEl.replaceChildren(note, button("↺ Restart", "pchoice restart", () => void startRun()));
+  // The shell's banner, which carries its own Restart. A BAR rather than the centred grey note this
+  // used to draw, because the session is frozen until you act and a note that reads like the end of a
+  // passage does not say so. Everything else this function does is unchanged.
+  controlsEl.replaceChildren(staleBar({ subject: "The scene", onRestart: () => void startRun() }));
   scrollToEnd(); // keep the last line above the freeze note, not hidden behind it
 }
 

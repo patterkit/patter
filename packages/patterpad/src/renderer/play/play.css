@@ -106,7 +106,7 @@ body.play {
 .play-stop:hover { border-color: var(--danger); color: var(--danger); }
 .pnote { color: var(--muted); font: 0.85rem var(--font-ui); text-align: center; padding: 0.3rem; }
 .pnote.error { color: var(--accent); }
-.pnote.stale { color: var(--accent); font-weight: 600; }
+/* `.pnote.stale` is gone: the stale session draws the shell's `staleBar` banner now (stale.css). */
 
 /* Live-refresh toast (live-bundle-refresh, phase 1): a quiet, self-dismissing pill confirming the
    editor's edit just landed in this running session. Removed by JS after the fade completes. */
