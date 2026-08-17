@@ -43,6 +43,7 @@ const stub = {
   onMode: () => undefined,
   onSeed: () => undefined,
   onProject: () => undefined,
+  onPin: () => undefined,
 };
 (window as unknown as { patterSearch: unknown }).patterSearch = stub;
 void import("../search/search.js");

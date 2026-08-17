@@ -93,6 +93,8 @@ async function run(): Promise<void> {
 let pinned = true;
 const reflectPin = (): void => { pinBtn.classList.toggle("on", pinned); pinBtn.setAttribute("aria-pressed", String(pinned)); };
 pinBtn.addEventListener("click", () => { pinned = !pinned; cov.setPin(pinned); reflectPin(); });
+// Reset View re-pins in main; the button has to be told or it keeps showing its own last choice.
+cov.onPin((on) => { pinned = on; reflectPin(); });
 
 runBtn.addEventListener("click", () => void run());
 worldBtn.addEventListener("click", () => cov.openWorld());

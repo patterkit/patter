@@ -302,6 +302,10 @@ search.onMode((m) => { void setMode(m === "recording" && !voiced ? "status" : m)
 // The editor seeded a query (coverage's "gated on @x" → property usage): fill it + run.
 search.onSeed((query) => { input.value = query; if (mode === "property") void runProperty(); });
 // A different project opened under the window: re-read voiced (it may have changed), then refresh.
+// Reset View re-pins every helper window in main. The button chose its own state and would go on
+// showing it, so main tells it: this is the case `pinButton`'s `set` handle exists for.
+search.onPin((on) => pin.set(on));
+
 search.onProject(() => void (async () => {
   voiced = (await search.info()).voiced; reflectVoiced();
   if (mode === "recording" && !voiced) { void setMode("status"); return; }
@@ -311,7 +315,7 @@ search.onProject(() => void (async () => {
 // Boot: read the initial mode + pin state (+ any seeded query), then render.
 void (async () => {
   const info = await search.info();
-  pin.set(info.pinned); // main decided this one (it also re-pins on Reset View), so no toggle callback
+  pin.set(info.pinned); // main decided this one, so no toggle callback
   voiced = info.voiced; reflectVoiced();
   if (!info.hasProject) {
     hintEl.textContent = "Open a project to search.";
