@@ -136,6 +136,7 @@ const searchApi: PatterSearchApi = {
   onMode: (handler) => { ipcRenderer.on("searchWin:mode", (_e, mode: SearchMode) => handler(mode)); },
   onSeed: (handler) => { ipcRenderer.on("searchWin:seed", (_e, query: string) => handler(query)); },
   onProject: (handler) => { ipcRenderer.on("searchWin:project", () => handler()); },
+  onPin: (handler) => { ipcRenderer.on("searchWin:pin", (_e, on: boolean) => handler(on)); },
 };
 
 // The detached coverage window's bridge (runs coverage in main; drives the editor's jump + External Properties tab).
@@ -149,6 +150,7 @@ const coverageApi: PatterCoverageApi = {
   findUsage: (ref) => { void ipcRenderer.invoke("covWin:findUsage", ref); },
   setPin: (on) => { void ipcRenderer.invoke("covWin:setPin", on); },
   onProject: (handler) => { ipcRenderer.on("covWin:project", () => handler()); },
+  onPin: (handler) => { ipcRenderer.on("covWin:pin", (_e, on: boolean) => handler(on)); },
 };
 
 contextBridge.exposeInMainWorld("patter", api);

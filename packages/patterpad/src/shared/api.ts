@@ -529,6 +529,9 @@ export interface PatterSearchApi {
   onSeed(handler: (query: string) => void): void;
   /** A different project was opened/closed under the window: re-fetch statuses + clear stale results. */
   onProject(handler: () => void): void;
+  /** Main changed this window's pin behind the window's back (Reset View re-pins every helper). The
+   *  button has to be TOLD, or it goes on showing the state it last chose itself. */
+  onPin(handler: (on: boolean) => void): void;
 }
 
 /** The coverage window's initial state on boot: the scene list (for the start picker), the project's
@@ -575,6 +578,9 @@ export interface PatterCoverageApi {
   setPin(on: boolean): void;
   /** A different project was opened/closed under the window: re-fetch info + clear stale results. */
   onProject(handler: () => void): void;
+  /** Main changed this window's pin behind the window's back (Reset View re-pins every helper). The
+   *  button has to be TOLD, or it goes on showing the state it last chose itself. */
+  onPin(handler: (on: boolean) => void): void;
 }
 
 export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "spelling";

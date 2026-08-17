@@ -590,6 +590,7 @@ function rescueWindows(): void {
   if (searchWin && !searchWin.isDestroyed()) {
     if (searchWin.isMinimized()) searchWin.restore();
     searchWin.setAlwaysOnTop(true); // the store says pinned; the live window must agree
+    searchWin.webContents.send("searchWin:pin", true); // ...and so must its BUTTON, which chose the old state
     searchWin.setBounds({ ...SEARCH_DEFAULT, ...centeredOnPrimary(SEARCH_DEFAULT) });
     searchWin.show();
   }
@@ -597,6 +598,7 @@ function rescueWindows(): void {
   if (coverageWin && !coverageWin.isDestroyed()) {
     if (coverageWin.isMinimized()) coverageWin.restore();
     coverageWin.setAlwaysOnTop(true); // as above
+    coverageWin.webContents.send("covWin:pin", true);
     coverageWin.setBounds({ ...COVERAGE_DEFAULT, ...centeredOnPrimary(COVERAGE_DEFAULT) });
     coverageWin.show();
   }

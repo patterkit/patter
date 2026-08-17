@@ -77,6 +77,7 @@ const stub = {
   findUsage: (ref: string) => console.log("findUsage", ref),
   setPin: (on: boolean) => console.log("setPin", on),
   onProject: () => undefined,
+  onPin: () => undefined,
 };
 (window as unknown as { patterCoverage: unknown }).patterCoverage = stub;
 void import("../coverage/coverage.js");
