@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noEmit": true
+  },
+  "_comment": "This package's `web/` half is DOM code, so the pure-Node root program cannot check it (the root takes packages/*/src + packages/*/test only, and has no DOM lib). It used to be checked ONLY where packages/patterpad happened to import it, which left anything unimported unchecked - that is how an undefined `CHUNK` and a CuePopup interface missing two of its own methods survived. `exclude` is inherited through `extends` and resolved against the ROOT, so it must be overridden here or this program silently checks nothing.",
+  "include": ["src", "web", "test"],
+  "exclude": ["node_modules"]
+}

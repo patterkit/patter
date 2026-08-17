@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "prepare": "git config core.hooksPath scripts/git-hooks || true",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p examples/player/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p examples/player/tsconfig.json && tsc --noEmit -p packages/patterpad/tsconfig.node.json && tsc --noEmit -p packages/patterpad/tsconfig.web.json && tsc --noEmit -p packages/patterpad-surface/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:pad": "npm run dev -w @patterkit/patterpad",

@@ -16,7 +16,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build:web": "vite build"
+    "build:web": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

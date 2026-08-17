@@ -26,7 +26,10 @@ describe("Enter-mirror then Space (full harness handlers)", () => {
     const view = new EditorView(host, {
       state: EditorState.create({ doc, selection: TextSelection.create(doc, sayEnd) }),
       nodeViews,
-      handleTextInput: (v, _f, _t, text) => popup.handleTextInput(v, text),
+      // No `handleTextInput` here. The real harness routes that to the SLASH menu (surface.ts), not to
+      // the cue popup, which filters from handleKeyDown; this test used to wire it to a
+      // `popup.handleTextInput` that has never existed. It never fired, because the flip below arrives
+      // as a keydown, so the mistake sat here until this package got a typecheck of its own.
       handleKeyDown: (v, event) => {
         if (popup.handleKeyDown(v, event)) return true;
         // Space on KEYDOWN (typing over a selection bypasses handleTextInput).
