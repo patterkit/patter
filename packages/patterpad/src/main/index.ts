@@ -11,9 +11,10 @@ import { userInfo } from "node:os";
 import { writeBinaryFile, writeTextFile } from "@wildwinter/simple-vc-lib";
 import * as project from "./project.js";
 import * as dictionaries from "./dictionaries.js";
-import { createStore, type PlayWindowState } from "./store.js";
+import { createStore } from "./store.js";
 import { applyMenu } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
+import { savedWindowRect, rememberBounds, centeredOnPrimary } from "@wildwinter/app-shell/tool-window";
 // The updater is the shell's. It IS this app's, generalised: the stall watchdog,
 // the retry budget, the surfaced background error and the live progress that
 // 0.6.6 grew after #33 all went into it, so this is a swap and not a downgrade.
@@ -518,32 +519,13 @@ const PLAY_MIN = { width: 340, height: 420 };
 /** A remembered helper-window rect, but only if it still lands on a connected display (so a window saved
  *  on a now-disconnected monitor doesn't open offscreen). Falls back to the default size. Shared by the
  *  play + search windows. */
-function savedWindowRect(
-  saved: { x?: number; y?: number; width: number; height: number } | undefined,
-  def: { width: number; height: number },
-  min: { width: number; height: number },
-): { x?: number; y?: number; width: number; height: number } {
-  if (!saved) return { ...def };
-  const w = Math.max(min.width, saved.width), h = Math.max(min.height, saved.height);
-  if (saved.x != null && saved.y != null) {
-    const onScreen = screen.getAllDisplays().some((d) => {
-      const a = d.workArea;
-      return saved.x! + w > a.x + 40 && saved.x! < a.x + a.width - 40 && saved.y! + h > a.y + 20 && saved.y! < a.y + a.height - 20;
-    });
-    if (onScreen) return { x: saved.x, y: saved.y, width: w, height: h };
-  }
-  return { width: w, height: h };
-}
-
-/** Persist a helper window's bounds as the user moves / resizes / closes it (debounced). Shared by the
- *  play + search windows; `read`/`write` thread its own store slice. */
-function rememberBounds(w: BrowserWindow, read: () => PlayWindowState, write: (s: PlayWindowState) => void): void {
-  const saveBounds = (): void => { if (!w.isDestroyed()) write({ ...read(), bounds: w.getBounds() }); };
-  let boundsTimer: ReturnType<typeof setTimeout> | undefined;
-  const queueSave = (): void => { clearTimeout(boundsTimer); boundsTimer = setTimeout(saveBounds, 400); };
-  w.on("resize", queueSave); w.on("move", queueSave);
-  w.on("close", () => { clearTimeout(boundsTimer); saveBounds(); });
-}
+// `savedWindowRect`, `rememberBounds` and `centeredOnPrimary` are the shell's
+// (@wildwinter/app-shell/tool-window). They were this app's, lifted: the first two
+// came across byte-identical, including the 40px / 20px margins that decide a
+// remembered position is still on a screen somebody has. `rememberBounds` came
+// back with a better signature, taking just the bounds instead of threading a
+// whole store slice through a read and a write, so the store shape stays here
+// where it belongs.
 
 function createPlayWindow(): void {
   const w = new BrowserWindow({
@@ -557,7 +539,7 @@ function createPlayWindow(): void {
   });
   playWin = w;
   w.once("ready-to-show", () => w.show());
-  rememberBounds(w, () => store.read().play, (s) => store.setPlay(s));
+  rememberBounds(w, (bounds) => store.setPlay({ ...store.read().play, bounds }));
   w.on("closed", () => { if (playWin === w) { playWin = null; win?.webContents.send("play:reset"); } }); // clear the editor's playhead + visited trail
 
   if (process.env["ELECTRON_RENDERER_URL"]) void w.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/play/index.html`);
@@ -608,10 +590,6 @@ function rescueWindows(): void {
 }
 
 /** Centre a rect on the primary display's work area. */
-function centeredOnPrimary(size: { width: number; height: number }): { x: number; y: number } {
-  const a = screen.getPrimaryDisplay().workArea;
-  return { x: Math.round(a.x + (a.width - size.width) / 2), y: Math.round(a.y + (a.height - size.height) / 2) };
-}
 
 // ---- the detached search tool window (#205) --------------------------------
 // A small, FRAMELESS, always-on-top helper (its own renderer): the editor stays live underneath while
@@ -632,7 +610,7 @@ function createSearchWindow(): void {
   });
   searchWin = w;
   w.once("ready-to-show", () => w.show());
-  rememberBounds(w, () => store.read().search, (s) => store.setSearch(s));
+  rememberBounds(w, (bounds) => store.setSearch({ ...store.read().search, bounds }));
   w.on("closed", () => { if (searchWin === w) searchWin = null; });
 
   if (process.env["ELECTRON_RENDERER_URL"]) void w.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/search/index.html`);
@@ -669,7 +647,7 @@ function createCoverageWindow(): void {
   });
   coverageWin = w;
   w.once("ready-to-show", () => w.show());
-  rememberBounds(w, () => store.read().coverage, (s) => store.setCoverage(s));
+  rememberBounds(w, (bounds) => store.setCoverage({ ...store.read().coverage, bounds }));
   w.on("closed", () => { if (coverageWin === w) coverageWin = null; });
 
   if (process.env["ELECTRON_RENDERER_URL"]) void w.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/coverage/index.html`);
