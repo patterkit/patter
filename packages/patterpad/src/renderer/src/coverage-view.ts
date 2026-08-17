@@ -1,5 +1,5 @@
 // The narrative-coverage results view (Review ▸ Run Coverage Test). A read-only render of the
-// CoverageReport the main process computes via runCoverage (#159) - the SAME report the CLI's `coverage`
+// CoverageReport the main process computes via runCoverageAsync (#159) - the SAME report the CLI's `coverage`
 // command prints. A summary header, then a per-scene beat table; never-reached rows are flagged - a danger
 // tint for truly-dead beats (‼) and a softer needs-input tint for ones gated on an unwritten @world input
 // (?). Clicking a row jumps the editor to that beat.

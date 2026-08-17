@@ -686,7 +686,6 @@ function registerIpc(): void {
   ipcMain.handle("project:createDialog", (_e, name: string, vcs: VcsKind, buildBundle?: string): Promise<OpenResult | null> => createDialog(name, vcs, buildBundle));
   ipcMain.handle("project:forget", (_e, path: string): BootState => { store.forget(path); if (samePath(path, currentRoot)) currentRoot = null; refreshMenu(); return bootState(null); });
   ipcMain.handle("project:report", () => project.report());
-  ipcMain.handle("project:coverage", (_e, options: import("../shared/api.js").CoverageRunOptions) => project.coverage(options));
   ipcMain.handle("project:proposeCoverageDrivers", () => project.proposeCoverageDrivers());
   // Coverage window (#159): open it, feed its boot state, run + cache, drive the editor's jump + External Properties tab.
   ipcMain.handle("coverage:open", () => openCoverageWindow());

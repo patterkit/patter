@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverage, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks } from "@patterkit/ops";
@@ -1127,17 +1127,12 @@ export function compileForDebugPush(): { hash: string; json: string } | null {
   } catch { return null; }
 }
 
-/** Run narrative coverage (#159) over the whole project. Drivers come from the saved `coverageDrivers`;
- *  the options just tune the sweep. Returns the report + scene display-names (the report holds scene ids). */
-export function coverage(options: CoverageRunOptions): CoverageResult | null {
-  if (!loaded) return null;
-  ensureHydrated(); // coverage walks every scene, so the whole project must be parsed in
-  return withSceneNames(runCoverage(loaded, options), loaded);
-}
-
-/** The same sweep, yielding between runs so the app stays responsive and a Cancel can be heard. Used by
- *  the coverage window through the shell's job host; `coverage` above stays for any caller with nothing
- *  to paint. A cancelled sweep still returns a result: the report says so and counts only what it ran. */
+/** Run narrative coverage (#159) over the whole project, yielding between runs so the app stays
+ *  responsive and a Cancel can be heard. Drivers come from the saved `coverageDrivers`; the options just
+ *  tune the sweep. A cancelled sweep still returns a result: the report says so and counts only what it
+ *  ran. There is no synchronous variant here on purpose - the one that existed was reachable only from a
+ *  dead IPC channel, and running this sweep on the main thread freezes the whole app. The CLI keeps the
+ *  synchronous driver in `@patterkit/ops`, having nothing to paint. */
 export async function coverageAsync(options: CoverageRunOptions, hooks: CoverageAsyncHooks): Promise<CoverageResult | null> {
   if (!loaded) return null;
   ensureHydrated();

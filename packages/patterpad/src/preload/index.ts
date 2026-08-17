@@ -50,7 +50,6 @@ const api: PatterApi = {
   addIgnoreWord: (word) => ipcRenderer.invoke("dict:addIgnore", word),
   setDictionary: (patch) => ipcRenderer.invoke("dict:set", patch),
   report: () => ipcRenderer.invoke("project:report"),
-  runCoverage: (options) => ipcRenderer.invoke("project:coverage", options),
   proposeCoverageDrivers: () => ipcRenderer.invoke("project:proposeCoverageDrivers"),
   exportReport: () => ipcRenderer.invoke("project:exportReport"),
   buildBundle: () => ipcRenderer.invoke("project:build"),
