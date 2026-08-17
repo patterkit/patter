@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-17
+
 ### Added
 - **The coverage test shows how far it has got, and you can stop it.** `Review ▸ Run Coverage Test`
   used to lock the whole app for the length of the sweep with no sign of progress: at the default
