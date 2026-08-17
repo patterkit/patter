@@ -3,7 +3,25 @@
 // leaked to the page. Each method is a typed wrapper over one ipcMain.handle channel.
 
 import { contextBridge, ipcRenderer } from "electron";
-import { JOB_PROGRESS } from "@wildwinter/app-shell/job";
+
+/**
+ * The shell's `JOB_PROGRESS` channel, as a literal.
+ *
+ * NOT imported from `@wildwinter/app-shell/job`, and this is a hard rule rather than a preference:
+ * this preload is SANDBOXED (`sandbox: true`), electron-vite auto-externalises everything in
+ * `dependencies`, and a sandboxed preload cannot `require` out of node_modules. Importing it built
+ * clean, typechecked clean, and then failed at runtime with "module not found" - which takes the
+ * WHOLE bridge down, so `window.patter` is undefined and the app opens to the welcome screen with
+ * every button dead.
+ *
+ * Bundling the shell into the preload instead would fix this one import and invite the next: the
+ * shell's `app-store` reaches for `node:fs` and its `session` for `node:path`, neither of which has
+ * any business in a sandboxed bridge. So the constraint stays "this file imports `electron` and
+ * types, and nothing else", and `test/preload-imports.test.ts` enforces it.
+ *
+ * The value is pinned against the shell's own constant by that same test.
+ */
+const JOB_PROGRESS = "job:progress";
 import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress } from "../shared/api.js";
 
 const api: PatterApi = {
