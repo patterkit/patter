@@ -4,6 +4,7 @@
 // so reopening the window shows it again. "World Properties…" opens Project Settings ▸ External
 // Properties (declare @world properties + edit the input drivers the sweep feeds them).
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
+import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "./coverage.css";
 import "@wildwinter/app-shell/job.css";
 import "@fontsource/newsreader/400.css";
@@ -11,8 +12,13 @@ import "@fontsource-variable/inter";
 
 import { mountJobProgress } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";
+import { initTooltips } from "@wildwinter/app-shell";
 import { renderCoverage } from "../src/coverage-view.js";
 import type { CoverageResult } from "../../shared/api.js";
+
+// The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
+// nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
+initTooltips();
 
 const cov = window.patterCoverage!;
 
@@ -93,7 +99,15 @@ async function run(): Promise<void> {
 
 // Always-on-top pin (default pinned, remembered): same affordance as the play + search windows.
 let pinned = true;
-const reflectPin = (): void => { pinBtn.classList.toggle("on", pinned); pinBtn.setAttribute("aria-pressed", String(pinned)); };
+const reflectPin = (): void => {
+  pinBtn.classList.toggle("on", pinned);
+  pinBtn.setAttribute("aria-pressed", String(pinned));
+  // Say what a CLICK will do, not what the state is. The markup's static "Keep on top" went on
+  // saying that while pinned, which is the one moment it is wrong.
+  const label = pinned ? "Pinned on top: click to unpin" : "Click to keep on top";
+  pinBtn.dataset["tip"] = label;
+  pinBtn.setAttribute("aria-label", label);
+};
 pinBtn.addEventListener("click", () => { pinned = !pinned; cov.setPin(pinned); reflectPin(); });
 // Reset View re-pins in main; the button has to be told or it keeps showing its own last choice.
 cov.onPin((on) => { pinned = on; reflectPin(); });

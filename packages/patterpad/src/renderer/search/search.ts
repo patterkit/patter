@@ -5,16 +5,22 @@
 //   - "content": find by Game ID / title / dialogue-text, OR paste an opaque id (the folded-in "Go to ID").
 //   - "status":  pick a writing-status rung and browse every line at it (unset = lowest); the box filters.
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
+import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "./search.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
 import { applyTheme } from "../src/apply-theme.js";
+import { initTooltips } from "@wildwinter/app-shell";
 import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js";
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
 import { pinButton } from "@wildwinter/app-shell";
+
+// The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
+// nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
+initTooltips();
 
 const search = window.patterSearch!;
 
