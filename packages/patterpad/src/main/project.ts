@@ -11,10 +11,11 @@ import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runE
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
+import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import type { ReviewItem } from "../shared/api.js";
-import { writeTextFilesAsync, writeBinaryFileAsync, fileStatusAsync, deleteFileAsync,
+import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
@@ -77,7 +78,7 @@ function buildShards(p: LoadedProject): Map<string, SceneShards> {
     map.set(scene.id, { flowPath, locPath: locPath ?? fallback, authoringPath, name: scene.name });
   }
   sourceMirror.clear(); // the shard set changed - drop the source mirror + the vcStatus path memo
-  vcPathsMemo = null;
+  vcShardsMemo = null;
   return map;
 }
 
@@ -94,7 +95,7 @@ const authoringCache = new Map<string, { mtimeMs: number; af: AuthoringFile }>()
 const sourceMirror = new Map<string, { flow: string; loc: string }>();
 // vcStatus's per-shard path list (+ which scene each path belongs to). Rebuilt only when the shard set
 // changes (buildShards) or a write may have created a new shard (commitWrites) - not on every poll.
-let vcPathsMemo: { paths: string[]; sceneOf: Map<string, string> } | null = null;
+let vcShardsMemo: ShardRef[] | null = null;
 
 /** Read a scene's authoring shard, or a fresh empty one if it's missing / corrupt (a hand-broken .patterx
  *  degrades to "no authoring" rather than throwing). The single place the shard is parsed. Returns a CLONE
@@ -231,7 +232,7 @@ function enqueueWrite<T>(op: () => Promise<T>): Promise<T> {
 // to a direct write when no VC tooling is present. Always called from inside an enqueueWrite section.
 async function commitWrites(writes: { path: string; content: string }[]): Promise<SaveResult> {
   for (const w of writes) authoringCache.delete(w.path); // a shard we just wrote must be re-read, not served stale
-  vcPathsMemo = null; // a write may have CREATED a shard (first loc / authoring write) - re-collect paths next poll
+  vcShardsMemo = null; // a write may have CREATED a shard (first loc / authoring write) - re-collect paths next poll
   const ok = (): SaveResult => { maybeScheduleAutoRebuild(writes); return { ok: true }; };
   try {
     const batch = await writeTextFilesAsync(writes.map((w) => ({ filePath: w.path, content: w.content })));
@@ -345,6 +346,9 @@ function syncAudioIndex(): void {
  *  #26) and its autosave `git add` the story shards into that unrelated repo. Pinning the exact configured
  *  system also fixes the subtler case of, say, a Perforce project that happens to sit under a `.git`. */
 function pinVcProvider(vcs: VcsKind | undefined): void {
+  // The shell's status query can emit one warning, and by default it signs it "app-shell". Name this app
+  // instead, so a line in a user's console says which program is talking.
+  setVcLogPrefix("patterpad");
   switch (vcs) {
     case "git": setProvider(new GitProvider()); break;
     case "perforce": setProvider(new PerforceProvider()); break;
@@ -361,7 +365,7 @@ export function openProject(path: string, preferLanding?: string): OpenedProject
   playLocale = null;           // a fresh project starts in its own source language (#195)
   playCaptionsOn = true;       // closed captions default ON in the play window (#214)
   hydrated = false;            // landing-only; the rest is parsed on hydrate() / first whole-project op
-  resetRemoteStatusThrottle(); // a new project's lock/out-of-date state must be re-queried, not inherited
+  resetShardStatus(); // a new project's lock/out-of-date state must be re-queried, not inherited
   resetPlaySession();          // and no stale play state from the project we just left
   authoringCache.clear();      // and no parsed shards cached from the previous project
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // drop a pending rebuild for the old project
@@ -617,76 +621,42 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
   });
 }
 
-/** A version-control snapshot per scene (#145), folded from one batched `fileStatusAsync` call over
- *  every scene's shards. The current user holding a file = checkedOutByMe (still editable); anyone else
- *  = lockedBy (read-only for us). `writable` is the on-disk read-only bit (the lock-VCS gate).
+/** A version-control snapshot per scene (#145), over the shell's `shardStatus`.
  *
- *  ASYNC + off the main thread: `fileStatusAsync` spawns the VCS query without blocking the Electron
- *  main-process event loop, so a slow `svn status -u` / `cm fileinfo` no longer freezes saves / opens /
- *  play while the renderer polls. `remote: true` permits the server round-trip SVN / Plastic need to
- *  learn `lockedBy` / `outOfDate` (Perforce + git-LFS carry that locally) - the whole point of the
- *  badge - which is exactly the slow path the async call keeps off the main thread.
+ *  The QUERY is the shell's now, and with it the throttle (remote bits cost a server round-trip under
+ *  SVN and Plastic, so they are re-asked at most once a window and otherwise reused) and, new here,
+ *  COALESCING: a save, a window focus and the 30s poll landing together used to be three spawns and are
+ *  now one. What stays this app's is the mapping - which files a scene is made of, and which one of them
+ *  decides whether the scene is new.
  *
- *  Best-effort: if the VC query throws, every scene reports clean + writable so the editor never wedges. */
-// The remote VC round-trip (lockedBy / outOfDate - the server hit SVN / Plastic need) is THROTTLED: the
-// local bits (writable / dirty / checkedOutByMe / untracked) refresh on every call so a save re-badges at
-// once, but the remote bits are re-queried at most once per window and otherwise reused from this cache.
-// That keeps bursty triggers (save + focus + the poll timer) from hammering the server. Reset on open.
-const REMOTE_STATUS_THROTTLE_MS = 15_000;
-let lastRemoteStatusAt = 0;
-let cachedRemoteBits = new Map<string, { lockedBy?: string[]; outOfDate?: boolean }>();
-function resetRemoteStatusThrottle(): void { lastRemoteStatusAt = 0; cachedRemoteBits = new Map(); }
-
+ *  Best-effort: a failed query reports every scene clean + writable, so the editor never wedges. */
 export async function vcStatus(): Promise<VcStatusDto | null> {
   if (!loaded) return null;
   ensureHydrated(); // badge every scene, not just the landing one
   const vcs = loaded.project.vcs ?? "none";
-  // Each scene's existing shard paths (flow always; loc / authoring when present), and a flat list to
-  // query in ONE spawn. Memoised across polls (rebuilt only when the shard set or a write invalidates it),
-  // so the per-poll existsSync sweep doesn't run every 30s / focus / save.
-  if (!vcPathsMemo) {
-    const sceneOf = new Map<string, string>();
-    const paths: string[] = [];
+  // Each scene's existing shards, as the shell's {key, path} refs. Memoised across polls (rebuilt only
+  // when the shard set or a write invalidates it), so the per-poll existsSync sweep doesn't run every
+  // 30s / focus / save. The FLOW shard is `primary`: it is the one that decides whether a scene is new,
+  // because a scene whose flow is committed and whose loc sidecar has never been written is an edited
+  // scene, not an untracked one.
+  if (!vcShardsMemo) {
+    const refs: ShardRef[] = [];
     for (const [sceneId, s] of shards) {
-      for (const p of [s.flowPath, s.locPath, s.authoringPath]) {
-        if (p && existsSync(p)) { paths.push(p); sceneOf.set(p, sceneId); }
+      if (s.flowPath && existsSync(s.flowPath)) refs.push({ key: sceneId, path: s.flowPath, primary: true });
+      for (const p of [s.locPath, s.authoringPath]) {
+        if (p && existsSync(p)) refs.push({ key: sceneId, path: p });
       }
     }
-    vcPathsMemo = { paths, sceneOf };
+    vcShardsMemo = refs;
   }
-  const { paths, sceneOf } = vcPathsMemo;
-  let system = vcs === "none" ? "filesystem" : vcs;
-  const status = new Map<string, SceneVcStatus>();
-  for (const s of shards.keys()) status.set(s, { sceneId: s, writable: true });
-  // Hit the server only when the throttle window has elapsed; otherwise a cheap local-only query.
-  const doRemote = Date.now() - lastRemoteStatusAt >= REMOTE_STATUS_THROTTLE_MS;
-  try {
-    for (const st of await fileStatusAsync(paths, { remote: doRemote })) {
-      const sceneId = sceneOf.get(st.filePath);
-      if (!sceneId) continue;
-      system = st.system;
-      const acc = status.get(sceneId)!;
-      if (!st.writable) acc.writable = false;
-      if (st.openedByMe) acc.checkedOutByMe = true;
-      if (st.dirty) acc.dirty = true;
-      if (st.filePath === shards.get(sceneId)?.flowPath && st.tracked === false) acc.untracked = true;
-      if (doRemote) { // remote bits are authoritative only on a fresh server query
-        if (st.lockedBy?.length) acc.lockedBy = [...new Set([...(acc.lockedBy ?? []), ...st.lockedBy])];
-        if (st.outOfDate) acc.outOfDate = true;
-      }
-    }
-    if (doRemote) { // snapshot the fresh remote bits for the throttled calls that follow
-      lastRemoteStatusAt = Date.now();
-      cachedRemoteBits = new Map([...status].map(([id, v]) => [id, { lockedBy: v.lockedBy, outOfDate: v.outOfDate }]));
-    } else { // overlay the last known remote bits onto the fresh local snapshot
-      for (const [id, acc] of status) {
-        const cached = cachedRemoteBits.get(id);
-        if (cached?.lockedBy?.length) acc.lockedBy = cached.lockedBy;
-        if (cached?.outOfDate) acc.outOfDate = true;
-      }
-    }
-  } catch (e) { console.warn("patterpad: VC status query failed - treating every scene as clean + writable:", e); } // tooling missing / repo error
-  return { vcs, system, scenes: [...status.values()] };
+  const { system, states } = await shardStatus(vcShardsMemo);
+  const scenes: SceneVcStatus[] = [...shards.keys()].map((sceneId) => ({
+    sceneId,
+    ...(states.get(sceneId) ?? { writable: true }),
+  }));
+  // The shell reports what it DETECTED; fall back to what the project is configured for when it detected
+  // nothing (an empty project has no paths to detect from).
+  return { vcs, system: system === "filesystem" && vcs !== "none" ? vcs : system, scenes };
 }
 
 /** Read a scene's typed documentation map (spec §18) from its authoring shard: node id -> notes. */

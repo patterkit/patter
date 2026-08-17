@@ -146,11 +146,11 @@ body.resizing main.panes { transition: none; }
 
 /* Per-scene version-control badge (#145): a small glyph chip on the right of a nav row. */
 .nav-badge { flex: 0 0 auto; font-size: 0.72rem; line-height: 1; opacity: 0.9; }
-.nav-badge.vcs-locked { color: var(--danger); }
-.nav-badge.vcs-stale  { color: var(--warn); }
-.nav-badge.vcs-mine   { color: var(--accent); }
-.nav-badge.vcs-dirty  { color: var(--accent); font-size: 0.6rem; }
-.nav-badge.vcs-new    { color: var(--muted); }
+/* The five `.vcs-*` badge colours are GONE: the shell's vc.css owns the badge now (`.vc-badge`, and
+   `.vc-locked` / `.vc-stale` / `.vc-mine` / `.vc-dirty` / `.vc-new` / `.vc-frozen`). Its three "yours"
+   colours are the ones this app already used, because the shell grew to this grammar rather than the
+   other way about. `vc-frozen` is new here: read-only on disk with nobody else holding it. */
+.nav-item .vc-badge { margin-left: auto; }
 
 /* Topbar chip: the CURRENT scene's VC state (sits beside the unsaved dot). */
 .vcs-scene { font: 600 0.72rem var(--font-ui); color: var(--warn); white-space: nowrap; }
@@ -158,7 +158,10 @@ body.resizing main.panes { transition: none; }
 
 /* Read-only scene (locked by another): dim + lock out the inspector edits; the surface is set
    non-editable in JS. Reading stays available. */
-main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; }
+/* A locked scene's inspector. The DIM is ours; what is disabled underneath is the shell's
+   `lockControls`, which turns off the editing controls one at a time and leaves the reading ones alone,
+   where this used to drop `pointer-events: none` over the lot and take the disclosures with it. */
+#inspector-stack.vc-readonly { opacity: 0.55; }
 
 /* Threaded comments (#148) are the shell's popover now (openComments), and its
    `.shell-cmt-*` styles come with it in comments.css. What survives here is the
