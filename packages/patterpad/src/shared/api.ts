@@ -206,7 +206,6 @@ export interface Identity {
 export interface RecentProject {
   path: string;
   name: string;
-  openedAt: number;
 }
 
 /** Which side panes are pinned open (user-level, remembered across launches). The editor goes

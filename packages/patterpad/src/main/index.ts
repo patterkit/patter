@@ -50,7 +50,9 @@ function ensureDebugServer(): DebugServer {
   }
   return debugServer;
 }
-const store = createStore(join(app.getPath("userData"), "patterpad-session.json"));
+// The shell names the settings file; we hand it the directory. It folds in the old
+// `patterpad-session.json` sitting beside it on the first run after the change.
+const store = createStore(app.getPath("userData"));
 
 // Live bundle refresh over the debug link (live-bundle-refresh, phases 2-3): after a save (or a
 // build), recompile the game-facing bundle and push it to a connected game, debounced. Free when

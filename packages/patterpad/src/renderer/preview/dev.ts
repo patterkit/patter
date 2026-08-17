@@ -56,8 +56,8 @@ const FAKE_AUDIO_INDEX: Record<string, { status: string; path: string; textHash?
   L_bo_reply: { status: "scratch", path: "/audio/scratch/L_bo_reply.mp3", textHash: "0" }, // never matches -> "take out of date" badge
 };
 const recents = [
-  { path: "/Users/ian/Projects/the-tavern.patter", name: "The Tavern", openedAt: 0 },
-  { path: "/Users/ian/Projects/the-heist.patter", name: "The Heist", openedAt: 0 },
+  { path: "/Users/ian/Projects/the-tavern.patter", name: "The Tavern" },
+  { path: "/Users/ian/Projects/the-heist.patter", name: "The Heist" },
 ];
 
 // A tiny fake index for the two search palettes. Content fields (name / gameId / text) feed the ⌘F
