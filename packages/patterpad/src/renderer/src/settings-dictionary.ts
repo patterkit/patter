@@ -5,7 +5,7 @@
 
 import type { DictionaryInfo } from "../../shared/api.js";
 import { el, iconBtn } from "./dom.js";
-import { focusNewRow } from "./settings-list.js";
+import { focusNewRow } from "@wildwinter/app-shell";
 
 /** Display order: alphabetical (case-insensitive), blanks last so a freshly-added empty row sits at the
  *  bottom (where it's focused). Returns source indices, so edits / deletes map back to the array. */

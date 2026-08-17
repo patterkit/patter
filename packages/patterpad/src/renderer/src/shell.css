@@ -691,20 +691,18 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; f
 
 /* Compact list row (Properties / Game Data / Cast / World): one inline line, secondary fields revealed by
    the ▸ disclosure. Replaces the old tall `.gd-field` card for these tabs. */
-.gd-row { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg); }
-.gd-rowline { display: flex; gap: 0.4rem; align-items: center; padding: 0.32rem 0.45rem; }
-.gd-rowline .gd-name { flex: 1; min-width: 0; }
-.gd-rowline .world-ref { flex: 1; min-width: 0; gap: 0.05rem; }
-.gd-rowline .world-token { flex: 0 0 4.6rem; width: 4.6rem; font-family: var(--font-mono); padding-left: 0.35rem; padding-right: 0.2rem; }
-.gd-rowline .world-ref .gd-name { min-width: 3rem; }
-.gd-rowline .gd-default { flex: 0 0 auto; max-width: 9rem; }
-.gd-expand { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 0.7rem; line-height: 1; padding: 0.2rem 0.15rem; border-radius: var(--radius-sm); flex: 0 0 auto; }
-.gd-expand:hover { color: var(--accent); }
-.gd-expand.open { color: var(--accent); }
-/* Stacked: each secondary field on its own collapsed line (Values and Purpose never share a line). */
-.gd-details { display: flex; flex-direction: column; gap: 0.45rem; align-items: stretch; padding: 0.4rem 0.5rem 0.5rem 1.3rem; border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent); }
-.gd-details[hidden] { display: none; }
-.gd-details .gd-shared { align-self: flex-start; }
+/* The ROW itself (the well, its line and its details panel) is the shell's now:
+   `.set-row` / `.set-rowline` / `.set-details` / `.set-expand` in settings.css,
+   grown to this app's design. What stays here is only what is Patterpad's, which
+   is how OUR fields sit on the shell's line. */
+.set-rowline .gd-name { flex: 1; min-width: 0; }
+.set-rowline .world-ref { flex: 1; min-width: 0; gap: 0.05rem; }
+.set-rowline .world-token { flex: 0 0 4.6rem; width: 4.6rem; font-family: var(--font-mono); padding-left: 0.35rem; padding-right: 0.2rem; }
+.set-rowline .world-ref .gd-name { min-width: 3rem; }
+.set-rowline .gd-default { flex: 0 0 auto; max-width: 9rem; }
+/* The details panel stacks its fields (Values and Purpose never share a line),
+   which is the shell's `.set-details` doing it. Only our own field sits here. */
+.set-details .gd-shared { align-self: flex-start; }
 .gd-flagnote { font: italic 0.78rem var(--font-ui); color: var(--muted); }
 /* Status rows reuse the compact row; keep the readiness radios from wrapping and the colour swatch tidy. */
 .gd-status-line .gd-name { min-width: 5rem; }
@@ -712,7 +710,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; f
 .gd-status-line .sp-colour-btn { flex: 0 0 auto; }
 .world-driver-values { flex: 1 1 8rem; min-width: 0; }
 /* Cast: name + display name + actor share the line (notes go in the expander). */
-.gd-rowline .cast-field { flex: 1 1 0; min-width: 4rem; }
+.set-rowline .cast-field { flex: 1 1 0; min-width: 4rem; }
 /* Dictionary tab (#177): the language picker row (select + Import / Remove) and the import error line. */
 .dict-lang-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 0.1rem; }
 .dict-lang-row .gd-add { margin-top: 0; }

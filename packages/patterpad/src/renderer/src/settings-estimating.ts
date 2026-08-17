@@ -5,7 +5,7 @@
 
 import type { EstimatingConfig, WritingStatusDecl } from "@patterkit/model";
 import { el, iconBtn, labelled } from "./dom.js";
-import { focusNewRow } from "./settings-list.js";
+import { focusNewRow } from "@wildwinter/app-shell";
 
 export interface EstimatingHandle { value(): EstimatingConfig; }
 

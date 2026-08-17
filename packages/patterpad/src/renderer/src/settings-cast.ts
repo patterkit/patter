@@ -6,7 +6,7 @@
 import type { CastMember } from "@patterkit/model";
 import { COMMON_GENDERS } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "./settings-list.js";
+import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 export interface CastHandle { value(): CastMember[]; firstDuplicate(): HTMLInputElement | null; }
 
