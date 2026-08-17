@@ -15,7 +15,9 @@ import { anchorBelowCaret } from "./anchor.js";
 import { createFloating } from "./floating.js";
 
 export interface CuePopup {
-  update(view: EditorView, ctx?: ZoneState): void;
+  /** @param mayOpen false when the caret only passed THROUGH the cue (a vertical move), so an
+   *  already-shut popup stays shut (#20). Defaults to true. */
+  update(view: EditorView, ctx?: ZoneState, mayOpen?: boolean): void;
   handleKeyDown(view: EditorView, event: KeyboardEvent): boolean;
   isOpen(): boolean;
   close(): void;

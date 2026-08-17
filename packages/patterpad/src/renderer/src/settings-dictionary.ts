@@ -103,7 +103,7 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
     const list = wordList(words, "remove word");
     host.append(list);
     const add = el("button", "gd-add", "+ Add word"); add.type = "button";
-    add.addEventListener("click", () => { words.push(""); render(); focusNewRow(host.querySelector(".wordlist")); });
+    add.addEventListener("click", () => { words.push(""); render(); focusNewRow(host.querySelector<HTMLElement>(".wordlist")); });
     host.append(add);
 
     // Ignored words: tokens silenced via right-click ▸ Ignore. Distinct from the word list above (not

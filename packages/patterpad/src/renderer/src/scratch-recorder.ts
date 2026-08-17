@@ -68,7 +68,7 @@ function beep(freq: number, ms: number): void {
 
 /** Play back an encoded WAV take (the saved-state "Replay"). Fire-and-forget. */
 function playWav(bytes: Uint8Array): void {
-  const url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "audio/wav" }));
   const audio = new Audio(url);
   audio.onended = (): void => URL.revokeObjectURL(url);
   void audio.play().catch(() => URL.revokeObjectURL(url));

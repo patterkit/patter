@@ -137,7 +137,7 @@ export function mountWorld(
     guard.check();
     const add = el("button", "gd-add", "+ Add world property") as HTMLButtonElement;
     add.type = "button";
-    add.addEventListener("click", () => { scopeRows.push(newScopeRow()); renderScopes(); focusNewRow(scopesHost.querySelector(".gd-fieldlist")); });
+    add.addEventListener("click", () => { scopeRows.push(newScopeRow()); renderScopes(); focusNewRow(scopesHost.querySelector<HTMLElement>(".gd-fieldlist")); });
     scopesHost.append(add);
   };
 
@@ -185,7 +185,7 @@ export function mountWorld(
     const actions = el("div", "world-driver-actions");
     const add = el("button", "gd-add", "+ Add driver") as HTMLButtonElement;
     add.type = "button";
-    add.addEventListener("click", () => { drivers.push({ ref: "@world.", kind: "recurring", cadence: "sometimes", values: [] }); renderDrivers(); focusNewRow(driversHost.querySelector(".gd-fieldlist")); });
+    add.addEventListener("click", () => { drivers.push({ ref: "@world.", kind: "recurring", cadence: "sometimes", values: [] }); renderDrivers(); focusNewRow(driversHost.querySelector<HTMLElement>(".gd-fieldlist")); });
     const propose = el("button", "gd-add", "Propose from story") as HTMLButtonElement;
     propose.type = "button";
     propose.addEventListener("click", async () => {

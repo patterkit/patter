@@ -130,7 +130,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     guard.check();
 
     const add = el("button", "gd-add", "+ Add field"); add.type = "button";
-    add.addEventListener("click", () => { fields.push({ name: "", type: "text" }); render(); focusNewRow(host.querySelector(".gd-fieldlist")); });
+    add.addEventListener("click", () => { fields.push({ name: "", type: "text" }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
     host.append(add);
   };
 
