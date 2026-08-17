@@ -5,6 +5,7 @@
 // Choices are buttons; the trail + playhead reset on a fresh run.
 
 import "@patterkit/patterpad-surface/theme.css"; // app-wide design tokens (same look as the editor)
+import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "./play.css";
 import "@wildwinter/app-shell/stale.css";
 import "@fontsource/newsreader/400.css";
@@ -14,8 +15,13 @@ import "@fontsource-variable/inter";
 
 import { staleBar } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";
+import { initTooltips } from "@wildwinter/app-shell";
 import { colourFor } from "@patterkit/patterpad-surface/colour";
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
+
+// The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
+// nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
+initTooltips();
 
 const play = window.patterPlay!;
 const transcriptEl = document.getElementById("transcript")!;
