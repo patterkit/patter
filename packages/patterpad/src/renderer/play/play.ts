@@ -378,6 +378,32 @@ async function startRun(): Promise<void> {
 // re-pins on Reset View without the button choosing it. Inserted where the markup used to put it.
 const pin = pinButton({ pinned: true, onToggle: (on) => play.setPin(on) });
 addrEl.after(pin.el);
+
+// "Follow in the editor" (play-follow): the editor reveals each played beat as the run goes.
+//
+// It sits beside the pin because both are about how this window sits NEXT TO the editor rather than
+// about the thing being played. OFF by default and remembered: marking is the default behaviour and
+// following is the author asking for it, which is not the same as us deciding they want it.
+//
+// The LABEL is the careful part, and the brief is right that it is a trap. "Follow" alone would match
+// the vocabulary of a window that follows the editor; this is the opposite direction, the editor
+// following the run. The same word with the arrow reversed is worse than a longer label.
+const followEl = document.createElement("button");
+followEl.type = "button";
+followEl.className = "play-follow";
+followEl.textContent = "Follow in the editor";
+let following = false;
+function reflectFollow(): void {
+  followEl.classList.toggle("on", following);
+  followEl.setAttribute("aria-pressed", String(following));
+  const label = following
+    ? "Following: the editor reveals each line as it plays. Click to stop."
+    : "Follow in the editor: reveal each line in the editor as it plays";
+  followEl.dataset["tip"] = label;
+}
+followEl.addEventListener("click", () => { following = !following; reflectFollow(); play.setFollow(following); });
+reflectFollow();
+pin.el.after(followEl);
 rewindEl.addEventListener("click", () => void startRun());
 
 // --- play-language switcher (#195) -------------------------------------------
@@ -405,7 +431,7 @@ function applyInfo(info: PlayInfo): void {
 }
 localeEl.addEventListener("change", () => { void play.setLocale(localeEl.value).then(() => startRun()); });
 
-void play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); });
+void play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); following = info.follow; reflectFollow(); });
 // The palette is the app's, not this window's: apply what the editor last chose, and follow it when
 // the author changes it. Importing theme.css is not enough, because the curated palettes only exist
 // under the `data-theme` attribute this sets.

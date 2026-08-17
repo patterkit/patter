@@ -2475,6 +2475,10 @@ window.patter.onPlayMark((id, sceneId) => {
 window.patter.onPlayReset(() => surface?.resetPlay());
 // A hit was chosen in the detached search window: jump the editor to it (loadScene + centred reveal).
 window.patter.onSearchNavigate((entry) => void jumpTo(entry));
+// "Follow in the editor": the play window is running and the author asked the editor to keep up. Same
+// reveal path as a search jump, deliberately - a followed beat is the same act as jumping to one. Main
+// decides whether following is on and never focuses this window, so the run keeps the keyboard.
+window.patter.onPlayFollow((sceneId, beatId) => void jumpTo({ id: beatId, kind: "beat", sceneId, location: [] }));
 // Project-wide Replace (driven from the search window): main asks us to flush the open scene before it
 // rewrites the shards, then to reload once it's done.
 window.patter.onEditorFlush(() => void (async () => { await save(); window.patter.editorFlushed(); })());

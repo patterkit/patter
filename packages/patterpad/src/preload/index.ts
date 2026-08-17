@@ -93,6 +93,7 @@ const api: PatterApi = {
   resetWindows: () => ipcRenderer.invoke("view:resetWindows"),
   playEdited: (sceneId, flow, loc) => { void ipcRenderer.invoke("play:edited", sceneId, flow, loc); },
   onPlayMark: (handler) => { ipcRenderer.on("play:mark", (_e, id: string | null, sceneId?: string) => handler(id, sceneId)); },
+  onPlayFollow: (handler) => { ipcRenderer.on("play:follow", (_e, sceneId: string, beatId: string) => handler(sceneId, beatId)); },
   onPlayReset: (handler) => { ipcRenderer.on("play:reset", () => handler()); },
   validate: (live) => ipcRenderer.invoke("project:validate", live),
   openSearchWindow: (mode, focus, query) => ipcRenderer.invoke("search:open", mode, focus, query),
@@ -136,6 +137,7 @@ const playApi: PatterPlayApi = {
   onStale: (handler) => { ipcRenderer.on("play:stale", () => handler()); },
   onRefreshed: (handler) => { ipcRenderer.on("play:refreshed", (_e, kind: "text" | "structure", options: PlayChoiceOption[]) => handler(kind, options)); },
   onPin: (handler) => { ipcRenderer.on("play:pin", (_e, on: boolean) => handler(on)); },
+  setFollow: (on) => { void ipcRenderer.invoke("play:setFollow", on); },
   onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 

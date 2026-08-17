@@ -454,9 +454,12 @@ export interface PatterPlayApi {
   /** The run's starting address (`<scene>.<block>`), the pin state, the play-language switcher (#195):
    *  every declared `locales`, the `locale` currently playing, the source `defaultLocale`; and whether the
    *  project is in Audio Folders mode (#206) so the window can show the "Play with audio" toggle. */
-  info(): Promise<{ address: string; pinned: boolean; theme: ThemePrefs; audio: boolean; captions: boolean; locales: string[]; locale: string; defaultLocale: string }>;
+  info(): Promise<{ address: string; pinned: boolean; theme: ThemePrefs; follow: boolean; audio: boolean; captions: boolean; locales: string[]; locale: string; defaultLocale: string }>;
   /** Main changed this window's pin behind its back (Reset View re-pins every helper). */
   onPin(handler: (on: boolean) => void): void;
+  /** "Follow in the editor": ask main to reveal each played beat in the editor as the run goes.
+   *  Remembered per user; OFF by default, because marking is the default and following is opt-in. */
+  setFollow(on: boolean): void;
   /** The author changed the colour / font theme in the editor. Every window shares the palette. */
   onTheme(handler: (theme: ThemePrefs) => void): void;
   /** Audio Folders mode (#206): the resolved audio bytes for a played line, for "Play with audio". Null when
@@ -808,6 +811,8 @@ export interface PatterApi {
   /** Subscribe to the editor step-marker (the play window's current beat id, or null to clear). The
    *  beat's `sceneId` lets the editor switch scenes when play crosses into a different one. */
   onPlayMark(handler: (beatId: string | null, sceneId?: string) => void): void;
+  /** "Follow in the editor" is on and the run just played this beat: reveal it. Never focuses. */
+  onPlayFollow(handler: (sceneId: string, beatId: string) => void): void;
   /** Subscribe to a play-marks reset (clear the visited trail + playhead). */
   onPlayReset(handler: () => void): void;
   /** Validate the whole project (the CLI's checks): for the problems panel. Reflects disk, unless

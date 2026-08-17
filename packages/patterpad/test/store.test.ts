@@ -18,7 +18,7 @@ const legacy = (dir: string, session: object): string => {
 
 describe("session store", () => {
   it("starts empty and tolerates a missing file", () => {
-    expect(createStore(tmpDir()).read()).toEqual({ lastScene: {}, lastCaret: {}, recents: [], panes: { nav: false, inspector: false }, theme: { colour: "system", font: "newsreader" }, play: { pinned: true }, search: { pinned: true }, coverage: { pinned: true } });
+    expect(createStore(tmpDir()).read()).toEqual({ lastScene: {}, lastCaret: {}, recents: [], panes: { nav: false, inspector: false }, theme: { colour: "system", font: "newsreader" }, playFollow: false, play: { pinned: true }, search: { pinned: true }, coverage: { pinned: true } });
   });
 
   it("remembers the side-pane (slide/pin) state", () => {
@@ -39,6 +39,18 @@ describe("session store", () => {
     s.setPanes({ nav: true, inspector: false, docHidden: ["vo"], lineStatusShown: ["draft"], reviewFeedback: true });
     s.setTheme({ colour: "slate", font: "literata" });
     expect(createStore(dir).read().panes).toEqual({ nav: true, inspector: false, docHidden: ["vo"], lineStatusShown: ["draft"], reviewFeedback: true });
+  });
+
+  it("remembers Follow in the editor, and defaults it OFF", () => {
+    // Marking is the default behaviour and following is the author asking for it, so a fresh install
+    // must not arrive with the editor jumping under them.
+    const dir = tmpDir();
+    expect(createStore(dir).read().playFollow).toBe(false);
+    const s = createStore(dir);
+    s.setPlayFollow(true);
+    expect(s.read().playFollow).toBe(true);
+    s.setTheme({ colour: "slate", font: "literata" }); // an unrelated write keeps it
+    expect(createStore(dir).read().playFollow).toBe(true); // and it survives a reload
   });
 
   it("remembers the colour theme / font theme", () => {

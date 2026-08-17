@@ -19,6 +19,13 @@ body.play {
 .play-from { font-weight: 700; }
 .play-addr { font: 500 0.78rem var(--font-mono); text-transform: none; letter-spacing: normal; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the always-on-top pin is the shell's `.swin-pin` now (tool-window.css), not this app's own */
+/* "Follow in the editor": a quiet header toggle, accented when on, matching the other header toggles
+   (.play-continue / .play-audio). Sits beside the pin: both are about this window's relationship to the
+   editor rather than to the thing being played. */
+.play-follow { flex: none; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--muted); font: 500 0.72rem var(--font-ui); text-transform: none; letter-spacing: normal; padding: 0.18rem 0.4rem; }
+.play-follow:hover { border-color: var(--accent); }
+.play-follow.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
+
 /* the play-language switcher (#195): a quiet select, sized to its content, on the right of the header */
 .play-locale { flex: none; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; color: var(--ink); font: 500 0.72rem var(--font-ui); text-transform: none; letter-spacing: normal; padding: 0.18rem 0.35rem; }
 .play-locale:hover { border-color: var(--accent); }

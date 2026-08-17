@@ -59,7 +59,7 @@ const stub = {
   mark: () => undefined,
   resetMarks: () => undefined,
   onRestart: () => undefined,
-  info: async () => ({ address: "the_tavern.intro", pinned: true, theme: { colour: "system" as const, font: "newsreader" as const }, audio: true, captions: true, locales: ["en", "fr", "de"], locale, defaultLocale: "en" }),
+  info: async () => ({ address: "the_tavern.intro", pinned: true, theme: { colour: "system" as const, font: "newsreader" as const }, follow: false, audio: true, captions: true, locales: ["en", "fr", "de"], locale, defaultLocale: "en" }),
   audioBytes: async () => null, // no real clips in the preview -> Continue fakes pacing at ~150 wpm
   setPin: () => undefined,
   setLocale: async (l: string) => { locale = l; },
@@ -69,6 +69,7 @@ const stub = {
   // The stub is cast to `unknown` on assignment, so a missing method is NOT a type error here: it is a
   // TypeError the moment play.ts calls it. Keep this list in step with PatterPlayApi by hand.
   onPin: () => undefined,
+  setFollow: () => undefined,
   onTheme: () => undefined,
 };
 (window as unknown as { patterPlay: unknown }).patterPlay = stub;

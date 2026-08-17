@@ -853,6 +853,7 @@ function registerIpc(): void {
     address: playSceneId ? project.playAddress(playSceneId, playBlockId ?? undefined) : "",
     pinned: store.read().play.pinned,
     theme: store.read().theme, // this window paints in the author's palette too
+    follow: store.read().playFollow,
 
     audio: project.audioFoldersEnabled(), // #206: surfaces the "Play with audio" toggle in folder mode
     captions: project.playCaptionsState(), // #214: closed-captions toggle state (default on)
@@ -890,7 +891,22 @@ function registerIpc(): void {
   ipcMain.handle("play:step", () => project.playStep());
   ipcMain.handle("play:toStop", () => project.playToStop());
   ipcMain.handle("play:choose", (_e, optionId: string) => project.playChoose(optionId));
-  ipcMain.handle("play:markAt", (_e, beatId: string | null, sceneId?: string) => { win?.webContents.send("play:mark", beatId, sceneId); });
+  ipcMain.handle("play:markAt", (_e, beatId: string | null, sceneId?: string) => {
+    win?.webContents.send("play:mark", beatId, sceneId);
+    // "Follow in the editor" (play-follow): when the author has asked for it, the mark ALSO reveals what
+    // was just played. The decision lives here rather than in the play window so there is one place that
+    // knows, and it reuses the marker's own target plus the editor's existing reveal path.
+    //
+    // IT MUST NOT STEAL FOCUS, which is the whole feature: a send reaches the editor's renderer without
+    // raising or focusing the window, so the hand that is playing stays on the play window. Restore a
+    // minimised editor - there is nothing to follow in a window you cannot see - but never `focus()`.
+    if (!beatId || !sceneId || !store.read().playFollow) return;
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.webContents.send("play:follow", sceneId, beatId);
+    }
+  });
+  ipcMain.handle("play:setFollow", (_e, on: boolean) => { store.setPlayFollow(on); });
   ipcMain.handle("play:resetMarks", () => { win?.webContents.send("play:reset"); });
   // Live debug link (#181): a localhost WS server an external game streams its cursor into. Frames for the
   // followed flow reuse the SAME play:mark path the in-app Play window uses, so the editor follows the live
