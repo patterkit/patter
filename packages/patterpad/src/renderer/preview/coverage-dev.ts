@@ -54,6 +54,7 @@ const stub = {
   info: async () => ({
     hasProject: true,
     pinned: true,
+    theme: { colour: "system" as const, font: "newsreader" as const },
     scenes: [{ id: "intro", name: "Intro" }, { id: "bar", name: "At the Bar" }],
     start: { scene: "intro" },
     driverCount: 1,
@@ -78,6 +79,7 @@ const stub = {
   setPin: (on: boolean) => console.log("setPin", on),
   onProject: () => undefined,
   onPin: () => undefined,
+  onTheme: () => undefined,
 };
 (window as unknown as { patterCoverage: unknown }).patterCoverage = stub;
 void import("../coverage/coverage.js");

@@ -10,6 +10,7 @@ import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
 import { mountJobProgress } from "@wildwinter/app-shell";
+import { applyTheme } from "../src/apply-theme.js";
 import { renderCoverage } from "../src/coverage-view.js";
 import type { CoverageResult } from "../../shared/api.js";
 
@@ -54,6 +55,7 @@ async function boot(): Promise<void> {
   for (const s of info.scenes) sceneSel.append(new Option(s.name, s.id));
   sceneSel.value = ""; // default to the project start
   pinned = info.pinned; reflectPin();
+  applyTheme(info.theme); // the palette is the app's; importing theme.css alone leaves this on Paper
   driversNote.textContent = !info.hasProject
     ? "No project open."
     : info.driverCount
@@ -95,6 +97,7 @@ const reflectPin = (): void => { pinBtn.classList.toggle("on", pinned); pinBtn.s
 pinBtn.addEventListener("click", () => { pinned = !pinned; cov.setPin(pinned); reflectPin(); });
 // Reset View re-pins in main; the button has to be told or it keeps showing its own last choice.
 cov.onPin((on) => { pinned = on; reflectPin(); });
+cov.onTheme((t) => applyTheme(t));
 
 runBtn.addEventListener("click", () => void run());
 worldBtn.addEventListener("click", () => cov.openWorld());

@@ -454,7 +454,11 @@ export interface PatterPlayApi {
   /** The run's starting address (`<scene>.<block>`), the pin state, the play-language switcher (#195):
    *  every declared `locales`, the `locale` currently playing, the source `defaultLocale`; and whether the
    *  project is in Audio Folders mode (#206) so the window can show the "Play with audio" toggle. */
-  info(): Promise<{ address: string; pinned: boolean; audio: boolean; captions: boolean; locales: string[]; locale: string; defaultLocale: string }>;
+  info(): Promise<{ address: string; pinned: boolean; theme: ThemePrefs; audio: boolean; captions: boolean; locales: string[]; locale: string; defaultLocale: string }>;
+  /** Main changed this window's pin behind its back (Reset View re-pins every helper). */
+  onPin(handler: (on: boolean) => void): void;
+  /** The author changed the colour / font theme in the editor. Every window shares the palette. */
+  onTheme(handler: (theme: ThemePrefs) => void): void;
   /** Audio Folders mode (#206): the resolved audio bytes for a played line, for "Play with audio". Null when
    *  there's no file. The renderer wraps them in a Blob to play (no file access in the renderer). */
   audioBytes(beatId: string): Promise<{ bytes: Uint8Array; mime: string } | null>;
@@ -496,7 +500,7 @@ export type DebugStatus =
 export interface PatterSearchApi {
   /** The window's initial state on boot: which mode to open in, the pin state, and whether a project is
    *  even open (no project → a quiet empty state). */
-  info(): Promise<{ mode: SearchMode; pinned: boolean; hasProject: boolean; voiced: boolean; query?: string }>;
+  info(): Promise<{ mode: SearchMode; pinned: boolean; hasProject: boolean; voiced: boolean; query?: string; theme: ThemePrefs }>;
   /** Content search: Game ID / title / dialogue-text, OR opaque id / handle (the folded-in "Go to ID"). */
   search(query: string): Promise<SearchEntry[]>;
   /** Status browse: every line / text beat at the given status (unset = lowest rung). `recording` picks the
@@ -532,6 +536,8 @@ export interface PatterSearchApi {
   /** Main changed this window's pin behind the window's back (Reset View re-pins every helper). The
    *  button has to be TOLD, or it goes on showing the state it last chose itself. */
   onPin(handler: (on: boolean) => void): void;
+  /** The author changed the colour / font theme in the editor. Every window shares the palette. */
+  onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
 /** The coverage window's initial state on boot: the scene list (for the start picker), the project's
@@ -540,6 +546,8 @@ export interface CoverageWinInfo {
   hasProject: boolean;
   /** Always-on-top pin state (remembered; default pinned). */
   pinned: boolean;
+  /** The author's colour + font theme. Every window paints in it, not just the editor. */
+  theme: ThemePrefs;
   scenes: Array<{ id: string; name: string }>;
   start?: { scene: string; block?: string };
   driverCount: number;
@@ -581,6 +589,8 @@ export interface PatterCoverageApi {
   /** Main changed this window's pin behind the window's back (Reset View re-pins every helper). The
    *  button has to be TOLD, or it goes on showing the state it last chose itself. */
   onPin(handler: (on: boolean) => void): void;
+  /** The author changed the colour / font theme in the editor. Every window shares the palette. */
+  onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
 export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "spelling";

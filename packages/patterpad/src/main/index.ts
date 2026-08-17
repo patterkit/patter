@@ -582,6 +582,7 @@ function rescueWindows(): void {
   if (playWin && !playWin.isDestroyed()) {
     if (playWin.isMinimized()) playWin.restore();
     playWin.setAlwaysOnTop(true);
+    playWin.webContents.send("play:pin", true); // ...and its BUTTON, which chose the old state
     playWin.setBounds({ ...PLAY_DEFAULT, ...centeredOnPrimary(PLAY_DEFAULT) });
     playWin.show();
   }
@@ -694,7 +695,8 @@ function registerIpc(): void {
   ipcMain.handle("covWin:info", (): import("../shared/api.js").CoverageWinInfo => {
     const pinned = store.read().coverage.pinned;
     const info = project.coverageInfo();
-    return info ? { hasProject: true, pinned, ...info, last: lastCoverageResult } : { hasProject: false, pinned, scenes: [], driverCount: 0, last: null };
+    const theme = store.read().theme; // this window paints in the author's palette too
+    return info ? { hasProject: true, pinned, theme, ...info, last: lastCoverageResult } : { hasProject: false, pinned, theme, scenes: [], driverCount: 0, last: null };
   });
   ipcMain.handle("covWin:setPin", (_e, on: boolean) => {
     store.setCoverage({ ...store.read().coverage, pinned: on });
@@ -820,6 +822,8 @@ function registerIpc(): void {
   ipcMain.handle("play:info", () => ({
     address: playSceneId ? project.playAddress(playSceneId, playBlockId ?? undefined) : "",
     pinned: store.read().play.pinned,
+    theme: store.read().theme, // this window paints in the author's palette too
+
     audio: project.audioFoldersEnabled(), // #206: surfaces the "Play with audio" toggle in folder mode
     captions: project.playCaptionsState(), // #214: closed-captions toggle state (default on)
     ...project.playLocaleInfo(),
@@ -870,7 +874,7 @@ function registerIpc(): void {
   ipcMain.handle("search:open", (_e, mode: SearchMode, focus?: SearchFocus, query?: string) => openSearchWindow(mode, focus, query));
   // `voiced` here gates ONLY the search window's Recording tab, so it reflects audio-status TRACKING (voiced +
   // not-opted-out), matching the inspector / menu (#206).
-  ipcMain.handle("searchWin:info", () => ({ mode: searchMode, pinned: store.read().search.pinned, hasProject: project.hasProject(), voiced: project.isAudioTracked(), query: searchSeed }));
+  ipcMain.handle("searchWin:info", () => ({ mode: searchMode, pinned: store.read().search.pinned, hasProject: project.hasProject(), voiced: project.isAudioTracked(), query: searchSeed, theme: store.read().theme }));
   ipcMain.handle("searchWin:byProperty", (_e, query: string) => project.propertyUsage(query, searchFocus));
   ipcMain.handle("searchWin:byTag", (_e, tag: string) => project.tagUsage(tag, searchFocus));
   ipcMain.handle("searchWin:tags", () => project.tagList());
@@ -905,7 +909,16 @@ function registerIpc(): void {
     store.setIdentity({ name: identity.name?.trim() || defaultUserName(), ...(email ? { email } : {}) });
   });
   ipcMain.handle("panes:set", (_e, panes: PaneState) => { store.setPanes(panes); refreshMenu(); });
-  ipcMain.handle("theme:set", (_e, theme: ThemePrefs) => { store.setTheme(theme); refreshMenu(); });
+  ipcMain.handle("theme:set", (_e, theme: ThemePrefs) => {
+    store.setTheme(theme);
+    refreshMenu();
+    // Every other open window shares this app's palette and cannot see the editor's root, so it has to
+    // be told. Broadcast rather than tracked: a window that is not listening ignores it, and a window
+    // opened later reads the same value out of its own boot info.
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed() && w !== win) w.webContents.send("theme:changed", theme);
+    }
+  });
   // External links the renderer may ask us to open in the browser: an allow-list (same philosophy as
   // openPath - only destinations the app itself put on screen), so a compromised renderer can't launch
   // arbitrary URLs.

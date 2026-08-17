@@ -4,7 +4,7 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import { JOB_PROGRESS } from "@wildwinter/app-shell/job";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress } from "../shared/api.js";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, ThemePrefs, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -117,6 +117,8 @@ const playApi: PatterPlayApi = {
   setClosedCaptions: (on) => ipcRenderer.invoke("play:setCaptions", on),
   onStale: (handler) => { ipcRenderer.on("play:stale", () => handler()); },
   onRefreshed: (handler) => { ipcRenderer.on("play:refreshed", (_e, kind: "text" | "structure", options: PlayChoiceOption[]) => handler(kind, options)); },
+  onPin: (handler) => { ipcRenderer.on("play:pin", (_e, on: boolean) => handler(on)); },
+  onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
 // The detached search window's bridge (queries the project-wide index + drives the editor's jump).
@@ -137,6 +139,7 @@ const searchApi: PatterSearchApi = {
   onSeed: (handler) => { ipcRenderer.on("searchWin:seed", (_e, query: string) => handler(query)); },
   onProject: (handler) => { ipcRenderer.on("searchWin:project", () => handler()); },
   onPin: (handler) => { ipcRenderer.on("searchWin:pin", (_e, on: boolean) => handler(on)); },
+  onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
 // The detached coverage window's bridge (runs coverage in main; drives the editor's jump + External Properties tab).
@@ -151,6 +154,7 @@ const coverageApi: PatterCoverageApi = {
   setPin: (on) => { void ipcRenderer.invoke("covWin:setPin", on); },
   onProject: (handler) => { ipcRenderer.on("covWin:project", () => handler()); },
   onPin: (handler) => { ipcRenderer.on("covWin:pin", (_e, on: boolean) => handler(on)); },
+  onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
 contextBridge.exposeInMainWorld("patter", api);
