@@ -406,60 +406,38 @@ main.panes.vcs-readonly #inspector-stack { opacity: 0.55; pointer-events: none; 
 .jump-list .exed-opt.danger { color: var(--muted); }
 .jump-list .exed-opt.danger:hover { color: var(--accent); }
 
-/* Problems bar: a slim bottom strip (Patterpad.md §4) - count, ‹ ›, and the current problem (click to
-   jump). Sits between the panes and the hint footer; hidden when there are no problems. */
-.problembar {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.8rem;
-  border-top: 1px solid var(--line); background: var(--surface); font: 0.78rem var(--font-ui); min-height: 1.9rem;
+/* The two bottom bars are the shell's `.stepbar` (stepper.css): count, ‹ ›, position, the current entry
+   as a button, an action slot. The parallel `.problembar-*` / `.reviewbar-*` class sets this app kept
+   for the one shape are GONE. What is left here is only what is genuinely this app's.
+
+   THE COLLAPSE IS OURS AND HAS TO OVERRIDE THE SHELL. `stepper.css` hides with `display: none`, which
+   cannot tween; these bars slide + fade open as problems appear and closed as they clear, with the
+   editor easing in lockstep, so they must stay in layout while hidden. Kept app-side rather than pushed
+   into the shell because it is choreography with this app's grid, not part of the bar's shape. */
+#problembar[hidden], #reviewbar[hidden] {
+  display: flex; min-height: 0; max-height: 0; opacity: 0;
+  padding-top: 0; padding-bottom: 0; border-width: 0; pointer-events: none;
 }
-/* Shown / hidden eases via the shared max-height collapse (see the .topbar/.problembar/.reviewbar rule):
-   the bar slides + fades open as problems appear and closed as they clear, the editor easing in lockstep.
-   Stays in layout (display:flex overriding the UA [hidden]) so the collapse can transition; min-height:0
-   lets it reach zero (the base 1.9rem floor would otherwise block it). */
-.problembar[hidden] {
-  display: flex; min-height: 0; max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; pointer-events: none;
-}
-.problembar-count { flex: 0 0 auto; color: var(--surface); background: var(--accent); border-radius: var(--radius-md); padding: 0.05rem 0.5rem; font: 600 0.66rem var(--font-ui); }
-.problembar-nav { background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); width: 1.4rem; height: 1.4rem; line-height: 1; padding: 0; }
-.problembar-nav:hover { color: var(--accent); border-color: var(--accent); }
-.problembar-nav[hidden] { display: none; }
-.problembar-cur { display: flex; align-items: baseline; gap: 0.5rem; flex: 1; min-width: 0; background: none; border: 0; text-align: left; padding: 0; color: inherit; font: inherit; }
-.problembar-cur.jump { cursor: pointer; }
-.problembar-cat { flex: 0 0 auto; color: var(--accent); font: 600 0.64rem var(--font-mono); }
-.problembar-msg { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Severity, which the bar deliberately knows nothing about: it takes `kindClass` and paints nothing. */
+.stepbar-cat.sev-error { color: var(--accent); }
+.stepbar-cat.sev-warning { color: var(--warn); }
+.stepbar-cat.sev-info { color: var(--muted); }
+/* A resolved thread in the review walk reads as done rather than as live feedback. */
+.stepbar-cat.done { color: var(--muted); }
+
 /* A tinted "fix" chip (not a solid primary button): its fill-to-solid hover is an intentional, quieter idiom
    for the problem bar. Kept distinct from .btn.primary's brightness, but now eased so it doesn't snap
    (design-language §4 "motion is interpolation") - brightness would be near-invisible on the tinted rest. */
-.problembar-fix { flex: 0 0 auto; margin-left: auto; cursor: pointer; background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-sm); font: 600 0.7rem var(--font-ui); padding: 0.15rem 0.55rem; transition: background var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
-.problembar-fix:hover { background: var(--accent); color: var(--surface); }
-.problembar-fix[hidden] { display: none; }
+.problem-fix { flex: 0 0 auto; margin-left: auto; cursor: pointer; background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-sm); font: 600 0.7rem var(--font-ui); padding: 0.15rem 0.55rem; transition: background var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
+.problem-fix:hover { background: var(--accent); color: var(--surface); }
+/* Amber when the problem you are standing on is advisory, matching the surface's amber squiggle. */
+#problembar:has(.stepbar-count.warn) .problem-fix { color: var(--warn); border-color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
+#problembar:has(.stepbar-count.warn) .problem-fix:hover { background: var(--warn); color: var(--surface); }
 
-/* Warning (advisory) variant: amber instead of accent, matching the surface's amber squiggle. The
-   count badge, category, and fix button recolour so a warning reads as softer than a hard error. */
-.problembar.warning .problembar-count { background: var(--warn); }
-.problembar.warning .problembar-cat { color: var(--warn); }
-.problembar.warning .problembar-fix { color: var(--warn); border-color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
-.problembar.warning .problembar-fix:hover { background: var(--warn); color: var(--surface); }
-
-/* Review Feedback walk bar (mirrors the problems bar): the looping comment + suggestion stepper. Sits at
-   the very bottom; a subtle accent-tinted ground distinguishes it from the (error) problems bar above. */
-.reviewbar {
-  display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.8rem;
-  border-top: 1px solid var(--line); background: color-mix(in oklab, var(--accent) 6%, var(--surface));
-  font: 0.78rem var(--font-ui); min-height: 1.9rem;
-}
-.reviewbar[hidden] {
-  display: flex; min-height: 0; max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; pointer-events: none;
-}
-.reviewbar-count { flex: 0 0 auto; color: var(--surface); background: var(--accent); border-radius: var(--radius-md); padding: 0.05rem 0.5rem; font: 600 0.66rem var(--font-ui); }
-.reviewbar-nav { background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); width: 1.4rem; height: 1.4rem; line-height: 1; padding: 0; }
-.reviewbar-nav:hover { color: var(--accent); border-color: var(--accent); }
-.reviewbar-nav[disabled] { opacity: 0.4; cursor: default; }
-.reviewbar-cur { display: flex; align-items: baseline; gap: 0.5rem; flex: 1; min-width: 0; background: none; border: 0; text-align: left; padding: 0; color: inherit; font: inherit; cursor: pointer; }
-.reviewbar-kind { flex: 0 0 auto; color: var(--accent); font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; }
-.reviewbar-msg { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.reviewbar-close { flex: 0 0 auto; margin-left: auto; background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; padding: 0 0.2rem; }
-.reviewbar-close:hover { color: var(--accent); }
+/* The review walk is the problems bar plus ONE modifier: a subtle accent-tinted ground, so the mode you
+   entered reads as distinct from the ambient bar above it. */
+.stepbar.reviewbar { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
 
 .btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
 .btn.primary:hover { filter: brightness(1.06); color: var(--surface); border-color: var(--accent); }
@@ -784,7 +762,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; f
 
 /* Framing chrome eases out: a capped height (auto-height can't tween) + fade + zeroed box, all on the
    shared curve/duration. The cap is generous (these are slim single-row bars) so it never clips. */
-.topbar, .problembar, .reviewbar {
+.topbar, .stepbar {
   max-height: 4rem; overflow: hidden;
   transition: max-height var(--dur-panel) var(--ease-standard), opacity var(--dur-panel) var(--ease-standard),
               padding var(--dur-panel) var(--ease-standard), border-width var(--dur-panel) var(--ease-standard);
@@ -792,8 +770,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; f
 /* The hint bar (#hintbar) STAYS in Writing View - its keystroke hints help the writer, and it hosts the
    exit affordance. The topbar + the two bottom bars (problems / review) collapse. */
 body.writing-view .topbar,
-body.writing-view .problembar,
-body.writing-view .reviewbar {
+body.writing-view .stepbar {
   min-height: 0; max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; overflow: hidden; pointer-events: none;
 }
 

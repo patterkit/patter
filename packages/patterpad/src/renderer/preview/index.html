@@ -34,27 +34,9 @@
          renderer's top-level binding doesn't throw and abort boot. -->
     <button id="writing-exit" class="writing-exit" type="button">Exit Writing View</button>
 
-    <div id="problembar" class="problembar" aria-label="problems" hidden>
-      <span id="problem-count" class="problembar-count">0</span>
-      <button id="problem-prev" class="problembar-nav" type="button" title="Previous problem" aria-label="previous problem">‹</button>
-      <button id="problem-next" class="problembar-nav" type="button" title="Next problem" aria-label="next problem">›</button>
-      <button id="problem-cur" class="problembar-cur" type="button">
-        <span id="problem-cat" class="problembar-cat"></span>
-        <span id="problem-msg" class="problembar-msg"></span>
-      </button>
-      <button id="problem-fix" class="problembar-fix" type="button" hidden></button>
-    </div>
-
-    <div id="reviewbar" class="reviewbar" aria-label="review feedback" hidden>
-      <span id="review-count" class="reviewbar-count">0</span>
-      <button id="review-prev" class="reviewbar-nav" type="button" title="Previous feedback" aria-label="previous feedback">‹</button>
-      <button id="review-next" class="reviewbar-nav" type="button" title="Next feedback" aria-label="next feedback">›</button>
-      <button id="review-cur" class="reviewbar-cur" type="button">
-        <span id="review-kind" class="reviewbar-kind"></span>
-        <span id="review-msg" class="reviewbar-msg"></span>
-      </button>
-      <button id="review-close" class="reviewbar-close" type="button" title="Exit review feedback" aria-label="exit review feedback">✕</button>
-    </div>
+    <!-- Hosts only: the shell's renderStepperBar fills them. Mirrors renderer/index.html. -->
+    <div id="problembar" class="stepbar" aria-label="problems" hidden></div>
+    <div id="reviewbar" class="stepbar reviewbar" aria-label="review feedback" hidden></div>
 
     <section id="welcome" class="welcome">
       <div class="welcome-card">

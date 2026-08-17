@@ -30,29 +30,12 @@
       <div id="insp-resizer" class="pane-resizer pane-resizer-insp" data-tip="Drag to resize" aria-hidden="true"></div>
     </main>
 
-    <div id="problembar" class="problembar" aria-label="problems" hidden>
-      <span id="problem-count" class="problembar-count">0</span>
-      <button id="problem-prev" class="problembar-nav" type="button" data-tip="Previous problem" aria-label="previous problem">‹</button>
-      <button id="problem-next" class="problembar-nav" type="button" data-tip="Next problem" aria-label="next problem">›</button>
-      <button id="problem-cur" class="problembar-cur" type="button">
-        <span id="problem-cat" class="problembar-cat"></span>
-        <span id="problem-msg" class="problembar-msg"></span>
-      </button>
-      <button id="problem-fix" class="problembar-fix" type="button" hidden></button>
-    </div>
+    <!-- Both bottom bars are hosts only: the shell's renderStepperBar fills them (stepper.ts). -->
+    <div id="problembar" class="stepbar" aria-label="problems" hidden></div>
 
     <!-- Review Feedback walk: a bottom bar stepping through every active comment + suggestion in the
-         whole script, looping. Mirrors the problems bar; shown only in Review Feedback mode. -->
-    <div id="reviewbar" class="reviewbar" aria-label="review feedback" hidden>
-      <span id="review-count" class="reviewbar-count">0</span>
-      <button id="review-prev" class="reviewbar-nav" type="button" data-tip="Previous feedback" aria-label="previous feedback">‹</button>
-      <button id="review-next" class="reviewbar-nav" type="button" data-tip="Next feedback" aria-label="next feedback">›</button>
-      <button id="review-cur" class="reviewbar-cur" type="button">
-        <span id="review-kind" class="reviewbar-kind"></span>
-        <span id="review-msg" class="reviewbar-msg"></span>
-      </button>
-      <button id="review-close" class="reviewbar-close" type="button" data-tip="Exit review feedback" aria-label="exit review feedback">✕</button>
-    </div>
+         whole script, looping. The problems bar plus one modifier; shown only in Review Feedback mode. -->
+    <div id="reviewbar" class="stepbar reviewbar" aria-label="review feedback" hidden></div>
 
     <section id="welcome" class="welcome">
       <div class="welcome-card">

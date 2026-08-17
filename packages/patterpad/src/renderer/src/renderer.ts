@@ -36,8 +36,10 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // in from the model, because the compiler, the CLI and the shipped runtime all
 // address content by them and none may depend on a UI kit. `id-parity.test.ts`
 // asserts our copy still matches the shell's default.
-import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator } from "@wildwinter/app-shell";
+import { el } from "./dom.js";
+import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
+import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
@@ -91,22 +93,11 @@ function toggleDocClass(cls: string): void {
   void window.patter.setPanes(panes); // remember it (also refreshes the View-menu checks)
   pushDocNotes();                      // re-surface with the new filter
 }
+// Both bottom bars are the shell's `renderStepperBar` now: one grammar, drawn from a list and an index,
+// where this app used to keep two parallel class sets for the one shape. Each is just a host element;
+// everything inside is rebuilt per paint, so nothing below holds a reference into either bar.
 const problembarEl = $("problembar");
-const problemCountEl = $("problem-count");
-const problemCatEl = $("problem-cat");
-const problemMsgEl = $("problem-msg");
-const problemCurEl = $<HTMLButtonElement>("problem-cur");
-const problemPrevEl = $<HTMLButtonElement>("problem-prev");
-const problemNextEl = $<HTMLButtonElement>("problem-next");
-const problemFixEl = $<HTMLButtonElement>("problem-fix");
 const reviewbarEl = $("reviewbar");
-const reviewCountEl = $("review-count");
-const reviewKindEl = $("review-kind");
-const reviewMsgEl = $("review-msg");
-const reviewCurEl = $<HTMLButtonElement>("review-cur");
-const reviewPrevEl = $<HTMLButtonElement>("review-prev");
-const reviewNextEl = $<HTMLButtonElement>("review-next");
-const reviewCloseEl = $<HTMLButtonElement>("review-close");
 const projectNameEl = $("project-name");
 const sceneSuffixEl = $("scene-suffix");
 const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
@@ -882,25 +873,53 @@ function rewriteEnumValue(src: string, bad: string, chosen: string): string {
   return src.replace(new RegExp(`\\b${bad.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`), chosen);
 }
 
-function showProblem(): void {
-  const p = problems[problemAt];
-  if (!p) return;
-  problembarEl.classList.toggle("warning", p.severity === "warning"); // amber for advisory issues
-  const { tag, message } = humanizeProblem(p);
-  problemCatEl.textContent = tag;
-  problemMsgEl.textContent = message;
-  problemCurEl.classList.toggle("jump", !!p.nodeId);
-  problemCurEl.dataset.tip = p.nodeId ? "Go to issue" : "";
-  problemFixEl.hidden = !p.fix;
-  if (p.fix) problemFixEl.textContent = fixLabel(p.fix);
+/** The quick-fix chip of the CURRENT paint, kept because two of the fixes hang a popover off it and an
+ *  anchor has to be the element actually on screen. Null when the current problem offers no fix. */
+let problemFixEl: HTMLButtonElement | null = null;
+
+/** Draw the problems bar from `problems` + `problemAt`. Idempotent: called again on every change. */
+function paintProblems(): void {
+  const cur = problems[problemAt];
+  const fix = cur?.fix;
+  problemFixEl = null;
+  if (fix) {
+    const chip = el("button", "problem-fix", fixLabel(fix));
+    chip.type = "button";
+    chip.addEventListener("click", () => void applyCurrentFix());
+    problemFixEl = chip;
+  }
+  renderStepperBar(problembarEl, {
+    items: problems.map((p) => {
+      const { tag, message } = humanizeProblem(p);
+      // `kindClass` is how severity colour stays app-side: the bar paints nothing itself.
+      return { kind: tag, kindClass: `sev-${p.severity}`, text: message };
+    }),
+    at: problemAt,
+    // The tone follows the CURRENT problem, not the worst one, which is what the old `.warning` class on
+    // the host did: an advisory issue reads softer than a hard error while you are standing on it.
+    tone: cur?.severity === "warning" ? "warn" : "accent",
+    tips: { prev: "Previous problem", next: "Next problem", go: "Go to issue" },
+    onStep: (next) => {
+      problemAt = next;
+      paintProblems();
+      const id = problems[problemAt]?.nodeId;
+      if (id) surface?.revealNode(id);
+    },
+    onGo: (i) => { const id = problems[i]?.nodeId; if (id) surface?.revealNode(id); },
+    actions: [problemFixEl],
+    // No `empty`: no problems, no problems bar. This one is ambient, not a mode.
+  });
 }
 
 async function applyCurrentFix(): Promise<void> {
   const fix = problems[problemAt]?.fix;
   if (!fix) return;
+  // Two of the fixes hang a popover off the chip that launched them. The chip is rebuilt each paint, so
+  // take the live one; the bar itself is the fallback anchor if there somehow is not one.
+  const anchor: HTMLElement = problemFixEl ?? problembarEl;
   if (fix.kind === "retarget-jump") {
     // A surface edit, not a project write: open the shared jump picker, set it, save, then re-validate.
-    surface?.editJump(fix.snippetId, problemFixEl, () => { void (async () => { await save(); await refreshProblems(); })(); });
+    surface?.editJump(fix.snippetId, anchor, () => { void (async () => { await save(); await refreshProblems(); })(); });
     return;
   }
   if (fix.kind === "add-prompt") {
@@ -914,7 +933,7 @@ async function applyCurrentFix(): Promise<void> {
     const nodeId = problems[problemAt]?.nodeId;
     if (!nodeId) return;
     openJumpPicker({
-      anchor: problemFixEl, current: "", targets: fix.options.map((v) => ({ id: v, label: v })),
+      anchor, current: "", targets: fix.options.map((v) => ({ id: v, label: v })),
       onPick: async (v) => { if (surface?.setCondition(nodeId, rewriteEnumValue(fix.src, fix.bad, v))) { await save(); await refreshProblems(); } },
     });
     return;
@@ -939,15 +958,6 @@ async function registerCharacter(name: string): Promise<void> {
   await refreshProblems();
 }
 
-function stepProblem(delta: number): void {
-  if (!problems.length) return;
-  problemAt = (problemAt + delta + problems.length) % problems.length;
-  problemCountEl.textContent = `${problemAt + 1} / ${problems.length}`;
-  showProblem();
-  const id = problems[problemAt]?.nodeId;
-  if (id) surface?.revealNode(id);
-}
-
 /** Push the current problems to the surface as inline squiggles (ids not in the open scene are ignored).
  *  Spelling is EXCLUDED - it already has its own wavy underline from the spell-check plugin (#177). */
 function applyProblemMarks(): void {
@@ -970,13 +980,7 @@ function renderProblems(dto: ProblemsDto): void {
   problems = [...dto.problems, ...spellingProblems()];
   problemAt = 0;
   applyProblemMarks(); // inline squiggles at the offending sites
-  problembarEl.hidden = problems.length === 0;
-  const multi = problems.length > 1;
-  problemPrevEl.hidden = !multi;
-  problemNextEl.hidden = !multi;
-  if (!problems.length) { problemFixEl.hidden = true; return; }
-  problemCountEl.textContent = multi ? `1 / ${problems.length}` : "1 problem";
-  showProblem();
+  paintProblems();     // hides itself when the list is empty
 }
 
 async function refreshProblems(): Promise<void> {
@@ -997,11 +1001,6 @@ function scheduleValidate(): void {
     if (sceneEdited && surface && currentSceneId) { const s = surface.getSource(); window.patter.playEdited(currentSceneId, s.flow, s.loc); }
   }, 350);
 }
-
-problemPrevEl.addEventListener("click", () => stepProblem(-1));
-problemNextEl.addEventListener("click", () => stepProblem(1));
-problemFixEl.addEventListener("click", () => void applyCurrentFix());
-problemCurEl.addEventListener("click", () => { const id = problems[problemAt]?.nodeId; if (id) surface?.revealNode(id); });
 
 // --- the detail inspector (right pane) ---------------------------------------
 let sceneProps: ConditionProperty[] = []; // referenceable properties for the condition editor (per scene)
@@ -1497,21 +1496,26 @@ async function gatherReview(): Promise<void> {
 
 function renderReviewBar(): void {
   if (!showReviewFeedback) { reviewbarEl.hidden = true; return; }
-  reviewbarEl.hidden = false;
-  const n = reviewItems.length;
-  const multi = n > 1;
-  reviewPrevEl.disabled = !multi;
-  reviewNextEl.disabled = !multi;
-  if (!n) {
-    reviewCountEl.textContent = "0";
-    reviewKindEl.textContent = "";
-    reviewMsgEl.textContent = "No open comments or suggestions.";
-    return;
-  }
-  const item = reviewItems[reviewAt]!;
-  reviewCountEl.textContent = `${reviewAt + 1} / ${n}`;
-  reviewKindEl.textContent = (item.kind === "comment" ? "Comment" : "Rewrite") + (item.resolved ? " (resolved)" : "");
-  reviewMsgEl.textContent = `${item.sceneName} · ${item.author}: ${item.text}`;
+  renderStepperBar(reviewbarEl, {
+    items: reviewItems.map((item) => ({
+      kind: item.kind === "comment" ? "Comment" : "Rewrite",
+      kindClass: item.resolved ? "done" : undefined,
+      // The scene now has its OWN segment instead of being jammed on the front of the message, which is
+      // the segment this app's two bars lacked and the reason the shape was worth adopting.
+      where: item.sceneName,
+      text: `${item.author}: ${item.text}`,
+    })),
+    at: reviewAt,
+    tone: "accent",
+    tips: { prev: "Previous feedback", next: "Next feedback", go: "Go to this feedback" },
+    onStep: (next) => { reviewAt = next; void stepReviewTo(next); },
+    onGo: (i) => { const item = reviewItems[i]; if (item) void gotoReviewItem(item); },
+    // A MODE, not an ambient bar: entering the walk and seeing nothing at all reads as a broken command
+    // rather than as "there is no feedback", so the bar stays up and says so.
+    empty: "No open comments or suggestions.",
+    onClose: () => setReviewFeedback(false),
+    closeTip: "Exit review feedback",
+  });
 }
 
 /** Jump to a feedback item (loading its scene if elsewhere), reveal its beat, and open the relevant
@@ -1530,12 +1534,21 @@ async function gotoReviewItem(item: ReviewItem): Promise<void> {
   });
 }
 
+/** Land on an index the bar has already wrapped for us: repaint, then travel. */
+async function stepReviewTo(index: number): Promise<void> {
+  const item = reviewItems[index];
+  if (!item) return;
+  renderReviewBar();
+  await gotoReviewItem(item);
+}
+
+/** The Review menu's Previous / Next, which also ENTER the walk on first press (the bar's own arrows
+ *  cannot: it is not on screen yet). */
 async function stepReview(delta: number): Promise<void> {
   if (!showReviewFeedback) { setReviewFeedback(true); return; } // first press: enter the walk
   if (!reviewItems.length) return;
   reviewAt = (reviewAt + delta + reviewItems.length) % reviewItems.length;
-  renderReviewBar();
-  await gotoReviewItem(reviewItems[reviewAt]!);
+  await stepReviewTo(reviewAt);
 }
 
 /** Review > Review Feedback: enter / leave the looping feedback walk (a remembered mode). */
@@ -1547,11 +1560,6 @@ function setReviewFeedback(on: boolean): void {
   // in flight must land on disk before reviewFeedback() reads it (else the bar misses it).
   if (on) { reviewAt = 0; void flushReview(); } else reviewbarEl.hidden = true;
 }
-
-reviewPrevEl.addEventListener("click", () => void stepReview(-1));
-reviewNextEl.addEventListener("click", () => void stepReview(1));
-reviewCurEl.addEventListener("click", () => { if (reviewItems[reviewAt]) void gotoReviewItem(reviewItems[reviewAt]!); });
-reviewCloseEl.addEventListener("click", () => setReviewFeedback(false));
 
 function showInspector(ctx: InspectorContext): void {
   // Remember the caret to the LINE (deepest node id under the selection) on every move - even when the
