@@ -48,7 +48,7 @@ export function selectChunkAt(view: EditorView, pos: number, mods: SelectMods = 
   let curIds = multiSelectIds(view.state);
   if (curIds.length === 0) {
     const sel = view.state.selection;
-    if (sel instanceof NodeSelection && CHUNK.has(sel.node.type.name)) { const id = idAt(doc, sel.from); if (id) curIds = [id]; }
+    if (sel instanceof NodeSelection && isChunk(sel.node)) { const id = idAt(doc, sel.from); if (id) curIds = [id]; }
   }
   const anchorId = multiSelectAnchorId(view.state) ?? curIds[0] ?? null;
 

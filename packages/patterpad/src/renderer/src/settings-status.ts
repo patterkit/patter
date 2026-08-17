@@ -119,7 +119,7 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
     host.replaceChildren();
     renderLadder(host,
       "From not-started to done. The lowest rung is the default for any beat with no status set. Pick which status means ready to record, and which means ready to ship.",
-      writing.map(writingRow), "+ Add writing status", () => { writing.push({ name: "" }); render(); focusNewRow(host.querySelector(".gd-fieldlist")); });
+      writing.map(writingRow), "+ Add writing status", () => { writing.push({ name: "" }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
   };
   render();
 
@@ -227,7 +227,7 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
       audioFolders
         ? "A line's recording status is the HIGHEST rung whose derived folder holds its <beatId>.wav (preferred) or .mp3, else the fallback. Each rung's subfolder is named from its status."
         : "From not-recorded to done. The lowest rung is the default for any line with no recording status.",
-      recording.map(recordingRow), "+ Add recording status", () => { recording.push({ name: "" }); render(); focusNewRow(body.querySelector(".gd-fieldlist")); });
+      recording.map(recordingRow), "+ Add recording status", () => { recording.push({ name: "" }); render(); focusNewRow(body.querySelector<HTMLElement>(".gd-fieldlist")); });
 
     // The Audio Folders toggle sits BELOW the ladder: off = manual recording status (set per line in the
     // inspector); on = derive each dialogue line's status from which derived folder holds its <beatId>.wav (#206).

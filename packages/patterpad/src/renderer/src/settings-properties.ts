@@ -109,7 +109,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
     host.append(list);
     guard.check();
     const add = el("button", "gd-add", "+ Add property"); add.type = "button";
-    add.addEventListener("click", () => { state.push({ name: "", type: "number" }); render(); focusNewRow(host.querySelector(".gd-fieldlist")); });
+    add.addEventListener("click", () => { state.push({ name: "", type: "number" }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
     host.append(add);
   };
   render();

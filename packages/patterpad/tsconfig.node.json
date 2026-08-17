@@ -5,5 +5,7 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["src/main", "src/preload", "src/shared", "electron.vite.config.ts"]
+  "include": ["src/main", "src/preload", "src/shared", "electron.vite.config.ts"],
+  "_comment": "The root config excludes this app's main / preload / renderer so its pure-Node program skips them. `exclude` is INHERITED through `extends` and resolved against the ROOT, so without this override it also excluded everything below - and these two programs silently checked nothing but src/shared.",
+  "exclude": ["node_modules"]
 }

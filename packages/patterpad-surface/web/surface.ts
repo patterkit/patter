@@ -42,7 +42,7 @@ import { writingStatusPlugin, setWritingStatusMap, setWritingStatusShown, setWri
 import { replaceSayText } from "../src/lines.js";
 import { multiSelectDecorations } from "./multiselect.js";
 export type {
-  InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, LeafKind,
+  InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, LeafKind,
 } from "../src/inspect.js";
 export type { GroupPropsPatch, SnippetEffect } from "../src/groups.js";
 export type { OptionSummary } from "../src/inspect.js";

@@ -98,7 +98,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
     host.append(list);
     guard.check();
     const add = el("button", "gd-add", "+ Add cast member"); add.type = "button";
-    add.addEventListener("click", () => { state.push({ name: "" }); render(); focusNewRow(host.querySelector(".gd-fieldlist")); });
+    add.addEventListener("click", () => { state.push({ name: "" }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
     host.append(add);
   };
   render();

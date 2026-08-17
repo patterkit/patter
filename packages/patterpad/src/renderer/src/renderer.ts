@@ -934,7 +934,9 @@ async function applyCurrentFix(): Promise<void> {
     if (!nodeId) return;
     openJumpPicker({
       anchor, current: "", targets: fix.options.map((v) => ({ id: v, label: v })),
-      onPick: async (v) => { if (surface?.setCondition(nodeId, rewriteEnumValue(fix.src, fix.bad, v))) { await save(); await refreshProblems(); } },
+      // The picker's "No jump" row passes null. It means nothing when the picker is standing in as an
+      // enum chooser, and without this guard it rewrote the condition to the literal "null".
+      onPick: async (v) => { if (v && surface?.setCondition(nodeId, rewriteEnumValue(fix.src, fix.bad, v))) { await save(); await refreshProblems(); } },
     });
     return;
   }
@@ -1285,7 +1287,7 @@ async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<void>
   if (!data) return; // no file (shouldn't happen - the button only shows when one resolved)
   inspectorAudio?.pause();                       // stop any current clip...
   inspectorPlayBtn?.classList.remove("playing"); // ...and drop its pulse
-  const url = URL.createObjectURL(new Blob([data.bytes], { type: data.mime }));
+  const url = URL.createObjectURL(new Blob([data.bytes as BlobPart], { type: data.mime }));
   const audio = new Audio(url);
   inspectorAudio = audio; inspectorPlayBtn = btn ?? null;
   btn?.classList.add("playing");
@@ -1595,7 +1597,10 @@ function showInspector(ctx: InspectorContext): void {
     editGroupProps: (id, patch) => { surface?.setGroupProps(id, patch); },
     editJump: (id, _current, anchor) => surface?.editJump(id, anchor),
     setJumpMode: (id, mode) => { surface?.setJumpMode(id, mode); },
-    editEffects: (id, onEnter, onExit, anchor, phase) => openEffectsEditor({ anchor, onEnter, onExit, ...(phase ? { phase } : {}), properties: sceneProps, text: preferText, onChange: (ph, effects) => { surface?.setEffects(id, ph, effects); } }),
+    editEffects: (id, onEnter, onExit, anchor, phase) => openEffectsEditor({ anchor, onEnter, onExit, ...(phase ? { phase } : {}), properties: sceneProps, text: preferText, // The editor's effect union still carries `emit`; Patter's does not (effects are set-only, and host
+// events ride gameData), so narrow rather than cast. Nothing in this dialect can produce an emit, so
+// the filter is a no-op at runtime and the types stop lying about it.
+onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e.kind === "set")); } }),
     jumpLabel: (id) => surface?.jumpTargets().find((t) => t.id === id)?.label ?? id,
     addOption: (choiceId) => { surface?.addOption(choiceId); },
     removeChunk: (id) => { surface?.deleteChunk(id); },
