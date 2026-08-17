@@ -17,6 +17,19 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   previous results stay readable, dimmed, while a new sweep runs.
 
 ### Changed
+- **Every window paints in your theme now, not just the editor.** The Play, Search and Coverage
+  windows had never applied your colour or font choice at all: whatever you picked, they sat on
+  Paper in the default reading face. They follow the setting now, and change with it while they
+  are open.
+- **The scene list says more about version control.** Alongside "locked by" and "out of date", a
+  scene now shows when it is **checked out by you**, when it has **uncommitted changes**, and when
+  it is **new and not yet committed**. A fourth marker appears for a file that is read-only on disk
+  with nobody else holding it, which under a locking system is most of a fresh checkout: it is not
+  a problem, and saving checks the file out for you.
+- **A scene somebody else has locked is more usable.** The inspector used to be switched off
+  wholesale, which also stopped you expanding a section or copying an address to go and ask them
+  about it. Only the controls that would change something are disabled now; everything you can read
+  stays readable.
 - **Your preferences have moved to `app-settings.json`,** in the same folder as before. The first
   launch after this update reads the old `patterpad-session.json` once and carries everything
   across: recent projects and their names, the scene and line you were last on in each of them,
@@ -32,6 +45,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   of the comment, so the comment itself gets the width.
 
 ### Fixed
+- **View ▸ Reset View left the helper windows' pin buttons showing the wrong state.** It re-pinned
+  the Play, Search and Coverage windows and floated them back on top, but each window's pin button
+  went on showing whatever it had last been set to, so the button and the window disagreed until
+  you closed and reopened it.
 - **Shift-clicking to extend a selection from a single selected line or group did nothing.** The
   run between the two never formed. (It failed outright rather than misbehaving, so nothing was
   written wrongly.)
