@@ -12,6 +12,8 @@ import "@fontsource-variable/inter";
 import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js";
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
+import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
+import { pinButton } from "@wildwinter/app-shell";
 
 const search = window.patterSearch!;
 
@@ -32,8 +34,13 @@ const statusLike = (m: SearchMode): boolean => m === "status" || m === "recordin
 /** Modes that browse via CHIPS + a filter box (writing / recording status, or author tags) rather than a
  *  free-text query. They share the chip rail, the "filter these" input, and the pick-a-chip flow. */
 const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag";
-const pinBtn = document.getElementById("swin-pin") as HTMLButtonElement;
 const closeBtn = document.getElementById("swin-close") as HTMLButtonElement;
+// The pin is the shell's and is BUILT, not marked up: it owns its own class,
+// aria-pressed and the tooltip that says what a click will do, so there is one
+// place that decides what a pinned window looks like. Inserted before the close
+// button, which is where the markup used to put it.
+const pin = pinButton({ pinned: true, onToggle: (on) => search.setPin(on) });
+closeBtn.before(pin.el);
 const input = document.getElementById("swin-input") as HTMLInputElement;
 const chipsEl = document.getElementById("swin-chips")!;
 const resultsEl = document.getElementById("swin-results")!;
@@ -54,7 +61,6 @@ let results: SearchEntry[] = [];
 let replaceHits: ReplaceHitDto[] = []; // the previewed replacements (Replace mode)
 let sel = 0;
 let token = 0; // guards against an out-of-order async response overwriting a newer query
-let pinned = true;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // --- rendering ---------------------------------------------------------------
@@ -286,8 +292,6 @@ modePropertyBtn.addEventListener("click", () => void setMode("property"));
 modeTagBtn.addEventListener("click", () => void setMode("tag"));
 closeBtn.addEventListener("click", () => search.close());
 
-const reflectPin = (): void => { pinBtn.classList.toggle("on", pinned); pinBtn.setAttribute("aria-pressed", String(pinned)); };
-pinBtn.addEventListener("click", () => { pinned = !pinned; search.setPin(pinned); reflectPin(); });
 
 // The Recording tab is voiced-only (#206): hide it for a text-only project, and never leave the window
 // sitting in recording mode there.
@@ -307,7 +311,7 @@ search.onProject(() => void (async () => {
 // Boot: read the initial mode + pin state (+ any seeded query), then render.
 void (async () => {
   const info = await search.info();
-  pinned = info.pinned; reflectPin();
+  pin.set(info.pinned); // main decided this one (it also re-pins on Reset View), so no toggle callback
   voiced = info.voiced; reflectVoiced();
   if (!info.hasProject) {
     hintEl.textContent = "Open a project to search.";

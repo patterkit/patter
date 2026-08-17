@@ -14,20 +14,19 @@ body.swin {
 
 /* Every interactive element eases its hover/active/focus/selection change with the shared motion tokens,
    so nothing in this window snaps (design-language §4 "motion is interpolation, never a jump"). */
-.swin-mode, .swin-pin, .swin-close, .swin-input, .swin-chip, .swin-row {
+.swin-mode, .swin-input, .swin-chip, .swin-row {
   transition: background var(--dur-quick) var(--ease-standard),
               border-color var(--dur-quick) var(--ease-standard),
               color var(--dur-quick) var(--ease-standard);
 }
 
 /* The drag bar: thin, quiet, with the mode toggle on the left and pin + close on the right. */
-.swin-head {
-  -webkit-app-region: drag;
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.26rem 0.45rem; border-bottom: 1px solid var(--line); background: var(--surface);
-}
-.swin-head button, .swin-modes { -webkit-app-region: no-drag; }
-.swin-spacer { flex: 1; }
+/* The CHROME (the drag bar, the spacer, the pin and close buttons) is the shell's
+   now: tool-window.css. Its no-drag rule covers the controls themselves
+   (button / select / input), and `.swin-modes` is OUR container, so its opt-out
+   stays here. Without it the segmented control's own frame, the border and the
+   gaps between its buttons, would drag the window. */
+.swin-modes { -webkit-app-region: no-drag; }
 
 /* segmented mode toggle: Text | Replace | Status | Recording | Property */
 .swin-modes { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
@@ -39,15 +38,9 @@ body.swin {
 .swin-mode:hover { color: var(--ink); }
 .swin-mode.active { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
 
-.swin-pin, .swin-close {
-  flex: none; display: inline-flex; align-items: center; justify-content: center;
-  background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer;
-  color: var(--muted); line-height: 0; padding: 0.22rem;
-}
-.swin-pin:hover, .swin-close:hover { border-color: var(--line); color: var(--ink); }
-.swin-pin svg { display: block; }
-.swin-pin.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
-.swin-close { font: 0.8rem var(--font-ui); width: 1.5rem; height: 1.5rem; }
+/* The pin and close buttons, their hover, the pinned state and their motion are
+   all the shell's (tool-window.css), which carries the same "motion is
+   interpolation, never a jump" transition this window applies to everything else. */
 
 /* the query box: styled like every other text field in the app (the .gd-input vocabulary) - UI font on the
    raised --surface, so it reads clearly as a "type here" field against the window's --bg body, not as text. */
