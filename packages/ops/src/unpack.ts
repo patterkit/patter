@@ -13,11 +13,13 @@
 //     editor-integration refinement.)
 //
 // A document may arrive from an untrusted external author, so entry paths are
-// validated: no absolute paths, no `..` traversal, no escaping the target.
+// validated twice: a screen on the entry NAME (no absolute paths, no `..`), and
+// containment of the resolved WRITE PATH inside the target, which is the one
+// that holds. See `isUnsafeEntry` / `containedWrite` at the foot of this file.
 // ---------------------------------------------------------------------------
 
 import JSZip from "jszip";
-import { join, normalize, isAbsolute, sep } from "node:path";
+import { join, normalize, isAbsolute, resolve, sep } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { parseSource, canonicalStringify } from "@patterkit/core";
 import { runMerge } from "./merge.js";
@@ -45,7 +47,7 @@ async function readDocShards(bytes: Buffer | Uint8Array): Promise<Map<string, st
 export async function runUnpack(bytes: Buffer | Uint8Array, targetDir: string): Promise<PlannedWrite[]> {
   const shards = await readDocShards(bytes);
   return [...shards.entries()]
-    .map(([name, content]) => ({ path: join(targetDir, name), content }))
+    .map(([name, content]) => ({ path: containedWrite(targetDir, name), content }))
     .sort((a, b) => a.path.localeCompare(b.path));
 }
 
@@ -89,7 +91,7 @@ export async function runUnpackMerge(
   let conflicts = 0, warnings = 0;
 
   for (const [rel, theirText] of [...theirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const outPath = join(projectDir, rel);
+    const outPath = containedWrite(projectDir, rel);
     if (!existsSync(outPath)) {
       // The author added a file we do not have - take it verbatim.
       writes.push({ path: outPath, content: theirText });
@@ -115,9 +117,35 @@ export async function runUnpackMerge(
 }
 
 /** True if a document entry is an absolute path or would escape the target dir.
- *  (JSZip's own API normalises `..` away, but a zip from any other tool may not.) */
+ *
+ *  A screen on the NAME, and the cheap half of the answer. `containedWrite` below is the check that
+ *  actually holds, because a name is not a path: this cannot know what the name resolves to once it is
+ *  joined to a target, and `normalize` does not treat `\` as a separator away from Windows.
+ *
+ *  Note what normalises, because the comment here used to credit the wrong half: it is JSZip's READER,
+ *  not its writer, that collapses `..`. A traversal entry does not survive `loadAsync` however the zip
+ *  was produced, so neither this nor `containedWrite` can currently be reached through it. They are
+ *  kept for a different zip library or a future JSZip, and `pack.test.ts` pins the normalisation so
+ *  that assumption fails loudly rather than silently. */
 export function isUnsafeEntry(name: string): boolean {
   if (isAbsolute(name) || /^[a-zA-Z]:/.test(name)) return true;
   const norm = normalize(name);
   return norm === ".." || norm.startsWith(".." + sep) || norm.startsWith("../");
+}
+
+/**
+ * Join `name` onto `dir` and refuse the result unless it lands INSIDE `dir`.
+ *
+ * This is the guard that holds, and it is deliberately at the point the write path is FORMED rather
+ * than where the entry is read: containment of a resolved path is a fact about the write, where a
+ * judgement about a name is a guess about one. Every path handed back by the two ops below goes
+ * through here.
+ */
+function containedWrite(dir: string, name: string): string {
+  const root = resolve(dir);
+  const full = resolve(join(dir, name));
+  if (full !== root && !full.startsWith(root + sep)) {
+    throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
+  }
+  return full;
 }

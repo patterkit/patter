@@ -64,14 +64,39 @@ describe("pack / unpack round-trip", () => {
   });
 
   it("guards against entries that escape the target directory", () => {
-    // JSZip's own API normalises `..` away, so the real defence is the predicate
-    // runUnpack applies to every entry name - against zips from any other tool.
+    // JSZip's own API normalises `..` away, so this predicate is the screen runUnpack applies to every
+    // entry name - against zips from any other tool. It is only half the guard: see the two below.
     expect(isUnsafeEntry("../escape.patterflow")).toBe(true);
     expect(isUnsafeEntry("a/../../b.patterflow")).toBe(true);
     expect(isUnsafeEntry("/etc/passwd")).toBe(true);
     expect(isUnsafeEntry("C:\\windows\\x")).toBe(true);
     expect(isUnsafeEntry("scenes/start.patterflow")).toBe(false);
     expect(isUnsafeEntry("loc/en/x.patterloc")).toBe(false);
+  });
+
+  it("JSZip collapses a traversal name on the way IN, so neither guard can be reached through it", async () => {
+    // Worth pinning, because it says what the two guards are actually for. A `..` entry does not
+    // survive being read: JSZip normalises it away, so `isUnsafeEntry` never sees one and neither does
+    // the containment check. Both are there for a different reader or a future JSZip, not for a hole
+    // that is open today. If this test ever fails, they stop being belt-and-braces and start earning
+    // their keep, and the refusal path below them needs a test of its own.
+    const zip = new JSZip();
+    zip.file("../escape.patterflow", "{}");
+    const bytes = await zip.generateAsync({ type: "nodebuffer" });
+    const target = scaffold();
+    const writes = await runUnpack(bytes, target);
+    expect(writes.map((w) => w.path)).toEqual([join(target, "escape.patterflow")]);
+  });
+
+  it("every path runUnpack plans lands inside the target directory", async () => {
+    // The property that has to hold whatever an entry is called. `isUnsafeEntry` judges a NAME, which
+    // cannot know where that name resolves to once joined; containment of the resolved path can, and is
+    // what the op now checks at the point each write path is formed.
+    const src = scaffold();
+    const target = scaffold();
+    const writes = await runUnpack(await runPack(src), target);
+    expect(writes.length).toBeGreaterThan(0);
+    for (const w of writes) expect(w.path.startsWith(target + "/")).toBe(true);
   });
 });
 
