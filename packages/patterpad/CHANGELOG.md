@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+- **Hover tooltips are back in the Play, Search and Coverage windows.** Several controls in those
+  windows explained themselves on hover and had quietly stopped: the Search window's pin has had no
+  tooltip since 0.7.0, and the Play window's lost its own in 0.8.0. Every control in those windows
+  now shows the app's own tooltip rather than the operating system's slower one, matching the
+  editor. The Coverage window's pin also says what a click will *do* ("click to unpin" when it is
+  pinned) instead of always reading "Keep on top".
+
 ## [0.8.0] - 2026-08-17
 
 ### Added
