@@ -3,7 +3,8 @@
 // leaked to the page. Each method is a typed wrapper over one ipcMain.handle channel.
 
 import { contextBridge, ipcRenderer } from "electron";
-import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress } from "../shared/api.js";
+import { JOB_PROGRESS } from "@wildwinter/app-shell/job";
+import type { PatterApi, PatterPlayApi, PatterSearchApi, PatterCoverageApi, JobProgressDto, PlayChoiceOption, SearchEntry, SearchMode, OpenResult, UpdaterPromptOptions, UpdaterDownloadProgress } from "../shared/api.js";
 
 const api: PatterApi = {
   boot: () => ipcRenderer.invoke("project:boot"),
@@ -142,6 +143,8 @@ const searchApi: PatterSearchApi = {
 const coverageApi: PatterCoverageApi = {
   info: () => ipcRenderer.invoke("covWin:info"),
   run: (options) => ipcRenderer.invoke("covWin:run", options),
+  cancel: () => { void ipcRenderer.invoke("covWin:cancel"); },
+  onProgress: (handler) => { ipcRenderer.on(JOB_PROGRESS, (_e, p: JobProgressDto) => handler(p)); },
   reveal: (sceneId, beatId) => { void ipcRenderer.invoke("covWin:reveal", sceneId, beatId); },
   openWorld: () => { void ipcRenderer.invoke("covWin:openWorld"); },
   findUsage: (ref) => { void ipcRenderer.invoke("covWin:findUsage", ref); },

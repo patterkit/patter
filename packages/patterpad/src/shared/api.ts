@@ -543,13 +543,27 @@ export interface CoverageWinInfo {
   last: CoverageResult | null;
 }
 
+/** One progress tick from a long job in main. Mirrors app-shell's `JobProgress`, restated here so the
+ *  renderer contract does not depend on the shell's types crossing the preload boundary. */
+export interface JobProgressDto {
+  kind: string;
+  done: number;
+  total: number;
+  elapsedMs: number;
+}
+
 /** The detached COVERAGE window's bridge (window.patterCoverage). Runs coverage in the main process,
  *  caches the last result for the session, and drives the editor's jump + the World Properties settings tab. */
 export interface PatterCoverageApi {
   /** Initial state on boot (scenes, start, saved-driver count, last cached result). */
   info(): Promise<CoverageWinInfo>;
-  /** Run a coverage sweep; the result is cached in the main process for the rest of the session. */
+  /** Run a coverage sweep; the result is cached in the main process for the rest of the session.
+   *  Resolves with a PARTIAL result if the sweep was cancelled (its report says so). */
   run(options: CoverageRunOptions): Promise<CoverageResult | null>;
+  /** Ask a running sweep to stop. It stops at the next run and still returns what it sampled. */
+  cancel(): void;
+  /** Progress from the running sweep (runs done / asked for, and how long it has been going). */
+  onProgress(handler: (p: JobProgressDto) => void): void;
   /** Jump the editor to a beat (focuses the editor; the coverage window stays open). */
   reveal(sceneId: string, beatId: string): void;
   /** Open Project Settings ▸ World Properties in the editor (declare host scopes + edit drivers). */

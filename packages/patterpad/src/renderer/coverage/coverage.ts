@@ -5,9 +5,11 @@
 // Properties (declare @world properties + edit the input drivers the sweep feeds them).
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "./coverage.css";
+import "@wildwinter/app-shell/job.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
+import { mountJobProgress } from "@wildwinter/app-shell";
 import { renderCoverage } from "../src/coverage-view.js";
 import type { CoverageResult } from "../../shared/api.js";
 
@@ -23,6 +25,14 @@ const pinBtn = document.getElementById("cov-pin") as HTMLButtonElement;
 const driversNote = document.getElementById("cov-drivers")!;
 const statusEl = document.getElementById("cov-status")!;
 const host = document.getElementById("cov-host")!;
+
+// The progress strip (app-shell's long-job kit). A STRIP, not a modal: the sweep no longer freezes the
+// app, so the rest of this window stays usable while it runs, and the last results stay readable.
+const jobView = mountJobProgress(document.getElementById("cov-job")!, {
+  onCancel: () => { cov.cancel(); },
+  units: "runs",
+});
+cov.onProgress((p) => { if (p.kind === "coverage") jobView.update(p.done, p.total, p.elapsedMs); });
 
 let sceneNames: Record<string, string> = {};
 
@@ -56,20 +66,25 @@ async function boot(): Promise<void> {
 /** Run a sweep with the bar's options and render it. The result is cached in the main process. */
 async function run(): Promise<void> {
   runBtn.disabled = true;
-  statusEl.hidden = false; statusEl.textContent = "Running…"; host.hidden = true;
-  await new Promise((r) => setTimeout(r, 0)); // let "Running…" paint before the (sync, main-thread) run
+  statusEl.hidden = true;
+  // The previous results are DIMMED rather than hidden: the sweep now runs beside you, and a stale
+  // answer you can still read beats an empty pane. The dim is what says it is stale.
+  host.classList.add("stale");
+  jobView.begin("Running coverage…");
   try {
     const result = await cov.run({
       runs: numOr(runsInput, 5000), maxSteps: numOr(maxStepsInput, 200),
       seed: Math.max(0, Math.floor(Number(seedInput.value) || 0)),
       scene: sceneSel.value || undefined,
     });
-    if (!result) { statusEl.textContent = "No project open."; return; }
-    statusEl.hidden = true;
+    if (!result) { statusEl.hidden = false; statusEl.textContent = "No project open."; return; }
     showResult(result);
   } catch (e) {
+    statusEl.hidden = false;
     statusEl.textContent = `Coverage failed: ${e instanceof Error ? e.message : String(e)}`;
   } finally {
+    jobView.end();
+    host.classList.remove("stale");
     runBtn.disabled = false;
   }
 }

@@ -21,6 +21,7 @@ import { savedWindowRect, rememberBounds, centeredOnPrimary } from "@wildwinter/
 // Its IPC channel names are byte-identical to the ones this app already used, so
 // the preload and the renderer dialog are untouched.
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
+import { createJobHost, JOB_PROGRESS } from "@wildwinter/app-shell/job";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenResult, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
 
@@ -53,6 +54,16 @@ function ensureDebugServer(): DebugServer {
 // The shell names the settings file; we hand it the directory. It folds in the old
 // `patterpad-session.json` sitting beside it on the first run after the change.
 const store = createStore(app.getPath("userData"));
+
+// Long jobs (the coverage sweep, today). COOPERATIVE, not parallel: the work still runs here, it just
+// hands the event loop back every few milliseconds, so IPC keeps flowing and Cancel is heard. Progress
+// goes to every live window rather than a remembered one, because the window that started the job is
+// not necessarily the only one that should see it, and a closed-and-reopened window still catches up.
+const jobs = createJobHost({
+  send: (channel, payload) => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload);
+  },
+});
 
 // Live bundle refresh over the debug link (live-bundle-refresh, phases 2-3): after a save (or a
 // build), recompile the game-facing bundle and push it to a connected game, debounced. Free when
@@ -688,10 +699,21 @@ function registerIpc(): void {
     store.setCoverage({ ...store.read().coverage, pinned: on });
     coverageWin?.setAlwaysOnTop(on);
   });
-  ipcMain.handle("covWin:run", (_e, options: import("../shared/api.js").CoverageRunOptions) => {
-    lastCoverageResult = project.coverage(options); // cache for the session (reopen restores it)
-    return lastCoverageResult;
+  ipcMain.handle("covWin:run", async (_e, options: import("../shared/api.js").CoverageRunOptions) => {
+    const outcome = await jobs.start("coverage", async (ctx) => project.coverageAsync(options, {
+      // The job's cancel flag, in the shape ops asks for. Read through a getter: ops checks it at the
+      // top of every run, and the whole point is that it can change between two of them.
+      signal: { get aborted() { return ctx.cancelled; } },
+      onRun: (done, total) => ctx.step(done, total),
+    }));
+    // A cancelled sweep still produced a report, and it is an honest one (`runs` is what it executed,
+    // `cancelled` is set), so it is worth caching and showing rather than throwing away.
+    if ("error" in outcome) throw new Error(outcome.error);
+    const result = outcome.value ?? null;
+    if (result) lastCoverageResult = result; // cache for the session (reopen restores it)
+    return result;
   });
+  ipcMain.handle("covWin:cancel", () => { jobs.cancel("coverage"); });
   ipcMain.handle("covWin:reveal", (_e, sceneId: string, beatId: string) => {
     if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); win.webContents.send("coverage:navigate", sceneId, beatId); }
   });
