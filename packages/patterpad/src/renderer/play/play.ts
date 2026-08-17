@@ -15,7 +15,8 @@ import "@fontsource-variable/inter";
 
 import { staleBar } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";
-import { initTooltips } from "@wildwinter/app-shell";
+import { initTooltips, pinButton } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/tool-window.css"; // the pin's chrome travels with it
 import { colourFor } from "@patterkit/patterpad-surface/colour";
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
 
@@ -26,7 +27,6 @@ initTooltips();
 const play = window.patterPlay!;
 const transcriptEl = document.getElementById("transcript")!;
 const controlsEl = document.getElementById("choices")!;
-const pinEl = document.getElementById("play-pin") as HTMLButtonElement;
 const addrEl = document.getElementById("play-addr")!;
 const localeEl = document.getElementById("play-locale") as HTMLSelectElement;
 const rewindEl = document.getElementById("play-rewind") as HTMLButtonElement;
@@ -373,18 +373,11 @@ async function startRun(): Promise<void> {
 }
 
 // --- header (starting address) + always-on-top pin ---------------------------
-let pinned = true;
-function setPin(on: boolean): void {
-  pinned = on;
-  pinEl.setAttribute("aria-pressed", String(on));
-  pinEl.classList.toggle("on", on);
-  // The THEMED rollover, not the platform's, and `aria-label` because `title` was also this
-  // button's only accessible name. Same fix the shell's `pinButton` had in 0.27.0.
-  const label = on ? "Pinned on top: click to unpin" : "Click to keep on top";
-  pinEl.dataset["tip"] = label;
-  pinEl.setAttribute("aria-label", label);
-}
-pinEl.addEventListener("click", () => { setPin(!pinned); play.setPin(pinned); });
+// The pin is the shell's `pinButton`, as the search window's already was: one place decides what a
+// pinned tool window looks like, and this app was drawing two of them. Its `set` handle is how main
+// re-pins on Reset View without the button choosing it. Inserted where the markup used to put it.
+const pin = pinButton({ pinned: true, onToggle: (on) => play.setPin(on) });
+addrEl.after(pin.el);
 rewindEl.addEventListener("click", () => void startRun());
 
 // --- play-language switcher (#195) -------------------------------------------
@@ -412,12 +405,12 @@ function applyInfo(info: PlayInfo): void {
 }
 localeEl.addEventListener("change", () => { void play.setLocale(localeEl.value).then(() => startRun()); });
 
-void play.info().then((info) => { applyInfo(info); setPin(info.pinned); applyTheme(info.theme); });
+void play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); });
 // The palette is the app's, not this window's: apply what the editor last chose, and follow it when
 // the author changes it. Importing theme.css is not enough, because the curated palettes only exist
 // under the `data-theme` attribute this sets.
 play.onTheme((t) => applyTheme(t));
-play.onPin((on) => setPin(on)); // Reset View re-pins in main; the button must be told
+play.onPin((on) => pin.set(on)); // Reset View re-pins in main; the button must be told
 play.onRestart(() => { void play.info().then(applyInfo); void startRun(); });
 play.onStale(showStale); // editor edited the scene mid-run AND the swap failed: freeze until restart
 // Live bundle refresh (phase 1): the edit landed in the running session in place. Confirm quietly;

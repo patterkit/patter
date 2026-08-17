@@ -10,7 +10,8 @@ import "@wildwinter/app-shell/job.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
-import { mountJobProgress } from "@wildwinter/app-shell";
+import { mountJobProgress, pinButton } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/tool-window.css"; // the pin's chrome travels with it
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips } from "@wildwinter/app-shell";
 import { renderCoverage } from "../src/coverage-view.js";
@@ -28,7 +29,6 @@ const seedInput = document.getElementById("cov-seed") as HTMLInputElement;
 const sceneSel = document.getElementById("cov-scene") as HTMLSelectElement;
 const runBtn = document.getElementById("cov-run") as HTMLButtonElement;
 const worldBtn = document.getElementById("cov-world") as HTMLButtonElement;
-const pinBtn = document.getElementById("cov-pin") as HTMLButtonElement;
 const driversNote = document.getElementById("cov-drivers")!;
 const statusEl = document.getElementById("cov-status")!;
 const host = document.getElementById("cov-host")!;
@@ -60,7 +60,7 @@ async function boot(): Promise<void> {
   sceneSel.replaceChildren(new Option("Project start", ""));
   for (const s of info.scenes) sceneSel.append(new Option(s.name, s.id));
   sceneSel.value = ""; // default to the project start
-  pinned = info.pinned; reflectPin();
+  pin.set(info.pinned);
   applyTheme(info.theme); // the palette is the app's; importing theme.css alone leaves this on Paper
   driversNote.textContent = !info.hasProject
     ? "No project open."
@@ -97,20 +97,12 @@ async function run(): Promise<void> {
   }
 }
 
-// Always-on-top pin (default pinned, remembered): same affordance as the play + search windows.
-let pinned = true;
-const reflectPin = (): void => {
-  pinBtn.classList.toggle("on", pinned);
-  pinBtn.setAttribute("aria-pressed", String(pinned));
-  // Say what a CLICK will do, not what the state is. The markup's static "Keep on top" went on
-  // saying that while pinned, which is the one moment it is wrong.
-  const label = pinned ? "Pinned on top: click to unpin" : "Click to keep on top";
-  pinBtn.dataset["tip"] = label;
-  pinBtn.setAttribute("aria-label", label);
-};
-pinBtn.addEventListener("click", () => { pinned = !pinned; cov.setPin(pinned); reflectPin(); });
-// Reset View re-pins in main; the button has to be told or it keeps showing its own last choice.
-cov.onPin((on) => { pinned = on; reflectPin(); });
+// The pin is the shell's `pinButton`, like the play + search windows: one place decides what a pinned
+// tool window looks like. Its `set` handle is how main re-pins on Reset View without the button
+// choosing it, and it says what a CLICK will do rather than what the state is.
+const pin = pinButton({ pinned: true, onToggle: (on) => cov.setPin(on) });
+worldBtn.before(pin.el);
+cov.onPin((on) => pin.set(on));
 cov.onTheme((t) => applyTheme(t));
 
 runBtn.addEventListener("click", () => void run());
