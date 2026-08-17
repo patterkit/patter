@@ -20,7 +20,7 @@ const tagHits: SearchEntry[] = [
 ];
 
 const stub = {
-  info: async () => ({ mode: "property" as const, pinned: true, hasProject: true, voiced: true, query: "@gold" }),
+  info: async () => ({ mode: "property" as const, pinned: true, hasProject: true, voiced: true, query: "@gold", theme: { colour: "system" as const, font: "newsreader" as const } }),
   search: async (q: string) => (q.trim() ? contentHits : []),
   propertyUsage: async (q: string) => (q.trim() ? propertyHits.filter((e) => !q.includes(" ") || e.text!.toLowerCase().includes(q.split(/\s+/)[1]!.toLowerCase())) : []),
   replacePreview: async (opts: { query: string; replacement: string }) => {
@@ -44,6 +44,7 @@ const stub = {
   onSeed: () => undefined,
   onProject: () => undefined,
   onPin: () => undefined,
+  onTheme: () => undefined,
 };
 (window as unknown as { patterSearch: unknown }).patterSearch = stub;
 void import("../search/search.js");

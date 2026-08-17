@@ -37,6 +37,7 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // address content by them and none may depend on a UI kit. `id-parity.test.ts`
 // asserts our copy still matches the shell's default.
 import { el } from "./dom.js";
+import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, type ShardVc } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
@@ -789,18 +790,12 @@ writingExitEl.textContent = `Exit Writing View · ${navigator.platform.toUpperCa
 // --- colour / font theme (View menu) -----------------------------------------
 let theme: ThemePrefs = { colour: "system", font: "newsreader" };
 
-/** Reflect the theme on the renderer root: `data-theme` drives the colour scheme ("system" follows
- *  the OS by setting nothing), `data-font` swaps the reading-face token set (see the surface theme.css). */
-function applyTheme(): void {
-  const root = document.documentElement;
-  if (theme.colour === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme.colour);
-  root.setAttribute("data-font", theme.font);
-}
-
 function setTheme(patch: Partial<ThemePrefs>): void {
   theme = { ...theme, ...patch };
-  applyTheme();
-  void window.patter.setTheme(theme); // remember it (also refreshes the View-menu radio checks)
+  applyTheme(theme);
+  // Remember it (this also refreshes the View-menu radio checks) AND hand it to every other open
+  // window: the helper windows share this app's palette and cannot see this one's root.
+  void window.patter.setTheme(theme);
 }
 
 // --- the problems bar (bottom, prev/next nav) --------------------------------
@@ -2371,7 +2366,7 @@ async function boot(): Promise<void> {
   showResolved = false;
   showResolvedSuggestions = false;
   showReviewFeedback = false;
-  theme = state.theme; applyTheme(); // restore the remembered colour / font theme
+  theme = state.theme; applyTheme(theme); // restore the remembered colour / font theme
   await ensureIdentity(state.identity);
   authorName = (await window.patter.getIdentity())?.name ?? state.identity?.name ?? ""; // stamp comments
   if (state.open) await showProject(state.open);

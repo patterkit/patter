@@ -9,6 +9,7 @@ import "./search.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
+import { applyTheme } from "../src/apply-theme.js";
 import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js";
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
@@ -305,6 +306,7 @@ search.onSeed((query) => { input.value = query; if (mode === "property") void ru
 // Reset View re-pins every helper window in main. The button chose its own state and would go on
 // showing it, so main tells it: this is the case `pinButton`'s `set` handle exists for.
 search.onPin((on) => pin.set(on));
+search.onTheme((t) => applyTheme(t));
 
 search.onProject(() => void (async () => {
   voiced = (await search.info()).voiced; reflectVoiced();
@@ -316,6 +318,7 @@ search.onProject(() => void (async () => {
 void (async () => {
   const info = await search.info();
   pin.set(info.pinned); // main decided this one, so no toggle callback
+  applyTheme(info.theme);  // the palette is the app's; importing theme.css alone leaves this on Paper
   voiced = info.voiced; reflectVoiced();
   if (!info.hasProject) {
     hintEl.textContent = "Open a project to search.";
