@@ -18,7 +18,7 @@ describe("bridge stamps type from the node name (not raw)", () => {
     const doc = S.nodes.doc.create({ raw: JSON.stringify({ id: "S_1", type: "scene", name: "S" }) }, [block]);
 
     const { scene } = docToScene(doc);
-    const child = scene.blocks[0].children[0];
+    const child = scene.blocks[0]!.children[0]!;
     expect(child.type).toBe("group");
     expect((child as { children?: unknown[] }).children).toEqual([]);
   });
@@ -29,6 +29,6 @@ describe("bridge stamps type from the node name (not raw)", () => {
     const doc = S.nodes.doc.create({ raw: JSON.stringify({ id: "S_1", type: "scene", name: "S" }) }, [block]);
 
     const { scene } = docToScene(doc);
-    expect(scene.blocks[0].children[0].type).toBe("snippet");
+    expect(scene.blocks[0]!.children[0]!.type).toBe("snippet");
   });
 });
