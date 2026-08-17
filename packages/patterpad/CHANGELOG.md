@@ -6,6 +6,40 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+- **The coverage test shows how far it has got, and you can stop it.** `Review ▸ Run Coverage Test`
+  used to lock the whole app for the length of the sweep with no sign of progress: at the default
+  5000 runs that is several seconds of a window that does not respond to anything. It now runs
+  beside you. A strip above the results carries a progress bar, the runs done, how long it has
+  been going, a rough estimate of what is left, and a **Cancel** button. Cancelling keeps what the
+  sweep actually sampled instead of throwing it away, and marks that report **stopped early** and
+  counts only the runs it really did, so a short sample can never be mistaken for a full one. The
+  previous results stay readable, dimmed, while a new sweep runs.
+
+### Changed
+- **Your preferences have moved to `app-settings.json`,** in the same folder as before. The first
+  launch after this update reads the old `patterpad-session.json` once and carries everything
+  across: recent projects and their names, the scene and line you were last on in each of them,
+  your name, the colour and font themes, and the size, position and pin of the Play, Search and
+  Coverage windows. **The old file is not written to and not deleted,** so it stays where it is as
+  a way back. One deliberate change comes with it: a remembered position is now kept only for
+  projects still in your Open Recent list, rather than for every project ever opened.
+- **A play session that has fallen behind the script now says so in a banner,** with the Restart
+  button inside it, instead of a line of grey text at the bottom of the choice tray. The run is
+  frozen until you restart, and the old note read like the end of a passage rather than something
+  needing an answer.
+- **The Review Feedback bar gives the scene its own column** instead of running it into the front
+  of the comment, so the comment itself gets the width.
+
+### Fixed
+- **Shift-clicking to extend a selection from a single selected line or group did nothing.** The
+  run between the two never formed. (It failed outright rather than misbehaving, so nothing was
+  written wrongly.)
+- **A quick fix offering a list of valid values could write `null` into a condition.** The chooser
+  it opens is shared with the "go to" picker, so it carried that picker's **No jump** row, which
+  means nothing when you are picking a value. Choosing it wrote the word `null` into the condition
+  instead of doing nothing. That row is now ignored here.
+
 ## [0.7.0] - 2026-08-16
 
 ### Changed
