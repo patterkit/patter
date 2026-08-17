@@ -79,6 +79,18 @@ Not every stakeholder is in your repo: a freelance writer, a reviewer, a transla
 of the project. They edit it, send it back, and `patter unpack --merge` folds their changes back
 in, line by line. → [The CLI](/cli/)
 
+:::caution[Keep the pack you sent]
+`unpack --merge` is a three-way merge, so it needs the version you sent as the common ancestor:
+
+```sh
+patter unpack their-return.patterpack --merge --base the-pack-you-sent.patterpack -o .
+```
+
+Keep every pack you hand out, in an outbox folder or in the repo. Without the original there is
+nothing to merge against, and their return can only be unpacked over the top of your work, losing
+anything you changed while they had it.
+:::
+
 ## A typical shipping loop
 
 1. Writers finish a pass; you run **Production ▸ Production Information** to check coverage and
