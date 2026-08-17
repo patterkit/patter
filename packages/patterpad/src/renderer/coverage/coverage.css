@@ -22,10 +22,6 @@ body.coverage-win {
 .cov-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--paper, #fff); }
 .cov-bar .btn.primary:hover { color: var(--paper, #fff); filter: brightness(1.05); }
 .cov-bar .btn:disabled { opacity: 0.5; cursor: default; }
-.cov-pin { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 1.85rem; border: 1px solid var(--line); border-radius: 6px; background: none; color: var(--muted); cursor: pointer; padding: 0; }
-.cov-pin:hover { color: var(--ink); border-color: var(--line); }
-.cov-pin svg { display: block; }
-.cov-pin.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
 .cov-drivers { flex: 0 0 auto; margin: 0; padding: 0.4rem 0.9rem 0; font: 0.74rem var(--font-ui); color: var(--ink-soft); }
 .cov-status { flex: 0 0 auto; margin: 0; padding: 0.5rem 0.9rem; color: var(--muted); font: 0.82rem var(--font-ui); }
