@@ -790,13 +790,6 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* --- Themed tooltip (web/tooltip.ts): one shared bubble replacing native `title` rollovers. A quiet,
    inverted bubble (ink ground / surface text) so it reads as a tooltip in either theme; eases in with
    the shared panel-enter; positioned by JS (position: fixed). Suppressed in Writing View by the JS. --- */
-.tooltip {
-  position: fixed; z-index: 100; pointer-events: none;
-  max-width: 22rem; white-space: pre-line; /* the comment / note tips carry newlines */
-  background: var(--ink); color: var(--surface);
-  font: 0.72rem/1.4 var(--font-ui); letter-spacing: 0.01em;
-  padding: 0.3rem 0.5rem; border-radius: var(--radius-sm);
-  box-shadow: 0 4px 14px color-mix(in oklab, var(--ink) 35%, transparent);
-}
-.tooltip[hidden] { display: none; }
-.tooltip.show { animation: var(--anim-panel-in); }
+/* The tooltip bubble's styles travel with the controller now: it is the shell's
+   (app-shell tooltip.css), imported where the controller is started. The rules
+   were identical, which is what made the lift safe. */

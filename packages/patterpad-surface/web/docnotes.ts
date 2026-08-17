@@ -14,7 +14,7 @@ import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import type { Node as PMNode } from "prosemirror-model";
 import { createGutterOverlay } from "./gutterlayer.js";
-import { tipBold } from "./tooltip.js";
+import { tipBold } from "@wildwinter/app-shell";
 import { modelIdOf } from "../src/zoneutil.js";
 
 /** One visible note: its class (for the label) + text. */
