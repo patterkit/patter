@@ -4,7 +4,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "noEmit": true
   },
-  "include": ["src/renderer/src", "src/renderer/play", "src/renderer/search", "src/renderer/coverage", "src/renderer/preview", "src/shared"],
-  "_comment": "The root config excludes this app's main / preload / renderer so its pure-Node program skips them. `exclude` is INHERITED through `extends` and resolved against the ROOT, so without this override it also excluded everything below - and these two programs silently checked nothing but src/shared.",
+  "include": ["src/renderer", "src/shared"],
+  "_comment": "Two DIRECTORIES, not a list of the windows inside them. This listed renderer subdirectories one by one and had drifted twice: coverage and preview were never added, so a whole window was written against no compiler. An allowlist that has to be extended every time somebody adds a window is a list nothing checks for completeness. Naming the parent derives it instead. Separately: the root config excludes this app's main / preload / renderer so its pure-Node program skips them, and `exclude` is INHERITED through `extends` and resolved against the ROOT, so without the override below it also excluded everything here and these two programs silently checked nothing but src/shared.",
   "exclude": ["node_modules"]
 }
