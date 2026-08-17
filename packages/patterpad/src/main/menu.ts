@@ -19,7 +19,7 @@ const NAMED = namedMenuItems({
   docsUrl: "https://patterkit.dev/patterpad/overview/",
   suiteDocsUrl: "https://patterkit.dev/",
 });
-import { manualCheckForUpdates } from "./updater.js";
+import { manualCheckForUpdates } from "@wildwinter/app-shell/updater";
 import type { PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
 const isMac = process.platform === "darwin";
