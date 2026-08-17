@@ -1,10 +1,21 @@
-// A tiny JSON session store under the app's userData dir: the last project, recent projects, the
-// last scene per project (open-where-you-left-off), and the author identity (first run). Pure over a
-// given file path so it's unit-testable without Electron. Reads are tolerant - a missing / corrupt
-// file is treated as empty, never a crash.
+// The session store (last project, recents, open-where-you-left-off, identity, theme, helper-window
+// bounds) - now an ADAPTER over the shell's `createAppStore`.
+//
+// The shape below is Patterpad's own and is deliberately unchanged: 37 call sites in index.ts read
+// `lastScene` / `play.pinned` / `theme` and call `recordOpen` / `recordScene`, and none of them should
+// have to care that the bytes underneath are now the family's `app-settings.json`. Everything that is
+// genuinely shared (recents and their cap, panes, identity, per-window bounds + pin, the atomic write,
+// the tolerant read) is the shell's; everything below is the translation plus the three things that are
+// this app's alone - the light/dark theme remap, the pinned-by-default helper windows, and the
+// `lastScene` / `lastCaret` pair the renderer still speaks in.
+//
+// Takes the userData DIRECTORY, not a file: the shell owns the filename, and the one-time fold-in of
+// the old `patterpad-session.json` needs to look beside it.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { createAppStore } from "@wildwinter/app-shell/app-store";
+import type { AppSettings, PaneState as ShellPaneState, WindowState } from "@wildwinter/app-shell/app-store";
 import type { Identity, PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
 export interface SessionState {
@@ -33,7 +44,24 @@ export interface PlayWindowState {
   pinned: boolean;
 }
 
-const RECENTS_MAX = 8;
+/** Where the author was in one project. The shell keeps `places` opaque and keyed by project path;
+ *  this is what Patterpad puts in the slot, and `read()` fans it back out into the parallel
+ *  `lastScene` / `lastCaret` records the rest of the app still reads. */
+interface Place {
+  scene: string;
+  caret?: string;
+}
+
+/** Patterpad's own slice of the settings file. The shell merges this field by field, so a key added
+ *  in a later version arrives with its default rather than being absent for existing authors. */
+interface AppSlice {
+  theme: ThemePrefs;
+}
+
+/** The old hand-rolled file, kept only for the one-time fold-in below. */
+const LEGACY_FILE = "patterpad-session.json";
+const SETTINGS_FILE = "app-settings.json";
+
 // First-run default: BOTH sides closed so the editor opens full-bleed (Patterpad.md §4 - "both sides
 // start closed... the centre is the constant, the sides are guests"). Either is remembered once toggled,
 // so a writer who likes the navigator up gets it back on every later launch.
@@ -42,18 +70,24 @@ const DEFAULT_PANES: PaneState = { nav: false, inspector: false };
 const DEFAULT_THEME: ThemePrefs = { colour: "system", font: "newsreader" };
 /** Migrate an older session's colour choice to the current curated palettes: the raw light/dark switch
  *  (#173) light -> Paper, dark -> Night, and the retired warm "sepia" -> the cool "mist". Anything
- *  already a current palette (or "system") passes through unchanged. */
+ *  already a current palette (or "system") passes through unchanged.
+ *
+ *  Stays HERE rather than moving into the shell: the shell's `app` slice merges field by field and
+ *  knows nothing about what any one app's values mean, let alone which of them were retired. */
 function migrateTheme(t: ThemePrefs): ThemePrefs {
   const remap: Record<string, ThemePrefs["colour"]> = { light: "paper", dark: "night", sepia: "mist" };
   const colour = remap[t.colour as string] ?? t.colour;
   return colour === t.colour ? t : { ...t, colour };
 }
-// The play window floats on top by default (the author reads it beside the script as they edit).
-const DEFAULT_PLAY: PlayWindowState = { pinned: true };
-// The search tool window also floats on top by default (it's a helper you read against the script).
-const DEFAULT_SEARCH: PlayWindowState = { pinned: true };
-const DEFAULT_COVERAGE: PlayWindowState = { pinned: true };
-const empty = (): SessionState => ({ lastScene: {}, lastCaret: {}, recents: [], panes: { ...DEFAULT_PANES }, theme: { ...DEFAULT_THEME }, play: { ...DEFAULT_PLAY }, search: { ...DEFAULT_SEARCH }, coverage: { ...DEFAULT_COVERAGE } });
+
+// The three helper windows float on top by default (the author reads them beside the script as they
+// edit). The shell's `pinned` is OPTIONAL and so absent until something writes it; applying the default
+// on READ is what stops every window silently unpinning on the first launch after this change.
+const PINNED_BY_DEFAULT = true;
+const windowState = (w: WindowState | undefined): PlayWindowState => ({
+  ...(w?.bounds ? { bounds: w.bounds } : {}),
+  pinned: w?.pinned ?? PINNED_BY_DEFAULT,
+});
 
 export interface Store {
   read(): SessionState;
@@ -68,80 +102,141 @@ export interface Store {
   forget(path: string): void;
 }
 
-export function createStore(filePath: string, now: () => number = Date.now): Store {
-  // We are the SOLE writer of this prefs file, so the parsed state can be cached in the closure (a single
-  // operation calls read() several times) and kept in sync on write - no re-parse of the JSON each access,
-  // and the read-modify-write of the mutators sees a consistent value.
-  let cached: SessionState | null = null;
-  let lastWritten: string | null = null; // the bytes currently on disk, so write() can skip a no-op
+/**
+ * One-time fold-in of the pre-shell `patterpad-session.json`.
+ *
+ * Runs only when the shell's own file does not exist yet, and writes the TRANSLATED settings before
+ * the store opens them, so `createAppStore` just reads a normal file of its own shape. The old file is
+ * never written to and never deleted: it stays on disk as a free rollback.
+ *
+ * Deliberately not done by pointing the shell at the old filename. Its read is tolerant enough to
+ * ingest that file, but its migrations cover the shell's own history, not Patterpad's keys, so
+ * `lastScene`, `lastCaret`, `play`, `search`, `coverage` and `theme` would all be silently dropped on
+ * the first write.
+ */
+function foldInLegacySession(dir: string): void {
+  const settingsFile = join(dir, SETTINGS_FILE);
+  if (existsSync(settingsFile)) return; // the shell's file is authoritative once it exists
+  let old: Partial<SessionState>;
+  try {
+    old = JSON.parse(readFileSync(join(dir, LEGACY_FILE), "utf8")) as Partial<SessionState>;
+  } catch {
+    return; // no old file, or an unreadable one: a genuine first run, defaults all the way down
+  }
+  const places: Record<string, Place> = {};
+  for (const [path, scene] of Object.entries(old.lastScene ?? {})) {
+    const caret = old.lastCaret?.[path];
+    places[path] = { scene, ...(caret ? { caret } : {}) };
+  }
+  const settings: AppSettings<Place, AppSlice> = {
+    recents: (old.recents ?? []).map((r) => ({ path: r.path, ...(r.name ? { name: r.name } : {}) })),
+    ...(old.lastProject !== undefined ? { lastProject: old.lastProject } : {}),
+    places,
+    panes: { ...DEFAULT_PANES, ...old.panes } as ShellPaneState,
+    ...(old.identity ? { identity: old.identity } : {}),
+    windows: {
+      play: { ...old.play },
+      search: { ...old.search },
+      coverage: { ...old.coverage },
+    },
+    app: { theme: migrateTheme({ ...DEFAULT_THEME, ...old.theme }) },
+  };
+  try {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(settingsFile, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+  } catch {
+    // A read-only home, a full disk: carry on and let the shell start from defaults, exactly as it
+    // would on a first run. Settings are not worth failing to start over.
+  }
+}
+
+/** @param dir the app's userData directory (NOT a file path: the shell names the file). */
+export function createStore(dir: string): Store {
+  foldInLegacySession(dir);
+  const app = createAppStore<Place, AppSlice>({
+    dir,
+    fileName: SETTINGS_FILE,
+    defaults: { theme: { ...DEFAULT_THEME } },
+    panes: { ...DEFAULT_PANES },
+  });
+
+  // These three setters REPLACE, where the shell's `setWindow` merges, and the difference is load
+  // bearing: `rescueWindows()` calls `setPlay({ pinned: true })` precisely to CLEAR a remembered
+  // rectangle, which is the whole point of a rescue - a window stranded off-screen must not come back
+  // to the same bad coordinates on the next launch. Every other caller already spreads the current
+  // state in, so passing the rectangle through explicitly (undefined and all) is what they both want.
+  const setWindow = (key: string, w: PlayWindowState): void => {
+    app.setWindow(key, { bounds: w.bounds, pinned: w.pinned });
+  };
+
   const read = (): SessionState => {
-    if (cached) return cached;
-    try {
-      const raw = readFileSync(filePath, "utf8");
-      lastWritten = raw;
-      const parsed = JSON.parse(raw) as Partial<SessionState>;
-      cached = {
-        ...empty(), ...parsed,
-        lastScene: parsed.lastScene ?? {}, lastCaret: parsed.lastCaret ?? {}, recents: parsed.recents ?? [],
-        panes: { ...DEFAULT_PANES, ...parsed.panes },
-        theme: migrateTheme({ ...DEFAULT_THEME, ...parsed.theme }),
-        play: { ...DEFAULT_PLAY, ...parsed.play },
-        search: { ...DEFAULT_SEARCH, ...parsed.search },
-        coverage: { ...DEFAULT_COVERAGE, ...parsed.coverage },
-      };
-    } catch {
-      cached = empty();
+    const s = app.get();
+    // `places` is one record of {scene, caret}; the app has always spoken in two parallel records and
+    // several readers still index them directly, so fan it back out here.
+    const lastScene: Record<string, string> = {};
+    const lastCaret: Record<string, string> = {};
+    for (const [path, place] of Object.entries(s.places)) {
+      if (!place) continue;
+      lastScene[path] = place.scene;
+      if (place.caret !== undefined) lastCaret[path] = place.caret;
     }
-    return cached;
+    return {
+      ...(s.lastProject !== undefined ? { lastProject: s.lastProject } : {}),
+      lastScene,
+      lastCaret,
+      // The shell's name is optional (the path is the identity); Patterpad's menu always renders one,
+      // and every write below passes it, so the fallback is for entries written by an older shell.
+      recents: s.recents.map((r) => ({ path: r.path, name: r.name ?? basename(r.path) })),
+      ...(s.identity ? { identity: s.identity } : {}),
+      // Patterpad's PaneState is a SUPERSET of the shell's (docHidden, the review-session toggles,
+      // lineStatusShown). The shell merges and serialises whatever object it is handed and never reads
+      // into it, so the extra fields round-trip untouched; only the static type is narrower.
+      panes: { ...DEFAULT_PANES, ...(s.panes as PaneState) },
+      theme: migrateTheme({ ...DEFAULT_THEME, ...s.app.theme }),
+      play: windowState(s.windows.play),
+      search: windowState(s.windows.search),
+      coverage: windowState(s.windows.coverage),
+    };
   };
-  const write = (next: SessionState): void => {
-    const body = `${JSON.stringify(next, null, 2)}\n`;
-    cached = next; // keep the cache in step with disk (we are the only writer)
-    if (body === lastWritten) return; // no-op write (e.g. boot forcing already-false pane flags) - skip the disk hit
-    lastWritten = body;
-    mkdirSync(dirname(filePath), { recursive: true });
-    writeFileSync(filePath, body, "utf8");
-  };
+
   return {
     read,
     recordOpen(path, name) {
-      const cur = read();
-      const recents = [{ path, name, openedAt: now() }, ...cur.recents.filter((r) => r.path !== path)].slice(0, RECENTS_MAX);
-      write({ ...cur, lastProject: path, recents });
+      app.touchProject(path, name);
     },
     recordScene(projectPath, sceneId, caretId) {
-      const cur = read();
-      // lastScene + lastCaret are written together so the remembered caret always belongs to the
-      // remembered scene; no caret (top of scene) deletes any stale entry rather than keeping it.
-      const lastCaret = { ...cur.lastCaret };
-      if (caretId) lastCaret[projectPath] = caretId; else delete lastCaret[projectPath];
-      write({ ...cur, lastScene: { ...cur.lastScene, [projectPath]: sceneId }, lastCaret });
+      // The shell keys a place off whatever project is currently open; this signature names one. They
+      // agree at every call site today (`scene:remember` fires for the project on screen), but the
+      // path arrives from the RENDERER, so check rather than trust: recording against the wrong key
+      // would land one project's caret in another's slot, and be near-impossible to spot afterwards.
+      if (app.get().lastProject !== projectPath) {
+        console.warn(`[store] ignoring a remembered place for ${projectPath}, which is not the open project`);
+        return;
+      }
+      // scene + caret travel together so the remembered caret always belongs to the remembered scene;
+      // no caret (top of scene) omits the field rather than keeping a stale one.
+      app.setPlace({ scene: sceneId, ...(caretId ? { caret: caretId } : {}) });
     },
     setIdentity(identity) {
-      write({ ...read(), identity });
+      app.setIdentity(identity);
     },
     setPanes(panes) {
-      write({ ...read(), panes });
+      app.setPanes(panes as ShellPaneState);
     },
     setTheme(theme) {
-      write({ ...read(), theme });
+      app.patchApp({ theme });
     },
     setPlay(play) {
-      write({ ...read(), play });
+      setWindow("play", play);
     },
     setSearch(search) {
-      write({ ...read(), search });
+      setWindow("search", search);
     },
     setCoverage(coverage) {
-      write({ ...read(), coverage });
+      setWindow("coverage", coverage);
     },
     forget(path) {
-      const cur = read();
-      write({
-        ...cur,
-        lastProject: cur.lastProject === path ? undefined : cur.lastProject,
-        recents: cur.recents.filter((r) => r.path !== path),
-      });
+      app.forgetProject(path);
     },
   };
 }
