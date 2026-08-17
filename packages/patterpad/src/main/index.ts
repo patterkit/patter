@@ -14,7 +14,12 @@ import * as dictionaries from "./dictionaries.js";
 import { createStore, type PlayWindowState } from "./store.js";
 import { applyMenu } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
-import { startBackgroundUpdateCheck } from "./updater.js";
+// The updater is the shell's. It IS this app's, generalised: the stall watchdog,
+// the retry budget, the surfaced background error and the live progress that
+// 0.6.6 grew after #33 all went into it, so this is a swap and not a downgrade.
+// Its IPC channel names are byte-identical to the ones this app already used, so
+// the preload and the renderer dialog are untouched.
+import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenResult, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
 
@@ -1030,6 +1035,9 @@ if (!app.requestSingleInstanceLock({ argv: process.argv })) {
     createWindow();
     app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
     // Auto-update: check shortly after launch (let the window settle first), then every 6 hours.
+    // `configureUpdater` first, or its prompts would be addressed to "This app" and
+    // hung off whatever window happened to be focused.
+    configureUpdater({ appName: "Patterpad", activeWindow: () => win ?? BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null });
     setTimeout(startBackgroundUpdateCheck, 10_000);
     setInterval(startBackgroundUpdateCheck, 6 * 60 * 60 * 1000);
   }).catch((e) => { console.error("failed to start Patterpad:", e); app.quit(); });

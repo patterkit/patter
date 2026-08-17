@@ -28,4 +28,17 @@ export default defineConfig({
       ...(expr("scoperegistry") ? { "@wildwinter/scoperegistry": expr("scoperegistry")! } : {}),
     },
   },
+  test: {
+    server: {
+      deps: {
+        // The updater lives in @wildwinter/app-shell now, and its watchdog test
+        // (#33) mocks `electron` and `electron-updater`. A dependency shipped as
+        // built ESM in node_modules is EXTERNALISED by default, so it resolves
+        // those imports itself and never sees the mocks: the test fails on
+        // electron's CommonJS shape rather than on any behaviour. Inlining makes
+        // vitest process it like source, which is what the mocks need.
+        inline: ["@wildwinter/app-shell"],
+      },
+    },
+  },
 });

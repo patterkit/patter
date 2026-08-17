@@ -62,7 +62,11 @@ describe("updater download watchdog (#33)", () => {
     vi.useFakeTimers();
     H.state.reset();
     vi.resetModules();
-    await import("../src/main/updater.js"); // registers the real handlers against the fake autoUpdater
+    // The updater moved into @wildwinter/app-shell, so this now drives the SHARED
+    // copy against the fake autoUpdater. Kept here rather than deleted with the
+    // local module: the shell ships no updater test of its own, and this is the
+    // #33 regression, which is the one bug in this area that reached a user.
+    await import("@wildwinter/app-shell/updater"); // registers the real handlers against the fake autoUpdater
   });
 
   it("kills a download that reports no progress, retries, and the retry can succeed", async () => {
