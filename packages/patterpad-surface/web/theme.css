@@ -233,6 +233,11 @@
    :root[data-theme] block is active without being repeated per theme. --- */
 :root {
   --line-soft: color-mix(in oklab, var(--line) 55%, transparent);  /* a quieter rule than --line */
-  --card: var(--surface);                                          /* Patterpad cards ARE the surface */
+  /* The ground an INSET control sits on: settings rows, inputs, composers, badges.
+     Step 0 aliased this to --surface, reading "card" as a raised thing. Every one
+     of the shell's uses is the opposite, and this app already draws all of them on
+     --bg (the nav, the inspector levels, every input), so the row would have been
+     invisible against its own panel. --bg is the answer. */
+  --card: var(--bg);
   --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent); /* accent wash behind a selection */
 }

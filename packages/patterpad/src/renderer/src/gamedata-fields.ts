@@ -7,7 +7,7 @@
 
 import type { GameDataField, GameDataFields, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "./settings-list.js";
+import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
   { kind: "scene", label: "Scene" }, { kind: "block", label: "Block" }, { kind: "snippet", label: "Snippet" },

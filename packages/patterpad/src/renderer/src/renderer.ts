@@ -8,6 +8,10 @@ import "@patterkit/patterpad-surface/styles.css"; // surface component styles
 import "@wildwinter/expr-editor/styles.css"; // the visual condition editor
 import "@wildwinter/app-shell/anchored.css"; // the shared anchored-panel chrome (a shared module carries its own CSS)
 import "@wildwinter/app-shell/tooltip.css"; // ...and the themed tooltip's bubble
+// The list-row kit (the well, its line, its details panel and the disclosure).
+// Imported BEFORE shell.css so this app's own field rules, which sit on those
+// classes, come after and win.
+import "@wildwinter/app-shell/settings.css";
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";

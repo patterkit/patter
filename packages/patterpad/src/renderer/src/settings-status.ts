@@ -8,7 +8,7 @@ import type { WritingStatusDecl, RecordingStatusDecl, RecordingFolder } from "@p
 import { deriveRecordingFolders } from "@patterkit/model";
 import { PALETTE_SIZE } from "@patterkit/patterpad-surface/colour";
 import { el, iconBtn, moveItem } from "./dom.js";
-import { focusNewRow } from "./settings-list.js";
+import { focusNewRow } from "@wildwinter/app-shell";
 
 export interface WritingStatusHandle { value(): WritingStatusDecl[]; }
 export interface AudioHandle { value(): { trackAudioStatus: boolean; recordingStatuses: RecordingStatusDecl[]; audioFolders: boolean; audioRoot: string | null; scratchStatus: string | null }; }
@@ -92,8 +92,8 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
 
   const writingRow = (s: WritingStatusDecl, i: number): HTMLElement => {
     // One line: name | the two readiness radios | a colour swatch (opens the palette popover) | move/delete.
-    const row = el("div", "gd-row");
-    const line = el("div", "gd-rowline gd-status-line");
+    const row = el("div", "set-row");
+    const line = el("div", "set-rowline gd-status-line");
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
     name.type = "text"; name.placeholder = "<status name>"; name.value = s.name; name.spellcheck = false;
     name.addEventListener("input", () => { s.name = name.value; });
@@ -161,8 +161,8 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
 
   const recordingRow = (s: RecordingStatusDecl, i: number): HTMLElement => {
     // One line: name | (derived-folder hint, in folder mode) | a colour swatch (palette popover) | move/delete.
-    const row = el("div", "gd-row");
-    const line = el("div", "gd-rowline gd-status-line");
+    const row = el("div", "set-row");
+    const line = el("div", "set-rowline gd-status-line");
     // The fixed "not recorded" fallback (folder mode, lowest rung): its name / delete are locked.
     const locked = audioFolders && i === 0;
     const name = el("input", "gd-input gd-name") as HTMLInputElement;

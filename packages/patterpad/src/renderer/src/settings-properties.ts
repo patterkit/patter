@@ -5,7 +5,7 @@
 
 import type { PropertyDecl, PropertyType, ScalarValue } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "./settings-list.js";
+import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
   ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"],
