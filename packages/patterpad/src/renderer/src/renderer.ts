@@ -7,6 +7,7 @@ import "@patterkit/patterpad-surface/theme.css"; // app-wide design tokens
 import "@patterkit/patterpad-surface/styles.css"; // surface component styles
 import "@wildwinter/expr-editor/styles.css"; // the visual condition editor
 import "@wildwinter/app-shell/anchored.css"; // the shared anchored-panel chrome (a shared module carries its own CSS)
+import "@wildwinter/app-shell/tooltip.css"; // ...and the themed tooltip's bubble
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";
@@ -2322,7 +2323,11 @@ function signalReady(): void {
 }
 
 async function boot(): Promise<void> {
-  initTooltips(); // our themed tooltip controller (one delegated listener over the whole document)
+  // The family's tooltip controller (one delegated listener over the whole
+  // document). The Writing View rule is ours and arrives as a predicate, because
+  // the shell knows nothing about either app's modes: chrome rollovers would
+  // break the point of a view that hides the chrome.
+  initTooltips({ suppressed: () => document.body.classList.contains("writing-view") });
   // Autosave: one timer for the app's life; save() no-ops when idle (no dirty scene) or autosave is off.
   window.setInterval(() => { if (autosaveOn) void save(); }, AUTOSAVE_MS);
   window.addEventListener("beforeunload", flushRemember); // closing mid-debounce still records caret + scene

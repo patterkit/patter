@@ -50,7 +50,11 @@ export type { DocNote, DocNoteMap } from "./docnotes.js";
 export type { CommentMark, CommentOpenRequest } from "./comments.js";
 export type { SuggestionMark, SuggestionOpenRequest } from "./suggestions.js";
 export type { SpellChecker } from "./spellcheck.js";
-export { initTooltips, tipBold } from "./tooltip.js"; // the shared themed tooltip (replaces native `title` rollovers)
+// The themed tooltip is the shell's now (app-shell 0.7.0 lifted THIS one), so it
+// is re-exported rather than re-implemented and the surface's callers are
+// unchanged. `tipAt` / `hideTip` come with it: a tip anchored to a rectangle
+// rather than an element, for anything drawn rather than laid out.
+export { initTooltips, tipBold, tipAt, hideTip } from "@wildwinter/app-shell";
 import { createCuePopup } from "./cuepopup.js";
 import { createSlashMenu } from "./slashmenu.js";
 import { createHintBar } from "./hintbar.js";
