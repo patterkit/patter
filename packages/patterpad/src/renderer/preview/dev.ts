@@ -173,24 +173,6 @@ const stub = {
       choices: 2, writtenDone: 12, writtenRemaining: 23, voicedDone: 8, voicedRemaining: 16, projectedWritten: 35, projectedVoiced: 24,
     },
   }),
-  // Coverage test (#159): a canned report with a reached line, a truly-dead beat, and a needs-input one.
-  runCoverage: async (_options: unknown) => ({
-    sceneNames: { intro: "Intro", bar: "At the Bar" },
-    report: {
-      runs: 5000, maxSteps: 200, seed: 0, start: { scene: "intro" },
-      beats: [
-        { id: "L1", scene: "intro", kind: "line", character: "BARKEEP", preview: "Welcome, traveller.", hits: 5000, reachedRuns: 5000, reachPct: 100 },
-        { id: "L2", scene: "intro", kind: "line", character: "ANNA", preview: "You again?", hits: 2480, reachedRuns: 2480, reachPct: 49.6 },
-        { id: "L3", scene: "bar", kind: "text", preview: "The fire crackles.", hits: 0, reachedRuns: 0, reachPct: 0 },
-        { id: "L4", scene: "bar", kind: "line", character: "BARKEEP", preview: "The guards are here!", hits: 0, reachedRuns: 0, reachPct: 0, needsInput: ["@world.alarm"] },
-      ],
-      totals: { beats: 4, covered: 2, neverHit: 2, coveragePct: 50 },
-      termination: { ended: 5000, capped: 0, stalled: 0, evalError: 0 },
-      drivers: [{ ref: "@world.mood", kind: "recurring", cadence: "sometimes", values: ["calm", "tense"] }],
-      unwrittenInputs: ["@world.alarm"],
-      cancelled: false,
-    },
-  }),
   proposeCoverageDrivers: async () => ([
     { ref: "@world.alarm", kind: "recurring", cadence: "sometimes", values: [true, false] },
     { ref: "@world.mood", kind: "recurring", cadence: "sometimes", values: ["calm", "tense", "hostile"] },

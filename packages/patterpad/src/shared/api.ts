@@ -675,9 +675,6 @@ export interface PatterApi {
   /** Update Audio Manifest (Production menu, #206): (re)write the sidecar `patteraudio.json` from the live
    *  Audio Folders index, without a full bundle rebuild. Returns where it landed. */
   buildAudioManifest(): Promise<ExportResult>;
-  /** Run narrative coverage (#159) over the open project: random playthroughs tally which beats get
-   *  reached, flagging never-reached (dead) and needs-input content. Null if no project open. */
-  runCoverage(options: CoverageRunOptions): Promise<CoverageResult | null>;
   /** Auto-propose `@world` coverage drivers from the project's conditions (the "Propose from story"
    *  button in Project Settings ▸ World Properties). Empty when there are no host scopes to drive. */
   proposeCoverageDrivers(): Promise<CoverageDriver[]>;
