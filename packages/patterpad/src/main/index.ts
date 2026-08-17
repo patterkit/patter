@@ -22,8 +22,9 @@ import { savedWindowRect, rememberBounds, centeredOnPrimary } from "@wildwinter/
 // the preload and the renderer dialog are untouched.
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
 import { createJobHost, JOB_PROGRESS } from "@wildwinter/app-shell/job";
+import { createProjectSession } from "@wildwinter/app-shell/session";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
-import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenResult, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
+import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let win: BrowserWindow | null = null;
@@ -124,46 +125,74 @@ function flushEditorScene(): Promise<void> {
   });
 }
 
+/**
+ * Opening a project, on the shell's `createProjectSession`.
+ *
+ * The shell owns the ORDER - open, forget on failure, record the root, invalidate what main cached for
+ * the old project, rebuild the menu - and this app supplies the only step that is actually about the
+ * app: `open`. The resolution of which scene and caret to land on stays in there, because none of it is
+ * family-level.
+ *
+ * **The satellites are the reason to adopt this even if nothing else.** Both apps hand-wired "a
+ * different project is open now" once per tool window, and both had left a window out. Registered here,
+ * a satellite cannot be forgotten, and `clear` runs whether its window is open or not: the cache lives
+ * in MAIN, so a closed window that reopens would otherwise be handed the previous project's report.
+ */
+const session = createProjectSession<OpenedProject, OpenResult>({
+  // The shell's slice of the store, over this app's own `Store`.
+  store: {
+    get: () => { const s = store.read(); return { recents: s.recents, ...(s.lastProject !== undefined ? { lastProject: s.lastProject } : {}) }; },
+    touchProject: (path, name) => store.recordOpen(path, name ?? basename(path)),
+    forgetProject: (path) => store.forget(path),
+  },
+  open: (path) => {
+    // Resolve the remembered scene FIRST (cheap root walk) so the landing-first open (#171) parses the
+    // scene we'll actually paint - reopening straight onto the last-edited scene must not parse the
+    // first one then immediately re-parse on hydration. A file-association launch onto a scene shard
+    // still wins over it.
+    const root = project.peekRoot(path);
+    const remembered = root ? store.read().lastScene[root] : undefined;
+    let proj: OpenedProject;
+    // `openProject` throws on a bad / missing / unreadable project; the shell wants that as a value,
+    // and turns it into a `forgetProject` so a moved project stops being offered.
+    try { proj = project.openProject(path, remembered); }
+    catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+    currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
+    // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
+    // otherwise (the project root / `.patter` package) fall back to where the author last left off.
+    const launched = project.sceneForPath(path);
+    const land = launched ?? (remembered && proj.sceneIds.includes(remembered) ? remembered : undefined);
+    // Restore the caret only when we're landing on the very scene it was recorded in (a file-association
+    // launch onto a different scene must not place the caret on a node that isn't there).
+    const lastCaret = land && land === remembered ? store.read().lastCaret[proj.root] : undefined;
+    // NOT setting `searchFocus` here: the satellites run AFTER this callback, and the search one clears
+    // it. `openAndRecord` re-anchors from the reply once the shell has finished, so the clear removes
+    // the OLD project's anchor and the new one lands after it, which is the order that was intended.
+    return { session: proj, root: proj.root, name: proj.name, reply: { project: proj, lastScene: land, lastCaret } };
+  },
+  refreshMenu: () => refreshMenu(),
+  satellites: [
+    // `searchFocus` is re-anchored by `open` above when there is somewhere to anchor to; this clears it
+    // for the failure path and for an invalidation that is not an open.
+    { window: () => searchWin, channel: "searchWin:project", clear: () => { searchFocus = undefined; } },
+    { window: () => coverageWin, channel: "covWin:project", clear: () => { lastCoverageResult = null; } },
+  ],
+});
+
 /** Paths the renderer is allowed to ask us to open: ones the app already knows about (the last project,
  *  recents). A fresh path only enters via the NATIVE open / create dialogs (driven here in main, where the
- *  user picked it) - never straight from the untrusted renderer. */
-function isKnownProjectPath(path: string): boolean {
-  const s = store.read();
-  const known = new Set(
-    [s.lastProject, ...s.recents.map((r) => r.path)]
-      .filter((p): p is string => !!p)
-      .map((p) => resolve(p)),
-  );
-  return known.has(resolve(path));
-}
+ *  user picked it) - never straight from the untrusted renderer. This app wrote the guard; the shell now
+ *  holds it so a third app gets it for free. */
+const isKnownProjectPath = (path: string): boolean => session.isKnownPath(path);
 
-/** Open a project, record it in the session, and resolve the scene to land on (if still present). The
- *  start `path` may be the project root OR an internal shard (a Windows file-association launch) - either
- *  way `openProject` resolves the enclosing project, so we record/key off its ROOT, never the raw path. */
+/** Open a project and record it. The shell reports a failed open as a VALUE; every caller here predates
+ *  that and expects a throw, so the conversion happens once, here, rather than at five call sites. */
 function openAndRecord(path: string): OpenResult {
-  // Resolve the remembered scene FIRST (cheap root walk) so the landing-first open (#171) parses the scene
-  // we'll actually paint - reopening straight onto the last-edited scene must not parse the first one then
-  // immediately re-parse on hydration. A file-association launch onto a scene shard still wins over it.
-  const root = project.peekRoot(path);
-  const remembered = root ? store.read().lastScene[root] : undefined;
-  const proj = project.openProject(path, remembered);
-  store.recordOpen(proj.root, proj.name);
-  currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
-  refreshMenu();
-  // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene; otherwise
-  // (the project root / `.patter` package) fall back to where the author last left off.
-  const launched = project.sceneForPath(path);
-  const land = launched ?? (remembered && proj.sceneIds.includes(remembered) ? remembered : undefined);
-  // Restore the caret only when we're landing on the very scene it was recorded in (a file-association
-  // launch onto a different scene must not place the caret on a node that isn't there).
-  const lastCaret = land && land === remembered ? store.read().lastCaret[proj.root] : undefined;
-  // A different project is now open: re-anchor search ranking and let an open search window re-fetch.
-  searchFocus = land ? { sceneId: land, fromBeatId: lastCaret } : undefined;
-  if (searchWin && !searchWin.isDestroyed()) searchWin.webContents.send("searchWin:project");
-  // A different project invalidates the cached coverage report; let an open coverage window re-fetch.
-  lastCoverageResult = null;
-  if (coverageWin && !coverageWin.isDestroyed()) coverageWin.webContents.send("covWin:project");
-  return { project: proj, lastScene: land, lastCaret };
+  const r = session.openAt(path);
+  if ("error" in r) throw new Error(r.error);
+  // Re-anchor search ranking at wherever we landed, after the satellites have cleared the old anchor.
+  searchFocus = r.lastScene ? { sceneId: r.lastScene, fromBeatId: r.lastCaret } : undefined;
+  return r;
 }
 
 function bootState(open: OpenResult | null): BootState {
@@ -246,8 +275,9 @@ function boot(): BootState {
   const last = store.read().lastProject;
   if (last && existsSync(last)) {
     // A bare `patterpad --at <where>` (no path) reopens the last project straight at that location.
+    // The session already drops a project that fails to open, so this only has to not crash the boot.
     try { return bootState(openAt(last, at)); }
-    catch { store.forget(last); } // moved / deleted / unreadable -> drop it, show welcome
+    catch { /* moved / deleted / unreadable -> the session forgot it; show welcome */ }
   }
   return bootState(null);
 }
