@@ -18,6 +18,13 @@ export type {
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
 } from "./engine.js";
 
+// The bundle inspector's runtime half: what a game may call, read off the asset with no Engine.
+export { describeBundle } from "./describe.js";
+export type {
+  BundleDescription, BundleIdentity, AddressSummary, HostScopeSummary,
+  PropertySummary, OwnedProperties, GameDataSummary, GameDataFieldSummary, BundleCounts,
+} from "./describe.js";
+
 // gameData read helpers (sparse overrides + field-default merge).
 export { gameDataFields, gameDataValue, effectiveGameData } from "./gamedata.js";
 
