@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-18
+
 ### Added
 - **File ▸ Merge Returned Patterpack.** Sending a project to a freelancer, a translator or a reviewer
   has been a single file for a while (**Export as Patterpack**), but folding their work back in was a
