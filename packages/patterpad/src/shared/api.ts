@@ -348,10 +348,16 @@ export interface PackMergeSummary {
   /** Total across every shard. */
   conflicts: number;
   warnings: number;
-  /** Whether the two packs and the open project agree on their project id. False means the author has
-   *  most likely picked the wrong file at one of the two prompts, which is worth saying BEFORE the
-   *  merge lands rather than leaving them to read it out of a pile of conflicts. */
-  sameProject: boolean;
+  /** Whether the two packs and the open project agree on their project id, AND the ids themselves.
+   *
+   *  The ids are carried, not just the verdict, so the dialog can name them. "These do not look like
+   *  the same project" tells an author something is wrong; quoting the three ids tells them WHICH of
+   *  the two files they chose is the odd one out, which is the thing they have to act on. Storyletter
+   *  reached the better wording here first and both apps now use it.
+   *
+   *  An id is absent where none could be read (a pack with no manifest, an unreadable project file).
+   *  That is "cannot say", never a mismatch: refusing on ignorance would block a legitimate merge. */
+  provenance: { returned?: string; base?: string; target?: string; ok: boolean };
 }
 
 /** A localisation export: a format + an optional target locale (omitted = a blank source template). */

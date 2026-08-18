@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+- **The "not the same project" warning now names the project ids.** Merging a returned Patterpack
+  told you the two packs and your project disagreed, but not which of the two files you picked was
+  the odd one out, which is the only part you can act on. It now quotes all three ids. Wording
+  matched to Storyletter's, so the two editors say the same thing.
+
 ## [0.9.0] - 2026-08-18
 
 ### Added

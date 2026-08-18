@@ -469,7 +469,7 @@ export async function planPackMerge(returnedPath: string, basePath: string): Pro
         shards: res.shards.map((sh) => ({ path: sh.path, added: sh.added, conflicts: sh.result?.conflicts.length ?? 0 })),
         conflicts: res.conflicts,
         warnings: res.warnings,
-        sameProject: res.provenance.ok,
+        provenance: res.provenance,
       },
     };
   } catch (e) {
