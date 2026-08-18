@@ -1236,6 +1236,119 @@
       ]
     },
     {
+      "name": "a declared host scope with no resolver is self-backed from its defaults",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "02ylvsy",
+          "structureHash": "0wmachz"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "declarations": [
+                {
+                  "name": "isNight",
+                  "type": "boolean",
+                  "default": true
+                }
+              ]
+            }
+          ]
+        },
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "condition": {
+                      "src": "@world.isNight",
+                      "ast": [
+                        "sv",
+                        "world",
+                        "isnight"
+                      ]
+                    },
+                    "children": [
+                      {
+                        "id": "sn",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "L",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Night falls.",
+            "L2": "Daylight."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "L",
+          "text": "Night falls."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
       "name": "interpolation: line + text beats expand {@ref}",
       "bundle": {
         "schema": "patter/bundle@0",

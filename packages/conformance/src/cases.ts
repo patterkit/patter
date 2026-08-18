@@ -70,6 +70,32 @@ const choicePick = {
   ],
 } satisfies RuntimeFixture;
 
+// --- a declared host scope with no resolver, self-backed from its defaults ---
+// The parity contract for `@world` (and any host scope a project declares). A runtime that ignores
+// `scopeRegistry` finds no `world` scope, reads the reference as a graceful false, skips the gated
+// group and plays "Daylight." instead - which is a silently DIFFERENT STORY from the same bundle,
+// not an error anyone would see. Nothing in the corpus covered this until now.
+const selfBackedHostScope = {
+  name: "a declared host scope with no resolver is self-backed from its defaults",
+  project: project({ scopeRegistry: { version: 1, scopes: [
+    { token: "world", declarations: [{ name: "isNight", type: "boolean", default: true }] },
+  ] } }),
+  scenes: [{
+    id: "s", type: "scene", name: "S",
+    blocks: [{ id: "b", type: "block", name: "B", children: [
+      { id: "g", type: "group", condition: "@world.isNight", children: [
+        { id: "sn", type: "snippet", beats: [{ id: "L", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "sn2", type: "snippet", beats: [{ id: "L2", kind: "text" }], jump: { to: "END" } },
+    ] }],
+  }],
+  locales: [loc("s", { L: "Night falls.", L2: "Daylight." })],
+  expectedTranscript: [
+    { type: "text", id: "L", text: "Night falls." },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
 // --- interpolation in a line + a following text beat ------------------------
 const interpolation = {
   name: "interpolation: line + text beats expand {@ref}",
@@ -1335,7 +1361,7 @@ export const cases: Fixtures = {
     { name: "(a and b) or c: left AND holds at 2, OR max scores 2", src: "(@a == 1 and @b == 1) or @c == 1", scopes: { patter: { a: 1, b: 1, c: 0 } }, expected: 2 },
   ],
   runtime: [
-    lineThenEnd, choicePick, interpolation, effectsSet, gameEventBeat,
+    lineThenEnd, choicePick, selfBackedHostScope, interpolation, effectsSet, gameEventBeat,
     crossScene, cycle, once, voiced, escaped, shuffle, sequence,
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,

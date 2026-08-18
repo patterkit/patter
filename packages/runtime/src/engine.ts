@@ -1824,11 +1824,16 @@ function hostScopeDefault(decl: HostScopeDecl): ScalarValue {
  *  opaque scope (no declarations) starts empty and accepts any name. Per-property read-only is enforced at
  *  validation, not here (the registry is per-scope), so `set` accepts any name. */
 function selfBackedResolver(decls: HostScopeDecl[]): ScopeResolver {
+  // Keyed LOWERCASE. The compiler lowercases every property reference, so an AST reads `isnight` where
+  // the declaration says `isNight`; seeding the bag verbatim meant any declared name carrying a capital
+  // was never found, read as undefined, and silently took the falsy branch. `@patter` and `@scene`
+  // already normalise (patterSharedNames / sceneSharedNames); this resolver was the one that did not.
+  const key = (name: string): string => name.toLowerCase();
   const bag = new Map<string, ScalarValue>();
-  for (const d of decls) bag.set(d.name, hostScopeDefault(d));
+  for (const d of decls) bag.set(key(d.name), hostScopeDefault(d));
   return {
-    get: (name) => bag.get(name),
-    set: (name, value) => { bag.set(name, value); },
+    get: (name) => bag.get(key(name)),
+    set: (name, value) => { bag.set(key(name), value); },
   };
 }
 
