@@ -108,6 +108,7 @@ const api: PatterApi = {
   onOpenWorldSettings: (handler) => { ipcRenderer.on("coverage:open-world", () => handler()); },
   applyFix: (fix) => ipcRenderer.invoke("project:applyFix", fix),
   getIdentity: () => ipcRenderer.invoke("identity:get"),
+  suggestIdentity: () => ipcRenderer.invoke("identity:suggest"),
   setIdentity: (identity) => ipcRenderer.invoke("identity:set", identity),
   setPanes: (panes) => ipcRenderer.invoke("panes:set", panes),
   setTheme: (theme) => ipcRenderer.invoke("theme:set", theme),

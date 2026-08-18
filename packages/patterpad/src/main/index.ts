@@ -8,7 +8,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { userInfo } from "node:os";
-import { writeBinaryFile, writeTextFile } from "@wildwinter/simple-vc-lib";
+import { currentUserAsync, writeBinaryFile, writeTextFile } from "@wildwinter/simple-vc-lib";
 import * as project from "./project.js";
 import * as dictionaries from "./dictionaries.js";
 import { createStore } from "./store.js";
@@ -948,6 +948,24 @@ function registerIpc(): void {
   ipcMain.handle("searchWin:close", () => { searchWin?.close(); });
   ipcMain.handle("project:applyFix", (_e, fix: QuickFix) => project.applyFix(fix));
   ipcMain.handle("identity:get", (): Identity | null => store.read().identity ?? null);
+  /**
+   * A name to OFFER in the identity box, from the version control system.
+   *
+   * Both this app and Storyletter ask a person to type their name at first run while showing a
+   * "Locked by bob@bob-ws" badge elsewhere in the same window: one person under two names, with the
+   * name already in reach. This offers the second one as a starting point.
+   *
+   * A SUGGESTION only. It is not stored, not used as an author, and the person can type over it: a
+   * workspace account is not always a name somebody wants on their words. Null whenever the VCS cannot
+   * say, which is the filesystem provider always, git with no `user.name`, and svn ever.
+   *
+   * Keyed off the open project so it asks THAT working copy; with nothing open it falls back to the
+   * process directory, where a machine-level answer (p4, plastic) may still arrive and git's will not.
+   */
+  ipcMain.handle("identity:suggest", async (): Promise<string | null> => {
+    try { return (await currentUserAsync(currentRoot ?? undefined)) ?? null; }
+    catch { return null; } // a suggestion is never worth failing a dialog over
+  });
   // A blank name falls back to the OS user name (else "Author"), so skipping the first-run prompt still
   // yields a sensible signature for review comments + the per-line edit trail.
   ipcMain.handle("identity:set", (_e, identity: Identity) => {

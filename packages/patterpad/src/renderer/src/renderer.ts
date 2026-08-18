@@ -2307,12 +2307,17 @@ function ensureIdentity(current: Identity | null): Promise<void> {
 // The identity dialog in one of two modes: "welcome" (first run) or "edit" (File / app menu ▸ User
 // Information, prefilled). Name is optional; on close we refresh the local author name used to stamp new
 // comments. A blank name is defaulted by main (the OS user name); cancelling in edit mode changes nothing.
-function showIdentityDialog(current: Identity | null, mode: "welcome" | "edit"): Promise<void> {
+async function showIdentityDialog(current: Identity | null, mode: "welcome" | "edit"): Promise<void> {
+  // Offer the VCS's name when we have nothing of our own. The badge in the corner of this same window
+  // already says "Locked by bob@bob-ws", so the app has had a name in reach the whole time it was asking
+  // for one, and an empty box is a poor first impression. Filled in as a VALUE rather than a placeholder
+  // so that pressing Continue accepts it; it is still the person's to type over, and skipping still works.
+  const suggested = current?.name ? null : await window.patter.suggestIdentity();
   (identityDialog.querySelector(".identity-title") as HTMLElement).textContent = mode === "welcome" ? "Welcome to Patterpad" : "User information";
   (identityDialog.querySelector(".identity-sub") as HTMLElement).textContent =
     "Your name tags your edits and signs your review comments. Leave it blank to use your computer's user name. You can change it any time from the menu.";
   $<HTMLButtonElement>("identity-save").textContent = mode === "welcome" ? "Continue" : "Save";
-  nameInput.value = current?.name ?? "";
+  nameInput.value = current?.name ?? suggested ?? "";
   emailInput.value = current?.email ?? "";
   identityDialog.returnValue = "";
   return new Promise((resolve) => {
