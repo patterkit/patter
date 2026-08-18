@@ -165,6 +165,46 @@ describe("runUnpackMerge (fold a returned document into existing shards)", () =>
     expect(existsSync(join(oursDir, "loc/en/s.patterloc.patterconflict"))).toBe(true);
   });
 
+  it("notices when the two packs and the project are not the same project", async () => {
+    // The weak half of provenance (brief section 7). It cannot tell you that you picked the wrong
+    // REVISION of the right project - nothing in a pack records what it descends from - but it does
+    // catch the wrong project entirely, which otherwise merges by id, matches almost nothing, and hands
+    // back a mountain of conflicts reading as though the other author had rewritten the lot.
+    const oursDir = mkProject({ A: "a" });
+    const baseDoc = await runPack(oursDir);
+
+    const stranger = mkProject({ A: "a" });                        // mkProject stamps project id "p"...
+    const projFile = join(stranger, "game.patterproj");
+    const pf = JSON.parse(readFileSync(projFile, "utf8"));
+    pf.project.id = "someone_elses_project";                        // ...so make this one a different project
+    writeFileSync(projFile, JSON.stringify(pf));
+    const returnedDoc = await runPack(stranger);
+
+    const res = await runUnpackMerge(returnedDoc, baseDoc, oursDir);
+    expect(res.provenance.ok).toBe(false);
+    expect(res.provenance.returned).toBe("someone_elses_project");
+    expect(res.provenance.base).toBe("p");
+    expect(res.provenance.target).toBe("p");
+    // A WARNING, not a refusal: the merge still produced its writes for the author to accept or decline.
+    expect(res.writes.length).toBeGreaterThan(0);
+  });
+
+  it("is quiet when the three agree, and when there is nothing to compare", async () => {
+    const oursDir = mkProject({ A: "a" });
+    const baseDoc = await runPack(oursDir);
+    const returnedDoc = await runPack(mkProject({ A: "a2" }));
+    expect((await runUnpackMerge(returnedDoc, baseDoc, oursDir)).provenance.ok).toBe(true);
+
+    // A document with no manifest cannot disagree with anything. Some other tool's zip, or a hand-made
+    // one, must not be turned away by a check that exists to catch a slip of the file picker.
+    const bare = new JSZip();
+    bare.file("loc/en/s.patterloc", readFileSync(join(oursDir, "loc/en/s.patterloc"), "utf8"));
+    const bareDoc = await bare.generateAsync({ type: "nodebuffer" });
+    const res = await runUnpackMerge(bareDoc, baseDoc, oursDir);
+    expect(res.provenance.ok).toBe(true);
+    expect(res.provenance.returned).toBeUndefined();
+  });
+
   it("is PURE: planning a merge touches nothing on disk", async () => {
     // The editor shows a confirmation between the plan and the commit, and the CLI can fail part way
     // through argument handling. Both rely on this: a merge that is not committed must be a merge that

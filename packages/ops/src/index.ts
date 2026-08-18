@@ -51,7 +51,7 @@ export type { ReplaceOptions, ReplaceHit, ReplacePlan } from "./replace.js";
 export { runPack, SHARD_EXTENSIONS } from "./pack.js";
 export type { DocumentManifest } from "./pack.js";
 export { runUnpack, runUnpackMerge, UnsafeEntryError, isUnsafeEntry } from "./unpack.js";
-export type { UnpackMergeResult, MergedShard } from "./unpack.js";
+export type { UnpackMergeResult, MergedShard, ProvenanceCheck } from "./unpack.js";
 export { resolveDocumentation, classesForChannel } from "./documentation.js";
 export { runMerge, detectMergeType, UnsupportedMergeError } from "./merge.js";
 export type { MergeResult, MergeFileType, Conflict, ConflictKind } from "./merge.js";

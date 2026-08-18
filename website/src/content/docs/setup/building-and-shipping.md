@@ -108,6 +108,11 @@ you both changed the same line, your version is kept and a `.patterconflict` fil
 shard saying what disagreed. Those are ordinary files: resolve them the way you would a version-control
 conflict, and delete them when you're done (`patter validate` fails while one is still lying about).
 
+If the pack that came back, the pack you sent and your open project don't all belong to the same
+project, Patterpad says so first and makes **Cancel** the default. It's a warning rather than a
+refusal, since a project can legitimately be forked, but usually it means one of the two files was
+the wrong one. `patter unpack --merge` prints the same warning.
+
 :::note
 A merge edits the open project in place and **can't be undone from the Edit menu**. Commit or check in
 before you run one, and your version control is the way back.

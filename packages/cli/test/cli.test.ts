@@ -199,6 +199,21 @@ describe("main exit codes", () => {
     expect(readFileSync(join(root, "scenes", "start.patterflow"), "utf8")).toBe(before);
   });
 
+  it("unpack --merge warns when the packs are not the same project, and merges anyway", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "patter-cli-prov-"));
+    expect(await main(["init", join(dir, "ours"), "--name", "Ours"])).toBe(0);
+    expect(await main(["init", join(dir, "theirs"), "--name", "Theirs"])).toBe(0);
+    const ours = join(dir, "ours.patter");
+    const sent = join(dir, "sent.patterpack");
+    const stranger = join(dir, "stranger.patterpack");
+    expect(await main(["pack", ours, "-o", sent])).toBe(0);
+    expect(await main(["pack", join(dir, "theirs.patter"), "-o", stranger])).toBe(0);
+
+    const code = await main(["unpack", stranger, "--merge", "--base", sent, "-o", ours]);
+    expect(lastError()).toMatch(/do not look like the same project/);
+    expect(code).not.toBe(2); // a warning, not a usage error: it went ahead
+  });
+
   it("mergetool: a non-Patter file runs --fallback and returns its exit code", async () => {
     const dir = mkdtempSync(join(tmpdir(), "patter-cli-mt2-"));
     for (const f of ["base", "theirs", "ours", "out"]) writeFileSync(join(dir, `${f}.txt`), "x");
