@@ -24,7 +24,7 @@ import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-sh
 import { createJobHost, JOB_PROGRESS } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
-import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
+import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let win: BrowserWindow | null = null;
@@ -494,6 +494,78 @@ async function openPatterpackDialog(): Promise<OpenResult | null> {
   return r.canceled || !pack ? null : unpackAndOpen(pack);
 }
 
+/**
+ * Merge Returned Patterpack: fold a pack that came BACK into the OPEN project, in place.
+ *
+ * The third move of the round trip and a different act from the other two, which is why it is its own
+ * menu entry rather than a mode of Open. Export writes a file and touches nothing; Open replaces the
+ * project by unpacking to a new folder; this one EDITS the project you are looking at. An "Open" that
+ * sometimes merged would be a command that sometimes replaces your work and sometimes rewrites it.
+ *
+ * Two pickers, returned-first. The returned pack is the thing the author came here to do, so it is asked
+ * for first; the sent pack is bookkeeping, and leading with it reads as an interrogation before they have
+ * said what they want. There is deliberately NO third picker for a destination: a merge always targets the
+ * open project, and letting it target another one would just be an unpack.
+ *
+ * Then a confirmation, which is where this departs from the brief. The family spec asks for the merge to
+ * be ONE undo step, and Storyletter can do that because its undo is a file-byte replay. Patterpad's undo
+ * is ProseMirror history, per scene: there is no mechanism here that could unpick a write across every
+ * shard in the project. So this follows the local precedent for a project-level edit the app cannot undo
+ * (`deleteScene`, whose comment says the same thing): the VCS is the safety net, and the confirm carries
+ * the weight. It is shown AFTER the merge has run, so it reports what the merge actually found rather
+ * than asking for approval sight unseen - which the op's purity makes free.
+ */
+async function mergePatterpack(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string } | null> {
+  if (!win) return null;
+  if (!project.currentRoot()) return { error: "no project open" };
+
+  const returned = await dialog.showOpenDialog(win, {
+    title: "Merge a Returned Patterpack",
+    message: "Choose the .patterpack that came back to you.",
+    buttonLabel: "Choose",
+    properties: ["openFile"],
+    filters: [{ name: "Patterpack document", extensions: ["patterpack"] }],
+  });
+  const returnedPath = returned.filePaths[0];
+  if (returned.canceled || !returnedPath) return null;
+
+  const base = await dialog.showOpenDialog(win, {
+    title: "And the Patterpack you sent?",
+    message: "Choose the .patterpack you originally sent them. It is the common ancestor, and the merge needs it.",
+    buttonLabel: "Choose",
+    properties: ["openFile"],
+    filters: [{ name: "Patterpack document", extensions: ["patterpack"] }],
+  });
+  const basePath = base.filePaths[0];
+  if (base.canceled || !basePath) return null;
+
+  const plan = await project.planPackMerge(returnedPath, basePath);
+  if ("error" in plan) return plan;
+
+  const { summary } = plan;
+  const added = summary.shards.filter((sh) => sh.added).length;
+  const merged = summary.shards.length - added;
+  if (summary.shards.length === 0) {
+    await dialog.showMessageBox(win, { type: "info", message: "Nothing to merge.", detail: "That pack has no project files in it." });
+    return null;
+  }
+  const confirm = await dialog.showMessageBox(win, {
+    type: summary.conflicts > 0 ? "warning" : "question",
+    buttons: ["Merge", "Cancel"],
+    defaultId: 0,
+    cancelId: 1,
+    message: `Merge ${merged} file${merged === 1 ? "" : "s"}${added ? ` and add ${added}` : ""} into this project?`,
+    detail: summary.conflicts > 0
+      ? `${summary.conflicts} conflict${summary.conflicts === 1 ? "" : "s"} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.\n\nThis edits the open project and cannot be undone from the Edit menu.`
+      : "This edits the open project and cannot be undone from the Edit menu.",
+  });
+  if (confirm.response !== 0) return null;
+
+  const res = await project.commitPackMerge(plan);
+  if (!res.ok || !res.project) return { error: res.error ?? "merge failed" };
+  return { project: res.project, summary };
+}
+
 /** Unpack a `.patterpack` (menu-chosen OR double-clicked) into a NEW `.patter` folder, ALWAYS asking where
  *  to put it (default `<packname>.patter` beside the pack), then open the result. Shared by the menu open
  *  and the file-association launch so both prompt for a destination rather than guessing one. */
@@ -769,6 +841,7 @@ function registerIpc(): void {
   ipcMain.handle("project:exportScript", () => exportScript());
   ipcMain.handle("patterpack:export", (): Promise<ExportResult> => exportPatterpack());
   ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
+  ipcMain.handle("patterpack:merge", () => mergePatterpack());
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => exportLoc(request));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());

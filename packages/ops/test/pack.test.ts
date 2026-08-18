@@ -165,6 +165,67 @@ describe("runUnpackMerge (fold a returned document into existing shards)", () =>
     expect(existsSync(join(oursDir, "loc/en/s.patterloc.patterconflict"))).toBe(true);
   });
 
+  it("is PURE: planning a merge touches nothing on disk", async () => {
+    // The editor shows a confirmation between the plan and the commit, and the CLI can fail part way
+    // through argument handling. Both rely on this: a merge that is not committed must be a merge that
+    // did not happen, or a cancelled dialog would leave the project half-rewritten.
+    const baseDoc = await runPack(mkProject({ A: "a" }));
+    const returnedDoc = await runPack(mkProject({ A: "theirs" }));
+    const oursDir = mkProject({ A: "ours" });
+    const before = readFileSync(join(oursDir, "loc/en/s.patterloc"), "utf8");
+
+    const res = await runUnpackMerge(returnedDoc, baseDoc, oursDir); // conflicting, so it has plenty to say
+    expect(res.conflicts).toBe(1);
+    expect(readFileSync(join(oursDir, "loc/en/s.patterloc"), "utf8")).toBe(before);
+    expect(existsSync(join(oursDir, "loc/en/s.patterloc.patterconflict"))).toBe(false);
+  });
+
+  it("leaves a shard the author DELETED alone", async () => {
+    // Deliberate, and the safe direction: not propagating a delete cannot destroy work, where honouring
+    // one would remove content on the strength of a file's ABSENCE from a zip - which can happen because
+    // somebody's tool skipped an entry. The sender can always delete it themselves.
+    const withExtra = mkProject({ A: "a" });
+    writeFileSync(join(withExtra, "loc", "en", "extra.patterloc"), JSON.stringify({ schema: "patter/strings@0", scene: "s2", locale: "en", strings: { C: "c" } }));
+    const baseDoc = await runPack(withExtra);                    // what we sent: both shards
+    const returnedDoc = await runPack(mkProject({ A: "a2" }));   // what came back: extra.patterloc is gone
+    const oursDir = mkProject({ A: "a" });
+    writeFileSync(join(oursDir, "loc", "en", "extra.patterloc"), JSON.stringify({ schema: "patter/strings@0", scene: "s2", locale: "en", strings: { C: "c" } }));
+
+    const res = await runUnpackMerge(returnedDoc, baseDoc, oursDir);
+    expect(res.writes.some((w) => w.path.endsWith("extra.patterloc"))).toBe(false); // not rewritten
+    applyWrites([...res.writes, ...res.sidecars]);
+    expect(existsSync(join(oursDir, "loc/en/extra.patterloc"))).toBe(true);         // and not removed
+    expect(stringsOf(oursDir).A).toBe("a2");                                        // their edit still landed
+  });
+
+  it("leaves a real project still validating after a merge", async () => {
+    // The per-shard tests use a hand-built two-file project. This one goes through a full scaffolded
+    // project so the merged result is checked as a PROJECT (ids resolving, shards agreeing) rather than
+    // as a bag of files that happened to parse.
+    const oursDir = scaffold();
+    const baseDoc = await runPack(oursDir);
+
+    // Their copy comes from the pack we sent, so every id matches by construction.
+    const theirsDir = join(mkdtempSync(join(tmpdir(), "patter-ret-")), "proj");
+    applyWrites(await runUnpack(baseDoc, theirsDir));
+    const locPath = join(theirsDir, "loc", "en", "start.patterloc");
+    const locFile = parseSource(readFileSync(locPath, "utf8")) as { strings: Record<string, string> };
+    const firstKey = Object.keys(locFile.strings)[0]!;
+    expect(firstKey).toBeDefined(); // the scaffold ships a line to edit; without one this proves nothing
+    locFile.strings[firstKey] = "their rewrite";
+    writeFileSync(locPath, canonicalStringify(locFile));
+    const returnedDoc = await runPack(theirsDir);
+
+    const res = await runUnpackMerge(returnedDoc, baseDoc, oursDir);
+    expect(res.conflicts).toBe(0);
+    applyWrites([...res.writes, ...res.sidecars]);
+    // Their edit must actually be IN there. Without this the test passes just as well when the merge
+    // found nothing to do, which is the way a validate-still-passes check quietly goes vacuous.
+    const oursLoc = parseSource(readFileSync(join(oursDir, "loc", "en", "start.patterloc"), "utf8")) as { strings: Record<string, string> };
+    expect(oursLoc.strings[firstKey]).toBe("their rewrite");
+    expect(runValidate(loadProject(oursDir)).ok).toBe(true);
+  });
+
   it("a file only in the returned document is added verbatim", async () => {
     const baseDoc = await runPack(mkProject({ A: "a" }));
     const theirsDir = mkProject({ A: "a" });

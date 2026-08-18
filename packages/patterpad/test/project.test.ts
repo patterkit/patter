@@ -791,3 +791,94 @@ describe("project session: create -> open -> read -> save -> play", () => {
     expect((pick as { options: string[] }).options).toEqual(expect.arrayContaining(["calm", "angry"]));
   });
 });
+
+// Merge Returned Patterpack: the app-layer half of the round trip. The id-keyed merge itself is
+// `@patterkit/ops`' business and tested there; what matters here is the split the editor depends on -
+// planning writes NOTHING (a confirmation sits between plan and commit, and cancelling must leave the
+// project exactly as it was), and committing re-reads the project so the window is not left rendering
+// a model that disagrees with the disk.
+describe("merge returned patterpack", () => {
+  /** Pack the open project to a temp file, the way Export as Patterpack does. */
+  const packTo = async (file: string): Promise<string> => {
+    writeFileSync(file, await project.packBytes());
+    return file;
+  };
+
+  it("plans without writing, then commits and re-reads the project", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pp-merge-"));
+    const opened = await project.createProject(dir, "Round Trip");
+    const sceneId = opened.scenes[0]!.id;
+    const root = project.currentRoot()!;
+
+    // The pack we "sent", and the one that comes "back" with a line rewritten. Building theirs by
+    // editing the project, packing, and putting it back keeps every id identical, which is what makes
+    // this a merge rather than two unrelated projects colliding.
+    const sent = await packTo(join(dir, "sent.patterpack"));
+    const original = project.readScene(sceneId);
+    const theirLoc = parseSource(original.locSource) as { strings: Record<string, string> };
+    const key = Object.keys(theirLoc.strings)[0];
+    expect(key).toBeDefined(); // a scaffold with no lines would make the whole test vacuous
+    theirLoc.strings[key!] = "their rewrite";
+    await project.saveScene(sceneId, original.flowSource, canonicalStringify(theirLoc));
+    const returned = await packTo(join(dir, "returned.patterpack"));
+    // Put our copy back to how it was before they touched it.
+    await project.saveScene(sceneId, original.flowSource, original.locSource);
+
+    const plan = await project.planPackMerge(returned, sent);
+    expect("error" in plan).toBe(false);
+    if ("error" in plan) return;
+    expect(plan.summary.conflicts).toBe(0);
+    expect(plan.writes.length).toBeGreaterThan(0);
+    // The plan is the whole point of the split: nothing has changed on disk yet.
+    expect(project.readScene(sceneId).locSource).toBe(original.locSource);
+
+    const res = await project.commitPackMerge(plan);
+    expect(res.ok).toBe(true);
+    expect(res.project).toBeDefined();
+    // Committed, AND the in-memory model was re-read rather than left stale.
+    expect((parseSource(project.readScene(sceneId).locSource) as { strings: Record<string, string> }).strings[key!]).toBe("their rewrite");
+    expect(project.currentRoot()).toBe(root); // a merge edits in place; it never moves the project
+  });
+
+  it("reports a conflict, keeps OUR line, and leaves a sidecar", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pp-merge-c-"));
+    const opened = await project.createProject(dir, "Clash");
+    const sceneId = opened.scenes[0]!.id;
+
+    const sent = await packTo(join(dir, "sent.patterpack"));
+    const original = project.readScene(sceneId);
+    const base = parseSource(original.locSource) as { strings: Record<string, string> };
+    const key = Object.keys(base.strings)[0]!;
+
+    const theirs = parseSource(original.locSource) as { strings: Record<string, string> };
+    theirs.strings[key] = "theirs";
+    await project.saveScene(sceneId, original.flowSource, canonicalStringify(theirs));
+    const returned = await packTo(join(dir, "returned.patterpack"));
+
+    const ours = parseSource(original.locSource) as { strings: Record<string, string> };
+    ours.strings[key] = "ours";
+    await project.saveScene(sceneId, original.flowSource, canonicalStringify(ours));
+
+    const plan = await project.planPackMerge(returned, sent);
+    if ("error" in plan) throw new Error(plan.error);
+    expect(plan.summary.conflicts).toBe(1);
+    expect(plan.sidecars).toHaveLength(1);
+    // Every summary row is project-relative, because the editor reads them out to the author.
+    for (const row of plan.summary.shards) expect(row.path.startsWith(dir)).toBe(false);
+
+    expect(await project.commitPackMerge(plan)).toMatchObject({ ok: true });
+    expect((parseSource(project.readScene(sceneId).locSource) as { strings: Record<string, string> }).strings[key]).toBe("ours");
+    expect(plan.sidecars[0]!.path.endsWith(".patterconflict")).toBe(true);
+    expect(existsSync(plan.sidecars[0]!.path)).toBe(true); // the sidecar is a real file, written like any other
+  });
+
+  it("reports a pack it cannot read as an error rather than throwing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pp-merge-bad-"));
+    await project.createProject(dir, "Bad Pack");
+    const sent = await packTo(join(dir, "sent.patterpack"));
+    const junk = join(dir, "junk.patterpack");
+    writeFileSync(junk, "this is not a zip");
+    const plan = await project.planPackMerge(junk, sent);
+    expect("error" in plan).toBe(true);
+  });
+});

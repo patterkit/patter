@@ -5,10 +5,10 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
-  type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks } from "@patterkit/ops";
+  type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
@@ -17,7 +17,7 @@ import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene
 import type { ReviewItem } from "../shared/api.js";
 import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
-import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult } from "../shared/api.js";
+import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
 import { startAudioIndex, audioManifest, AUDIO_MANIFEST_FILE, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 
@@ -431,6 +431,74 @@ export async function unpackTo(packPath: string, destDir: string): Promise<{ ok:
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
+  });
+}
+
+/** A planned Merge Returned Patterpack: what it WOULD write, and what to tell the author it did.
+ *  Held between the plan and the commit so main can show the counts before anything touches disk. */
+export interface PackMergePlan {
+  writes: PlannedWrite[];
+  sidecars: PlannedWrite[];
+  summary: PackMergeSummary;
+}
+
+/**
+ * PLAN a merge of a RETURNED `.patterpack` into the open project, using the pack originally SENT as the
+ * common ancestor. Pure: reads the two documents and the working copy, and returns the writes without
+ * making any. Nothing is on disk until `commitPackMerge`.
+ *
+ * Split from the commit on purpose. The op's purity is the feature - a merge that fails part way must
+ * leave the project untouched - and keeping the two apart lets main put a confirmation between them
+ * showing what the merge actually found, rather than asking the author to approve a merge sight unseen.
+ * It also keeps the modal OUT of the write queue, which `commitPackMerge` enters only once there is
+ * something to write.
+ *
+ * `ensureHydrated` first: a merge spans every scene, and the landing-first open has parsed only one.
+ */
+export async function planPackMerge(returnedPath: string, basePath: string): Promise<PackMergePlan | { error: string }> {
+  if (!loaded) return { error: "no project open" };
+  ensureHydrated();
+  const root = loaded.root;
+  try {
+    const res = await runUnpackMerge(readFileSync(returnedPath), readFileSync(basePath), root);
+    return {
+      writes: res.writes,
+      sidecars: res.sidecars,
+      summary: {
+        // Paths back to project-relative: the absolute ones are for writing, not for reading out.
+        shards: res.shards.map((sh) => ({ path: sh.path, added: sh.added, conflicts: sh.result?.conflicts.length ?? 0 })),
+        conflicts: res.conflicts,
+        warnings: res.warnings,
+      },
+    };
+  } catch (e) {
+    // A corrupt zip, a shard that will not parse, or an entry trying to escape the project (`UnsafeEntryError`).
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * COMMIT a planned merge: land the shards and their conflict sidecars through the VC layer, then RELOAD
+ * the project so the in-memory model matches what is now on disk.
+ *
+ * A full reload rather than the shard-swap `applyReplace` does. Replace rewrites known locale shards and
+ * can put each one back in its slot; a returned pack may have touched the project file, added scenes, or
+ * changed anything else, so there is no reliable in-place patch and re-opening is both correct and cheap.
+ *
+ * The sidecars go through the same VC path as the shards, deliberately: a `.patterconflict` is a real file
+ * the author will want to commit or ignore on purpose, not scratch output.
+ */
+export function commitPackMerge(plan: PackMergePlan): Promise<SaveResult & { project?: OpenedProject }> {
+  return enqueueWrite(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    const root = loaded.root;
+    const all = [...plan.writes, ...plan.sidecars];
+    if (all.length === 0) return { ok: true, project: summarise(loaded) }; // nothing came back that we do not already have
+    const res = await commitWrites(all);
+    if (!res.ok) return res;
+    const project = openProject(root); // re-read from disk; the merge may have touched anything
+    ensureHydrated();
+    return { ok: true, project };
   });
 }
 

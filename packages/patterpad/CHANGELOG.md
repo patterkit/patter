@@ -7,6 +7,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 ## [Unreleased]
 
 ### Added
+- **File ▸ Merge Returned Patterpack.** Sending a project to a freelancer, a translator or a reviewer
+  has been a single file for a while (**Export as Patterpack**), but folding their work back in was a
+  terminal command. It is a menu entry now, and the round trip is three moves in the File menu: export
+  sends, **Open Patterpack** receives someone else's as a new project, and **Merge Returned Patterpack**
+  takes yours back. It asks for the pack that came *back*, then the pack you *sent* (the merge needs it
+  as the common ancestor), and **shows you what it found before it writes anything**, so you can back
+  out. Changes to different lines simply combine. Where you both changed the same line yours is kept
+  and a `.patterconflict` file is left beside the shard saying what disagreed. A file they *added*
+  arrives as it is; a file they *deleted* is left alone, because a missing entry in a zip is not good
+  enough reason to remove your work. **It edits the open project and cannot be undone from the Edit
+  menu**, so it says so and asks first, and your version control is the way back.
 - **The name box offers the one your version control already knows.** Patterpad asks for your name
   on first run while a "Locked by *someone*" badge sits in the corner of the same window, which
   means it has had a name within reach the whole time it was asking for one. It now fills the box in
