@@ -872,6 +872,33 @@ describe("merge returned patterpack", () => {
     expect(existsSync(plan.sidecars[0]!.path)).toBe(true); // the sidecar is a real file, written like any other
   });
 
+  it("flags a base pack from a different project, without refusing it", async () => {
+    // The editor turns this into the headline of the confirmation and flips the default to Cancel, so
+    // the summary has to carry it. Warning, not refusal: the writes are still planned.
+    const dir = mkdtempSync(join(tmpdir(), "pp-merge-x-"));
+    const opened = await project.createProject(dir, "Ours");
+    const sceneId = opened.scenes[0]!.id;
+    const ourRoot = project.currentRoot()!; // createProject roots the project AT dir, not in a child
+    const sent = await packTo(join(dir, "sent.patterpack"));
+
+    // A pack from an entirely different project, built the same way so only the id differs.
+    const other = mkdtempSync(join(tmpdir(), "pp-merge-y-"));
+    await project.createProject(other, "Theirs");
+    const strangerPack = await packTo(join(other, "stranger.patterpack"));
+
+    // Back to ours, so the merge targets the project we started with.
+    project.openProject(ourRoot);
+    // Without this the test could be "merging into the stranger", where a mismatch would be expected
+    // for entirely the wrong reason.
+    expect(project.currentRoot()).toBe(ourRoot);
+    expect(project.readScene(sceneId).flowSource.length).toBeGreaterThan(0);
+
+    const plan = await project.planPackMerge(strangerPack, sent);
+    if ("error" in plan) throw new Error(plan.error);
+    expect(plan.summary.sameProject).toBe(false);
+    expect(plan.writes.length).toBeGreaterThan(0); // planned anyway; the author decides
+  });
+
   it("reports a pack it cannot read as an error rather than throwing", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pp-merge-bad-"));
     await project.createProject(dir, "Bad Pack");

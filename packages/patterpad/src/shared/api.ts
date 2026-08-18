@@ -348,6 +348,10 @@ export interface PackMergeSummary {
   /** Total across every shard. */
   conflicts: number;
   warnings: number;
+  /** Whether the two packs and the open project agree on their project id. False means the author has
+   *  most likely picked the wrong file at one of the two prompts, which is worth saying BEFORE the
+   *  merge lands rather than leaving them to read it out of a pile of conflicts. */
+  sameProject: boolean;
 }
 
 /** A localisation export: a format + an optional target locale (omitted = a blank source template). */

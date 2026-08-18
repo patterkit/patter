@@ -549,16 +549,38 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
     await dialog.showMessageBox(win, { type: "info", message: "Nothing to merge.", detail: "That pack has no project files in it." });
     return null;
   }
-  const confirm = await dialog.showMessageBox(win, {
-    type: summary.conflicts > 0 ? "warning" : "question",
-    buttons: ["Merge", "Cancel"],
-    defaultId: 0,
-    cancelId: 1,
-    message: `Merge ${merged} file${merged === 1 ? "" : "s"}${added ? ` and add ${added}` : ""} into this project?`,
-    detail: summary.conflicts > 0
-      ? `${summary.conflicts} conflict${summary.conflicts === 1 ? "" : "s"} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.\n\nThis edits the open project and cannot be undone from the Edit menu.`
-      : "This edits the open project and cannot be undone from the Edit menu.",
-  });
+  const what = `Merge ${merged} file${merged === 1 ? "" : "s"}${added ? ` and add ${added}` : ""} into this project?`;
+  const conflictLine = summary.conflicts > 0
+    ? `${summary.conflicts} conflict${summary.conflicts === 1 ? "" : "s"} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.`
+    : "";
+  const cannotUndo = "This edits the open project and cannot be undone from the Edit menu.";
+
+  // A project-id mismatch takes the headline and flips the default button to Cancel. It nearly always
+  // means the wrong file was chosen at one of the two prompts, and the merge that follows would be a
+  // heap of conflicts that reads as though the other author rewrote everything. Still only a WARNING:
+  // ids can legitimately differ across a fork or a reissue, and the author knows which is the case.
+  const confirm = await dialog.showMessageBox(win, summary.sameProject
+    ? {
+        type: summary.conflicts > 0 ? "warning" : "question",
+        buttons: ["Merge", "Cancel"],
+        defaultId: 0,
+        cancelId: 1,
+        message: what,
+        detail: [conflictLine, cannotUndo].filter(Boolean).join("\n\n"),
+      }
+    : {
+        type: "warning",
+        buttons: ["Merge Anyway", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+        message: "These do not look like the same project.",
+        detail: [
+          "The pack that came back, the pack you sent, and this project do not all carry the same project id. Usually that means the wrong file was chosen at one of the two prompts.",
+          "Merging anyway will work, but if the ancestor is wrong you will get conflicts everywhere rather than only where you and they really disagreed.",
+          what.replace(/\?$/, "."),
+          cannotUndo,
+        ].join("\n\n"),
+      });
   if (confirm.response !== 0) return null;
 
   const res = await project.commitPackMerge(plan);

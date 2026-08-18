@@ -17,7 +17,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   and a `.patterconflict` file is left beside the shard saying what disagreed. A file they *added*
   arrives as it is; a file they *deleted* is left alone, because a missing entry in a zip is not good
   enough reason to remove your work. **It edits the open project and cannot be undone from the Edit
-  menu**, so it says so and asks first, and your version control is the way back.
+  menu**, so it says so and asks first, and your version control is the way back. If the two packs and
+  your project don't all claim the same project, it says so before anything else and makes **Cancel**
+  the default button, because that nearly always means the wrong file was picked at one of the prompts.
 - **The name box offers the one your version control already knows.** Patterpad asks for your name
   on first run while a "Locked by *someone*" badge sits in the corner of the same window, which
   means it has had a name within reach the whole time it was asking for one. It now fills the box in

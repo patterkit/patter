@@ -22,8 +22,10 @@ import JSZip from "jszip";
 import { join, normalize, isAbsolute, resolve, sep } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { parseSource, canonicalStringify } from "@patterkit/core";
+import { findProjectFile } from "./load.js";
 import { runMerge } from "./merge.js";
 import type { MergeResult } from "./merge.js";
+import type { DocumentManifest } from "./pack.js";
 import type { PlannedWrite } from "./write.js";
 
 const MANIFEST = "patter.manifest.json";
@@ -31,16 +33,34 @@ const MANIFEST = "patter.manifest.json";
 /** A document entry whose path escapes the target dir (rejected). */
 export class UnsafeEntryError extends Error {}
 
+/** A document's contents: its shards as relpath -> text (paths validated), and its manifest when it has
+ *  a readable one. One zip load for both, since every caller that wants the manifest wants the shards. */
+interface DocContents {
+  shards: Map<string, string>;
+  manifest?: DocumentManifest;
+}
+
+async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
+  const zip = await JSZip.loadAsync(bytes);
+  const shards = new Map<string, string>();
+  let manifest: DocumentManifest | undefined;
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (entry.dir) continue;
+    if (name === MANIFEST) {
+      // A document from another tool, or a hand-made zip, may have no manifest or a broken one. That is
+      // not a reason to refuse the merge; it only means we cannot vouch for where it came from.
+      try { manifest = JSON.parse(await entry.async("string")) as DocumentManifest; } catch { /* unvouched */ }
+      continue;
+    }
+    if (isUnsafeEntry(name)) throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
+    shards.set(name, await entry.async("string"));
+  }
+  return { shards, manifest };
+}
+
 /** Read a `.patterpack` document's shards as relpath -> text (manifest excluded, paths validated). */
 async function readDocShards(bytes: Buffer | Uint8Array): Promise<Map<string, string>> {
-  const zip = await JSZip.loadAsync(bytes);
-  const out = new Map<string, string>();
-  for (const [name, entry] of Object.entries(zip.files)) {
-    if (entry.dir || name === MANIFEST) continue;
-    if (isUnsafeEntry(name)) throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
-    out.set(name, await entry.async("string"));
-  }
-  return out;
+  return (await readDoc(bytes)).shards;
 }
 
 /** Unpack a `.patterpack` document (zip bytes) into planned writes under `targetDir`. */
@@ -60,6 +80,55 @@ export interface MergedShard {
   added: boolean;
 }
 
+/**
+ * Whether the three documents in a merge agree about WHICH PROJECT they are.
+ *
+ * The weak half of the provenance story (brief §7). A pack carries no record of the pack it descends
+ * from, so nothing can tell you that you chose the wrong REVISION as your ancestor. But every manifest
+ * already carries `project.id`, and until now nothing read it: you could point the merge at an entirely
+ * unrelated project's pack and it would merge by id, find almost nothing in common, and hand back a
+ * mountain of conflicts that read as though the other author had rewritten everything.
+ *
+ * The strong half (a content hash plus an `unpack` marker recording what a working copy came from) is
+ * deliberately NOT built: it costs a non-shard file living inside every project folder, which is a
+ * permanent intrusion into a tree kept to source shards on purpose. A wrong ancestor already fails soft,
+ * as visible and recoverable conflicts.
+ *
+ * WARNS, never refuses. An id can legitimately differ - a project forked, or an id deliberately reissued
+ * - and the author is better placed than we are to know.
+ */
+export interface ProvenanceCheck {
+  /** The project id each side claims, or undefined where none could be read (no manifest, or no project
+   *  file in the target). An id that cannot be read cannot disagree. */
+  returned?: string;
+  base?: string;
+  target?: string;
+  /** True when every id that COULD be read is the same one. */
+  ok: boolean;
+}
+
+/** Compare the ids that are actually available. Silence when there is nothing to compare. */
+function checkProvenance(returned?: string, base?: string, target?: string): ProvenanceCheck {
+  const known = [returned, base, target].filter((id): id is string => typeof id === "string" && id !== "");
+  return {
+    ...(returned !== undefined ? { returned } : {}),
+    ...(base !== undefined ? { base } : {}),
+    ...(target !== undefined ? { target } : {}),
+    ok: new Set(known).size <= 1,
+  };
+}
+
+/** The open project's own id, for the target side of the check. Undefined when there is no project file
+ *  to read - `runUnpackMerge` is happy to merge into a bare directory, so this must not throw. */
+function targetProjectId(projectDir: string): string | undefined {
+  try {
+    const pf = parseSource(readFileSync(findProjectFile(projectDir), "utf8")) as { project?: { id?: string } };
+    return pf.project?.id;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface UnpackMergeResult {
   shards: MergedShard[];
   /** Merged (and added) shard contents to write into the project. */
@@ -68,6 +137,8 @@ export interface UnpackMergeResult {
   sidecars: PlannedWrite[];
   conflicts: number;
   warnings: number;
+  /** Do the returned document, the base document and the target project agree on their project id? */
+  provenance: ProvenanceCheck;
 }
 
 /**
@@ -83,8 +154,11 @@ export async function runUnpackMerge(
   baseBytes: Buffer | Uint8Array,
   projectDir: string,
 ): Promise<UnpackMergeResult> {
-  const theirs = await readDocShards(returnedBytes);
-  const base = await readDocShards(baseBytes);
+  const returnedDoc = await readDoc(returnedBytes);
+  const baseDoc = await readDoc(baseBytes);
+  const theirs = returnedDoc.shards;
+  const base = baseDoc.shards;
+  const provenance = checkProvenance(returnedDoc.manifest?.project?.id, baseDoc.manifest?.project?.id, targetProjectId(projectDir));
   const shards: MergedShard[] = [];
   const writes: PlannedWrite[] = [];
   const sidecars: PlannedWrite[] = [];
@@ -113,7 +187,7 @@ export async function runUnpackMerge(
     shards.push({ path: rel, result, added: false });
   }
 
-  return { shards, writes, sidecars, conflicts, warnings };
+  return { shards, writes, sidecars, conflicts, warnings, provenance };
 }
 
 /** True if a document entry is an absolute path or would escape the target dir.

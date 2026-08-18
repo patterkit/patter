@@ -452,6 +452,16 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
         // the document we originally sent (--base) as the common ancestor.
         if (typeof flags.base !== "string") { console.error("unpack --merge: --base <sent.patter> is required"); return 2; }
         const res = await runUnpackMerge(readFileSync(file), readFileSync(flags.base), flags.o);
+        // Warn BEFORE the writes, so it is the first thing on screen rather than buried above the
+        // per-shard list. A warning, not a refusal: an id can legitimately differ (a fork, a reissued
+        // id), and the author knows better than we do. See ProvenanceCheck for what this does not catch.
+        if (!res.provenance.ok) {
+          console.error("warning: these do not look like the same project");
+          console.error(`  returned pack: ${res.provenance.returned ?? "(no manifest)"}`);
+          console.error(`  base pack:     ${res.provenance.base ?? "(no manifest)"}`);
+          console.error(`  project at -o: ${res.provenance.target ?? "(no project file)"}`);
+          console.error("  merging anyway; expect spurious conflicts if the ancestor is wrong.");
+        }
         if (!commitWrites([...res.writes, ...res.sidecars])) return 1;
         for (const s of res.shards) {
           const n = s.result ? s.result.conflicts.length : 0;
