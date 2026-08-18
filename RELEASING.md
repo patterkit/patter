@@ -17,6 +17,30 @@ It queries npm with `--prefer-online` deliberately. **npm caches package metadat
 minutes after a publish a plain `npm view` reports the version you just replaced.** That has twice
 made a successful publish look like a failed one. If you check by hand, use `--prefer-online`.
 
+## Publishing what is waiting: `npm run release:npm`
+
+Ordinary work adds changesets as it goes, so most of the time there is simply a
+"Version Packages" PR sitting open. To ship it:
+
+```sh
+npm run release:npm             # shows the bumps, asks, merges, waits, verifies
+npm run release:npm -- --dry-run
+npm run release:npm -- --yes
+```
+
+It reads the bumps off the PR diff, asks once (npm versions cannot be
+unpublished), merges, then polls the registry with `--prefer-online` until the new
+versions are actually served. With no PR open it says so and exits 0.
+
+**Merging with YOUR credentials is load-bearing, which is why this is a local
+script and not a workflow step.** A push made with `GITHUB_TOKEN` does not trigger
+further workflow runs, so a pipeline that merged its own Version Packages PR would
+land the bumped manifests on main and never publish them.
+
+`ship:cli` is the other end of the same pipe: use it when there is no changeset
+yet and you want the whole CLI release in one command. Both share
+`scripts/lib/version-pr.mjs`.
+
 ## The changeset guard
 
 A push that moves a published package's source with no changeset covering it is refused, by a
