@@ -895,7 +895,11 @@ describe("merge returned patterpack", () => {
 
     const plan = await project.planPackMerge(strangerPack, sent);
     if ("error" in plan) throw new Error(plan.error);
-    expect(plan.summary.sameProject).toBe(false);
+    expect(plan.summary.provenance.ok).toBe(false);
+    // The ids must reach the dialog, not just the verdict: naming which file is the odd one out is the
+    // only part the author can act on.
+    expect(plan.summary.provenance.base).toBe(plan.summary.provenance.target); // ours is the ancestor
+    expect(plan.summary.provenance.returned).not.toBe(plan.summary.provenance.target);
     expect(plan.writes.length).toBeGreaterThan(0); // planned anyway; the author decides
   });
 

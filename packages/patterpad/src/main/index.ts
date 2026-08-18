@@ -559,7 +559,7 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
   // means the wrong file was chosen at one of the two prompts, and the merge that follows would be a
   // heap of conflicts that reads as though the other author rewrote everything. Still only a WARNING:
   // ids can legitimately differ across a fork or a reissue, and the author knows which is the case.
-  const confirm = await dialog.showMessageBox(win, summary.sameProject
+  const confirm = await dialog.showMessageBox(win, summary.provenance.ok
     ? {
         type: summary.conflicts > 0 ? "warning" : "question",
         buttons: ["Merge", "Cancel"],
@@ -574,9 +574,16 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
         defaultId: 1,
         cancelId: 1,
         message: "These do not look like the same project.",
+        // Name the three ids rather than only reporting that they disagree. Which FILE is wrong is the
+        // thing the author has to act on, and only the ids tell them that. Wording follows Storyletter's,
+        // which said it better than ours did; the two apps are deliberately identical here.
         detail: [
-          "The pack that came back, the pack you sent, and this project do not all carry the same project id. Usually that means the wrong file was chosen at one of the two prompts.",
-          "Merging anyway will work, but if the ancestor is wrong you will get conflicts everywhere rather than only where you and they really disagreed.",
+          [
+            `The returned pack carries project id ${summary.provenance.returned ?? "(none)"}`,
+            `the pack you sent carries ${summary.provenance.base ?? "(none)"}`,
+            `and this project is ${summary.provenance.target ?? "(unreadable)"}.`,
+          ].join(", "),
+          "Usually that means the wrong file was chosen at one of the two prompts. Merging anyway will work, but if the ancestor is wrong you will get conflicts everywhere rather than only where you and they really disagreed.",
           what.replace(/\?$/, "."),
           cannotUndo,
         ].join("\n\n"),
