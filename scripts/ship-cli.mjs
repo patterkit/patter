@@ -20,7 +20,7 @@
 
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { createInterface } from "node:readline/promises";
+import { waitForVersionPr, confirmPublish, waitForNpm } from "./lib/version-pr.mjs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -76,34 +76,19 @@ run("git push origin main");
 
 // --- 3. wait for the bot ----------------------------------------------------
 step(3, "waiting for the Version Packages PR");
-const findPr = () => {
-  const json = out('gh pr list --state open --head changeset-release/main --json number,title --limit 1');
-  const list = JSON.parse(json || "[]");
-  return list[0]?.number ?? null;
-};
 let pr = null;
 if (!dryRun) {
-  for (let i = 0; i < 40 && !pr; i++) {           // ~4 minutes; the bot usually takes well under one
-    pr = findPr();
-    if (!pr) execSync("sleep 6");
-  }
-  if (!pr) die("no Version Packages PR appeared - check the Release workflow, then merge it by hand");
+  pr = waitForVersionPr(root);                    // the bot usually takes well under a minute
+  if (!pr) die("no Version Packages PR appeared - check the Release workflow, then: npm run release:npm");
   console.log(`  PR #${pr} is open`);
 } else console.log("  [dry-run] would wait for the changeset-release/main PR");
 
 // --- 4. the gate ------------------------------------------------------------
 step(4, "merging it (this publishes to npm)");
 if (dryRun) console.log("  [dry-run] would stop here and ask before publishing");
-else if (!yes) {
-  console.log(`\n  https://github.com/patterkit/patter/pull/${pr}`);
-  console.log("  Merging publishes @patterkit/cli to npm. Published versions cannot be unpublished.\n");
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = (await rl.question("  merge and publish? [y/N] ")).trim().toLowerCase();
-  rl.close();
-  if (answer !== "y" && answer !== "yes") {
-    console.log(`\n  stopped. PR #${pr} is still open; merge it yourself, then: npm run release:cli`);
-    process.exit(0);
-  }
+else if (!yes && !(await confirmPublish(pr, null, "https://github.com/patterkit/patter"))) {
+  console.log(`\n  stopped. PR #${pr} is still open; ship it later with: npm run release:npm`);
+  process.exit(0);
 }
 if (!dryRun) run(`gh pr merge ${pr} --squash`);
 else console.log("  [dry-run] gh pr merge <n> --squash");
@@ -115,15 +100,9 @@ const target = dryRun ? "(dry run)" : JSON.parse(readFileSync(manifest, "utf8"))
 if (!dryRun) {
   if (target === startVersion) die(`the manifest is still ${startVersion} after the merge - check the PR`);
   console.log(`  manifest is now ${target}; polling the registry`);
-  let live = false;
-  for (let i = 0; i < 40 && !live; i++) {
-    // --prefer-online, always: npm's metadata cache will report the previous version for minutes
-    // after a publish, which is exactly how a working release gets mistaken for a broken one.
-    const v = execSync(`npm view @patterkit/cli version --prefer-online`, { encoding: "utf8" }).trim();
-    live = v === target;
-    if (!live) execSync("sleep 6");
+  if (!waitForNpm("@patterkit/cli", target)) {
+    die(`npm has not served ${target} yet - check the Release workflow, then: npm run release:cli`);
   }
-  if (!live) die(`npm has not served ${target} yet - check the Release workflow, then: npm run release:cli`);
   console.log(`  @patterkit/cli@${target} is live`);
 }
 
