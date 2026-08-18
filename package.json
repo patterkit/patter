@@ -20,6 +20,9 @@
     "release:pad": "node scripts/release.mjs pad",
     "release:play": "node scripts/release.mjs play",
     "release:cli": "node scripts/release.mjs cli",
+    "release:guard": "node scripts/release-guard.mjs",
+    "release:status": "node scripts/release-status.mjs",
+    "ship:cli": "node scripts/ship-cli.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "npm run build && changeset publish"
