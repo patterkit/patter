@@ -93,7 +93,8 @@ if (!dryRun) {
 
 // --- 4. the gate ------------------------------------------------------------
 step(4, "merging it (this publishes to npm)");
-if (!dryRun && !yes) {
+if (dryRun) console.log("  [dry-run] would stop here and ask before publishing");
+else if (!yes) {
   console.log(`\n  https://github.com/patterkit/patter/pull/${pr}`);
   console.log("  Merging publishes @patterkit/cli to npm. Published versions cannot be unpublished.\n");
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -104,7 +105,8 @@ if (!dryRun && !yes) {
     process.exit(0);
   }
 }
-run(`gh pr merge ${pr ?? "PR"} --squash`);
+if (!dryRun) run(`gh pr merge ${pr} --squash`);
+else console.log("  [dry-run] gh pr merge <n> --squash");
 
 // --- 5. wait for the publish ------------------------------------------------
 step(5, "waiting for npm");
@@ -129,6 +131,10 @@ if (!dryRun) {
 step(6, "tagging the standalone binaries");
 run("npm run release:cli");
 
-console.log(`\nship:cli: done. @patterkit/cli@${target} on npm; cli-v${target} tagged.`);
-console.log("The CLI release workflow is building the executables now:");
-console.log("  https://github.com/patterkit/patter/actions/workflows/cli.yml");
+if (dryRun) {
+  console.log("\nship:cli: dry run complete - nothing was written, pushed, merged or tagged.");
+} else {
+  console.log(`\nship:cli: done. @patterkit/cli@${target} on npm; cli-v${target} tagged.`);
+  console.log("The CLI release workflow is building the executables now:");
+  console.log("  https://github.com/patterkit/patter/actions/workflows/cli.yml");
+}
