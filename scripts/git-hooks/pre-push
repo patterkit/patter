@@ -1,0 +1,33 @@
+#!/bin/sh
+# Refuse a push that moves a published package's source with no changeset covering it.
+#
+# The gap this closes: CI's `changeset-check` is `if: github.event_name == 'pull_request'`, and this
+# repo works directly on main. On 2026-08-18 @patterkit/ops and @patterkit/cli both gained a feature,
+# went straight to main, and the Release workflow ran green having published nothing - leaving the
+# registry serving one build under a version number the repo had given to another.
+#
+# Pre-push rather than pre-commit on purpose: a changeset describes a RELEASE, and mid-work commits
+# have no business being asked for one. The push is the moment the work becomes everyone's.
+#
+# Reads git's own stdin (`<local ref> <local sha> <remote ref> <remote sha>`) so the comparison is
+# against what the REMOTE actually has, not against a possibly stale local origin/main.
+#
+# Wired via `core.hooksPath = scripts/git-hooks` (set by the root `prepare` script on install).
+# `git push --no-verify` skips it; CI is the backstop.
+set -e
+
+z40=0000000000000000000000000000000000000000
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$z40" ] && continue                   # a branch deletion pushes nothing
+  if [ "$remote_sha" = "$z40" ]; then
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null || echo "")  # a brand-new branch
+    [ -z "$base" ] && continue
+  else
+    base="$remote_sha"
+  fi
+  node scripts/release-guard.mjs "$base" "$local_sha" || {
+    echo "pre-push: aborted. Add a changeset, or push with --no-verify if you are certain." >&2
+    exit 1
+  }
+done

@@ -3,6 +3,39 @@
 One repo, several deliverables, each on its own cadence. The **npm packages** are
 driven by Changesets; everything else is tag-triggered.
 
+## Before you start: `npm run release:status`
+
+```sh
+npm run release:status
+```
+
+One read-only summary of every train: each published package's repo version against the registry,
+Patterpad's version and whether it is tagged, unpushed commits, pending changesets, an open
+"Version Packages" PR, and the last few pipeline runs. Run it before and after anything below.
+
+It queries npm with `--prefer-online` deliberately. **npm caches package metadata, so for a few
+minutes after a publish a plain `npm view` reports the version you just replaced.** That has twice
+made a successful publish look like a failed one. If you check by hand, use `--prefer-online`.
+
+## The changeset guard
+
+A push that moves a published package's source with no changeset covering it is refused, by a
+pre-push hook (`scripts/git-hooks/pre-push`) and again by CI on `main`.
+
+Without one, `changeset publish` has nothing to do: the workflow goes green in under a minute having
+published nothing, and the registry keeps serving one build under a version number the repo has
+since given to another. Nothing goes red, because doing nothing is a legitimate outcome.
+
+```sh
+npm run changeset             # the fix, nearly always
+npm run changeset -- --empty  # a comment or a pure refactor that genuinely ships nothing
+npm run release:guard         # run the check by hand
+git push --no-verify          # bypass, if you are certain
+```
+
+`@patterkit/runtime` is the exception in both directions: it is versioned by `npm run bump:play`, so
+changing it needs no changeset, and a changeset that NAMES it is an error the guard reports.
+
 ## Tag scheme
 
 CI keys each pipeline off a tag prefix:
@@ -94,6 +127,23 @@ these secrets (see `packages/patterpad/RELEASE.md`): `CSC_LINK`, `CSC_KEY_PASSWO
 unsigned; Linux/Windows builds need no signing secrets.
 
 ## Standalone CLI + JS drop-in
+
+A CLI release is really two releases: the npm package (Changesets) and the standalone executables
+(a `cli-v*` tag). The binaries take their version from the manifest the npm side bumps, **so the npm
+half must land first** - tag early and you ship binaries labelled with one version and built from
+another.
+
+```sh
+npm run ship:cli -- patch      # the whole chain, with one confirmation before it publishes
+npm run ship:cli -- minor --yes
+npm run ship:cli -- patch --dry-run
+```
+
+`ship:cli` writes the changeset, commits, pushes, waits for the "Version Packages" PR, **stops and
+asks** (merging publishes to npm, and npm versions cannot be unpublished), merges, waits for the
+registry to actually serve the new version, pulls, then tags `cli-v<ver>`. `--yes` skips the prompt.
+
+The two halves by hand, if you would rather:
 
 ```sh
 npm run release:cli            # tags cli-v<ver> from @patterkit/cli's package.json
