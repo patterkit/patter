@@ -7,6 +7,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 ## [Unreleased]
 
 ### Added
+- **The name box offers the one your version control already knows.** Patterpad asks for your name
+  on first run while a "Locked by *someone*" badge sits in the corner of the same window, which
+  means it has had a name within reach the whole time it was asking for one. It now fills the box in
+  with what Git, Perforce or Plastic calls you, ready to accept or type straight over. It is a
+  suggestion and nothing more: nothing is stored until you press Continue, and the box is simply
+  empty when your version control cannot say (or when you are not using any).
 - **"Follow in the editor" on the Play window.** The play window has always marked the line it is on
   and left your place alone, which stays the default. If you would rather read the script as it runs,
   the new toggle beside the pin asks the editor to reveal each line as it plays. **Off until you turn

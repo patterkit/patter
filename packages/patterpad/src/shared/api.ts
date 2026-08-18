@@ -839,6 +839,9 @@ export interface PatterApi {
   applyFix(fix: QuickFix): Promise<SaveResult>;
   /** The stored author identity, or null on first run. */
   getIdentity(): Promise<Identity | null>;
+  /** A name to OFFER in the identity box, from the VCS ("bob@bob-ws"). Null when it cannot say.
+   *  A suggestion the person types over, never an identity in itself. */
+  suggestIdentity(): Promise<string | null>;
   setIdentity(identity: Identity): Promise<void>;
   /** Persist the side-pane (slide/pin) state. Fire-and-forget; also refreshes the View menu checks. */
   setPanes(panes: PaneState): Promise<void>;
