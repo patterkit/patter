@@ -91,6 +91,28 @@ nothing to merge against, and their return can only be unpacked over the top of 
 anything you changed while they had it.
 :::
 
+### The same round trip in Patterpad
+
+You don't need the terminal for any of it. The three moves are all in the **File** menu, and they are
+three different acts:
+
+| Move | Menu | What it does |
+|---|---|---|
+| Send | **Export as Patterpack…** | writes the file; your project is untouched |
+| Receive | **Open Patterpack…** | unpacks into a *new* project folder and opens it |
+| Take back | **Merge Returned Patterpack…** | folds their changes into the project you have open |
+
+**Merge Returned Patterpack** asks for two files, in this order: the pack that came *back*, then the
+pack you *sent*. It then shows you what it found before writing anything, so you can back out. Where
+you both changed the same line, your version is kept and a `.patterconflict` file is left beside the
+shard saying what disagreed. Those are ordinary files: resolve them the way you would a version-control
+conflict, and delete them when you're done (`patter validate` fails while one is still lying about).
+
+:::note
+A merge edits the open project in place and **can't be undone from the Edit menu**. Commit or check in
+before you run one, and your version control is the way back.
+:::
+
 ## A typical shipping loop
 
 1. Writers finish a pass; you run **Production ▸ Production Information** to check coverage and

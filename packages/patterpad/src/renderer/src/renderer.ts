@@ -2089,6 +2089,40 @@ async function openPatterpack(): Promise<void> {
   if (r) await showProject(r);
 }
 
+/** File ▸ Merge Returned Patterpack: fold a pack that came back into the OPEN project.
+ *
+ *  Flush first, and flush everything. A merge reads the working copy off DISK, so any pending edit still
+ *  sitting in a buffer would be invisible to the three-way merge and then overwritten by its result: the
+ *  one way this operation could actually lose work. Same flush as Export as Patterpack, for the same
+ *  reason from the other direction.
+ *
+ *  Main runs both pickers and the confirmation, so null covers all three dismissals and means nothing was
+ *  written. On success the project has been re-read from disk, so the whole editor is rebuilt from the
+ *  returned payload rather than patched. */
+async function mergePatterpack(): Promise<void> {
+  if (!project) return;
+  if (surface) await save(); // pending text edits
+  await persistDocs();                // pending Notes
+  await persistComments();            // pending comments
+  const r = await window.patter.mergePatterpack();
+  if (!r) return;                                        // cancelled at one of the three prompts
+  if ("error" in r) { toast(`Merge failed: ${r.error}`, "error"); return; }
+
+  project = r.project;
+  renderNav();
+  if (currentSceneId && project.scenes.some((sc) => sc.id === currentSceneId)) await loadScene(currentSceneId);
+  else if (project.scenes[0]) await loadScene(project.scenes[0].id); // their pack deleted the scene we were in
+
+  const added = r.summary.shards.filter((sh) => sh.added).length;
+  const merged = r.summary.shards.length - added;
+  const counts = `${merged} merged${added ? `, ${added} added` : ""}`;
+  // A conflict is not a failure - the merge committed - but it is not a quiet success either. The error
+  // voice is what stops an author walking away from unresolved conflicts thinking they were done.
+  if (r.summary.conflicts > 0) {
+    toast(`${counts}; ${r.summary.conflicts} conflict${r.summary.conflicts === 1 ? "" : "s"} need a look\nsee the .patterconflict files`, "error");
+  } else toast(`Merged the returned pack\n${counts}`);
+}
+
 /** Publish ▸ Publish for Web: write the story to a FOLDER as a customisable page (index.html +
  *  style.css published once and then kept; story.js + patterplay.js refreshed every publish). */
 async function exportWeb(): Promise<void> {
@@ -2403,6 +2437,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "save") void save();
   else if (cmd === "save-as") void saveAs();
   else if (cmd === "export-patterpack") void exportPatterpack();
+  else if (cmd === "merge-patterpack") void mergePatterpack();
   else if (cmd === "find") openSearch();
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "play") void play();

@@ -89,6 +89,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Save", accelerator: "CmdOrCtrl+S", click: () => send("save") },
         { label: "Save As…", accelerator: "Shift+CmdOrCtrl+S", click: () => send("save-as") }, // duplicate the project folder
         { label: "Export as Patterpack…", click: () => send("export-patterpack") }, // bundle the project into one sendable file
+        // The return leg of the line above, and a THIRD act rather than a mode of Open: export writes a
+        // file, Open Patterpack replaces the project with a new one, this edits the open project in place.
+        { label: "Merge Returned Patterpack…", click: () => send("merge-patterpack") },
         { type: "separator" },
         // Scene-level actions: within the OPEN project (project-level New/Open live above).
         { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", click: () => send("new-scene") },

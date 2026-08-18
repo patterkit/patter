@@ -182,6 +182,23 @@ describe("main exit codes", () => {
     expect(text).toContain('"B": "b2"');
   });
 
+  it("unpack --merge without --base is a usage error, not a two-way overwrite", async () => {
+    // The dangerous reading of a missing ancestor is "then just write theirs over ours", which silently
+    // discards everything the team did while the pack was away. It has to be refused, and refused BEFORE
+    // anything is written: the exit code is only half the promise, the untouched project is the other half.
+    const dir = mkdtempSync(join(tmpdir(), "patter-cli-um-"));
+    const proj = join(dir, "proj");
+    expect(await main(["init", proj, "--name", "Merge Game"])).toBe(0);
+    const root = join(dir, "proj.patter");
+    const pack = join(dir, "returned.patterpack");
+    expect(await main(["pack", root, "-o", pack])).toBe(0);
+    const before = readFileSync(join(root, "scenes", "start.patterflow"), "utf8");
+
+    expect(await main(["unpack", pack, "--merge", "-o", root])).toBe(2); // usage, not 0 and not 1
+    expect(lastError()).toMatch(/--base/);
+    expect(readFileSync(join(root, "scenes", "start.patterflow"), "utf8")).toBe(before);
+  });
+
   it("mergetool: a non-Patter file runs --fallback and returns its exit code", async () => {
     const dir = mkdtempSync(join(tmpdir(), "patter-cli-mt2-"));
     for (const f of ["base", "theirs", "ours", "out"]) writeFileSync(join(dir, `${f}.txt`), "x");

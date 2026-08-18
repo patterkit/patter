@@ -337,6 +337,19 @@ export interface ExportResult {
   error?: string;
 }
 
+/** What a Merge Returned Patterpack did, per shard and in total, ready to render without further work.
+ *
+ *  Conflicts are NOT failures: the shard is written with OUR version and a `.patterconflict` sidecar
+ *  records what disagreed, exactly as a version-control conflict leaves the file plus its markers. The
+ *  merge still commits, so this is reported in the error voice rather than as a failed operation - a
+ *  quiet success toast would let an author walk away from unresolved conflicts thinking they were done. */
+export interface PackMergeSummary {
+  shards: { path: string; added: boolean; conflicts: number }[];
+  /** Total across every shard. */
+  conflicts: number;
+  warnings: number;
+}
+
 /** A localisation export: a format + an optional target locale (omitted = a blank source template). */
 export interface LocExportRequest {
   format: "json" | "xlsx" | "po";
@@ -677,6 +690,11 @@ export interface PatterApi {
   /** Open Patterpack: pick a `.patterpack` file, then a destination folder to unpack it into, and open the
    *  result. Null if either picker is cancelled. A dedicated file picker (the normal Open is folder-oriented). */
   openPatterpack(): Promise<OpenResult | null>;
+  /** Merge Returned Patterpack: pick the pack that came BACK, then the pack you SENT (the common
+   *  ancestor), merge by id into the OPEN project, and refresh it. Two pickers plus a confirmation, all
+   *  in main; the renderer never sees a path. Null when any of the three is dismissed, which writes
+   *  nothing. Unlike Open Patterpack this edits the project in place rather than opening another one. */
+  mergePatterpack(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string } | null>;
   /** Export localisation strings (spec §14) in the chosen format: opens a native Save dialog, writes the file. */
   exportLoc(request: LocExportRequest): Promise<ExportResult>;
   /** Import a translated file: opens a native Open dialog, applies it (format by extension). `fallbackLocale`
