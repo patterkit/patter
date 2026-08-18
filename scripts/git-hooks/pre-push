@@ -14,7 +14,19 @@
 #
 # Wired via `core.hooksPath = scripts/git-hooks` (set by the root `prepare` script on install).
 # `git push --no-verify` skips it; CI is the backstop.
+#
+# LOCAL ONLY. `npm ci` runs `prepare`, so CI wires these hooks too, and this one then fired on the
+# Changesets bot's own push and failed the Release workflow: the "Version Packages" commit CONSUMES
+# the changesets (deletes the files) while the source changes they covered are still in the range, so
+# the guard saw a moved package with nothing justifying it and refused the push. The bot was doing
+# exactly the right thing. A developer-convenience hook has no business gating an automated release,
+# and nothing is lost by stepping aside: ci.yml runs the same guard explicitly on pushes to main,
+# with the range GitHub reports, which is the check that actually protects the branch.
 set -e
+
+if [ -n "$CI" ]; then
+  exit 0
+fi
 
 z40=0000000000000000000000000000000000000000
 
