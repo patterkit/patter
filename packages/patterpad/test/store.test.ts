@@ -53,6 +53,20 @@ describe("session store", () => {
     expect(createStore(dir).read().playFollow).toBe(true); // and it survives a reload
   });
 
+  it("a settings file written before playFollow existed reads it as OFF", () => {
+    // The real forward-migration case, and the one every existing author hits: an `app` slice holding
+    // only `theme`, written by a build that had never heard of this key. The shell merges the app slice
+    // field by field precisely so a key added later arrives with its default rather than `undefined`.
+    const dir = tmpDir();
+    writeFileSync(join(dir, "app-settings.json"), JSON.stringify({
+      recents: [], places: {}, panes: {}, windows: {},
+      app: { theme: { colour: "night", font: "literata" } },
+    }), "utf8");
+    const st = createStore(dir).read();
+    expect(st.playFollow).toBe(false);
+    expect(st.theme).toEqual({ colour: "night", font: "literata" }); // and the slice it DID have survives
+  });
+
   it("remembers the colour theme / font theme", () => {
     const s = createStore(tmpDir());
     expect(s.read().theme).toEqual({ colour: "system", font: "newsreader" }); // first-run default
