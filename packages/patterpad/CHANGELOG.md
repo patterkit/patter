@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-19
+
 ### Fixed
 
 - **Clicking a Game Data list value no longer deletes the first value in the list** (#44, thanks
