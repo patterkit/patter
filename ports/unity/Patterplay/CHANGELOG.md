@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-08-19
+
 ### Added
 
 - **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read
