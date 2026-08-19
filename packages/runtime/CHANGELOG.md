@@ -25,6 +25,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-19
+
 ### Fixed
 
 - **A declared host-scope property whose name carried a capital letter could never be read.** With no
