@@ -26,6 +26,7 @@ public class PatterplayEditor : ModuleRules
 			"SlateCore",
 			"InputCore",
 			"WorkspaceMenuStructure",
+			"PropertyEditor",    // the bundle inspector's details customisation
 			"DesktopPlatform",   // native Save/Load file dialogs on the state panel
 		});
 	}
