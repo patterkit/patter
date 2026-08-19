@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-19
+
 ### Added
 
 - **Declared host scopes (`@world`) are parsed and self-backed.** A project can DECLARE host properties
