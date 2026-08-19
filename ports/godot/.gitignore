@@ -3,3 +3,8 @@
 
 # Per-script .uid sidecars ARE committed (Godot 4.4+ convention): shipping them with the
 # addon keeps script UIDs stable in users' projects instead of regenerating as diff noise.
+
+# Import records for assets the addon's own importer claims (.patterc, the icon). Regenerated in
+# every project that opens them, and the paths inside point at THIS machine's .godot/imported cache,
+# so shipping them inside the addon zip would carry one machine's bookkeeping into users' projects.
+*.import
