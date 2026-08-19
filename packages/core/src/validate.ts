@@ -18,6 +18,7 @@
 import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, ScalarValue, AuthoringFile } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
+import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
 
 export interface ValidationIssue {
   code:
@@ -296,6 +297,23 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
 function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): void {
   checkDecls(project.properties, "project properties", issues);
 
+  // Host-scope declarations (`@world`, ...) are a separate shape from `properties`, and
+  // they take the same lower-case rule for the same reason. This is where the fault was
+  // actually found: `@world.isNight` declared with a default, and no reference able to
+  // reach it.
+  for (const scope of project.scopeRegistry?.scopes ?? []) {
+    const where = `host scope '@${scope.token}'`;
+    for (const decl of scope.declarations ?? []) {
+      const name = decl.name?.toLowerCase();
+      if (!name) {
+        issues.push({ code: "invalid-declaration", message: `${where}: a property declaration has no name` });
+        continue;
+      }
+      const problem = propertyNameProblem(decl.name);
+      if (problem) issues.push({ code: "invalid-declaration", message: `${where}: ${problem}` });
+    }
+  }
+
   // `temporary` (reseed-each-entry) only has meaning on a per-flow scene-local
   // property: a global never re-seeds (no scene-entry event).
   for (const decl of project.properties ?? []) {
@@ -427,6 +445,32 @@ function checkLadderNames(names: string[], where: string, issues: ValidationIssu
   }
 }
 
+/**
+ * Why this name cannot be used, or undefined when it can. The rule is
+ * `@wildwinter/expr`'s identifier grammar (see `@patterkit/model`); this only
+ * chooses the words, and each branch names the thing that actually happens rather
+ * than reciting the rule, because a declaration is written once and read later by
+ * somebody debugging a condition that does nothing.
+ */
+function propertyNameProblem(raw: string): string | undefined {
+  if (isValidPropertyName(raw)) return undefined;
+  const suggestion = propertyNameify(raw);
+  const tail = suggestion ? ` Try '${suggestion}'.` : "";
+  const q = `property name '${raw}'`;
+  if (RESERVED_PROPERTY_NAMES.includes(raw.toLowerCase())) {
+    return `${q} is a keyword in expressions ('${raw.toLowerCase()}'), so a reference to it will not parse.${tail}`;
+  }
+  if (raw.includes("-")) {
+    // The one that is not an error anywhere else: `@patter.a-b` compiles to a-minus-b.
+    return `${q} contains a hyphen, which an expression reads as subtraction: a reference would compile to a subtraction, not to this property.${tail}`;
+  }
+  if (/^[0-9]/.test(raw)) return `${q} starts with a digit, which an expression cannot parse as a name.${tail}`;
+  if (raw !== raw.toLowerCase() && isValidPropertyName(raw.toLowerCase())) {
+    return `${q} must be lower case: expressions fold names, so a reference looks for '${raw.toLowerCase()}' and finds nothing.${tail}`;
+  }
+  return `${q} can only hold lower case letters, digits and underscores.${tail}`;
+}
+
 /** Well-formedness of property declarations: unique names, enum/flags values, default/type agreement. */
 function checkDecls(decls: PropertyDecl[] | undefined, where: string, issues: ValidationIssue[]): void {
   const seen = new Set<string>();
@@ -440,6 +484,9 @@ function checkDecls(decls: PropertyDecl[] | undefined, where: string, issues: Va
       issues.push({ code: "invalid-declaration", message: `${where}: duplicate property '${decl.name}'` });
     }
     seen.add(name);
+
+    const problem = propertyNameProblem(decl.name);
+    if (problem) issues.push({ code: "invalid-declaration", message: `${where}: ${problem}` });
 
     if ((decl.type === "enum" || decl.type === "flags") && !decl.values?.length) {
       issues.push({ code: "invalid-declaration",

@@ -10,7 +10,8 @@
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, focusNewRow,
+  PROPERTY_NAME_HINT } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
   ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"],
@@ -25,6 +26,8 @@ export interface WorldHandle {
   setDrivers(drivers: CoverageDriver[]): void;
   /** The first host scope whose `@token.name` address clashes with another's, or null. */
   firstDuplicate(): HTMLInputElement | null;
+  /** The first name no expression could reach, for the Save gate. */
+  firstIllegalName(): HTMLInputElement | null;
 }
 
 /** Parse a comma-separated value pool: `true/false` -> boolean, numeric -> number, else the trimmed string. */
@@ -93,7 +96,10 @@ export function mountWorld(
     const ref = el("div", "world-ref");
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
     name.type = "text"; name.placeholder = "<property name>"; name.value = p.name; name.spellcheck = false;
-    name.addEventListener("input", () => { p.name = name.value; });
+    name.dataset.tip = PROPERTY_NAME_HINT;
+    // Same rule and same manners as @patter / @scene declarations; this is the scope
+    // where the fault that produced the rule was found.
+    bindPropertyName(name, (v) => { p.name = v; }, { hint: PROPERTY_NAME_HINT });
     ref.append(el("span", "world-at", "@"), el("span", "world-scope", "world"), el("span", "world-dot", "."), name);
     guard.track(name, () => `world.${p.name}`);
 
@@ -232,6 +238,7 @@ export function mountWorld(
     },
     setDrivers(next) { drivers.splice(0, drivers.length, ...structuredClone(next)); renderDrivers(); },
     firstDuplicate: () => guard.firstDuplicate(),
+    firstIllegalName: () => firstIllegalPropertyName(host),
   };
   return handle;
 }

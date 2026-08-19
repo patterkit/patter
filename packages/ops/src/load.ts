@@ -15,6 +15,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene } from "@patterkit/model";
+import { isCaseOnlyPropertyName } from "@patterkit/model";
 
 export interface LoadedProject {
   root: string;
@@ -97,6 +98,7 @@ function parseFile<T>(file: string, expectSchema: string, shapeKey: string): T {
     throw new Error(`${file}: schema is '${String(schema)}', expected '${expectSchema}@...'`);
   }
   migrateLegacyPropertyTypes(parsed, expectSchema);
+  foldDeclaredNames(parsed, expectSchema);
   return parsed as T;
 }
 
@@ -124,6 +126,35 @@ function migrateLegacyPropertyTypes(parsed: unknown, expectSchema: string): void
   } else if (expectSchema === "patter/flow") {
     const scene = obj["scene"] as { sceneProps?: unknown } | undefined;
     fixDecls(scene?.sceneProps);
+  }
+}
+
+/** Repair the ONE property-name fault a loader may repair without guessing: a name that is legal apart
+ *  from its case (`isNight`). The expression parser folds every REFERENCE, so the verbatim capital was
+ *  never observable to anything, and such projects DO play today (the bags key lower case). Folding it on
+ *  read - the way `bool` -> `boolean` is folded (#209) - changes no behaviour and upgrades the file on its
+ *  next save, where reporting a problem would put an error on a story that works.
+ *
+ *  Everything else illegal (`is-night`, `9lives`, `not`, a space) is LEFT ALONE for core to report. Those
+ *  never worked, and choosing an underscore for a space would be inventing intent - which is the same line
+ *  the gameId editor draws when it refuses an illegal address rather than quietly rewriting it. */
+function foldDeclaredNames(parsed: unknown, expectSchema: string): void {
+  const fold = (decls: unknown): void => {
+    if (!Array.isArray(decls)) return;
+    for (const d of decls) {
+      const name = d && typeof d === "object" ? (d as { name?: unknown }).name : undefined;
+      if (typeof name === "string" && isCaseOnlyPropertyName(name)) (d as { name: string }).name = name.toLowerCase();
+    }
+  };
+  if (!parsed || typeof parsed !== "object") return;
+  const obj = parsed as Record<string, unknown>;
+  if (expectSchema === "patter/project") {
+    fold(obj["properties"]);
+    const reg = obj["scopeRegistry"] as { scopes?: unknown } | undefined;
+    if (reg && Array.isArray(reg.scopes)) for (const s of reg.scopes) fold((s as { declarations?: unknown }).declarations);
+  } else if (expectSchema === "patter/flow") {
+    const scene = obj["scene"] as { sceneProps?: unknown } | undefined;
+    fold(scene?.sceneProps);
   }
 }
 
