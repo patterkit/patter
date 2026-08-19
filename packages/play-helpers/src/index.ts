@@ -26,5 +26,8 @@ export type { LiveBundleResult } from "./refresh.js";
 export { createPropertyInspector } from "./inspector.js";
 export type { PropertyInspector, PropertyInspectorOptions } from "./inspector.js";
 
+export { createBundleInspector } from "./bundle-inspector.js";
+export type { BundleInspector, BundleInspectorOptions, BundleSection } from "./bundle-inspector.js";
+
 export { createAudioResolver } from "./audio.js";
 export type { AudioResolver } from "./audio.js";
