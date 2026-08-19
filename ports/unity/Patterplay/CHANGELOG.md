@@ -6,6 +6,22 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read
+  from the asset alone with nothing running: the project's identity and hashes, every scene and block
+  ADDRESS `runFlow` / `goto` accept, the `@world` properties the GAME must supply (with the ones
+  carrying no default marked, because those are the values a story silently reads as a type default
+  if the host forgets them), the story's own declarations, the gameData fields, and counts for "is
+  this the right build?". A source-debug build says NOT SHIPPABLE rather than leaving it to be
+  inferred from `strings: ids`.
+
+  The summary itself is available to code as well (`BundleInfo.Describe`), so a build step or an
+  editor tool can read the   same description the panel draws.
+
+  The Inspector for a `PatterBundleAsset` draws it in foldouts, with the raw JSON demoted to the last
+  one and a button to copy it. Foldout state survives a domain reload.
+
 ## [0.4.2] - 2026-08-19
 
 ### Added

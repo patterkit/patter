@@ -219,6 +219,20 @@ CLI. Build locally with `npm run -w @patterkit/cli build:standalone` (host targe
 
 ## Patterplay runtimes (JS + Unity + Unreal + Godot)
 
+**Before an Unreal release, build the plugin against a real engine.** The tag pipeline gates on the
+clang TestHost, which compiles the std-only core and nothing UE-facing: not `PatterBundleLoader.cpp`,
+not the UObject wrappers, not the editor module. Since the port ships source-only, code that does not
+compile can reach a release (it did, on 2026-08-19). One command, with UE installed:
+
+```sh
+<UE>/Engine/Build/BatchFiles/Mac/Build.sh PatterplayDemoEditor Mac Development \
+  -project="$PWD/ports/unreal/PatterplayDemo/PatterplayDemo.uproject"
+```
+
+Then run `Patterplay.Smoke` from the editor's Session Frontend (Tools > Session Frontend >
+Automation), which drives the JSON loader, the UObject wrappers and the bundle description.
+
+
 The four runtimes are **one deliverable set, versioned in lockstep** (one version number =
 one runtime behaviour; the JS runtime is a member of the set, not a separate thing), and
 each ships its own `CHANGELOG.md`. One script is the release route:
