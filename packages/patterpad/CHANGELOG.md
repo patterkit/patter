@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Clicking a Game Data list value no longer deletes the first value in the list** (#44, thanks
+  @jlafos). Clicking anywhere on a values row except a chip's own ✕ removed the FIRST value, however
+  many values there were and wherever you clicked. It was not an off-by-one: the caption wrapped the
+  editor in a `<label>`, a label with no `for` forwards clicks to the first labelable thing inside it,
+  and buttons count - so every click on the row's dead space pressed the first chip's remove button.
+  The click never reached the chip you aimed at. Captions now point at the field they caption and
+  never at a button, which also fixes the same behaviour in the Properties and World Properties value
+  editors, where it was equally present and simply had not been reported.
+
 ### Changed
 - **The "not the same project" warning now names the project ids.** Merging a returned Patterpack
   told you the two packs and your project disagreed, but not which of the two files you picked was
