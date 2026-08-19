@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 0.2.1
+
+### Patch Changes
+
+- @patterkit/runtime@0.4.1
+
 ## 0.2.0
 
 ### Minor Changes
