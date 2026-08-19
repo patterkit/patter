@@ -27,6 +27,38 @@ namespace patter
         std::vector<std::string> values;
     };
 
+    // ----- host scopes (@world): design/scope-registry.md section 6 ------------
+    //
+    // The GAME owns these values; the story reads (and may write) them. A runtime that ignores the
+    // registry reads `@world.x` as a graceful false and plays a silently DIFFERENT story from the
+    // same bundle, which is what the conformance case "a declared host scope with no resolver is
+    // self-backed from its defaults" exists to catch.
+
+    struct HostScopeDecl
+    {
+        std::string name, type;
+        std::vector<std::string> values;               // enum / flags
+        bool hasDefault = false; PatterValue def;      // optional<PatterValue>
+        bool hasWritable = false; bool writable = true;
+    };
+
+    struct HostScopeSpec
+    {
+        std::string token;                             // the token after '@', e.g. "world"
+        bool hasWritable = false; bool writable = true;
+        // `present` distinguishes an OPAQUE scope (no `declarations` key: any name, nothing seeded)
+        // from one that declares an empty list.
+        bool hasDeclarations = false;
+        std::vector<HostScopeDecl> declarations;
+    };
+
+    struct HostScopeRegistry
+    {
+        bool present = false;
+        int version = 1;
+        std::vector<HostScopeSpec> scopes;
+    };
+
     struct Expression { AstPtr ast; };
     struct Effect { std::string target; Expression value; };
 
@@ -104,6 +136,7 @@ namespace patter
         Localisation localisation;
         std::map<std::string, std::vector<GameDataField>> gameDataFields;
         CaptionDelimiters closedCaptions;   // #214; `present=false` => use the default ( / )
+        HostScopeRegistry scopeRegistry;    // declared host scopes; `present=false` => the project declares none
     };
 
     // ----- gameData merge-at-read (port of gamedata.ts) ------------------------

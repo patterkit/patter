@@ -50,6 +50,13 @@ namespace Patterkit.Patterplay
             };
             _evalCtx.Scopes["patter"] = new ResolverScope(PatterGet);
             _evalCtx.Scopes["scene"] = new ResolverScope(SceneGet);
+            // Declared host scopes (@world): bound by the embedder, or self-backed from the bundle's
+            // declarations. Registering them is what stops `@world.x` reading as a graceful false.
+            foreach (var kv in _host.HostScopes)
+            {
+                var scope = kv.Value;
+                _evalCtx.Scopes[kv.Key] = new ResolverScope(name => scope.Get(name));
+            }
         }
 
         public string CurrentScene => _currentSceneId;
@@ -219,23 +226,28 @@ namespace Patterkit.Patterplay
             EnterChild(node);
         }
 
+        /// <summary>A host scope token counts as a scope for ref-splitting, or `@world.gold` would be read
+        /// as a @patter property literally named "world.gold".</summary>
+        private bool IsScopeToken(string t) => t == "scene" || t == "patter" || _host.HostScopes.ContainsKey(t);
+
         public PatterValue GetProperty(string refStr)
         {
-            var (scope, name) = Engine.SplitRef(refStr, t => t == "scene" || t == "patter");
+            var (scope, name) = Engine.SplitRef(refStr, IsScopeToken);
             if (scope == "patter") return PatterGet(name);
             if (scope == "scene") return SceneGet(name);
-            return null;
+            return _host.HostScopes.TryGetValue(scope, out var host) ? host.Get(name) : null;
         }
 
         public void SetProperty(string refStr, PatterValue value)
         {
-            var (scope, name) = Engine.SplitRef(refStr, t => t == "scene" || t == "patter");
+            var (scope, name) = Engine.SplitRef(refStr, IsScopeToken);
             if (scope == "patter") PatterSet(name, value);
             else if (scope == "scene")
             {
                 if (_currentSceneId == null) throw new Exception($"'{refStr}': the flow has not entered a scene yet");
                 SceneSet(name, value);
             }
+            else if (_host.HostScopes.TryGetValue(scope, out var host)) host.Set(name, value);
         }
 
         // -- settle / entry -----------------------------------------------------

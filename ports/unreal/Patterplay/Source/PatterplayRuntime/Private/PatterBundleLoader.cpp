@@ -113,6 +113,21 @@ namespace
 		return Out;
 	}
 
+	patter::HostScopeDecl ToHostDecl(const TSharedPtr<FJsonObject>& O)
+	{
+		patter::HostScopeDecl D;
+		D.name = Str(O, TEXT("name"));
+		D.type = Str(O, TEXT("type"));
+		const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
+		if (O->TryGetArrayField(TEXT("values"), Values))
+			for (const TSharedPtr<FJsonValue>& V : *Values) D.values.push_back(TCHAR_TO_UTF8(*V->AsString()));
+		const TSharedPtr<FJsonValue> Def = O->TryGetField(TEXT("default"));
+		if (Def.IsValid() && Def->Type != EJson::Null) { D.hasDefault = true; D.def = ToValue(Def); }
+		bool W = false;
+		if (O->TryGetBoolField(TEXT("writable"), W)) { D.hasWritable = true; D.writable = W; }
+		return D;
+	}
+
 	patter::PropertyDecl ToPropDecl(const TSharedPtr<FJsonObject>& O)
 	{
 		patter::PropertyDecl D;
@@ -237,6 +252,34 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 
 		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("properties")))
 			for (const auto& Pr : (*P)->AsArray()) Out.properties.push_back(ToPropDecl(Pr->AsObject()));
+
+		// Declared host scopes (@world). Skipping this is not a missing feature but a silently
+		// different story: the reference reads as a graceful false and the gated branch never runs.
+		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("scopeRegistry")))
+		{
+			const TSharedPtr<FJsonObject> Reg = (*P)->AsObject();
+			Out.scopeRegistry.present = true;
+			double Ver = 1.0;
+			if (Reg->TryGetNumberField(TEXT("version"), Ver)) Out.scopeRegistry.version = static_cast<int>(Ver);
+			const TArray<TSharedPtr<FJsonValue>>* Scopes = nullptr;
+			if (Reg->TryGetArrayField(TEXT("scopes"), Scopes))
+				for (const TSharedPtr<FJsonValue>& S : *Scopes)
+				{
+					const TSharedPtr<FJsonObject> O = S->AsObject();
+					patter::HostScopeSpec Spec;
+					Spec.token = Str(O, TEXT("token"));
+					bool W = false;
+					if (O->TryGetBoolField(TEXT("writable"), W)) { Spec.hasWritable = true; Spec.writable = W; }
+					const TArray<TSharedPtr<FJsonValue>>* Decls = nullptr;
+					if (O->TryGetArrayField(TEXT("declarations"), Decls))
+					{
+						// Present-but-empty is a declared scope with nothing in it; ABSENT is opaque.
+						Spec.hasDeclarations = true;
+						for (const TSharedPtr<FJsonValue>& D : *Decls) Spec.declarations.push_back(ToHostDecl(D->AsObject()));
+					}
+					Out.scopeRegistry.scopes.push_back(Spec);
+				}
+		}
 
 		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("strings"))) Out.strings = ToStrings((*P)->AsObject());
 

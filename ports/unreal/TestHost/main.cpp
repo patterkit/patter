@@ -92,6 +92,16 @@ static PropertyDecl parsePropDecl(const JsonValue& p)
     return d;
 }
 
+static HostScopeDecl parseHostDecl(const JsonValue& d)
+{
+    HostScopeDecl h;
+    h.name = d.at("name").str; h.type = d.at("type").str;
+    if (const JsonValue* vs = d.find("values")) h.values = strList(*vs);
+    if (const JsonValue* df = d.find("default")) { h.hasDefault = true; h.def = toValue(*df); }
+    if (const JsonValue* w = d.find("writable")) { h.hasWritable = true; h.writable = w->b; }
+    return h;
+}
+
 static Beat parseBeat(const JsonValue& b)
 {
     Beat beat;
@@ -163,6 +173,24 @@ static Bundle parseBundle(const JsonValue& b)
     if (const JsonValue* inc = loc.find("included")) bundle.locales.included = strList(*inc);
     if (const JsonValue* cast = b.find("cast")) for (const auto& c : cast->arr) { Cast cc; cc.name = c.at("name").str; if (const JsonValue* dn = c.find("displayName")) cc.displayName = dn->str; bundle.cast.push_back(cc); }
     if (const JsonValue* props = b.find("properties")) for (const auto& p : props->arr) bundle.properties.push_back(parsePropDecl(p));
+    if (const JsonValue* reg = b.find("scopeRegistry"))
+    {
+        bundle.scopeRegistry.present = true;
+        if (const JsonValue* v = reg->find("version")) bundle.scopeRegistry.version = static_cast<int>(v->num);
+        if (const JsonValue* scopes = reg->find("scopes"))
+            for (const auto& sc : scopes->arr)
+            {
+                HostScopeSpec spec;
+                spec.token = sc.at("token").str;
+                if (const JsonValue* w = sc.find("writable")) { spec.hasWritable = true; spec.writable = w->b; }
+                if (const JsonValue* decls = sc.find("declarations"))
+                {
+                    spec.hasDeclarations = true;
+                    for (const auto& d : decls->arr) spec.declarations.push_back(parseHostDecl(d));
+                }
+                bundle.scopeRegistry.scopes.push_back(spec);
+            }
+    }
     if (const JsonValue* strs = b.find("strings")) bundle.strings = parseStrings(*strs);
     if (const JsonValue* gdf = b.find("gameDataFields"))
         for (const auto& kind : gdf->obj)

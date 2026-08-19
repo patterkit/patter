@@ -13,15 +13,39 @@ static func load_from_string(json: String):
 
 
 # Split a ref ("@name" / "@scope.name") into [scope, lowercased name].
-static func split_ref(ref: String) -> Array:
+#
+# host_tokens are the scopes a project DECLARES (@world and friends). They have to be passed in
+# rather than hard-coded: without them "@world.gold" splits to a @patter property literally named
+# "world.gold", which reads as absent and takes the falsy branch in silence.
+static func split_ref(ref: String, host_tokens: Array = []) -> Array:
 	var body := ref.substr(1) if ref.begins_with("@") else ref
 	var dot := body.find(".")
 	if dot != -1 and body.find(".", dot + 1) == -1:
 		var head := body.substr(0, dot)
 		var tail := body.substr(dot + 1)
-		if head == "scene" or head == "patter":
+		if head == "scene" or head == "patter" or host_tokens.has(head):
 			return [head, tail.to_lower()]
 	return ["patter", body.to_lower()]
+
+
+# The seed value for a HOST scope declaration (its default, else the type default). Separate from
+# prop_default only because the shapes differ; the rule is the same.
+static func host_scope_default(decl: Dictionary):
+	if decl.has("default"):
+		return PatterValues.to_value(decl["default"])
+	match decl.get("type", ""):
+		"boolean":
+			return false
+		"number":
+			return 0.0
+		"string":
+			return ""
+		"flags":
+			return []
+		"enum":
+			var vals: Array = decl.get("values", [])
+			return str(vals[0]) if vals.size() > 0 else ""
+	return false
 
 
 # The seed value for a property declaration (its default, else the type default).

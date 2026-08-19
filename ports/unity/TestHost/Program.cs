@@ -539,6 +539,26 @@ namespace Patterkit.Patterplay.TestHost
             if (b.TryGetProperty("properties", out var props))
                 foreach (var p in props.EnumerateArray()) bundle.Properties.Add(ParsePropDecl(p));
 
+            // Declared host scopes (@world), parsed by BOTH loaders: this TestHost exercises the
+            // System.Text.Json path and Patterplay.Runtime.Json the Newtonsoft one.
+            if (b.TryGetProperty("scopeRegistry", out var reg) && reg.TryGetProperty("scopes", out var scopes))
+            {
+                bundle.ScopeRegistry = new HostScopeRegistry {
+                    Version = reg.TryGetProperty("version", out var rv) ? rv.GetInt32() : 1,
+                };
+                foreach (var sc in scopes.EnumerateArray())
+                {
+                    var spec = new HostScopeSpec {
+                        Token = sc.GetProperty("token").GetString(),
+                        Writable = sc.TryGetProperty("writable", out var sw) ? sw.GetBoolean() : (bool?)null,
+                    };
+                    // No `declarations` key = OPAQUE (any name, nothing seeded), which an empty list is not.
+                    if (sc.TryGetProperty("declarations", out var decls))
+                        spec.Declarations = decls.EnumerateArray().Select(ParseHostDecl).ToList();
+                    bundle.ScopeRegistry.Scopes.Add(spec);
+                }
+            }
+
             if (b.TryGetProperty("strings", out var strs)) bundle.Strings = ParseStrings(strs);
 
             if (b.TryGetProperty("gameDataFields", out var gdf))
@@ -550,6 +570,15 @@ namespace Patterkit.Patterplay.TestHost
 
             return bundle;
         }
+
+        private static HostScopeDecl ParseHostDecl(JsonElement d) => new HostScopeDecl
+        {
+            Name = d.GetProperty("name").GetString(),
+            Type = d.GetProperty("type").GetString(),
+            Values = d.TryGetProperty("values", out var vs) ? vs.EnumerateArray().Select(x => x.GetString()).ToList() : null,
+            Default = d.TryGetProperty("default", out var df) ? ToValue(df) : null,
+            Writable = d.TryGetProperty("writable", out var w) ? w.GetBoolean() : (bool?)null,
+        };
 
         private static PropertyDecl ParsePropDecl(JsonElement p) => new PropertyDecl
         {

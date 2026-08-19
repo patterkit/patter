@@ -29,6 +29,8 @@ namespace Patterkit.Patterplay
         public Dictionary<string, List<GameDataField>> GameDataFields = new Dictionary<string, List<GameDataField>>();
         /// <summary>Closed-caption delimiters (#214). Null = the default ( / ).</summary>
         public CaptionDelimiters ClosedCaptions;
+        /// <summary>Declared host scopes (`@world`), or null for a project that declares none.</summary>
+        public HostScopeRegistry ScopeRegistry;
     }
 
     /// <summary>Closed-caption config (#214): the open/close cue delimiters, plus a `Character` whose whole
@@ -68,6 +70,37 @@ namespace Patterkit.Patterplay
         public bool Temporary;
         public PatterValue Default;  // null => the type default
         public List<string> Values;  // enum
+    }
+
+    /// <summary>A property of a HOST scope (`@world`, ...): the game owns the value, the story reads it.
+    /// Mirrors @patterkit/model's HostScopeDecl. `Default` seeds the self-backed bag when no host binds
+    /// the scope; null means the type default.</summary>
+    public sealed class HostScopeDecl
+    {
+        public string Name;
+        public string Type;          // boolean | number | string | flags | enum
+        public List<string> Values;  // enum / flags
+        public PatterValue Default;
+        public bool? Writable;
+    }
+
+    /// <summary>One scope in the project's host-scope registry. No `Declarations` = OPAQUE: any name is
+    /// accepted and nothing is seeded.</summary>
+    public sealed class HostScopeSpec
+    {
+        public string Token;         // the token after '@', e.g. "world"
+        public bool? Writable;
+        public List<HostScopeDecl> Declarations;
+    }
+
+    /// <summary>The project's declared host scopes, baked into the bundle (design/scope-registry.md §6).
+    /// A runtime that ignores this reads `@world.x` as a graceful false and plays a silently DIFFERENT
+    /// story from the same bundle, which is what the conformance case `a declared host scope with no
+    /// resolver is self-backed from its defaults` exists to catch.</summary>
+    public sealed class HostScopeRegistry
+    {
+        public int Version = 1;
+        public List<HostScopeSpec> Scopes = new List<HostScopeSpec>();
     }
 
     public sealed class Scene

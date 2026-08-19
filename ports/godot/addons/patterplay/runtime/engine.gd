@@ -53,6 +53,11 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		"shared_visits": {},
 		"shared_selectors": {},
 		"stage_bags": {},
+		# Host scopes (design/scope-registry.md section 6), by token: either the embedder's own
+		# { "get": Callable, "set": Callable } binding, or a self-backed bag this engine seeds from the
+		# bundle's declarations. Empty for a bundle that declares none.
+		"host_scopes": {},
+		"host_tokens": [],
 		"custom_rng": options.get("rng"),
 		"replay_prompt_on_choose": options.get("replay_prompt_on_choose", false),
 		# Closed captions (#214): captions_on shows cues in dialogue lines (default true); when false the
@@ -72,6 +77,32 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	for c in bundle.get("cast", []):
 		if str(c.get("displayName", "")) != "":
 			_host["cast_display"][c["name"]] = c["displayName"]
+
+	# A declared scope the embedder binds is theirs; every other declared scope is SELF-BACKED from
+	# its declaration defaults, so a standalone build plays the same story a bound one does. Without
+	# this the reference reads as a graceful false and the @world-gated branch is silently skipped.
+	var bound: Dictionary = options.get("host_scopes", {})
+	for token in bound.keys():
+		_host["host_scopes"][token] = bound[token]
+	for spec in bundle.get("scopeRegistry", {}).get("scopes", []):
+		var token := str(spec.get("token", ""))
+		if token == "" or _host["host_scopes"].has(token):
+			continue   # the embedder's binding wins
+		# Keyed LOWER CASE, which is load-bearing: the compiler folds every property reference, so an
+		# AST reads "isnight" where the declaration says "isNight". Seeding verbatim means a declared
+		# name carrying a capital is never found and silently takes the falsy branch - the bug the JS
+		# runtime shipped and this port must not repeat. An OPAQUE scope (no "declarations" key)
+		# starts empty and accepts any name.
+		var bag := {}
+		for d in spec.get("declarations", []):
+			var nm := str(d.get("name", ""))
+			if nm != "":
+				bag[nm.to_lower()] = PatterBundle.host_scope_default(d)
+		_host["host_scopes"][token] = {
+			"get": func(n): return bag.get(str(n).to_lower()),
+			"set": func(n, v): bag[str(n).to_lower()] = v,
+		}
+	_host["host_tokens"] = _host["host_scopes"].keys()
 
 	if options.has("seed"):
 		_default_seed = int(options["seed"]) & 0xffffffff
@@ -298,10 +329,12 @@ func set_closed_captions(on: bool) -> void:
 
 
 func get_property(ref: String):
-	var sp := PatterBundle.split_ref(ref)
+	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
 	if sp[0] == "scene":
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return null
+	if _host["host_scopes"].has(sp[0]):
+		return _host["host_scopes"][sp[0]]["get"].call(sp[1])
 	return _host["shared_patter"].get(sp[1])
 
 
@@ -323,9 +356,12 @@ func list_properties() -> Array:
 
 
 func set_property(ref: String, value) -> void:
-	var sp := PatterBundle.split_ref(ref)
+	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
 	if sp[0] == "scene":
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
+		return
+	if _host["host_scopes"].has(sp[0]):
+		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
 		return
 	_host["shared_patter"][sp[1]] = value
 
