@@ -10,8 +10,8 @@
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
-import { bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, focusNewRow,
-  PROPERTY_NAME_HINT } from "@wildwinter/app-shell";
+import { bindPropertyName, bindPropertyRef, dupGuard, expandableRow, firstIllegalPropertyName,
+  focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
   ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"],
@@ -99,7 +99,9 @@ export function mountWorld(
     name.dataset.tip = PROPERTY_NAME_HINT;
     // Same rule and same manners as @patter / @scene declarations; this is the scope
     // where the fault that produced the rule was found.
-    bindPropertyName(name, (v) => { p.name = v; }, { hint: PROPERTY_NAME_HINT });
+    // Renaming a declaration makes every driver pointing at the old name wrong from that moment, with
+    // nothing typed into any of them, so the driver rows are re-checked here rather than on their own input.
+    bindPropertyName(name, (v) => { p.name = v; revalidatePropertyRefs(driversHost); }, { hint: PROPERTY_NAME_HINT });
     ref.append(el("span", "world-at", "@"), el("span", "world-scope", "world"), el("span", "world-dot", "."), name);
     guard.track(name, () => `world.${p.name}`);
 
@@ -145,6 +147,9 @@ export function mountWorld(
     add.type = "button";
     add.addEventListener("click", () => { scopeRows.push(newScopeRow()); renderScopes(); focusNewRow(scopesHost.querySelector<HTMLElement>(".gd-fieldlist")); });
     scopesHost.append(add);
+    // Adding, deleting or reordering a declaration changes what the drivers below may point at, and
+    // every one of those paths comes through here, so this is the one place that has to remember.
+    revalidatePropertyRefs(driversHost);
   };
 
   // ---- coverage driver rows ----------------------------------------------------------------------
@@ -154,8 +159,21 @@ export function mountWorld(
     const refWrap = el("div", "world-ref");
     const ref = el("input", "gd-input gd-name") as HTMLInputElement;
     ref.type = "text"; ref.placeholder = "property name"; ref.value = d.ref.replace(/^@\w+\./, "").replace(/^@/, ""); ref.spellcheck = false;
-    ref.addEventListener("input", () => { const v = ref.value.trim().replace(/^@+/, ""); d.ref = v ? `@world.${v}` : "@world."; });
     refWrap.append(el("span", "world-at", "@"), el("span", "world-scope", "world"), el("span", "world-dot", "."), ref);
+    // Bound AFTER the input is in the tree: the shell attaches its datalist as a SIBLING, which is a
+    // no-op while the input has no parent, and the failure is invisible (no autocomplete, no error).
+    // A REFERENCE, not a declaration, so it takes the other rule: case is fine (expressions fold every
+    // reference), but a hyphen, a space, a leading digit or a keyword can never match any declaration -
+    // and neither can a name nobody declared. That last one is the point: a driver aimed at a property
+    // that does not exist feeds a value nobody reads, the @world-gated branches it was meant to exercise
+    // stay unexercised, and the coverage report shows them as never hit, which reads as "this content is
+    // unreachable" rather than "that name is a typo". Declare-then-reference is the ruling, so this
+    // blocks Save; the declared names are offered as a datalist to keep that from being pedantic.
+    bindPropertyRef(ref, (v) => { const n = v.trim().replace(/^@+/, ""); d.ref = n ? `@world.${n}` : "@world."; }, {
+      known: () => scopeRows.filter((r) => r.token === "world").map((r) => r.name).filter(Boolean),
+      scope: "world",
+      hint: "The @world property this driver feeds. Declare it above first.",
+    });
 
     const values = el("input", "gd-input world-driver-values") as HTMLInputElement;
     values.type = "text"; values.placeholder = "values, comma-separated (e.g. 49, 50, 51)"; values.value = valuesText(d.values);
