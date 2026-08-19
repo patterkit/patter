@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [614eaa8]
+  - @patterkit/model@0.3.0
+  - @patterkit/dialect@0.1.5
+
 ## 0.2.1
 
 ### Patch Changes
@@ -20,6 +28,7 @@ version number always means the same runtime behaviour. This package is versione
 ## [0.4.0] - 2026-07-30
 
 ### Added
+
 - **State logger** (parity: previously JS-only). Watches the mutable runtime state - `@patter`
   globals, per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
   between captures, plus a per-step trace including `gameData`. Built on the engine's save-game, so
@@ -27,18 +36,21 @@ version number always means the same runtime behaviour. This package is versione
   every runtime.
 
 ### Fixed
+
 - The download now includes the **MIT `LICENSE` file**; previously the zip shipped with no licence
   text at all.
 
 ## [0.3.1] - 2026-07-22
 
 ### Changed
+
 - Version bump only, to keep the four Patterplay runtimes in lockstep. This release fixes
   Unreal-only build issues (see the Unreal changelog and #25); the JavaScript runtime is unchanged.
 
 ## [0.3.0] - 2026-07-21
 
 ### Added
+
 - **Host navigation.** `flow.goto(scene, block?)` sends a running flow to a Game ID address, behaving
   exactly like an authored `go` jump: the target scene's `onEntry` runs, arriving counts as a visit, and
   the callstack is replaced (pending call-returns discarded). Being a host action it lands immediately -
@@ -54,6 +66,7 @@ version number always means the same runtime behaviour. This package is versione
   (they were JS-only).
 
 ### Changed
+
 - Dropping a flow now FINISHES it. `closeFlow`, `engine.reset()` and re-opening a name all leave the old
   `Flow` inert (`advance()` reports the end, `goto()` refuses), so a stale reference a game still holds
   can no longer keep running scene entry effects and moving shared state. Re-opening a name still
@@ -62,6 +75,7 @@ version number always means the same runtime behaviour. This package is versione
 ## [0.2.2] - 2026-07-13
 
 ### Changed
+
 - Internal: the Best match (`specificity`) selection metric now uses the shared
   `@wildwinter/expr-specificity` package instead of a per-engine inline copy. Behaviour is
   unchanged and conformance-verified across all four engines.

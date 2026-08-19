@@ -1,5 +1,14 @@
 # @patterkit/compiler
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [614eaa8]
+  - @patterkit/core@0.2.0
+  - @patterkit/model@0.3.0
+  - @patterkit/dialect@0.1.5
+
 ## 0.2.2
 
 ### Patch Changes
