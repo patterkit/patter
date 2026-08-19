@@ -11,8 +11,14 @@
 # Wired via `core.hooksPath = scripts/git-hooks` (set by the root `prepare` script on install).
 set -e
 
-if git diff --cached --name-only --diff-filter=ACMR | grep -q '^packages/runtime/src/'; then
-  echo "pre-commit: runtime source changed -> refreshing the playable-runtime blob"
+# The blob is a MINIFIED BUNDLE, and `packages/runtime/tsup.config.ts` sets `noExternal: [/.*/]`, so it
+# inlines the workspace packages the runtime imports as well as the runtime's own source. Watching only
+# `packages/runtime/src` missed that: adding exports to `@patterkit/model` on 2026-08-19 shifted the
+# bundle, the hook stayed quiet, and CI caught a stale blob after the push. (A bumped `@wildwinter/*`
+# dependency shifts it too; that is left to CI rather than rebuilding on every lockfile touch.)
+if git diff --cached --name-only --diff-filter=ACMR \
+  | grep -qE '^packages/(runtime|model|dialect)/src/'; then
+  echo "pre-commit: bundled runtime source changed -> refreshing the playable-runtime blob"
   npm run --silent build -w @patterkit/runtime >/dev/null
   npm run --silent gen-runtime-blob -w @patterkit/ops >/dev/null
   git add packages/ops/src/playable-runtime.ts
