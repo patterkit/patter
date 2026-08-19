@@ -17,10 +17,35 @@ It queries npm with `--prefer-online` deliberately. **npm caches package metadat
 minutes after a publish a plain `npm view` reports the version you just replaced.** That has twice
 made a successful publish look like a failed one. If you check by hand, use `--prefer-online`.
 
-## Publishing what is waiting: `npm run release:npm`
+## The usual one: `npm run ship:npm`
 
-Ordinary work adds changesets as it goes, so most of the time there is simply a
-"Version Packages" PR sitting open. To ship it:
+**Committed some library work? This is the command.** From a clean tree it pushes,
+waits for the bot to open the Version Packages PR, shows exactly what it would
+publish, asks once, merges, and waits until the registry actually serves the new
+versions.
+
+```sh
+npm run ship:npm               # push -> wait -> show -> ask -> merge -> verify
+npm run ship:npm -- --dry-run  # plan only: pushes nothing, merges nothing
+npm run ship:npm -- --yes      # no prompt
+```
+
+It does NOT commit, and refuses a dirty tree while listing what is still loose: a
+script that stages files and invents a message is deciding what your change was.
+So the whole cadence for ordinary work is two steps, one of them yours:
+
+```sh
+git commit ...                 # your work, your words, explicit paths
+npm run ship:npm               # everything after that
+```
+
+If it says no changeset is pending, stop and read that sentence: a change to a
+published package that ships without one publishes nothing at all.
+
+## Publishing a PR that is already open: `npm run release:npm`
+
+The back half on its own, for when the push already happened and a "Version
+Packages" PR is sitting open:
 
 ```sh
 npm run release:npm             # shows the bumps, asks, merges, waits, verifies
@@ -37,8 +62,13 @@ script and not a workflow step.** A push made with `GITHUB_TOKEN` does not trigg
 further workflow runs, so a pipeline that merged its own Version Packages PR would
 land the bumped manifests on main and never publish them.
 
-`ship:cli` is the other end of the same pipe: use it when there is no changeset
-yet and you want the whole CLI release in one command. Both share
+With no PR open it says which of the three states you are in, because "nothing to
+publish" reads like "you are done" and usually means "wait": unpushed commits, or
+changesets on main with the workflow still running, or genuinely nothing pending.
+
+`ship:npm` and `ship:cli` are the whole-chain versions of the same pipe: `ship:npm`
+for ordinary library work that brings its own changeset, `ship:cli` when there is no
+changeset yet and the standalone binaries need tagging afterwards. All three share
 `scripts/lib/version-pr.mjs`.
 
 ## The changeset guard
