@@ -18,6 +18,7 @@ namespace Patterkit.Patterplay
         {
             var bundle = new Bundle
             {
+                Schema = (string)b["schema"],
                 Voiced = (bool?)b["voiced"] ?? false,
             };
             if (b["localisation"] is JObject lz)
@@ -29,6 +30,7 @@ namespace Patterkit.Patterplay
                 bundle.ContentHash = (string)ct["hash"];
                 bundle.StructureHash = (string)ct["structureHash"];
                 bundle.ContentProject = (string)ct["project"];
+                bundle.ContentVersion = (string)ct["version"];
             }
 
             var loc = (JObject)b["locales"];

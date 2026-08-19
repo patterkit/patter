@@ -219,6 +219,7 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 
 	try
 	{
+		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("schema"))) Out.schema = Std((*P)->AsString());
 		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("voiced"))) Out.voiced = (*P)->AsBool();
 			if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("content")))
 			{
@@ -228,6 +229,7 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 					if (const TSharedPtr<FJsonValue>* H = Field(Ct, TEXT("hash"))) Out.contentHash = Std((*H)->AsString());
 					if (const TSharedPtr<FJsonValue>* Sh = Field(Ct, TEXT("structureHash"))) Out.structureHash = Std((*Sh)->AsString());
 					if (const TSharedPtr<FJsonValue>* Pr = Field(Ct, TEXT("project"))) Out.contentProject = Std((*Pr)->AsString());
+					if (const TSharedPtr<FJsonValue>* Ve = Field(Ct, TEXT("version"))) Out.contentVersion = Std((*Ve)->AsString());
 				}
 			}
 			if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("localisation")))

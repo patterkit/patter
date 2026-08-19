@@ -9,6 +9,8 @@ namespace Patterkit.Patterplay
 {
     public sealed class Bundle
     {
+        /// <summary>The bundle schema tag ("patter/bundle@0"). Null if absent (an older compiler).</summary>
+        public string Schema;
         public bool Voiced;
         /// <summary>content.hash - the build identity (live-link stale-build check). Null if absent.</summary>
         public string ContentHash;
@@ -17,6 +19,8 @@ namespace Patterkit.Patterplay
         public string StructureHash;
         /// <summary>content.project - optional project name.</summary>
         public string ContentProject;
+        /// <summary>content.version - the authored bundle version, if the project stamps one.</summary>
+        public string ContentVersion;
         public Locales Locales = new Locales();
         public List<Cast> Cast = new List<Cast>();
         public List<PropertyDecl> Properties = new List<PropertyDecl>();

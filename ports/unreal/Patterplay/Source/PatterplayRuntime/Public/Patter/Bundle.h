@@ -123,11 +123,13 @@ namespace patter
 
     struct Bundle
     {
+        std::string schema;           // the bundle schema tag ("patter/bundle@0"); empty if absent
         bool voiced = false;
         std::string contentHash;      // content.hash - the build identity (live-link stale-build check)
         std::string structureHash;    // content.structureHash - the same fingerprint minus the strings:
                                       // equal + a different contentHash = a text-only edit (refresh tier 1)
         std::string contentProject;   // content.project - optional project name
+        std::string contentVersion;   // content.version - the authored bundle version, if stamped
         Locales locales;
         std::vector<Cast> cast;
         std::vector<PropertyDecl> properties;

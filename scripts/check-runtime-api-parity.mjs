@@ -25,10 +25,10 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 
 /** The surfaces we hold to parity. `bp` (the Unreal Blueprint wrapper) is the API Unreal USERS see. */
 const SURFACES = {
-  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
-  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
-  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/logger.gd", "ports/godot/addons/patterplay/runtime/save.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
+  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
+  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
+  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/runtime/logger.gd", "ports/godot/addons/patterplay/runtime/save.gd"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
   bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h"] },
 };
 
@@ -93,6 +93,14 @@ const API = [
     why: "not yet surfaced to Blueprint" },
   { on: "Engine", js: "tagsForBlock", unity: "TagsForBlock", godot: "tags_for_block", unreal: "tagsForBlock", bp: null,
     why: "not yet surfaced to Blueprint" },
+
+  // --- the bundle inspector (from-storylets/patterplay-bundle-inspector) ----
+  //
+  // A BUNDLE-level function on every surface, deliberately not an Engine method: it answers what a
+  // game may call on an imported asset, with nothing running. Spelled as a free function where the
+  // language has them and as a static on a holder where it does not.
+  { on: "Bundle", js: "describeBundle", unity: "Describe", godot: "describe_bundle", unreal: "describeBundle", bp: null,
+    why: "the Unreal view is an IDetailCustomization in C++; no Blueprint node consumes a description" },
 
   // --- save envelope + state logger (dev tools; parity brief B1/B2) ---------
   { on: "Save", js: "serializeState", unity: "SerializeState", godot: "serialize_state", unreal: "serializeState", bp: "SaveStateToJson" },
