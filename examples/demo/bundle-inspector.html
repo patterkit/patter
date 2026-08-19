@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!--
+    The bundle inspector's web view, over this folder's demo bundle. Two panels: the
+    defaults, and one with a host scope and a source-debug build, which are the two
+    things an integrator most needs to see and the demo story has neither of.
+
+    Served from the REPO ROOT so the import map can reach the built packages:
+      npm run build -w @patterkit/model -w @patterkit/dialect -w @patterkit/runtime -w @patterkit/play-helpers
+      node examples/drop-in/serve.mjs 8093
+      open http://localhost:8093/examples/demo/bundle-inspector.html
+  -->
+  <meta charset="utf-8" />
+  <title>Bundle inspector</title>
+  <style>
+    body { font: 16px/1.6 system-ui, sans-serif; margin: 2rem; background: #fbf9f5; }
+    h1 { font-size: 1.1rem; }
+    .grid { display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <h1>createBundleInspector</h1>
+  <div class="grid">
+    <div id="a"></div>
+    <div id="b"></div>
+  </div>
+  <script type="importmap">
+    {
+      "imports": {
+        "@patterkit/runtime": "/packages/runtime/dist/index.js",
+        "@patterkit/model": "/packages/model/dist/index.js",
+        "@wildwinter/expr": "/node_modules/@wildwinter/expr/dist/index.js",
+        "@wildwinter/expr-specificity": "/node_modules/@wildwinter/expr-specificity/dist/index.js",
+        "@wildwinter/scoperegistry": "/node_modules/@wildwinter/scoperegistry/dist/index.js",
+        "@patterkit/dialect": "/packages/dialect/dist/index.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import { createBundleInspector } from "/packages/play-helpers/dist/index.js";
+    const bundle = await fetch("/examples/demo/demo.patterc").then((r) => r.json());
+    createBundleInspector(bundle, { container: document.getElementById("a") });
+    // The same bundle, with the sections an integrator cares about most: a host scope
+    // it must supply (one property with no default), and a source-debug build.
+    const withHost = {
+      ...bundle,
+      localisation: { mode: "ids", sourceDebug: true },
+      scopeRegistry: { version: 1, scopes: [
+        { token: "world", declarations: [
+          { name: "isnight", type: "boolean", default: true },
+          { name: "weather", type: "string" },
+        ] },
+        { token: "game" },
+      ] },
+    };
+    createBundleInspector(withHost, {
+      container: document.getElementById("b"),
+      title: "Host scopes + a debug build",
+      open: ["identity", "addresses", "hostScopes", "properties", "counts"],
+    });
+  </script>
+</body>
+</html>
