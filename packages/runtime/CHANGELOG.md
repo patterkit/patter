@@ -25,6 +25,17 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Fixed
+
+- **A declared host-scope property whose name carried a capital letter could never be read.** With no
+  host resolver bound for a scope, `@world` is self-backed from its declaration defaults - and that bag
+  was seeded with the declared name VERBATIM, while the compiler folds every property reference to
+  lower case. So a bundle declaring `@world.isNight` compiled a reference to `isnight`, the bag held
+  `isNight`, and the two never met: the read returned `undefined` and the gate took the falsy branch,
+  silently playing a different story from the same bundle. Only all-lowercase names ever worked. The
+  bag is now keyed lower case on seed, get and set. (`@patter` and `@scene` already normalised; this
+  resolver was the one that did not.) Declaring such a name is now refused at compile time as well.
+
 ## [0.4.0] - 2026-07-30
 
 ### Added

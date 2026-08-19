@@ -7,6 +7,12 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
+  JavaScript-only - self-backed host scopes, which this port does not parse yet - and the editor
+  change is Unity-only. This runtime is unchanged.
+
 ## [0.4.0] - 2026-07-30
 
 ### Added
