@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-19
+
 ### Fixed
 - **Window ▸ Patterplay ▸ Runtime State now opens docked** (beside the Inspector) instead of
   floating. A floating editor window slides behind the main Unity window the moment you click the
