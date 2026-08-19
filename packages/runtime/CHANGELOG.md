@@ -25,6 +25,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-19
+
 ### Changed
 
 - Version bump only, to keep the four Patterplay runtimes in lockstep. This release brings Unity,
