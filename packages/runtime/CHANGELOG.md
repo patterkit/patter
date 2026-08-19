@@ -25,6 +25,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. This release brings Unity,
+  Unreal and Godot up to the JavaScript runtime's declared-host-scope behaviour; the JavaScript
+  runtime itself is unchanged since 0.4.1.
+
 ## [0.4.1] - 2026-08-19
 
 ### Fixed

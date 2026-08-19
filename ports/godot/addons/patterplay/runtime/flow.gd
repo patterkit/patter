@@ -41,6 +41,11 @@ func _init(host: Dictionary, seed_value: int) -> void:
 		"visits": func(nid): return _visit_counts.get(nid, 0),
 		"patter_visits": func(nid): return _host["shared_visits"].get(nid, 0),
 	}
+	# Declared host scopes (@world): bound by the embedder or self-backed by the engine. Registering
+	# them is what stops "@world.x" reading as a graceful false.
+	for token in _host.get("host_scopes", {}).keys():
+		var scope: Dictionary = _host["host_scopes"][token]
+		_eval_ctx["scopes"][token] = scope["get"]
 
 
 func current_scene() -> String:
@@ -221,16 +226,18 @@ func choose(option_id: String) -> void:
 
 
 func get_property(ref: String):
-	var sp := PatterBundle.split_ref(ref)
+	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
 	if sp[0] == "patter":
 		return _patter_get(sp[1])
 	if sp[0] == "scene":
 		return _scene_get(sp[1])
+	if _host["host_scopes"].has(sp[0]):
+		return _host["host_scopes"][sp[0]]["get"].call(sp[1])
 	return null
 
 
 func set_property(ref: String, value) -> void:
-	var sp := PatterBundle.split_ref(ref)
+	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
 	if sp[0] == "patter":
 		_patter_set(sp[1], value)
 	elif sp[0] == "scene":
@@ -238,6 +245,8 @@ func set_property(ref: String, value) -> void:
 			push_error("'%s': the flow has not entered a scene yet" % ref)
 			return
 		_scene_set(sp[1], value)
+	elif _host["host_scopes"].has(sp[0]):
+		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
 
 
 # -- scope resolvers -----------------------------------------------------------

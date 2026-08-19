@@ -9,6 +9,39 @@ using System.Linq;
 
 namespace Patterkit.Patterplay
 {
+    /// <summary>A host scope the story reads and writes (`@world`): the GAME owns the value. Bind one per
+    /// token through <see cref="EngineOptions.HostScopes"/>; a declared scope with no binding is self-backed
+    /// from its declaration defaults, so a standalone build plays the same story a bound one does.</summary>
+    public interface IHostScope
+    {
+        /// <summary>The current value, or null when this scope has no such property (reads graceful-false).</summary>
+        PatterValue Get(string name);
+        void Set(string name, PatterValue value);
+    }
+
+    /// <summary>The fallback for a scope the bundle DECLARES and the embedder does not bind: a live in-memory
+    /// bag seeded from the declarations' defaults.
+    ///
+    /// Keyed LOWER CASE, which is load-bearing rather than tidy: the compiler folds every property reference,
+    /// so an AST reads `isnight` where the declaration says `isNight`. Seeding verbatim means any declared
+    /// name carrying a capital is never found, reads as absent, and silently takes the falsy branch - the JS
+    /// runtime shipped exactly that bug (fixed 2026-08-18) and this port must not repeat it. Declaring such a
+    /// name is refused at compile time now, but a hand-written bundle can still carry one.</summary>
+    internal sealed class SelfBackedScope : IHostScope
+    {
+        private readonly Dictionary<string, PatterValue> _bag = new Dictionary<string, PatterValue>();
+
+        public SelfBackedScope(List<HostScopeDecl> decls)
+        {
+            if (decls == null) return;   // opaque scope: starts empty, accepts any name
+            foreach (var d in decls) if (d != null && d.Name != null) _bag[Key(d.Name)] = Engine.HostScopeDefault(d);
+        }
+
+        private static string Key(string name) => name == null ? null : name.ToLowerInvariant();
+        public PatterValue Get(string name) => _bag.TryGetValue(Key(name), out var v) ? v : null;
+        public void Set(string name, PatterValue value) { _bag[Key(name)] = value; }
+    }
+
     public sealed class EngineOptions
     {
         /// <summary>Custom float-in-[0,1) source, shared by all flows (NOT captured by save). Runtime
@@ -21,6 +54,10 @@ namespace Patterkit.Patterplay
         /// <summary>Closed captions (#214): show caption cues in dialogue lines. Default true (full text);
         /// false strips the cues. Toggle live with Engine.SetClosedCaptions.</summary>
         public bool ClosedCaptions = true;
+        /// <summary>Live game state per host-scope token (`"world"` -> your resolver). A binding WINS over
+        /// the self-backed bag for that token; tokens the bundle declares and you do not bind are self-backed
+        /// from their defaults. Leave null for the standalone case.</summary>
+        public Dictionary<string, IHostScope> HostScopes;
     }
 
     public sealed class StackFrame
@@ -67,6 +104,9 @@ namespace Patterkit.Patterplay
         public Dictionary<string, Dictionary<string, string>> BlockGameIdToId;
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
         public Dictionary<string, PatterValue> SharedPatter;
+        /// <summary>Host scopes by token, already resolved: an embedder's binding where one was given,
+        /// a self-backed bag for every other token the bundle declares. Empty for a bundle with none.</summary>
+        public Dictionary<string, IHostScope> HostScopes = new Dictionary<string, IHostScope>();
         public List<PropertyDecl> PatterSharedDecls;
         public List<PropertyDecl> PatterLocalDecls;
         public HashSet<string> PatterSharedNames;
@@ -176,6 +216,21 @@ namespace Patterkit.Patterplay
                 CaptionClose = bundle.ClosedCaptions?.Close ?? "]",
                 CaptionCharacter = string.IsNullOrEmpty(bundle.ClosedCaptions?.Character) ? "SFX" : bundle.ClosedCaptions.Character, // absent/empty -> SFX
             };
+
+            // Host scopes (design/scope-registry.md §6). An embedder's binding wins for its token; every
+            // OTHER token the bundle declares gets a self-backed bag seeded from its declaration defaults,
+            // so a standalone build plays the same story a bound one does. Without this the reference reads
+            // as a graceful false and a @world-gated branch is silently skipped.
+            if (options.HostScopes != null)
+                foreach (var kv in options.HostScopes)
+                    if (kv.Value != null) _host.HostScopes[kv.Key] = kv.Value;
+            if (bundle.ScopeRegistry != null)
+                foreach (var spec in bundle.ScopeRegistry.Scopes)
+                {
+                    if (spec == null || string.IsNullOrEmpty(spec.Token)) continue;
+                    if (_host.HostScopes.ContainsKey(spec.Token)) continue;   // the embedder's binding wins
+                    _host.HostScopes[spec.Token] = new SelfBackedScope(spec.Declarations);
+                }
         }
 
         /// <summary>The active locale (string + character-name lookups resolve in it).</summary>
@@ -582,6 +637,22 @@ namespace Patterkit.Patterplay
             }
             var parts = sb.ToString().Split(new[] { '-' }, StringSplitOptions.RemoveEmptyEntries);
             return string.Join("-", parts);
+        }
+
+        /// <summary>The seed value for a self-backed host property: its `default`, else the type default.
+        /// Mirrors the JS runtime's hostScopeDefault.</summary>
+        internal static PatterValue HostScopeDefault(HostScopeDecl d)
+        {
+            if (d.Default != null) return d.Default;
+            switch (d.Type)
+            {
+                case "boolean": return PatterValue.False;
+                case "number": return PatterValue.Num(0);
+                case "string": return PatterValue.Str("");
+                case "flags": return PatterValue.Flags(new List<string>());
+                case "enum": return PatterValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
+                default: return PatterValue.False;
+            }
         }
 
         internal static PatterValue PropDefault(PropertyDecl d)

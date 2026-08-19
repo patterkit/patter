@@ -35,6 +35,25 @@ namespace Patterkit.Patterplay
             bundle.Locales.Default = (string)loc["default"];
             if (loc["included"] is JArray inc) foreach (var x in inc) bundle.Locales.Included.Add((string)x);
 
+            // Declared host scopes (@world). A runtime that skips this plays a silently different story:
+            // the reference reads as a graceful false and the gated branch is never taken.
+            if (b["scopeRegistry"] is JObject reg && reg["scopes"] is JArray scopes)
+            {
+                bundle.ScopeRegistry = new HostScopeRegistry { Version = (int?)reg["version"] ?? 1 };
+                foreach (var sc in scopes)
+                {
+                    var spec = new HostScopeSpec { Token = (string)sc["token"], Writable = (bool?)sc["writable"] };
+                    // No `declarations` key at all = an OPAQUE scope, which is not the same as an empty
+                    // list: it accepts any name and seeds nothing.
+                    if (sc["declarations"] is JArray decls)
+                    {
+                        spec.Declarations = new List<HostScopeDecl>();
+                        foreach (var d in decls) spec.Declarations.Add(HostDecl((JObject)d));
+                    }
+                    bundle.ScopeRegistry.Scopes.Add(spec);
+                }
+            }
+
             if (b["cast"] is JArray cast)
                 foreach (var c in cast)
                     bundle.Cast.Add(new Cast { Name = (string)c["name"], DisplayName = (string)c["displayName"] });
@@ -94,6 +113,15 @@ namespace Patterkit.Patterplay
             foreach (var p in o) gd[p.Key] = ToValue(p.Value);
             return gd;
         }
+
+        private static HostScopeDecl HostDecl(JObject d) => new HostScopeDecl
+        {
+            Name = (string)d["name"],
+            Type = (string)d["type"],
+            Values = d["values"] is JArray vs ? ToStringList(vs) : null,
+            Default = d["default"] != null ? ToValue(d["default"]) : null,
+            Writable = (bool?)d["writable"],
+        };
 
         private static PropertyDecl PropDecl(JObject p) => new PropertyDecl
         {

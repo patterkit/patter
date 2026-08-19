@@ -32,16 +32,64 @@ namespace patter
         return r;
     }
 
-    inline std::pair<std::string, std::string> splitRef(const std::string& ref)
+    // `hostTokens` are the scopes a project DECLARES (@world and friends). They have to be passed in
+    // rather than hard-coded: without them "@world.gold" splits to a @patter property literally named
+    // "world.gold", which reads as absent and takes the falsy branch in silence.
+    inline std::pair<std::string, std::string> splitRef(const std::string& ref,
+                                                       const std::set<std::string>& hostTokens = {})
     {
         std::string body = (!ref.empty() && ref[0] == '@') ? ref.substr(1) : ref;
         size_t dot = body.find('.');
         if (dot != std::string::npos && body.find('.', dot + 1) == std::string::npos)
         {
             std::string head = body.substr(0, dot), tail = body.substr(dot + 1);
-            if (head == "scene" || head == "patter") return { head, toLower(tail) };
+            if (head == "scene" || head == "patter" || hostTokens.count(head)) return { head, toLower(tail) };
         }
         return { "patter", toLower(body) };
+    }
+
+    // The seed value for a self-backed host property: its `default`, else the type default.
+    inline PatterValue hostScopeDefault(const HostScopeDecl& d)
+    {
+        if (d.hasDefault) return d.def;
+        if (d.type == "boolean") return PatterValue::Bool(false);
+        if (d.type == "number") return PatterValue::Num(0);
+        if (d.type == "string") return PatterValue::Str("");
+        if (d.type == "flags") return PatterValue::Flags({});
+        if (d.type == "enum") return PatterValue::Str(d.values.empty() ? "" : d.values[0]);
+        return PatterValue::Bool(false);
+    }
+
+    // A host scope the story reads and writes: the GAME owns the value. An embedder binds one per
+    // token through EngineOptions::hostScopes; a declared scope with no binding is SELF-BACKED from
+    // its declaration defaults, so a standalone build plays the same story a bound one does.
+    struct HostScope
+    {
+        // Returns nullptr when this scope has no such name (which reads as a graceful false). The
+        // pointer must stay valid until the next call on this scope, exactly as patterGet's does: the
+        // evaluator copies immediately, and a binding that computes values should hold its own slot.
+        std::function<const PatterValue*(const std::string&)> get;
+        std::function<void(const std::string&, const PatterValue&)> set;
+    };
+
+    // The self-backed fallback. Keyed LOWER CASE, which is load-bearing rather than tidy: the compiler
+    // folds every property reference, so an AST reads "isnight" where the declaration says "isNight".
+    // Seeding verbatim means a declared name carrying a capital is never found, reads as absent, and
+    // silently takes the falsy branch - the bug the JS runtime shipped (fixed 2026-08-18) and this port
+    // must not repeat. An OPAQUE scope (no `declarations`) starts empty and accepts any name.
+    inline HostScope selfBackedScope(const HostScopeSpec& spec)
+    {
+        auto bag = std::make_shared<std::map<std::string, PatterValue>>();
+        for (const HostScopeDecl& d : spec.declarations)
+            if (!d.name.empty()) (*bag)[toLower(d.name)] = hostScopeDefault(d);
+        HostScope s;
+        // Pointers into a std::map stay valid across inserts, so the bag is its own stable storage.
+        s.get = [bag](const std::string& n) -> const PatterValue* {
+            auto it = bag->find(toLower(n));
+            return it != bag->end() ? &it->second : nullptr;
+        };
+        s.set = [bag](const std::string& n, const PatterValue& v) { (*bag)[toLower(n)] = v; };
+        return s;
     }
 
     inline PatterValue propDefault(const PropertyDecl& d)
@@ -238,6 +286,10 @@ namespace patter
         std::map<std::string, int> sharedVisits;
         std::map<std::string, SelectorState> sharedSelectors;
         std::map<std::string, std::map<std::string, PatterValue>> stageBags;
+        // Host scopes by token, already resolved: an embedder's binding where one was given, a
+        // self-backed bag for every other token the bundle declares. Empty for a bundle with none.
+        std::map<std::string, HostScope> hostScopes;
+        std::set<std::string> hostTokens;
         std::function<double()> customRng;
         bool replayPromptOnChoose = false;
         // Closed captions (#214): captionsOn shows cues in dialogue lines (default true); when false the
@@ -255,6 +307,9 @@ namespace patter
         std::string locale;
         bool replayPromptOnChoose = false;
         bool closedCaptions = true;                   // #214: show caption cues in dialogue lines (default)
+        // Live game state per host-scope token ("world" -> your resolver). A binding WINS over the
+        // self-backed bag for that token; declared tokens you do not bind are self-backed.
+        std::map<std::string, HostScope> hostScopes;
     };
 
     // ----- Flow ----------------------------------------------------------------
@@ -276,6 +331,13 @@ namespace patter
             local_ = freshLocal();
             evalCtx_.scopes["patter"] = [this](const std::string& n) { return patterGet(n); };
             evalCtx_.scopes["scene"] = [this](const std::string& n) { return sceneGet(n); };
+            // Declared host scopes (@world): bound by the embedder or self-backed by the engine.
+            // Registering them is what stops "@world.x" reading as a graceful false.
+            for (const auto& kv : host_->hostScopes)
+            {
+                const HostScope* scope = &kv.second;
+                evalCtx_.scopes[kv.first] = [scope](const std::string& n) { return scope->get(n); };
+            }
             evalCtx_.nextRandom = [this]() { return rng(); };
             evalCtx_.visits = [this](const std::string& id) { auto it = visitCounts_.find(id); return it != visitCounts_.end() ? it->second : 0; };
             evalCtx_.patterVisits = [this](const std::string& id) { auto it = host_->sharedVisits.find(id); return it != host_->sharedVisits.end() ? it->second : 0; };
@@ -443,16 +505,18 @@ namespace patter
 
         const PatterValue* getProperty(const std::string& ref) const
         {
-            auto sp = splitRef(ref);
+            auto sp = splitRef(ref, host_->hostTokens);
             if (sp.first == "patter") return patterGet(sp.second);
             if (sp.first == "scene") return sceneGet(sp.second);
-            return nullptr;
+            auto hs = host_->hostScopes.find(sp.first);
+            return hs != host_->hostScopes.end() ? hs->second.get(sp.second) : nullptr;
         }
 
         void setProperty(const std::string& ref, const PatterValue& value)
         {
-            auto sp = splitRef(ref);
+            auto sp = splitRef(ref, host_->hostTokens);
             if (sp.first == "patter") patterSet(sp.second, value);
+            else if (auto hs = host_->hostScopes.find(sp.first); hs != host_->hostScopes.end()) hs->second.set(sp.second, value);
             else if (sp.first == "scene")
             {
                 if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
@@ -1097,6 +1161,17 @@ namespace patter
             host_.captionOpen = bundle.closedCaptions.present ? bundle.closedCaptions.open : "[";   // default: square brackets (#214)
             host_.captionClose = bundle.closedCaptions.present ? bundle.closedCaptions.close : "]";
             host_.captionCharacter = (bundle.closedCaptions.present && !bundle.closedCaptions.character.empty()) ? bundle.closedCaptions.character : "SFX";
+
+            // Host scopes (design/scope-registry.md section 6). An embedder's binding wins for its
+            // token; every OTHER token the bundle declares gets a self-backed bag seeded from its
+            // declarations, so a standalone build plays the same story a bound one does.
+            for (const auto& kv : options.hostScopes) host_.hostScopes[kv.first] = kv.second;
+            for (const HostScopeSpec& spec : bundle.scopeRegistry.scopes)
+            {
+                if (spec.token.empty() || host_.hostScopes.count(spec.token)) continue;   // the binding wins
+                host_.hostScopes[spec.token] = selfBackedScope(spec);
+            }
+            for (const auto& kv : host_.hostScopes) host_.hostTokens.insert(kv.first);
         }
 
         // The active locale (string + character-name lookups resolve in it).
@@ -1244,15 +1319,19 @@ namespace patter
 
         const PatterValue* getProperty(const std::string& ref) const
         {
-            auto sp = splitRef(ref);
+            auto sp = splitRef(ref, host_.hostTokens);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            auto hs = host_.hostScopes.find(sp.first);
+            if (hs != host_.hostScopes.end()) return hs->second.get(sp.second);
             auto it = host_.sharedPatter.find(sp.second);
             return it != host_.sharedPatter.end() ? &it->second : nullptr;
         }
         void setProperty(const std::string& ref, const PatterValue& value)
         {
-            auto sp = splitRef(ref);
+            auto sp = splitRef(ref, host_.hostTokens);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            auto hs = host_.hostScopes.find(sp.first);
+            if (hs != host_.hostScopes.end()) { hs->second.set(sp.second, value); return; }
             host_.sharedPatter[sp.second] = value;
         }
 

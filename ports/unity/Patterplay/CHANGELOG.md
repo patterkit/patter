@@ -6,7 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
-## [0.4.1] - 2026-08-19
+### Added
+
+- **Declared host scopes (`@world`) are parsed and self-backed.** A project can DECLARE host properties
+  in its bundle (`scopeRegistry`); this port ignored them entirely, so `@world.isNight` resolved to
+  nothing, read as a graceful false, and any branch gated on it was skipped. The same bundle therefore
+  played a different story here than on the JavaScript runtime, with no error anywhere. The registry is
+  now parsed into the bundle model, a scope the embedder binds is theirs, and every other declared scope
+  gets a live bag seeded from its declaration defaults. The shared conformance corpus gates this.
 
 ### Fixed
 - **Window ▸ Patterplay ▸ Runtime State now opens docked** (beside the Inspector) instead of
