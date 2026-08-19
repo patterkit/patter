@@ -7,6 +7,28 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The bundle inspector.** Select an imported `.patterc` and see what your game code may call, read
+  from the asset alone with nothing running: the project's identity and hashes, every scene and block
+  ADDRESS `runFlow` / `goto` accept, the `@world` properties the GAME must supply (with the ones
+  carrying no default marked, because those are the values a story silently reads as a type default
+  if the host forgets them), the story's own declarations, the gameData fields, and counts for "is
+  this the right build?". A source-debug build says NOT SHIPPABLE rather than leaving it to be
+  inferred from `strings: ids`.
+
+  The summary itself is available to code as well (`patter::describeBundle`), so a build step or
+  an editor tool can read the   same description the panel draws.
+
+  Shown as details categories on a selected `UPatterBundle`. A bundle that fails to parse now keeps
+  its error on the asset (`LoadError`) and the panel shows it first, so a bad export is diagnosed
+  where you are looking instead of only in the log.
+
+  Also: a UE-boundary automation test (`Patterplay.Smoke`, in the Session Frontend or via
+  `-ExecCmds="Automation RunTests Patterplay.Smoke"`). The conformance corpus runs against the
+  std-only core, so nothing UE-facing had a test of any kind; this covers the JSON loader, the
+  UObject wrappers and the description.
+
 ## [0.4.2] - 2026-08-19
 
 ### Added

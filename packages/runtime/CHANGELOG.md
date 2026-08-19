@@ -25,6 +25,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. This release brings the bundle
+  inspector to Unity, Unreal and Godot; `describeBundle` has been in the JavaScript runtime since
+  0.4.1 and is unchanged.
+
 ## [0.4.2] - 2026-08-19
 
 ### Changed
