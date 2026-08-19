@@ -116,8 +116,8 @@ namespace
 	patter::HostScopeDecl ToHostDecl(const TSharedPtr<FJsonObject>& O)
 	{
 		patter::HostScopeDecl D;
-		D.name = Str(O, TEXT("name"));
-		D.type = Str(O, TEXT("type"));
+		D.name = Std(O->Values.FindRef(TEXT("name"))->AsString());
+		D.type = Std(O->Values.FindRef(TEXT("type"))->AsString());
 		const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
 		if (O->TryGetArrayField(TEXT("values"), Values))
 			for (const TSharedPtr<FJsonValue>& V : *Values) D.values.push_back(TCHAR_TO_UTF8(*V->AsString()));
@@ -269,7 +269,7 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 				{
 					const TSharedPtr<FJsonObject> O = S->AsObject();
 					patter::HostScopeSpec Spec;
-					Spec.token = Str(O, TEXT("token"));
+					Spec.token = Std(O->Values.FindRef(TEXT("token"))->AsString());
 					bool W = false;
 					if (O->TryGetBoolField(TEXT("writable"), W)) { Spec.hasWritable = true; Spec.writable = W; }
 					const TArray<TSharedPtr<FJsonValue>>* Decls = nullptr;

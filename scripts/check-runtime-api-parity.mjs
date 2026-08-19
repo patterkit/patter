@@ -25,10 +25,10 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 
 /** The surfaces we hold to parity. `bp` (the Unreal Blueprint wrapper) is the API Unreal USERS see. */
 const SURFACES = {
-  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
-  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
-  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/runtime/logger.gd", "ports/godot/addons/patterplay/runtime/save.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
+  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
+  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
+  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd", "ports/godot/addons/patterplay/runtime/save.gd"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
   bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h"] },
 };
 
@@ -101,6 +101,13 @@ const API = [
   // language has them and as a static on a holder where it does not.
   { on: "Bundle", js: "describeBundle", unity: "Describe", godot: "describe_bundle", unreal: "describeBundle", bp: null,
     why: "the Unreal view is an IDetailCustomization in C++; no Blueprint node consumes a description" },
+  //
+  // And the VIEW that draws it, one idiom probe per engine. These are not one member under four
+  // names: each is the hook its engine actually offers, which is the point - the summary is shared,
+  // the way you reach it is the engine's own. A missing row here means an engine got the data and
+  // no way to look at it, which is exactly how this work could rot.
+  { on: "BundleView", js: "createBundleInspector", unity: "OnInspectorGUI", godot: "_can_handle", unreal: "CustomizeDetails", bp: null,
+    why: "the details customisation IS the Unreal view; a Blueprint node would be a second surface for the same read" },
 
   // --- save envelope + state logger (dev tools; parity brief B1/B2) ---------
   { on: "Save", js: "serializeState", unity: "SerializeState", godot: "serialize_state", unreal: "serializeState", bp: "SaveStateToJson" },

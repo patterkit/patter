@@ -20,6 +20,12 @@ public:
 	UPROPERTY()
 	FString Json;
 
+	// Why the most recent Parse() failed, persisted so a BROKEN bundle still imports and carries its
+	// own diagnosis in the details panel, instead of importing as an asset that silently does nothing.
+	// Empty when the parse was clean.
+	UPROPERTY()
+	FString LoadError;
+
 	// Parse a transient bundle from a JSON string. Returns nullptr (and logs) on a parse error.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	static UPatterBundle* LoadFromString(const FString& InJson);

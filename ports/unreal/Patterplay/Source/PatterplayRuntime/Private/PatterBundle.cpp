@@ -17,8 +17,12 @@ bool UPatterBundle::Parse()
 	if (!PatterLoadBundle(Json, *NewBundle, Error))
 	{
 		UE_LOG(LogTemp, Error, TEXT("Patterplay: failed to parse bundle - %s"), *Error);
+		// Kept on the asset as well as logged: the details panel shows it, so a bad export is
+		// diagnosed where somebody is looking rather than in a log they have to think to open.
+		LoadError = Error;
 		return false;
 	}
+	LoadError.Empty();
 	Bundle = MoveTemp(NewBundle);
 	return true;
 }
