@@ -28,9 +28,60 @@ func _initialize() -> void:
 	var s := _run_scripted(root["scripted"])
 	var g := _run_gamedata(root["gameData"])
 
+	_run_describe_smoke()
+
 	print("expressions: %d  specificity: %d  runtime: %d  scripted: %d  gameData: %d" % [e, sp, r, s, g])
 	print("ALL PASS" if _fails == 0 else ("%d FAILED" % _fails))
 	quit(0 if _fails == 0 else 1)
+
+
+# describeBundle: the bundle inspector's runtime half. Not a corpus case - it adds no runtime
+# behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference or two
+# inspectors describe the same asset differently. Mirrors the fixture in the JS tests.
+func _run_describe_smoke() -> void:
+	var bundle := {
+		"schema": "patter/bundle@0",
+		"content": { "project": "Tavern", "version": "1.2.0", "hash": "abc", "structureHash": "def" },
+		"locales": { "default": "en", "included": ["en", "fr"] },
+		"properties": [{ "name": "gold", "type": "number", "default": 5 }],
+		"scopeRegistry": { "version": 1, "scopes": [
+			{ "token": "world", "declarations": [{ "name": "isnight", "type": "boolean", "default": true }] },
+			{ "token": "game" },   # no declarations at all: OPAQUE, which an empty list is not
+		] },
+		"scenes": { "s1": {
+			"id": "s1", "name": "Opening Night",
+			"sceneProps": [{ "name": "seen", "type": "boolean" }],
+			"blocks": [{ "id": "b1", "name": "The Bar", "children": [
+				{ "id": "g1", "type": "group", "selector": "choice", "prompt": { "id": "P1", "kind": "text" },
+				  "children": [{ "id": "opt1", "type": "snippet", "beats": [{ "id": "L1", "kind": "line" }] }] },
+				{ "id": "sn", "type": "snippet", "beats": [{ "id": "E1", "kind": "gameEvent" }] },
+			] }],
+		} },
+	}
+
+	var d := PatterDescribe.describe_bundle(bundle)
+
+	if d["identity"]["schema"] != "patter/bundle@0" or d["identity"]["project"] != "Tavern" or d["identity"]["version"] != "1.2.0":
+		_fail("describe", "identity", "schema / project / version not carried")
+	if d["identity"]["localisation"] != "embedded":
+		_fail("describe", "identity", "absent localisation must read as embedded")
+	if d["addresses"].size() != 1 or d["addresses"][0]["game_id"] != "opening-night" or d["addresses"][0]["name"] != "Opening Night":
+		_fail("describe", "addresses", "scene address derived from the name")
+	if d["addresses"][0]["blocks"].size() != 1 or d["addresses"][0]["blocks"][0]["game_id"] != "the-bar":
+		_fail("describe", "addresses", "block address nested under its scene")
+	if d["host_scopes"].size() != 2 or d["host_scopes"][0]["token"] != "world" or d["host_scopes"][0]["opaque"]:
+		_fail("describe", "host_scopes", "declared scope")
+	if not d["host_scopes"][1]["opaque"] or d["host_scopes"][1]["properties"].size() != 0:
+		_fail("describe", "host_scopes", "a scope with no declarations is OPAQUE, not empty")
+	if d["properties"]["patter"].size() != 1 or not d["properties"]["patter"][0]["shared"]:
+		_fail("describe", "properties", "@patter defaults to shared")
+	if d["properties"]["scene"].size() != 1 or d["properties"]["scene"][0]["properties"][0]["shared"]:
+		_fail("describe", "properties", "@scene defaults to per-flow")
+	# beats counts the population get_beat_sequence walks; the choice prompt is a SEPARATE row.
+	var c: Dictionary = d["counts"]
+	if c["scenes"] != 1 or c["blocks"] != 1 or c["groups"] != 1 or c["snippets"] != 2 \
+		or c["beats"] != 2 or c["prompts"] != 1 or c["game_events"] != 1:
+		_fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts")
 
 
 func _fail(section: String, name: String, detail: String) -> void:

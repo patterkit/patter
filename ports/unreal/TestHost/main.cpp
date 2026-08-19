@@ -12,6 +12,7 @@
 #include <queue>
 #include "Json.h"
 #include "Patter/Save.h"
+#include "Patter/Describe.h"
 #include "Patter/StateLogger.h"
 #include "Patter/Engine.h"
 #include "Patter/Mulberry32.h"
@@ -157,7 +158,14 @@ static std::map<std::string, std::map<std::string, std::string>> parseStrings(co
 static Bundle parseBundle(const JsonValue& b)
 {
     Bundle bundle;
+    if (const JsonValue* sc = b.find("schema")) bundle.schema = sc->str;
     if (const JsonValue* v = b.find("voiced")) bundle.voiced = v->b;
+    if (const JsonValue* ct = b.find("content")) {
+        if (const JsonValue* h = ct->find("hash")) bundle.contentHash = h->str;
+        if (const JsonValue* sh = ct->find("structureHash")) bundle.structureHash = sh->str;
+        if (const JsonValue* pr = ct->find("project")) bundle.contentProject = pr->str;
+        if (const JsonValue* ver = ct->find("version")) bundle.contentVersion = ver->str;
+    }
     if (const JsonValue* lz = b.find("localisation")) {
         if (const JsonValue* m = lz->find("mode")) bundle.localisation.mode = m->str;
         if (const JsonValue* sd = lz->find("sourceDebug")) bundle.localisation.sourceDebug = sd->b;
@@ -584,6 +592,66 @@ static void runInspectorSmoke()
 
 // Structure introspection (Engine::listOutline / beatSequence): not part of the shared corpus, so
 // exercise directly on a hand-built scene -> block -> choice group -> snippets -> beats.
+// describeBundle: the bundle inspector's runtime half. Not a corpus case - this adds no runtime
+// behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference or two
+// inspectors describe the same asset differently. The fixture mirrors the one in the JS tests.
+static void runDescribeSmoke()
+{
+    Bundle b;
+    b.schema = "patter/bundle@0";
+    b.contentProject = "Tavern";
+    b.contentVersion = "1.2.0";
+    b.contentHash = "abc";
+    b.structureHash = "def";
+    b.locales.defaultLocale = "en";
+    b.locales.included = { "en", "fr" };
+    { PropertyDecl d; d.name = "gold"; d.type = "number"; d.hasDefault = true; d.def = PatterValue::Num(5); b.properties.push_back(d); }
+
+    HostScopeSpec world;
+    world.token = "world";
+    world.hasDeclarations = true;
+    { HostScopeDecl d; d.name = "isnight"; d.type = "boolean"; d.hasDefault = true; d.def = PatterValue::Bool(true); world.declarations.push_back(d); }
+    HostScopeSpec opaque;                       // no declarations at all: any name, unchecked
+    opaque.token = "game";
+    b.scopeRegistry.present = true;
+    b.scopeRegistry.scopes = { world, opaque };
+
+    auto opt1 = std::make_shared<Node>(); opt1->type = "snippet"; opt1->id = "opt1";
+    { Beat beat; beat.id = "L1"; beat.kind = "line"; opt1->beats.push_back(beat); }
+    auto group = std::make_shared<Node>(); group->type = "group"; group->id = "g1"; group->selector = "choice";
+    group->prompt = std::make_shared<Beat>(); group->prompt->id = "P1"; group->prompt->kind = "text";
+    group->children = { opt1 };
+    auto sn = std::make_shared<Node>(); sn->type = "snippet"; sn->id = "sn";
+    { Beat beat; beat.id = "E1"; beat.kind = "gameEvent"; sn->beats.push_back(beat); }
+
+    Block block; block.id = "b1"; block.name = "The Bar"; block.children = { group, sn };
+    Scene scene; scene.id = "s1"; scene.name = "Opening Night"; scene.blocks = { block };
+    { PropertyDecl d; d.name = "seen"; d.type = "boolean"; scene.sceneProps.push_back(d); }
+    b.scenes["s1"] = scene;
+
+    BundleDescription d = describeBundle(b);
+
+    if (d.identity.schema != "patter/bundle@0" || d.identity.project != "Tavern" || d.identity.version != "1.2.0")
+        fail("describe", "identity", "schema / project / version not carried");
+    if (d.identity.localisation != "embedded") fail("describe", "identity", "absent localisation must read as embedded");
+    if (d.addresses.size() != 1 || d.addresses[0].gameId != "opening-night" || d.addresses[0].name != "Opening Night")
+        fail("describe", "addresses", "scene address derived from the name");
+    if (d.addresses[0].blocks.size() != 1 || d.addresses[0].blocks[0].gameId != "the-bar")
+        fail("describe", "addresses", "block address nested under its scene");
+    if (d.hostScopes.size() != 2 || d.hostScopes[0].token != "world" || d.hostScopes[0].opaque)
+        fail("describe", "hostScopes", "declared scope");
+    if (!d.hostScopes[1].opaque || !d.hostScopes[1].properties.empty())
+        fail("describe", "hostScopes", "a scope with no declarations is OPAQUE, not empty");
+    if (d.properties.patter.size() != 1 || !d.properties.patter[0].shared)
+        fail("describe", "properties", "@patter defaults to shared");
+    if (d.properties.scene.size() != 1 || d.properties.scene[0].properties[0].shared)
+        fail("describe", "properties", "@scene defaults to per-flow");
+    // beats counts the population getBeatSequence walks; the choice prompt is a SEPARATE row.
+    if (d.counts.scenes != 1 || d.counts.blocks != 1 || d.counts.groups != 1 || d.counts.snippets != 2
+        || d.counts.beats != 2 || d.counts.prompts != 1 || d.counts.gameEvents != 1)
+        fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts");
+}
+
 static void runOutlineSmoke()
 {
     Bundle b;
@@ -643,6 +711,7 @@ int main(int argc, char** argv)
     int g = runGameData(root.at("gameData"));
     runInspectorSmoke();
     runOutlineSmoke();
+    runDescribeSmoke();
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";

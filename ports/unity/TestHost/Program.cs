@@ -60,9 +60,77 @@ namespace Patterkit.Patterplay.TestHost
             _jsonSaveLoad = false;
             Console.WriteLine($"  [PatterSave JSON] scripted save/load: {sj}");
 
+            RunDescribeSmoke();
+
             Console.WriteLine($"expressions: {e}  specificity: {sp}  runtime: {r}  scripted: {s}  gameData: {g}");
             Console.WriteLine(_fails == 0 ? "ALL PASS" : $"{_fails} FAILED");
             return _fails == 0 ? 0 : 1;
+        }
+
+        // describeBundle: the bundle inspector's runtime half. Not a corpus case - this adds no runtime
+        // behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference
+        // or two inspectors describe the same asset differently. Mirrors the JS test's fixture.
+        private static void RunDescribeSmoke()
+        {
+            var b = new Bundle
+            {
+                Schema = "patter/bundle@0",
+                ContentProject = "Tavern",
+                ContentVersion = "1.2.0",
+                ContentHash = "abc",
+                StructureHash = "def",
+            };
+            b.Locales.Default = "en";
+            b.Locales.Included.AddRange(new[] { "en", "fr" });
+            b.Properties.Add(new PropertyDecl { Name = "gold", Type = "number", Default = PatterValue.Num(5) });
+
+            b.ScopeRegistry = new HostScopeRegistry();
+            b.ScopeRegistry.Scopes.Add(new HostScopeSpec
+            {
+                Token = "world",
+                Declarations = new List<HostScopeDecl>
+                {
+                    new HostScopeDecl { Name = "isnight", Type = "boolean", Default = PatterValue.Bool(true) },
+                },
+            });
+            // No Declarations at all: an OPAQUE scope, which is not the same as an empty list.
+            b.ScopeRegistry.Scopes.Add(new HostScopeSpec { Token = "game" });
+
+            var opt = new Node { Id = "opt1", Type = "snippet", Beats = new List<Beat> { new Beat { Id = "L1", Kind = "line" } } };
+            var group = new Node
+            {
+                Id = "g1", Type = "group", Selector = "choice",
+                Prompt = new Beat { Id = "P1", Kind = "text" },
+                Children = new List<Node> { opt },
+            };
+            var sn = new Node { Id = "sn", Type = "snippet", Beats = new List<Beat> { new Beat { Id = "E1", Kind = "gameEvent" } } };
+            var block = new Block { Id = "b1", Name = "The Bar", Children = new List<Node> { group, sn } };
+            var scene = new Scene { Id = "s1", Name = "Opening Night" };
+            scene.Blocks.Add(block);
+            scene.SceneProps.Add(new PropertyDecl { Name = "seen", Type = "boolean" });
+            b.Scenes["s1"] = scene;
+
+            var d = BundleInfo.Describe(b);
+
+            if (d.Identity.Schema != "patter/bundle@0" || d.Identity.Project != "Tavern" || d.Identity.Version != "1.2.0")
+                Fail("describe", "identity", "schema / project / version not carried");
+            if (d.Identity.Localisation != "embedded") Fail("describe", "identity", "absent localisation must read as embedded");
+            if (d.Addresses.Count != 1 || d.Addresses[0].GameId != "opening-night" || d.Addresses[0].Name != "Opening Night")
+                Fail("describe", "addresses", "scene address derived from the name");
+            if (d.Addresses[0].Blocks.Count != 1 || d.Addresses[0].Blocks[0].GameId != "the-bar")
+                Fail("describe", "addresses", "block address nested under its scene");
+            if (d.HostScopes.Count != 2 || d.HostScopes[0].Token != "world" || d.HostScopes[0].Opaque)
+                Fail("describe", "hostScopes", "declared scope");
+            if (!d.HostScopes[1].Opaque || d.HostScopes[1].Properties.Count != 0)
+                Fail("describe", "hostScopes", "a scope with no declarations is OPAQUE, not empty");
+            if (d.Properties.Patter.Count != 1 || !d.Properties.Patter[0].Shared)
+                Fail("describe", "properties", "@patter defaults to shared");
+            if (d.Properties.Scene.Count != 1 || d.Properties.Scene[0].Properties[0].Shared)
+                Fail("describe", "properties", "@scene defaults to per-flow");
+            // Beats counts the population GetBeatSequence walks; the choice prompt is a SEPARATE row.
+            if (d.Counts.Scenes != 1 || d.Counts.Blocks != 1 || d.Counts.Groups != 1 || d.Counts.Snippets != 2
+                || d.Counts.Beats != 2 || d.Counts.Prompts != 1 || d.Counts.GameEvents != 1)
+                Fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts");
         }
 
         private static void Fail(string section, string name, string detail)
@@ -509,12 +577,14 @@ namespace Patterkit.Patterplay.TestHost
         private static Bundle ParseBundle(JsonElement b)
         {
             var bundle = new Bundle();
+            if (b.TryGetProperty("schema", out var sch)) bundle.Schema = sch.GetString();
             if (b.TryGetProperty("voiced", out var v)) bundle.Voiced = v.GetBoolean();
             if (b.TryGetProperty("content", out var ct))
             {
                 if (ct.TryGetProperty("hash", out var ch)) bundle.ContentHash = ch.GetString();
                 if (ct.TryGetProperty("structureHash", out var csh)) bundle.StructureHash = csh.GetString();
                 if (ct.TryGetProperty("project", out var cp)) bundle.ContentProject = cp.GetString();
+                if (ct.TryGetProperty("version", out var cv)) bundle.ContentVersion = cv.GetString();
             }
             var loc = b.GetProperty("locales");
             bundle.Locales.Default = loc.GetProperty("default").GetString();
