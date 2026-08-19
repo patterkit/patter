@@ -64,6 +64,24 @@ describe("first-class host scopes", () => {
     expect(firstLine(flow)).toBe("gold 5 phase a1");
   });
 
+  // The compiler now REFUSES a capitalised declaration (core's `invalid-declaration`:
+  // expressions fold references, so `isNight` could never be reached), which makes this
+  // fold belt-and-braces rather than load-bearing. It stays, and is pinned here, because
+  // a bundle can also arrive hand-written or from an embedder's own spec, and the failure
+  // it prevents is silent: the property reads `undefined` and takes the falsy branch.
+  it("self-backs a capitalised declaration, which the compiler would no longer emit", () => {
+    const handBuilt = {
+      ...bundle,
+      scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [
+        { name: "Gold", type: "number", default: 7 },
+        { name: "phase", type: "enum", values: ["a1", "a2"], default: "a1" },
+      ] }] },
+    } as typeof bundle;
+    const flow = new Engine(handBuilt).openFlow("f", { scene: "s" });
+    // onEntry adds 5 to a bag seeded from `Gold`; a verbatim key reads undefined and yields NaN.
+    expect(firstLine(flow)).toBe("gold 12 phase a1");
+  });
+
   it("a host-bound resolver wins over the self-backed bag", () => {
     const bag = new Map<string, number>([["gold", 100]]);
     const flow = new Engine(bundle, {

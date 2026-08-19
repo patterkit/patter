@@ -303,6 +303,57 @@ export function isValidGameId(gameId: string): boolean {
   return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(gameId);
 }
 
+// ---------------------------------------------------------------------------
+// Property names (design: `@wildwinter/app-shell` src/property-names.ts, which
+// holds the same rules as the shell's defaults and argues them).
+//
+// Not house style: the rule is what `@wildwinter/expr` can parse. Its lexer takes
+// an identifier as /[a-zA-Z_][a-zA-Z0-9_]*/ and folds it to lower case, so
+// `@patter.isNight` reaches a property called `isnight`, `@patter.9lives` and
+// `@patter.not` are parse errors, and `@patter.is-night` is not an error at all:
+// it compiles to `@patter.is` MINUS the string "night". That last one is why the
+// rule is worth enforcing rather than trusting - it is the only violation that
+// silently means something else.
+//
+// These live here, and not behind an import of the UI kit, because the compiler,
+// the CLI and the JS runtime embedded in game engines all resolve state by them.
+// `packages/model/test/property-name-parity.test.ts` holds them to the shell's.
+// ---------------------------------------------------------------------------
+
+/** The words `@wildwinter/expr` lexes as keywords, so no property may be called one.
+ *  `packages/model/test/property-name-grammar.test.ts` probes the real parser rather
+ *  than trusting this copy. */
+export const RESERVED_PROPERTY_NAMES: readonly string[] = ["true", "false", "and", "or", "not"];
+
+/** Coerce a label into a legal property name: lower case, apostrophes dropped, runs of
+ *  anything else to a single underscore, no trailing underscore, an underscore in front
+ *  of a leading digit, one behind a keyword. "" when nothing usable was left. */
+export function propertyNameify(text: string): string {
+  const trimmed = text.trim();
+  // An underscore the author typed is kept; one that is only the ghost of leading
+  // punctuation is not. That is the difference between `_private` and `!gold`.
+  const deliberateLeading = trimmed.startsWith("_");
+  let out = trimmed.toLowerCase().replace(/['\u2019]/g, "")
+    .replace(/[^a-z0-9_]+/g, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  if (out === "") return "";
+  if (deliberateLeading || /^[0-9]/.test(out)) out = `_${out}`;
+  if (RESERVED_PROPERTY_NAMES.includes(out)) out = `${out}_`;
+  return out;
+}
+
+/** Is this a name an expression can actually reach? Lower case letters, digits and
+ *  underscores, not starting with a digit, not a keyword. "" is not a name. */
+export function isValidPropertyName(name: string): boolean {
+  return /^[a-z_][a-z0-9_]*$/.test(name) && !RESERVED_PROPERTY_NAMES.includes(name);
+}
+
+/** True when folding case ALONE would make it legal (`isNight`). The only violation a
+ *  loader may repair without guessing at intent: every reference is folded already, so
+ *  folding the declaration to match changes nothing observable. */
+export function isCaseOnlyPropertyName(name: string): boolean {
+  return !isValidPropertyName(name) && isValidPropertyName(name.toLowerCase());
+}
+
 /** The effective address: the explicit `gameId` if pinned, else derived from `name`. */
 export function effectiveGameId(entity: { gameId?: string; name: string }): string {
   const g = entity.gameId?.trim();

@@ -71,6 +71,11 @@ const choicePick = {
 } satisfies RuntimeFixture;
 
 // --- a declared host scope with no resolver, self-backed from its defaults ---
+// The declared name KEEPS its capital deliberately. Since 2026-08-18 the compiler refuses to emit
+// this bundle (core's `invalid-declaration`: expressions fold references, so `isNight` could never
+// be reached), so no author can produce one - but every runtime is still told to key its self-backed
+// bag lower case, and this is the case that proves it did. Lower-casing the fixture would leave that
+// instruction untested in three ports for the sake of tidiness.
 // The parity contract for `@world` (and any host scope a project declares). A runtime that ignores
 // `scopeRegistry` finds no `world` scope, reads the reference as a graceful false, skips the gated
 // group and plays "Daylight." instead - which is a silently DIFFERENT STORY from the same bundle,

@@ -5,13 +5,20 @@
 
 import type { PropertyDecl, PropertyType, ScalarValue } from "@patterkit/model";
 import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, focusNewRow,
+  PROPERTY_NAME_HINT } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
   ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"],
 ];
 
-export interface PropertiesHandle { value(): PropertyDecl[]; firstDuplicate(): HTMLInputElement | null; }
+export interface PropertiesHandle {
+  value(): PropertyDecl[];
+  firstDuplicate(): HTMLInputElement | null;
+  /** The first name no expression could reach, for the Save gate. Separate from
+   *  `firstDuplicate` because the two faults have different words. */
+  firstIllegalName(): HTMLInputElement | null;
+}
 
 
 /** `scope` distinguishes project globals (@patter: default SHARED) from scene-local (@scene: default
@@ -53,7 +60,8 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
   const propRow = (p: PropertyDecl, i: number): HTMLElement => {
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
     name.type = "text"; name.placeholder = "<property name>"; name.value = p.name; name.spellcheck = false;
-    name.addEventListener("input", () => { p.name = name.value; });
+    name.dataset.tip = PROPERTY_NAME_HINT;
+    bindPropertyName(name, (v) => { p.name = v; }, { hint: PROPERTY_NAME_HINT });
     guard.track(name);
 
     const type = el("select", "insp-select gd-type") as HTMLSelectElement;
@@ -116,6 +124,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
 
   return {
     firstDuplicate: () => guard.firstDuplicate(),
+    firstIllegalName: () => firstIllegalPropertyName(host),
     value(): PropertyDecl[] {
       return state.filter((p) => p.name.trim()).map((p): PropertyDecl => {
         const c: PropertyDecl = { name: p.name.trim(), type: p.type };

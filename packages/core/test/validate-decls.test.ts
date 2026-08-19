@@ -48,6 +48,68 @@ describe("property declarations", () => {
     expect(codes(p)).toContain("invalid-declaration");
   });
 
+  // A name expr cannot reach is not a style question: the header of
+  // packages/model/src/index.ts records what each of these compiles to.
+  const NAME_FAULTS: Array<[string, RegExp]> = [
+    ["isNight", /lower case/],
+    ["is-night", /subtraction/],       // the silent one
+    ["is night", /letters, digits and underscores/],
+    ["9lives", /starts with a digit/],
+    ["not", /keyword/],
+    ["TRUE", /keyword/],
+  ];
+
+  it("flags every name an expression cannot reach, and says what happens", () => {
+    for (const [name, why] of NAME_FAULTS) {
+      const p = base();
+      p.properties = [{ name, type: "boolean" }];
+      const issues = validateProject({ project: p, scenes: [scene()] })
+        .filter((i) => i.code === "invalid-declaration");
+      expect(issues, name).toHaveLength(1);
+      expect(issues[0]!.message, name).toMatch(why);
+    }
+  });
+
+  it("offers the coerced name in the message", () => {
+    const p = base();
+    p.properties = [{ name: "Is Night!", type: "boolean" }];
+    const issues = validateProject({ project: p, scenes: [scene()] });
+    expect(issues[0]!.message).toContain("Try 'is_night'");
+  });
+
+  it("applies the rule to scene-local props", () => {
+    const s = scene();
+    s.sceneProps = [{ name: "Mood", type: "string" }];
+    expect(codes(base(), [s])).toContain("invalid-declaration");
+  });
+
+  it("applies the rule to host-scope declarations, where the fault was found", () => {
+    const p = base();
+    p.scopeRegistry = { version: 1, scopes: [
+      { token: "world", declarations: [{ name: "isNight", type: "boolean", default: true }] },
+    ] };
+    const issues = validateProject({ project: p, scenes: [scene()] })
+      .filter((i) => i.code === "invalid-declaration");
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.message).toContain("host scope '@world'");
+    expect(issues[0]!.message).toContain("isnight");
+  });
+
+  it("accepts legal host-scope declarations, and an opaque scope", () => {
+    const p = base();
+    p.scopeRegistry = { version: 1, scopes: [
+      { token: "world", declarations: [{ name: "is_night", type: "boolean", default: true }] },
+      { token: "game" },
+    ] };
+    expect(codes(p)).toEqual([]);
+  });
+
+  it("accepts an underscored and a leading-underscore name", () => {
+    const p = base();
+    p.properties = [{ name: "gold_pieces", type: "number" }, { name: "_private", type: "number" }];
+    expect(codes(p)).toEqual([]);
+  });
+
   it("accepts well-formed declarations", () => {
     const p = base();
     p.properties = [

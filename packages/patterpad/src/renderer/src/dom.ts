@@ -70,4 +70,3 @@ export function tagChips(holder: { values?: string[] }, onChange?: () => void): 
   wrap.append(input);
   return wrap;
 }
-

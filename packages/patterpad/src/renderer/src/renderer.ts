@@ -2195,6 +2195,9 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   const settingsForm = settingsDialogEl.querySelector("form")!;
   const setErrorEl = $("set-error"); setErrorEl.hidden = true;
   const dupTabs: Array<[string, { firstDuplicate(): HTMLInputElement | null }]> = [["properties", props], ["gamedata", gd], ["cast", cast], ["world", world]];
+  // Only the two editors that declare PROPERTIES carry the name rule: game-data fields and cast
+  // members are not referenced by expressions, so they are not held to the expression grammar.
+  const nameTabs: Array<[string, { firstIllegalName(): HTMLInputElement | null }]> = [["properties", props], ["world", world]];
   const onSubmit = (e: Event): void => {
     for (const [tab, h] of dupTabs) {
       const bad = h.firstDuplicate();
@@ -2202,6 +2205,20 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
       e.preventDefault(); // keep the dialog open
       showTab(tab);
       setErrorEl.textContent = "Two entries share a name. Names must be unique."; setErrorEl.hidden = false;
+      setTimeout(() => { bad.scrollIntoView({ block: "nearest" }); bad.focus(); }, 0);
+      return;
+    }
+    // Illegal-name gate: a declared property whose name no expression can reach (a hyphen reads as
+    // subtraction, a leading digit or a keyword will not parse, a capital is folded away). Saving one
+    // writes a declaration nothing can refer to, so it is blocked the same way a duplicate is - and the
+    // field's own rollover says which fault it is, so the bar repeats it rather than inventing a summary.
+    for (const [tab, h] of nameTabs) {
+      const bad = h.firstIllegalName();
+      if (!bad) continue;
+      e.preventDefault();
+      showTab(tab);
+      setErrorEl.textContent = bad.title || "That property name cannot be used in an expression.";
+      setErrorEl.hidden = false;
       setTimeout(() => { bad.scrollIntoView({ block: "nearest" }); bad.focus(); }, 0);
       return;
     }
