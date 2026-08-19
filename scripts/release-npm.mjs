@@ -12,7 +12,8 @@
 // It deliberately does NOT create anything. If no PR is open there is nothing to ship and it says so.
 
 import { execSync } from "node:child_process";
-import { resolve, dirname } from "node:path";
+import { readdirSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { findVersionPr, plannedBumps, confirmPublish, waitForNpm } from "./lib/version-pr.mjs";
 
@@ -32,9 +33,20 @@ if (out("git rev-parse --abbrev-ref HEAD") !== "main") die("not on main");
 
 const pr = findVersionPr(root);
 if (!pr) {
-  // Not a failure. Either everything is published, or no changeset has reached main yet.
-  console.log("release:npm: no Version Packages PR is open - nothing to publish.");
-  console.log("  If you expected one, check the Release workflow, or add a changeset:  npm run changeset");
+  // Not a failure, but "nothing to publish" reads like "you are done" and usually means "wait", so say
+  // WHICH of the three states this is. Getting that wrong is what `ship:npm` exists to stop entirely.
+  const ahead = Number(out("git rev-list --count origin/main..HEAD 2>/dev/null || echo 0"));
+  const pending = readdirSync(join(root, ".changeset")).filter((f) => f.endsWith(".md") && f !== "README.md");
+  console.log("release:npm: no Version Packages PR is open.");
+  if (ahead) {
+    console.log(`  You have ${ahead} unpushed commit(s). The bot only sees what is on main:  npm run ship:npm`);
+  } else if (pending.length) {
+    console.log(`  ${pending.length} changeset(s) are on main, so the Release workflow should be opening one - give it a moment and retry.`);
+    console.log(`  If it does not appear: ${REPO}/actions/workflows/release.yml`);
+  } else {
+    console.log("  Nothing is pending: no unpushed commits and no changesets. There is genuinely nothing to publish.");
+    console.log("  A change to a published package needs one:  npm run changeset");
+  }
   process.exit(0);
 }
 

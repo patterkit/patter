@@ -24,6 +24,7 @@
     "release:status": "node scripts/release-status.mjs",
     "release:npm": "node scripts/release-npm.mjs",
     "ship:cli": "node scripts/ship-cli.mjs",
+    "ship:npm": "node scripts/ship-npm.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "npm run build && changeset publish"
