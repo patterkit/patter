@@ -7,6 +7,11 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  Godot-only (#45); this runtime is unchanged.
+
 ## [0.4.4] - 2026-08-20
 
 ### Changed

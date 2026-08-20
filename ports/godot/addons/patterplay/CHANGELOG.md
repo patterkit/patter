@@ -6,6 +6,33 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The bundle inspector is back (#45), and this time an exported build is part of the test.** Select a
+  `.patterc` in the FileSystem dock and the Inspector shows what your game code may call: identity and
+  hashes, every scene and block address, the `@world` properties the game must supply (with the ones
+  carrying no default marked), the story's own declarations, gameData fields, and counts.
+
+  0.4.3 shipped this by importing `.patterc` as a Resource, which stopped the source file reaching an
+  exported build and broke every shipped game; 0.4.4 removed it. What was missing was the other half:
+  an export plugin now puts the raw bundle back at its own path and skips the imported product, so a
+  build carries exactly the bytes it did before any of this, at the same size (measured: a 3.4 MB
+  bundle gives a 3.6 MB pack, the same as 0.4.4, against 7.2 MB when the imported copy also ships).
+
+  Two things worth knowing. `ResourceLoader.load("res://game.patterc")` works in the EDITOR and
+  returns nothing in a build - the resource is an editor convenience, and a running game reads the
+  file, as it always has. And the `*.patterc` entry in "filters to export non-resource files" is no
+  longer needed, though it is harmless if you leave it.
+
+  `ports/godot/test/export_check.sh` is the gate that was missing: it exports a project and RUNS the
+  pack, in a directory with no project above it, because every other check here runs in the editor
+  where the file is on disk whatever the addon does to it.
+
+### Fixed
+
+- **The plugin removes what it registers.** An `EditorPlugin` with no `_exit_tree` leaves Godot holding
+  freed script instances and it aborts on shutdown. That was mine, found by the export gate.
+
 ## [0.4.4] - 2026-08-20
 
 ### Fixed

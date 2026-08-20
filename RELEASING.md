@@ -219,6 +219,12 @@ CLI. Build locally with `npm run -w @patterkit/cli build:standalone` (host targe
 
 ## Patterplay runtimes (JS + Unity + Unreal + Godot)
 
+**Before a Godot release, run the export check.** `ports/godot/test/export_check.sh` exports a
+project and runs the resulting pack. Everything else in `ports/godot/test` runs inside the editor,
+where a bundle is on disk whatever the addon does to it, so an editor-only gate cannot see a build
+that ships the wrong thing. That is how #45 reached users. It needs Godot plus export templates
+installed, and skips cleanly without them.
+
 **Before an Unreal release, build the plugin against a real engine.** The tag pipeline gates on the
 clang TestHost, which compiles the std-only core and nothing UE-facing: not `PatterBundleLoader.cpp`,
 not the UObject wrappers, not the editor module. Since the port ships source-only, code that does not

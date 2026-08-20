@@ -3,11 +3,6 @@ extends SceneTree
 
 # Headless check of the EDITOR's bundle view (addons/patterplay/editor/patter_bundle_view.gd).
 #
-# NOTE (#45): the Inspector view is currently UNREGISTERED - importing a .patterc as a Resource broke
-# exported builds, so the importer is off and nothing produces a PatterBundleResource for the view to
-# draw. This test keeps running because the view is a plain VBoxContainer and the rows still have to be
-# right when it comes back; it is not evidence that a user can see any of this today.
-#
 # The view is a @tool script that normally only runs inside the Godot editor's Inspector, which is
 # exactly why it needs this: nothing else in the suite instantiates it, so a change to it would
 # otherwise only ever be parsed, never executed. It is a plain VBoxContainer, so a headless
