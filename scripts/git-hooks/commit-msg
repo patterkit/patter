@@ -1,0 +1,16 @@
+#!/bin/sh
+# Commits in this repo have a single author: reject attribution trailers.
+# Wired via `core.hooksPath = scripts/git-hooks`. Use --no-verify for a genuine co-author.
+set -e
+
+body=$(git stripspace --strip-comments < "$1")
+
+if printf '%s\n' "$body" | grep -qiE '^Co-Authored-By:'; then
+  echo "commit-msg: co-author trailer rejected." >&2
+  exit 1
+fi
+
+if printf '%s\n' "$body" | grep -qiE 'Generated with .*https?://'; then
+  echo "commit-msg: tool attribution line rejected." >&2
+  exit 1
+fi
