@@ -21,8 +21,9 @@ same runtime behaviour.
 
   Two things worth knowing. `ResourceLoader.load("res://game.patterc")` works in the EDITOR and
   returns nothing in a build - the resource is an editor convenience, and a running game reads the
-  file, as it always has. And the `*.patterc` entry in "filters to export non-resource files" is no
-  longer needed, though it is harmless if you leave it.
+  file, as it always has. And the plugin now puts the bundle into the export itself, so the
+  `*.patterc` entry in "filters to export non-resource files" is a safety net rather than a
+  requirement - keep it if you have it, since it covers a disabled plugin, and it costs nothing.
 
   `ports/godot/test/export_check.sh` is the gate that was missing: it exports a project and RUNS the
   pack, in a directory with no project above it, because every other check here runs in the editor

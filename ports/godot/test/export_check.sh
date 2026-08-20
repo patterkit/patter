@@ -102,9 +102,9 @@ cat > "$proj/export_presets.cfg" <<CFG
 name="check"
 platform="$platform"
 runnable=true
-export_filter="all_resources"
+export_filter="${EXPORT_MODE:-all_resources}"
 include_filter="$include_filter"
-exclude_filter=""
+exclude_filter="${EXPORT_EXCLUDE_FILTER:-}"
 export_path="build/check.pck"
 
 [preset.0.options]

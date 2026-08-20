@@ -110,14 +110,19 @@ byte-identical across them).
 
 ## Exporting your game
 
-One Godot setting catches almost everyone on their first export: Godot only packs files it
-recognises as *resources* (scenes, scripts, imported assets), and **silently drops everything
-else** - including your `.patterc` bundle - from the exported `.pck`. The game then runs fine in
-the editor (which reads loose project files) but the bundle is missing from the export, on every
-platform: desktop, mobile, and web alike.
+**From Patterplay 0.4.5 the plugin handles your bundle for you.** It adds the `.patterc` to the
+export itself, so a build gets its story without you configuring anything. The rest of this
+section still matters: for other loose files you read at runtime, and for anyone running an older
+Patterplay or with the plugin disabled.
 
-The fix is a filter on the export preset. In **Project ▸ Export... ▸ your preset ▸ Resources ▸
-"Filters to export non-resource files/folders"**, add:
+Godot only packs files it recognises as *resources* (scenes, scripts, imported assets), and can
+**silently drop everything else** - including a `.patterc` bundle - from the exported `.pck`. The
+game then runs fine in the editor, which reads loose project files, while the export is missing
+its story, on every platform: desktop, mobile, and web alike.
+
+The setting is a filter on the export preset, and it is still worth having: it costs nothing, and
+it is what protects you if the plugin is ever disabled. In **Project ▸ Export... ▸ your preset ▸
+Resources ▸ "Filters to export non-resource files/folders"**, add:
 
 ```
 *.patterc
