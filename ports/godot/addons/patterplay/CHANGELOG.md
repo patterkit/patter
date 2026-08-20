@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-20
+
 ### Added
 
 - **The bundle inspector is back (#45), and this time an exported build is part of the test.** Select a
