@@ -55,7 +55,10 @@ let range;
 try {
   // Two dots, not three: we want what these commits actually touch, not what the branch has diverged
   // by. On main those are the same thing, but a merge-base diff would silently forgive a revert.
-  out(`git rev-parse --verify --quiet ${base}`);
+  // `^{commit}` matters: --verify accepts any well-formed 40-character SHA whether or not the object
+  // is present, so without it a base that has left the repo (a force-push, where the push event's
+  // `before` is now unreachable) sails past this check and fails on the diff instead.
+  out(`git rev-parse --verify --quiet "${base}^{commit}"`);
   range = `${base}..${head}`;
 } catch {
   console.error(`release-guard: no such ref '${base}' - skipping (nothing to compare against)`);
