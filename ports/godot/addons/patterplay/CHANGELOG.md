@@ -6,6 +6,24 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Exported builds could not find their bundle (#45, thanks @yukonmakesgames).** 0.4.3 registered an
+  importer for `.patterc`, which turned it from a plain file into an imported RESOURCE: Godot then
+  resolved `res://game.patterc` to `.godot/imported/game-<hash>.tres` and stopped shipping the source
+  file, so `FileAccess.get_file_as_string("res://game.patterc")` read nothing in an exported build.
+  Adding `*.patterc` to "filters to export non-resource files" could not help, because the file had
+  stopped being a non-resource. The importer is off again and `.patterc` is a plain file, as it was
+  before 0.4.3.
+
+  **If you opened your project in 0.4.3**, delete the `*.patterc.import` files it left beside your
+  bundles (and any matching entries under `.godot/imported/`). Godot leaves them in place and an
+  export still follows them, so removing them is what actually restores your build.
+
+  The bundle Inspector added in 0.4.3 goes with it: without the importer there is no asset for it to
+  draw. The code is still in `addons/patterplay/editor/`, unregistered, and comes back when it can be
+  turned on without changing how a bundle ships.
+
 ## [0.4.3] - 2026-08-19
 
 ### Added

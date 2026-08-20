@@ -106,8 +106,12 @@ const API = [
   // names: each is the hook its engine actually offers, which is the point - the summary is shared,
   // the way you reach it is the engine's own. A missing row here means an engine got the data and
   // no way to look at it, which is exactly how this work could rot.
-  { on: "BundleView", js: "createBundleInspector", unity: "OnInspectorGUI", godot: "_can_handle", unreal: "CustomizeDetails", bp: null,
-    why: "the details customisation IS the Unreal view; a Blueprint node would be a second surface for the same read" },
+  { on: "BundleView", js: "createBundleInspector", unity: "OnInspectorGUI", godot: null, unreal: "CustomizeDetails", bp: null,
+    why: "Godot's view is OFF since 0.4.4 (#45): its inspector needs the .patterc imported as a Resource, and "
+       + "that stopped the source file shipping in an export, which broke every existing project's build. The "
+       + "code is still in addons/patterplay/editor, unregistered, and this row goes back to `_can_handle` when "
+       + "an export-safe design is proven against a real exported build. Unreal: the details customisation IS "
+       + "the view; a Blueprint node would be a second surface for the same read" },
 
   // --- save envelope + state logger (dev tools; parity brief B1/B2) ---------
   { on: "Save", js: "serializeState", unity: "SerializeState", godot: "serialize_state", unreal: "serializeState", bp: "SaveStateToJson" },

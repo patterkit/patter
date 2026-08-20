@@ -25,6 +25,11 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
+  Godot-only (#45); this runtime is unchanged.
+
 ## [0.4.3] - 2026-08-19
 
 ### Changed
