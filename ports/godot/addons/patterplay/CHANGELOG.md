@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-20
+
 ### Fixed
 
 - **Exported builds could not find their bundle (#45, thanks @yukonmakesgames).** 0.4.3 registered an

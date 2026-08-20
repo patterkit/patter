@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-08-20
+
 ### Changed
 
 - Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
