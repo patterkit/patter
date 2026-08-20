@@ -62,11 +62,9 @@ In `demo/` (delete the folder freely):
   See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Localisation**: play any locale of an Embedded bundle (`engine.set_locale`), or ship an
   IDs-only bundle and localise in your own system.
-- **Exporting**: from 0.4.5 the plugin puts your bundle into the export itself, so a build gets
-  its story whatever your preset says. Keep `*.patterc` in **Resources ▸ "Filters to export
-  non-resource files/folders"** anyway if you have it - it costs nothing and covers the case where
-  the plugin is disabled - and add `patteraudio.json` there if you use Audio Folders, which the
-  plugin does not handle. Details:
+- **Exporting**: nothing to configure. From 0.4.5 the plugin puts your bundle into the export
+  itself, so a build has its story on every platform. (If you use Audio Folders, `patteraudio.json`
+  is still yours to add to the export filters.) Details:
   [Exporting your game](https://patterkit.dev/play/godot/#exporting-your-game).
   See [the localisation guide](https://patterkit.dev/play/localisation/).
 

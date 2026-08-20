@@ -110,33 +110,26 @@ byte-identical across them).
 
 ## Exporting your game
 
-**From Patterplay 0.4.5 the plugin handles your bundle for you.** It adds the `.patterc` to the
-export itself, so a build gets its story without you configuring anything. The rest of this
-section still matters: for other loose files you read at runtime, and for anyone running an older
-Patterplay or with the plugin disabled.
+**Nothing to configure.** From Patterplay 0.4.5 the plugin puts your `.patterc` into the export
+itself, so an exported build has its story on every platform - desktop, mobile and web. Export as
+you would any Godot project.
 
-Godot only packs files it recognises as *resources* (scenes, scripts, imported assets), and can
-**silently drop everything else** - including a `.patterc` bundle - from the exported `.pck`. The
-game then runs fine in the editor, which reads loose project files, while the export is missing
-its story, on every platform: desktop, mobile, and web alike.
+That is worth stating plainly because it used to be a trap. Godot packs the files it recognises as
+*resources* and can silently drop everything else, so a game ran perfectly in the editor, which
+reads loose project files, and shipped without its story. If you followed an older version of this
+page and added `*.patterc` to your export filters, you can leave it: it is harmless, and it still
+covers you if the plugin is ever disabled.
 
-The setting is a filter on the export preset, and it is still worth having: it costs nothing, and
-it is what protects you if the plugin is ever disabled. In **Project ▸ Export... ▸ your preset ▸
-Resources ▸ "Filters to export non-resource files/folders"**, add:
+**Other loose files are still yours to handle.** The plugin knows about bundles and nothing else,
+so if you use [Audio Folders](/play/audio/) add **`patteraudio.json`** under **Project ▸ Export...
+▸ your preset ▸ Resources ▸ "Filters to export non-resource files/folders"** - the audio files
+themselves are imported resources and export fine, the manifest is plain JSON and is not. The same
+goes for any other data file you read at runtime, like a `*.json` save template.
 
-```
-*.patterc
-```
-
-Also add **`patteraudio.json`** if you use [Audio Folders](/play/audio/) (the audio files
-themselves are imported resources and export fine; the manifest is plain JSON and is not). The
-same applies to any other loose data files you read at runtime, like `*.json` save templates.
-
-Once the file is in the pack, `FileAccess.get_file_as_string("res://...")` works exactly as it
-does in the editor, web export included. To sanity-check a build before you ship it:
+To sanity-check a build before you ship it, in the EXPORTED game rather than the editor:
 
 ```gdscript
-print(FileAccess.file_exists("res://story.patterc"))   # must print true in the EXPORTED build
+print(FileAccess.file_exists("res://story.patterc"))   # must print true
 ```
 
 ## Next
