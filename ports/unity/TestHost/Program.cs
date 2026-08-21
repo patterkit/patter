@@ -11,7 +11,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Patterkit.Patterplay;
 
 namespace Patterkit.Patterplay.TestHost
@@ -61,6 +68,7 @@ namespace Patterkit.Patterplay.TestHost
             Console.WriteLine($"  [PatterSave JSON] scripted save/load: {sj}");
 
             RunDescribeSmoke();
+            RunDebugLinkUtf8Check();
 
             Console.WriteLine($"expressions: {e}  specificity: {sp}  runtime: {r}  scripted: {s}  gameData: {g}");
             Console.WriteLine(_fails == 0 ? "ALL PASS" : $"{_fails} FAILED");
@@ -131,6 +139,87 @@ namespace Patterkit.Patterplay.TestHost
             if (d.Counts.Scenes != 1 || d.Counts.Blocks != 1 || d.Counts.Groups != 1 || d.Counts.Snippets != 2
                 || d.Counts.Beats != 2 || d.Counts.Prompts != 1 || d.Counts.GameEvents != 1)
                 Fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts");
+        }
+
+        // The live debug link's RECEIVE path. A pushed bundle is far larger than the client's 64 KB
+        // receive buffer, so it arrives in chunks, and a multi-byte character straddling a chunk
+        // boundary must survive reassembly. Decoding each chunk on its own (what this used to do) turns
+        // that character into two replacement characters and can leave the pushed JSON unparseable.
+        //
+        // Not a corpus case: this is transport, not runtime behaviour, and reproducing the chunking
+        // needs a real socket. The payload is a long run of a THREE-byte character, so a boundary at any
+        // offset not divisible by three lands inside a character - which every plausible chunk size does,
+        // 65536 included (65536 = 3 * 21845 + 1).
+        private static void RunDebugLinkUtf8Check()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            string sent = string.Concat(Enumerable.Repeat("\u2026", 40000)); // 120,000 bytes of U+2026
+
+            try
+            {
+                var served = Task.Run(async () =>
+                {
+                    using var client = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                    using var stream = client.GetStream();
+                    string key = await ReadHandshakeKey(stream).ConfigureAwait(false);
+                    byte[] accept = Encoding.ASCII.GetBytes(
+                        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+                        "Sec-WebSocket-Accept: " + AcceptKey(key) + "\r\n\r\n");
+                    await stream.WriteAsync(accept, 0, accept.Length).ConfigureAwait(false);
+
+                    using var ws = WebSocket.CreateFromStream(stream, isServer: true, subProtocol: null,
+                        keepAliveInterval: TimeSpan.FromSeconds(30));
+                    // Drain the client's hello frame, then push the payload as ONE message.
+                    var scratch = new byte[8 * 1024];
+                    await ws.ReceiveAsync(new ArraySegment<byte>(scratch), CancellationToken.None).ConfigureAwait(false);
+                    byte[] payload = Encoding.UTF8.GetBytes(sent);
+                    await ws.SendAsync(new ArraySegment<byte>(payload), WebSocketMessageType.Text, true,
+                        CancellationToken.None).ConfigureAwait(false);
+                    await Task.Delay(500).ConfigureAwait(false); // hold the socket open while the client reassembles
+                });
+
+                using var link = new PatterDebugLink("build-1", "proj", $"ws://127.0.0.1:{port}");
+                string got = null;
+                for (int i = 0; i < 100 && got == null; i++)
+                {
+                    if (!link.TryReceive(out got)) { got = null; Thread.Sleep(50); }
+                }
+                served.Wait(TimeSpan.FromSeconds(5));
+
+                if (got == null) Fail("debugLink", "utf8 chunks", "no message arrived over the link");
+                else if (got.IndexOf('\uFFFD') >= 0)
+                    Fail("debugLink", "utf8 chunks", "a character was split across a 64 KB chunk boundary and decoded as U+FFFD");
+                else if (got != sent)
+                    Fail("debugLink", "utf8 chunks", $"reassembled message differs (got {got.Length} chars, expected {sent.Length})");
+            }
+            finally { listener.Stop(); }
+        }
+
+        /// <summary>Read the client's HTTP upgrade request, returning its Sec-WebSocket-Key.</summary>
+        private static async Task<string> ReadHandshakeKey(NetworkStream stream)
+        {
+            var head = new StringBuilder();
+            var one = new byte[1];
+            while (!head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+            {
+                int n = await stream.ReadAsync(one, 0, 1).ConfigureAwait(false);
+                if (n == 0) break;
+                head.Append((char)one[0]);
+            }
+            foreach (string line in head.ToString().Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries))
+                if (line.StartsWith("Sec-WebSocket-Key:", StringComparison.OrdinalIgnoreCase))
+                    return line.Substring("Sec-WebSocket-Key:".Length).Trim();
+            return "";
+        }
+
+        /// <summary>The RFC 6455 handshake response value: base64(sha1(key + GUID)).</summary>
+        private static string AcceptKey(string key)
+        {
+            using var sha = SHA1.Create();
+            return Convert.ToBase64String(sha.ComputeHash(
+                Encoding.ASCII.GetBytes(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
         }
 
         private static void Fail(string section, string name, string detail)

@@ -18,6 +18,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -155,16 +156,23 @@ namespace Patterkit.Patterplay
         private async Task ReceiveLoop(CancellationToken ct)
         {
             var buffer = new byte[64 * 1024];
-            var frame = new StringBuilder();
-            while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
+            // Accumulate BYTES and decode once at the end of the message, never chunk by chunk: a
+            // multi-byte character straddling a 64 KB boundary would decode as two replacement
+            // characters, one at the tail of one chunk and one at the head of the next. The message that
+            // spans chunks is a pushed bundle, so any non-ASCII character in the story that lands on a
+            // boundary would corrupt the JSON the game is about to apply.
+            using (var frame = new MemoryStream())
             {
-                var result = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
-                if (result.MessageType == WebSocketMessageType.Close) return;
-                if (result.MessageType != WebSocketMessageType.Text) continue;
-                frame.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                if (!result.EndOfMessage) continue; // a pushed bundle spans many chunks
-                _inbox.Enqueue(frame.ToString());
-                frame.Clear();
+                while (!ct.IsCancellationRequested && _ws.State == WebSocketState.Open)
+                {
+                    var result = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), ct).ConfigureAwait(false);
+                    if (result.MessageType == WebSocketMessageType.Close) return;
+                    if (result.MessageType != WebSocketMessageType.Text) continue;
+                    frame.Write(buffer, 0, result.Count);
+                    if (!result.EndOfMessage) continue; // a pushed bundle spans many chunks
+                    _inbox.Enqueue(Encoding.UTF8.GetString(frame.GetBuffer(), 0, (int)frame.Length));
+                    frame.SetLength(0);
+                }
             }
         }
 

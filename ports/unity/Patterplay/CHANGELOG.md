@@ -6,6 +6,16 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The live debug link no longer corrupts a pushed bundle at a chunk boundary.** `PatterDebugLink`
+  reads the socket in 64 KB chunks, and decoded each chunk on its own, so a multi-byte character
+  straddling a boundary became two replacement characters and could leave the pushed JSON unparseable.
+  A pushed bundle is exactly the message large enough to span chunks, so any non-ASCII text in the
+  story (a curly quote, an accented name) could hit it. The bytes are now accumulated and decoded once
+  at the end of the message. Unreal and Godot were checked and never had this: both receive a whole
+  message at a time. Reported from the Storylet Studio side.
+
 ## [0.5.0] - 2026-08-21
 
 ### Added
