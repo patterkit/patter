@@ -1,5 +1,12 @@
 # @patterkit/ops
 
+## 0.3.3
+
+### Patch Changes
+
+- dca5b44: The inlined playable-runtime snapshot is refreshed for the cast APIs (`getCast`, `castForScene`,
+  `castForBlock`), so a playable HTML export ships a runtime that has them.
+
 ## 0.3.2
 
 ### Patch Changes
