@@ -39,6 +39,10 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
       { header: "Gender", key: "gender", width: 12 },
     ];
     ws.getRow(1).font = { bold: true };
+    // Frozen, not just bold: a long sheet is read by scrolling, and the header row is the only
+    // thing that says which of the look-alike columns you are looking at. Presentation only -
+    // `xlsxToCatalog` reads columns positionally and is untouched by it.
+    ws.views = [{ state: "frozen", ySplit: 1 }];
     for (const e of entries) {
       ws.addRow({ id: e.id, source: e.source, translation: e.translation,
         comments: e.comments.join("\n"), status: e.stale ? "stale" : (e.translation ? "translated" : ""),

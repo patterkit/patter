@@ -90,6 +90,17 @@ describe("Excel round-trip", () => {
     expect(rowFor("L2").getCell(6).value ?? "").toBe("");         // BO: no declared gender
   });
 
+  // A translator scrolls the longest of anyone, so the header has to stay on screen. `views` is
+  // presentation only: xlsxToCatalog still reads the columns positionally from row 1.
+  it("freezes the header row on every sheet", async () => {
+    const { default: ExcelJS } = await import("exceljs");
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await catalogToXlsx(catalog) as unknown as ArrayBuffer);
+    for (const ws of wb.worksheets) {
+      expect(ws.views[0], `${ws.name} header is not frozen`).toMatchObject({ state: "frozen", ySplit: 1 });
+    }
+  });
+
   it("still imports a sheet with no Gender column (an older export)", async () => {
     const { default: ExcelJS } = await import("exceljs");
     const wb = new ExcelJS.Workbook();

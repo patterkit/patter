@@ -6,6 +6,23 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Replace preview shows the replacement again.** Its row was one no-wrap line, so at the search
+  window's default width a line of dialogue of ordinary length was cut off before the arrow: you saw
+  the start of the old text and none of the new, which is the one thing the preview exists to show.
+  The row is now a two-column grid, the diff wraps, the location sits on its own line beneath it, and
+  the per-row Replace button spans both.
+
+### Changed
+
+- **The New Project dialog says what it creates.** It offered a name, version control, a publish path
+  and a folder preview, and never mentioned that a new project arrives with a playable scene in it. A
+  line under the name field now says so, in the concrete: a scene called `Start` holding one line of
+  narration, so the project plays the moment it opens.
+- Every sheet in an .xlsx export (report, voice script, localisation) freezes its header row, so it
+  stays put while you scroll.
+
 ## [0.9.1] - 2026-08-19
 
 ### Fixed

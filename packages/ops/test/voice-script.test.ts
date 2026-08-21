@@ -8,7 +8,8 @@ import { describe, it, expect } from "vitest";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadProject, runVoiceScript } from "../src/index.js";
+import ExcelJS from "exceljs";
+import { loadProject, runVoiceScript, voiceScriptToXlsx } from "../src/index.js";
 
 function makeProject(): string {
   const dir = mkdtempSync(join(tmpdir(), "patter-vo-"));
@@ -135,5 +136,15 @@ describe("runVoiceScript: plain text for the booth", () => {
     const line = vs.lines.find((l) => l.id === "L1")!;
     expect(line.text).toBe("Take five gold & glory.");      // tags gone, &amp; -> &
     expect(line.scope.endsWith("Fight & flee")).toBe(true);  // option prompt likewise plain
+  });
+
+  // Four hundred lines of script are read by scrolling: bold alone lets the header scroll away.
+  it("freezes the header row", async () => {
+    const vs = runVoiceScript(loadProject(makeFormatted()), { everything: true });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await voiceScriptToXlsx(vs) as unknown as ArrayBuffer);
+    for (const ws of wb.worksheets) {
+      expect(ws.views[0], `${ws.name} header is not frozen`).toMatchObject({ state: "frozen", ySplit: 1 });
+    }
   });
 });

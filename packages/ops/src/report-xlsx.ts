@@ -49,6 +49,10 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
   const totalRow = scenes.addRow(sceneRow("TOTAL", totals));
   totalRow.font = { bold: true };
   scenes.getRow(1).font = { bold: true };
+  // Frozen, not just bold: a long sheet is read by scrolling, and the header row is the only
+  // thing that says which of the look-alike columns you are looking at. Presentation only -
+  // `xlsxToCatalog` reads columns positionally and is untouched by it.
+  scenes.views = [{ state: "frozen", ySplit: 1 }];
 
   // --- Characters -----------------------------------------------------------
   const chars = wb.addWorksheet("Characters");
@@ -64,6 +68,7 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
       ...Object.fromEntries(data.recordingLadder.map((k) => [`r:${k}`, c.recording[k] ?? 0])) });
   }
   chars.getRow(1).font = { bold: true };
+  chars.views = [{ state: "frozen", ySplit: 1 }];
 
   // --- Localisation ---------------------------------------------------------
   if (data.locales.length > 0) {
@@ -77,6 +82,7 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
     ];
     for (const l of data.locales) loc.addRow(l);
     loc.getRow(1).font = { bold: true };
+    loc.views = [{ state: "frozen", ySplit: 1 }];
   }
 
   // --- Estimates (only when Estimating is on) -------------------------------
@@ -91,6 +97,7 @@ export async function runReportXlsx(data: ReportData): Promise<Buffer> {
     const coverageRow = plan.addRow({ name: `coverage: ${data.coverage.estimated}/${data.coverage.totalScenes} scenes estimated` });
     coverageRow.font = { italic: true };
     plan.getRow(1).font = { bold: true };
+    plan.views = [{ state: "frozen", ySplit: 1 }];
   }
 
   return Buffer.from(await wb.xlsx.writeBuffer());

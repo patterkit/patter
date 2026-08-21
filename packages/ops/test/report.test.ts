@@ -191,6 +191,15 @@ describe("runReportXlsx", () => {
     const charHeaders = (wb.getWorksheet("Characters")!.getRow(1).values as string[]).filter(Boolean);
     expect(charHeaders).toContain("Est. lines");
   });
+
+  // A report is read by scrolling, so the header has to stay put; bold alone scrolls away with it.
+  it("freezes the header row on every sheet", async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(await runReportXlsx(data) as unknown as ArrayBuffer);
+    for (const ws of wb.worksheets) {
+      expect(ws.views[0], `${ws.name} header is not frozen`).toMatchObject({ state: "frozen", ySplit: 1 });
+    }
+  });
 });
 
 describe("a line flagged needs-re-record masks its recording status (#227)", () => {

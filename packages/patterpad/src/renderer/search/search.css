@@ -89,7 +89,24 @@ body.swin {
 .swin-replace { flex: 1; margin: 0; }
 .swin-replace-all { flex: none; padding: 0.32rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--accent); color: var(--on-accent, #fff); font: 0.8rem var(--font-ui); cursor: pointer; }
 .swin-replace-all:disabled { opacity: 0.45; cursor: default; background: var(--surface-2, var(--line)); color: var(--muted); }
-.swin-rrow { align-items: baseline; }
+/* A Replace row is a two-column GRID, not the flex line the other rows use, because its diff has to
+   wrap. On one nowrap line at the window's 460px default, a line of dialogue of ordinary length was cut
+   off before the arrow: the row showed the start of the old text and none of the new, so the preview
+   previewed nothing. The diff wraps across the first column, the location drops to its own line
+   beneath it, and the per-row Replace button spans both rows on the right. */
+.swin-rrow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  column-gap: 0.45rem;
+  row-gap: 0.1rem;
+}
+.swin-rrow .swin-name {
+  grid-column: 1; grid-row: 1;
+  overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere;
+}
+.swin-rrow .swin-loc { grid-column: 1; grid-row: 2; max-width: 100%; }
+.swin-rrow .swin-rone { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .swin-before { color: var(--muted); } /* muted (not struck) - the → after + ink colour shows the change */
 .swin-arrow { color: var(--muted); }
 .swin-after { color: var(--ink); }

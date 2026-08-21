@@ -20,6 +20,10 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
     { header: "Status", key: "status", width: 12 },
   ];
   ws.getRow(1).font = { bold: true };
+  // Frozen, not just bold: a long sheet is read by scrolling, and the header row is the only
+  // thing that says which of the look-alike columns you are looking at. Presentation only -
+  // `xlsxToCatalog` reads columns positionally and is untouched by it.
+  ws.views = [{ state: "frozen", ySplit: 1 }];
 
   for (const l of data.lines) {
     const row = ws.addRow({
