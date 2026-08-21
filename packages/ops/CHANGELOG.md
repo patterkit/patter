@@ -1,5 +1,13 @@
 # @patterkit/ops
 
+## 0.3.4
+
+### Patch Changes
+
+- a89d0b8: Every sheet the .xlsx renderers produce (report, voice script, localisation) now freezes its header
+  row, so it stays on screen while you scroll a long export. Presentation only: `xlsxToCatalog` reads
+  columns positionally and is unaffected.
+
 ## 0.3.3
 
 ### Patch Changes
