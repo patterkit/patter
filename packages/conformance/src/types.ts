@@ -110,6 +110,13 @@ export type ScriptOp =
   // content: stack frames re-find their next child by id, drifted choice options drop, a vanished
   // active snippet is skipped. Every port must resolve the drift identically.
   | { op: "hotSwap" }
+  // Cast introspection: a STATIC structure query, so it reads the same at any point in a script and
+  // produces no transcript. No `scene` = the project's declared cast (`getCast`), `scene` alone = that
+  // scene's speakers, `scene` + `block` = the block's. `expectResult` pins the exact array INCLUDING
+  // order: declaration order for the project, first-appearance document order for a scene / block. Refs
+  // may be internal ids or gameId addresses. Spelled `expectResult`, like `goto`'s, because a runner
+  // reads a bare `expect` as a TRANSCRIPT - this is a return value asserted directly instead.
+  | { op: "expectCast"; scene?: string; block?: string; expectResult: string[] }
   | { op: "reset" };
 
 /** A compiled scripted case in the portable corpus. */

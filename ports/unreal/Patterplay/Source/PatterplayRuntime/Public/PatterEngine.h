@@ -167,6 +167,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Structure")
 	TArray<FPatterFlatBeat> GetBeatSequence() const;
 
+	// Every cast member the project DECLARES, in authored order. A superset of any scene's cast.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FString> GetCast() const;
+
+	// A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
+	// first-appearance order. Static: a speaker behind a condition, inside any group, or voicing a
+	// choice prompt counts - who CAN speak here, not who this playthrough heard. SceneRef is an
+	// internal id or a gameId address; empty for an unknown ref or a scene with no dialogue.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FString> CastForScene(const FString& SceneRef) const;
+
+	// One block's cast, by scene + block ref (id or gameId). CastForScene, block-scoped.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FString> CastForBlock(const FString& SceneRef, const FString& BlockRef) const;
+
 	// Publish this engine to the editor's Runtime State inspector under an optional label. Call after
 	// Create; it unregisters itself automatically when destroyed. (Parity with PatterDebug.Register.)
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")

@@ -524,6 +524,23 @@ int runScripted(const JsonValue& arr)
                 else if (kind == "setLocale") engine->setLocale(op.at("locale").str);
                 else if (kind == "setClosedCaptions") engine->setClosedCaptions(op.at("on").b);
                 else if (kind == "reset") { engine->reset(); current.clear(); }
+                // Static structure query: no transcript, expectResult pins the exact list INCLUDING
+                // order. No scene = the declared project cast.
+                else if (kind == "expectCast")
+                {
+                    std::vector<std::string> got = !op.has("scene") ? engine->getCast()
+                        : !op.has("block") ? engine->castForScene(op.at("scene").str)
+                        : engine->castForBlock(op.at("scene").str, op.at("block").str);
+                    std::vector<std::string> want;
+                    for (const auto& w : op.at("expectResult").arr) want.push_back(w.str);
+                    if (got != want)
+                    {
+                        std::string g, e;
+                        for (const auto& n : got) { if (!g.empty()) g += ", "; g += n; }
+                        for (const auto& n : want) { if (!e.empty()) e += ", "; e += n; }
+                        throw std::runtime_error("expectCast: expected [" + e + "], got [" + g + "]");
+                    }
+                }
 
                 const JsonValue* expect = op.find("expect");
                 bool match = expect ? matchValue(chunk, *expect) : (chunk.arr.empty());

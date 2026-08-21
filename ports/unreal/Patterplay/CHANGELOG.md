@@ -7,6 +7,17 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Cast lists you can query at runtime.** Three static reads answer "who is in this?": the cast the
+  project declares, the speakers of a scene, and the speakers of one block. Scene and block refs take
+  an internal id or a gameId address. The result is the character token a line beat carries, deduped
+  and ordered by first appearance, and it is derived from the AUTHORED structure, so a speaker behind a
+  condition, inside a group, or voicing a choice prompt is included: it answers who *can* speak, not
+  who a given playthrough heard. Held across all four runtimes by the conformance corpus.
+  `Engine->getCast()`, `castForScene`, `castForBlock`, each also exposed to Blueprint as `GetCast`,
+  `CastForScene` and `CastForBlock` (BlueprintPure).
+
 ## [0.4.5] - 2026-08-20
 
 ### Changed

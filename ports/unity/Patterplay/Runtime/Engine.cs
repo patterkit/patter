@@ -371,6 +371,68 @@ namespace Patterkit.Patterplay
             return id != null && _host.TagIndex.TryGetValue(id, out var t) ? t : new List<string>();
         }
 
+        // --- cast ------------------------------------------------------------
+
+        /// <summary>Every cast member the PROJECT declares, in authored order - the same list
+        /// BundleInfo.Describe counts. A superset of any scene's cast: a beat's character must be a
+        /// declared member, so CastForScene / CastForBlock only ever return names from here.</summary>
+        public List<string> GetCast()
+        {
+            // Cast is absent from a bundle whose project declares none, and a nameless member is junk
+            // from a hand-edited bundle: both give an empty answer, not a throw.
+            var names = new List<string>();
+            if (_host.Bundle.Cast != null)
+                foreach (var c in _host.Bundle.Cast)
+                    if (c != null && !string.IsNullOrEmpty(c.Name)) names.Add(c.Name);
+            return names;
+        }
+
+        /// <summary>A scene's cast: the character token of every speaker with a line anywhere in it,
+        /// deduped, in first-appearance order. Static, like GetOutline: it walks the authored structure,
+        /// so a speaker behind a condition, inside any group, or voicing a choice prompt counts - this is
+        /// who CAN speak in the scene, not who a given playthrough heard. Empty for an unknown ref or a
+        /// scene with no dialogue. Tokens, not display names: read those off a delivered step.</summary>
+        public List<string> CastForScene(string sceneRef)
+        {
+            var id = ResolveSceneRef(sceneRef);
+            var cast = new List<string>();
+            if (id == null || !_host.Bundle.Scenes.TryGetValue(id, out var scene)) return cast;
+            var seen = new HashSet<string>();
+            foreach (var block in scene.Blocks) CollectCast(block.Children, seen, cast);
+            return cast;
+        }
+
+        /// <summary>One block's cast, by scene + block ref (id or gameId). CastForScene, block-scoped.</summary>
+        public List<string> CastForBlock(string sceneRef, string blockRef)
+        {
+            var id = ResolveBlockRef(ResolveSceneRef(sceneRef), blockRef);
+            var cast = new List<string>();
+            if (id == null || !_host.BlockById.TryGetValue(id, out var block)) return cast;
+            CollectCast(block.Children, new HashSet<string>(), cast);
+            return cast;
+        }
+
+        /// <summary>Collect speakers under a run of nodes in document order. A group contributes its
+        /// option prompt's speaker (a prompt is a line | text beat) before its children.</summary>
+        private static void CollectCast(List<Node> nodes, HashSet<string> seen, List<string> into)
+        {
+            if (nodes == null) return;
+            foreach (var n in nodes)
+            {
+                if (n.IsGroup)
+                {
+                    if (n.Prompt != null && n.Prompt.Kind == "line" && !string.IsNullOrEmpty(n.Prompt.Character) && seen.Add(n.Prompt.Character))
+                        into.Add(n.Prompt.Character);
+                    CollectCast(n.Children, seen, into);
+                    continue;
+                }
+                if (n.Beats == null) continue;
+                foreach (var beat in n.Beats)
+                    if (beat.Kind == "line" && !string.IsNullOrEmpty(beat.Character) && seen.Add(beat.Character))
+                        into.Add(beat.Character);
+            }
+        }
+
         // --- Static structure introspection (editor / dev tooling) -----------------
 
         /// <summary>The authored structure as a nested tree: scenes -> blocks -> children (groups + snippets,

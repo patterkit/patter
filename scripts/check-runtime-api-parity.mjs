@@ -94,6 +94,12 @@ const API = [
   { on: "Engine", js: "tagsForBlock", unity: "TagsForBlock", godot: "tags_for_block", unreal: "tagsForBlock", bp: null,
     why: "not yet surfaced to Blueprint" },
 
+  // Cast: who is declared, and who speaks in a scope. Static structure queries, corpus-gated by the
+  // `expectCast` script op (declaration order for the project, first-appearance order for a scope).
+  { on: "Engine", js: "getCast", unity: "GetCast", godot: "get_cast", unreal: "getCast", bp: "GetCast" },
+  { on: "Engine", js: "castForScene", unity: "CastForScene", godot: "cast_for_scene", unreal: "castForScene", bp: "CastForScene" },
+  { on: "Engine", js: "castForBlock", unity: "CastForBlock", godot: "cast_for_block", unreal: "castForBlock", bp: "CastForBlock" },
+
   // --- the bundle inspector (from-storylets/patterplay-bundle-inspector) ----
   //
   // A BUNDLE-level function on every surface, deliberately not an Engine method: it answers what a

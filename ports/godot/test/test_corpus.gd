@@ -231,6 +231,21 @@ func _run_scripted(arr: Array) -> int:
 					engine.set_locale(op["locale"])
 				"setClosedCaptions":
 					engine.set_closed_captions(op["on"])
+				"expectCast":
+					# Static structure query: no transcript, expectResult pins the exact list INCLUDING
+					# order. No scene = the declared project cast.
+					var got: Array = []
+					if not op.has("scene"):
+						got = engine.get_cast()
+					elif not op.has("block"):
+						got = engine.cast_for_scene(op["scene"])
+					else:
+						got = engine.cast_for_block(op["scene"], op["block"])
+					var want: Array = op["expectResult"]
+					if not _deep_equal(got, want):
+						ok = false
+						_fail("scripted", name, "expectCast: expected %s, got %s" % [JSON.stringify(want), JSON.stringify(got)])
+						break
 				"reset":
 					engine.reset()
 					current = ""

@@ -436,6 +436,69 @@ func tags_for_block(scene_ref: String, block_ref: String) -> Array:
 	return _host["tag_index"].get(_resolve_block_ref(scene_id, block_ref), [])
 
 
+# -- cast ----------------------------------------------------------------------
+
+# Every cast member the PROJECT declares, in authored order - the same list PatterDescribe counts.
+# A superset of any scene's cast: a beat's character must be a declared member, so cast_for_scene()
+# and cast_for_block() only ever return names from here.
+func get_cast() -> Array:
+	# "cast" is absent from a bundle whose project declares none, and a nameless member is junk from a
+	# hand-edited bundle: both give an empty answer, not an error.
+	var names: Array = []
+	for c in _host["bundle"].get("cast", []):
+		var n: String = c.get("name", "")
+		if n != "":
+			names.append(n)
+	return names
+
+
+# A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
+# first-appearance order. Static, like get_outline(): it walks the authored structure, so a speaker
+# behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN speak in
+# the scene, not who a given playthrough heard. Empty for an unknown ref or a scene with no dialogue.
+# Tokens, not display names: read those off a delivered step.
+func cast_for_scene(scene_ref: String) -> Array:
+	var cast: Array = []
+	var scene_id := _resolve_scene_ref(scene_ref)
+	if not _host["bundle"]["scenes"].has(scene_id):
+		return cast
+	var scene: Dictionary = _host["bundle"]["scenes"][scene_id]
+	var seen := {}
+	for block in scene["blocks"]:
+		_collect_cast(block.get("children", []), seen, cast)
+	return cast
+
+
+# One block's cast, by scene + block ref (id or gameId). cast_for_scene(), block-scoped.
+func cast_for_block(scene_ref: String, block_ref: String) -> Array:
+	var cast: Array = []
+	var block_id := _resolve_block_ref(_resolve_scene_ref(scene_ref), block_ref)
+	if not _host["block_by_id"].has(block_id):
+		return cast
+	var block: Dictionary = _host["block_by_id"][block_id]
+	_collect_cast(block.get("children", []), {}, cast)
+	return cast
+
+
+# Collect speakers under a run of nodes in document order. A group contributes its option prompt's
+# speaker (a prompt is a line | text beat) before its children.
+func _collect_cast(nodes: Array, seen: Dictionary, into: Array) -> void:
+	for n in nodes:
+		if n.get("type", "") == "group":
+			var prompt: Dictionary = n.get("prompt", {})
+			var pc: String = prompt.get("character", "")
+			if prompt.get("kind", "") == "line" and pc != "" and not seen.has(pc):
+				seen[pc] = true
+				into.append(pc)
+			_collect_cast(n.get("children", []), seen, into)
+			continue
+		for beat in n.get("beats", []):
+			var c: String = beat.get("character", "")
+			if beat.get("kind", "") == "line" and c != "" and not seen.has(c):
+				seen[c] = true
+				into.append(c)
+
+
 # -- static structure introspection (editor / dev tooling) ---------------------
 
 # The authored structure as a nested tree: scenes -> blocks -> children (groups + snippets, groups

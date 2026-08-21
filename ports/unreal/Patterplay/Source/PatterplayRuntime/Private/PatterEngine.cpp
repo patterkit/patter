@@ -221,6 +221,30 @@ TArray<FString> UPatterEngine::TagsForBeat(const FString& BeatId) const
 	return Out;
 }
 
+TArray<FString> UPatterEngine::GetCast() const
+{
+	TArray<FString> Out;
+	if (!Engine) return Out;
+	for (const std::string& N : Engine->getCast()) Out.Add(Ue(N));
+	return Out;
+}
+
+TArray<FString> UPatterEngine::CastForScene(const FString& SceneRef) const
+{
+	TArray<FString> Out;
+	if (!Engine) return Out;
+	for (const std::string& N : Engine->castForScene(Std(SceneRef))) Out.Add(Ue(N));
+	return Out;
+}
+
+TArray<FString> UPatterEngine::CastForBlock(const FString& SceneRef, const FString& BlockRef) const
+{
+	TArray<FString> Out;
+	if (!Engine) return Out;
+	for (const std::string& N : Engine->castForBlock(Std(SceneRef), Std(BlockRef))) Out.Add(Ue(N));
+	return Out;
+}
+
 void UPatterEngine::SetLocale(const FString& Locale)
 {
 	if (!Engine) return;

@@ -342,6 +342,19 @@ namespace Patterkit.Patterplay.TestHost
                             case "setClosedCaptions":
                                 engine.SetClosedCaptions(op.GetProperty("on").GetBoolean());
                                 break;
+                            case "expectCast":
+                            {
+                                // Static structure query: no transcript, expectResult pins the exact list
+                                // INCLUDING order. No scene = the declared project cast.
+                                var got = !op.TryGetProperty("scene", out var cs) ? engine.GetCast()
+                                    : !op.TryGetProperty("block", out var cb) ? engine.CastForScene(cs.GetString())
+                                    : engine.CastForBlock(cs.GetString(), cb.GetString());
+                                var want = new List<string>();
+                                foreach (var w in op.GetProperty("expectResult").EnumerateArray()) want.Add(w.GetString());
+                                if (got.Count != want.Count || !got.SequenceEqual(want))
+                                    throw new Exception($"expectCast: expected [{string.Join(", ", want)}], got [{string.Join(", ", got)}]");
+                                break;
+                            }
                             case "reset":
                                 engine.Reset();
                                 current = "";

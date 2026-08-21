@@ -664,6 +664,47 @@ export class Engine {
   }
 
   /**
+   * Every cast member the PROJECT declares, in authored order - the same list `describeBundle` counts.
+   * A superset of any scene's cast: the validator holds a beat's `character` to a declared member, so
+   * {@link castForScene} and {@link castForBlock} only ever return names that appear here.
+   */
+  getCast(): string[] {
+    // `cast` is absent from a bundle whose project declares none (the compiler omits the key), and a
+    // nameless member is junk from a hand-edited bundle: both give an empty answer, not a throw.
+    const names: string[] = [];
+    for (const c of this.host.bundle.cast ?? []) if (c?.name) names.push(c.name);
+    return names;
+  }
+
+  /**
+   * A scene's cast: the `character` token of every speaker with a line anywhere in it, deduped, in
+   * first-appearance order. Static, like {@link getOutline}: it walks the authored structure, so a
+   * speaker behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN
+   * speak in the scene, not who a given playthrough heard. Empty for an unknown ref, or a scene with no
+   * dialogue. Tokens, not display names: resolve those through the delivered step (`characterName`),
+   * which is what follows `setLocale`.
+   */
+  castForScene(sceneRef: string): string[] {
+    const id = this.resolveSceneRef(sceneRef);
+    const scene = id != null ? this.host.bundle.scenes[id] : undefined;
+    if (!scene) return [];
+    const out = new Set<string>();
+    for (const block of scene.blocks) collectCast(block.children, out);
+    return [...out];
+  }
+
+  /** One block's cast, by scene + block ref (id or gameId). {@link castForScene} scoped to a block. */
+  castForBlock(sceneRef: string, blockRef: string): string[] {
+    const sceneId = this.resolveSceneRef(sceneRef);
+    const id = this.resolveBlockRef(sceneId, blockRef);
+    const block = id != null ? this.host.blockById.get(id) : undefined;
+    if (!block) return [];
+    const out = new Set<string>();
+    collectCast(block.children, out);
+    return [...out];
+  }
+
+  /**
    * The authored structure as a nested tree: scenes -> blocks -> children (groups + snippets, groups
    * preserved) -> a snippet's beats. Static (no flow / play state); per-beat data is read at the source
    * locale. For dev tooling that builds against the writer's structure (see also {@link getBeatSequence}).
@@ -1758,6 +1799,19 @@ export class Flow {
 // ---------------------------------------------------------------------------
 // Helpers.
 // ---------------------------------------------------------------------------
+
+/** Collect the speakers under a run of nodes into `out`, in document order (insertion order IS the
+ *  result order). Groups contribute their option prompt's speaker - a prompt is a line | text beat, so
+ *  a line prompt is spoken by someone - and `walkNodes` carries the recursion into nested groups. */
+function collectCast(nodes: Array<CompiledGroup | CompiledSnippet>, out: Set<string>): void {
+  walkNodes<SelectableNode>(nodes, (n) => {
+    if (n.type === "group") {
+      if (n.prompt?.kind === "line" && n.prompt.character) out.add(n.prompt.character);
+      return;
+    }
+    for (const beat of n.beats ?? []) if (beat.kind === "line" && beat.character) out.add(beat.character);
+  });
+}
 
 /** Serialise a `sequence` selector-cursor map to plain snapshots. */
 function serialiseSelectors(map: Map<string, SelectorState>): Record<string, SelectorSnapshot> {

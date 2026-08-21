@@ -130,6 +130,16 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
       case "setClosedCaptions":
         engine.setClosedCaptions(op.on); // live caption toggle - subsequent dialogue lines strip cues when off
         break;
+      case "expectCast": {
+        const got = op.scene === undefined ? engine.getCast()
+          : op.block === undefined ? engine.castForScene(op.scene)
+          : engine.castForBlock(op.scene, op.block);
+        const scope = op.scene === undefined ? "project" : op.block === undefined ? op.scene : `${op.scene}/${op.block}`;
+        if (got.length !== op.expectResult.length || got.some((n, i) => n !== op.expectResult[i])) {
+          throw new Error(`expectCast ${scope}: expected [${op.expectResult.join(", ")}], got [${got.join(", ")}]`);
+        }
+        break;
+      }
       case "reset":
         engine.reset();
         current = "";

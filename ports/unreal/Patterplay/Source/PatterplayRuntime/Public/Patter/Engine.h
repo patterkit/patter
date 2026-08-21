@@ -1306,6 +1306,65 @@ namespace patter
             return it != host_.tagIndex.end() ? it->second : std::vector<std::string>{};
         }
 
+        // Every cast member the PROJECT declares, in authored order - the same list describeBundle
+        // counts. A superset of any scene's cast: a beat's character must be a declared member, so
+        // castForScene / castForBlock only ever return names from here.
+        std::vector<std::string> getCast() const
+        {
+            // Cast is absent from a bundle whose project declares none, and a nameless member is junk
+            // from a hand-edited bundle: both give an empty answer, not a throw.
+            std::vector<std::string> names;
+            names.reserve(host_.bundle->cast.size());
+            for (const auto& c : host_.bundle->cast) if (!c.name.empty()) names.push_back(c.name);
+            return names;
+        }
+
+        // A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
+        // first-appearance order. Static, like listOutline: it walks the authored structure, so a speaker
+        // behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN speak
+        // in the scene, not who a given playthrough heard. Empty for an unknown ref or a scene with no
+        // dialogue. Tokens, not display names: read those off a delivered step.
+        std::vector<std::string> castForScene(const std::string& sceneRef)
+        {
+            std::vector<std::string> cast;
+            auto it = host_.bundle->scenes.find(resolveSceneRef(sceneRef));
+            if (it == host_.bundle->scenes.end()) return cast;
+            std::set<std::string> seen;
+            for (const auto& block : it->second.blocks) collectCast(block.children, seen, cast);
+            return cast;
+        }
+
+        // One block's cast, by scene + block ref (id or gameId). castForScene, block-scoped.
+        std::vector<std::string> castForBlock(const std::string& sceneRef, const std::string& blockRef)
+        {
+            std::vector<std::string> cast;
+            auto it = host_.blockById.find(resolveBlockRef(resolveSceneRef(sceneRef), blockRef));
+            if (it == host_.blockById.end()) return cast;
+            std::set<std::string> seen;
+            collectCast(it->second->children, seen, cast);
+            return cast;
+        }
+
+        // Collect speakers under a run of nodes in document order. A group contributes its option
+        // prompt's speaker (a prompt is a line | text beat) before its children.
+        static void collectCast(const std::vector<NodePtr>& nodes, std::set<std::string>& seen, std::vector<std::string>& into)
+        {
+            for (const auto& n : nodes)
+            {
+                if (n->type == "group")
+                {
+                    if (n->prompt && n->prompt->kind == "line" && !n->prompt->character.empty()
+                        && seen.insert(n->prompt->character).second)
+                        into.push_back(n->prompt->character);
+                    collectCast(n->children, seen, into);
+                    continue;
+                }
+                for (const auto& beat : n->beats)
+                    if (beat.kind == "line" && !beat.character.empty() && seen.insert(beat.character).second)
+                        into.push_back(beat.character);
+            }
+        }
+
         void reset()
         {
             for (auto& kv : flows_) kv.second->close(); // finish them, don't just forget them

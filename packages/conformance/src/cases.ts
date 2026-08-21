@@ -1324,6 +1324,103 @@ const scriptedHotSwapEmptiedBlock = {
   ],
 } satisfies ScriptedFixture;
 
+// --- cast introspection ------------------------------------------------------
+//
+// Who speaks, at three scopes. The project's list is what the author DECLARED (MAYOR is in it and never
+// opens their mouth); a scene's and a block's are derived from the beats, so they must be deduped, in
+// first-appearance document order, and must include speakers a playthrough might never hear: COOK is
+// inside a conditional option group, and SFX only ever voices an option's prompt. It is a static query,
+// so playing the flow must not change any answer - the script asks again mid-scene to pin that.
+const scriptedCast = {
+  name: "cast: declared project list, and the speakers of a scene / block",
+  project: project({ cast: [{ name: "ANNA" }, { name: "BARD" }, { name: "COOK" }, { name: "GUARD" }, { name: "MAYOR" }, { name: "SFX" }] }),
+  scenes: [
+    { id: "scn_tavern", type: "scene", name: "Tavern", blocks: [
+      { id: "b_greet", type: "block", name: "Greeting", children: [
+        { id: "sn1", type: "snippet", beats: [
+          { id: "L1", kind: "line", character: "GUARD" },
+          { id: "T1", kind: "text" },                      // narration: no speaker to collect
+          { id: "L2", kind: "line", character: "ANNA" },
+          { id: "L3", kind: "line", character: "GUARD" },   // second GUARD line: deduped, keeps first position
+        ] },
+        { id: "g_choice", type: "group", selector: "choice", children: [
+          { id: "o1", type: "group", condition: "true", prompt: { id: "P1", kind: "line", character: "SFX" }, children: [
+            { id: "sn2", type: "snippet", beats: [{ id: "L4", kind: "line", character: "COOK" }], jump: { to: "END" } },
+          ] },
+          { id: "o2", type: "group", prompt: { id: "P2", kind: "text" }, children: [
+            { id: "sn3", type: "snippet", beats: [{ id: "T2", kind: "text" }], jump: { to: "END" } },
+          ] },
+        ] },
+      ] },
+      { id: "b_back", type: "block", name: "Back Room", children: [
+        { id: "sn4", type: "snippet", beats: [
+          { id: "L5", kind: "line", character: "ANNA" },
+          { id: "L6", kind: "line", character: "BARD" },
+        ], jump: { to: "END" } },
+      ] },
+    ] },
+    { id: "scn_quiet", type: "scene", name: "Quiet", blocks: [
+      { id: "b_only", type: "block", name: "Only", children: [
+        { id: "sn5", type: "snippet", beats: [{ id: "T3", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ],
+  locales: [
+    loc("scn_tavern", { L1: "Halt!", T1: "The gate creaks.", L2: "Let me pass.", L3: "No.", L4: "Stew?", L5: "Again?", L6: "A song!", P1: "[a knock]", P2: "Say nothing", T2: "Silence." }),
+    loc("scn_quiet", { T3: "Snow falls." }),
+  ],
+  script: [
+    // The declared cast, in authored order, including the member who never speaks.
+    { op: "expectCast", expectResult: ["ANNA", "BARD", "COOK", "GUARD", "MAYOR", "SFX"] },
+
+    // A scene: both blocks, deduped, first appearance wins. Addresses derive from names, so a port that
+    // forgets the name-slug fallback fails the second of each pair.
+    { op: "expectCast", scene: "scn_tavern", expectResult: ["GUARD", "ANNA", "SFX", "COOK", "BARD"] },
+    { op: "expectCast", scene: "tavern", expectResult: ["GUARD", "ANNA", "SFX", "COOK", "BARD"] },
+    { op: "expectCast", scene: "scn_tavern", block: "b_greet", expectResult: ["GUARD", "ANNA", "SFX", "COOK"] },
+    { op: "expectCast", scene: "tavern", block: "greeting", expectResult: ["GUARD", "ANNA", "SFX", "COOK"] },
+    { op: "expectCast", scene: "scn_tavern", block: "b_back", expectResult: ["ANNA", "BARD"] },
+
+    // Nothing to report: narration only, and refs that do not resolve.
+    { op: "expectCast", scene: "scn_quiet", expectResult: [] },
+    { op: "expectCast", scene: "no-such-scene", expectResult: [] },
+    { op: "expectCast", scene: "scn_tavern", block: "no-such-block", expectResult: [] },
+
+    // Static: playing into the scene changes none of it.
+    { op: "openFlow", flow: "f", scene: "tavern", block: "greeting" },
+    { op: "advance", expect: [{ type: "line", id: "L1", text: "Halt!", character: "GUARD" }] },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "The gate creaks." }] },
+    { op: "expectCast", scene: "scn_tavern", expectResult: ["GUARD", "ANNA", "SFX", "COOK", "BARD"] },
+    { op: "expectCast", expectResult: ["ANNA", "BARD", "COOK", "GUARD", "MAYOR", "SFX"] },
+  ],
+} satisfies ScriptedFixture;
+
+// A bundle from before any of this existed: its project declares no cast, so the compiler omits the
+// `cast` key altogether (not an empty array - the key is simply absent). Every runtime must answer the
+// three cast queries with an empty list rather than choking on the missing section, which is what any
+// bundle built by an older toolchain looks like.
+const scriptedCastAbsent = {
+  name: "cast: a bundle with no cast section at all",
+  project: project({ cast: undefined }),
+  scenes: [
+    { id: "scn_only", type: "scene", name: "Only", blocks: [
+      { id: "b_only", type: "block", name: "Narration", children: [
+        { id: "sn_only", type: "snippet", beats: [{ id: "N1", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ],
+  locales: [loc("scn_only", { N1: "Snow falls." })],
+  script: [
+    { op: "expectCast", expectResult: [] },
+    { op: "expectCast", scene: "scn_only", expectResult: [] },
+    { op: "expectCast", scene: "scn_only", block: "b_only", expectResult: [] },
+    // ... and it still plays.
+    { op: "openFlow", flow: "f", scene: "only" },
+    { op: "advance", expect: [{ type: "text", id: "N1", text: "Snow falls." }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -1376,6 +1473,6 @@ export const cases: Fixtures = {
   scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
-    scriptedHotSwapEmptiedBlock],
+    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
 };
