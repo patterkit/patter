@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-21
+
 ### Added
 
 - **Cast lists you can query at runtime.** Three static reads answer "who is in this?": the cast the
