@@ -516,6 +516,10 @@ body.resizing main.panes { transition: none; }
 .identity-field { display: flex; flex-direction: column; gap: 0.25rem; font: 600 0.76rem var(--font-ui); color: var(--muted); }
 .identity-field input { font: 1rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.4rem 0.55rem; }
 .identity-field input:focus { outline: none; border-color: var(--accent); }
+/* The sentence under a field. It had no rule of its own, so it inherited the field LABEL's 600 weight
+   and shrank again as a `small`, reading as a squashed label rather than as prose. Sized and weighted
+   here to match the shell's own `.shell-ident-hint`. */
+.identity-field .identity-hint { font: 0.72rem/1.45 var(--font-ui); color: var(--muted); margin-top: 2px; }
 .identity-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
 
 /* New-project dialog (reuses the identity dialog chrome): a quiet preview of the .patter folder name. */

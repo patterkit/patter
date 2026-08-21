@@ -22,6 +22,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   narration, so the project plays the moment it opens.
 - Every sheet in an .xlsx export (report, voice script, localisation) freezes its header row, so it
   stays put while you scroll.
+- The explanatory line under a form field (New Project, Project Settings) reads as prose rather than
+  as a shrunken label. `.identity-hint` had no style of its own, so it inherited the field label's
+  semi-bold and shrank again as a `small`; it is now sized and weighted like the shell's own hints.
 
 ## [0.9.1] - 2026-08-19
 
