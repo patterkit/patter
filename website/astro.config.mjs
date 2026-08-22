@@ -19,7 +19,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Patter",
-      tagline: "Write branching narrative once. Play it everywhere.",
+      tagline: "Write playable dialogue.",
       customCss: ["./src/styles/patter.css"],
       // Every docs page ends with the license/author/home credit line (the landing page's footer
       // carries the same credit separately - it doesn't use Starlight chrome).
