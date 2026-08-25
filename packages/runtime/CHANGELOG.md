@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [f97f6eb]
+  - @patterkit/model@0.4.0
+  - @patterkit/dialect@0.1.6
+
 ## 0.4.1
 
 ### Patch Changes
@@ -41,7 +49,7 @@ version number always means the same runtime behaviour. This package is versione
   project declares, the speakers of a scene, and the speakers of one block. Scene and block refs take
   an internal id or a gameId address. The result is the character token a line beat carries, deduped
   and ordered by first appearance, and it is derived from the AUTHORED structure, so a speaker behind a
-  condition, inside a group, or voicing a choice prompt is included: it answers who *can* speak, not
+  condition, inside a group, or voicing a choice prompt is included: it answers who _can_ speak, not
   who a given playthrough heard. Held across all four runtimes by the conformance corpus.
   `engine.getCast()`, `engine.castForScene(sceneRef)`, `engine.castForBlock(sceneRef, blockRef)`.
 
