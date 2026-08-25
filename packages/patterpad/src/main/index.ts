@@ -14,7 +14,7 @@ import * as dictionaries from "./dictionaries.js";
 import { createStore } from "./store.js";
 import { applyMenu } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
-import { savedWindowRect, rememberBounds, centeredOnPrimary } from "@wildwinter/app-shell/tool-window";
+import { savedWindowRect, rememberBounds, centeredOnPrimary, pinToolWindow } from "@wildwinter/app-shell/tool-window";
 // The updater is the shell's. It IS this app's, generalised: the stall watchdog,
 // the retry budget, the surfaced background error and the live progress that
 // 0.6.6 grew after #33 all went into it, so this is a swap and not a downgrade.
@@ -678,10 +678,12 @@ function createPlayWindow(): void {
     minHeight: PLAY_MIN.height,
     show: false,
     title: "Patterpad · Play",
-    alwaysOnTop: store.read().play.pinned, // floats over the editor by default (remembered)
     webPreferences: { preload: join(here, "../preload/index.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   playWin = w;
+  // The pin means "above the EDITOR", which is a child window - not alwaysOnTop, which floats over
+  // every other application on macOS and Windows (app-shell 0.33.0; a Storyletter user found it).
+  pinToolWindow(w, win, store.read().play.pinned);
   w.once("ready-to-show", () => w.show());
   rememberBounds(w, (bounds) => store.setPlay({ ...store.read().play, bounds }));
   w.on("closed", () => { if (playWin === w) { playWin = null; win?.webContents.send("play:reset"); } }); // clear the editor's playhead + visited trail
@@ -712,7 +714,7 @@ function rescueWindows(): void {
   store.setPlay({ pinned: true });
   if (playWin && !playWin.isDestroyed()) {
     if (playWin.isMinimized()) playWin.restore();
-    playWin.setAlwaysOnTop(true);
+    pinToolWindow(playWin, win, true);
     playWin.webContents.send("play:pin", true); // ...and its BUTTON, which chose the old state
     playWin.setBounds({ ...PLAY_DEFAULT, ...centeredOnPrimary(PLAY_DEFAULT) });
     playWin.show();
@@ -721,7 +723,7 @@ function rescueWindows(): void {
   store.setSearch({ pinned: true });
   if (searchWin && !searchWin.isDestroyed()) {
     if (searchWin.isMinimized()) searchWin.restore();
-    searchWin.setAlwaysOnTop(true); // the store says pinned; the live window must agree
+    pinToolWindow(searchWin, win, true); // the store says pinned; the live window must agree
     searchWin.webContents.send("searchWin:pin", true); // ...and so must its BUTTON, which chose the old state
     searchWin.setBounds({ ...SEARCH_DEFAULT, ...centeredOnPrimary(SEARCH_DEFAULT) });
     searchWin.show();
@@ -729,7 +731,7 @@ function rescueWindows(): void {
   store.setCoverage({ pinned: true });
   if (coverageWin && !coverageWin.isDestroyed()) {
     if (coverageWin.isMinimized()) coverageWin.restore();
-    coverageWin.setAlwaysOnTop(true); // as above
+    pinToolWindow(coverageWin, win, true); // as above
     coverageWin.webContents.send("covWin:pin", true);
     coverageWin.setBounds({ ...COVERAGE_DEFAULT, ...centeredOnPrimary(COVERAGE_DEFAULT) });
     coverageWin.show();
@@ -752,10 +754,10 @@ function createSearchWindow(): void {
     show: false,
     title: "Patterpad · Search",
     frame: false, // a light, chrome-free tool window: no OS title bar; the renderer draws its own slim drag bar + ✕
-    alwaysOnTop: store.read().search.pinned, // floats over the editor by default (remembered)
     webPreferences: { preload: join(here, "../preload/index.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   searchWin = w;
+  pinToolWindow(w, win, store.read().search.pinned); // above the editor, not above the machine
   w.once("ready-to-show", () => w.show());
   rememberBounds(w, (bounds) => store.setSearch({ ...store.read().search, bounds }));
   w.on("closed", () => { if (searchWin === w) searchWin = null; });
@@ -789,10 +791,10 @@ function createCoverageWindow(): void {
     minHeight: COVERAGE_MIN.height,
     show: false,
     title: "Patterpad · Coverage",
-    alwaysOnTop: store.read().coverage.pinned, // floats over the editor by default (remembered)
     webPreferences: { preload: join(here, "../preload/index.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   coverageWin = w;
+  pinToolWindow(w, win, store.read().coverage.pinned); // as above
   w.once("ready-to-show", () => w.show());
   rememberBounds(w, (bounds) => store.setCoverage({ ...store.read().coverage, bounds }));
   w.on("closed", () => { if (coverageWin === w) coverageWin = null; });
@@ -831,7 +833,7 @@ function registerIpc(): void {
   });
   ipcMain.handle("covWin:setPin", (_e, on: boolean) => {
     store.setCoverage({ ...store.read().coverage, pinned: on });
-    coverageWin?.setAlwaysOnTop(on);
+    pinToolWindow(coverageWin, win, on);
   });
   ipcMain.handle("covWin:run", async (_e, options: import("../shared/api.js").CoverageRunOptions) => {
     const outcome = await jobs.start("coverage", async (ctx) => project.coverageAsync(options, {
@@ -965,7 +967,7 @@ function registerIpc(): void {
   ipcMain.handle("play:setCaptions", (_e, on: boolean) => project.setPlayCaptions(on));
   ipcMain.handle("play:setPin", (_e, on: boolean) => {
     store.setPlay({ ...store.read().play, pinned: on });
-    playWin?.setAlwaysOnTop(on);
+    pinToolWindow(playWin, win, on);
   });
   ipcMain.handle("view:resetWindows", () => rescueWindows());
   // The editor's scene changed: stash the live source (so the next (re)start plays it), then LIVE
@@ -1045,7 +1047,7 @@ function registerIpc(): void {
   });
   ipcMain.handle("searchWin:setPin", (_e, on: boolean) => {
     store.setSearch({ ...store.read().search, pinned: on });
-    searchWin?.setAlwaysOnTop(on);
+    pinToolWindow(searchWin, win, on);
   });
   ipcMain.handle("searchWin:close", () => { searchWin?.close(); });
   ipcMain.handle("project:applyFix", (_e, fix: QuickFix) => project.applyFix(fix));

@@ -6,6 +6,21 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A pinned tool window no longer floats over every other application.** Pin meant "stay on top",
+  full stop, so a pinned Find, Coverage or Play window sat above every app on the machine and nothing
+  else could be brought to the front. It now means what it says: above Patterpad's own editor window,
+  stacking normally against everything else. A window an older build left floating is healed the next
+  time you pin it, or by View ▸ Reset Windows. (Found on the Storyletter side; fixed in app-shell
+  0.33.0, adopted here.)
+- **Open-where-you-left-off stops forgetting.** A stale key from a pre-0.24 build won the merge on
+  every launch and reset the current project's remembered place, while every save wrote correctly.
+  The shell now prefers the real entry and retires the old key. (app-shell 0.33.0; nothing to do.)
+- **An emptied outcome value asks for a value.** Deleting the last term of an effect left the
+  condition empty state in the row: "always", and a button offering to add your first condition,
+  where a value belongs. (expr-editor 0.13.1.)
+
 ### Changed
 
 - **A quality outcome reads as a sentence.** Advancing a Quality was written out as
