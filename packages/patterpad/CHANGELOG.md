@@ -15,10 +15,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   the ladder's stages, the default picker reads "(first stage)", and coverage runs walk the stages.
   Conditions on a quality are built the same way as any other: the property is offered in the clause
   wizard, with the ORDERING operators ("at or past a stage") and its stages listed in ladder order,
-  and an outcome targeting one starts as `advance(...)` - which needs expr-editor 0.12.2, released
-  for this. That last release also fixed the clause that matters most: a stage compared with `>=`
+  and an outcome targeting one starts as `advance(...)` - which needs expr-editor 0.12.3, released
+  for this. That release chain also fixed the clause that matters most: a stage compared with `>=`
   offered a free-text box where `==` offered the ladder, so the type's whole reason to exist was the
   one shape with no stage picker.
+
+### Changed
+
+- **The operator menu reads in words.** Swapping a condition's operator offered rows like `is ==`
+  and `> >`: the label, then the raw source, which said the same thing twice. Each row is now the
+  glyph and a plain word (`≥  at least`), matching the step the clause wizard already used.
 
 ## [0.10.0] - 2026-08-25
 
