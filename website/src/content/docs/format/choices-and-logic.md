@@ -164,9 +164,9 @@ hands to the host.
 - **Scope**: `@patter` (global; created at the start, lives forever, visible
   everywhere) and `@scene` (local to one scene, but still kept for the life of the
   piece). A bare `@name` means `@patter.name`. There's no block- or group-local scope.
-- **Types**: `boolean`, `number`, `string`, `flags`, `enum` (flags and enum behave
-  like Ink LISTs), and `quality` - a story stage as an **ordered ladder** of named
-  stages (see below).
+- **Types**: `boolean`, `number`, `string`, `enum`, `flags` (enum and flags behave like
+  Ink LISTs), and `quality` - a story stage as an ordered ladder. Which to reach for, and
+  how to tell the confusable pairs apart, is [Property types](/format/property-types/).
 - **Sharing**: a per-property `shared` flag controls *where the value lives*: one value
   for the whole world, or one per concurrent flow. `@patter` is shared by default;
   `@scene` is per-flow by default. The two are independent, so you can have a
@@ -194,36 +194,8 @@ files or building tooling, not something an author has to learn:
 - **Built-in functions**: `seen()` / `visits()` (and their world-wide `patter_` forms),
   `random(a, b)` (a whole number from `a` to `b` inclusive, drawn from a seeded
   generator so every engine gets the same result), the flag helpers
-  `check_flags(@prop, +x, -y)` / `set_flags(...)`, and `advance(@quality)` (below).
-
-## Qualities: story stages as a ladder
-
-A **quality** tracks where a story thread stands, as an ordered ladder of named stages:
-
-```
-negotiation: not_started → underway → done → aftermath
-```
-
-Its value is always one stage name, starting at the first. What makes it more than an
-enum is that **the order is the meaning**:
-
-- Comparisons work **by position**, not alphabetically: `@negotiation >= "done"` reads
-  "at or past done", whichever names the stages carry.
-- `advance(@negotiation)` (in an effect: `set @negotiation to advance(@negotiation)`)
-  moves to the **next** stage, stopping at the last - it never wraps and never errors.
-- Stage names are checked at compile time: a condition naming a stage that isn't on the
-  ladder is an error in Patterpad's problem bar, never a gate that silently fails.
-
-The payoff is **insertion safety**. Conditions say "at or past a stage" and effects say
-"the next stage", so nothing names its destination - and adding a stage mid-production
-(a `confrontation` between `underway` and `done`) breaks neither the script nor saved
-games, because a save carries the stage *name*, not its number.
-
-Declared in **Settings ▸ Properties** (or World Properties for a host scope) as the
-**Stages** type: add the stages in order, and reorder them with the ‹ › movers on each
-chip. The rule of thumb from production use: **facts are flags, stages are a quality**.
-Only genuine sequences convert - anything whose beats can land in any order stays on
-flags - and a project wants many small ladders, never one big one.
+  `check_flags(@prop, +x, -y)` / `set_flags(...)`, and `advance(@quality)`, which steps a
+  [quality](/format/property-types/#quality-the-stage-of-a-story) to its next stage.
 
 ## Embedding property values in text
 

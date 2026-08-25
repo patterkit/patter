@@ -111,6 +111,7 @@ export default defineConfig({
             "format/overview",
             "format/structure",
             "format/choices-and-logic",
+            "format/property-types",
             "format/gamedata-and-addressing",
           ],
         },
