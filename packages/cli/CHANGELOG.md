@@ -1,5 +1,16 @@
 # @patterkit/cli
 
+## 0.2.5
+
+### Patch Changes
+
+- c3ca0c2: `export-script` works again in the published CLI: the bundled PDFKit tried to load its default font
+  from disk via `__dirname`, which an ESM bundle does not define, so every PDF export failed with
+  "\_\_dirname is not defined". Fixed in @patterkit/ops (no default font is loaded at all) and rebundled;
+  a bundle smoke test now runs `dist/cli.js` end to end so a bundle-only fault cannot ship green again.
+- Updated dependencies [c3ca0c2]
+  - @patterkit/ops@0.3.5
+
 ## 0.2.4
 
 ### Patch Changes
