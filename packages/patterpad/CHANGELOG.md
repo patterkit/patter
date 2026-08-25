@@ -8,15 +8,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
-- **The Stages property type** (a `quality`: a story stage as an ordered ladder). Declared in
-  Settings ▸ Properties or World Properties like a List, except the stage chips carry ‹ › movers,
+- **The Quality property type** (a story stage as an ordered ladder of named stages). Declared in
+  Settings ▸ Properties or World Properties like a List, except its Stages carry ‹ › movers,
   because for a ladder the order is the meaning: conditions compare by position ("at or past done")
   and `advance()` steps along it. Stage names are validated in conditions, the value picker offers
   the ladder's stages, the default picker reads "(first stage)", and coverage runs walk the stages.
   Conditions on a quality are built the same way as any other: the property is offered in the clause
   wizard, with the ORDERING operators ("at or past a stage") and its stages listed in ladder order,
-  and an outcome targeting one starts as `advance(...)` - which needs expr-editor 0.11.0, released
-  for this.
+  and an outcome targeting one starts as `advance(...)` - which needs expr-editor 0.12.2, released
+  for this. That last release also fixed the clause that matters most: a stage compared with `>=`
+  offered a free-text box where `==` offered the ladder, so the type's whole reason to exist was the
+  one shape with no stage picker.
 
 ## [0.10.0] - 2026-08-25
 

@@ -26,7 +26,7 @@ Where you declare a property matters as much as its type. The scopes (`@patter`,
 | `quality` | exactly one stage of an ordered ladder | `investigation`: unaware, suspicious, certain, confronted |
 
 In Patterpad these are the choices on each row of **Settings ▸ Properties**: True / False,
-Number, Text, List, Flags and **Stages**.
+Number, Text, List, Flags and **Quality**.
 
 ## Boolean, number, string
 
@@ -176,7 +176,7 @@ to, comes back from [Coverage testing](/production/coverage-testing/).
 ## Declaring a quality in Patterpad
 
 In **Settings ▸ Properties** (or **World Properties**, for a value your game owns), pick
-**Stages** as the type and add the stages in order. Each stage chip carries ‹ › movers,
+**Quality** as the type and add its **Stages (in order)**. Each stage chip carries ‹ › movers,
 because for a ladder the order is the meaning: reordering the chips reorders the story.
 A quality's default is its first stage unless you pick another.
 

@@ -56,18 +56,18 @@ There are three kinds, told apart by who owns them:
   Declare them in Project Settings ▸ World Properties so the editor knows they exist.
 
 A property can be a **yes/no**, a **number**, some **text**, a **pick-list** (choose one
-value, or choose several), or **Stages**. And two built-ins, `seen()` and `visits()`,
+value, or choose several), or a **Quality**. And two built-ins, `seen()` and `visits()`,
 always know whether, and how often, the player has been somewhere.
 
-**Stages** is the one worth knowing about, because it saves the most work. It holds an
+**Quality** is the one worth knowing about, because it saves the most work. It holds an
 ordered ladder, say `unaware → suspicious → certain → confronted`, and the order is what
 you get to use: a line can be gated on "at or past *suspicious*" instead of listing every
 stage that counts, and an effect moves the story on one rung without naming where it
 lands. That last part is why you can add a stage in the middle later, after the lines
 around it are written and recorded, and nothing you already wrote needs revisiting.
 
-The rule of thumb: **a flag records that something happened; Stages records how far along
-a story is.** If asking "or past it" makes sense, use Stages.
+The rule of thumb: **a flag records that something happened; a Quality records how far
+along a story is.** If asking "or past it" makes sense, use a Quality.
 [Property types](/format/property-types/) goes through all six with examples.
 
 ## Game Data: your own fields

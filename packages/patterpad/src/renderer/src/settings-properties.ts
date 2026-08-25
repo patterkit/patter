@@ -9,7 +9,7 @@ import { bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, fo
   PROPERTY_NAME_HINT } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
-  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Stages"],
+  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Quality"],
 ];
 
 export interface PropertiesHandle {

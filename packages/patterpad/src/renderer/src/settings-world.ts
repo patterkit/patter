@@ -14,7 +14,7 @@ import { bindPropertyName, bindPropertyRef, dupGuard, expandableRow, firstIllega
   focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
-  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Stages"],
+  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Quality"],
 ];
 
 /** A flat host-scope property row, carrying its scope token alongside the declaration (grouped on save). */

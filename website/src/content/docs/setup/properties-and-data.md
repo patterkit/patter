@@ -19,8 +19,8 @@ in [Game Data & addressing](/format/gamedata-and-addressing/).
 ## Properties: the story's variables
 
 Declare properties in **Project Settings ▸ Properties** (for `@patter`) and on the scene itself
-for `@scene`. Each has a **name**, a **type** (yes/no, number, text, a pick-list, a set of flags, or
-the ordered **Stages** of a [quality](/format/property-types/#quality-the-stage-of-a-story)),
+for `@scene`. Each has a **name**, a **type** (yes/no, number, text, a pick-list, a set of flags, or a
+[**Quality**](/format/property-types/#quality-the-stage-of-a-story), an ordered ladder of stages),
 and a default. Once declared, the editor offers them by name in the condition and effect
 editors and checks every use: a writer can't compare a number against a word, or test a property
 that doesn't exist.
