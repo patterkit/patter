@@ -29,9 +29,12 @@ jobs:
         working-directory: patter
       - run: npm run typecheck
         working-directory: patter
-      - run: npm test
-        working-directory: patter
+      # Build BEFORE the tests: the CLI bundle-smoke test runs dist/cli.js as a user would, and skips
+      # when no dist exists - tests-first quietly hollowed that gate out (the "__dirname is not
+      # defined" bundle fault shipped under a green suite precisely because nothing ran the bundle).
       - run: npm run build
+        working-directory: patter
+      - run: npm test
         working-directory: patter
       # `npm run build` regenerates the inlined runtime blob (ops prebuild). If the committed
       # copy drifted from the current runtime, playable-HTML exports would ship a stale engine

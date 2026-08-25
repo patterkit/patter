@@ -44,7 +44,13 @@ const isEmoji = (cp: number): boolean => cp >= 0x1f000 || (cp >= 0x2600 && cp <=
 export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
   const { scriptFont } = await import("./script-fonts.js"); // lazy: only a PDF export pays the font decode
   return new Promise((resolve, reject) => {
-    const pdf = new PDFDocument({ size: "A4", margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, info: { Title: doc.project, Author: "Patter" } });
+    // `font: null` (cast: the typings only admit a string) stops PDFKit loading its default Helvetica,
+    // which it reads as an AFM file via `__dirname` + a data directory. Neither survives being bundled:
+    // the self-contained CLI died with "__dirname is not defined" on its first PDF export, and even
+    // shimmed it would need PDFKit's data files shipped beside one bundled file. Every glyph this
+    // renderer draws goes through the embedded faces registered below, so Helvetica was pure start-up
+    // cost even where it loaded.
+    const pdf = new PDFDocument({ size: "A4", margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, info: { Title: doc.project, Author: "Patter" }, font: null as unknown as string });
     pdf.registerFont("Serif", scriptFont("serif"));
     pdf.registerFont("Serif-Bold", scriptFont("serifBold"));
     pdf.registerFont("Serif-Italic", scriptFont("serifItalic"));
@@ -143,11 +149,16 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
           let bodyX = cueX;
           if (el.character) { pdf.font("Sans-Bold").fontSize(CUE); bodyX = cueX + pdf.widthOfString(el.character.toUpperCase()) + CUE_GAP; }
           const yTop = pdf.y;
+          // Cue FIRST, then the body. The cue is placed against the body's first line, whose position is
+          // known up front - and a long body may run onto the next page, after which yTop names a spot on
+          // a page PDFKit has left. Drawn afterwards, the cue landed at that spot on the NEW page: a
+          // stranded speaker name at the bottom of one page for a body at the top of the next.
+          if (el.character) {
+            pdf.font("Sans-Bold").fontSize(CUE).fillColor(hex(characterColour(el.character))).text(el.character.toUpperCase(), cueX, yTop + ascentPt("Serif", BODY) - ascentPt("Sans-Bold", CUE), { lineBreak: false });
+            pdf.y = yTop;
+          }
           pdf.fontSize(BODY);
           draw([...(el.direction ? split(`(${el.direction})  `, "Serif-Italic", MUTED) : []), ...bodyPieces(el.runs, INK_READ)], bodyX, { width: Math.max(120, pageRight - bodyX), lineGap: LEAD });
-          const yEnd = pdf.y;
-          if (el.character) { pdf.font("Sans-Bold").fontSize(CUE).fillColor(hex(characterColour(el.character))).text(el.character.toUpperCase(), cueX, yTop + ascentPt("Serif", BODY) - ascentPt("Sans-Bold", CUE), { lineBreak: false }); }
-          pdf.y = yEnd;
           break;
         }
         case "narration":
@@ -168,18 +179,31 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
           const tag = el.tag ? el.tag.toUpperCase() : "";
           const tagW = tag ? pdf.font("Sans").fontSize(7.5).widthOfString(tag) + 8 : 0;
           const yStart = pdf.y;
+          // Tag first, body second, for the same reason as a line's cue: the tag belongs to the option's
+          // first line, and a body that runs onto the next page moves pdf.page out from under yStart.
+          // (The old order skipped the tag when that happened rather than misdraw it; now it never has to.)
+          if (tag) {
+            pdf.font("Sans").fontSize(7.5).fillColor(MUTED).text(tag, pageRight - tagW, yStart, { width: tagW, align: "right", lineBreak: false });
+            pdf.y = yStart;
+          }
           pdf.fontSize(BODY);
           draw([...split("◇  ", "Serif", ACCENT), ...bodyPieces(el.runs, INK)], ox, { width: Math.max(80, pageRight - ox - tagW), indent: -HANG, lineGap: LEAD });
-          const yEnd = pdf.y;
-          if (tag && yEnd >= yStart) { pdf.font("Sans").fontSize(7.5).fillColor(MUTED).text(tag, pageRight - tagW, yStart, { width: tagW, align: "right", lineBreak: false }); pdf.y = yEnd; }
           break;
         }
         case "jump":
           drawRight(split(`↪  ${el.text}`, "Sans-Bold", ACCENT), 9.5);
           break;
-        case "gameEvent":
-          drawRight(split(`⚙  ${el.text}`, "Mono", ACCENT), 9);
+        case "gameEvent": {
+          const pieces = split(`⚙  ${el.text}`, "Mono", ACCENT);
+          pdf.fontSize(9);
+          let total = 0;
+          for (const p of pieces) { pdf.font(p.font); total += pdf.widthOfString(p.text); }
+          // Short = set apart flush right, as ever. A long field list (#48 carries them ALL) wraps as
+          // a left-aligned mono block instead of truncating or escaping the margin.
+          if (total <= pageRight - cx) drawRight(pieces, 9);
+          else draw(pieces, cx, { width: pageRight - cx });
           break;
+        }
       }
     };
 
@@ -195,12 +219,18 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
       const sid = "snippet" in el ? el.snippet : undefined;
       const sameNext = sid !== undefined && next !== undefined && "snippet" in next && next.snippet === sid;
 
+      // Widow guard, for EVERY kind: an element must not start in the last sliver of a page. One that did
+      // put its yTop on a page its body then left, and everything placed from yTop (the speaker cue, the
+      // snippet edge) landed at that stale coordinate on the NEW page - a stranded cue at the foot of one
+      // page for a body at the top of the next, and an edge drawn most of the way down it.
       if (el.kind === "scene") ensure(90); else if (el.kind === "block") ensure(70);
+      else ensure(leadOf(el.kind) + BODY + LEAD + 14); // its lead + at least one body line
       pdf.y += leadOf(el.kind);
 
       const base = "indent" in el ? MARGIN + el.indent * INDENT_STEP : MARGIN;
       const cx = base + (sid !== undefined ? EDGE_INSET : 0);
       const yTop = pdf.y;
+      const pageBefore = pdf.page;
       drawContent(el, cx);
       const bottom = pdf.y;
 
@@ -216,7 +246,12 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
       if (sid !== undefined) {
         if (sid !== curSid) { curSid = sid; curBase = "indent" in el ? el.indent : 0; }
         const ex = MARGIN + curBase * INDENT_STEP + EDGE_OFF;
-        pdf.strokeColor(EDGE).lineWidth(0.75).moveTo(ex, yTop).lineTo(ex, bottom + (sameNext ? trail : 0)).stroke();
+        // A body long enough to cross onto a new page leaves yTop naming a spot on the OLD one; drawn
+        // as-is, that is a stroke most of the way down the new page, through whatever it passes. Clamp
+        // to this page: the edge resumes at the top margin. (The old page's tail goes without an edge,
+        // which is quiet, and strictly better than a stray line.)
+        const top = pdf.page === pageBefore ? yTop : MARGIN;
+        pdf.strokeColor(EDGE).lineWidth(0.75).moveTo(ex, top).lineTo(ex, bottom + (sameNext ? trail : 0)).stroke();
       }
 
       pdf.y = bottom + trail;
