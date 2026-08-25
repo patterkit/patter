@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-25
+
 ### Added
 
 - **The Quality property type** (a story stage as an ordered ladder of named stages). Declared in
