@@ -6,6 +6,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **A quality outcome reads as a sentence.** Advancing a Quality was written out as
+  `@debt = advance(@debt)`, naming the property three times to say one thing. The row now reads
+  `debt advances`, in the outcome editor and in the read-only previews on inspector rows alike;
+  clicking the word still opens the usual editor. An outcome that advances a DIFFERENT quality
+  keeps its explicit form, because there the second name is telling you something. (expr-editor
+  0.13.0, released for this.)
+
 ## [0.11.0] - 2026-08-25
 
 ### Added
