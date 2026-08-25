@@ -148,9 +148,10 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
       inp.addEventListener("change", () => commit(Number(inp.value)));
       ctl.appendChild(inp);
       read = () => { if (!focused(inp)) inp.value = String(engine.getProperty(row.ref) ?? ""); };
-    } else if (row.type === "enum") {
+    } else if (row.type === "enum" || row.type === "quality") {
+      // A quality edits as a dropdown of its STAGES - the ladder is closed, like an enum's values.
       const sel = doc.createElement("select");
-      for (const v of row.values ?? []) {
+      for (const v of (row.type === "quality" ? row.stages : row.values) ?? []) {
         const o = doc.createElement("option");
         o.value = v; o.textContent = v;
         sel.appendChild(o);

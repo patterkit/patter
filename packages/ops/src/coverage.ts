@@ -229,9 +229,9 @@ export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] 
   const { written, proposals } = analyzeHostScopes(bundle, hostTokens);
 
   // Fill in declared enum / bool ranges where the conditions gave no literals (e.g. a bare `if @world.flag`).
-  const declByRef = new Map<string, { type: string; values?: string[] }>();
+  const declByRef = new Map<string, { type: string; values?: string[]; stages?: string[] }>();
   for (const s of loaded.project.scopeRegistry?.scopes ?? []) {
-    for (const d of s.declarations ?? []) declByRef.set(`@${s.token}.${d.name}`, { type: d.type, values: d.values });
+    for (const d of s.declarations ?? []) declByRef.set(`@${s.token}.${d.name}`, { type: d.type, values: d.values, stages: d.stages });
   }
 
   const drivers: CoverageDriver[] = [];
@@ -242,6 +242,7 @@ export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] 
     if (values.length === 0 && decl) {
       if (decl.type === "boolean") values = [true, false];
       else if (decl.type === "enum" && decl.values) values = [...decl.values];
+      else if (decl.type === "quality" && decl.stages) values = [...decl.stages]; // stage names ARE the values
     }
     if (values.length === 0) continue;
     drivers.push({ ref, kind: "recurring", cadence: "sometimes", values: sortValues(values) });

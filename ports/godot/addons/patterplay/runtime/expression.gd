@@ -62,6 +62,31 @@ static func _eval_binary(node: Array, ctx: Dictionary):
 
 	var left = evaluate(node[2], ctx)
 	var right = evaluate(node[3], ctx)
+
+	# Quality (expr 0.4.0): when either operand REFERENCES a quality, ordering compares by ladder
+	# POSITION and arithmetic is refused. == / != fall through to plain value equality - the compiler's
+	# validator holds stage names to the ladder, so a bad name never gets this far from source.
+	var l_ladder = _ladder_of(node[2], ctx)
+	var r_ladder = _ladder_of(node[3], ctx)
+	var ladder = l_ladder if l_ladder != null else r_ladder
+	if ladder != null:
+		var ordering: bool = op == ">" or op == ">=" or op == "<" or op == "<="
+		if ordering and l_ladder != null and r_ladder != null and l_ladder != r_ladder:
+			push_error("'%s' compares two different qualities, whose stage orders are unrelated" % op)
+			return false
+		match op:
+			">":
+				return _stage_index(left, ladder, op) > _stage_index(right, ladder, op)
+			">=":
+				return _stage_index(left, ladder, op) >= _stage_index(right, ladder, op)
+			"<":
+				return _stage_index(left, ladder, op) < _stage_index(right, ladder, op)
+			"<=":
+				return _stage_index(left, ladder, op) <= _stage_index(right, ladder, op)
+			"+", "-", "*", "/":
+				push_error("'%s' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it" % op)
+				return false
+
 	match op:
 		"==":
 			return PatterValues.value_equals(left, right)
@@ -100,9 +125,42 @@ static func _num(v) -> float:
 	return v if typeof(v) == TYPE_FLOAT else 0.0
 
 
+# The ladder behind an operand NODE, when the context's quality channel says it references one
+# (null otherwise). The node carries the scope+name the channel needs; values are plain strings.
+static func _ladder_of(node, ctx: Dictionary):
+	if not ctx.has("qualities") or typeof(node) != TYPE_ARRAY or node.size() < 3 or node[0] != "sv":
+		return null
+	return ctx["qualities"].call(node[1], node[2])
+
+
+# Index of a stage in a ladder; an unknown stage is an ERROR naming the value and the ladder (a
+# drifted save is exactly what lands here), never a silent never-match.
+static func _stage_index(value, ladder: Array, op: String) -> int:
+	if typeof(value) != TYPE_STRING:
+		push_error("'%s' on a quality compares stages, got a non-string" % op)
+		return 0
+	var i := ladder.find(value)
+	if i < 0:
+		push_error('"%s" is not a stage of this quality (stages: %s)' % [value, ", ".join(ladder)])
+		return 0
+	return i
+
+
 static func _eval_call(node: Array, ctx: Dictionary):
 	var fn = node[1]
 	var args: Array = node.slice(2)
+	# advance() is the language's own (expr 0.4.0): the NEXT stage in the argument's ladder,
+	# saturating at the last. Patter's dialect defines no advance, so the core one always runs.
+	if fn == "advance":
+		if args.size() != 1:
+			push_error("advance() takes exactly 1 argument, got %d" % args.size())
+			return ""
+		var ladder = _ladder_of(args[0], ctx)
+		if ladder == null:
+			push_error("advance() needs a quality reference (@scope.name of a quality property)")
+			return ""
+		var current := _stage_index(evaluate(args[0], ctx), ladder, "advance")
+		return str(ladder[mini(current + 1, ladder.size() - 1)])
 	match fn:
 		"random":
 			if args.size() != 2 or ctx.get("next_random") == null:

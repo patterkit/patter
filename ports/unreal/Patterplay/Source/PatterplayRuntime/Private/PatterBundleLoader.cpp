@@ -121,6 +121,9 @@ namespace
 		const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
 		if (O->TryGetArrayField(TEXT("values"), Values))
 			for (const TSharedPtr<FJsonValue>& V : *Values) D.values.push_back(TCHAR_TO_UTF8(*V->AsString()));
+		const TArray<TSharedPtr<FJsonValue>>* Stages = nullptr;
+		if (O->TryGetArrayField(TEXT("stages"), Stages))
+			for (const TSharedPtr<FJsonValue>& V : *Stages) D.stages.push_back(TCHAR_TO_UTF8(*V->AsString()));
 		const TSharedPtr<FJsonValue> Def = O->TryGetField(TEXT("default"));
 		if (Def.IsValid() && Def->Type != EJson::Null) { D.hasDefault = true; D.def = ToValue(Def); }
 		bool W = false;
@@ -137,6 +140,7 @@ namespace
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("temporary"))) D.temporary = (*P)->AsBool();
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("default"))) { D.hasDefault = true; D.def = ToValue(*P); }
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("values"))) D.values = StrList(*P);
+		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("stages"))) D.stages = StrList(*P);
 		return D;
 	}
 

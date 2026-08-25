@@ -69,11 +69,12 @@ namespace Patterkit.Patterplay
     public sealed class PropertyDecl
     {
         public string Name;
-        public string Type;          // bool | number | string | flags | enum
+        public string Type;          // boolean | number | string | flags | enum | quality
         public bool? Shared;
         public bool Temporary;
         public PatterValue Default;  // null => the type default
         public List<string> Values;  // enum
+        public List<string> Stages;  // quality: the ORDERED stage ladder (order IS the meaning)
     }
 
     /// <summary>A property of a HOST scope (`@world`, ...): the game owns the value, the story reads it.
@@ -82,8 +83,9 @@ namespace Patterkit.Patterplay
     public sealed class HostScopeDecl
     {
         public string Name;
-        public string Type;          // boolean | number | string | flags | enum
+        public string Type;          // boolean | number | string | flags | enum | quality
         public List<string> Values;  // enum / flags
+        public List<string> Stages;  // quality: the ordered stage ladder
         public PatterValue Default;
         public bool? Writable;
     }

@@ -364,7 +364,7 @@ export function effectiveGameId(entity: { gameId?: string; name: string }): stri
 // Project file (.patterproj) - spec §14, schema §6.
 // ---------------------------------------------------------------------------
 
-export type PropertyType = "boolean" | "number" | "string" | "flags" | "enum";
+export type PropertyType = "boolean" | "number" | "string" | "flags" | "enum" | "quality";
 
 export interface PropertyDecl {
   name: string;
@@ -389,6 +389,11 @@ export interface PropertyDecl {
   temporary?: boolean;
   /** For enum / flags. */
   values?: string[];
+  /** For quality: the ORDERED ladder of stage names (the shared engine's quality type, expr 0.4.0).
+   *  Ordering operators compare by position in this list and `advance()` steps along it, so the order
+   *  is the meaning - unlike `values`, whose order is presentation only. Default seeds to the first
+   *  stage when no `default` is declared. */
+  stages?: string[];
   /** Free-text author note documenting what this property is for (authoring only; shown as a hint). */
   purpose?: string;
 }
@@ -404,6 +409,8 @@ export interface HostScopeDecl {
   name: string;
   type: PropertyType;
   values?: string[];
+  /** For quality: the ordered stage ladder (see `PropertyDecl.stages`). */
+  stages?: string[];
   default?: ScalarValue;
   writable?: boolean;
   /** Free-text author note documenting the property (authoring only; shown as a hint). */

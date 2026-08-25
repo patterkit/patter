@@ -48,6 +48,11 @@ namespace Patterkit.Patterplay
         public Func<string, int> PatterVisits;
         /// <summary>Scopes whose missing property is an error rather than graceful-false. Default: none.</summary>
         public HashSet<string> ThrowOnMissing = new HashSet<string>();
+        /// <summary>The quality channel (expr 0.4.0): "is @scope.name a quality, and what is its ladder?"
+        /// Null when the bundle declares no quality - evaluation is then byte-identical to before.
+        /// A stage's runtime value is its NAME (a plain string); the ladder makes ordering compare by
+        /// position and advance() step. Mirrors the JS EvalContext.qualities.</summary>
+        public Func<string, string, List<string>> Qualities;
     }
 
     public static class Expr
@@ -122,6 +127,32 @@ namespace Patterkit.Patterplay
 
             var left = Evaluate(n.Left, ctx);
             var right = Evaluate(n.Right, ctx);
+
+            // Quality (expr 0.4.0): when either operand REFERENCES a quality, ordering compares by
+            // ladder POSITION (the stage names are chosen by authors, not alphabetised) and arithmetic
+            // is refused. == and != fall through to plain value equality, unchanged - the validator
+            // holds stage names to the ladder at compile time.
+            var lLadder = LadderOf(n.Left, ctx);
+            var rLadder = LadderOf(n.Right, ctx);
+            var ladder = lLadder ?? rLadder;
+            if (ladder != null)
+            {
+                bool ordering = n.Op == ">" || n.Op == ">=" || n.Op == "<" || n.Op == "<=";
+                if (ordering && lLadder != null && rLadder != null && !SameLadder(lLadder, rLadder))
+                {
+                    throw new EvalException($"'{n.Op}' compares two different qualities, whose stage orders are unrelated");
+                }
+                switch (n.Op)
+                {
+                    case ">": return PatterValue.Bool(StageIndex(left, ladder, ">") > StageIndex(right, ladder, ">"));
+                    case ">=": return PatterValue.Bool(StageIndex(left, ladder, ">=") >= StageIndex(right, ladder, ">="));
+                    case "<": return PatterValue.Bool(StageIndex(left, ladder, "<") < StageIndex(right, ladder, "<"));
+                    case "<=": return PatterValue.Bool(StageIndex(left, ladder, "<=") <= StageIndex(right, ladder, "<="));
+                    case "+": case "-": case "*": case "/":
+                        throw new EvalException($"'{n.Op}' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it");
+                }
+            }
+
             switch (n.Op)
             {
                 case "==": return PatterValue.Bool(left.ValueEquals(right));
@@ -147,6 +178,16 @@ namespace Patterkit.Patterplay
 
         private static PatterValue EvalCall(Call call, EvalContext ctx)
         {
+            // `advance` is the language's own (expr 0.4.0): the NEXT stage in the argument's ladder,
+            // saturating at the last. Patter's dialect defines no advance, so the core one always runs.
+            if (call.Name == "advance")
+            {
+                if (call.Args.Length != 1) throw new EvalException($"advance() takes exactly 1 argument, got {call.Args.Length}");
+                var ladder = LadderOf(call.Args[0], ctx);
+                if (ladder == null) throw new EvalException("advance() needs a quality reference (@scope.name of a quality property)");
+                var current = StageIndex(Evaluate(call.Args[0], ctx), ladder, "advance");
+                return PatterValue.Str(ladder[Math.Min(current + 1, ladder.Count - 1)]);
+            }
             switch (call.Name)
             {
                 case "random":
@@ -209,6 +250,31 @@ namespace Patterkit.Patterplay
             var v = Evaluate(call.Args[0], ctx);
             if (!v.IsString) throw new EvalException($"{fn}(id) requires a string node id");
             return v.AsString;
+        }
+
+        /// <summary>The ladder behind an operand NODE, when the context's quality channel says it
+        /// references one. The node carries the scope+name the channel needs; values are plain strings.</summary>
+        private static List<string> LadderOf(AstNode node, EvalContext ctx)
+        {
+            if (ctx.Qualities == null || !(node is ScopedVar sv)) return null;
+            return ctx.Qualities(sv.Scope, sv.Name);
+        }
+
+        /// <summary>Index of a stage in a ladder; an unknown stage is an ERROR naming the value and the
+        /// ladder (a drifted save is exactly what lands here), never a silent never-match.</summary>
+        private static int StageIndex(PatterValue value, List<string> ladder, string op)
+        {
+            if (!value.IsString) throw new EvalException($"'{op}' on a quality compares stages, got {Kind(value)}");
+            var i = ladder.IndexOf(value.AsString);
+            if (i < 0) throw new EvalException($"\"{value.AsString}\" is not a stage of this quality (stages: {string.Join(", ", ladder)})");
+            return i;
+        }
+
+        private static bool SameLadder(List<string> a, List<string> b)
+        {
+            if (a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++) if (a[i] != b[i]) return false;
+            return true;
         }
 
         private static void AssertNumbers(PatterValue l, PatterValue r, string op)

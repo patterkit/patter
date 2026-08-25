@@ -14,14 +14,17 @@ import type { ConditionProperty } from "../../shared/api.js";
 export const SCOPE_ORDER = ["patter", "scene"];
 
 export const catalogueFrom = (props: ConditionProperty[]): CatalogueEntry[] =>
-  props.map((p) => ({ scope: p.scope, name: p.name, type: p.type, enumValues: p.enumValues, ...(p.purpose ? { purpose: p.purpose } : {}) }));
+  // A quality's stages ride the catalogue's enumValues channel: the editor offers a comparison peer's
+  // enumValues as value choices, so `@scope.q == ...` gets a stage picker without a stages-aware
+  // editor release. (Validation still knows the real ladder via the schema below.)
+  props.map((p) => ({ scope: p.scope, name: p.name, type: p.type, enumValues: p.type === "quality" ? p.stages : p.enumValues, ...(p.purpose ? { purpose: p.purpose } : {}) }));
 
 export function schemaFrom(props: ConditionProperty[]): ExpressionSchema {
   const m = new Map<string, Map<string, PropertyMeta>>();
   for (const p of props) {
     let s = m.get(p.scope);
     if (!s) { s = new Map(); m.set(p.scope, s); }
-    s.set(p.name.toLowerCase(), { type: p.type, enumValues: p.enumValues });
+    s.set(p.name.toLowerCase(), { type: p.type, enumValues: p.enumValues, stages: p.stages });
   }
   return { properties: m };
 }

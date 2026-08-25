@@ -47,6 +47,9 @@ namespace Patterkit.Patterplay
                 NextRandom = Rng,
                 Visits = id2 => _visitCounts.TryGetValue(id2, out var v) ? v : 0,
                 PatterVisits = id2 => _host.SharedVisits.TryGetValue(id2, out var v) ? v : 0,
+                // The quality channel: a property's stage ladder, from wherever the declaration lives -
+                // @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
+                Qualities = StagesFor,
             };
             _evalCtx.Scopes["patter"] = new ResolverScope(PatterGet);
             _evalCtx.Scopes["scene"] = new ResolverScope(SceneGet);
@@ -60,6 +63,36 @@ namespace Patterkit.Patterplay
         }
 
         public string CurrentScene => _currentSceneId;
+
+        /// <summary>The stage ladder of `@scope.name` when it is a declared quality, else null. Names
+        /// compare lowercase, as the compiler emits references (the SelfBackedScope lesson). Mirrors the
+        /// JS Flow.stagesFor.</summary>
+        private List<string> StagesFor(string scope, string name)
+        {
+            var key = name == null ? null : name.ToLowerInvariant();
+            List<string> FromDecls(List<PropertyDecl> decls)
+            {
+                if (decls == null) return null;
+                foreach (var d in decls)
+                {
+                    if (d.Type == "quality" && d.Name != null && d.Name.ToLowerInvariant() == key) return d.Stages;
+                }
+                return null;
+            }
+            if (scope == "patter") return FromDecls(_host.PatterSharedDecls) ?? FromDecls(_host.PatterLocalDecls);
+            if (scope == "scene")
+            {
+                if (_currentSceneId == null || !_host.Bundle.Scenes.TryGetValue(_currentSceneId, out var scene)) return null;
+                return FromDecls(scene.SceneProps);
+            }
+            var spec = _host.Bundle.ScopeRegistry?.Scopes?.Find(s => s.Token == scope);
+            if (spec?.Declarations == null) return null;
+            foreach (var d in spec.Declarations)
+            {
+                if (d.Type == "quality" && d.Name != null && d.Name.ToLowerInvariant() == key) return d.Stages;
+            }
+            return null;
+        }
 
         /// <summary>Advance repeatedly, collecting every played beat, until a choice or the end - the
         /// "play to the next stop" a host's play UI / tooling wants. The terminal choice / end is returned

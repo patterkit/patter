@@ -713,6 +713,7 @@ namespace Patterkit.Patterplay
                 case "string": return PatterValue.Str("");
                 case "flags": return PatterValue.Flags(new List<string>());
                 case "enum": return PatterValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
+                case "quality": return PatterValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
                 default: return PatterValue.False;
             }
         }
@@ -727,6 +728,7 @@ namespace Patterkit.Patterplay
                 case "string": return PatterValue.Str("");
                 case "flags": return PatterValue.Flags(new List<string>());
                 case "enum": return PatterValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
+                case "quality": return PatterValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
                 default: return PatterValue.False;
             }
         }

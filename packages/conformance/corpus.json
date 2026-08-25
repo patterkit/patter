@@ -4439,6 +4439,357 @@
       ]
     },
     {
+      "name": "quality: seeds at the first stage and gates by ladder position",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "16gpg8f",
+          "structureHash": "19yqutq"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "negotiation",
+            "type": "quality",
+            "stages": [
+              "not_started",
+              "underway",
+              "done",
+              "aftermath"
+            ],
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b_probe",
+                "type": "block",
+                "name": "Probe",
+                "children": [
+                  {
+                    "id": "sn_past",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@negotiation >= \"done\"",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "negotiation"
+                        ],
+                        [
+                          "s",
+                          "done"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_past",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "sn_mid",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@negotiation == \"underway\"",
+                      "ast": [
+                        "bin",
+                        "==",
+                        [
+                          "sv",
+                          "patter",
+                          "negotiation"
+                        ],
+                        [
+                          "s",
+                          "underway"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_mid",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "sn_pre",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_pre",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_past": "past",
+            "T_mid": "mid",
+            "T_pre": "pre {@negotiation}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T_pre",
+          "text": "pre not_started"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "quality: advance() steps one stage per pass and saturates at the last",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1e4dhdb",
+          "structureHash": "1eeua5g"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "negotiation",
+            "type": "quality",
+            "stages": [
+              "not_started",
+              "underway",
+              "done",
+              "aftermath"
+            ],
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@negotiation",
+                        "value": {
+                          "src": "advance(@negotiation)",
+                          "ast": [
+                            "call",
+                            "advance",
+                            [
+                              "sv",
+                              "patter",
+                              "negotiation"
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "b_loop"
+                    }
+                  },
+                  {
+                    "id": "sn_stop",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@negotiation >= \"aftermath\"",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "negotiation"
+                        ],
+                        [
+                          "s",
+                          "aftermath"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_stop",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_loop",
+                "type": "block",
+                "name": "loop",
+                "gameId": "loop",
+                "children": [
+                  {
+                    "id": "sn_back",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@negotiation < \"aftermath\"",
+                      "ast": [
+                        "bin",
+                        "<",
+                        [
+                          "sv",
+                          "patter",
+                          "negotiation"
+                        ],
+                        [
+                          "s",
+                          "aftermath"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_back",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "b"
+                    }
+                  },
+                  {
+                    "id": "sn_done",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_done",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "step to {@negotiation}",
+            "T_stop": "stop",
+            "T_back": "at {@negotiation}",
+            "T_done": "done at {@negotiation}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T",
+          "text": "step to not_started"
+        },
+        {
+          "type": "text",
+          "id": "T_back",
+          "text": "at underway"
+        },
+        {
+          "type": "text",
+          "id": "T",
+          "text": "step to underway"
+        },
+        {
+          "type": "text",
+          "id": "T_back",
+          "text": "at done"
+        },
+        {
+          "type": "text",
+          "id": "T",
+          "text": "step to done"
+        },
+        {
+          "type": "text",
+          "id": "T_done",
+          "text": "done at aftermath"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
       "name": "specificity prefers the more specific line (AND sums)",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -8515,6 +8866,330 @@
               "type": "text",
               "id": "N1",
               "text": "Snow falls."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quality: a stage inserted mid-production shifts nothing (save by name)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "13k3gey",
+          "structureHash": "0hy032n"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "negotiation",
+            "type": "quality",
+            "stages": [
+              "not_started",
+              "underway",
+              "done",
+              "aftermath"
+            ],
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b_set",
+                "type": "block",
+                "name": "Set",
+                "children": [
+                  {
+                    "id": "sn_set",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_set",
+                        "kind": "text"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@negotiation",
+                        "value": {
+                          "src": "\"done\"",
+                          "ast": [
+                            "s",
+                            "done"
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_probe",
+                "type": "block",
+                "name": "Probe",
+                "gameId": "probe",
+                "children": [
+                  {
+                    "id": "sn_past",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@negotiation >= \"done\"",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "negotiation"
+                        ],
+                        [
+                          "s",
+                          "done"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_past",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "sn_pre",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_pre",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_set": "set",
+            "T_past": "past {@negotiation}",
+            "T_pre": "pre"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1274to8",
+          "structureHash": "1j7i3e1"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "negotiation",
+            "type": "quality",
+            "stages": [
+              "not_started",
+              "underway",
+              "confrontation",
+              "done",
+              "aftermath"
+            ],
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b_set",
+                "type": "block",
+                "name": "Set",
+                "children": [
+                  {
+                    "id": "sn_set",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_set",
+                        "kind": "text"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@negotiation",
+                        "value": {
+                          "src": "\"done\"",
+                          "ast": [
+                            "s",
+                            "done"
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_probe",
+                "type": "block",
+                "name": "Probe",
+                "gameId": "probe",
+                "children": [
+                  {
+                    "id": "sn_past",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@negotiation >= \"done\"",
+                      "ast": [
+                        "bin",
+                        ">=",
+                        [
+                          "sv",
+                          "patter",
+                          "negotiation"
+                        ],
+                        [
+                          "s",
+                          "done"
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "T_past",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  },
+                  {
+                    "id": "sn_pre",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_pre",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_set": "set",
+            "T_past": "past {@negotiation}",
+            "T_pre": "pre"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "s",
+          "block": "set"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_set",
+              "text": "set"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "goto",
+          "scene": "s",
+          "block": "probe",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_past",
+              "text": "past done"
             }
           ]
         },

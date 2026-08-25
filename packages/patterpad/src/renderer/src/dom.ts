@@ -89,3 +89,39 @@ export function tagChips(holder: { values?: string[] }, onChange?: () => void): 
   wrap.append(input);
   return wrap;
 }
+
+/** The chip editor for a quality's STAGE LADDER: `tagChips`, plus order. Same add / remove / persistent
+ *  input, but each chip carries ‹ › movers, because for a quality the order IS the meaning (comparisons
+ *  are positional, advance() walks the list) - unlike `values`, whose order is presentation only. */
+export function stageChips(holder: { stages?: string[] }, onChange?: () => void): HTMLElement {
+  const wrap = el("div", "gd-tags");
+  const input = el("input", "gd-tag-input") as HTMLInputElement;
+  input.type = "text"; input.placeholder = "<add stage>"; input.spellcheck = false;
+  const rebuild = (): void => {
+    for (const c of Array.from(wrap.children)) if (c !== input) c.remove();
+    const stages = holder.stages ?? [];
+    stages.forEach((v, i) => {
+      const chip = el("span", "gd-tag", `${i + 1}. ${v}`);
+      const left = el("button", "gd-tag-x", "‹"); left.type = "button"; left.dataset.tip = "earlier"; left.setAttribute("aria-label", `move ${v} earlier`);
+      left.disabled = i === 0;
+      left.addEventListener("click", () => { [stages[i - 1], stages[i]] = [stages[i]!, stages[i - 1]!]; rebuild(); onChange?.(); });
+      const right = el("button", "gd-tag-x", "›"); right.type = "button"; right.dataset.tip = "later"; right.setAttribute("aria-label", `move ${v} later`);
+      right.disabled = i === stages.length - 1;
+      right.addEventListener("click", () => { [stages[i], stages[i + 1]] = [stages[i + 1]!, stages[i]!]; rebuild(); onChange?.(); });
+      const x = el("button", "gd-tag-x", "✕"); x.type = "button"; x.dataset.tip = `remove ${v}`; x.setAttribute("aria-label", `remove ${v}`);
+      x.addEventListener("click", () => { holder.stages = (holder.stages ?? []).filter((o) => o !== v); rebuild(); onChange?.(); });
+      chip.append(left, right, x);
+      wrap.insertBefore(chip, input);
+    });
+  };
+  const commit = (): void => {
+    const v = input.value.trim();
+    if (v && !(holder.stages ?? []).includes(v)) { (holder.stages ??= []).push(v); rebuild(); onChange?.(); }
+    input.value = "";
+  };
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commit(); } });
+  input.addEventListener("blur", commit);
+  wrap.append(input);
+  rebuild();
+  return wrap;
+}

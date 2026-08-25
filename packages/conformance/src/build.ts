@@ -53,7 +53,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     bundle: exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }),
     // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, §9.8): same project,
     // edited scenes/strings.
-    ...(f.scenesB ? { bundleB: exportBundle({ project: f.project, scenes: f.scenesB, locales: f.localesB ?? f.locales }) } : {}),
+    ...(f.scenesB ? { bundleB: exportBundle({ project: f.projectB ?? f.project, scenes: f.scenesB, locales: f.localesB ?? f.locales }) } : {}),
     ...(f.seed !== undefined ? { seed: f.seed } : {}),
     script: f.script,
   }));

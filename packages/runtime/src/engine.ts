@@ -276,6 +276,8 @@ export interface PropertyRow {
   value: ScalarValue | undefined;
   default: ScalarValue;
   values?: string[];
+  /** A quality's ordered stage ladder (lets an inspector offer stages instead of free text). */
+  stages?: string[];
 }
 
 /** Options for opening a flow. */
@@ -844,6 +846,7 @@ export class Engine {
       ref: `@${d.name}`,
       type: d.type as PropertyType,
       values: d.values,
+      stages: d.stages,
       value: this.getProperty(`@${d.name}`),
       default: declDefault(d),
     }));
@@ -990,7 +993,28 @@ export class Flow {
         visits: (id: string) => this.visitCounts.get(id) ?? 0,
         patterVisits: (id: string) => this.host.sharedVisits.get(id) ?? 0,
       },
+      // The quality channel (expr 0.4.0): hands the evaluator a property's stage ladder, which is what
+      // makes ordering compare by position and advance() step. Wired by hand because this context takes
+      // only the registry's SCOPES (the patter/scene resolvers here are the flow's own merged views),
+      // and because @scene declarations belong to whichever scene the flow is in RIGHT NOW.
+      qualities: (scope, name) => this.stagesFor(scope, name),
     };
+  }
+
+  /** The stage ladder of `@scope.name` when it is a declared quality, else undefined. Names compare
+   *  lowercase, as the compiler emits references (the selfBackedResolver lesson). */
+  private stagesFor(scope: string, name: string): readonly string[] | undefined {
+    const key = name.toLowerCase();
+    const fromDecls = (decls: ReadonlyArray<{ name: string; type: string; stages?: string[] }> | undefined) =>
+      decls?.find((d) => d.name.toLowerCase() === key && d.type === "quality")?.stages;
+    if (scope === "patter") {
+      return fromDecls(this.host.patterSharedDecls) ?? fromDecls(this.host.patterLocalDecls);
+    }
+    if (scope === "scene") {
+      const scene = this.currentSceneId != null ? this.host.bundle.scenes[this.currentSceneId] : undefined;
+      return fromDecls(scene?.sceneProps);
+    }
+    return fromDecls(this.host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope)?.declarations);
   }
 
   // -- Host API -------------------------------------------------------------
@@ -1841,10 +1865,11 @@ function deserialiseSelectors(rec: Record<string, SelectorSnapshot> | undefined)
 
 /** Adapt a Patter `PropertyDecl` to a registry `ScopeDeclaration` (same type vocabulary). */
 function toDecl(decl: PropertyDecl): ScopeDeclaration {
-  return { name: decl.name, type: decl.type, values: decl.values, default: decl.default };
+  return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default };
 }
 
-/** A shared-decl's value for reset-to-default: its declared default, else the type default. */
+/** A shared-decl's value for reset-to-default: its declared default, else the type default.
+ *  A quality seeds at its FIRST stage - the ladder's start is the story's start. */
 function declDefault(d: ScopeDeclaration): ScalarValue {
   if (d.default !== undefined) return d.default;
   switch (d.type) {
@@ -1852,13 +1877,14 @@ function declDefault(d: ScopeDeclaration): ScalarValue {
     case "string": return "";
     case "flags": return [];
     case "enum": return d.values?.[0] ?? "";
+    case "quality": return d.stages?.[0] ?? "";
     default: return false; // boolean (and any unknown) → false
   }
 }
 
 /** A host-scope declaration (`@world.x`) → registry declaration. */
 function toForeignDecl(decl: HostScopeDecl): ScopeDeclaration {
-  return { name: decl.name, type: decl.type, values: decl.values, default: decl.default, writable: decl.writable };
+  return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default, writable: decl.writable };
 }
 
 /** The seed value for a host-scope property: its declared default, else the type default. */
@@ -1870,6 +1896,7 @@ function hostScopeDefault(decl: HostScopeDecl): ScalarValue {
     case "string": return "";
     case "flags": return [];
     case "enum": return decl.values?.[0] ?? "";
+    case "quality": return decl.stages?.[0] ?? "";
   }
 }
 
@@ -1900,6 +1927,7 @@ function sceneDefault(decl: PropertyDecl): ScalarValue {
     case "string": return "";
     case "flags": return [];
     case "enum": return decl.values?.[0] ?? "";
+    case "quality": return decl.stages?.[0] ?? "";
   }
 }
 

@@ -524,9 +524,9 @@ const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON
  *  Patter's property types are the same vocabulary as the condition editor's, so no mapping is needed. */
 function sceneProperties(sceneId: string): ConditionProperty[] {
   const out: ConditionProperty[] = [];
-  for (const d of loaded?.project.properties ?? []) out.push({ scope: "patter", name: d.name, type: d.type, enumValues: d.values, purpose: d.purpose });
+  for (const d of loaded?.project.properties ?? []) out.push({ scope: "patter", name: d.name, type: d.type, enumValues: d.values, stages: d.stages, purpose: d.purpose });
   const scene = loaded?.scenes.find((s) => s.id === sceneId);
-  for (const d of scene?.sceneProps ?? []) out.push({ scope: "scene", name: d.name, type: d.type, enumValues: d.values, purpose: d.purpose });
+  for (const d of scene?.sceneProps ?? []) out.push({ scope: "scene", name: d.name, type: d.type, enumValues: d.values, stages: d.stages, purpose: d.purpose });
   return out;
 }
 

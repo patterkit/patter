@@ -121,6 +121,7 @@ namespace Patterkit.Patterplay
             Name = (string)d["name"],
             Type = (string)d["type"],
             Values = d["values"] is JArray vs ? ToStringList(vs) : null,
+            Stages = d["stages"] is JArray st122 ? ToStringList(st122) : null,
             Default = d["default"] != null ? ToValue(d["default"]) : null,
             Writable = (bool?)d["writable"],
         };
@@ -133,6 +134,7 @@ namespace Patterkit.Patterplay
             Temporary = (bool?)p["temporary"] ?? false,
             Default = p["default"] != null ? ToValue(p["default"]) : null,
             Values = p["values"] is JArray vs ? ToStringList(vs) : null,
+            Stages = p["stages"] is JArray st134 ? ToStringList(st134) : null,
         };
 
         private static GameDataField Field(JObject f) => new GameDataField

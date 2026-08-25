@@ -25,6 +25,7 @@ namespace patter
         bool temporary = false;
         bool hasDefault = false; PatterValue def;       // optional<PatterValue>
         std::vector<std::string> values;
+        std::vector<std::string> stages;                // quality: the ORDERED stage ladder
     };
 
     // ----- host scopes (@world): design/scope-registry.md section 6 ------------
@@ -38,6 +39,7 @@ namespace patter
     {
         std::string name, type;
         std::vector<std::string> values;               // enum / flags
+        std::vector<std::string> stages;               // quality: the ordered stage ladder
         bool hasDefault = false; PatterValue def;      // optional<PatterValue>
         bool hasWritable = false; bool writable = true;
     };

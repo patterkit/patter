@@ -57,6 +57,7 @@ namespace patter
         if (d.type == "string") return PatterValue::Str("");
         if (d.type == "flags") return PatterValue::Flags({});
         if (d.type == "enum") return PatterValue::Str(d.values.empty() ? "" : d.values[0]);
+        if (d.type == "quality") return PatterValue::Str(d.stages.empty() ? "" : d.stages[0]); // the ladder's start
         return PatterValue::Bool(false);
     }
 
@@ -100,6 +101,7 @@ namespace patter
         if (d.type == "string") return PatterValue::Str("");
         if (d.type == "flags") return PatterValue::Flags({});
         if (d.type == "enum") return PatterValue::Str(d.values.empty() ? "" : d.values[0]);
+        if (d.type == "quality") return PatterValue::Str(d.stages.empty() ? "" : d.stages[0]); // the ladder's start
         return PatterValue::Bool(false);
     }
 
@@ -341,11 +343,44 @@ namespace patter
             evalCtx_.nextRandom = [this]() { return rng(); };
             evalCtx_.visits = [this](const std::string& id) { auto it = visitCounts_.find(id); return it != visitCounts_.end() ? it->second : 0; };
             evalCtx_.patterVisits = [this](const std::string& id) { auto it = host_->sharedVisits.find(id); return it != host_->sharedVisits.end() ? it->second : 0; };
+            // The quality channel: a property's stage ladder, from wherever the declaration lives -
+            // @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
+            evalCtx_.qualities = [this](const std::string& scope, const std::string& name) { return stagesFor(scope, name); };
         }
         Flow(const Flow&) = delete;
         Flow& operator=(const Flow&) = delete;
 
         const std::string& currentScene() const { return currentSceneId_; }
+
+        // The stage ladder of `@scope.name` when it is a declared quality, else null. Names compare
+        // lowercase, as the compiler emits references. Mirrors the JS Flow.stagesFor.
+        const std::vector<std::string>* stagesFor(const std::string& scope, const std::string& name) const
+        {
+            const std::string key = toLower(name);
+            auto fromProps = [&key](const std::vector<PropertyDecl>& decls) -> const std::vector<std::string>* {
+                for (const auto& d : decls) if (d.type == "quality" && toLower(d.name) == key) return &d.stages;
+                return nullptr;
+            };
+            if (scope == "patter")
+            {
+                if (const auto* s = fromProps(host_->patterSharedDecls)) return s;
+                return fromProps(host_->patterLocalDecls);
+            }
+            if (scope == "scene")
+            {
+                auto it = host_->bundle->scenes.find(currentSceneId_);
+                if (it == host_->bundle->scenes.end()) return nullptr;
+                return fromProps(it->second.sceneProps);
+            }
+            for (const auto& spec : host_->bundle->scopeRegistry.scopes)
+            {
+                if (spec.token != scope) continue;
+                for (const auto& d : spec.declarations)
+                    if (d.type == "quality" && toLower(d.name) == key) return &d.stages;
+                return nullptr;
+            }
+            return nullptr;
+        }
 
         // The options of the choice currently waiting for the player, empty when none is pending. The same
         // list the `choice` step carries - re-readable, e.g. after restoring a save.

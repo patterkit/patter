@@ -40,6 +40,9 @@ func _init(host: Dictionary, seed_value: int) -> void:
 		"next_random": func(): return _rng(),
 		"visits": func(nid): return _visit_counts.get(nid, 0),
 		"patter_visits": func(nid): return _host["shared_visits"].get(nid, 0),
+		# The quality channel: a property's stage ladder, from wherever the declaration lives -
+		# @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
+		"qualities": func(scope, name): return _stages_for(scope, name),
 	}
 	# Declared host scopes (@world): bound by the embedder or self-backed by the engine. Registering
 	# them is what stops "@world.x" reading as a graceful false.
@@ -50,6 +53,30 @@ func _init(host: Dictionary, seed_value: int) -> void:
 
 func current_scene() -> String:
 	return _current_scene_id
+
+
+# The stage ladder of "@scope.name" when it is a declared quality, else null. Names compare
+# lowercase, as the compiler emits references. Mirrors the JS Flow.stagesFor.
+func _stages_for(scope: String, name: String):
+	var key := name.to_lower()
+	var from_decls := func(decls):
+		if decls == null:
+			return null
+		for d in decls:
+			if d.get("type", "") == "quality" and str(d.get("name", "")).to_lower() == key:
+				return d.get("stages")
+		return null
+	if scope == "patter":
+		var hit = from_decls.call(_host.get("patter_shared_decls"))
+		return hit if hit != null else from_decls.call(_host.get("patter_local_decls"))
+	if scope == "scene":
+		if _current_scene_id == "" or not _host["bundle"]["scenes"].has(_current_scene_id):
+			return null
+		return from_decls.call(_host["bundle"]["scenes"][_current_scene_id].get("sceneProps"))
+	for spec in _host["bundle"].get("scopeRegistry", {}).get("scopes", []):
+		if spec.get("token", "") == scope:
+			return from_decls.call(spec.get("declarations"))
+	return null
 
 
 # Advance repeatedly, collecting every played beat, until a choice or the end - the "play to the next

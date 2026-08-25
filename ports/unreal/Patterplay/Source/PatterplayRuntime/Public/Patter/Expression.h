@@ -24,10 +24,27 @@ namespace patter
         std::function<double()> nextRandom;
         std::function<int(const std::string&)> visits;
         std::function<int(const std::string&)> patterVisits;
+        // The quality channel (expr 0.4.0): "is @scope.name a quality, and what is its ladder?"
+        // Unset when the bundle declares no quality - evaluation is then byte-identical to before.
+        // A stage's runtime value is its NAME (a plain string); the ladder makes ordering compare
+        // by position and advance() step. Mirrors the JS EvalContext.qualities.
+        std::function<const std::vector<std::string>*(const std::string&, const std::string&)> qualities;
     };
 
     namespace detail
     {
+        // The ladder behind an operand NODE, when the context's quality channel says it references
+        // one (null otherwise). The node carries the scope+name the channel needs.
+        inline const std::vector<std::string>* ladderOf(const AstNode& node, const EvalContext& ctx)
+        {
+            if (!ctx.qualities || node.tag != AstTag::ScopedVar) return nullptr;
+            return ctx.qualities(node.scope, node.name);
+        }
+
+        // Index of a stage in a ladder; an unknown stage is an ERROR naming the value and the ladder
+        // (a drifted save is exactly what lands here), never a silent never-match.
+        inline int stageIndex(const PatterValue& value, const std::vector<std::string>& ladder, const char* op);
+
         inline const char* kindName(const PatterValue& v)
         {
             switch (v.kind)
@@ -66,6 +83,18 @@ namespace patter
 
     inline PatterValue evalCall(const AstNode& call, const EvalContext& ctx)
     {
+        // advance() is the language's own (expr 0.4.0): the NEXT stage in the argument's ladder,
+        // saturating at the last. Patter's dialect defines no advance, so the core one always runs.
+        if (call.fn == "advance")
+        {
+            if (call.args.size() != 1) throw EvalError("advance() takes exactly 1 argument, got " + std::to_string(call.args.size()));
+            const std::vector<std::string>* ladder = detail::ladderOf(*call.args[0], ctx);
+            if (!ladder) throw EvalError("advance() needs a quality reference (@scope.name of a quality property)");
+            int current = detail::stageIndex(evaluate(*call.args[0], ctx), *ladder, "advance");
+            size_t next = static_cast<size_t>(current) + 1;
+            if (next >= ladder->size()) next = ladder->size() - 1;
+            return PatterValue::Str((*ladder)[next]);
+        }
         const std::string& fn = call.fn;
         if (fn == "random")
         {
@@ -162,6 +191,26 @@ namespace patter
                 }
                 PatterValue l = evaluate(*node.left, ctx), r = evaluate(*node.right, ctx);
                 const std::string& op = node.op;
+
+                // Quality (expr 0.4.0): when either operand REFERENCES a quality, ordering compares
+                // by ladder POSITION and arithmetic is refused. == / != fall through to plain value
+                // equality - the compiler's validator holds stage names to the ladder from source.
+                const std::vector<std::string>* lLadder = detail::ladderOf(*node.left, ctx);
+                const std::vector<std::string>* rLadder = detail::ladderOf(*node.right, ctx);
+                const std::vector<std::string>* ladder = lLadder ? lLadder : rLadder;
+                if (ladder)
+                {
+                    const bool ordering = op == ">" || op == ">=" || op == "<" || op == "<=";
+                    if (ordering && lLadder && rLadder && *lLadder != *rLadder)
+                        throw EvalError("'" + op + "' compares two different qualities, whose stage orders are unrelated");
+                    if (op == ">") return PatterValue::Bool(detail::stageIndex(l, *ladder, ">") > detail::stageIndex(r, *ladder, ">"));
+                    if (op == ">=") return PatterValue::Bool(detail::stageIndex(l, *ladder, ">=") >= detail::stageIndex(r, *ladder, ">="));
+                    if (op == "<") return PatterValue::Bool(detail::stageIndex(l, *ladder, "<") < detail::stageIndex(r, *ladder, "<"));
+                    if (op == "<=") return PatterValue::Bool(detail::stageIndex(l, *ladder, "<=") <= detail::stageIndex(r, *ladder, "<="));
+                    if (op == "+" || op == "-" || op == "*" || op == "/")
+                        throw EvalError("'" + op + "' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it");
+                }
+
                 if (op == "==") return PatterValue::Bool(l.valueEquals(r));
                 if (op == "!=") return PatterValue::Bool(!l.valueEquals(r));
                 if (op == ">") { assertNumbers(l, r, ">"); return PatterValue::Bool(l.n > r.n); }
@@ -186,5 +235,14 @@ namespace patter
             }
         }
         throw EvalError("unknown ast node");
+    }
+
+    inline int detail::stageIndex(const PatterValue& value, const std::vector<std::string>& ladder, const char* op)
+    {
+        if (!value.isString()) throw EvalError(std::string("'") + op + "' on a quality compares stages, got " + detail::kindName(value));
+        for (size_t i = 0; i < ladder.size(); i++) if (ladder[i] == value.s) return static_cast<int>(i);
+        std::string joined;
+        for (const auto& s : ladder) { if (!joined.empty()) joined += ", "; joined += s; }
+        throw EvalError("\"" + value.s + "\" is not a stage of this quality (stages: " + joined + ")");
     }
 }

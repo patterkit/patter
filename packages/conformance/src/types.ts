@@ -206,9 +206,11 @@ export interface ScriptedFixture {
   project: ProjectFile;
   scenes: Scene[];
   locales?: LocaleFile[];
-  /** The EDITED scenes/locales compiled into `bundleB` for `hotSwap` scripts (project is shared). */
+  /** The EDITED scenes/locales compiled into `bundleB` for `hotSwap` scripts (project is shared
+   *  unless `projectB` overrides it - e.g. a quality's ladder growing a stage mid-production). */
   scenesB?: Scene[];
   localesB?: LocaleFile[];
+  projectB?: ProjectFile;
   seed?: number;
   script: ScriptOp[];
 }

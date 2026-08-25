@@ -4,12 +4,12 @@
 // names pruned) for the save round-trip.
 
 import type { PropertyDecl, PropertyType, ScalarValue } from "@patterkit/model";
-import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
+import { el, iconBtn, labelled, moveItem, tagChips, stageChips } from "./dom.js";
 import { bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, focusNewRow,
   PROPERTY_NAME_HINT } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
-  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"],
+  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Stages"],
 ];
 
 export interface PropertiesHandle {
@@ -43,6 +43,14 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
       sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value; });
       return sel;
     }
+    if (p.type === "quality") {
+      // Default = where the ladder starts; unset means the FIRST stage, so say so rather than "(unset)".
+      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
+      const o0 = el("option", undefined, "(first stage)") as HTMLOptionElement; o0.value = ""; sel.append(o0);
+      for (const v of p.stages ?? []) { const o = el("option", undefined, v) as HTMLOptionElement; o.value = v; if (p.default === v) o.selected = true; sel.append(o); }
+      sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value; });
+      return sel;
+    }
     if (p.type === "flags") {
       // Flags hold a SET of values (any number on at once), so there's no single default value: a flags
       // property starts empty. (Toggle flags in effects with set_flags().)
@@ -69,6 +77,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
     type.addEventListener("change", () => {
       p.type = type.value as PropertyType; delete p.default;
       if (p.type === "enum" || p.type === "flags") p.values ??= []; else delete p.values;
+      if (p.type === "quality") p.stages ??= []; else delete p.stages;
       render();
     });
 
@@ -100,6 +109,8 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
       tl.append(temp, el("span", undefined, "Temporary")); details.push(tl);
     }
     if (p.type === "enum" || p.type === "flags") details.push(labelled("Values", tagChips(p, refreshDefault)));
+    // A quality's ladder, IN ORDER: the chips carry movers because position is the meaning here.
+    if (p.type === "quality") details.push(labelled("Stages (in order)", stageChips(p, refreshDefault)));
     const purpose = el("input", "gd-input") as HTMLInputElement;
     purpose.type = "text"; purpose.placeholder = "<what this property is for (a note for your team)>"; purpose.value = p.purpose ?? "";
     purpose.addEventListener("input", () => { p.purpose = purpose.value.trim() || undefined; });
@@ -130,6 +141,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
         const c: PropertyDecl = { name: p.name.trim(), type: p.type };
         if (p.default !== undefined) c.default = p.default;
         if ((p.type === "enum" || p.type === "flags") && p.values?.length) c.values = [...p.values];
+        if (p.type === "quality" && p.stages?.length) c.stages = [...p.stages];
         if (p.shared !== undefined) c.shared = p.shared;
         if (scope === "scene" && p.temporary) c.temporary = true;
         if (p.purpose) c.purpose = p.purpose;

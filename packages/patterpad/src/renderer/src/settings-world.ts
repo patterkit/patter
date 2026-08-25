@@ -9,12 +9,12 @@
 // value() returns a clean { scopeRegistry, coverageDrivers } for the save round-trip (blank rows pruned).
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
-import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
+import { el, iconBtn, labelled, moveItem, tagChips, stageChips } from "./dom.js";
 import { bindPropertyName, bindPropertyRef, dupGuard, expandableRow, firstIllegalPropertyName,
   focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
-  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"],
+  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Stages"],
 ];
 
 /** A flat host-scope property row, carrying its scope token alongside the declaration (grouped on save). */
@@ -78,6 +78,14 @@ export function mountWorld(
       sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value; });
       return sel;
     }
+    if (p.type === "quality") {
+      // Default = where the ladder starts; unset means the FIRST stage, so say so rather than "(unset)".
+      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
+      const o0 = el("option", undefined, "(first stage)") as HTMLOptionElement; o0.value = ""; sel.append(o0);
+      for (const v of p.stages ?? []) { const o = el("option", undefined, v) as HTMLOptionElement; o.value = v; if (p.default === v) o.selected = true; sel.append(o); }
+      sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value; });
+      return sel;
+    }
     if (p.type === "flags") {
       const s = el("span", "gd-flagnote", "starts empty");
       s.dataset.tip = "A flags property begins with no flags set; turn them on in effects with set_flags().";
@@ -110,6 +118,7 @@ export function mountWorld(
     type.addEventListener("change", () => {
       p.type = type.value as PropertyType; delete p.default;
       if (p.type === "enum" || p.type === "flags") p.values ??= []; else delete p.values;
+      if (p.type === "quality") p.stages ??= []; else delete p.stages;
       renderScopes();
     });
 
@@ -132,6 +141,8 @@ export function mountWorld(
 
     const details: HTMLElement[] = [roLabel];
     if (p.type === "enum" || p.type === "flags") details.push(labelled("Values", tagChips(p, refreshDefault)));
+    // A quality's ladder, IN ORDER: the chips carry movers because position is the meaning here.
+    if (p.type === "quality") details.push(labelled("Stages (in order)", stageChips(p, refreshDefault)));
     return expandableRow({ line: [ref, type, dflt, acts], details });
   };
 
@@ -240,6 +251,7 @@ export function mountWorld(
         const decl: HostScopeDecl = { name, type: r.type };
         if (r.default !== undefined) decl.default = r.default;
         if ((r.type === "enum" || r.type === "flags") && r.values?.length) decl.values = [...r.values];
+        if (r.type === "quality" && r.stages?.length) decl.stages = [...r.stages];
         if (r.writable === false) decl.writable = false;
         declarations.push(decl);
       }

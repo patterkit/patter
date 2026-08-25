@@ -260,8 +260,10 @@ export interface BootState {
 export interface ConditionProperty {
   scope: string;
   name: string;
-  type: "boolean" | "number" | "string" | "enum" | "flags";
+  type: "boolean" | "number" | "string" | "enum" | "flags" | "quality";
   enumValues?: string[];
+  /** A quality's ordered stage ladder (drives validation and the value picker's choices). */
+  stages?: string[];
   /** Author's note on what the property is for - shown as a hint in the picker. */
   purpose?: string;
 }

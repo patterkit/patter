@@ -229,6 +229,7 @@ export function hostScopesToSpec(reg?: HostScopeRegistry): ScopeRegistrySpec | u
               name: d.name,
               type: d.type,
               ...(d.values ? { values: d.values } : {}),
+              ...(d.stages ? { stages: d.stages } : {}),
               ...(d.default !== undefined ? { default: d.default } : {}),
               ...(d.writable === false ? { writable: false } : {}),
             })),
@@ -255,11 +256,11 @@ export function buildSchema(
   sceneProps: PropertyDecl[] = [],
   foreign?: ScopeRegistrySpec,
 ): ExpressionSchema {
-  const properties = new Map<string, Map<string, { type: ExprPropertyType; enumValues?: string[] }>>();
+  const properties = new Map<string, Map<string, { type: ExprPropertyType; enumValues?: string[]; stages?: string[] }>>();
   const put = (scope: string, decl: PropertyDecl): void => {
     let m = properties.get(scope);
     if (!m) { m = new Map(); properties.set(scope, m); }
-    m.set(decl.name.toLowerCase(), { type: decl.type, enumValues: decl.values });
+    m.set(decl.name.toLowerCase(), { type: decl.type, enumValues: decl.values, stages: decl.stages });
   };
   for (const decl of project.properties ?? []) put("patter", decl);
   for (const decl of sceneProps) put("scene", decl);
@@ -267,8 +268,8 @@ export function buildSchema(
   for (const scope of foreign?.scopes ?? []) {
     if (known.has(scope.token)) continue;      // never let a foreign spec shadow patter/scene
     if (!scope.declarations?.length) continue; // opaque scope
-    const m = new Map<string, { type: ExprPropertyType; enumValues?: string[] }>();
-    for (const d of scope.declarations) m.set(d.name.toLowerCase(), { type: d.type, enumValues: d.values });
+    const m = new Map<string, { type: ExprPropertyType; enumValues?: string[]; stages?: string[] }>();
+    for (const d of scope.declarations) m.set(d.name.toLowerCase(), { type: d.type, enumValues: d.values, stages: d.stages });
     properties.set(scope.token, m);
   }
   return { properties };

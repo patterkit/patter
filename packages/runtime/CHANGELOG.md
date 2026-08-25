@@ -25,6 +25,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **The `quality` property type: a story stage as an ordered ladder of named stages.** The value is a
+  stage name; ordering operators compare by ladder POSITION, `advance(@q)` steps to the next stage
+  saturating at the last, and a save carries the stage by name - so a stage inserted mid-production
+  shifts nothing. Declared with `stages` on the property; seeds at the first stage. Corpus-locked
+  across all four runtimes (gating, stepping, and the insertion story through a live hot swap).
+
 ## [0.5.0] - 2026-08-21
 
 ### Added

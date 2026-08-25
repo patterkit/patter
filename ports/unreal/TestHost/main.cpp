@@ -90,6 +90,7 @@ static PropertyDecl parsePropDecl(const JsonValue& p)
     if (const JsonValue* tp = p.find("temporary")) d.temporary = tp->b;
     if (const JsonValue* df = p.find("default")) { d.hasDefault = true; d.def = toValue(*df); }
     if (const JsonValue* vs = p.find("values")) d.values = strList(*vs);
+    if (const JsonValue* st = p.find("stages")) d.stages = strList(*st);
     return d;
 }
 
@@ -98,6 +99,7 @@ static HostScopeDecl parseHostDecl(const JsonValue& d)
     HostScopeDecl h;
     h.name = d.at("name").str; h.type = d.at("type").str;
     if (const JsonValue* vs = d.find("values")) h.values = strList(*vs);
+    if (const JsonValue* st = d.find("stages")) h.stages = strList(*st);
     if (const JsonValue* df = d.find("default")) { h.hasDefault = true; h.def = toValue(*df); }
     if (const JsonValue* w = d.find("writable")) { h.hasWritable = true; h.writable = w->b; }
     return h;

@@ -748,6 +748,7 @@ namespace Patterkit.Patterplay.TestHost
             Name = d.GetProperty("name").GetString(),
             Type = d.GetProperty("type").GetString(),
             Values = d.TryGetProperty("values", out var vs) ? vs.EnumerateArray().Select(x => x.GetString()).ToList() : null,
+            Stages = d.TryGetProperty("stages", out var st) ? st.EnumerateArray().Select(x => x.GetString()).ToList() : null,
             Default = d.TryGetProperty("default", out var df) ? ToValue(df) : null,
             Writable = d.TryGetProperty("writable", out var w) ? w.GetBoolean() : (bool?)null,
         };
@@ -760,6 +761,7 @@ namespace Patterkit.Patterplay.TestHost
             Temporary = p.TryGetProperty("temporary", out var tp) && tp.GetBoolean(),
             Default = p.TryGetProperty("default", out var df) ? ToValue(df) : null,
             Values = p.TryGetProperty("values", out var vs) ? vs.EnumerateArray().Select(x => x.GetString()).ToList() : null,
+            Stages = p.TryGetProperty("stages", out var st) ? st.EnumerateArray().Select(x => x.GetString()).ToList() : null,
         };
 
         private static GameDataField ParseGameDataField(JsonElement f) => new GameDataField

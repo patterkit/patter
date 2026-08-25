@@ -94,6 +94,7 @@ const stub = {
       { scope: "patter", name: "reputation", type: "number" },
       { scope: "patter", name: "quest_flags", type: "flags", enumValues: ["rats_cleared", "paid", "betrayed"] },
       { scope: "patter", name: "mood", type: "enum", enumValues: ["calm", "tense", "hostile"] },
+      { scope: "patter", name: "negotiation", type: "quality", stages: ["not_started", "underway", "done", "aftermath"] },
       { scope: "scene", name: "asked_about_work", type: "boolean" },
     ],
   }),

@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **The Stages property type** (a `quality`: a story stage as an ordered ladder). Declared in
+  Settings ▸ Properties or World Properties like a List, except the stage chips carry ‹ › movers,
+  because for a ladder the order is the meaning: conditions compare by position ("at or past done")
+  and `advance()` steps along it. Stage names are validated in conditions, the value picker offers
+  the ladder's stages, the default picker reads "(first stage)", and coverage runs walk the stages.
+
 ## [0.10.0] - 2026-08-25
 
 ### Added

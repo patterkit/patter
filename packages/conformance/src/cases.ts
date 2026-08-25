@@ -1421,6 +1421,110 @@ const scriptedCastAbsent = {
   ],
 } satisfies ScriptedFixture;
 
+
+// --- quality properties (expr 0.4.0) -----------------------------------------
+//
+// A story stage as an ORDERED ladder of named stage strings. The value is the stage NAME (a plain
+// string in bags and saves); the ladder - `stages` on the declaration, baked into the bundle - is what
+// makes ordering compare by POSITION and advance() step. The stage names are chosen so alphabetical
+// order disagrees with ladder order: an engine comparing strings instead of positions fails loudly.
+
+const qualityProject = (stages: string[]) => project({
+  properties: [{ name: "negotiation", type: "quality", stages, shared: true }],
+});
+const QUALITY_STAGES = ["not_started", "underway", "done", "aftermath"];
+
+// Gating: three sibling snippets probe the quality (positional >=, exact ==, else). Seeded at the
+// FIRST stage, the fallthrough plays; the interpolation shows the stage name travelling as a string.
+const qualityGates = {
+  name: "quality: seeds at the first stage and gates by ladder position",
+  project: qualityProject(QUALITY_STAGES),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b_probe", type: "block", name: "Probe", children: [
+      { id: "sn_past", type: "snippet", condition: '@negotiation >= "done"', beats: [{ id: "T_past", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_mid", type: "snippet", condition: '@negotiation == "underway"', beats: [{ id: "T_mid", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_pre", type: "snippet", beats: [{ id: "T_pre", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  locales: [loc("s", { T_past: "past", T_mid: "mid", T_pre: "pre {@negotiation}" })],
+  expectedTranscript: [
+    { type: "text", id: "T_pre", text: "pre not_started" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// advance(): each pass through the block steps the ladder ONE stage and saturates at the last -
+// "aftermath" holds on the fourth and fifth passes, with no wrap and no error. Alphabetically
+// "underway" < "done" is FALSE ("u" > "d"), so the third pass's gate proves positional comparison
+// on the moved value too.
+const qualityAdvance = {
+  name: "quality: advance() steps one stage per pass and saturates at the last",
+  project: qualityProject(QUALITY_STAGES),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b", type: "block", name: "B", children: [
+      { id: "sn", type: "snippet", beats: [{ id: "T", kind: "text" }],
+        onExit: [{ kind: "set", target: "@negotiation", value: "advance(@negotiation)" }],
+        jump: { to: "b_loop" } },
+      { id: "sn_stop", type: "snippet", condition: '@negotiation >= "aftermath"', beats: [{ id: "T_stop", kind: "text" }], jump: { to: "END" } },
+    ] },
+    { id: "b_loop", type: "block", name: "loop", gameId: "loop", children: [
+      { id: "sn_back", type: "snippet", condition: '@negotiation < "aftermath"', beats: [{ id: "T_back", kind: "text" }], jump: { to: "b" } },
+      { id: "sn_done", type: "snippet", beats: [{ id: "T_done", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  locales: [loc("s", { T: "step to {@negotiation}", T_stop: "stop", T_back: "at {@negotiation}", T_done: "done at {@negotiation}" })],
+  expectedTranscript: [
+    { type: "text", id: "T", text: "step to not_started" },   // onExit runs on LEAVING: text shows the pre-step stage
+    { type: "text", id: "T_back", text: "at underway" },
+    { type: "text", id: "T", text: "step to underway" },
+    { type: "text", id: "T_back", text: "at done" },
+    { type: "text", id: "T", text: "step to done" },
+    { type: "text", id: "T_done", text: "done at aftermath" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// The insertion story, end to end: the save carries "done" BY NAME; the hot-swapped bundle's ladder
+// has grown a stage before it. Restoring by name lands on "done" still (by index it would land on the
+// inserted "confrontation"), and the >= gate reads the NEW ladder's positions.
+const scriptedQualityInsertion = {
+  name: "quality: a stage inserted mid-production shifts nothing (save by name)",
+  project: qualityProject(QUALITY_STAGES),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b_set", type: "block", name: "Set", children: [
+      { id: "sn_set", type: "snippet", beats: [{ id: "T_set", kind: "text" }],
+        onExit: [{ kind: "set", target: "@negotiation", value: '"done"' }], jump: { to: "END" } },
+    ] },
+    { id: "b_probe", type: "block", name: "Probe", gameId: "probe", children: [
+      { id: "sn_past", type: "snippet", condition: '@negotiation >= "done"', beats: [{ id: "T_past", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_pre", type: "snippet", beats: [{ id: "T_pre", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  locales: [loc("s", { T_set: "set", T_past: "past {@negotiation}", T_pre: "pre" })],
+  projectB: qualityProject(["not_started", "underway", "confrontation", "done", "aftermath"]),
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b_set", type: "block", name: "Set", children: [
+      { id: "sn_set", type: "snippet", beats: [{ id: "T_set", kind: "text" }],
+        onExit: [{ kind: "set", target: "@negotiation", value: '"done"' }], jump: { to: "END" } },
+    ] },
+    { id: "b_probe", type: "block", name: "Probe", gameId: "probe", children: [
+      { id: "sn_past", type: "snippet", condition: '@negotiation >= "done"', beats: [{ id: "T_past", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_pre", type: "snippet", beats: [{ id: "T_pre", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  localesB: [loc("s", { T_set: "set", T_past: "past {@negotiation}", T_pre: "pre" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s", block: "set" },
+    { op: "advance", expect: [{ type: "text", id: "T_set", text: "set" }] },
+    { op: "advance", expect: [{ type: "end" }] },      // leaving sn_set runs the onExit: @negotiation = "done"
+    { op: "saveLoad" },                                 // the stage survives a save as its NAME
+    { op: "hotSwap" },                                  // ...and lands in the GROWN ladder
+    { op: "goto", scene: "s", block: "probe", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_past", text: "past done" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -1467,12 +1571,12 @@ export const cases: Fixtures = {
     crossScene, cycle, once, voiced, escaped, shuffle, sequence,
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
-    characterName, localeActive, idsMode, tagsAccumulate,
+    characterName, localeActive, idsMode, tagsAccumulate, qualityGates, qualityAdvance,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ],
   scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
-    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent],
+    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedQualityInsertion],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
 };

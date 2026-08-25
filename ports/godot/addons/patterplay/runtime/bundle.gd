@@ -45,6 +45,10 @@ static func host_scope_default(decl: Dictionary):
 		"enum":
 			var vals: Array = decl.get("values", [])
 			return str(vals[0]) if vals.size() > 0 else ""
+		"quality":
+			# The ladder's start: a quality seeds at its FIRST stage.
+			var stages: Array = decl.get("stages", [])
+			return str(stages[0]) if stages.size() > 0 else ""
 	return false
 
 
@@ -64,6 +68,10 @@ static func prop_default(decl: Dictionary):
 		"enum":
 			var vals: Array = decl.get("values", [])
 			return vals[0] if not vals.is_empty() else ""
+		"quality":
+			# The ladder's start: a quality seeds at its FIRST stage.
+			var stages: Array = decl.get("stages", [])
+			return stages[0] if not stages.is_empty() else ""
 	return false
 
 

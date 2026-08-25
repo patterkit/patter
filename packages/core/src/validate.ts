@@ -492,6 +492,22 @@ function checkDecls(decls: PropertyDecl[] | undefined, where: string, issues: Va
       issues.push({ code: "invalid-declaration",
         message: `${where}: '${decl.name}' is ${decl.type} but declares no values` });
     }
+    if (decl.type === "quality") {
+      // The ladder IS the meaning (comparisons are positional, advance() walks it), so a quality with
+      // fewer than two stages has nothing to order, and a duplicated stage name makes "which position?"
+      // unanswerable.
+      const stages = decl.stages ?? [];
+      if (stages.length < 2) {
+        issues.push({ code: "invalid-declaration",
+          message: `${where}: '${decl.name}' is a quality but declares ${stages.length === 0 ? "no stages" : "only one stage"} (a ladder needs at least two)` });
+      }
+      const seenStages = new Set<string>();
+      for (const s of stages) {
+        if (!s.trim()) issues.push({ code: "invalid-declaration", message: `${where}: '${decl.name}' has an empty stage name` });
+        else if (seenStages.has(s)) issues.push({ code: "invalid-declaration", message: `${where}: '${decl.name}' declares stage '${s}' more than once` });
+        else seenStages.add(s);
+      }
+    }
     if (decl.default !== undefined && !defaultMatchesType(decl.default, decl)) {
       issues.push({ code: "invalid-declaration",
         message: `${where}: '${decl.name}' default ${JSON.stringify(decl.default)} does not match type '${decl.type}'` });
@@ -507,5 +523,6 @@ function defaultMatchesType(value: ScalarValue, decl: PropertyDecl): boolean {
     case "enum": return typeof value === "string" && (decl.values?.includes(value) ?? true);
     case "flags":
       return Array.isArray(value) && value.every((v) => typeof v === "string" && (decl.values?.includes(v) ?? true));
+    case "quality": return typeof value === "string" && (decl.stages?.includes(value) ?? true);
   }
 }
