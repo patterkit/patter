@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-25
+
 ### Added
 
 - **Game Events show their gameData inline** (#48, thanks @rubiline): the editor row reads
