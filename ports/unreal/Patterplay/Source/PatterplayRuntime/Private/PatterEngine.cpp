@@ -15,6 +15,7 @@ namespace
 		if (T == "string") return EPatterPropertyType::String;
 		if (T == "flags") return EPatterPropertyType::Flags;
 		if (T == "enum") return EPatterPropertyType::Enum;
+		if (T == "quality") return EPatterPropertyType::Quality;
 		return EPatterPropertyType::Boolean;
 	}
 
@@ -379,7 +380,7 @@ TArray<FPatterPropertyRow> UPatterEngine::ListProperties() const
 		Row.Value = Ue(R.value.toDisplayString());
 		Row.Default = Ue(R.def.toDisplayString());
 		Row.bIsDefault = R.value.valueEquals(R.def);
-		for (const std::string& V : R.values) Row.Values.Add(Ue(V));
+		for (const std::string& V : (R.type == "quality" ? R.stages : R.values)) Row.Values.Add(Ue(V));
 		Out.Add(Row);
 	}
 	return Out;

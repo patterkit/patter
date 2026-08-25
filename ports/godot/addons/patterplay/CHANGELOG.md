@@ -13,6 +13,8 @@ same runtime behaviour.
   saturating at the last, and a save carries the stage by name - so a stage inserted mid-production
   shifts nothing. Declared with `stages` on the property; seeds at the first stage. Corpus-locked
   across all four runtimes (gating, stepping, and the insertion story through a live hot swap).
+  The runtime state inspector edits a quality as a dropdown of its stage ladder, like an enum's
+  values.
 
 ## [0.5.0] - 2026-08-21
 

@@ -115,6 +115,7 @@ namespace patter
         PatterValue value;
         PatterValue def;
         std::vector<std::string> values;
+        std::vector<std::string> stages;  // quality: the ordered stage ladder (an inspector offers these)
     };
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
@@ -1442,6 +1443,7 @@ namespace patter
                 r.ref = "@" + d.name;
                 r.type = d.type;
                 r.values = d.values;
+                r.stages = d.stages;
                 r.def = propDefault(d);
                 auto it = host_.sharedPatter.find(toLower(d.name));
                 r.value = it != host_.sharedPatter.end() ? it->second : r.def;

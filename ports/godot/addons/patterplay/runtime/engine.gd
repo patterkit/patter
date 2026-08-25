@@ -351,6 +351,7 @@ func list_properties() -> Array:
 			"value": _host["shared_patter"].get(nm),
 			"default": PatterBundle.prop_default(d),
 			"values": d.get("values", []),
+			"stages": d.get("stages", []),
 		})
 	return rows
 

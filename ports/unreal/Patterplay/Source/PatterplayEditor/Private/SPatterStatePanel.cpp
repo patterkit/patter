@@ -192,6 +192,7 @@ TSharedRef<SWidget> SPatterStatePanel::BuildRow(TWeakObjectPtr<UPatterEngine> En
 		break;
 
 	case EPatterPropertyType::Enum:
+	case EPatterPropertyType::Quality: // a stage edits as a dropdown of its ladder (Row.Values carries it)
 	{
 		TSharedRef<TArray<TSharedPtr<FString>>> Options = MakeShared<TArray<TSharedPtr<FString>>>();
 		for (const FString& V : Row.Values) { Options->Add(MakeShared<FString>(V)); }

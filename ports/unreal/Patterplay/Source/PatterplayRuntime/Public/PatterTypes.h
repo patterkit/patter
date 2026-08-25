@@ -22,7 +22,9 @@ enum class EPatterPropertyType : uint8
 	Number,
 	String,
 	Flags,
-	Enum
+	Enum,
+	// A quality: a story stage on an ordered ladder (appended, so existing Blueprint assets keep their values).
+	Quality
 };
 
 /** One author Game Data value: name, value type, and the value as a display string. Carried by
@@ -91,7 +93,8 @@ struct FPatterPropertyRow
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Default;
 
-	// Enum options (only populated when Type == Enum).
+	// The closed choice list: an enum's options (Type == Enum), or a quality's stage ladder IN ORDER
+	// (Type == Quality) - either way, what a UI offers as the value choices.
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Values;
 

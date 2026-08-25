@@ -581,6 +581,7 @@ namespace Patterkit.Patterplay
                     Name = d.Name,
                     Type = d.Type,
                     Values = d.Values,
+                    Stages = d.Stages,
                     Value = _host.SharedPatter.TryGetValue(name, out var v) ? v : PropDefault(d),
                     Default = PropDefault(d),
                 });
@@ -748,8 +749,9 @@ namespace Patterkit.Patterplay
     {
         public string Ref;          // "@hp"
         public string Name;
-        public string Type;         // bool | number | string | flags | enum
+        public string Type;         // boolean | number | string | flags | enum | quality
         public List<string> Values; // enum options
+        public List<string> Stages; // quality: the ordered stage ladder (an inspector offers these)
         public PatterValue Value;
         public PatterValue Default;
     }

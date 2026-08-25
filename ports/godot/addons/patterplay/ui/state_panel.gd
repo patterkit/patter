@@ -172,9 +172,10 @@ func _make_widget(e, row: Dictionary) -> Control:
 			le.text = str(row["value"]) if row["value"] != null else ""
 			le.text_submitted.connect(_on_string.bind(e, ref))
 			return le
-		"enum":
+		"enum", "quality":
+			# A quality edits as a dropdown of its STAGE LADDER - closed, like an enum's values.
 			var ob := OptionButton.new()
-			var opts: Array = row.get("values", [])
+			var opts: Array = row.get("stages", []) if row.get("type", "") == "quality" else row.get("values", [])
 			for o in opts:
 				ob.add_item(str(o))
 			var cur := opts.find(row["value"]) if row["value"] != null else -1
@@ -207,7 +208,7 @@ func _refresh_values() -> void:
 				(widget as SpinBox).set_value_no_signal(float(value) if value != null else 0.0)
 			"string":
 				(widget as LineEdit).text = str(value) if value != null else ""
-			"enum":
+			"enum", "quality":
 				var ob := widget as OptionButton
 				var i := ob.get_item_index(ob.get_selected_id())
 				if value != null and ob.get_item_text(max(i, 0)) != str(value):

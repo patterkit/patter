@@ -133,8 +133,9 @@ namespace Patterkit.Patterplay.Editor
                 case "string":
                     return PatterValue.Str(EditorGUILayout.TextField(row.Value.IsString ? row.Value.AsString : ""));
                 case "enum":
+                case "quality": // a stage edits as a dropdown of its LADDER - closed, like an enum's values
                 {
-                    var opts = row.Values ?? new List<string>();
+                    var opts = (row.Type == "quality" ? row.Stages : row.Values) ?? new List<string>();
                     int cur = row.Value.IsString ? Mathf.Max(0, opts.IndexOf(row.Value.AsString)) : 0;
                     int next = EditorGUILayout.Popup(cur, opts.ToArray());
                     return opts.Count > 0 ? PatterValue.Str(opts[Mathf.Clamp(next, 0, opts.Count - 1)]) : row.Value;
