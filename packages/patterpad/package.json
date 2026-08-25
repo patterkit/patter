@@ -32,7 +32,7 @@
     "@patterkit/model": "0.4.0",
     "@patterkit/ops": "0.3.6",
     "@patterkit/patterpad-surface": "0.0.0",
-    "@patterkit/runtime": "0.5.1",
+    "@patterkit/runtime": "0.6.0",
     "@wildwinter/app-shell": "^0.31.0",
     "@wildwinter/expr-editor": "^0.12.3",
     "@wildwinter/simple-vc-lib": "^0.4.1",

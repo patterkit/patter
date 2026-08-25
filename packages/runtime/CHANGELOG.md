@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-25
+
 ### Added
 
 - **The `quality` property type: a story stage as an ordered ladder of named stages.** The value is a
