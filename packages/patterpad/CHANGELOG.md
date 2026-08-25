@@ -6,7 +6,23 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Game Events show their gameData inline** (#48, thanks @rubiline): the editor row reads
+  `⚙ cue: camera_focus · target: barkeep` instead of a bare gear, so you can tell which event is
+  which while reading the script - one line, ellipsized before it ever wraps, live as the inspector
+  edits it. The readable-script export carries every field too (it silently capped at three), and a
+  long field list wraps rather than truncating.
+- **A project says where it lives on disk.** The Project view shows the full path under the title
+  (click it to reveal the folder in Finder / your file manager), and the project name in the top bar
+  carries the path as a tooltip - so two projects with the same name are no longer indistinguishable.
+
 ### Fixed
+
+- **A readable-script PDF no longer draws stray lines down the page after a page break.** A dialogue
+  line starting near the foot of a page, with its text flowing onto the next, left its snippet edge
+  drawn most of the way down the following page and its speaker name stranded far from its words.
+  (Thanks to the reporter's project for the reproduction.)
 
 - **The Replace preview shows the replacement again.** Its row was one no-wrap line, so at the search
   window's default width a line of dialogue of ordinary length was cut off before the arrow: you saw

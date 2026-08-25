@@ -110,6 +110,9 @@ const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bo
 const recentsEl = $("recents");
 const recentsLabel = $("recents-label");
 const overviewEl = $("overview"); // the project-overview landing (#3a)
+const overviewPathEl = $("overview-path"); // where the project lives on disk (click reveals it)
+overviewPathEl.dataset.tip = navigator.platform.toUpperCase().includes("MAC") ? "Show in Finder" : "Show in file manager";
+overviewPathEl.addEventListener("click", () => window.patter.revealProject());
 const overviewTitleEl = $("overview-title");
 const overviewStatsEl = $("overview-stats");
 const overviewProgressEl = $("overview-progress");
@@ -1796,6 +1799,9 @@ async function showProject(open: OpenResult): Promise<void> {
   debugLink.setVisible(true); // the bottom-right live-debug-link control is available once a project is open
   saver.setAuto(project.autosave); // the project's setting (default on); off stops the clock, not the flushes
   projectNameEl.textContent = project.name;
+  // Two projects can share a name; the disk path is what tells them apart. The topbar name carries it
+  // as a tooltip, and the overview shows it in full (with a click-to-reveal).
+  projectNameEl.dataset.tip = project.root;
   currentSceneId = null;
   await buildSpellcheck(); // build the spell engine before the first scene mounts (#177); it pushes on mount
   // A project opened with a remembered scene drops straight into it; a never-opened one lands on the
@@ -1835,6 +1841,7 @@ async function showOverview(): Promise<void> {
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true; // the overview is a calm screen, no bars
   projectNameEl.textContent = project.name;
+  projectNameEl.dataset.tip = project.root;
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = "";
   await hydrateProject(); // the index needs every scene, not just the lazy-loaded landing one
   renderOverview();
@@ -1847,6 +1854,8 @@ async function showOverview(): Promise<void> {
 function renderOverview(): void {
   if (!project) return;
   overviewTitleEl.textContent = project.name;
+  overviewPathEl.textContent = project.root;
+  overviewPathEl.hidden = false;
   const n = project.scenes.length;
   overviewStatsEl.textContent = `${n} ${n === 1 ? "scene" : "scenes"}`;
   overviewProgressEl.hidden = true;
@@ -1927,6 +1936,7 @@ function showWelcome(state: BootState): void {
   problembarEl.hidden = true; inspectorStackEl.replaceChildren(); lastInspectorCtx = null; lastInspectorSig = null; // no script -> nothing to inspect
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   projectNameEl.textContent = "Patterpad";
+  delete projectNameEl.dataset.tip; // no project, no path
   renderRecents(state.recents);
   signalReady(); // the welcome screen is up - safe to reveal the window (no-op if already revealed)
 }

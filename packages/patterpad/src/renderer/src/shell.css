@@ -478,6 +478,14 @@ body.resizing main.panes { transition: none; }
 .overview-card { width: min(42rem, 100%); } /* entrance handled by the screen-level cross-fade */
 .overview-title { margin: 0 0 0.3rem; font: 700 2.2rem/1.1 var(--font-read); color: var(--ink); }
 .overview-stats { color: var(--muted); font: 0.9rem var(--font-ui); margin-bottom: 1rem; }
+/* The project's place on disk - what tells two same-named projects apart. A quiet mono line the
+   width of its text; clicking reveals the folder in the platform file manager. */
+.overview-path {
+  display: block; margin: -0.1rem 0 0.5rem; padding: 0; border: none; background: none; cursor: pointer;
+  color: var(--muted); font: 0.78rem var(--font-mono); text-align: left;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.overview-path:hover { color: var(--accent); }
 .overview-progress { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 2rem; }
 .overview-progress[hidden] { display: none; }
 .overview-bar { flex: 1; height: 0.4rem; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--ink) 10%, transparent); overflow: hidden; }

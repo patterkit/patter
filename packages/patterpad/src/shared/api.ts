@@ -877,6 +877,9 @@ export interface PatterApi {
   setTheme(theme: ThemePrefs): Promise<void>;
   /** Open a URL in the user's browser. Main enforces an allow-list (About-dialog links only). */
   openExternal(url: string): void;
+  /** Reveal the open project's folder in the platform file manager. Main uses its own record of the
+   *  root (nothing renderer-supplied); a no-op when no project is open. */
+  revealProject(): void;
   /** Subscribe to native-menu commands (File/Run/Edit/View) - "new" | "open" | "save" | "play" |
    *  "undo" | "redo" | "toggle-nav" | "toggle-inspector" | "open-recent:<path>". */
   onMenu(handler: (cmd: string) => void): void;

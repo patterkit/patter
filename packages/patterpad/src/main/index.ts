@@ -1091,6 +1091,12 @@ function registerIpc(): void {
   ipcMain.handle("app:openExternal", (_e, url: string) => {
     if (ABOUT_LINKS.has(url)) void shell.openExternal(url);
   });
+  // Reveal the OPEN project in the platform file manager. Main's own record of the root, nothing
+  // renderer-supplied (same philosophy as openPath / openExternal above).
+  ipcMain.handle("app:revealProject", () => {
+    const root = project.currentRoot();
+    if (root) shell.showItemInFolder(root);
+  });
 }
 
 /** The About dialog's links (the only external URLs the renderer can open). */

@@ -296,6 +296,7 @@ const stub = {
   resetWindows: async () => undefined, // Reset View rescues all windows (inert in the browser preview)
   setTheme: async () => undefined,
   openExternal: (url: string) => { window.open(url, "_blank"); }, // About-dialog links: a real tab in the preview
+  revealProject: () => { console.log("[preview] revealProject"); }, // no file manager in a browser
   search: async (q: string) => { // MAIN search: Game ID / title / text content
     const ql = q.toLowerCase();
     return SEARCH_INDEX.filter((e) => (e.gameId?.toLowerCase().includes(ql)) || (e.name?.toLowerCase().includes(ql)) || (e.text?.toLowerCase().includes(ql)) || e.id.toLowerCase().includes(ql));

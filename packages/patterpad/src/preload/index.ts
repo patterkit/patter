@@ -114,6 +114,7 @@ const api: PatterApi = {
   setPanes: (panes) => ipcRenderer.invoke("panes:set", panes),
   setTheme: (theme) => ipcRenderer.invoke("theme:set", theme),
   openExternal: (url) => { void ipcRenderer.invoke("app:openExternal", url); },
+  revealProject: () => { void ipcRenderer.invoke("app:revealProject"); },
   onMenu: (handler) => { ipcRenderer.on("menu", (_e, cmd: string) => handler(cmd)); },
   onOpenProject: (handler) => { ipcRenderer.on("project:open", (_e, result: OpenResult) => handler(result)); },
   onUpdaterCheckDirty: (handler) => { ipcRenderer.on("updater:check-dirty", () => ipcRenderer.send("updater:dirty-reply", handler())); },
