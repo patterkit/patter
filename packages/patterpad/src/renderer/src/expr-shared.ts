@@ -14,10 +14,17 @@ import type { ConditionProperty } from "../../shared/api.js";
 export const SCOPE_ORDER = ["patter", "scene"];
 
 export const catalogueFrom = (props: ConditionProperty[]): CatalogueEntry[] =>
-  // A quality's stages ride the catalogue's enumValues channel: the editor offers a comparison peer's
-  // enumValues as value choices, so `@scope.q == ...` gets a stage picker without a stages-aware
-  // editor release. (Validation still knows the real ladder via the schema below.)
-  props.map((p) => ({ scope: p.scope, name: p.name, type: p.type, enumValues: p.type === "quality" ? p.stages : p.enumValues, ...(p.purpose ? { purpose: p.purpose } : {}) }));
+  // A quality's ladder goes in `stages`, its own channel since expr-editor 0.11.0. It used to ride
+  // `enumValues`, which bought a value picker and nothing else: the editor could not tell a ladder
+  // from a list, so it withheld the ordering operators and would not even offer the property as a
+  // comparison subject. Passing the real thing is what turns "at or past a stage" into a clause a
+  // writer can build.
+  props.map((p) => ({
+    scope: p.scope, name: p.name, type: p.type,
+    ...(p.enumValues ? { enumValues: p.enumValues } : {}),
+    ...(p.stages ? { stages: p.stages } : {}),
+    ...(p.purpose ? { purpose: p.purpose } : {}),
+  }));
 
 export function schemaFrom(props: ConditionProperty[]): ExpressionSchema {
   const m = new Map<string, Map<string, PropertyMeta>>();

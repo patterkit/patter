@@ -13,6 +13,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   because for a ladder the order is the meaning: conditions compare by position ("at or past done")
   and `advance()` steps along it. Stage names are validated in conditions, the value picker offers
   the ladder's stages, the default picker reads "(first stage)", and coverage runs walk the stages.
+  Conditions on a quality are built the same way as any other: the property is offered in the clause
+  wizard, with the ORDERING operators ("at or past a stage") and its stages listed in ladder order,
+  and an outcome targeting one starts as `advance(...)` - which needs expr-editor 0.11.0, released
+  for this.
 
 ## [0.10.0] - 2026-08-25
 
