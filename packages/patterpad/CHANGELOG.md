@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-08-25
+
 ### Fixed
 
 - **A pinned tool window no longer floats over every other application.** Pin meant "stay on top",
