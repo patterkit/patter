@@ -248,17 +248,46 @@ function atomDeleteButton(view: import("prosemirror-view").EditorView, getPos: (
   return del;
 }
 
-export const gameEventView: NodeViewConstructor = (_node, view, getPos) => {
+/** A game event's inline label (#48): its `gameData` fields, so the script reads WHICH event this is
+ *  without opening the inspector. Sparse by design - exactly what the author set on this beat (the
+ *  type's field defaults are the inspector's business); the plain "game event" when nothing is set.
+ *  Value-less fields (empty string / null) show as the bare key. */
+function gameEventFields(node: PMNode): string {
+  const gd = rawAttr(node).gameData;
+  if (gd && typeof gd === "object" && !Array.isArray(gd)) {
+    const parts = Object.entries(gd as Record<string, unknown>).map(([k, v]) =>
+      v == null || v === "" ? k : `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
+    if (parts.length) return parts.join(" · ");
+  }
+  return "game event";
+}
+
+export const gameEventView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "beat kind-gameEvent"; dom.contentEditable = "false";
-  const glyph = document.createElement("span"); glyph.className = "atom-glyph"; glyph.textContent = "⚙ game event";
-  dom.append(glyph, atomDeleteButton(view, getPos));
+  const glyph = document.createElement("span"); glyph.className = "atom-glyph"; glyph.textContent = "⚙";
+  const fields = document.createElement("span"); fields.className = "atom-fields";
+  // The inline line ellipsizes rather than wrap, so the HOVER carries the whole list (the docnotes /
+  // comment-chip idiom): a long event stays one quiet row and still answers in full on approach. No
+  // gameData = the plain "game event" label and NO tip - a tooltip repeating visible text is noise.
+  const setFields = (n: PMNode): void => {
+    const label = gameEventFields(n);
+    fields.textContent = label;
+    if (label === "game event") delete fields.dataset.tip; else fields.dataset.tip = label;
+  };
+  setFields(node);
+  dom.append(glyph, fields, atomDeleteButton(view, getPos));
   // A game event is an atom with no caret position: clicking it node-selects it so it visibly reads as the
   // current object (PM adds .ProseMirror-selectednode) and the inspector reflects it.
   dom.addEventListener("mousedown", (e) => selectNodeOnClick(e, view, getPos));
   wireBeatMenu(dom, view, getPos); // right-click → snippet menu with a beat-targeted "Note…" (no VO/loc on a game event)
   // Ignore attribute mutations (the play-marker `.playing` / `.visited` classes, node-selection class)
-  // so PM keeps our chrome instead of redrawing the atom and stripping it.
-  return { dom, ignoreMutation: (m) => m.type === "attributes" };
+  // so PM keeps our chrome instead of redrawing the atom and stripping it. `update` keeps the inline
+  // fields live when the inspector edits the beat's gameData (an attrs-only change PM hands us here).
+  return {
+    dom,
+    update: (n) => { if (n.type !== node.type) return false; setFields(n); return true; },
+    ignoreMutation: (m) => m.type === "attributes",
+  };
 };
 
 /** Node-select the node at `getPos` on a chrome click, so it reads as the selected object + drives the

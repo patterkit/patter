@@ -542,6 +542,13 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   display: flex; justify-content: flex-end; align-items: center; gap: 0.4rem; margin: 0.25rem 0;
   color: var(--accent); font-size: 0.9rem; user-select: none;
 }
+/* The event's gameData, inline (#48): machine text, so the design-language mono; one line that yields
+   real estate gracefully - it shrinks and ellipsizes before it ever wraps the row. */
+.beat.kind-gameEvent .atom-fields {
+  min-width: 0; flex: 0 1 auto;
+  font: 0.78rem var(--font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* group container: a left RAIL + an always-visible structural label (groups §3).
    Nesting reads as nested rails. The label is persistent (structure the author must

@@ -130,7 +130,10 @@ function targetLabel(to: string, sceneOf: Map<string, string>, blockTrail: Map<s
 function gameEventLabel(beat: GameEventBeat): string {
   const gd = beat.gameData;
   if (gd && typeof gd === "object") {
-    const parts = Object.entries(gd).slice(0, 3).map(([k, v]) => {
+    // ALL the fields, not a sample (#48): a team driving cutscenes off gameData reads the script to
+    // see where things happen, and a silently-dropped fourth field reads as "not set here". The PDF
+    // wraps a long event line rather than truncating it.
+    const parts = Object.entries(gd).map(([k, v]) => {
       const val = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
       return val === "" ? k : `${k}: ${val}`;
     });

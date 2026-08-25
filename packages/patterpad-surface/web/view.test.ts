@@ -34,7 +34,9 @@ describe("EditorView renders the real shard in the zone model (jsdom)", () => {
     // narration (text) beats outside the option PROMPT cells, + the four option PROMPT cells (§13.10)
     expect(dom.querySelectorAll(".option-prompt").length).toBe(4);
     expect(dom.querySelectorAll(".beat.kind-prose:not(.option-prompt .beat.kind-prose)").length).toBe(9);
-    expect(dom.querySelector(".beat.kind-gameEvent .atom-glyph")?.textContent).toBe("⚙ game event");
+    // The game event carries its gameData inline (#48): which event, at a glance, no inspector.
+    expect(dom.querySelector(".beat.kind-gameEvent .atom-glyph")?.textContent).toBe("⚙");
+    expect(dom.querySelector(".beat.kind-gameEvent .atom-fields")?.textContent).toBe("cue: camera_focus · target: barkeep");
     expect(dom.querySelector(".bubble.has-jump .bubble-jump")?.textContent).toBe("↪ menu");   // read-only snippet jump chip
     // the choice is a real recursive group, rendered as a rail (its options live inside it)
     const choice = dom.querySelector(".group-rail.is-choice");
@@ -136,6 +138,25 @@ describe("EditorView renders the real shard in the zone model (jsdom)", () => {
     refreshJumpLabels();                // ...so the host refreshes; the chip re-resolves past the unchanged-jump guard
     expect(chip.textContent?.trim()).toBe("↪ Specials Board");
     setJumpLabelResolver((id) => id);   // reset the shared resolver
+    view.destroy();
+  });
+});
+
+describe("the game-event inline fields (#48)", () => {
+  it("re-render when the beat's gameData changes (the inspector-edit path)", () => {
+    const mount = document.createElement("div");
+    document.body.appendChild(mount);
+    const view = new EditorView(mount, {
+      state: EditorState.create({ doc: openScene(flowSource, locSource).doc }),
+      nodeViews,
+    });
+    let pos = -1;
+    view.state.doc.descendants((n, p) => { if (n.type.name === "gameEvent") { pos = p; return false; } return true; });
+    expect(pos).toBeGreaterThanOrEqual(0);
+    const node = view.state.doc.nodeAt(pos)!;
+    const raw = JSON.stringify({ ...(JSON.parse(node.attrs.raw as string) as object), gameData: { cue: "camera_wide" } });
+    view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, raw }));
+    expect((view.dom as HTMLElement).querySelector(".beat.kind-gameEvent .atom-fields")?.textContent).toBe("cue: camera_wide");
     view.destroy();
   });
 });

@@ -35,7 +35,7 @@ function makeProject(): string {
         { id: "n1", type: "snippet", beats: [
           { id: "T1", kind: "text" },
           { id: "L1", kind: "line", character: "BARKEEP", direction: "gruff" },
-          { id: "A1", kind: "gameEvent", gameData: { event: "door.open" } }] },
+          { id: "A1", kind: "gameEvent", gameData: { event: "door.open", door: "cell", speed: 2, actor: "guard", sfx: "clank" } }] },
         { id: "g1", type: "group", selector: "choice", children: [
           { id: "o1", type: "group", prompt: { id: "P1", kind: "text" }, condition: "@gold > 5", children: [
             { id: "n2", type: "snippet", beats: [{ id: "L2", kind: "line", character: "BARKEEP" }], jump: { to: "b2" } }] },
@@ -75,6 +75,9 @@ describe("runScriptDoc", () => {
     const ge = kinds("gameEvent")[0] as Extract<ScriptElement, { kind: "gameEvent" }>;
     expect(ge.text).toContain("game event");
     expect(ge.text).toContain("door.open");
+    // ALL the fields ride along (#48) - a fourth and fifth are not silently dropped.
+    expect(ge.text).toContain("actor: guard");
+    expect(ge.text).toContain("sfx: clank");
   });
 
   it("renders a choice as a 'Choose' group label plus options carrying a flag tag", () => {
