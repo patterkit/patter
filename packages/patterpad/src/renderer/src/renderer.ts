@@ -24,7 +24,7 @@ import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type Inspector
 import { buildSpellEngine } from "./spellcheck.js";
 import { closeWithExit } from "@patterkit/patterpad-surface/exit";
 import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
-import { PROPERTIES_PLACE } from "../../shared/api.js";
+import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
@@ -484,6 +484,7 @@ function renderNav(): void {
   const propsRow = document.createElement("button");
   propsRow.className = "nav-doc"; propsRow.type = "button";
   propsRow.dataset.tip = "the project's @patter properties";
+  propsRow.dataset["vc"] = PROJECT_SHARD_KEY; // the shard key `paintVcBadges` badges this row from
   propsRow.setAttribute("aria-label", "Properties");
   propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-name", textContent: "Properties" }));
   propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-count", textContent: String(patterProps.length) }));
@@ -756,6 +757,9 @@ async function refreshVcStatus(): Promise<void> {
   const dto = await window.patter.vcStatus();
   if (!dto || !project) return; // project may have closed while we awaited
   vcMap = new Map(dto.scenes.map((s) => [s.sceneId, { key: s.sceneId, ...s }]));
+  // The project shard rides in the same map: the Properties row is badged from it, because the
+  // declarations that page edits live in the project file.
+  if (dto.project) vcMap.set(PROJECT_SHARD_KEY, { key: PROJECT_SHARD_KEY, ...dto.project });
   paintNavBadges();
   applySceneVc();
 }
@@ -2492,6 +2496,7 @@ async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
       ...s.properties.map((d): ConditionProperty => ({ scope: "patter", name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) })),
       ...sceneProps.filter((p) => p.scope !== "patter"),
     ];
+    void refreshVcStatus(); // the PROJECT shard just changed on disk: re-badge the Properties row
     await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
     void refreshProblems();  // refresh the spelling entries in the problems panel for the new setup
     pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)

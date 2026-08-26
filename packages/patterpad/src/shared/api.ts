@@ -326,6 +326,11 @@ export interface SceneVcStatus {
   untracked?: boolean;
 }
 
+/** The key the PROJECT shard is badged under, beside the scene ids. Safe as a shared key space
+ *  because a scene id is always `scn_…`; the navigator's Properties row carries this one, since the
+ *  `@patter` declarations it edits live in the project file. */
+export const PROJECT_SHARD_KEY = "@project";
+
 /** The whole project's version-control snapshot for the reactive UI (#145). */
 export interface VcStatusDto {
   /** The configured VCS (so the renderer knows whether exclusive locks are even possible). */
@@ -333,6 +338,9 @@ export interface VcStatusDto {
   /** The backend simple-vc-lib actually detected ("git" / "perforce" / "filesystem" / ...). */
   system: string;
   scenes: SceneVcStatus[];
+  /** The project file's own state, keyed by `PROJECT_SHARD_KEY`. Same shape as a scene's, minus the
+   *  id: it is one file rather than a set, so nothing folds. */
+  project?: Omit<SceneVcStatus, "sceneId">;
 }
 
 /** The outcome of a file export through a native Save dialog. `canceled` (no error) when the author

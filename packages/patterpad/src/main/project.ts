@@ -14,6 +14,7 @@ import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
+import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
 import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
@@ -710,6 +711,10 @@ export async function vcStatus(): Promise<VcStatusDto | null> {
   // scene, not an untracked one.
   if (!vcShardsMemo) {
     const refs: ShardRef[] = [];
+    // The project file is a shard like any other: it holds the `@patter` declarations the Properties
+    // page edits, so that row wants the same badge a scene row gets. `primary` because it is the only
+    // path under this key - untracked means the project file itself is new.
+    refs.push({ key: PROJECT_SHARD_KEY, path: loaded.projectFile, primary: true });
     for (const [sceneId, s] of shards) {
       if (s.flowPath && existsSync(s.flowPath)) refs.push({ key: sceneId, path: s.flowPath, primary: true });
       for (const p of [s.locPath, s.authoringPath]) {
@@ -725,7 +730,11 @@ export async function vcStatus(): Promise<VcStatusDto | null> {
   }));
   // The shell reports what it DETECTED; fall back to what the project is configured for when it detected
   // nothing (an empty project has no paths to detect from).
-  return { vcs, system: system === "filesystem" && vcs !== "none" ? vcs : system, scenes };
+  const project = states.get(PROJECT_SHARD_KEY);
+  return {
+    vcs, system: system === "filesystem" && vcs !== "none" ? vcs : system, scenes,
+    ...(project ? { project } : {}),
+  };
 }
 
 /** Read a scene's typed documentation map (spec §18) from its authoring shard: node id -> notes. */

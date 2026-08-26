@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **The Properties page carries a version-control badge**, the way a scene row does: modified, new,
+  locked by someone else, out of date. It reads the project file, which is where `@patter`
+  declarations live, and it updates the moment the page saves rather than on the next poll.
+
 ## [0.12.0] - 2026-08-26
 
 ### Added
