@@ -1,6 +1,6 @@
 ---
 title: Search and navigation
-description: "Find any line in a Patterpad project and jump straight to it: search by text, title, or Game ID, browse lines by writing status, all from a small always-on-top search window."
+description: "Find any line in a Patterpad project and jump straight to it: search by text, title, or Game ID, browse lines by writing status, all from a small search window that floats above the editor."
 ---
 
 Patterpad searches the **whole project**, every scene, not just the one you have open, and jumps you
@@ -12,7 +12,7 @@ can step through matches and keep working without losing your place.
 Press **⌘F** (macOS) / **Ctrl-F** (Windows / Linux) to open the search window. Press it again to bring
 the window back to the front if it slips behind the editor.
 
-The window floats above the editor, which stays live underneath. **Drag it by its top bar** to move it,
+The window floats above the editor (above Patterpad, not above your other apps), which stays live underneath. **Drag it by its top bar** to move it,
 and the **pin** button keeps it on top. Close it with **✕** or **Escape**.
 
 ## Finding a line

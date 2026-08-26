@@ -25,7 +25,7 @@ Where you declare a property matters as much as its type. The scopes (`@patter`,
 | `flags` | any number of named facts, in any combination | `rel_anna`: met, warm, owes_favour |
 | `quality` | exactly one stage of an ordered ladder | `investigation`: unaware, suspicious, certain, confronted |
 
-In Patterpad these are the choices on each row of **Settings ▸ Properties**: True / False,
+In Patterpad these are the choices on each row of the **Properties** page: True / False,
 Number, Text, List, Flags and **Quality**.
 
 ## Boolean, number, string
@@ -168,14 +168,14 @@ flags.
 6. Is it one of a fixed set that only moves forwards, where "or past it" is exactly what
    you want to ask? **quality**.
 
-Patterpad's Properties tab offers all six, and the compiler checks whatever you pick:
+Patterpad's Properties page offers all six, and the compiler checks whatever you pick:
 unknown stage names, unknown enum values and unknown flag names are all errors before you
 run the project. What it cannot catch statically, such as a stage nothing ever advances
 to, comes back from [Coverage testing](/production/coverage-testing/).
 
 ## Declaring a quality in Patterpad
 
-In **Settings ▸ Properties** (or **World Properties**, for a value your game owns), pick
+On the **Properties** page (or in **Settings ▸ World Properties**, for a value your game owns), pick
 **Quality** as the type and add its **Stages (in order)**. Each stage chip carries ‹ › movers,
 because for a ladder the order is the meaning: reordering the chips reorders the story.
 A quality's default is its first stage unless you pick another.

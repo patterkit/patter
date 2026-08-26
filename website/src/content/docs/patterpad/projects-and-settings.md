@@ -23,7 +23,6 @@ sidebar:
 - **Language**: the languages your project supports and which one is the source.
 - **Game Data**: the fields each kind of beat can carry (see
   [Conditions, effects & data](/patterpad/conditions-and-data/)).
-- **Properties**: the `@patter` properties your story remembers.
 - **World Properties**: the `@world` values your game owns and your story reads
   (declaring them is covered in
   [Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)),
@@ -47,6 +46,12 @@ sidebar:
   turns captions off. Avoid `(` as the opener: parentheses open a performer direction
   at the start of a line. See [Closed captions](/play/closed-captions/).
 - **Dictionary**: spell-check setup (below).
+
+The `@patter` properties your story remembers are NOT here: they are the story's working
+vocabulary rather than configuration, so they have their own
+[**Properties** page](/setup/properties-and-data/#properties-the-storys-variables) at the top of the
+navigator. What stays in this dialog is the contract with your game (**World Properties**) and the
+settings around it.
 
 The tabs are grouped down the left (Project / Story data / Writing & audio /
 Localisation) so the list stays easy to read as it grows.

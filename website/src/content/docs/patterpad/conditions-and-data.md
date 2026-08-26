@@ -49,7 +49,8 @@ editor can offer it to you by name and catch a typo before it turns into a bug.
 
 There are three kinds, told apart by who owns them:
 
-- **`@patter`**: remembered for the whole story. Declared in Project Settings ▸ Properties.
+- **`@patter`**: remembered for the whole story. Declared on the **Properties** page, at the top of
+  the navigator.
 - **`@scene`**: the same, but written for a single scene. Declared on that scene.
 - **`@world`**: owned by your **game**, not the story, the player's class, the current
   threat level. The story only reads these; your game supplies the values while it runs.
@@ -69,6 +70,19 @@ around it are written and recorded, and nothing you already wrote needs revisiti
 The rule of thumb: **a flag records that something happened; a Quality records how far
 along a story is.** If asking "or past it" makes sense, use a Quality.
 [Property types](/format/property-types/) goes through all six with examples.
+
+### What a property chip can tell you
+
+Wherever a property appears as a chip - in a condition, in an effect, in the read-only rows
+on the inspector - it will answer two questions about itself:
+
+- **Hover it** for the note written on its declaration (the **Purpose** field), and, for a
+  Quality, its ladder of stages. Worth filling in: it is what everyone else on the project
+  reads when they meet the property in a line you wrote.
+- **Right-click it** for **Go to definition**, which opens where it is declared (the
+  Properties page, the scene's own properties, or Settings ▸ World Properties), and **Find
+  usages**, which opens the search window's property mode listing every read and write of it,
+  each with its location.
 
 ## Game Data: your own fields
 

@@ -11,9 +11,11 @@ gives you ways to strip it back, re-theme it, and get out of your own way.
 
 ## Writing View
 
-**View ▸ Writing View** (`⇧⌘M`) clears everything away: both side panes, the top bar,
-and the bottom bars, leaving only the script and the hint bar. It hides the furniture,
-never the words. Nothing is lost; it puts your exact layout back the moment you leave,
+**View ▸ Writing View** (`⇧⌘M`) clears everything away: both side panes and the bottom
+bars, leaving only the script and the hint bar. The top bar stays, faded almost out of
+sight, and firms up when you point at it - on macOS it is the window's title bar, so
+taking it away would leave the window's own buttons floating over your prose. It hides
+the furniture, never the words. Nothing is lost; it puts your exact layout back the moment you leave,
 by the same shortcut, **Esc**, or the quiet "Exit Writing View" pill at the
 bottom-left.
 

@@ -111,7 +111,10 @@ version-control system.
 
 Three columns, with the script always in the centre:
 
-- **Scenes** (left): your list of scenes. The open scene unfolds to list its **blocks** -
+- **Scenes** (left): the **Properties** page sits at the top, above your scenes, showing how many
+  `@patter` properties the project declares (see
+  [Conditions, effects & data](/patterpad/conditions-and-data/#properties-the-storys-memory)).
+  Below it, your list of scenes. The open scene unfolds to list its **blocks** -
   the block your cursor is in stays marked, and clicking one jumps straight to it. **Drag**
   a scene to reorder the list; the order is saved with the project (it changes nothing
   about how the story plays). Add a scene with the **+ New Scene** row at the foot of the
@@ -128,8 +131,13 @@ to reset the pane to its usual width. **View ▸ Reset View** brings both panes 
 rescues a play window that's drifted off-screen). Patterpad remembers your pane widths
 between sessions.
 
+Above the script, the top bar carries a **`←` `→` pair** that retraces the pages you have
+visited - scenes, the Properties page, the Project Overview - greyed when there is nowhere
+to go, and also on **View ▸ Back / Forward** (`⌃⌘←` / `⌃⌘→`). It is the other axis from the
+navigator: the navigator shows you where things live, Back retraces where you have been.
+
 When you want nothing but the words, **Writing View** (`⇧⌘M`) clears everything else
-away: both panes, the top bar, and the bottom bars, leaving just the script and the
+away: both panes and the bottom bars, leaving just the script and the
 hint bar. See [Reading & focus](/patterpad/reading-and-focus/).
 
 ## Saving

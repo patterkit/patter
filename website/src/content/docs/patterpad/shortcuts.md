@@ -23,6 +23,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⌘F` | Search (go to anything) |
 | `⌘⌥F` / `Ctrl-H` | Replace text across the project |
 | `⌘1` / `⌘2` | Show Scenes / Show Inspector |
+| `⌃⌘←` / `⌃⌘→` | Back / Forward through the pages you have visited (`Alt`+arrows off the Mac) |
 | `⇧⌘M` | Writing View (toggle; **Esc** also exits) |
 | `⇧⌘B` | Publish Bundle |
 | `⌘⇧R` | Review Feedback (toggle) |

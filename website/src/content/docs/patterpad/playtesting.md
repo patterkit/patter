@@ -18,7 +18,8 @@ branches, and hear how a scene lands before anyone else sees it.
   the first time).
 - To start partway in, right-click a block and choose **▶ Play block**.
 
-The window is always on top, so it floats over the editor while you work.
+The window is pinned by default, so it stays above the editor while you work - above Patterpad,
+that is, not above everything else on your screen. Unpin it from its own pin control.
 
 <figure class="doc-shot">
   <img src="/doc-images/PlayWindow.png" alt="The Play window mid-run: a header reading PLAYING FROM the-patter-tour with speed, closed-caption, audio and pin controls, a transcript of played lines, and a tray of choice buttons at the foot." />
