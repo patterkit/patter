@@ -11,6 +11,7 @@
   "main": "./out/main/index.js",
   "license": "MIT",
   "scripts": {
+    "predev": "node -e \"fs.rmSync('node_modules/.vite',{recursive:true,force:true})\"",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
