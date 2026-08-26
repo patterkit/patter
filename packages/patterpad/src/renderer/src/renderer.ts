@@ -29,6 +29,7 @@ import { renderInspector } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
 import { openConditionEditor, renderConditionPills } from "./cond-editor.js";
+import { setPropertyActions, type PropertyAction } from "./expr-shared.js";
 import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // The gameId editor is the shell's now: it IS this app's, generalised, and it
 // gained a stopPropagation on keydown that ours lacked (a Delete typed into an
@@ -2421,6 +2422,19 @@ async function boot(): Promise<void> {
   // the shell knows nothing about either app's modes: chrome rollovers would
   // break the point of a view that hides the chrome.
   initTooltips({ suppressed: () => document.body.classList.contains("writing-view") });
+  // What a property pill can answer about itself (from-storylets/property-visibility): where it is
+  // declared, and who else touches it. The editors own the pills; the destinations are all ours, so
+  // they are registered here once. The ref carries no owner and needs none - a @scene pill can only
+  // mean the scene it is being read in.
+  setPropertyActions(({ scope, name }) => {
+    const ref = scope === "patter" ? `@${name}` : `@${scope}.${name}`;
+    const go: PropertyAction | null =
+      scope === "patter" ? { label: "Go to definition", run: () => void openProjectSettings("properties") }
+      : scope === "scene" ? { label: "Go to definition", run: () => openSceneProps() }
+      : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world") }
+      : null;
+    return [...(go ? [go] : []), { label: "Find usages", run: () => openPropertyUsage(ref) }];
+  });
   // No autosave timer: the controller runs its own clock off the edits themselves.
   window.addEventListener("beforeunload", flushRemember); // closing mid-debounce still records caret + scene
   const state = await window.patter.boot();

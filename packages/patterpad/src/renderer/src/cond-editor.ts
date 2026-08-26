@@ -6,7 +6,7 @@
 import { mountExpressionEditor, renderConditionPreview, type ExpressionEditorHandle } from "@wildwinter/expr-editor";
 import { patterDialect } from "@patterkit/dialect";
 import type { ConditionProperty } from "../../shared/api.js";
-import { SCOPE_ORDER, catalogueFrom, schemaFrom, patterFunctions } from "./expr-shared.js";
+import { SCOPE_ORDER, catalogueFrom, schemaFrom, patterFunctions, propertyActions } from "./expr-shared.js";
 import { openPanel } from "./panel.js";
 import type { AnchoredPanel } from "@wildwinter/app-shell";
 
@@ -15,7 +15,7 @@ import type { AnchoredPanel } from "@wildwinter/app-shell";
  *  seen()/visits() node ids to readable names. */
 export function renderConditionPills(src: string, properties: ConditionProperty[], nodeLabel?: (id: string) => string): HTMLElement {
   const cat = catalogueFrom(properties);
-  return renderConditionPreview(src, { schema: schemaFrom(properties), dialect: patterDialect, catalogue: cat, scopeOrder: SCOPE_ORDER, ...(nodeLabel ? { nodeLabel } : {}) });
+  return renderConditionPreview(src, { schema: schemaFrom(properties), dialect: patterDialect, catalogue: cat, scopeOrder: SCOPE_ORDER, propertyActions, ...(nodeLabel ? { nodeLabel } : {}) });
 }
 
 let active: AnchoredPanel | null = null;
@@ -63,6 +63,7 @@ export function openConditionEditor(opts: {
     mode: "tree",
     text: opts.text ?? false,
     nullLabel: "always", // an empty condition is "always" eligible
+    propertyActions,
     ...(opts.pickNode ? { pickNode: opts.pickNode } : {}),
     ...(opts.nodeLabel ? { nodeLabel: opts.nodeLabel } : {}),
     onChange: opts.onChange,

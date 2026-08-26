@@ -10,6 +10,18 @@ import {
 import type { ExpressionSchema, PropertyMeta } from "@wildwinter/expr";
 import type { ConditionProperty } from "../../shared/api.js";
 
+/** The right-click menu a property pill offers (from-storylets/property-visibility): "where is this
+ *  declared" and "who else touches it", the two questions a chip in an expression cannot answer by
+ *  itself. The actions are the RENDERER's to run - it owns the settings dialog, the scene-props
+ *  editor and the search window - so it registers them once at boot and every editor surface reads
+ *  the same provider, rather than four call sites threading an option through their callers. */
+export type PropertyAction = { label: string; run: () => void };
+let provider: ((ref: { scope: string; name: string }) => PropertyAction[]) | null = null;
+export const setPropertyActions = (fn: (ref: { scope: string; name: string }) => PropertyAction[]): void => { provider = fn; };
+/** Stable to pass as an option: the editor opens a menu only when this returns items, so a pill
+ *  right-clicked before the renderer has registered anything simply has no menu. */
+export const propertyActions = (ref: { scope: string; name: string }): PropertyAction[] => provider?.(ref) ?? [];
+
 /** Scope display order in the property picker (project globals first, then scene-locals). */
 export const SCOPE_ORDER = ["patter", "scene"];
 

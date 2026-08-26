@@ -7,7 +7,7 @@
 import { mountEffectsEditor, renderEffectsPreview, type EffectsEditorHandle, type EditorEffect } from "@wildwinter/expr-editor";
 import { patterDialect } from "@patterkit/dialect";
 import type { ConditionProperty } from "../../shared/api.js";
-import { SCOPE_ORDER, catalogueFrom, schemaFrom, patterFunctions } from "./expr-shared.js";
+import { SCOPE_ORDER, catalogueFrom, schemaFrom, patterFunctions, propertyActions } from "./expr-shared.js";
 import { el } from "./dom.js";
 import { openPanel } from "./panel.js";
 import type { AnchoredPanel } from "@wildwinter/app-shell";
@@ -25,7 +25,7 @@ const toEditor = (e: ModelEffect): EditorEffect => ({ kind: "set", target: e.tar
  *  matching the editor's pills. `nodeLabel` resolves any node references in values. */
 export function renderEffectsPills(effects: ModelEffect[], properties: ConditionProperty[], nodeLabel?: (id: string) => string): HTMLElement {
   const cat = catalogueFrom(properties);
-  return renderEffectsPreview(effects.map(toEditor), { schema: schemaFrom(properties), dialect: patterDialect, catalogue: cat, scopeOrder: SCOPE_ORDER, ...(nodeLabel ? { nodeLabel } : {}) });
+  return renderEffectsPreview(effects.map(toEditor), { schema: schemaFrom(properties), dialect: patterDialect, catalogue: cat, scopeOrder: SCOPE_ORDER, propertyActions, ...(nodeLabel ? { nodeLabel } : {}) });
 }
 
 let active: AnchoredPanel | null = null;
@@ -79,6 +79,7 @@ export function openEffectsEditor(opts: {
       effects: effects.map(toEditor),
       schema, dialect: patterDialect, catalogue: cat, scopeOrder: SCOPE_ORDER, functions: fns,
       allowEmit: false, // patter effects are set-only; emission rides on gameData (spec §15)
+      propertyActions, // right-click a property (a target pill included): go to definition / find usages
       text: opts.text ?? false,
       onChange: (next) => opts.onChange(phase, next),
     }));

@@ -6,6 +6,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **A property chip says what it is for.** Hovering a property in any condition or effect shows the
+  purpose written on its declaration, and, for a Quality, its ladder of stages. Nothing to fill in
+  that you have not already: it is the Purpose field in Settings ▸ Properties.
+- **Right-click a property: Go to definition, Find usages.** Go to definition opens where it is
+  declared (`@patter` in Settings ▸ Properties, a scene property in that scene's editor, `@world` in
+  Settings ▸ World Properties); Find usages opens the search window's property mode, which lists
+  every read and write with its location. On every property chip, including the target of an effect
+  and the read-only rows in the inspector. (from-storylets/property-visibility; expr-editor 0.14.1,
+  which also carries the fix for a preview's target chip having neither.)
+
+### Fixed
+
+- Move and delete buttons in the property lists centre their glyphs (app-shell 0.33.1).
+
 ## [0.11.1] - 2026-08-25
 
 ### Fixed
