@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-26
+
 ### Added
 
 - **Back and forward.** A quiet `← →` pair at the top left retraces the documents you have visited,
