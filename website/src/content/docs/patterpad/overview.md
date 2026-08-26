@@ -105,8 +105,8 @@ version-control system.
 ## The workspace
 
 <figure class="doc-shot">
-  <img src="/doc-images/ThreeColumns.png" alt="The Patterpad workspace: a Scenes navigator on the left, the script surface in the centre showing dialogue snippets for The Patter Tour, and the Inspector on the right." />
-  <figcaption>The three-column workspace: the Scenes navigator (left), the script surface (centre), and the Inspector (right). The script stays put; the side panes are guests you toggle with <code>⌘1</code> and <code>⌘2</code>.</figcaption>
+  <img src="/doc-images/ThreeColumns.png" alt="The Patterpad workspace: a navigator on the left holding a Properties page and the scene list with its blocks, the script surface in the centre showing dialogue snippets for The Patter Tour, and the Inspector on the right showing the selected line's writing status, audio status and character. Back and forward arrows sit in the top bar." />
+  <figcaption>The three-column workspace: the navigator (left, with the Properties page above the scenes), the script surface (centre), and the Inspector (right). The script stays put; the side panes are guests you toggle with <code>⌘1</code> and <code>⌘2</code>.</figcaption>
 </figure>
 
 Three columns, with the script always in the centre:

@@ -10,7 +10,7 @@ sidebar:
 **File ▸ Project Settings…** (`⌘,`) opens a tabbed dialog:
 
 <figure class="doc-shot">
-  <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Audio Status tab open, showing a Track Audio Status switch, a ladder of recording-status folders, and Use Audio Folders and scratch-recording options." />
+  <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Audio Status tab open, showing a Track Audio Status switch, an audio root folder, a ladder of recording-status folders, and Use Audio Folders and scratch-recording options." />
   <figcaption>Project settings, with tabs grouped down the left (Project / Story data / Writing &amp; audio / Localisation). The <strong>Audio Status</strong> tab is shown here, mapping each recording stage to a folder on disk.</figcaption>
 </figure>
 
