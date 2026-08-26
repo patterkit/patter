@@ -8,7 +8,7 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
-- **Back and forward.** A quiet `‹ ›` pair at the top left retraces the documents you have visited,
+- **Back and forward.** A quiet `← →` pair at the top left retraces the documents you have visited,
   greyed when there is nowhere to go, with **View ▸ Back / Forward** behind it (⌃⌘← / ⌃⌘→ on a Mac,
   Alt+arrows elsewhere). It is the other axis from the navigator: the navigator climbs, Back
   retraces. Scenes, the Properties page and the Project Overview are all places, and moving the

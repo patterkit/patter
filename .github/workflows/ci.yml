@@ -47,6 +47,12 @@ jobs:
             git diff -- packages/ops/src/playable-runtime.ts | head -20
             exit 1
           fi
+      # Patterpad copies five rules out of app-shell's pane-shell.css rather than importing the file
+      # (it hand-rolls its own .topbar / .panes). The copy is only honest while it matches, and it
+      # drifted within a day of being written, so the comparison is a gate rather than a habit.
+      - name: Patterpad's mirrored shell CSS matches app-shell
+        working-directory: patter
+        run: node scripts/check-shell-css-mirror.mjs
       # The conformance corpus pins BEHAVIOUR, but only of the calls a case actually makes - an API that
       # no case exercises can live on ONE runtime alone (advanceToStop did exactly that). This proves all
       # four surfaces HAVE the same members; the corpus proves they agree on what they do.

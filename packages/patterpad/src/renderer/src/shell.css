@@ -207,8 +207,10 @@ body.resizing main.panes { transition: none; }
 /* --- borrowed from app-shell's pane-shell.css -------------------------------
    Patterpad does not import pane-shell.css: it hand-rolls its own .topbar / .panes / .pane-* rules,
    and taking the shell's file wholesale would give every one of them a second definition. So the
-   handful of rules these two shell features need are mirrored here, and ONLY those. Kept verbatim so
-   a diff against the shell shows drift immediately (reported back as `pane-shell-not-shared`). */
+   handful of rules these two shell features need are mirrored here, and ONLY those. Kept verbatim,
+   and `scripts/check-shell-css-mirror.mjs` (CI) fails if they stop matching the installed shell -
+   which they did within a day of being written, when the arrows-not-chevrons ruling changed a
+   font-size. A copy is only honest while something checks it. */
 /* The bar IS the window's drag surface (fused-title-bar); anything clickable opts out. */
 .topbar.titlebar { -webkit-app-region: drag; }
 .topbar.titlebar :is(button, input, select, a, .no-drag) { -webkit-app-region: no-drag; }
@@ -219,7 +221,7 @@ body.resizing main.panes { transition: none; }
 .shell-histnav-btn {
   display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
   padding: 0; border: none; border-radius: var(--radius-sm); background: none; color: var(--muted);
-  font-size: 1.05rem; line-height: 1; cursor: pointer;
+  font-size: 0.95rem; line-height: 1; cursor: pointer;
 }
 .shell-histnav-btn:hover:not(:disabled) { color: var(--ink); background: var(--accent-soft); }
 .shell-histnav-btn:disabled { opacity: 0.35; cursor: default; }
