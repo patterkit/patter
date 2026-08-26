@@ -20,6 +20,18 @@
     <main id="panes" class="panes" hidden>
       <nav id="nav" class="nav" aria-label="scenes"><div id="nav-list" class="pane-inner nav-list"></div></nav>
       <section id="editor" aria-label="script"></section>
+      <!-- The Properties document (from-storylets/property-visibility): @patter is the story's working
+           vocabulary, read and written every day, so it gets a first-class page in the navigator rather
+           than a tab in a configuration dialog. @world stays in Settings, beside the coverage drivers -
+           that one IS configuration, the contract with the game. -->
+      <section id="props-doc" class="propsdoc" hidden>
+        <div class="propsdoc-card">
+          <h1 class="propsdoc-title">Properties</h1>
+          <p class="propsdoc-sub">The story's own memory: <code>@patter</code> properties your conditions and effects read and write. Edits save as they settle.</p>
+          <div id="props-doc-host"></div>
+          <p class="propsdoc-foot">Values your <em>game</em> owns and the story only reads live in <button id="props-doc-world" class="propsdoc-link" type="button">Project Settings ▸ World Properties</button>.</p>
+        </div>
+      </section>
       <aside id="inspector" class="inspector" aria-label="inspector">
         <div class="pane-inner">
           <div class="inspector-label"><span>Inspector</span></div>
@@ -152,7 +164,6 @@
             <button type="button" class="settings-tab" data-tab="build">Publish</button>
             <button type="button" class="settings-tab" data-tab="vcs">Version Control</button>
             <div class="settings-group">Story data</div>
-            <button type="button" class="settings-tab" data-tab="properties">Properties</button>
             <button type="button" class="settings-tab" data-tab="world">World Properties</button>
             <button type="button" class="settings-tab" data-tab="gamedata">Game Data</button>
             <button type="button" class="settings-tab" data-tab="cast">Cast</button>
@@ -187,10 +198,6 @@
                 <option value="none">None</option>
               </select></label>
               <p class="settings-note">Drives the lock-aware vs merge-based write path and the project's VCS config files (<code>vcs-setup.md</code>, ignore rules). Switching regenerates those config files for the new system.</p>
-            </section>
-            <section class="settings-panel" data-panel="properties" hidden>
-              <p class="settings-note">Project-global <code>@patter</code> properties: game state your conditions and effects read and write.</p>
-              <div id="set-properties"></div>
             </section>
             <section class="settings-panel" data-panel="world" hidden>
               <p class="settings-note">World properties: the values your game engine owns and your story reads (referenced as <code>@world</code>), plus the inputs the coverage test feeds them.</p>

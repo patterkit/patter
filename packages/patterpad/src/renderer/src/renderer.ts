@@ -24,6 +24,7 @@ import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type Inspector
 import { buildSpellEngine } from "./spellcheck.js";
 import { closeWithExit } from "@patterkit/patterpad-surface/exit";
 import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
+import { PROPERTIES_PLACE } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
@@ -120,6 +121,10 @@ const overviewProgressEl = $("overview-progress");
 const overviewBarFillEl = $("overview-bar-fill");
 const overviewProgressLabelEl = $("overview-progress-label");
 const overviewScenesEl = $("overview-scenes");
+const propsDocEl = $("props-doc");            // the Properties document (@patter's own page)
+const propsDocHostEl = $("props-doc-host");
+const propsDocWorldEl = $<HTMLButtonElement>("props-doc-world");
+propsDocWorldEl.addEventListener("click", () => void openProjectSettings("world"));
 const identityDialog = $<HTMLDialogElement>("identity");
 const nameInput = $<HTMLInputElement>("identity-name");
 const emailInput = $<HTMLInputElement>("identity-email");
@@ -154,7 +159,6 @@ const syncBuildLocaleRows = (): void => { setBuildSourceDebugRow.hidden = setBui
 setBuildLocalesSel.addEventListener("change", syncBuildLocaleRows);
 const setLanguagesHost = $("set-languages");
 const setGameDataHost = $("set-gamedata");
-const setPropsHost = $("set-properties");
 const setWorldHost = $("set-world");
 const setCastHost = $("set-cast");
 const setWritingStatusHost = $("set-writing-status");
@@ -393,6 +397,17 @@ function renderNav(): void {
   search.append(Object.assign(document.createElement("kbd"), { className: "nav-search-kbd", textContent: "⌘F" }));
   search.addEventListener("click", () => openSearch());
   navListEl.appendChild(search);
+  // The Properties document's row: fixed, above the scenes, with a count of what it holds. Depth 0
+  // and no chevron - it is a page, not a container. (No VC badge yet: the renderer's shard map covers
+  // scenes only, so the project shard has no status to paint here.)
+  const propsRow = document.createElement("button");
+  propsRow.className = "nav-doc"; propsRow.type = "button";
+  propsRow.dataset.tip = "the project's @patter properties";
+  propsRow.setAttribute("aria-label", "Properties");
+  propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-name", textContent: "Properties" }));
+  propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-count", textContent: String(patterProps.length) }));
+  propsRow.addEventListener("click", () => void showPropertiesDoc());
+  navListEl.appendChild(propsRow);
   for (const s of project?.scenes ?? []) {
     const row = document.createElement("div");
     row.className = "nav-scene"; row.dataset["id"] = s.id;
@@ -936,6 +951,7 @@ async function applyCurrentFix(): Promise<void> {
     return;
   }
   const res = await window.patter.applyFix(fix); // add-to-cast / declare-property (project-file writes)
+  if (fix.kind === "declare-property") void refreshPatterProps(); // the navigator's count just moved
   if (res.ok) await refreshProblems(); // re-validate: the fixed problem (and its squiggle) drops out
   else console.error("Quick-fix failed:", res.error);
 }
@@ -1645,6 +1661,10 @@ async function save(): Promise<void> { await saver.flush(); }
 
 async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
   if (!project || sceneId === currentSceneId) return;
+  // Opening a scene is the one funnel every route into the editor goes through (the navigator, a
+  // search jump, play-follow, the restore), so it is where the Properties document gets left - and
+  // left properly, flushing a save still inside its debounce before the scene loads over it.
+  await leavePropertiesDoc();
   if (surface) await save();           // files are the truth - persist before switching
   await persistDocs();                          // flush any pending Notes edits before leaving the scene
   await persistComments();                      // flush any pending comment edits too
@@ -1805,9 +1825,17 @@ async function showProject(open: OpenResult): Promise<void> {
   projectNameEl.dataset.tip = project.root;
   currentSceneId = null;
   await buildSpellcheck(); // build the spell engine before the first scene mounts (#177); it pushes on mount
+  await refreshPatterProps(); // the navigator's Properties row carries a count, from the first paint
   // A project opened with a remembered scene drops straight into it; a never-opened one lands on the
   // project overview (#3a) - the shape of the work before a scene (reachable later via the project name).
-  if (open.lastScene) {
+  if (open.lastScene === PROPERTIES_PLACE) {
+    // Left off in the Properties document: come back to it, not to whichever scene preceded it.
+    renderNav();
+    await showPropertiesDoc();
+    await hydrateProject();
+    void refreshProblems();
+    void refreshVcStatus();
+  } else if (open.lastScene) {
     enterWorkspace();
     renderNav();
     await loadScene(open.lastScene, { restoreCaret: open.lastCaret });
@@ -1822,6 +1850,7 @@ async function showProject(open: OpenResult): Promise<void> {
 
 /** Switch the chrome to the editing WORKSPACE (panes + toggles), leaving welcome / overview. */
 function enterWorkspace(): void {
+  void leavePropertiesDoc(); // flushes a save still in its debounce, then hides the page
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
   toggleNavEl.hidden = false; toggleInspectorEl.hidden = false; // pane toggles only matter in the workspace
   playTopEl.hidden = false;   // the primary loop's visible door: play what you wrote
@@ -1838,6 +1867,7 @@ function enterWorkspace(): void {
 async function showOverview(): Promise<void> {
   if (!project) return;
   if (surface) await save(); // files are the truth - persist before leaving the editor
+  await leavePropertiesDoc();
   welcomeEl.hidden = true; panesEl.hidden = true; overviewEl.hidden = false;
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true; // the overview is a calm screen, no bars
@@ -1849,6 +1879,97 @@ async function showOverview(): Promise<void> {
   signalReady();          // the overview (scene index) is up - safe to reveal the window (no-op if already)
   const data = await window.patter.report();
   if (data && !overviewEl.hidden) fillOverviewStats(data); // ignore if we already navigated away
+}
+
+// --- the Properties document -------------------------------------------------
+// @patter is the story's working vocabulary: everyone touches it, it grows with the content, and it
+// was living in a tab of a configuration dialog (from-storylets/property-visibility). It gets its own
+// page in the navigator instead, saving as edits settle - a document's rhythm, where the dialog saved
+// on close because it was a dialog. @world stays in Settings: that one is the contract with the game.
+
+/** The project's `@patter` declarations, cached for the navigator count and the document's mount.
+ *  Refreshed whenever they are saved (here or, for a rename through the fix, by the main process). */
+let patterProps: PropertyDecl[] = [];
+let propsHandle: { value(): PropertyDecl[]; firstDuplicate(): HTMLInputElement | null; firstIllegalName(): HTMLInputElement | null } | null = null;
+let propsSaveTimer: number | null = null;
+let propsSavedSig = "";
+
+async function refreshPatterProps(): Promise<void> {
+  const s = await window.patter.readSettings();
+  patterProps = s?.properties ?? [];
+  paintPropsCount();
+}
+
+function paintPropsCount(): void {
+  const count = navListEl.querySelector<HTMLElement>(".nav-doc-count");
+  if (count) count.textContent = String(patterProps.length);
+}
+
+/** Save what the document holds, unless it holds a fault. A duplicate or an unreachable name is the
+ *  same data hazard the dialog's Save gate refused; here there is no Save button to refuse, so the
+ *  write is skipped and the offending field keeps its red ring until it is fixed. */
+async function savePropsDoc(): Promise<void> {
+  if (!propsHandle || !project) return;
+  if (propsHandle.firstDuplicate() || propsHandle.firstIllegalName()) return;
+  const next = propsHandle.value();
+  const sig = JSON.stringify(next);
+  if (sig === propsSavedSig) return; // nothing settled that was not already saved
+  const s = await window.patter.readSettings();
+  if (!s) return;
+  propsSavedSig = sig;
+  await saveProjectSettings({ ...s, properties: next });
+  patterProps = next;
+  paintPropsCount();
+}
+
+function schedulePropsSave(): void {
+  if (propsSaveTimer != null) window.clearTimeout(propsSaveTimer);
+  propsSaveTimer = window.setTimeout(() => { propsSaveTimer = null; void savePropsDoc(); }, 400);
+}
+
+/** Open the Properties document (the navigator's fixed row, and every "go to definition" on a
+ *  `@patter` property). */
+async function showPropertiesDoc(): Promise<void> {
+  if (!project) return;
+  if (surface) await save(); // files are the truth - persist the open scene before leaving it
+  await refreshPatterProps();
+  // The page lives IN the workspace, not instead of it: the navigator stays put (its row is how you
+  // got here and how you leave), the editor's column carries the document, and the inspector folds
+  // away, since it speaks about a selected node and there is none here.
+  welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
+  applyPanes();
+  panesEl.classList.add("props-doc-open");
+  editorEl.hidden = true; propsDocEl.hidden = false;
+  toggleNavEl.hidden = false; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
+  problembarEl.hidden = true; reviewbarEl.hidden = true;
+  titleObserver?.disconnect(); titleObserver = null;
+  sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene is open
+  propsDocHostEl.replaceChildren();
+  propsHandle = mountProperties(propsDocHostEl, patterProps);
+  propsSavedSig = JSON.stringify(patterProps);
+  // The control has no change callback: it writes into its own state on every input, and its chips /
+  // movers / delete are buttons. So listen for both and read the state back after it settles, which
+  // is also why the save compares signatures - a click that changed nothing must not write a file.
+  propsDocHostEl.addEventListener("input", schedulePropsSave);
+  propsDocHostEl.addEventListener("change", schedulePropsSave);
+  propsDocHostEl.addEventListener("click", schedulePropsSave);
+  highlightNav("");                       // no scene is current while the document is open
+  navListEl.querySelector(".nav-doc")?.classList.add("active");
+  // Open-where-you-left-off covers this page too: the document is where the author WAS, so a restart
+  // should come back to it rather than to whichever scene happened to be open before it.
+  currentSceneId = null;
+  void window.patter.rememberScene(project.root, PROPERTIES_PLACE);
+  signalReady();
+}
+
+/** Leaving the document: flush anything mid-debounce, since the next thing may reload the project. */
+async function leavePropertiesDoc(): Promise<void> {
+  if (propsSaveTimer != null) { window.clearTimeout(propsSaveTimer); propsSaveTimer = null; await savePropsDoc(); }
+  propsHandle = null;
+  propsDocEl.hidden = true;
+  editorEl.hidden = false;
+  panesEl.classList.remove("props-doc-open");
+  navListEl.querySelector(".nav-doc")?.classList.remove("active");
 }
 
 /** Build the scene index + a placeholder stats line (the real counts arrive async from the report). */
@@ -1933,6 +2054,7 @@ function showWelcome(state: BootState): void {
   comments = []; commentsDirty = false; // no project -> no comments
   suggestions = []; suggestionsDirty = false; // no project -> no suggestions
   reviewItems = []; reviewbarEl.hidden = true; // no project -> no feedback walk
+  void leavePropertiesDoc();
   panesEl.hidden = true; overviewEl.hidden = true; welcomeEl.hidden = false;
   problembarEl.hidden = true; inspectorStackEl.replaceChildren(); lastInspectorCtx = null; lastInspectorSig = null; // no script -> nothing to inspect
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
@@ -2181,7 +2303,6 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   // Language / Game Data / Properties / Cast tabs: mount each editor with the project's current data.
   const langs = mountLanguages(setLanguagesHost, { localeDefault: s.localeDefault, locales: s.locales });
   const gd = mountGameDataFields(setGameDataHost, s.gameDataFields);
-  const props = mountProperties(setPropsHost, s.properties);
   const world = mountWorld(setWorldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers() });
   const cast = mountCast(setCastHost, s.cast);
   const writingStatus = mountWritingStatus(setWritingStatusHost, s.writingStatuses);
@@ -2205,10 +2326,10 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   // hazard, so block the Save submit, jump to the offending tab, and focus the clashing (red) field.
   const settingsForm = settingsDialogEl.querySelector("form")!;
   const setErrorEl = $("set-error"); setErrorEl.hidden = true;
-  const dupTabs: Array<[string, { firstDuplicate(): HTMLInputElement | null }]> = [["properties", props], ["gamedata", gd], ["cast", cast], ["world", world]];
+  const dupTabs: Array<[string, { firstDuplicate(): HTMLInputElement | null }]> = [["gamedata", gd], ["cast", cast], ["world", world]];
   // Only the two editors that declare PROPERTIES carry the name rule: game-data fields and cast
   // members are not referenced by expressions, so they are not held to the expression grammar.
-  const nameTabs: Array<[string, { firstIllegalName(): HTMLInputElement | null }]> = [["properties", props], ["world", world]];
+  const nameTabs: Array<[string, { firstIllegalName(): HTMLInputElement | null }]> = [["world", world]];
   const onSubmit = (e: Event): void => {
     for (const [tab, h] of dupTabs) {
       const bad = h.firstDuplicate();
@@ -2258,7 +2379,8 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
       closedCaptions: { open: setCcOpenInput.value, close: setCcCloseInput.value, character: setCcCharacterInput.value.trim() },
       buildBundle: setBuildInput.value.trim(), buildLocalisation: setBuildLocalesSel.value as "embedded" | "ids", buildSourceDebug: setBuildSourceDebug.checked,
       ...langs.value(), gameDataFields: gd.value(),
-      properties: props.value(), ...world.value(), cast: cast.value(),
+      properties: s.properties, // @patter lives in the Properties document now; pass the current set through untouched
+      ...world.value(), cast: cast.value(),
       writingStatuses: writingStatus.value(), estimating: estimating.value(), ...audio.value(),
       ...dictionary.value(),
     });
@@ -2429,7 +2551,7 @@ async function boot(): Promise<void> {
   setPropertyActions(({ scope, name }) => {
     const ref = scope === "patter" ? `@${name}` : `@${scope}.${name}`;
     const go: PropertyAction | null =
-      scope === "patter" ? { label: "Go to definition", run: () => void openProjectSettings("properties") }
+      scope === "patter" ? { label: "Go to definition", run: () => void showPropertiesDoc() }
       : scope === "scene" ? { label: "Go to definition", run: () => openSceneProps() }
       : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world") }
       : null;

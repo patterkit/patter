@@ -8,6 +8,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Properties have their own page.** `@patter` properties are the story's working vocabulary, and
+  they were living in a tab of the Project Settings dialog, which treated them as configuration.
+  There is now a **Properties** row at the top of the navigator, above the scenes, carrying a count
+  of what the project declares; it opens a page in the editor's column, with the navigator still
+  beside it. Edits save as they settle, the way a document does, instead of on closing a dialog.
+  World Properties stay in Settings, beside the coverage drivers: that half really is configuration,
+  the contract with your game, and the page links across to it. If you were last on the page when
+  you quit, that is where the project reopens. (from-storylets/property-visibility.)
+
 - **A property chip says what it is for.** Hovering a property in any condition or effect shows the
   purpose written on its declaration, and, for a Quality, its ladder of stages. Nothing to fill in
   that you have not already: it is the Purpose field in Settings ▸ Properties.

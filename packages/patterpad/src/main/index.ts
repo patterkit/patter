@@ -23,6 +23,7 @@ import { savedWindowRect, rememberBounds, centeredOnPrimary, pinToolWindow } fro
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
 import { createJobHost, JOB_PROGRESS } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
+import { PROPERTIES_PLACE } from "../shared/api.js";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
 
@@ -161,7 +162,10 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
     // otherwise (the project root / `.patter` package) fall back to where the author last left off.
     const launched = project.sceneForPath(path);
-    const land = launched ?? (remembered && proj.sceneIds.includes(remembered) ? remembered : undefined);
+    // The Properties document is a place too: its sentinel is not a scene, so it skips the
+    // scene-existence check and lands the renderer on the document instead.
+    const land = launched ?? (remembered === PROPERTIES_PLACE ? remembered
+      : remembered && proj.sceneIds.includes(remembered) ? remembered : undefined);
     // Restore the caret only when we're landing on the very scene it was recorded in (a file-association
     // launch onto a different scene must not place the caret on a node that isn't there).
     const lastCaret = land && land === remembered ? store.read().lastCaret[proj.root] : undefined;

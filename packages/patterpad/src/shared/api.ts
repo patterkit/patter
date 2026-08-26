@@ -189,6 +189,11 @@ export interface ProjectSettingsDto {
 }
 
 /** An opened project plus the scene to land on (open-where-you-left-off). */
+/** The remembered place when the author left off in the PROPERTIES DOCUMENT rather than a scene.
+ *  It travels in the same slot as a scene id, which is safe because a scene id is always `scn_…`:
+ *  one place field, one restore path, and nothing in the shell's store had to learn a new shape. */
+export const PROPERTIES_PLACE = "@properties";
+
 export interface OpenResult {
   project: OpenedProject;
   /** The scene last edited in this project, if remembered and still present. */
