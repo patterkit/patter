@@ -204,6 +204,26 @@ body.resizing main.panes { transition: none; }
 .nav-search-icon svg { display: block; }
 .nav-search-kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); font: 0.64rem var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 0.25rem; color: var(--muted); }
 
+/* --- borrowed from app-shell's pane-shell.css -------------------------------
+   Patterpad does not import pane-shell.css: it hand-rolls its own .topbar / .panes / .pane-* rules,
+   and taking the shell's file wholesale would give every one of them a second definition. So the
+   handful of rules these two shell features need are mirrored here, and ONLY those. Kept verbatim so
+   a diff against the shell shows drift immediately (reported back as `pane-shell-not-shared`). */
+/* The bar IS the window's drag surface (fused-title-bar); anything clickable opts out. */
+.topbar.titlebar { -webkit-app-region: drag; }
+.topbar.titlebar :is(button, input, select, a, .no-drag) { -webkit-app-region: no-drag; }
+/* Traffic-light room. macOS only - the class is not added elsewhere. */
+.topbar.titlebar-inset { padding-left: 84px; }
+/* The back/forward pair (nav-history): quiet chevrons, greyed when there is nowhere to go. */
+.shell-histnav { display: inline-flex; gap: 2px; margin-right: 6px; }
+.shell-histnav-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  padding: 0; border: none; border-radius: var(--radius-sm); background: none; color: var(--muted);
+  font-size: 1.05rem; line-height: 1; cursor: pointer;
+}
+.shell-histnav-btn:hover:not(:disabled) { color: var(--ink); background: var(--accent-soft); }
+.shell-histnav-btn:disabled { opacity: 0.35; cursor: default; }
+
 /* The Properties document's row: a PAGE in the navigator, not a container - same weight as a scene
    row, with its count where a scene's chevron would be, and a hairline under it so the scene list
    below still reads as the list. */
@@ -808,11 +828,19 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; f
               padding var(--dur-panel) var(--ease-standard), border-width var(--dur-panel) var(--ease-standard);
 }
 /* The hint bar (#hintbar) STAYS in Writing View - its keystroke hints help the writer, and it hosts the
-   exit affordance. The topbar + the two bottom bars (problems / review) collapse. */
-body.writing-view .topbar,
+   exit affordance. The two bottom bars (problems / review) collapse away entirely. */
 body.writing-view .stepbar {
   min-height: 0; max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-width: 0; overflow: hidden; pointer-events: none;
 }
+/* The topbar STAYS, quietly. It used to collapse with the rest, which was right while it sat under a
+   native title bar - but it IS the title bar now (fused-title-bar), and collapsing it would leave the
+   traffic lights floating over the prose with nothing behind them. So it recedes instead: dim at rest,
+   firm on hover, the same manners as the Writing View exit pill. The window also stays draggable. */
+body.writing-view .topbar {
+  opacity: 0.25; border-bottom-color: transparent;
+  transition: opacity var(--dur-panel) var(--ease-standard), border-color var(--dur-panel) var(--ease-standard);
+}
+body.writing-view .topbar:hover { opacity: 1; }
 
 /* Editor goes full-bleed: both side columns collapse (eases via the panes grid transition) and the
    pane contents fade in lockstep; the drag seams hide. State (panes.nav / .inspector) is untouched. */

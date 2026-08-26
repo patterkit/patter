@@ -1118,6 +1118,10 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     title: "Patterpad",
+    // One chrome row, family-wide (from-storylets/fused-title-bar): on macOS the app's own topbar IS
+    // the title bar, so the native strip above it - whose only cargo was a title the bar already
+    // shows - goes. Off macOS the window keeps its native frame and the same bar sits beneath it.
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: {
       preload: join(here, "../preload/index.cjs"),
       contextIsolation: true,

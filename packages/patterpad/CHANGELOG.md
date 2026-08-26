@@ -8,6 +8,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Back and forward.** A quiet `‹ ›` pair at the top left retraces the documents you have visited,
+  greyed when there is nowhere to go, with **View ▸ Back / Forward** behind it (⌃⌘← / ⌃⌘→ on a Mac,
+  Alt+arrows elsewhere). It is the other axis from the navigator: the navigator climbs, Back
+  retraces. Scenes, the Properties page and the Project Overview are all places, and moving the
+  caret around a scene is not a journey, so a Back into a scene lands where you left it.
+
 - **Properties have their own page.** `@patter` properties are the story's working vocabulary, and
   they were living in a tab of the Project Settings dialog, which treated them as configuration.
   There is now a **Properties** row at the top of the navigator, above the scenes, carrying a count
@@ -26,6 +32,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   every read and write with its location. On every property chip, including the target of an effect
   and the read-only rows in the inspector. (from-storylets/property-visibility; expr-editor 0.14.1,
   which also carries the fix for a preview's target chip having neither.)
+
+### Changed
+
+- **One row of chrome, not two.** On macOS Patterpad's own topbar is now the window's title bar: the
+  native strip above it carried nothing but a title the bar already showed, so it is gone and you get
+  the row back. Off macOS the window keeps its native frame and the bar sits beneath it as before.
+  In Writing View the bar no longer collapses; it fades back instead, and firms up when you point at
+  it - collapsing it would leave the traffic lights floating over your prose.
 
 ### Fixed
 

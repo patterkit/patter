@@ -10,7 +10,7 @@ import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 // The suite-standard Edit items. Their LABELS and ACCELERATORS are family grammar and come from
 // the shell so both apps spell them the same; the click handlers stay Patterpad's, because the
 // undo MECHANISM is per app (ProseMirror history here, file-byte replay in Storyletter).
-import { EDIT_MENU, HELP_MENU, APP_MENU, namedMenuItems } from "@wildwinter/app-shell/menu";
+import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, namedMenuItems } from "@wildwinter/app-shell/menu";
 
 // The family-standard named items (About / Documentation), so this app spells them the way
 // every app in the suite does. The URLs are Patterpad's; the labels are not.
@@ -240,6 +240,13 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       label: "View",
       submenu: [
         { label: "Project Overview", click: () => send("project-overview") }, // the #3a landing (scene index + stats)
+        { type: "separator" },
+        // Navigation HISTORY, the other axis from the navigator's hierarchy (from-storylets/nav-history).
+        // Always enabled: the arrows in the topbar carry the greyed state, and a step with nowhere to go
+        // is a quiet no-op. The accelerators split by platform - the browsers' Cmd+[ is Up a Level in
+        // this family, so the Mac takes Xcode's pair instead.
+        { label: GO_MENU.back.label, accelerator: process.platform === "darwin" ? GO_MENU.back.acceleratorMac : GO_MENU.back.acceleratorOther, click: () => send("nav-back") },
+        { label: GO_MENU.forward.label, accelerator: process.platform === "darwin" ? GO_MENU.forward.acceleratorMac : GO_MENU.forward.acceleratorOther, click: () => send("nav-forward") },
         { type: "separator" },
         { label: "Show Scenes", type: "checkbox", checked: panes.nav, accelerator: "CmdOrCtrl+1", click: () => send("toggle-nav") },
         { label: "Show Inspector", type: "checkbox", checked: panes.inspector, accelerator: "CmdOrCtrl+2", click: () => send("toggle-inspector") },

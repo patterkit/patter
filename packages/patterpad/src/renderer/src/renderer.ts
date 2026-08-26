@@ -41,7 +41,7 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 import { el } from "./dom.js";
 import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
-  paintVcBadges, lockControls, type ShardVc } from "@wildwinter/app-shell";
+  paintVcBadges, lockControls, createNavHistory, historyNav, type ShardVc } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
@@ -77,6 +77,18 @@ const panesEl = $("panes");
 const playTopEl = $<HTMLButtonElement>("play-topbtn");
 const welcomeEl = $("welcome");
 const editorEl = $("editor");
+const histNavHostEl = $("histnav"); // the back/forward pair, left of the project name
+
+// The topbar is the window's drag surface now (app-shell 0.34.0's `.topbar.titlebar`). The inset is
+// macOS-only: it reserves the traffic lights' 84px, and adding it anywhere else would indent a bar
+// that still sits under a native frame.
+const topbarEl = document.querySelector<HTMLElement>(".topbar")!;
+topbarEl.classList.add("titlebar");
+if (navigator.platform.toUpperCase().includes("MAC")) topbarEl.classList.add("titlebar-inset");
+// A drag surface swallows clicks on anything that is not a button / input / select / a, so the two
+// spans in the bar that DO respond opt out by hand.
+for (const id of ["vcs-scene", "save-indicator"]) document.getElementById(id)?.classList.add("no-drag");
+
 const navEl = $("nav");
 const inspectorEl = $("inspector");
 const navListEl = $("nav-list");
@@ -341,6 +353,75 @@ function scheduleRemember(): void {
 }
 
 
+
+// --- navigation history (from-storylets/nav-history) -------------------------
+// The other axis from hierarchy: Back retraces the documents you visited, where the navigator
+// climbs. The shell owns the stack and the arrows over a Place it never inspects; what a place IS
+// here is a scene (and where you were in it), the Properties document, or the project overview.
+
+type NavPlace =
+  | { kind: "scene"; sceneId: string; caret?: string }
+  | { kind: "properties" }
+  | { kind: "overview" };
+
+/** Where the author is NOW, or null before a project is open. */
+function currentPlace(): NavPlace | null {
+  if (!project) return null;
+  if (!propsDocEl.hidden) return { kind: "properties" };
+  if (!overviewEl.hidden) return { kind: "overview" };
+  return currentSceneId ? { kind: "scene", sceneId: currentSceneId, ...(caretNodeId ? { caret: caretNodeId } : {}) } : null;
+}
+
+const history = createNavHistory<NavPlace>({
+  // The same DOCUMENT, caret ignored: moving the caret around a scene is not a journey, and letting
+  // it stack would fill the history with one scene. The newest entry wins, so a Back into a scene
+  // lands on the line you left it at.
+  same: (a, b) => a.kind === b.kind && (a.kind !== "scene" || a.sceneId === (b as { sceneId: string }).sceneId),
+  // A scene deleted since it was visited cannot be restored; the step walks past it.
+  usable: (p) => p.kind !== "scene" || !!project?.scenes.some((s) => s.id === p.sceneId),
+});
+let travelling = false; // restoring re-enters the ordinary navigation, which must not record itself
+
+/** Record the place being LEFT. Every route into a document calls this through its own entry point. */
+function visitFrom(): void {
+  if (travelling) return;
+  const here = currentPlace();
+  if (here) history.visit(here);
+}
+
+async function restorePlace(p: NavPlace): Promise<void> {
+  travelling = true;
+  try {
+    if (p.kind === "properties") await showPropertiesDoc();
+    else if (p.kind === "overview") await showOverview();
+    else if (p.sceneId !== currentSceneId) {
+      await loadScene(p.sceneId, ...(p.caret ? [{ restoreCaret: p.caret }] : []) as [{ restoreCaret: string }?]);
+    } else {
+      // The scene is the one already loaded - but it may be sitting BEHIND the overview or the
+      // Properties document, which cover the workspace without unloading it. loadScene would return
+      // early on the id it already holds, so bring the workspace back by hand.
+      enterWorkspace();
+      highlightNav(p.sceneId);
+      if (p.caret) surface?.revealNode(p.caret);
+    }
+  } finally { travelling = false; }
+  paintHistory();
+}
+
+/** One step, whether it came from an arrow or from View ▸ Back / Forward. Nowhere to go is a quiet
+ *  no-op: the arrows are already greyed, and the menu items stay enabled so the keys always answer. */
+function stepHistory(dir: "back" | "forward"): void {
+  const here = currentPlace();
+  if (!here) return;
+  const p = dir === "back" ? history.back(here) : history.forward(here);
+  if (p) void restorePlace(p);
+  else paintHistory(); // the step found only stale entries and discarded them
+}
+
+const histNav = historyNav(() => stepHistory("back"), () => stepHistory("forward"));
+histNavHostEl.append(histNav.el);
+function paintHistory(): void { histNav.set(history.canBack(), history.canForward()); }
+paintHistory();
 
 // --- the project workspace ---------------------------------------------------
 
@@ -1663,7 +1744,10 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   if (!project || sceneId === currentSceneId) return;
   // Opening a scene is the one funnel every route into the editor goes through (the navigator, a
   // search jump, play-follow, the restore), so it is where the Properties document gets left - and
-  // left properly, flushing a save still inside its debounce before the scene loads over it.
+  // left properly, flushing a save still inside its debounce before the scene loads over it. It is
+  // also where the history records the place being left, for the same reason: one choke point means
+  // a Find hit, a problem jump and a plain nav click all record themselves without knowing it.
+  visitFrom();
   await leavePropertiesDoc();
   if (surface) await save();           // files are the truth - persist before switching
   await persistDocs();                          // flush any pending Notes edits before leaving the scene
@@ -1715,6 +1799,7 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   currentSceneId = sceneId;
   saver.cancel(); // mount fires onChange once (the initial mirror); not a user edit
   highlightNav(sceneId);
+  paintHistory(); // the arrows follow every arrival, not just the ones they caused
   applySceneVc(); // read-only + topbar chip if this scene is locked by another (from the cached snapshot)
   surface.focus();
   // Open-where-you-left-off: on the initial landing load, drop the caret back on the remembered node (it
@@ -1866,6 +1951,7 @@ function enterWorkspace(): void {
  *  production report (which also hydrates the rest of the project for the full scene list). */
 async function showOverview(): Promise<void> {
   if (!project) return;
+  visitFrom();
   if (surface) await save(); // files are the truth - persist before leaving the editor
   await leavePropertiesDoc();
   welcomeEl.hidden = true; panesEl.hidden = true; overviewEl.hidden = false;
@@ -1876,6 +1962,7 @@ async function showOverview(): Promise<void> {
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = "";
   await hydrateProject(); // the index needs every scene, not just the lazy-loaded landing one
   renderOverview();
+  paintHistory();
   signalReady();          // the overview (scene index) is up - safe to reveal the window (no-op if already)
   const data = await window.patter.report();
   if (data && !overviewEl.hidden) fillOverviewStats(data); // ignore if we already navigated away
@@ -1931,6 +2018,7 @@ function schedulePropsSave(): void {
  *  `@patter` property). */
 async function showPropertiesDoc(): Promise<void> {
   if (!project) return;
+  visitFrom();
   if (surface) await save(); // files are the truth - persist the open scene before leaving it
   await refreshPatterProps();
   // The page lives IN the workspace, not instead of it: the navigator stays put (its row is how you
@@ -1954,6 +2042,7 @@ async function showPropertiesDoc(): Promise<void> {
   propsDocHostEl.addEventListener("change", schedulePropsSave);
   propsDocHostEl.addEventListener("click", schedulePropsSave);
   highlightNav("");                       // no scene is current while the document is open
+  paintHistory();
   navListEl.querySelector(".nav-doc")?.classList.add("active");
   // Open-where-you-left-off covers this page too: the document is where the author WAS, so a restart
   // should come back to it rather than to whichever scene happened to be open before it.
@@ -2612,6 +2701,8 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "toggle-inspector") togglePane("inspector");
   else if (cmd === "reset-view") resetView();
   else if (cmd === "project-overview") { if (project) void showOverview(); }
+  else if (cmd === "nav-back") stepHistory("back");
+  else if (cmd === "nav-forward") stepHistory("forward");
   else if (cmd === "toggle-writing-view") toggleWritingView();
   else if (cmd === "line-status:all") setLineStatusShown((project?.writingStatuses ?? []).map((s) => s.name));
   else if (cmd === "line-status:none") setLineStatusShown([]);
