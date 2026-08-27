@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A pinned tool window stays where you put it.** On macOS, dragging the editor dragged every pinned
+  window along with it. They keep the pin's meaning - above Patterpad while you are in Patterpad, and
+  not above your other apps - without being towed around. (app-shell 0.35.1.)
+
 ### Added
 
 - **File ▸ Close Project.** Opening a project was a one-way door: the welcome screen only appeared at
