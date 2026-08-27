@@ -24,7 +24,9 @@ change either at any time from **User Information** (in the Patterpad app menu o
 or the File menu on Windows and Linux).
 
 From there you land on the **welcome screen**, where you can open a project, create
-one, or pick from your recent projects.
+one, or pick from your recent projects. **File ▸ Close Project** brings you back to it
+at any time: the window stays open, and the project you closed is top of the recents
+list. It is also the way back to the shipped **tour** once you have a project open.
 
 ### Creating a project
 

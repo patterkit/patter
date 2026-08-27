@@ -375,6 +375,23 @@ export function openProject(path: string, preferLanding?: string): OpenedProject
   return summarise(loaded);
 }
 
+/** Let the project go (File ▸ Close Project). The mirror of `openProject`'s reset: everything it clears
+ *  for the NEXT project is cleared here for no project at all, because main answers plenty of questions
+ *  from `loaded` and every one of them would otherwise keep answering for a project the author closed -
+ *  starting with "is a project open?", which the menu reads to enable this very item. */
+export function closeProject(): void {
+  loaded = null;
+  shards = new Map();
+  hydrated = false;
+  playLocale = null;
+  resetShardStatus();
+  resetPlaySession();
+  authoringCache.clear();
+  if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; }
+  lastBuiltHash = undefined;
+  syncAudioIndex(); // stops the Audio Folders watcher, since there is nothing to watch
+}
+
 /** Finish the lazy open and return the FULL project summary (every scene), so the renderer can reconcile
  *  its nav + cross-scene jump targets once the landing scene is painted. Called by the renderer right
  *  after the first scene mounts; idempotent (later whole-project ops would force it anyway). */

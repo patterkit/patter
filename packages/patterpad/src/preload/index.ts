@@ -31,6 +31,7 @@ const api: PatterApi = {
   openDialog: () => ipcRenderer.invoke("project:openDialog"),
   saveAs: () => ipcRenderer.invoke("project:saveAs"),
   openPath: (path) => ipcRenderer.invoke("project:openPath", path),
+  closeProject: () => ipcRenderer.invoke("project:close"),
   createDialog: (name, vcs, buildBundle) => ipcRenderer.invoke("project:createDialog", name, vcs, buildBundle),
   forget: (path) => ipcRenderer.invoke("project:forget", path),
   readScene: (sceneId) => ipcRenderer.invoke("scene:read", sceneId),

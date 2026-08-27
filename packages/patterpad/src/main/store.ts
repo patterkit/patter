@@ -107,6 +107,9 @@ export interface Store {
   setSearch(search: PlayWindowState): void;
   setCoverage(coverage: PlayWindowState): void;
   forget(path: string): void;
+  /** Forget WHICH project was open, keeping it in recents (Close Project). A quit after closing then
+   *  boots to the welcome screen instead of silently reopening what the author just closed. */
+  clearLastProject(): void;
 }
 
 /**
@@ -245,6 +248,9 @@ export function createStore(dir: string): Store {
     },
     setCoverage(coverage) {
       setWindow("coverage", coverage);
+    },
+    clearLastProject() {
+      app.clearLastProject();
     },
     forget(path) {
       app.forgetProject(path);

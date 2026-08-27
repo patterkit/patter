@@ -84,6 +84,7 @@ const stub = {
   openDialog: async () => ({ project }),
   saveAs: async () => ({ project }),
   openPath: async () => ({ project }),
+  closeProject: async () => undefined,
   createDialog: async (_name: string, _vcs: string) => ({ project }),
   forget: async () => ({ open: null, recents, identity }),
   readScene: async () => ({

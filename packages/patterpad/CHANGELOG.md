@@ -8,6 +8,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **File ▸ Close Project.** Opening a project was a one-way door: the welcome screen only appeared at
+  launch, so there was no way back to it, or to the shipped tour, without quitting. Closing returns
+  the window to the welcome with the project you closed at the top of the recents list, and shuts the
+  Play, Search and Coverage windows, which have nothing to show once there is no project. A quit
+  after closing opens on the welcome screen rather than silently reopening what you just closed.
 - **The Properties page carries a version-control badge**, the way a scene row does: modified, new,
   locked by someone else, out of date. It reads the project file, which is where `@patter`
   declarations live, and it updates the moment the page saves rather than on the next poll.

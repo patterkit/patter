@@ -145,6 +145,15 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     get: () => { const s = store.read(); return { recents: s.recents, ...(s.lastProject !== undefined ? { lastProject: s.lastProject } : {}) }; },
     touchProject: (path, name) => store.recordOpen(path, name ?? basename(path)),
     forgetProject: (path) => store.forget(path),
+    clearLastProject: () => store.clearLastProject(),
+  },
+  // The teardown half the shell runs first: main holds a whole project's worth of state behind
+  // `loaded`, and every IPC that reads it would keep answering for a project the author has closed.
+  close: () => {
+    project.closeProject();
+    currentRoot = null;      // the second-instance jump-in-place guard must not point at a closed project
+    searchFocus = undefined; // and the search window's ranking anchor belongs to that project too
+    lastCoverageResult = null;
   },
   open: (path) => {
     // Resolve the remembered scene FIRST (cheap root walk) so the landing-first open (#171) parses the
@@ -819,6 +828,14 @@ function registerIpc(): void {
   ipcMain.handle("project:hydrate", () => project.hydrate()); // finish the lazy open; returns the full scene list
   ipcMain.handle("project:openDialog", (): Promise<OpenResult | null> => openDialog());
   ipcMain.handle("project:saveAs", (): Promise<OpenResult | null> => saveAsDialog());
+  // Close Project (from-storylets/close-project): the shell runs the teardown order - close hook,
+  // satellites, menu, and forgetting WHICH project was open while keeping it in recents. The tool
+  // windows CLOSE rather than being left stale: a Play or Coverage window over no project is not an
+  // out-of-date view, it is a view of nothing.
+  ipcMain.handle("project:close", () => {
+    session.closeCurrent();
+    for (const w of [playWin, searchWin, coverageWin]) if (w && !w.isDestroyed()) w.close();
+  });
   ipcMain.handle("project:openPath", (_e, path: string): OpenResult => {
     if (!isKnownProjectPath(path)) throw new Error("refused to open an unrecognised path"); // renderer can only reopen known projects
     return openAndRecord(path);

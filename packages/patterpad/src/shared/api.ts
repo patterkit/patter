@@ -689,6 +689,8 @@ export interface PatterApi {
   saveAs(): Promise<OpenResult | null>;
   /** Open a known path (a recent). Records it in the session. */
   openPath(path: string): Promise<OpenResult>;
+  /** Close the open project and return to the welcome screen (the window stays). */
+  closeProject(): Promise<void>;
   /** Scaffold a new `<name>.patter` project: the renderer collects `name` (themed New-project dialog),
    *  this opens the system folder picker for the parent location, runs runInit, and opens it; null if
    *  the location picker is cancelled. */

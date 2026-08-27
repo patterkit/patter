@@ -2136,6 +2136,21 @@ function renderRecents(recents: RecentProject[]): void {
   }
 }
 
+/** File ▸ Close Project: back to the welcome screen, which is the only way to reach the shipped
+ *  examples again once a project is open (from-storylets/close-project). The window stays: this is
+ *  Close PROJECT, not the Close Window neither app offers.
+ *
+ *  Boot state is re-read rather than reused, so the welcome's recents list carries the project just
+ *  closed at the top - the point of closing is usually to open something else. */
+async function closeProject(): Promise<void> {
+  if (!project) return;
+  if (surface) await save();      // files are the truth - flush before letting go of the project
+  await persistDocs(); await persistComments();
+  flushRemember();                // and record where the author was, for when they come back
+  await window.patter.closeProject();
+  showWelcome(await window.patter.boot());
+}
+
 function showWelcome(state: BootState): void {
   // One call, because all four editors ARE the one anchored panel: closing it
   // fires whichever onClose is registered, which clears that module's singleton.
@@ -2705,6 +2720,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "toggle-nav") togglePane("nav");
   else if (cmd === "toggle-inspector") togglePane("inspector");
   else if (cmd === "reset-view") resetView();
+  else if (cmd === "close-project") void closeProject();
   else if (cmd === "project-overview") { if (project) void showOverview(); }
   else if (cmd === "nav-back") stepHistory("back");
   else if (cmd === "nav-forward") stepHistory("forward");
