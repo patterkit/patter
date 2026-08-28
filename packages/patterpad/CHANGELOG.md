@@ -6,6 +6,18 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Setting a flag is its own step.** Point an effect at a flags property and the value step now leads
+  with **Set a flag** / **Clear a flag**, listing the flags you declared, instead of asking you to
+  build the call yourself. Replacing the whole set is still there, one step further in.
+
+### Changed
+
+- Newly written effect targets spell the scope out (`@patter.gold` where the editor used to write
+  `@gold`). Both forms mean the same thing and both compile; old scenes are untouched, and a target
+  re-picked in the editor takes the longer spelling. (expr-editor 0.15.0.)
+
 ### Fixed
 
 - **A pinned tool window stays where you put it.** On macOS, dragging the editor dragged every pinned
