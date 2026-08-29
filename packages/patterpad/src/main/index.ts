@@ -1123,7 +1123,7 @@ function registerIpc(): void {
 }
 
 /** The About dialog's links (the only external URLs the renderer can open). */
-const ABOUT_LINKS = new Set(["https://patterkit.dev", "https://ian.wildwinter.net"]);
+const ABOUT_LINKS = new Set(["https://patterkit.dev", "https://ian.wildwinter.net", "https://patterkit.dev/download/#something-to-open"]);
 
 function createWindow(): void {
   win = new BrowserWindow({

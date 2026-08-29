@@ -2691,6 +2691,9 @@ async function boot(): Promise<void> {
 // Welcome-screen CTAs (the in-window primary actions). All other commands come from the app menus.
 $<HTMLButtonElement>("welcome-open").addEventListener("click", () => void openDialog());
 $<HTMLButtonElement>("welcome-new").addEventListener("click", () => void createDialog());
+// The tour is a download rather than something the app carries, so this opens the page that
+// offers it - the same allow-listed external route the About box uses.
+$<HTMLButtonElement>("welcome-tour").addEventListener("click", () => window.patter.openExternal("https://patterkit.dev/download/#something-to-open"));
 toggleNavEl.addEventListener("click", () => togglePane("nav"));
 toggleInspectorEl.addEventListener("click", () => togglePane("inspector"));
 // The project name is the way back to the project overview (#3a) - a no-op on the welcome screen.

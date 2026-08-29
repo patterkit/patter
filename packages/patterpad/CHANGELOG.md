@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **The welcome screen points at the tour.** A quiet line under Open and New: "New to Patter? Take
+  the interactive tour", which opens the download page that offers it. The first screen is where
+  somebody who needs teaching is standing, and it used to say nothing about the thing that teaches.
+
 ### Changed
 
 - **Hints look like hints, and the explanations read as sentences.** Placeholder text is styled once,

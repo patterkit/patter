@@ -495,7 +495,12 @@ body.resizing main.panes { transition: none; }
 .welcome-card { width: min(34rem, 100%); }
 .welcome-title { margin: 0 0 0.2rem; font: 700 2.4rem/1.1 var(--font-read); color: var(--ink); text-align: center; }
 .welcome-sub { margin: 0 0 1.8rem; color: var(--muted); font-style: italic; text-align: center; }
-.welcome-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.8rem; }
+.welcome-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem; }
+/* The teaching line: quieter than the two actions above it, and a LINK rather than a third button,
+   because it leaves the app rather than doing something in it. */
+.welcome-learn { margin: 0 0 1.8rem; text-align: center; color: var(--muted); font: 0.82rem var(--font-ui); }
+.linklike { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.linklike:hover { color: var(--ink); }
 .welcome-recents-label { color: var(--muted); font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
 .recents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .recent-item {
