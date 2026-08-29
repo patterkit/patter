@@ -11,6 +11,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Setting a flag is its own step.** Point an effect at a flags property and the value step now leads
   with **Set a flag** / **Clear a flag**, listing the flags you declared, instead of asking you to
   build the call yourself. Replacing the whole set is still there, one step further in.
+- **File ▸ Close Project.** Opening a project was a one-way door: the welcome screen only appeared at
+  launch, so there was no way back to it, or to the shipped tour, without quitting. Closing returns
+  the window to the welcome with the project you closed at the top of the recents list, and shuts the
+  Play, Search and Coverage windows, which have nothing to show once there is no project. A quit
+  after closing opens on the welcome screen rather than silently reopening what you just closed.
+- **The Properties page carries a version-control badge**, the way a scene row does: modified, new,
+  locked by someone else, out of date. It reads the project file, which is where `@patter`
+  declarations live, and it updates the moment the page saves rather than on the next poll.
 
 ### Changed
 
@@ -23,17 +31,6 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **A pinned tool window stays where you put it.** On macOS, dragging the editor dragged every pinned
   window along with it. They keep the pin's meaning - above Patterpad while you are in Patterpad, and
   not above your other apps - without being towed around. (app-shell 0.35.1.)
-
-### Added
-
-- **File ▸ Close Project.** Opening a project was a one-way door: the welcome screen only appeared at
-  launch, so there was no way back to it, or to the shipped tour, without quitting. Closing returns
-  the window to the welcome with the project you closed at the top of the recents list, and shuts the
-  Play, Search and Coverage windows, which have nothing to show once there is no project. A quit
-  after closing opens on the welcome screen rather than silently reopening what you just closed.
-- **The Properties page carries a version-control badge**, the way a scene row does: modified, new,
-  locked by someone else, out of date. It reads the project file, which is where `@patter`
-  declarations live, and it updates the moment the page saves rather than on the next poll.
 
 ## [0.12.0] - 2026-08-26
 
