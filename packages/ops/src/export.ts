@@ -6,7 +6,9 @@ import { basename, isAbsolute, join } from "node:path";
 import { exportBundle } from "@patterkit/compiler";
 import { isContentlessBeat } from "@patterkit/model";
 import type { Bundle, Scene, Block, Group, Snippet } from "@patterkit/model";
+import { walkFiles } from "./load.js";
 import type { LoadedProject } from "./load.js";
+import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 
 /** Drop content-less beats - an empty bubble left behind only to carry a jump - from every snippet before
  *  we compile. Such a beat would render at runtime as a blank line that, lacking any localised string,
@@ -34,7 +36,24 @@ function compileScenes(loaded: LoadedProject): Scene[] {
  *  "embedded" (default) keeps every locale's strings inline; "ids" strips them so the runtime emits beat
  *  IDs (the game localises). `sourceDebug` keeps only the SOURCE locale, embedded for debug playback and
  *  flagged so the runtime warns it is not a shippable build. */
+/**
+ * Refuse to compile a project with a merge still unresolved (patter-merge.md §3.6, via
+ * `sidecarIssues`). A merged shard is valid canonical source whose conflicted values resolved
+ * provisionally to OURS, so a bundle built over one is a bundle of one side of a disagreement.
+ * `validate` has always said so; export never looked, and an author who runs `patter export`
+ * without validating first is exactly the person the rule is for.
+ */
+function refuseUnresolvedMerge(loaded: LoadedProject): void {
+  const issues = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
+  if (!issues.length) return;
+  throw new Error(
+    `${issues.length} unresolved merge conflict(s) - resolve them and delete the .patterconflict sidecar(s) first:\n` +
+    issues.map((i) => `  ${i.file}`).join("\n"),
+  );
+}
+
 export function runExport(loaded: LoadedProject): Bundle {
+  refuseUnresolvedMerge(loaded);
   const { project, locales } = loaded;
   const full = exportBundle({ project, scenes: compileScenes(loaded), locales });
   const loc = project.export?.localisation;
@@ -47,6 +66,7 @@ export function runExport(loaded: LoadedProject): Bundle {
 /** Compile WITHOUT the localisation-mode transform - the full bundle with every locale inline. Used where
  *  the host needs all strings regardless of build mode (e.g. Patterpad's Play window + Export Localisation). */
 export function runExportFull(loaded: LoadedProject): Bundle {
+  refuseUnresolvedMerge(loaded);
   const { project, locales } = loaded;
   return exportBundle({ project, scenes: compileScenes(loaded), locales });
 }

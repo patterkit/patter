@@ -65,6 +65,28 @@ const eq = (a: unknown, b: unknown): boolean => canonicalStringify(a) === canoni
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** Detect the merge type from a file's `schema` tag. */
+/** The conflict sidecar's extension. One constant, because three callers now look for it. */
+export const CONFLICT_SIDECAR = ".patterconflict";
+
+/**
+ * Turn a set of lingering `.patterconflict` paths into the issues that STOP work.
+ *
+ * The rule is patter-merge.md §3.6: a merged shard is valid canonical source with conflicted values
+ * resolved provisionally to OURS, so an unresolved merge cannot be allowed to reach CI or an export.
+ * That was stated in the design and enforced in exactly one place - `validate` - while `export` and
+ * `pack` never looked. Pack is the worse of the two: a pack carries shards but NOT sidecars, so
+ * sending one hands the recipient your side of a disagreement with nothing to say it was in dispute.
+ *
+ * It lives here, beside the sentence it enforces, because three call sites each re-deciding what a
+ * lingering sidecar means is how the rule drifted out of the code in the first place.
+ */
+export function sidecarIssues(sidecarPaths: readonly string[]): Array<{ file: string; message: string }> {
+  return sidecarPaths.map((file) => ({
+    file,
+    message: "unresolved merge conflict - resolve it and delete the .patterconflict sidecar before committing",
+  }));
+}
+
 export function detectMergeType(file: { schema?: unknown }): MergeFileType {
   const s = typeof file.schema === "string" ? file.schema : "";
   if (s.startsWith("patter/flow")) return "flow";
@@ -171,7 +193,43 @@ function mergeAuthoring(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   // Cut: per-key 3-way.
   setIf(merged, "cut", mergeMap(asMap(base.cut), asMap(ours.cut), asMap(theirs.cut), "cut", conflicts, undefined));
 
+  // Suggestions: a UNION by id like comments, but the records are NOT immutable - accepting or
+  // rejecting one writes `resolved` / `outcome` - so each id is a 3-way in its own right. First-seen
+  // wins would keep base's copy and quietly undo a resolution either side had made.
+  setIf(merged, "suggestions", mergeById(asArr(base.suggestions), asArr(ours.suggestions), asArr(theirs.suggestions), "suggestions", conflicts));
+
+  // Re-record flags: a line-id -> boolean map, per-key 3-way like cut.
+  setIf(merged, "rerecord", mergeMap(asMap(base.rerecord), asMap(ours.rerecord), asMap(theirs.rerecord), "rerecord", conflicts, undefined));
+
+  // Anything this merger does not name explicitly still travels. The fixed list above is what DROPPED
+  // `suggestions` and `rerecord` outright when they were added to the model - not merged coarsely,
+  // deleted, with no conflict and no warning (from-storylets/merge-holes-worth-checking §5: a merge
+  // spec is a second description of the model, and nothing makes it track the first). A plain 3-way is
+  // the honest default for a field nobody has thought about yet; `mergeProject` already works this way.
+  for (const k of new Set([...Object.keys(base), ...Object.keys(ours), ...Object.keys(theirs)])) {
+    if (k in merged || AUTHORING_HANDLED.has(k)) continue;
+    const v = merge3(base[k], ours[k], theirs[k], "", k, conflicts);
+    if (v !== undefined) merged[k] = v;
+  }
+
   return { type: "authoring", merged, conflicts, warnings: [] };
+}
+
+/** Every authoring key with a strategy of its own above. A key NOT here falls to the plain 3-way, which
+ *  is coarse but never lossy; the set exists so the fallback does not re-merge what was already merged
+ *  (an empty result from `setIf` must not be reconsidered as "unhandled"). */
+const AUTHORING_HANDLED = new Set(["schema", "comments", "edits", "writing", "recording", "audio", "documentation", "cut", "suggestions", "rerecord"]);
+
+/** Union an array of id-keyed records, 3-way per id: both sides' additions survive, and a record both
+ *  sides changed differently is a conflict rather than a silent pick. */
+function mergeById(base: unknown[], ours: unknown[], theirs: unknown[], path: string, conflicts: Conflict[]): unknown[] {
+  const index = (arr: unknown[]): Obj => {
+    const m: Obj = {};
+    for (const r of arr) if (isObj(r) && typeof r.id === "string") m[r.id] = r;
+    return m;
+  };
+  const merged = mergeMap(index(base), index(ours), index(theirs), path, conflicts);
+  return Object.values(merged).sort((a, b) => String(asMap(a).ts ?? "").localeCompare(String(asMap(b).ts ?? "")));
 }
 
 function mergeComments(base: unknown[], ours: unknown[], theirs: unknown[]): unknown[] {

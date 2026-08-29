@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, statSync } from "node:fs";
+import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
 import { validateConditions, validateInterpolation, exportBundle, hostScopesToSpec } from "@patterkit/compiler";
@@ -44,9 +45,7 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes });
   const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles]);
   const staleBundles = checkBundles(loaded);
-  const unresolvedMerges = walkFiles(loaded.root, ".patterconflict").map((file) => ({
-    file, message: "unresolved merge conflict - resolve it and delete the .patterconflict sidecar before committing",
-  }));
+  const unresolvedMerges = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
   return {
     structural,
     conditions,

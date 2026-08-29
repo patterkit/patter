@@ -17,6 +17,7 @@ import { dirname, relative, sep } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile } from "@patterkit/model";
 import { findProjectFile, walkFiles } from "./load.js";
+import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 
 /** The source-shard extensions a document carries (the merge-friendly truth). */
 export const SHARD_EXTENSIONS = [".patterflow", ".patterloc", ".patterx", ".patterproj"] as const;
@@ -41,6 +42,19 @@ export async function runPack(startPath: string): Promise<Buffer> {
   const projectFile = findProjectFile(startPath);
   const root = dirname(projectFile);
   const project = parseSource(readFileSync(projectFile, "utf8")) as ProjectFile;
+
+  // Refuse a pack built over an unresolved merge (patter-merge.md §3.6, via `sidecarIssues`). This is
+  // the worse of the two holes that rule left: a pack carries SHARDS and not sidecars, so the
+  // recipient gets conflicted values provisionally resolved to our side with nothing at all to say
+  // they were in dispute - and somebody else opening it is the whole point of a pack.
+  const unresolved = sidecarIssues(walkFiles(root, CONFLICT_SIDECAR));
+  if (unresolved.length) {
+    throw new Error(
+      `${unresolved.length} unresolved merge conflict(s) - resolve them before packing, or the recipient ` +
+      `gets your side of a disagreement with no sign of it:\n` +
+      unresolved.map((i) => `  ${i.file}`).join("\n"),
+    );
+  }
 
   // Gather every source shard under the project root, layout-independent.
   const files = SHARD_EXTENSIONS.flatMap((ext) => walkFiles(root, ext))

@@ -231,3 +231,53 @@ describe("project (.patterproj) merge", () => {
     expect((r.merged as any).locales.all).toEqual(["en", "fr", "de"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The merge spec is a SECOND description of the model, and nothing makes it track the first
+// (from-storylets/merge-holes-worth-checking, 2026-08-29). These hold the two lists together.
+// ---------------------------------------------------------------------------
+
+describe("an authoring merge carries every field the model has", () => {
+  const authoring = (extra: Record<string, unknown>): Record<string, unknown> =>
+    ({ schema: "patter/authoring@0", ...extra });
+
+  it("keeps BOTH sides' rewrite suggestions", () => {
+    // These were dropped outright - not merged coarsely, deleted, with no conflict and no warning.
+    // Suggestions are what a reviewer sends back in a pack, so the loss landed on the one workflow
+    // packs exist for.
+    const r = runMerge(
+      authoring({ suggestions: [] }),
+      authoring({ suggestions: [{ id: "s1", anchor: "L1", proposed: "ours", ts: "2026-01-01" }] }),
+      authoring({ suggestions: [{ id: "s2", anchor: "L2", proposed: "theirs", ts: "2026-01-02" }] }),
+    );
+    expect((r.merged["suggestions"] as Array<{ id: string }>).map((s) => s.id)).toEqual(["s1", "s2"]);
+    expect(r.conflicts).toHaveLength(0);
+  });
+
+  it("3-ways a suggestion both sides touched, rather than letting base win", () => {
+    // A suggestion record is NOT immutable: accepting or rejecting one writes resolved/outcome.
+    const base = authoring({ suggestions: [{ id: "s1", anchor: "L1", proposed: "x", ts: "2026-01-01" }] });
+    const ours = authoring({ suggestions: [{ id: "s1", anchor: "L1", proposed: "x", ts: "2026-01-01", resolved: true, outcome: "accepted" }] });
+    const r = runMerge(base, ours, base);
+    expect((r.merged["suggestions"] as Array<{ resolved?: boolean }>)[0]!.resolved).toBe(true);
+
+    const theirs = authoring({ suggestions: [{ id: "s1", anchor: "L1", proposed: "x", ts: "2026-01-01", resolved: true, outcome: "rejected" }] });
+    expect(runMerge(base, ours, theirs).conflicts).toHaveLength(1); // accepted vs rejected is a real disagreement
+  });
+
+  it("keeps both sides' re-record flags", () => {
+    const r = runMerge(
+      authoring({ rerecord: {} }),
+      authoring({ rerecord: { L1: true } }),
+      authoring({ rerecord: { L2: true } }),
+    );
+    expect(r.merged["rerecord"]).toEqual({ L1: true, L2: true });
+  });
+
+  it("carries a field the merger has never heard of, instead of dropping it", () => {
+    // The structural half: the next field added to AuthoringFile survives even if nobody updates
+    // this file. Coarse (a plain 3-way) is a fine default; deleted is not.
+    const r = runMerge(authoring({}), authoring({ somethingNew: { a: 1 } }), authoring({}));
+    expect(r.merged["somethingNew"]).toEqual({ a: 1 });
+  });
+});

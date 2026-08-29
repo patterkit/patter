@@ -53,5 +53,5 @@ export type { DocumentManifest } from "./pack.js";
 export { runUnpack, runUnpackMerge, UnsafeEntryError, isUnsafeEntry } from "./unpack.js";
 export type { UnpackMergeResult, MergedShard, ProvenanceCheck } from "./unpack.js";
 export { resolveDocumentation, classesForChannel } from "./documentation.js";
-export { runMerge, detectMergeType, UnsupportedMergeError } from "./merge.js";
+export { runMerge, detectMergeType, UnsupportedMergeError, sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 export type { MergeResult, MergeFileType, Conflict, ConflictKind } from "./merge.js";

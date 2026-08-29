@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from "vitest";
 import { join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import JSZip from "jszip";
 import { canonicalStringify, parseSource } from "@patterkit/core";
@@ -277,5 +277,38 @@ describe("runUnpackMerge (fold a returned document into existing shards)", () =>
     expect(res.shards.find((s) => s.path.endsWith("extra.patterloc"))?.added).toBe(true);
     applyWrites(res.writes);
     expect(existsSync(join(oursDir, "loc/en/extra.patterloc"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The rule patter-merge.md §3.6 states and only `validate` enforced: an unresolved merge must not
+// reach CI or an export (from-storylets/merge-holes-worth-checking §1). A merged shard is valid
+// canonical source whose conflicted values resolved provisionally to OURS, so both of these ship one
+// side of a disagreement as though it were settled - and a PACK carries shards but not sidecars, so
+// the recipient has nothing that says it was ever in dispute.
+// ---------------------------------------------------------------------------
+
+describe("an unresolved merge cannot be packed or exported", () => {
+  it("refuses to pack, naming the file", async () => {
+    const dir = mkProject({ L1: "hello" });
+    writeFileSync(join(dir, "loc/en/s.patterloc.patterconflict"), JSON.stringify({ type: "loc", conflicts: [{ id: "L1" }] }));
+    await expect(runPack(dir)).rejects.toThrow(/unresolved merge conflict/i);
+    await expect(runPack(dir)).rejects.toThrow(/s\.patterloc\.patterconflict/);
+  });
+
+  it("packs once the sidecar is gone", async () => {
+    const dir = mkProject({ L1: "hello" });
+    const sidecar = join(dir, "loc/en/s.patterloc.patterconflict");
+    writeFileSync(sidecar, "{}");
+    await expect(runPack(dir)).rejects.toThrow();
+    rmSync(sidecar);
+    await expect(runPack(dir)).resolves.toBeInstanceOf(Buffer);
+  });
+
+  it("refuses to export, so a bundle is never built over a provisional resolution", () => {
+    const dir = scaffold();
+    expect(() => runExport(loadProject(dir))).not.toThrow(); // clean tree first, or the test proves nothing
+    writeFileSync(join(dir, "scenes", "start.patterflow.patterconflict"), "{}");
+    expect(() => runExport(loadProject(dir))).toThrow(/unresolved merge conflict/i);
   });
 });

@@ -172,10 +172,19 @@ export async function runUnpackMerge(
       shards.push({ path: rel, added: true });
       continue;
     }
-    const oursObj = parseSource(readFileSync(outPath, "utf8")) as Record<string, unknown>;
-    const theirsObj = parseSource(theirText) as Record<string, unknown>;
+    // A three-way merge cannot proceed over a shard it cannot read, and half-merging a return leg is
+    // worse than refusing it - so this still aborts the whole run. What it did NOT do was say WHICH
+    // file or WHICH of the three sides was unreadable, and this is a call the author made on a whole
+    // project, so the error was "unexpected token" with no way to tell where. (from-storylets/
+    // merge-holes-worth-checking, found in their tree and true in ours.)
+    const readSide = (side: "ours" | "theirs" | "base", text: string): Record<string, unknown> => {
+      try { return parseSource(text) as Record<string, unknown>; }
+      catch (e) { throw new Error(`${rel}: the ${side} copy is not readable Patter source - ${e instanceof Error ? e.message : String(e)}`); }
+    };
+    const oursObj = readSide("ours", readFileSync(outPath, "utf8"));
+    const theirsObj = readSide("theirs", theirText);
     const baseText = base.get(rel);
-    const baseObj = (baseText !== undefined ? parseSource(baseText) : {}) as Record<string, unknown>;
+    const baseObj = baseText !== undefined ? readSide("base", baseText) : {};
 
     const result = runMerge(baseObj, oursObj, theirsObj);
     writes.push({ path: outPath, content: canonicalStringify(result.merged) });
