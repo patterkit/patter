@@ -45,6 +45,12 @@ function readDirSafe(dir: string) {
 export function walkFiles(dir: string, ext: string): string[] {
   const out: string[] = [];
   for (const e of readDirSafe(dir)) {
+    // Dot-entries are not the project: an editor backup, a `.trash`, a vendored checkout, `.git`
+    // itself. Recursing into them made a stray shard REAL CONTENT - a scene the author had deleted
+    // could come back from a backup directory (from-storylets/load-issues-and-the-strict-loader).
+    // The project ROOT is never tested here, only what is inside it, so a project living under a
+    // dot-directory of the user's own still loads.
+    if (e.name.startsWith(".")) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) out.push(...walkFiles(p, ext));
     else if (e.isFile() && e.name.endsWith(ext)) out.push(p);

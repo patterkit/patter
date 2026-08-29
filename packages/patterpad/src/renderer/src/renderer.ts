@@ -922,7 +922,8 @@ function fixLabel(fix: NonNullable<Problem["fix"]>): string {
 /** Friendly category names for the problems bar (the CLI keeps the precise technical codes). */
 const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
   structure: "Structure", condition: "Condition", interpolation: "Text",
-  hygiene: "Tidy-up", "stale-bundle": "Build", merge: "Merge", spelling: "Spelling",
+  hygiene: "Tidy-up", "stale-bundle": "Build", merge: "Merge", "not-in-project": "Not in project",
+  spelling: "Spelling",
 };
 
 /** Rewrite a validator problem into plain language for the editor's problems bar - the audience is
@@ -932,6 +933,7 @@ function humanizeProblem(p: Problem): { tag: string; message: string } {
   const tag = PROBLEM_CATEGORY[p.category] ?? "Problem";
   if (p.category === "stale-bundle") return { tag, message: "Your playable build is out of date. It refreshes the next time you export." };
   if (p.category === "merge") return { tag, message: "This file still has an unresolved merge conflict in it." };
+  if (p.category === "not-in-project") return { tag, message: "This file sits outside the project's folders, so nothing opens it and none of it is in your story. Move it in, or delete it." };
   if (p.category === "spelling") return { tag, message: p.message }; // already writer-facing (#177)
   const speaker = /'([^']+)' is not in the project cast/.exec(p.message);
   switch (p.detail) {

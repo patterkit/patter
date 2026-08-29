@@ -634,7 +634,7 @@ export interface PatterCoverageApi {
   onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
-export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "spelling";
+export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling";
 
 /** A one-click remedy for a problem (spec §4). Extensible discriminated union.
  *  `add-to-cast` / `declare-property` are project-file writes (applyFix); `retarget-jump`,

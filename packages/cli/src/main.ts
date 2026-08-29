@@ -252,14 +252,15 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
 
     case "validate": {
       const loaded = loadProject(positionals[0] ?? ".");
-      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, ok } = runValidate(loaded);
+      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, ok } = runValidate(loaded);
       for (const i of structural) console.error(`  [${i.code}] ${i.message}`);
       for (const i of conditions) console.error(`  [${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`);
       for (const i of interpolation) console.error(`  [${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`);
       for (const i of hygiene) console.error(`  [hygiene] ${i.file}: ${i.message}`);
       for (const i of staleBundles) console.error(`  [stale-bundle] ${i.file}: ${i.message}`);
       for (const i of unresolvedMerges) console.error(`  [unresolved-merge] ${i.file}: ${i.message}`);
-      const count = structural.length + conditions.length + interpolation.length + hygiene.length + staleBundles.length + unresolvedMerges.length;
+      for (const i of orphans) console.error(`  [not-in-project] ${i.file}: ${i.message}`);
+      const count = structural.length + conditions.length + interpolation.length + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
       if (ok) console.log(`ok - ${loaded.scenes.length} scene(s), no issues`);
       else console.error(`\n${count} issue(s)`);
       return ok ? 0 : 1;

@@ -31,6 +31,8 @@ export interface ValidateResult {
   staleBundles: HygieneIssue[];
   /** Lingering `.patterconflict` sidecars - an unresolved merge (patter-merge.md §3.6). */
   unresolvedMerges: HygieneIssue[];
+  /** Patter shards on disk that the project does NOT contain - see `orphanShards`. */
+  orphans: HygieneIssue[];
   ok: boolean;
 }
 
@@ -46,6 +48,7 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles]);
   const staleBundles = checkBundles(loaded);
   const unresolvedMerges = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
+  const orphans = orphanShards(loaded);
   return {
     structural,
     conditions,
@@ -53,9 +56,44 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
     hygiene,
     staleBundles,
     unresolvedMerges,
+    orphans,
     ok: structural.length === 0 && conditions.length === 0 && interpolation.length === 0
-      && hygiene.length === 0 && staleBundles.length === 0 && unresolvedMerges.length === 0,
+      && hygiene.length === 0 && staleBundles.length === 0 && unresolvedMerges.length === 0
+      && orphans.length === 0,
   };
+}
+
+/**
+ * Patter source files that are NOT part of the project.
+ *
+ * The loader is strict about every file it READS - a bad parse, a wrong shape, two files claiming one
+ * scene id all throw, naming the file - but it collects by layout directory, so a perfectly valid
+ * `.patterflow` outside `scenes/` is not malformed. It is simply not in the project, and until now
+ * nothing anywhere said so: not the loader, which never looked at it, and not validate, which
+ * examined only what loaded. A scene moved by hand, dropped in the root, or left behind by a
+ * reorganisation just stopped existing (from-storylets/load-issues-and-the-strict-loader).
+ *
+ * This is the cheap half of a warnings channel: strictness stays, and the one state it cannot see
+ * becomes a question the author can answer.
+ */
+export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
+  const collected = new Set([
+    loaded.projectFile,
+    ...Object.values(loaded.sceneFiles),
+    ...loaded.localeFiles,
+    ...loaded.authoringFiles,
+  ]);
+  const kind: Record<string, string> = {
+    ".patterflow": "scene", ".patterloc": "locale", ".patterx": "authoring", ".patterproj": "project",
+  };
+  const out: HygieneIssue[] = [];
+  for (const [ext, what] of Object.entries(kind)) {
+    for (const file of walkFiles(loaded.root, ext)) {
+      if (collected.has(file)) continue;
+      out.push({ file, message: `a ${what} shard outside the project's layout - nothing loads it, so its content is not in the project (move it under the configured folder, or delete it)` });
+    }
+  }
+  return out;
 }
 
 /**

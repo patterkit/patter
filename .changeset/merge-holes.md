@@ -1,5 +1,6 @@
 ---
 "@patterkit/ops": minor
+"@patterkit/cli": patch
 ---
 
 Close four holes in the merge path (from-storylets/merge-holes-worth-checking).
@@ -24,3 +25,10 @@ this shape.
 **A malformed shard on the return leg says which shard and which side.** `runUnpackMerge` parsed
 ours, theirs and base bare, so one unreadable file aborted the whole return leg with a raw parse
 error naming neither.
+
+Separately, two answers to "which files on disk are the project?" (from-storylets/
+load-issues-and-the-strict-loader). `walkFiles` skips dot-entries, so a shard in an editor backup or
+a vendored checkout is no longer collected as real content - it could previously collide with a live
+scene id and fail the load outright. And `runValidate` gains `orphans`: a valid shard outside the
+project's layout was not malformed, merely not in the project, and nothing anywhere said so. The CLI
+reports it as `[not-in-project]`.
