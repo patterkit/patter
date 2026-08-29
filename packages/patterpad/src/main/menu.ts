@@ -85,8 +85,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Windows / Linux the Open Project dialog is a directory selector that would grey the file out.
         { label: "Open Patterpack…", click: () => send("open-patterpack") },
         { label: "Open Recent", submenu: recentItems },
-        // The way back to the welcome screen, and so to the shipped tour: without it, opening a
-        // project is a one-way door. No accelerator - it is not a key you tap. Close PROJECT, not
+        // The way back to the welcome screen: without it, opening a project is a one-way door and the
+        // recents list is unreachable. No accelerator - it is not a key you tap. Close PROJECT, not
         // Close Window: the window stays, showing the welcome.
         { label: "Close Project", enabled: spelling?.hasProject ?? false, click: () => send("close-project") },
         { type: "separator" },

@@ -2136,9 +2136,13 @@ function renderRecents(recents: RecentProject[]): void {
   }
 }
 
-/** File ▸ Close Project: back to the welcome screen, which is the only way to reach the shipped
- *  examples again once a project is open (from-storylets/close-project). The window stays: this is
- *  Close PROJECT, not the Close Window neither app offers.
+/** File ▸ Close Project: back to the welcome screen, which without this was reachable only at launch
+ *  (from-storylets/close-project). The window stays: this is Close PROJECT, not the Close Window
+ *  neither app offers.
+ *
+ *  What the welcome is FOR here is Open, New and recents. It offers no examples and no tour: the
+ *  brief this came from was written around Storyletter's three shipped example projects, and the
+ *  wording followed it across when this app has no such row (from-storylets/welcome-screen-shape).
  *
  *  Boot state is re-read rather than reused, so the welcome's recents list carries the project just
  *  closed at the top - the point of closing is usually to open something else. */
