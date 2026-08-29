@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-29
+
 ### Changed
 
 - Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is

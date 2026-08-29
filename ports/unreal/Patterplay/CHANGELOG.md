@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-29
+
 ### Added
 
 - **Blueprint can manage flows.** `GetFlow` (fetch one already open by name), `CloseFlow` and `Reset`
