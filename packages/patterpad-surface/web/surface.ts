@@ -1045,7 +1045,10 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     redo: () => { redo(view.state, view.dispatch); view.focus(); },
     sceneName: () => opened.flow.scene.name,
     focus: () => view.focus(),
-    destroy: () => { cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setJumpNavHandler(null); pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); view.destroy(); },
+    // The hint bar is the HOST's element, filled by us: emptying it belongs here, or its last hints
+    // outlive the editor they describe. Patterpad's welcome screen showed "Tab -> dialogue" with
+    // nothing to type into (from-storylets/welcome-screen-shape, spotted in a screenshot).
+    destroy: () => { cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setJumpNavHandler(null); pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); opts.hintbar?.replaceChildren(); view.destroy(); },
   };
   opts.onChange?.(handle); // initial mirror
   opts.onSelect?.(inspect(view.state)); // initial inspector context

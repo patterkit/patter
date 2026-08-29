@@ -44,6 +44,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **The keystroke hints go when the editor does.** The welcome screen showed "Tab → dialogue, Enter
+  next line" with nothing to type into, because the bar kept whatever it last displayed. It empties
+  with the editor now.
 - **A pinned tool window stays where you put it.** On macOS, dragging the editor dragged every pinned
   window along with it. They keep the pin's meaning - above Patterpad while you are in Patterpad, and
   not above your other apps - without being towed around. (app-shell 0.35.1.)
