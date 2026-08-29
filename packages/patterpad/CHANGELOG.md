@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-29
+
 ### Added
 
 - **Setting a flag is its own step.** Point an effect at a flags property and the value step now leads
