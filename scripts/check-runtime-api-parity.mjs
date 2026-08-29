@@ -56,19 +56,15 @@ const API = [
 
   // --- host navigation ------------------------------------------------------
   { on: "Flow", js: "goto", unity: "Goto", godot: "goto", unreal: "gotoAddress", bp: "Goto" },
-  { on: "Flow", js: "close", unity: "Close", godot: "close", unreal: "close", bp: null,
-    why: "engine-managed; Blueprint sees it through IsClosed" },
+  { on: "Flow", js: "close", unity: "Close", godot: "close", unreal: "close", bp: "Close" },
   { on: "Flow", js: "isClosed", unity: "IsClosed", godot: "is_closed", unreal: "isClosed", bp: "IsClosed" },
   { on: "Engine", js: "runFlow", unity: "RunFlow", godot: "run_flow", unreal: "runFlow", bp: "RunFlow" },
 
   // --- flow lifecycle -------------------------------------------------------
   { on: "Engine", js: "openFlow", unity: "OpenFlow", godot: "open_flow", unreal: "openFlow", bp: "OpenFlow" },
-  { on: "Engine", js: "getFlow", unity: "GetFlow", godot: "get_flow", unreal: "getFlow", bp: null,
-    why: "OpenFlow hands back the UPatterFlow the caller keeps" },
-  { on: "Engine", js: "closeFlow", unity: "CloseFlow", godot: "close_flow", unreal: "closeFlow", bp: null,
-    why: "not yet surfaced to Blueprint" },
-  { on: "Engine", js: "reset", unity: "Reset", godot: "reset", unreal: "reset", bp: null,
-    why: "not yet surfaced to Blueprint" },
+  { on: "Engine", js: "getFlow", unity: "GetFlow", godot: "get_flow", unreal: "getFlow", bp: "GetFlow" },
+  { on: "Engine", js: "closeFlow", unity: "CloseFlow", godot: "close_flow", unreal: "closeFlow", bp: "CloseFlow" },
+  { on: "Engine", js: "reset", unity: "Reset", godot: "reset", unreal: "reset", bp: "Reset" },
 
   // --- state ----------------------------------------------------------------
   { on: "Engine", js: "getProperty", unity: "GetProperty", godot: "get_property", unreal: "getProperty", bp: null,

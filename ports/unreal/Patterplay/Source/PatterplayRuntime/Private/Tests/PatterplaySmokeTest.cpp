@@ -152,6 +152,23 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 		}
 	}
 
+	// The flow-management surface Blueprint gained: fetch by name, close, and reset. Each one drops or
+	// replaces a flow underneath a wrapper, which is the shape that started all this.
+	{
+		UPatterFlow* Same = Engine->GetFlow(TEXT("f"));
+		TestEqual(TEXT("GetFlow hands back the wrapper we already hold"), Same, Flow);
+		TestNull(TEXT("GetFlow answers null for a name that is not open"), Engine->GetFlow(TEXT("nope")));
+
+		Engine->CloseFlow(TEXT("f"));
+		TestTrue(TEXT("a closed flow's wrapper reads as closed"), Flow->IsClosed());
+		TestNull(TEXT("and GetFlow no longer offers it"), Engine->GetFlow(TEXT("f")));
+
+		UPatterFlow* Second = Engine->OpenFlow(TEXT("f2"), TEXT("s1"));
+		Engine->Reset();
+		TestTrue(TEXT("Reset closes every flow's wrapper"), Second->IsClosed());
+		TestEqual(TEXT("and the shared world is back to its defaults"), Engine->GetPropertyNumber(TEXT("@gold")), 5.0f);
+	}
+
 	// A flow the save did not carry comes back CLOSED rather than dangling: getFlow answers null for
 	// its id, every UPatterFlow method guards on the pointer, and IsClosed reports the truth.
 	{

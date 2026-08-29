@@ -128,7 +128,12 @@ namespace
 
 // ----- UPatterFlow ------------------------------------------------------------
 
-void UPatterFlow::Init(UPatterEngine* InOwner, const FString& InId, patter::Flow* InFlow) { Owner = InOwner; Id = InId; Flow = InFlow; }
+void UPatterFlow::Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow) { Owner = InOwner; Id = InId; Flow = InFlow; }
+
+void UPatterFlow::Close()
+{
+	if (Owner) Owner->CloseFlow(Id); // the engine finishes and drops it, then re-binds this wrapper
+}
 
 FPatterStep UPatterFlow::Advance()
 {
@@ -193,9 +198,9 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
 	if (!Engine) return nullptr;
 	try
 	{
-		patter::Flow* F = Engine->openFlow(Std(Id), Std(Scene));
+		Engine->openFlow(Std(Id), Std(Scene));
 		UPatterFlow* Flow = NewObject<UPatterFlow>(this);
-		Flow->Init(this, Id, F);
+		Flow->Init(this, Id, Engine->flowPtr(Std(Id))); // an OWNING handle: see UPatterFlow::Flow
 		WrappedFlows.Add(Flow); // so a live hot swap can re-bind the wrapper by id
 		return Flow;
 	}
@@ -348,6 +353,36 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 	}
 }
 
+UPatterFlow* UPatterEngine::GetFlow(const FString& FlowName)
+{
+	if (!Engine) return nullptr;
+	// Hand back the wrapper we already made for this id, so a Blueprint that fetches twice gets one
+	// object rather than two views of the same flow.
+	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
+		if (UPatterFlow* Wrapper = Weak.Get())
+			if (Wrapper->GetFlowId() == FlowName) return Wrapper->IsClosed() ? nullptr : Wrapper;
+	std::shared_ptr<patter::Flow> F = Engine->flowPtr(Std(FlowName));
+	if (!F) return nullptr; // not open: null, not an inert wrapper nobody asked for
+	UPatterFlow* Flow = NewObject<UPatterFlow>(this);
+	Flow->Init(this, FlowName, F);
+	WrappedFlows.Add(Flow);
+	return Flow;
+}
+
+void UPatterEngine::CloseFlow(const FString& FlowName)
+{
+	if (!Engine) return;
+	Engine->closeFlow(Std(FlowName));
+	RebindFlows(); // the flow is gone; its wrapper must stop pointing at a map entry that is not there
+}
+
+void UPatterEngine::Reset()
+{
+	if (!Engine) return;
+	Engine->reset();
+	RebindFlows(); // every flow went with it
+}
+
 void UPatterEngine::RebindFlows()
 {
 	WrappedFlows.RemoveAll([](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid(); });
@@ -359,7 +394,7 @@ void UPatterEngine::RebindFlows()
 	}
 	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
 		if (UPatterFlow* Wrapper = Weak.Get())
-			Wrapper->Rebind(Engine->getFlow(Std(Wrapper->GetFlowId())));
+			Wrapper->Rebind(Engine->flowPtr(Std(Wrapper->GetFlowId())));
 }
 
 TArray<FString> UPatterEngine::GetPropertyFlags(const FString& Ref) const

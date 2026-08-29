@@ -1,6 +1,10 @@
 // Blueprint/C++ API over the engine: UPatterEngine wraps patter::Engine, UPatterFlow wraps
-// a patter::Flow (owned by the engine). The std engine objects are held via Pimpl pointers.
+// a patter::Flow. The engine is held via a Pimpl pointer; a flow is held as a SHARED handle,
+// because the engine rebuilds or drops its flows (load, hot swap, close, reset) underneath
+// wrappers that outlive them.
 #pragma once
+
+#include <memory>
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
@@ -54,18 +58,29 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	bool IsClosed() const;
 
-	void Init(UPatterEngine* InOwner, const FString& InId, patter::Flow* InFlow);
-	// Live bundle refresh: point this wrapper at the flow of the SAME id inside a swapped engine
-	// (nullptr when the flow did not survive - the wrapper then no-ops).
-	void Rebind(patter::Flow* InFlow) { Flow = InFlow; }
+	// Finish this flow and drop it from the engine. Inert afterwards, exactly as if the engine had
+	// closed it: a flow per speaker needs a way to end one without ending the game.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void Close();
+
+	// The name this flow was opened under. Not a UFUNCTION: no other runtime exposes a flow's own
+	// id, and a Blueprint-only member breaks the parity contract from the other side.
 	const FString& GetFlowId() const { return Id; }
+
+	void Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow);
+	// Live bundle refresh, a save load, a close: point this wrapper at the flow of the SAME id inside
+	// the engine as it is NOW (empty when the flow did not survive - the wrapper then no-ops).
+	void Rebind(const std::shared_ptr<patter::Flow>& InFlow) { Flow = InFlow; }
 
 private:
 	UPROPERTY()
 	TObjectPtr<UPatterEngine> Owner = nullptr;
 
-	FString Id;                   // the flow's id, for re-binding after a hot swap
-	patter::Flow* Flow = nullptr; // owned by the engine
+	FString Id; // the flow's id, for re-binding after a load / hot swap
+	// OWNING, not borrowed. The engine rebuilds or drops its flows on loadGame / closeFlow / reset,
+	// and this wrapper outlives those by design; holding a share means a missed re-bind reads as a
+	// finished flow rather than as freed memory.
+	std::shared_ptr<patter::Flow> Flow;
 };
 
 UCLASS(BlueprintType)
@@ -220,6 +235,19 @@ public:
 	 * in an honest "closed" state instead of a live pointer to nothing.
 	 */
 	void RebindFlows();
+
+	// Fetch a flow already opened under this name, or null. The counterpart to OpenFlow, which
+	// REPLACES: a Blueprint holding only an id needs a way to get the live wrapper back.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	UPatterFlow* GetFlow(const FString& FlowName);
+
+	// Finish a flow and drop it. Its wrapper goes inert rather than dangling.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void CloseFlow(const FString& FlowName);
+
+	// Close every flow and clear the shared world: back to a freshly created engine, same bundle.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void Reset();
 
 private:
 

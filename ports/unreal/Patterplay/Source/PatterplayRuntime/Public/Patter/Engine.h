@@ -1274,13 +1274,20 @@ namespace patter
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
             // driving the shared world. Replacing is a reset - contrast runFlow, which reuses.
             { auto prev = flows_.find(id); if (prev != flows_.end()) prev->second->close(); }
-            auto flow = std::unique_ptr<Flow>(new Flow(id, &host_, seed ? *seed : static_cast<int64_t>(defaultSeed_)));
+            auto flow = std::make_shared<Flow>(id, &host_, seed ? *seed : static_cast<int64_t>(defaultSeed_));
             Flow* raw = flow.get();
             flows_[id] = std::move(flow);
             raw->start(sceneId, blockId);
             return raw;
         }
         Flow* getFlow(const std::string& id) { auto it = flows_.find(id); return it != flows_.end() ? it->second.get() : nullptr; }
+        /** The same flow as an OWNING handle, for a wrapper that outlives the map entry (see `flows_`).
+         *  Empty for an id that is not open, which is the honest answer: the wrapper reads as closed. */
+        std::shared_ptr<Flow> flowPtr(const std::string& id)
+        {
+            auto it = flows_.find(id);
+            return it != flows_.end() ? it->second : std::shared_ptr<Flow>();
+        }
         // Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
         // holding it cannot keep advancing it into the shared world.
         void closeFlow(const std::string& id)
@@ -1579,7 +1586,7 @@ namespace patter
             flows_.clear();
             for (const auto& kv : save.flows)
             {
-                auto flow = std::unique_ptr<Flow>(new Flow(kv.first, &host_, static_cast<int64_t>(defaultSeed_)));
+                auto flow = std::make_shared<Flow>(kv.first, &host_, static_cast<int64_t>(defaultSeed_));
                 flow->restore(kv.second);
                 flows_[kv.first] = std::move(flow);
             }
@@ -1588,7 +1595,14 @@ namespace patter
     private:
         FlowHost host_;
         uint32_t defaultSeed_ = 0x9e3779b9u;
-        std::map<std::string, std::unique_ptr<Flow>> flows_;
+        // SHARED, not unique: a wrapper (UPatterFlow, and any host object of that shape) outlives the
+        // core object by design, and three paths destroy a flow underneath one - loadGame rebuilds the
+        // map, closeFlow erases an entry, reset clears the lot. Holding a shared_ptr means a wrapper
+        // that misses a re-bind keeps its flow ALIVE and reads as closed, rather than reading freed
+        // memory. The other three runtimes are reference counted; this brings C++ into line.
+        // The public accessors still hand out `Flow*` (`.get()`), so existing C++ is unaffected;
+        // `flowPtr` is the handle for anything that needs to OUTLIVE the map entry.
+        std::map<std::string, std::shared_ptr<Flow>> flows_;
         std::map<std::string, std::string> sceneGameIdToId_;
         std::map<std::string, std::map<std::string, std::string>> blockGameIdToId_;
         std::string currentLocale_;

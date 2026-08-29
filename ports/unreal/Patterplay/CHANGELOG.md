@@ -7,6 +7,21 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Blueprint can manage flows.** `GetFlow` (fetch one already open by name), `CloseFlow` and `Reset`
+  on the engine, and `Close` on a flow. A Blueprint-only game that opens a flow per speaker had no
+  way to shut one down or to ask whether one was still live; these existed in the C++ core and were
+  recorded in the parity table as unsurfaced.
+
+### Changed
+
+- The core owns its flows by `shared_ptr` rather than `unique_ptr`, and `UPatterFlow` holds a share
+  instead of a borrowed pointer. Source-compatible: `openFlow` / `getFlow` still return `Flow*`, so
+  existing C++ is unaffected; the new `flowPtr(id)` is the owning handle. A wrapper that misses a
+  re-bind now reads as a finished flow rather than as freed memory, which brings C++ into line with
+  the three reference-counted runtimes.
+
 ### Fixed
 
 - **A `UPatterFlow` you are holding survives a save/load.** The core owns its flows by value and
