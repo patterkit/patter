@@ -181,10 +181,10 @@
             <section class="settings-panel" data-panel="general">
               <label class="identity-field">Project name<input id="set-name" type="text" required /></label>
               <label class="identity-field">Start<select id="set-start"></select><small class="settings-fieldnote">Where the story begins: used by Play from Start and the Coverage test.</small></label>
-              <label class="settings-toggle"><input id="set-voiced" type="checkbox" /><span>Voiced<small>This story is voiced. Tracks recording status and voice scripts.</small></span></label>
+              <label class="settings-toggle"><input id="set-voiced" type="checkbox" /><span>Voiced<small>This story is voiced, so Patterpad tracks recording status and can export voice scripts.</small></span></label>
               <label class="settings-toggle"><input id="set-formatting" type="checkbox" /><span>Inline formatting<small>Authors can bold / italicise dialogue and narration (stored as tags in the strings).</small></span></label>
               <label class="settings-toggle"><input id="set-autosave" type="checkbox" /><span>Autosave<small>Save the open scene automatically every 30 seconds while you write.</small></span></label>
-              <label class="settings-toggle"><input id="set-autorebuild" type="checkbox" /><span>Auto Rebuild<small>Recompile the .patterc bundle after edits (debounced), so the on-disk build stays current. Best when the bundle isn't committed to a lock-based VCS.</small></span></label>
+              <label class="settings-toggle"><input id="set-autorebuild" type="checkbox" /><span>Auto Rebuild<small>Recompile the .patterc bundle as your edits settle, so the build on disk stays current. Best when the bundle isn't committed to a lock-based VCS.</small></span></label>
             </section>
             <section class="settings-panel" data-panel="language" hidden>
               <p class="settings-note">The project's languages. The <strong>default</strong> is the source language every string is authored in; the others are localisation targets.</p>
@@ -198,7 +198,7 @@
                 <option value="svn">Subversion (SVN)</option>
                 <option value="none">None</option>
               </select></label>
-              <p class="settings-note">Drives the lock-aware vs merge-based write path and the project's VCS config files (<code>vcs-setup.md</code>, ignore rules). Switching regenerates those config files for the new system.</p>
+              <p class="settings-note">Your version control decides how Patterpad saves: it checks a file out before writing where the system locks files, and writes straight away where it merges instead. It also writes the project's config files (<code>vcs-setup.md</code>, ignore rules), and switching regenerates them for the new system.</p>
             </section>
             <section class="settings-panel" data-panel="world" hidden>
               <p class="settings-note">World properties: the values your game engine owns and your story reads (referenced as <code>@world</code>), plus the inputs the coverage test feeds them.</p>
@@ -212,7 +212,7 @@
               <div id="set-writing-status"></div>
             </section>
             <section class="settings-panel" data-panel="estimating" hidden>
-              <p class="settings-note">Estimating replaces a still-guesswork scene's line count with a guess in the production report, so a stub scene (a couple of placeholder lines) doesn't read as nearly finished. The estimate is shared across the characters in its placeholder lines. When off, reports show pure actuals.</p>
+              <p class="settings-note">A scene you have only sketched counts as a couple of lines, which makes the production report look nearly finished. Estimating counts your own figure instead until the scene is really written, and shares that figure across the characters in its placeholder lines. Turn it off and reports show only what is actually there.</p>
               <div id="set-estimating"></div>
             </section>
             <section class="settings-panel" data-panel="recording-status" hidden>
@@ -232,7 +232,7 @@
               <div id="set-dictionary"></div>
             </section>
             <section class="settings-panel" data-panel="gamedata" hidden>
-              <p class="settings-note">Custom fields the host game reads off each node type. Define them here; edit each node's values in the inspector.</p>
+              <p class="settings-note">Your game can read fields of your own from any part of the script: a scene, a block, a snippet or a line. Define the fields here, then fill them in from the inspector.</p>
               <div id="set-gamedata"></div>
             </section>
             <section class="settings-panel" data-panel="build" hidden>

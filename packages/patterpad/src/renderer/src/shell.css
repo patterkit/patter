@@ -427,7 +427,6 @@ body.resizing main.panes { transition: none; }
   background: transparent; color: inherit; opacity: 0.6; font-size: 0.85rem; line-height: 1; cursor: pointer; }
 .insp-tag-x:hover { opacity: 1; background: color-mix(in oklab, var(--tag-c) 28%, transparent); }
 .insp-tag-input { flex: 1 1 4rem; min-width: 4rem; font: 0.78rem var(--font-ui); color: var(--ink); background: transparent; border: 0; padding: 0.1rem 0.15rem; }
-.insp-tag-input::placeholder { color: var(--muted); }
 .insp-tag-input:focus { outline: none; }
 /* the host's custom fields, grouped in the lower part of the level under a subtle divider */
 .insp-gd-section { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent); }
@@ -622,8 +621,15 @@ body.resizing main.panes { transition: none; }
 .settings-note { margin: 0; color: var(--muted); font-size: 0.76rem; }
 
 /* Placeholder text everywhere: faded well below real input so a prompt can't read as content. The
-   prompt strings themselves are wrapped in <angle brackets> to reinforce "this is a hint, not a value". */
-input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.5; font-style: italic; }
+   prompt strings themselves are wrapped in <angle brackets> to reinforce "this is a hint, not a value".
+   The family's rule (from-storylets/microcopy-sentences): the fade lives in the COLOUR, with opacity
+   pinned at 1, because a browser that applies its own placeholder opacity would otherwise fade an
+   already-faded colour twice. */
+input::placeholder, textarea::placeholder {
+  color: color-mix(in oklab, var(--muted) 70%, transparent);
+  font-style: italic;
+  opacity: 1;
+}
 
 /* Documentation Notes modal (one text area per class). */
 .doc-dialog { width: 92vw; max-width: 34rem; }

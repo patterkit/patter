@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Hints look like hints, and the explanations read as sentences.** Placeholder text is styled once,
+  consistently, so an empty field can't read as a filled one (a tag field's hint was the exception and
+  sat at full strength). And a sweep of the settings notes for words that came from the code rather
+  than from writing: "debounced", "write path", "node type", and a couple of sentences contorted
+  enough to say the same thing twice.
+
 ## [0.13.0] - 2026-08-29
 
 ### Added

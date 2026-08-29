@@ -169,7 +169,7 @@ export function mountWorld(
     // name; stored back as the full `@world.name` ref.
     const refWrap = el("div", "world-ref");
     const ref = el("input", "gd-input gd-name") as HTMLInputElement;
-    ref.type = "text"; ref.placeholder = "property name"; ref.value = d.ref.replace(/^@\w+\./, "").replace(/^@/, ""); ref.spellcheck = false;
+    ref.type = "text"; ref.placeholder = "<property name>"; ref.value = d.ref.replace(/^@\w+\./, "").replace(/^@/, ""); ref.spellcheck = false;
     refWrap.append(el("span", "world-at", "@"), el("span", "world-scope", "world"), el("span", "world-dot", "."), ref);
     // Bound AFTER the input is in the tree: the shell attaches its datalist as a SIBLING, which is a
     // no-op while the input has no parent, and the failure is invisible (no autocomplete, no error).
@@ -187,7 +187,7 @@ export function mountWorld(
     });
 
     const values = el("input", "gd-input world-driver-values") as HTMLInputElement;
-    values.type = "text"; values.placeholder = "values, comma-separated (e.g. 49, 50, 51)"; values.value = valuesText(d.values);
+    values.type = "text"; values.placeholder = "<values, comma-separated: 49, 50, 51>"; values.value = valuesText(d.values);
     values.addEventListener("input", () => { d.values = parseValues(values.value); });
 
     const kind = el("select", "insp-select gd-type") as HTMLSelectElement;
