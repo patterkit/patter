@@ -112,11 +112,17 @@ Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Typ
 
 ## Save and load
 
-The C++ core serialises the whole run: every flow's position, the shared `@patter` / `@scene`
-state, visit counts, and the seeded random generator. Call `saveGame()` / `loadGame()` on the core
-engine (reached with `UPatterEngine::Raw()`). Note the Unreal plugin does not yet ship a
-Blueprint save node or a JSON `.patterstate` serialiser like the Unity and Godot runtimes, so today
-save/load in Unreal is a C++ call.
+The runtime serialises the whole run: every flow's position, the shared `@patter` / `@scene`
+state, visit counts, and the seeded random generator.
+
+Use **`UPatterSave`**, which is Blueprint-callable and gives you the JSON to write where you like:
+`SaveStateToJson(Engine)` returns it, `LoadStateFromJson(Engine, Json)` restores it and returns
+whether the file was accepted (a refusal is logged with its reason).
+
+Prefer it over reaching past the wrapper. Loading REBUILDS the engine's flows, so any `UPatterFlow`
+you are holding refers to a flow that no longer exists; `UPatterSave` re-binds your wrappers to the
+restored flows for you, and a flow the save did not carry comes back closed rather than dangling.
+Calling `loadGame()` on the core engine through `UPatterEngine::Raw()` skips that step.
 → [Save/load & Game Data](/play/integration/)
 
 ## Build against the writer's structure

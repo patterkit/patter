@@ -334,9 +334,7 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 		Engine->setClosedCaptions(bCaptions);
 		BundleRef = NewBundle;
 		StringsBundleRef = nullptr;
-		for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
-			if (UPatterFlow* Wrapper = Weak.Get())
-				Wrapper->Rebind(Engine->getFlow(Std(Wrapper->GetFlowId())));
+		RebindFlows(); // the swap rebuilt the flows; the same re-bind the load path needs
 		return true;
 	}
 	catch (const std::exception& Ex)
@@ -348,6 +346,20 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 			if (UPatterFlow* Wrapper = Weak.Get()) Wrapper->Rebind(nullptr);
 		return false;
 	}
+}
+
+void UPatterEngine::RebindFlows()
+{
+	WrappedFlows.RemoveAll([](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid(); });
+	if (!Engine) // no core: nothing to point at, and a stale pointer is the thing we are here to avoid
+	{
+		for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
+			if (UPatterFlow* Wrapper = Weak.Get()) Wrapper->Rebind(nullptr);
+		return;
+	}
+	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
+		if (UPatterFlow* Wrapper = Weak.Get())
+			Wrapper->Rebind(Engine->getFlow(Std(Wrapper->GetFlowId())));
 }
 
 TArray<FString> UPatterEngine::GetPropertyFlags(const FString& Ref) const

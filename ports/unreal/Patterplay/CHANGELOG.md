@@ -7,6 +7,18 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `UPatterFlow` you are holding survives a save/load.** The core owns its flows by value and
+  `loadGame` clears and rebuilds them, so every wrapper the game held pointed at freed memory the
+  moment a save was loaded - and `LoadStateFromJson` returned true, giving no sign. Wrappers are
+  re-bound by id after a load (the hot swap already did this; the save path did not), and a flow the
+  save did not carry comes back closed rather than dangling. Reported from the Storylet Studio side,
+  2026-08-29, found while building their own Unreal wrapper against this one.
+- **A refused save file says why.** `LoadStateFromJson` caught the exception and returned a bare
+  `false`; it now logs the reason. An automation test that asserts a refusal needs an
+  `AddExpectedError`, since UE counts a logged error as a test failure.
+
 ## [0.6.0] - 2026-08-25
 
 ### Added

@@ -20,6 +20,7 @@
 
 #include "PatterBundle.h"
 #include "PatterEngine.h"
+#include "PatterSave.h"
 #include "Patter/Describe.h"
 
 namespace
@@ -65,7 +66,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPatterplaySmokeTest,
 bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 {
 	// A blob that is not a bundle fails, and says so on the asset rather than only in the log.
+	// The refusal is LOGGED as an error, and UE counts any logged Error during a test as a failure -
+	// so the intended refusal has to be declared, or this whole test fails on a passing assertion.
+	// It was doing exactly that: `Patterplay.Smoke` has been red since the log line was added, and
+	// nothing noticed because release CI gates on the clang TestHost, which never runs this file.
 	{
+		AddExpectedError(TEXT("failed to parse bundle"), EAutomationExpectedErrorFlags::Contains, 1);
 		UPatterBundle* Broken = UPatterBundle::LoadFromString(TEXT("{ not json"));
 		TestNull(TEXT("a malformed bundle returns null"), Broken);
 	}
@@ -127,6 +133,36 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 	const FPatterStep Step = Flow->Advance();
 	TestEqual(TEXT("the first beat is delivered with its text"), Step.Text, FString(TEXT("Quiet tonight.")));
 	TestEqual(TEXT("a declared @patter global reads its default"), Engine->GetPropertyNumber(TEXT("@gold")), 5.0f);
+
+	// A held flow SURVIVES a save/load. The core owns its flows by value and `loadGame` clears the
+	// map and rebuilds it, so a wrapper holding the old pointer was reading freed memory on the next
+	// call - a crash in a shipped build, and the obvious way to hold a flow from Blueprint is exactly
+	// this: a variable. Reported from the Storylet Studio side, 2026-08-29.
+	{
+		const FString Save = UPatterSave::SaveStateToJson(Engine);
+		TestFalse(TEXT("the save produces JSON"), Save.IsEmpty());
+		if (TestTrue(TEXT("the save loads back"), UPatterSave::LoadStateFromJson(Engine, Save)))
+		{
+			// The wrapper the game was already holding must answer for the RESTORED flow. Before the
+			// fix this read freed memory; the test would pass or crash depending on the allocator.
+			TestFalse(TEXT("a held flow is still live after a load"), Flow->IsClosed());
+			TestEqual(TEXT("and it is still the same flow"), Flow->GetFlowId(), FString(TEXT("f")));
+			const FPatterStep After = Flow->Advance();
+			TestEqual(TEXT("and it advances into the restored story"), static_cast<uint8>(After.Type), static_cast<uint8>(EPatterStepType::Choice));
+		}
+	}
+
+	// A flow the save did not carry comes back CLOSED rather than dangling: getFlow answers null for
+	// its id, every UPatterFlow method guards on the pointer, and IsClosed reports the truth.
+	{
+		UPatterEngine* Fresh = UPatterEngine::Create(Bundle);
+		UPatterFlow* Ghost = Fresh->OpenFlow(TEXT("ghost"), TEXT("s1"));
+		const FString EmptySave = UPatterSave::SaveStateToJson(Engine); // a save with flow "f", not "ghost"
+		if (TestTrue(TEXT("the other engine's save loads"), UPatterSave::LoadStateFromJson(Fresh, EmptySave)))
+		{
+			TestTrue(TEXT("a flow the save did not carry reads as closed"), Ghost->IsClosed());
+		}
+	}
 
 	return true;
 }

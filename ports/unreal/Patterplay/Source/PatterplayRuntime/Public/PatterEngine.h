@@ -206,5 +206,22 @@ private:
 	// Every wrapper handed out by OpenFlow, so a hot swap can re-bind them by id.
 	TArray<TWeakObjectPtr<UPatterFlow>> WrappedFlows;
 
+public:
+	/**
+	 * Re-bind every live wrapper after the core has rebuilt or dropped its flows.
+	 *
+	 * `patter::Engine` owns its flows by value, and three paths destroy them underneath a wrapper
+	 * that is holding a raw pointer: `loadGame` (which clears the map and rebuilds it), `closeFlow`
+	 * and `reset`. A hot swap already re-binds; loading a save did not, so a Blueprint variable
+	 * holding a flow pointed at freed memory and the next Advance read it.
+	 *
+	 * `getFlow` answering null for an id the save did not carry is the right answer, not a hole:
+	 * every UPatterFlow method guards on the pointer and IsClosed reports true, so the wrapper lands
+	 * in an honest "closed" state instead of a live pointer to nothing.
+	 */
+	void RebindFlows();
+
+private:
+
 	TPimplPtr<patter::Engine> Engine;
 };
