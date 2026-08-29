@@ -8,6 +8,10 @@ same runtime behaviour.
 
 ### Fixed
 
+- **The debug registry no longer keeps a dead engine alive.** `PatterDebug` held engines strongly, so an engine your game replaced - a restart, a scene change, a live bundle swap - stayed in memory with its whole compiled story unless you remembered to `unregister` it. It holds weakrefs now, and `PatterDebug.engines` hands back only live ones.
+
+### Fixed
+
 - **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the
   host's job and nothing could check it, so a game that opened a flow and did not announce it left
   the editor's follow list short - and the omission outlived a reconnect, because the link's hello
