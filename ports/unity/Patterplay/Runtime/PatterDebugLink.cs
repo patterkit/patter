@@ -40,6 +40,18 @@ namespace Patterkit.Patterplay
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private ClientWebSocket _ws;
         private volatile bool _closed;
+        private volatile bool _connected;
+
+        /// <summary>What the link is doing, for the editor's Runtime State window. "the editor is not
+        /// listening" and "I never attached" look identical from inside a running game, and that is the
+        /// first question a link's user asks (from-storylets/weak-debug-registries).</summary>
+        public string State => _closed ? "closed" : _connected ? "connected" : "connecting";
+
+        /// <summary>The build identity this link handshook with (moves on SetBuild after a live refresh).</summary>
+        public string Build => _build;
+
+        /// <summary>The editor address this link dials.</summary>
+        public string Url => _url;
 
         public PatterDebugLink(string build, string project = null, string url = "ws://127.0.0.1:4471")
         {
@@ -134,6 +146,7 @@ namespace Patterkit.Patterplay
             {
                 _ws = new ClientWebSocket();
                 await _ws.ConnectAsync(new Uri(_url), ct).ConfigureAwait(false);
+                _connected = true;
                 // Handshake first, so the editor can verify the build + seed the flow list before frames.
                 await SendRaw(HelloJson(), ct).ConfigureAwait(false);
                 // Send + receive run concurrently: outgoing frames drain from _queue, incoming editor
@@ -147,6 +160,7 @@ namespace Patterkit.Patterplay
             finally
             {
                 _closed = true;
+                _connected = false;
                 while (_queue.TryDequeue(out _)) { }
             }
         }

@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The state panel says whether Patterpad is listening.** A Live Link registered with
+  `PatterDebug.register_link(link)` shows its state (connecting / connected / closed), the address it
+  dials and the build it handshook. From inside a running game, "the editor is not listening" and
+  "I never attached" look identical, and only the game knows which.
+
 ### Fixed
 
 - **The debug registry no longer keeps a dead engine alive.** `PatterDebug` held engines strongly, so an engine your game replaced - a restart, a scene change, a live bundle swap - stayed in memory with its whole compiled story unless you remembered to `unregister` it. It holds weakrefs now, and `PatterDebug.engines` hands back only live ones.

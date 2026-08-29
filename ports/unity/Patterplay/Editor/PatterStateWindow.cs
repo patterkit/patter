@@ -50,6 +50,7 @@ namespace Patterkit.Patterplay.Editor
                 EditorGUILayout.HelpBox("Enter Play mode and register an engine with PatterDebug.Register(engine) to watch and edit its state.", MessageType.Info);
                 return;
             }
+            DrawLink();
             if (PatterDebug.Engines.Count == 0)
             {
                 EditorGUILayout.HelpBox("No engines registered. Call PatterDebug.Register(engine) after creating your Engine.", MessageType.Info);
@@ -72,6 +73,25 @@ namespace Patterkit.Patterplay.Editor
         }
 
         // -- Save / Load --------------------------------------------------------
+
+        /// <summary>The Live Link's state, so this window answers the question a link's user asks first.
+        /// From inside a running game "the editor is not listening" and "I never attached" look
+        /// identical; only the game knows which (from-storylets/weak-debug-registries).</summary>
+        private void DrawLink()
+        {
+            var links = PatterDebug.Links;
+            if (links.Count == 0)
+            {
+                EditorGUILayout.LabelField("Live Link", "not attached (PatterDebug.RegisterLink(link))");
+                EditorGUILayout.Space();
+                return;
+            }
+            foreach (var link in links)
+            {
+                EditorGUILayout.LabelField("Live Link", $"{link.State} - {link.Url} - build {link.Build}");
+            }
+            EditorGUILayout.Space();
+        }
 
         private void DrawSaveLoad(Engine engine)
         {

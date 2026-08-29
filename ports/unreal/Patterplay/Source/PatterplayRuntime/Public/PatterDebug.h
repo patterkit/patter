@@ -8,6 +8,7 @@
 #include "UObject/WeakObjectPtr.h"
 
 class UPatterEngine;
+class FPatterDebugLink;
 
 class PATTERPLAYRUNTIME_API FPatterDebug
 {
@@ -29,4 +30,14 @@ public:
 	static TArray<FEntry> List();
 
 	static FOnRegistryChanged& OnChanged();
+
+	// -- the live debug link ---------------------------------------------------
+	// A registered link lets the Runtime State panel say whether the editor is actually listening:
+	// from inside a running game, "the editor is not listening" and "I never attached" look identical
+	// (from-storylets/weak-debug-registries). Weak, like the engines: an observer must not decide what
+	// stays alive.
+	static void RegisterLink(const TSharedPtr<FPatterDebugLink>& Link);
+	static void UnregisterLink(const TSharedPtr<FPatterDebugLink>& Link);
+	/** Live registered links, dead weak pointers pruned. */
+	static TArray<TSharedPtr<FPatterDebugLink>> Links();
 };

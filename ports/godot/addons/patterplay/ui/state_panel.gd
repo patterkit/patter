@@ -80,6 +80,8 @@ func _rebuild() -> void:
 	for child in _body.get_children():
 		child.queue_free()
 
+	_build_link()
+
 	var engines := _engines()
 	if engines.is_empty():
 		_body.add_child(_hint("No engines registered. Call PatterDebug.register(engine), or set panel.engine."))
@@ -95,6 +97,19 @@ func _rebuild() -> void:
 		_build_save_load(e)
 		_build_properties(e)
 		_body.add_child(HSeparator.new())
+
+
+## The Live Link's state, so the panel answers the question a link's user asks first: from inside a
+## running game "the editor is not listening" and "I never attached" look identical, and only the game
+## knows which (from-storylets/weak-debug-registries).
+func _build_link() -> void:
+	var links: Array = PatterDebug.links
+	if links.is_empty():
+		_body.add_child(_hint("Live Link: not attached (PatterDebug.register_link(link))"))
+		return
+	for l in links:
+		var s: Dictionary = l.status()
+		_body.add_child(_hint("Live Link: %s - %s - build %s" % [s["state"], s["url"], s["build"]]))
 
 
 func _hint(text: String) -> Label:

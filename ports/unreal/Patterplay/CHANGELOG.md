@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **The Runtime State panel says whether Patterpad is listening.** A Live Link registered with
+  `FPatterDebug::RegisterLink(Link)` shows its state (connecting / connected / closed), the address it
+  dials and the build it handshook. From inside a running game, "the editor is not listening" and
+  "I never attached" look identical, and only the game knows which.
+
 ### Fixed
 
 - **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the

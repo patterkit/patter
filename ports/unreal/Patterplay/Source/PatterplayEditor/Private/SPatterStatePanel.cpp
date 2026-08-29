@@ -1,6 +1,7 @@
 #include "SPatterStatePanel.h"
 
 #include "PatterDebug.h"
+#include "PatterDebugLink.h"
 #include "PatterEngine.h"
 #include "PatterTypes.h"
 
@@ -82,6 +83,27 @@ void SPatterStatePanel::Rebuild()
 	Body->ClearChildren();
 	EnumSources.Reset();
 	LastSignature = Signature();
+
+	// The Live Link's state, above the engines. From inside a running game "the editor is not
+	// listening" and "I never attached" look identical, and that is the first question a link's user
+	// asks (from-storylets/weak-debug-registries).
+	{
+		TArray<TSharedPtr<FPatterDebugLink>> Links = FPatterDebug::Links();
+		FString LinkText = TEXT("Live Link: not attached (FPatterDebug::RegisterLink)");
+		if (Links.Num() > 0)
+		{
+			TArray<FString> Lines;
+			for (const TSharedPtr<FPatterDebugLink>& L : Links)
+			{
+				Lines.Add(FString::Printf(TEXT("Live Link: %s - %s - build %s"), *L->State(), *L->GetUrl(), *L->GetBuild()));
+			}
+			LinkText = FString::Join(Lines, TEXT("\n"));
+		}
+		Body->AddSlot().AutoHeight().Padding(10.f, 10.f, 10.f, 2.f)
+		[
+			SNew(STextBlock).AutoWrapText(true).Text(FText::FromString(LinkText))
+		];
+	}
 
 	TArray<FPatterDebug::FEntry> Entries = FPatterDebug::List();
 	if (Entries.Num() == 0)

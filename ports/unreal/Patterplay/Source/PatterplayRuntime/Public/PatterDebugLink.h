@@ -46,6 +46,16 @@ public:
 	 *  match/stale pill updates and it stops re-pushing the same bundle). */
 	void SetBuild(const FString& Build);
 
+	/** What the link is doing, for the editor's Runtime State panel: "connecting", "connected" or
+	 *  "closed". From inside a running game "the editor is not listening" and "I never attached" look
+	 *  identical, and that is the first question a link's user asks
+	 *  (from-storylets/weak-debug-registries). Always "closed" in Shipping, where the link is a no-op. */
+	FString State() const;
+	/** The build identity this link handshook with (moves on SetBuild after a live refresh). */
+	const FString& GetBuild() const { return BuildId; }
+	/** The editor address this link dials. */
+	const FString& GetUrl() const { return Url; }
+
 private:
 	FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl);
 	void Connect();
@@ -59,5 +69,6 @@ private:
 	TSet<FString> Flows;
 	TArray<FString> Queue;   // messages awaiting an open socket
 	bool bOpen = false;
+	bool bClosed = false;   // Close() was called, or the socket went away for good
 	TSharedPtr<IWebSocket> Socket;
 };

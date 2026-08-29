@@ -21,6 +21,8 @@
 #include "PatterBundle.h"
 #include "PatterEngine.h"
 #include "PatterSave.h"
+#include "PatterDebug.h"
+#include "PatterDebugLink.h"
 #include "Patter/Describe.h"
 
 namespace
@@ -179,6 +181,36 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 		{
 			TestTrue(TEXT("a flow the save did not carry reads as closed"), Ghost->IsClosed());
 		}
+	}
+
+	// The debug registry is an OBSERVER: it must not keep an engine alive, and it must be able to say
+	// whether the editor is actually listening (from-storylets/weak-debug-registries).
+	{
+		FPatterDebug::Register(Engine, TEXT("smoke"));
+		TestEqual(TEXT("a registered engine is listed"), FPatterDebug::List().Num(), 1);
+		FPatterDebug::Unregister(Engine);
+		TestEqual(TEXT("and unregistering drops it"), FPatterDebug::List().Num(), 0);
+
+		TestEqual(TEXT("no link registered reads as none"), FPatterDebug::Links().Num(), 0);
+		TSharedPtr<FPatterDebugLink> Link = FPatterDebugLink::Create(TEXT("build-hash"), TEXT("Smoke"));
+		FPatterDebug::RegisterLink(Link);
+		if (TestEqual(TEXT("a registered link is listed"), FPatterDebug::Links().Num(), 1))
+		{
+			// Nothing is listening on the loopback port in a test, so this is "connecting" or already
+			// "closed" - never a lie about being connected, which is the point of showing it.
+			const FString State = FPatterDebug::Links()[0]->State();
+			TestTrue(FString::Printf(TEXT("the link reports an honest state (got '%s')"), *State),
+				State == TEXT("connecting") || State == TEXT("closed"));
+			TestEqual(TEXT("and carries its build"), FPatterDebug::Links()[0]->GetBuild(), FString(TEXT("build-hash")));
+		}
+		FPatterDebug::UnregisterLink(Link);
+		TestEqual(TEXT("unregistering drops the link"), FPatterDebug::Links().Num(), 0);
+
+		// WEAK: dropping the last shared pointer must empty the registry on its own.
+		TSharedPtr<FPatterDebugLink> Weak = FPatterDebugLink::Create(TEXT("b2"));
+		FPatterDebug::RegisterLink(Weak);
+		Weak.Reset();
+		TestEqual(TEXT("a link nobody holds leaves the registry by itself"), FPatterDebug::Links().Num(), 0);
 	}
 
 	return true;

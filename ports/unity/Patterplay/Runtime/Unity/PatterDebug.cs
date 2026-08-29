@@ -42,5 +42,36 @@ namespace Patterkit.Patterplay
         {
             Refs.RemoveAll(r => !r.TryGetTarget(out var t) || t == null || ReferenceEquals(t, e));
         }
+
+        // -- the live debug link ---------------------------------------------------
+        // A registered link lets the Runtime State window say whether the editor is actually
+        // listening. From inside a running game, "the editor is not listening" and "I never attached"
+        // look identical, and that is the first question a link's user asks.
+
+        private static readonly List<WeakReference<PatterDebugLink>> LinkRefs = new List<WeakReference<PatterDebugLink>>();
+
+        /// <summary>Live registered links, collected ones pruned.</summary>
+        public static List<PatterDebugLink> Links
+        {
+            get
+            {
+                var live = new List<PatterDebugLink>();
+                LinkRefs.RemoveAll(r => !r.TryGetTarget(out var l) || l == null);
+                foreach (var r in LinkRefs) if (r.TryGetTarget(out var l) && l != null) live.Add(l);
+                return live;
+            }
+        }
+
+        public static void RegisterLink(PatterDebugLink link)
+        {
+            if (link == null) return;
+            LinkRefs.RemoveAll(r => !r.TryGetTarget(out var t) || t == null || ReferenceEquals(t, link));
+            LinkRefs.Add(new WeakReference<PatterDebugLink>(link));
+        }
+
+        public static void UnregisterLink(PatterDebugLink link)
+        {
+            LinkRefs.RemoveAll(r => !r.TryGetTarget(out var t) || t == null || ReferenceEquals(t, link));
+        }
     }
 }

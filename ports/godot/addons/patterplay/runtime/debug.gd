@@ -52,5 +52,48 @@ static func unregister(engine) -> void:
 	_refs = kept
 
 
+# -- the live debug link -------------------------------------------------------
+# A registered link lets the state panel say whether the editor is actually listening.
+
+static var _link_refs: Array = []
+
+
+static func _live_links() -> Array:
+	var out: Array = []
+	var kept: Array = []
+	for r in _link_refs:
+		var l = r.get_ref()
+		if l != null:
+			kept.append(r)
+			out.append(l)
+	_link_refs = kept
+	return out
+
+
+# Every live registered link.
+static var links: Array:
+	get:
+		return _live_links()
+
+
+static func register_link(link) -> void:
+	if link == null:
+		return
+	for l in _live_links():
+		if l == link:
+			return
+	_link_refs.append(weakref(link))
+
+
+static func unregister_link(link) -> void:
+	var kept: Array = []
+	for r in _link_refs:
+		var l = r.get_ref()
+		if l != null and l != link:
+			kept.append(r)
+	_link_refs = kept
+
+
 static func clear() -> void:
 	_refs.clear()
+	_link_refs.clear()

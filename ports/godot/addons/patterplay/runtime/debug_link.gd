@@ -66,6 +66,17 @@ func _process(_delta: float) -> void:
 			_enabled = false   # editor closed the link - go quiet
 
 
+## What the link is doing, for the editor / state panel: "connecting", "connected" or "closed", with
+## the build it handshook and the address it dials. From inside a running game "the editor is not
+## listening" and "I never attached" look identical, and that is the first question a link's user
+## asks (from-storylets/weak-debug-registries).
+func status() -> Dictionary:
+	var state := "closed"
+	if _enabled:
+		state = "connected" if _ws.get_ready_state() == WebSocketPeer.STATE_OPEN else "connecting"
+	return { "state": state, "build": _build, "url": _url }
+
+
 # -- public API (mirrors the JS DebugLink) -------------------------------------
 
 func flow_opened(flow_id: String) -> void:

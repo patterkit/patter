@@ -139,9 +139,16 @@ void FPatterDebugLink::SetBuild(const FString& Build)
 	if (bOpen && Socket.IsValid()) Socket->Send(HelloMessage()); // re-handshake: the editor re-reads the build
 }
 
+FString FPatterDebugLink::State() const
+{
+	if (bClosed || !Socket.IsValid()) return TEXT("closed");
+	return bOpen ? TEXT("connected") : TEXT("connecting");
+}
+
 void FPatterDebugLink::Close()
 {
 	bOpen = false;
+	bClosed = true;
 	Queue.Reset();
 	if (Socket.IsValid())
 	{
@@ -203,5 +210,6 @@ void FPatterDebugLink::FlowClosed(const FString&) {}
 void FPatterDebugLink::Observe(const FString&, const FString&, const FString&, const FString&, const FString&) {}
 void FPatterDebugLink::SetBuild(const FString&) {}
 void FPatterDebugLink::Close() {}
+FString FPatterDebugLink::State() const { return TEXT("closed"); } // Shipping: the link is compiled out
 
 #endif
