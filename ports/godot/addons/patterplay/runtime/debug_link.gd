@@ -81,6 +81,12 @@ func flow_closed(flow_id: String) -> void:
 # Report a flow's current position - call after each advance() / choose(). An empty beat_id (e.g. a
 # choice stop) is sent as null, matching the JS client.
 func observe(flow_id: String, scene_id: String, beat_id: String, type: String, choice_id: String = "") -> void:
+	# A flow reports itself: flow_opened is the host's job and nothing could check it, so a game that
+	# forgot it left the editor's list short - and the omission survived a reconnect, because the hello
+	# sends this set. Announce a flow we have not seen, then the frame.
+	if not _flows.has(flow_id):
+		_flows[flow_id] = true
+		_post({ "t": "flowOpen", "flow": flow_id })
 	var frame := {
 		"t": "frame",
 		"flow": flow_id,

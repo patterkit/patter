@@ -80,6 +80,13 @@ namespace Patterkit.Patterplay
         /// beatId is sent as null, matching the JS client.</summary>
         public void Observe(string flowId, string sceneId, string beatId, string type, string choiceId = null)
         {
+            // A flow reports itself: FlowOpened is the host's job and nothing could check it, so a game
+            // that forgot it left the editor's list short - and the omission survived a reconnect,
+            // because the hello sends this set. Announce a flow we have not seen, then the frame.
+            bool announce;
+            lock (_flows) announce = _flows.Add(flowId);
+            if (announce) Post("{\"t\":\"flowOpen\",\"flow\":" + Esc(flowId) + "}");
+
             var sb = new StringBuilder();
             sb.Append("{\"t\":\"frame\",\"flow\":").Append(Esc(flowId));
             sb.Append(",\"sceneId\":").Append(Esc(sceneId));

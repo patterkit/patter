@@ -107,6 +107,11 @@ void FPatterDebugLink::FlowClosed(const FString& FlowId)
 
 void FPatterDebugLink::Observe(const FString& FlowId, const FString& SceneId, const FString& BeatId, const FString& Type, const FString& ChoiceId)
 {
+	// A flow reports itself: FlowOpened is the host's job and nothing could check it, so a game that
+	// forgot it left the editor's list short - and the omission survived a reconnect, because the
+	// hello sends this set. Announce a flow we have not seen, then the frame.
+	if (!Flows.Contains(FlowId)) FlowOpened(FlowId);
+
 	TSharedRef<FJsonObject> Msg = MakeShared<FJsonObject>();
 	Msg->SetStringField(TEXT("t"), TEXT("frame"));
 	Msg->SetStringField(TEXT("flow"), FlowId);

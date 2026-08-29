@@ -127,7 +127,7 @@ const link = createDebugLink({
   // url: "ws://127.0.0.1:4471",    // the default; override if you changed the port
 });
 
-link.flowOpened("main");            // tell the editor a flow exists
+link.flowOpened("main");            // optional: lists the flow before its first step
 
 // ...in your play loop, after each step:
 const step = flow.advance();
@@ -135,6 +135,12 @@ link.observe("main", flow.currentScene, step.id ?? null, step.type);
 
 link.flowClosed("main");            // ...and when the flow ends
 ```
+
+**`observe` is the only call you must make.** It carries the flow's id, so a flow the link has not
+seen announces itself on its first step: forgetting `flowOpened` costs you the flow's row in the
+follow list until it moves, not for the whole session. `flowOpened` is still worth calling for a flow
+that exists before it says anything, and `flowClosed` still matters, since nothing else tells the
+editor a flow has finished.
 
 **Unity** - `new PatterDebugLink(...)`. Wire it behind `#if UNITY_EDITOR || DEVELOPMENT_BUILD` so it
 is stripped from a release player build:

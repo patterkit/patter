@@ -6,6 +6,15 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the
+  host's job and nothing could check it, so a game that opened a flow and did not announce it left
+  the editor's follow list short - and the omission outlived a reconnect, because the link's hello
+  carries that list. A flow now announces itself the first time it is observed; `flowOpened` remains
+  worth calling for a flow that exists before it says anything. Reported from the Storylet Studio
+  side, 2026-08-29. (Same fix in all four runtimes.)
+
 ## [0.7.0] - 2026-08-29
 
 ### Changed

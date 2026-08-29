@@ -127,6 +127,12 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
     flowOpened(flowId: string): void { flows.add(flowId); post({ t: "flowOpen", flow: flowId }); },
     flowClosed(flowId: string): void { flows.delete(flowId); post({ t: "flowClose", flow: flowId }); },
     observe(flowId: string, sceneId: string | null, beatId: string | null, type: string, choiceId?: string): void {
+      // A flow reports itself. `flowOpened` is the host's job and nothing could check it, so a game
+      // that opened a flow and forgot to announce it left the editor's list short - and the omission
+      // survived a reconnect, because the hello sends this set. Observing a flow we have not seen
+      // announces it first, which makes the host's call a courtesy (it lists the flow before its
+      // first step) rather than something to remember.
+      if (!flows.has(flowId)) { flows.add(flowId); post({ t: "flowOpen", flow: flowId }); }
       post({ t: "frame", flow: flowId, sceneId, beatId, type, choiceId });
     },
     setBuild(next: string): void {
