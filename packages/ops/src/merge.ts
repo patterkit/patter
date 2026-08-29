@@ -218,7 +218,7 @@ function mergeAuthoring(base: Obj, ours: Obj, theirs: Obj): MergeResult {
 /** Every authoring key with a strategy of its own above. A key NOT here falls to the plain 3-way, which
  *  is coarse but never lossy; the set exists so the fallback does not re-merge what was already merged
  *  (an empty result from `setIf` must not be reconsidered as "unhandled"). */
-const AUTHORING_HANDLED = new Set(["schema", "comments", "edits", "writing", "recording", "audio", "documentation", "cut", "suggestions", "rerecord"]);
+export const AUTHORING_HANDLED = new Set(["schema", "comments", "edits", "writing", "recording", "audio", "documentation", "cut", "suggestions", "rerecord"]);
 
 /** Union an array of id-keyed records, 3-way per id: both sides' additions survive, and a record both
  *  sides changed differently is a conflict rather than a silent pick. */

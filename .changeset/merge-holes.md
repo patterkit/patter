@@ -17,6 +17,10 @@ one handed the recipient conflicted values resolved provisionally to our side wi
 they were in dispute. `sidecarIssues` now lives beside the rule in `merge.ts` and all three callers
 use it.
 
+`AUTHORING_HANDLED` is exported so a test can hold the merger's own key list against the model's
+interfaces - the direction that found a live stale-key bug on the Storyletter side when they took
+this shape.
+
 **A malformed shard on the return leg says which shard and which side.** `runUnpackMerge` parsed
 ours, theirs and base bare, so one unreadable file aborted the whole return leg with a raw parse
 error naming neither.

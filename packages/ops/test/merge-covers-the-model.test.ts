@@ -17,10 +17,25 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readdirSync } from "node:fs";
 import { SHARD_EXTENSIONS } from "../src/pack.js";
-import { detectMergeType, runMerge } from "../src/merge.js";
+import { detectMergeType, runMerge, AUTHORING_HANDLED } from "../src/merge.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const MODEL_SRC = resolve(here, "../../model/src");
+
+/** EVERY model source file, not just the index. Storyletter's version of this guard reported false
+ *  orphans until it read them all, and told us so; our model is one file today, which is exactly when
+ *  a hardcoded path is cheapest to remove. */
+const modelSource = (): string =>
+  readdirSync(MODEL_SRC).filter((f) => f.endsWith(".ts")).map((f) => readFileSync(resolve(MODEL_SRC, f), "utf8")).join("\n");
+
+/** The field names declared on a model interface, read from the source rather than a copy of it. */
+function modelFields(iface: string): string[] {
+  const body = new RegExp(`export interface ${iface}\\b[^{]*\\{([\\s\\S]*?)\\n\\}`).exec(modelSource());
+  expect(body, `${iface} not found in the model`).toBeTruthy();
+  return [...body![1]!.matchAll(/^\s*(?:readonly\s+)?([A-Za-z][A-Za-z0-9_]*)\??:/gm)].map((m) => m[1]!);
+}
 
 /** The schema string each packed extension carries, as its writer sets it. */
 const SCHEMA_FOR: Record<string, string> = {
@@ -47,10 +62,7 @@ describe("an authoring merge covers every field the model declares", () => {
   it("loses none of AuthoringFile's fields", () => {
     // Read the model's own interface rather than a copy of it: a field added there and forgotten
     // here is precisely the failure this guards.
-    const model = readFileSync(resolve(here, "../../model/src/index.ts"), "utf8");
-    const body = /export interface AuthoringFile\b[^{]*\{([\s\S]*?)\n\}/.exec(model);
-    expect(body, "AuthoringFile not found in the model").toBeTruthy();
-    const fields = [...body![1]!.matchAll(/^\s*(?:readonly\s+)?([A-Za-z][A-Za-z0-9_]*)\??:/gm)].map((m) => m[1]!);
+    const fields = modelFields("AuthoringFile");
     expect(fields.length).toBeGreaterThan(5); // the regex still finds the interface
 
     // A value shaped plausibly for each field, on OUR side only: whatever the strategy, it must come
@@ -74,5 +86,18 @@ describe("an authoring merge covers every field the model declares", () => {
     const merged = runMerge(base, sample, base).merged;
     const dropped = fields.filter((f) => merged[f] === undefined);
     expect(dropped, `an authoring merge DROPPED ${dropped.join(", ")}`).toEqual([]);
+  });
+});
+
+// The MIRROR of the guard above, and the direction that found a live bug on the Storyletter side when
+// they took this shape: a key the merger still names after the model has dropped it. Theirs was
+// `coverage.args`, a spec entry outliving the field, naming nothing and invisible at runtime - six
+// audits had missed it. Ours is a hand-written merger rather than a spec table, so the set of names
+// it treats specially is the thing to hold.
+describe("the authoring merger names no field the model has lost", () => {
+  it("has every specially-handled key on AuthoringFile", () => {
+    const fields = new Set(modelFields("AuthoringFile"));
+    const orphans = [...AUTHORING_HANDLED].filter((k) => !fields.has(k));
+    expect(orphans, `the merger handles ${orphans.join(", ")}, which AuthoringFile no longer declares`).toEqual([]);
   });
 });
