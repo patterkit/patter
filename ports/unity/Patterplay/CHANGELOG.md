@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The fix in this release is
+  Unreal's: a `UPatterFlow` held across a save load pointed at freed memory, because the core rebuilt
+  its flows underneath the wrapper. The C# runtime is reference counted and never had that fault.
+
 ## [0.6.0] - 2026-08-25
 
 ### Added
