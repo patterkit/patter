@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-30
+
 ### Added
 
 - **The welcome screen points at the tour.** A quiet line under Open and New: "New to Patter? Take
