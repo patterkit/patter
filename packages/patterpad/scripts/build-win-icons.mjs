@@ -48,9 +48,28 @@ const OUT_DIR    = join(APP_DIR, "build");
 // Icons" view (256).
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
 
+// What this script produces, and therefore what the Windows build needs to find. Named here rather than
+// inferred from the calls below so the off-mac check can run before any of them.
+const OUTPUTS = ["doc-patter", "doc-patterproj", "doc-patterc", "doc-patterpack", "icon"];
+
+// Off macOS there is no `sips`, so nothing can be generated here. That is FINE, because the .ico set is
+// committed (see .gitignore) - but only while it is actually there. This used to exit 0 unconditionally,
+// which meant a missing icon was announced as a "skip" in one step and surfaced a minute later in another
+// as electron-builder failing on a file nobody had mentioned. A build step that no-ops when it cannot do
+// its job hands the error to whoever runs next, and that is a different machine with no idea what was
+// skipped. (from-storylets/win-icons-skip-blind, 2026-08-30, where this cost them an hour.)
 if (process.platform !== "darwin") {
-  console.error("build-win-icons.mjs: skipping - the sips resize step is mac-only");
-  process.exit(0);
+  const missing = OUTPUTS.filter((n) => !existsSync(join(OUT_DIR, `${n}.ico`)));
+  if (missing.length === 0) {
+    console.log("build-win-icons.mjs: using the committed .ico files (regenerate on a Mac when branding changes)");
+    process.exit(0);
+  }
+  console.error(
+    `build-win-icons.mjs: missing committed icons: ${missing.map((n) => `${n}.ico`).join(", ")}\n`
+    + "  The resize step needs Apple's sips, so these cannot be built here.\n"
+    + "  On a Mac: npm run --workspace @patterkit/patterpad build:win-icons, then commit build/*.ico",
+  );
+  process.exit(1);
 }
 
 function runSips(args) {
@@ -87,9 +106,9 @@ async function generateIco(name, srcOverride) {
 }
 
 mkdirSync(OUT_DIR, { recursive: true });
-await generateIco("doc-patter");
-await generateIco("doc-patterproj");
-await generateIco("doc-patterc");
-await generateIco("doc-patterpack");
-// The app icon itself (window / shortcut / taskbar / search).
-await generateIco("icon", join(REPO_ROOT, "branding/icons/png/icon-patterpad-1024.png"));
+// Driven from OUTPUTS, so the list the off-mac check tests for cannot drift from the list this makes.
+for (const name of OUTPUTS) {
+  // The app icon itself (window / shortcut / taskbar / search) comes from the app branding rather than
+  // the document-icon sources.
+  await generateIco(name, name === "icon" ? join(REPO_ROOT, "branding/icons/png/icon-patterpad-1024.png") : undefined);
+}

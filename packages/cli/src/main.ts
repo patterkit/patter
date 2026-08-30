@@ -52,6 +52,7 @@ export const USAGE = `patter - Patter CLI
 
 Usage:
   patter --version                Print the version (also -v / version)
+  patter --help                   Print this usage (also -h / help)
   patter init    [dir]            Scaffold a new project (the <dir>.patter folder, starter scene, VCS config)
                  [--name X] [--vcs git|perforce|plastic|svn] [--bundle commit|ignore]
   patter validate [path]          Validate a project (structural + expressions + encoding + bundle)
@@ -185,6 +186,9 @@ export async function main(argv: string[]): Promise<number> {
   // Three spellings, because people try all three. A standalone binary has no package.json beside it and
   // was not installed by npm, so without this there is no way to ask a downloaded `patter` what it is.
   if (cmd === "--version" || cmd === "-v" || cmd === "version") { console.log(pkg.version); return 0; }
+  // Asking for help is not a usage error. Without this, `--help` falls through the unknown-command branch
+  // below and exits 2, which is the code a script reads as "you invoked me wrongly".
+  if (cmd === "--help" || cmd === "-h" || cmd === "help") { console.log(USAGE); return 0; }
   const canonical = cmd === "fmt" ? "format" : cmd === "stats" ? "report" : cmd;
   if (!(canonical in FLAGS)) { console.log(USAGE); return 2; }
   const { positionals, flags, errors } = parseArgs(canonical, rest);

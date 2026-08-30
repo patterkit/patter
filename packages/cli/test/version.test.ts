@@ -45,3 +45,23 @@ describe("patter --version", () => {
     return captured(["--version"]).then(({ out }) => expect(out).not.toContain("Usage:"));
   });
 });
+
+describe("patter --help", () => {
+  // Asking for help is not a usage error. `--help` used to fall through the unknown-command branch and
+  // exit 2, which a CI script reads as "you invoked me wrongly" - and which sat oddly beside `--version`
+  // exiting 0 for the same shape of question.
+  for (const spelling of ["--help", "-h", "help"]) {
+    it(`answers '${spelling}' with the usage text, and exit 0`, async () => {
+      const { code, out } = await captured([spelling]);
+      expect(out).toContain("Usage:");
+      expect(code).toBe(0);
+    });
+  }
+
+  it("still treats an unknown command as a usage error", async () => {
+    // The exit code that MUST stay 2, or the change would hide real mistakes.
+    const { code, out } = await captured(["frobnicate"]);
+    expect(out).toContain("Usage:");
+    expect(code).toBe(2);
+  });
+});

@@ -6,6 +6,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **The Windows icon script fails where the fault is, rather than a minute later somewhere else.** Off
+  macOS it cannot run (the resize step is Apple's `sips`), and it used to announce a skip and exit 0. The
+  committed `.ico` set is what makes that safe, so it now checks the set is actually there: quiet when it
+  is, and a failure naming the missing files and the command that rebuilds them when it is not. Nothing
+  was broken; this keeps it that way. Reported from the Storylet Studio side, where the same blind skip
+  surfaced an hour later as electron-builder failing on a file nobody had mentioned.
+
 ### Added
 
 - **Conditions that can never hold are reported as you type.** A snippet asking for `@connected && !@seen`
