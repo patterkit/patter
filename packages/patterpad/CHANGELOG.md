@@ -6,6 +6,20 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A flags property with more than a handful of values no longer runs off the popover.** Choosing a
+  flags property in the effects editor drew its flags as one non-wrapping row of sign x flag, which grew
+  as wide as the author's data and ran past the popover and on across the window. The picker now uses the
+  set/clear toggle over one column that the package's other two flag pickers already used, so all three
+  behave alike. A popover too long to fit below its anchor also flips to the roomier side and scrolls
+  inside a max-height, rather than sitting below with its tail off the bottom of the window. Both fixes
+  are `@wildwinter/expr-editor@0.15.1`, adopted here; reported and fixed on the Storylet Studio side.
+- **Three file dialogs said nothing on macOS.** macOS open panels ignore `title`, so Publish for Web,
+  Import localisation and Import a Hunspell dictionary rendered a bare file browser with a button reading
+  "Open" and no sentence anywhere. Each now carries the `message` and `buttonLabel` that macOS does show,
+  which five of the eight open dialogs already had. A source scan holds the convention from now on.
+
 ## [0.14.0] - 2026-08-30
 
 ### Added

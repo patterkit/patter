@@ -388,6 +388,7 @@ async function exportWeb(): Promise<ExportResult & { kept?: string[] }> {
   if (!win) return { ok: false, error: "no window" };
   const r = await dialog.showOpenDialog(win, {
     title: "Publish for Web",
+    message: "Choose a folder. The story and its player are written into it, and an index.html or style.css you have already customised is kept.",
     buttonLabel: "Publish Here",
     properties: ["openDirectory", "createDirectory"],
   });
@@ -415,6 +416,8 @@ async function importLoc(fallbackLocale?: string): Promise<LocImportResult> {
   if (!win) return { ok: false, error: "no window" };
   const r = await dialog.showOpenDialog(win, {
     title: "Import localisation",
+    message: "Choose a translated file (.json, .po, .pot or .xlsx). Its lines replace the ones held for that language.",
+    buttonLabel: "Import",
     properties: ["openFile"],
     filters: [{ name: "Localisation files", extensions: ["json", "po", "pot", "xlsx"] }],
   });
@@ -430,6 +433,7 @@ async function importDictionaryDialog(): Promise<{ ok: boolean; error?: string; 
   const r = await dialog.showOpenDialog(win, {
     title: "Import a Hunspell dictionary",
     message: "Choose the .dic file - its matching .aff (same name, same folder) is imported with it.",
+    buttonLabel: "Import",
     properties: ["openFile"],
     filters: [{ name: "Hunspell dictionary", extensions: ["dic"] }],
   });
