@@ -43,10 +43,15 @@ function writeMergeResult(result: MergeResult, out: string, announce: boolean): 
   return 0;
 }
 import { writeTextFiles, writeBinaryFile, deleteFile } from "@wildwinter/simple-vc-lib";
+// The number comes from the MANIFEST, inlined by both shipping paths (tsup and Bun --compile), rather
+// than a hand-kept constant. A release is tagged from the manifest, so a constant that drifts from it
+// drifts from the name of the file the user downloaded, which is the one thing they can still read.
+import pkg from "../package.json" with { type: "json" };
 
 export const USAGE = `patter - Patter CLI
 
 Usage:
+  patter --version                Print the version (also -v / version)
   patter init    [dir]            Scaffold a new project (the <dir>.patter folder, starter scene, VCS config)
                  [--name X] [--vcs git|perforce|plastic|svn] [--bundle commit|ignore]
   patter validate [path]          Validate a project (structural + expressions + encoding + bundle)
@@ -177,6 +182,9 @@ function parseThree(baseP: string, oursP: string, theirsP: string, label: string
 export async function main(argv: string[]): Promise<number> {
   const [cmd, ...rest] = argv;
   if (cmd === undefined) { console.log(USAGE); return 0; }
+  // Three spellings, because people try all three. A standalone binary has no package.json beside it and
+  // was not installed by npm, so without this there is no way to ask a downloaded `patter` what it is.
+  if (cmd === "--version" || cmd === "-v" || cmd === "version") { console.log(pkg.version); return 0; }
   const canonical = cmd === "fmt" ? "format" : cmd === "stats" ? "report" : cmd;
   if (!(canonical in FLAGS)) { console.log(USAGE); return 2; }
   const { positionals, flags, errors } = parseArgs(canonical, rest);

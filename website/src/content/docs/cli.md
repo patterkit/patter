@@ -18,6 +18,16 @@ overwritten. **Exit codes** are consistent: **0** success · **1** the operation
 problems or failed · **2** a usage error. `fmt` is an alias for `format`, and `stats`
 for `report`.
 
+### Which build am I running?
+
+```sh
+patter --version    # also -v, or `patter version`
+```
+
+Worth knowing if you use the [standalone binary](/download/): it has no
+`package.json` beside it and npm never installed it, so the tool itself is the only
+thing that can tell you which build you have.
+
 ## Authoring & validation
 
 ### `patter init [dir]`
