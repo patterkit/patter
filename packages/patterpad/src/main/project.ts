@@ -1134,6 +1134,10 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
       ...r.staleBundles.map((i): Problem => ({ category: "stale-bundle", severity: "warning", message: i.message, file: i.file })),
       // A lingering conflict sidecar is a hard stop - the merge is unresolved.
       ...r.unresolvedMerges.map((i): Problem => ({ category: "merge", severity: "error", message: i.message, file: i.file })),
+      // A condition that provably cannot hold. A warning, never an error: content is written in pieces,
+      // so "I have not authored the bit that sets that yet" is a normal reading (from-storylets/
+      // coverage-run-count-and-the-second-hop).
+      ...r.reachability.map((i): Problem => ({ category: "condition", severity: i.severity, message: i.message, nodeId: i.nodeId, detail: i.field })),
       // A shard outside the layout loads for nobody. A warning, not an error: the project is fine,
       // but a scene the author thinks exists does not (from-storylets/load-issues-and-the-strict-loader).
       ...r.orphans.map((i): Problem => ({ category: "not-in-project", severity: "warning", message: i.message, file: i.file })),

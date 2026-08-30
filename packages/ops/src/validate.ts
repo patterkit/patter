@@ -11,6 +11,7 @@ import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
 import { validateConditions, validateInterpolation, exportBundle, hostScopesToSpec } from "@patterkit/compiler";
 import type { ConditionIssue } from "@patterkit/compiler";
+import { reachabilityIssues } from "./reachability.js";
 import { walkFiles } from "./load.js";
 import type { LoadedProject } from "./load.js";
 
@@ -29,6 +30,10 @@ export interface ValidateResult {
   hygiene: HygieneIssue[];
   /** Committed `.patterc` bundles whose hash no longer matches source (spec §11). */
   staleBundles: HygieneIssue[];
+  /** Conditions provably unsatisfiable over monotonic latches (reachability.ts). WARNINGS, and
+   *  deliberately NOT part of `ok`: content is written in pieces, so a gate whose writer has not been
+   *  authored yet is the normal state mid-work and must never fail a build. */
+  reachability: ConditionIssue[];
   /** Lingering `.patterconflict` sidecars - an unresolved merge (patter-merge.md §3.6). */
   unresolvedMerges: HygieneIssue[];
   /** Patter shards on disk that the project does NOT contain - see `orphanShards`. */
@@ -49,10 +54,14 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const staleBundles = checkBundles(loaded);
   const unresolvedMerges = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
   const orphans = orphanShards(loaded);
+  // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
+  // breakage, and the real errors are already being told.
+  const reachability = structural.length === 0 && conditions.length === 0 ? reachabilityIssues(loaded) : [];
   return {
     structural,
     conditions,
     interpolation,
+    reachability,
     hygiene,
     staleBundles,
     unresolvedMerges,

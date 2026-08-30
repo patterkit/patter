@@ -186,6 +186,28 @@ Wherever a snippet or group has a condition, the script shows it as a quiet `if 
 tag, and you edit it visually in the inspector. See
 [Conditions, effects & data](/patterpad/conditions-and-data/).
 
+### Conditions that can never hold
+
+Some conditions are dead on the page, and you can see it without playing. If a
+snippet asks for `@connected && !@seen`, and the only thing that ever sets
+`@connected` is itself behind `@seen`, then `@connected` can only be true *after*
+`@seen` is, and nothing ever sets `@seen` back. The snippet can never run.
+
+Patterpad checks for this as you type and says so in the Problems panel, naming the
+chain: *"@connected can only become true after @seen, which nothing sets back."*
+It works on a single flag of a flags property too.
+
+It is a **warning, never an error**, and it never fails a build or `patter validate`:
+writing the bit that sets a value later in the week is completely normal.
+
+The check is deliberately narrow, because a wrong *"this can never happen"* on
+something that plays fine is worse than saying nothing. It reasons only about
+**one-way switches**: a boolean only ever set `true`, and a flag only ever `+set`.
+The moment a value is written any other way (set back to `false`, cleared, assigned
+something computed, driven by your game through `@world`, reseeded by `temporary`, or
+already `true` by default) it drops out of the check entirely rather than being
+guessed at. Counters, text and qualities are never analysed at all.
+
 ## The inspector, briefly
 
 The right pane (`⌘2`) stacks up everything around your cursor, innermost first: the

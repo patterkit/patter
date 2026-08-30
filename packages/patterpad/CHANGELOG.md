@@ -8,6 +8,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Conditions that can never hold are reported as you type.** A snippet asking for `@connected && !@seen`
+  where the only writer of `@connected` is itself gated on `@seen` is dead on the page, and no amount of
+  playtesting explains why. The Problems panel now names the chain. It reasons only about one-way switches
+  (a boolean only ever set true, a flag only ever `+set`) and drops any value written another way, driven
+  by the game, reseeded by `temporary` or already true by default, because a wrong "this can never happen"
+  is worse than silence. A warning, never an error: writing that bit next week is normal.
 - **Coverage explains a dead beat that is dead at one remove.** A beat gated on a value the story does
   set, but only from a beat that never played either, used to read as perfectly wired: two dead beats,
   one cause, and nothing joining them. The row now names the gate and links the writer that would have

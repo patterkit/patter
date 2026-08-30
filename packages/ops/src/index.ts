@@ -13,6 +13,7 @@ export type { LoadedProject } from "./load.js";
 export { applyWrites } from "./write.js";
 export type { PlannedWrite } from "./write.js";
 export { runValidate } from "./validate.js";
+export { reachabilityIssues } from "./reachability.js";
 export type { ValidateResult, HygieneIssue } from "./validate.js";
 export { runExport, runExportFull, bundleOutputPath } from "./export.js";
 export { runExportHtml, runExportWeb } from "./export-html.js";
