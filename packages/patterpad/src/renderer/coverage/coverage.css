@@ -80,5 +80,6 @@ body.coverage-win {
 .cov-gate { display: block; margin-top: 0.1rem; font: italic 0.72rem var(--font-ui); color: var(--ink-soft); }
 .cov-gate-ref { font: 0.72rem var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .cov-gate-ref:hover { filter: brightness(1.15); }
+.cov-gate-blocked { color: var(--warn, var(--accent)); }
 .cov-n { text-align: right; font-variant-numeric: tabular-nums; }
 .cov-reach { font-weight: 600; }

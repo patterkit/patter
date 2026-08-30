@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Coverage explains a dead beat that is dead at one remove.** A beat gated on a value the story does
+  set, but only from a beat that never played either, used to read as perfectly wired: two dead beats,
+  one cause, and nothing joining them. The row now names the gate and links the writer that would have
+  to play first. A gate on a single flag is named as that flag rather than the whole property, since a
+  property half the story writes always looks well fed. Where it cannot be sure, it says nothing.
+
 ### Fixed
 
 - **A flags property with more than a handful of values no longer runs off the popover.** Choosing a

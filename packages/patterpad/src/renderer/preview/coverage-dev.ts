@@ -10,6 +10,8 @@ const sample: CoverageResult = {
       { id: "L2", scene: "intro", kind: "line", character: "ANNA", preview: "You again?", hits: 2480, reachedRuns: 2480, reachPct: 49.6 },
       { id: "L3", scene: "bar", kind: "text", preview: "The fire crackles.", hits: 0, reachedRuns: 0, reachPct: 0 },
       { id: "L4", scene: "bar", kind: "line", character: "BARKEEP", preview: "The guards are here!", hits: 0, reachedRuns: 0, reachPct: 0, needsInput: ["@world.alarm"] },
+      { id: "L5", scene: "bar", kind: "line", character: "BARKEEP", preview: "You came armed, then.", hits: 0, reachedRuns: 0, reachPct: 0,
+        blockedBy: [{ ref: "@world.mood:armed", writers: ["L4"] }] },
     ],
     totals: { beats: 4, covered: 2, neverHit: 2, coveragePct: 50 },
     termination: { ended: 5000, capped: 0, stalled: 0, evalError: 0 },

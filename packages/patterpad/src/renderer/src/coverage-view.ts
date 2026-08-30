@@ -94,14 +94,14 @@ export function renderCoverage(
     const table = el("table", "cov-table");
     const tbody = el("tbody");
     for (const b of beats) {
-      const tr = el("tr", b.reachedRuns === 0 ? (b.needsInput ? "cov-row-input" : "cov-row-dead") : undefined);
+      const tr = el("tr", b.reachedRuns === 0 ? (b.needsInput || b.blockedBy ? "cov-row-input" : "cov-row-dead") : undefined);
       // A clickable row jumps to the beat (its scene + id).
       tr.tabIndex = 0;
       const reveal = (): void => onReveal(b.scene, b.id);
       tr.addEventListener("click", reveal);
       tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); reveal(); } });
 
-      const mark = el("td", "cov-mark", b.reachedRuns === 0 ? (b.needsInput ? "?" : "‼") : "");
+      const mark = el("td", "cov-mark", b.reachedRuns === 0 ? (b.needsInput || b.blockedBy ? "?" : "‼") : "");
       const label = b.character ? `${b.character}: ${clip(b.preview)}` : clip(b.preview || `(${b.kind})`);
       const beatCell = el("td", "cov-beat");
       beatCell.append(el("span", "cov-kind", b.kind), el("span", "cov-text", label));
@@ -117,6 +117,30 @@ export function renderCoverage(
           } else gate.append(document.createTextNode(ref));
         });
         beatCell.append(gate);
+      }
+      // The second hop: this beat's gate IS written, but only by content that never played. Naming the
+      // writer turns two dead beats into one question, and the writer is a link, because the next thing
+      // the author wants is to look at IT.
+      for (const bg of b.blockedBy ?? []) {
+        const line = el("span", "cov-gate cov-gate-blocked");
+        line.append(document.createTextNode("gated on "));
+        if (onFindUsage) {
+          const a = el("button", "cov-gate-ref", bg.ref); a.type = "button"; a.title = `Find where ${bg.ref} is used`;
+          a.addEventListener("click", (e) => { e.stopPropagation(); onFindUsage(bg.ref); });
+          line.append(a);
+        } else line.append(document.createTextNode(bg.ref));
+        line.append(document.createTextNode(", written only by "));
+        bg.writers.forEach((w, i) => {
+          if (i) line.append(document.createTextNode(", "));
+          const target = report.beats.find((x) => x.id === w);
+          if (!target) { line.append(document.createTextNode(w)); return; }
+          const a = el("button", "cov-gate-ref", clip(target.preview || target.id, 28)); a.type = "button";
+          a.title = "This never played either - open it";
+          a.addEventListener("click", (e) => { e.stopPropagation(); onReveal(target.scene, target.id); });
+          line.append(a);
+        });
+        line.append(document.createTextNode(", which never played either."));
+        beatCell.append(line);
       }
       const reachCell = el("td", "cov-n cov-reach", pct(b.reachPct));
       const hitsCell = el("td", "cov-n", num(b.hits));

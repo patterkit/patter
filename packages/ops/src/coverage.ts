@@ -72,6 +72,20 @@ export interface CoverageBeat {
   /** Set on a never-reached beat that is gated on a host-scope ref (`@world.x`) nothing writes and no
    *  driver provides, i.e. it may just need an input, not be truly dead. Lists the offending refs. */
   needsInput?: string[];
+  /** Set on a never-reached beat gated on a ref that IS written, but ONLY by content that was itself
+   *  never reached: the beat is dead at one remove, and the gate is not the real question. Names the
+   *  ref and the beats that witness its only writers, so two mysteries collapse into one. Absent
+   *  whenever the chain cannot be refuted (see `writerSites` in the analysis). */
+  blockedBy?: BlockedGate[];
+}
+
+/** A gate on a never-reached beat whose every writer was itself never reached. */
+export interface BlockedGate {
+  /** The gating ref, at the granularity the condition reads it: `@world.alarm`, or `@world.mood:armed`
+   *  for a single flag of a flags property. */
+  ref: string;
+  /** Beat ids witnessing the writers: content that would have to play for this gate to be written. */
+  writers: string[];
 }
 
 /** A choice that ran DRY during the coverage run: at some point it had no takeable option and no eligible
@@ -131,6 +145,18 @@ interface HostScopeAnalysis {
   gatesByBeat: Map<string, Set<string>>;
   /** Per host-scope ref, the literal values seen compared against it: the auto-proposed driver pool. */
   proposals: Map<string, Set<ScalarValue>>;
+  /** Gates again, but at FLAG granularity where the condition has it: a `check_flags(@world.mood, +armed)`
+   *  contributes `@world.mood:armed` rather than `@world.mood`. This is the whole trick behind the second
+   *  hop. Keyed coarsely, a property half the project writes always looks written, and the hop finds
+   *  nothing; keyed by the individual flag, the one writer that matters is visible. */
+  fineGatesByBeat: Map<string, Set<string>>;
+  /** Per gate key (fine or coarse), the sites that write it. A site is a set of beat ids that WITNESS it
+   *  running: a snippet's own beats for its `onEnter` / `onExit`, a scene's beats for its `onEntry`. */
+  writerSites: Map<string, string[][]>;
+  /** Coarse refs written by something the flag analysis cannot read as a per-flag delta (a whole-list
+   *  assignment, a computed value). Any such write makes every flag of that property unrefutable, so the
+   *  hop drops it rather than guessing. */
+  opaqueWrites: Set<string>;
 }
 
 /** Walk an ExprNode, collecting host-scope refs (`@token.name` for a declared token) and, for any
@@ -175,45 +201,141 @@ function targetHostRef(target: string, hostTokens: Set<string>): string | undefi
   return m && hostTokens.has(m[1]!) ? `@${m[1]}.${m[2]}` : undefined;
 }
 
+/** The flag keys a `check_flags(@world.mood, +armed, -hurt)` call reads: `@world.mood:armed`,
+ *  `@world.mood:hurt`. Empty for anything else, including a check whose first argument is not a plain
+ *  host-scope ref (a computed flags value is not something this analysis can key). */
+function flagKeys(node: ExprNode, hostTokens: Set<string>, fn: "check_flags" | "set_flags"): string[] {
+  if (node.kind !== "call" || node.name !== fn) return [];
+  const subject = node.args[0];
+  if (!subject || subject.kind !== "scopedvar" || !hostTokens.has(subject.scope)) return [];
+  const ref = `@${subject.scope}.${subject.name}`;
+  return node.args.slice(1).filter((a) => a.kind === "flagdelta").map((a) => `${ref}:${(a as { name: string }).name}`);
+}
+
+/** Every flag key read anywhere in a condition, at any depth. */
+function fineRefsIn(node: ExprNode, hostTokens: Set<string>, out: Set<string>): void {
+  for (const k of flagKeys(node, hostTokens, "check_flags")) out.add(k);
+  switch (node.kind) {
+    case "unary": fineRefsIn(node.operand, hostTokens, out); break;
+    case "binary": fineRefsIn(node.left, hostTokens, out); fineRefsIn(node.right, hostTokens, out); break;
+    case "call": for (const a of node.args) fineRefsIn(a, hostTokens, out); break;
+    default: break;
+  }
+}
+
 /** Static scan of the compiled bundle: which host-scope refs are written, which gate each beat, and the
  *  literal pool each ref is compared against (for auto-proposed drivers). */
 function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAnalysis {
   const written = new Set<string>();
   const gatesByBeat = new Map<string, Set<string>>();
+  const fineGatesByBeat = new Map<string, Set<string>>();
   const proposals = new Map<string, Set<ScalarValue>>();
-  if (hostTokens.size === 0) return { written, gatesByBeat, proposals };
+  const writerSites = new Map<string, string[][]>();
+  const opaqueWrites = new Set<string>();
+  const empty: HostScopeAnalysis = { written, gatesByBeat, proposals, fineGatesByBeat, writerSites, opaqueWrites };
+  if (hostTokens.size === 0) return empty;
 
   const refsIn = (expr?: Expression): Set<string> => {
     const refs = new Set<string>();
     if (expr) scanExpr(deserialiseAst(expr.ast), hostTokens, refs, proposals);
     return refs;
   };
-  const scanEffects = (effects?: CompiledEffect[]): void => {
+  const fineIn = (expr?: Expression): Set<string> => {
+    const refs = new Set<string>();
+    if (expr) fineRefsIn(deserialiseAst(expr.ast), hostTokens, refs);
+    return refs;
+  };
+  const addSite = (key: string, witnesses: string[]): void => {
+    (writerSites.get(key) ?? writerSites.set(key, []).get(key)!).push(witnesses);
+  };
+  /** `witnesses` are the beats whose being reached proves these effects ran. */
+  const scanEffects = (effects: CompiledEffect[] | undefined, witnesses: string[]): void => {
     for (const e of effects ?? []) {
-      const t = targetHostRef(e.target, hostTokens);
-      if (t) written.add(t);
+      const target = targetHostRef(e.target, hostTokens);
+      if (target) {
+        written.add(target);
+        addSite(target, witnesses);
+        // A `set_flags(@world.mood, +armed)` write is readable per flag; anything else assigns the whole
+        // property, so no per-flag claim about it can be refuted.
+        const flags = e.value ? flagKeys(deserialiseAst(e.value.ast), hostTokens, "set_flags") : [];
+        if (flags.length) for (const k of flags) addSite(k, witnesses);
+        else opaqueWrites.add(target);
+      }
       refsIn(e.value); // RHS refs feed proposals
     }
   };
 
-  const walk = (nodes: Array<CompiledGroup | CompiledSnippet>, gate: Set<string>): void => {
+  const walk = (nodes: Array<CompiledGroup | CompiledSnippet>, gate: Set<string>, fine: Set<string>): void => {
     for (const node of nodes) {
       const here = new Set([...gate, ...refsIn(node.condition)]);
+      const hereFine = new Set([...fine, ...fineIn(node.condition)]);
       if (node.type === "group") {
-        walk(node.children, here); // a group's prompt carries no expression
+        walk(node.children, here, hereFine); // a group's prompt carries no expression
       } else {
-        scanEffects(node.onEnter);
-        scanEffects(node.onExit);
-        for (const beat of node.beats ?? []) gatesByBeat.set(beat.id, here);
+        const witnesses = (node.beats ?? []).map((b) => b.id);
+        scanEffects(node.onEnter, witnesses);
+        scanEffects(node.onExit, witnesses);
+        for (const beat of node.beats ?? []) { gatesByBeat.set(beat.id, here); fineGatesByBeat.set(beat.id, hereFine); }
       }
     }
   };
 
   for (const scene of Object.values(bundle.scenes)) {
-    scanEffects(scene.onEntry);
-    for (const block of scene.blocks) walk(block.children, new Set());
+    // A scene's entry effects are witnessed by every beat in it: if any of them played, entry ran.
+    const sceneBeats: string[] = [];
+    const collect = (nodes: Array<CompiledGroup | CompiledSnippet>): void => {
+      for (const n of nodes) {
+        if (n.type === "group") collect(n.children);
+        else for (const b of n.beats ?? []) sceneBeats.push(b.id);
+      }
+    };
+    for (const block of scene.blocks) collect(block.children);
+    scanEffects(scene.onEntry, sceneBeats);
+    for (const block of scene.blocks) walk(block.children, new Set(), new Set());
   }
-  return { written, gatesByBeat, proposals };
+  return empty;
+}
+
+/**
+ * The second hop, for a beat nothing reached.
+ *
+ * `needsInput` answers "is this gate fed by anyone?" and stops there, so a gate that IS written reads as
+ * perfectly wired. But a write only counts if the content carrying it ever plays: content gated on a flag
+ * whose only writer is ITSELF never reached is dead at one remove, and the gate is not the real question.
+ * Two silent beats, one cause, and nothing anywhere drawing the arrow between them. (Reported from the
+ * Storylet Studio side, 2026-08-30, where exactly this hid two never-dealt cards behind each other.)
+ *
+ * The rule this holds itself to is **only report what you can refute**. A site whose witnesses are not
+ * measurable content, or a flag on a property something assigns wholesale, drops OUT of the analysis
+ * rather than being guessed at. A false "this can never happen" on a beat that plays fine is the one
+ * failure this class of check does not recover from: it teaches authors to stop reading the panel.
+ */
+function blockedGates(
+  beatId: string,
+  analysis: HostScopeAnalysis,
+  drivenRefs: Set<string>,
+  reachedRuns: Map<string, number>,
+): BlockedGate[] {
+  const out: BlockedGate[] = [];
+  const gates = new Set([...(analysis.gatesByBeat.get(beatId) ?? []), ...(analysis.fineGatesByBeat.get(beatId) ?? [])]);
+  for (const ref of [...gates].sort()) {
+    const coarse = ref.includes(":") ? ref.slice(0, ref.indexOf(":")) : ref;
+    if (drivenRefs.has(coarse)) continue;              // a driver feeds it; the story's writers are moot
+    if (!analysis.written.has(coarse)) continue;       // unwritten is hop one's answer, not this one
+    // A flag key is only readable while every write to its property is a per-flag delta.
+    if (ref !== coarse && analysis.opaqueWrites.has(coarse)) continue;
+    // A fine gate keeps the coarse key out of the report: `@world.mood:armed` is the useful sentence.
+    if (ref === coarse && [...gates].some((g) => g !== ref && g.startsWith(`${ref}:`))) continue;
+    const sites = analysis.writerSites.get(ref) ?? [];
+    if (!sites.length) continue;
+    // Unwitnessed site = a write whose running we cannot observe (a snippet with no beats of its own).
+    // It might well have run, so nothing here is refutable.
+    if (sites.some((s) => !s.length || s.some((w) => !reachedRuns.has(w)))) continue;
+    if (!sites.every((s) => s.every((w) => reachedRuns.get(w) === 0))) continue; // some writer did play
+    const writers = [...new Set(sites.flat())].sort();
+    out.push({ ref, writers });
+  }
+  return out;
 }
 
 /**
@@ -384,9 +506,12 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     // A never-reached beat gated on a host-scope ref that nothing writes AND no driver feeds may just
     // need an input: flag it so the author can add a driver rather than assume it is dead.
     let needsInput: string[] | undefined;
+    let blockedBy: BlockedGate[] | undefined;
     if (reached === 0) {
       const gates = [...(analysis.gatesByBeat.get(id) ?? [])].filter((r) => !analysis.written.has(r) && !drivenRefs.has(r));
       if (gates.length) { needsInput = gates; for (const g of gates) unwrittenInputs.add(g); }
+      const blocked = blockedGates(id, analysis, drivenRefs, reachedRuns);
+      if (blocked.length) blockedBy = blocked;
     }
     return {
       id, scene: m.scene, kind: m.kind, character: m.character, preview: m.preview,
@@ -394,6 +519,7 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
       reachedRuns: reached,
       reachPct: executed ? (reached / executed) * 100 : 0,
       ...(needsInput ? { needsInput } : {}),
+      ...(blockedBy ? { blockedBy } : {}),
     };
   });
   const neverHit = beats.filter((b) => b.reachedRuns === 0).length;
@@ -486,9 +612,17 @@ export function renderCoverageText(report: CoverageReport, sceneName: (id: strin
     out.push(`${sceneName(scene)}${dead ? `  (${dead} never reached)` : ""}`);
     for (const b of beats) {
       // `?` = a never-reached beat that may just need an input driver; `‼` = never-reached and truly so.
-      const mark = b.reachedRuns === 0 ? (b.needsInput ? "? " : "‼ ") : "  ";
+      const mark = b.reachedRuns === 0 ? (b.needsInput || b.blockedBy ? "? " : "‼ ") : "  ";
       const label = b.character ? `${b.character}: ${clip(b.preview)}` : clip(b.preview || `(${b.kind})`);
       out.push(`  ${mark}${b.reachPct.toFixed(0).padStart(3)}%  ${String(b.hits).padStart(6)}  ${label}`);
+      // Dead at one remove: say which beat would have to play first, so the author chases one thing.
+      for (const bg of b.blockedBy ?? []) {
+        const names = bg.writers.map((w) => {
+          const target = report.beats.find((x) => x.id === w);
+          return target ? clip(target.preview || target.id, 28) : w;
+        });
+        out.push(`         gated on ${bg.ref}, written only by: ${names.join(", ")} (never played either)`);
+      }
     }
   }
   return out;
