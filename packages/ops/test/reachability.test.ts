@@ -358,3 +358,44 @@ describe("a latch that starts set, in either position", () => {
     expect(r).toEqual([]);
   });
 });
+
+describe("the scope the header claims", () => {
+  // Their `world-refs-are-the-hosts` brief makes the point the hard way: a conservatism stated in a
+  // design document and not implemented reads exactly like one that was never thought of, because the
+  // whole family asserts silence and a missing guard produces silence too. So the scope this file's
+  // header claims gets a case, rather than being taken on trust.
+  it("says nothing about a quality ladder, even a genuinely unsatisfiable one", () => {
+    // This condition really cannot hold: `rank` only advances behind `@seen`, nothing lowers it, and the
+    // snippet also wants `!@seen`. Qualities are deliberately out of scope (ordered comparisons want
+    // their own argument), so the right answer here is silence, not a report.
+    //
+    // Honest note on what this test is worth, since the family it sits in asserts silence: TWO separate
+    // things keep qualities out - `advance()` is not read as a latch write, and an ordered comparison is
+    // not read as a latch term - and either alone is enough. So no single-line mutation makes this
+    // report, and probing it needs both opened at once, which it then does. It pins the SCOPE decision
+    // rather than any one guard, and should not be mistaken for a guard test.
+    const r = issues([{ name: "rank", type: "quality", stages: ["novice", "adept", "veteran"] }, { name: "seen", type: "boolean", default: false }], [
+      { id: "n_look", type: "snippet", onEnter: [{ kind: "set", target: "@seen", value: "true" }],
+        beats: [{ id: "L0", kind: "line", character: "A" }] },
+      { id: "n_set", type: "snippet", condition: "@seen",
+        onEnter: [{ kind: "set", target: "@rank", value: "advance(@rank)" }],
+        beats: [{ id: "L1", kind: "line", character: "A" }] },
+      { id: "n_gated", type: "snippet", condition: "@rank >= \"veteran\" && !@seen",
+        beats: [{ id: "L2", kind: "line", character: "A" }] },
+    ]);
+    expect(r).toEqual([]);
+  });
+
+  it("says nothing about a counter", () => {
+    const r = issues([{ name: "gold", type: "number", default: 0 }, { name: "seen", type: "boolean", default: false }], [
+      { id: "n_look", type: "snippet", onEnter: [{ kind: "set", target: "@seen", value: "true" }],
+        beats: [{ id: "L0", kind: "line", character: "A" }] },
+      { id: "n_set", type: "snippet", condition: "@seen",
+        onEnter: [{ kind: "set", target: "@gold", value: "@gold + 1" }],
+        beats: [{ id: "L1", kind: "line", character: "A" }] },
+      { id: "n_gated", type: "snippet", condition: "@gold > 0 && !@seen",
+        beats: [{ id: "L2", kind: "line", character: "A" }] },
+    ]);
+    expect(r).toEqual([]);
+  });
+});
