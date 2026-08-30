@@ -10,9 +10,16 @@ name: Patterpad release
 # electron-updater's GitHub provider walks the releases feed skipping any tag
 # that isn't plain semver (so cli-v* / play-*-v* / @patterkit/* releases are
 # invisible to it). Never give another deliverable a bare v* tag.
+#
+# The filter anchors on a DIGIT, because `v*` is a glob and not a semver pattern: it matches any tag
+# starting with v, which is a larger set than the sentence above describes. A future `viewer-v*` or
+# `vscode-v*` family would fire this pipeline, derive `version` by stripping the leading v (giving
+# "iewer-v0.1.0"), and be stopped only by the changelog lookup below - a guard that exists to stop a
+# release shipping without notes, not to stop one shipping off another deliverable's tag.
+# (from-storylets/bare-v-tag-glob, 2026-08-30, where `village-v0.1.0` fired their equivalent.)
 on:
   push:
-    tags: ["v*"]
+    tags: ["v[0-9]*"]
 
 permissions:
   contents: write
