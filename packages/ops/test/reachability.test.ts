@@ -323,3 +323,38 @@ describe("the shipped example", () => {
     expect(reachabilityIssues(loadProject(dir))).toEqual([]);
   });
 });
+
+describe("a latch that starts set, in either position", () => {
+  // The Storylets side adopted our positive-latch fix and found it closes only one of two routes on
+  // their side (from-storylets INDEX, 2026-08-30). Route two: a DEFAULTED latch is monotonic in the
+  // sense that nothing moves it back, it simply never needed a writer, so it can still anchor a
+  // refutation. Here that is closed by `preset` feeding `monotonic`, which gates both positions - but
+  // the tests above only ever put a defaulted latch in the NEGATED position, so this is the case that
+  // was going untested.
+  it("says nothing when the POSITIVE term is a boolean defaulting to true", () => {
+    const r = issues([{ name: "connected", type: "boolean", default: true }, { name: "seen", type: "boolean", default: false }], [
+      { id: "n_look", type: "snippet", onEnter: [{ kind: "set", target: "@seen", value: "true" }],
+        beats: [{ id: "L0", kind: "line", character: "A" }] },
+      { id: "n_set", type: "snippet", condition: "@seen",
+        onEnter: [{ kind: "set", target: "@connected", value: "true" }],
+        beats: [{ id: "L1", kind: "line", character: "A" }] },
+      // @connected is true before anything runs, so it implies nothing about what ran first.
+      { id: "n_live", type: "snippet", condition: "@connected && !@seen",
+        beats: [{ id: "L2", kind: "line", character: "A" }] },
+    ]);
+    expect(r).toEqual([]);
+  });
+
+  it("says nothing when the POSITIVE term is a flag the default already holds", () => {
+    const r = issues([{ name: "mood", type: "flags", values: ["armed"], default: ["armed"] }, { name: "seen", type: "boolean", default: false }], [
+      { id: "n_look", type: "snippet", onEnter: [{ kind: "set", target: "@seen", value: "true" }],
+        beats: [{ id: "L0", kind: "line", character: "A" }] },
+      { id: "n_set", type: "snippet", condition: "@seen",
+        onEnter: [{ kind: "set", target: "@mood", value: "set_flags(@mood, +armed)" }],
+        beats: [{ id: "L1", kind: "line", character: "A" }] },
+      { id: "n_live", type: "snippet", condition: "check_flags(@mood, +armed) && !@seen",
+        beats: [{ id: "L2", kind: "line", character: "A" }] },
+    ]);
+    expect(r).toEqual([]);
+  });
+});
