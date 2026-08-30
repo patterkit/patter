@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-30
+
 ### Added
 
 - **The Runtime State panel says whether Patterpad is listening.** A Live Link registered with

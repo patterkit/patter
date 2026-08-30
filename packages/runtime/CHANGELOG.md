@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-08-30
+
 ### Fixed
 
 - **A flow you forgot to announce still shows up in Patterpad's debug link.** `flowOpened` was the

@@ -30,7 +30,7 @@
     "@patterkit/compiler": "0.2.4",
     "@patterkit/core": "0.2.1",
     "@patterkit/model": "0.4.0",
-    "@patterkit/runtime": "0.7.0",
+    "@patterkit/runtime": "0.7.1",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
