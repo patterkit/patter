@@ -1,5 +1,27 @@
 # @patterkit/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 156ea39: `patter --version` (also `-v`, `patter version`) prints the CLI's version.
+
+  The CLI ships as a self-contained per-platform binary: no `package.json` beside it, no npm that installed it, and a filename that is whatever the downloader called it. The tool was the only thing that could answer "which build is this?" and it printed the usage text instead, which reads as a refusal. The number is inlined from the manifest at build time rather than kept in a constant, and both shipping paths (tsup and Bun `--compile`) were run to confirm it, since a JSON import a bundler fails to inline is a runtime `undefined` rather than a build error. Reported from the Storylet Studio side.
+
+### Patch Changes
+
+- c37067b: Coverage: a never-reached beat now says when its gate is written only by content that was itself never reached.
+
+  `needsInput` asks whether anything writes a gate and stops there, so a gate written only by a beat nobody reaches read as perfectly wired. `CoverageBeat.blockedBy` names the gate and the writers, turning two silent beats with one cause into a single question. Gates are keyed by individual flag (`@world.mood:armed`) rather than by property, since a property half the story writes always looks fed. The check refuses to speak where it cannot refute: an unwitnessed writer, or a property assigned wholesale, drops out rather than being guessed at.
+
+- 7004f48: `validate` now reports conditions that provably can never hold.
+
+  A snippet gated on `@connected && !@seen`, where the only writer of `@connected` is itself gated on `@seen` and nothing sets `@seen` back, is unsatisfiable. `ValidateResult.reachability` names the chain, and `patter validate` prints it as `[unreachable]`. The analysis covers monotonic latches only (a boolean only ever written `true`, a flag only ever `+set`); anything written another way, host-driven, `temporary`, or already true by default drops out rather than being guessed at, because a false "this can never happen" is worse than silence. Warnings, deliberately outside `ok`: they never fail a build. Adapted from a design contributed by the Storylet Studio side.
+
+- Updated dependencies [c37067b]
+- Updated dependencies [7004f48]
+  - @patterkit/ops@0.5.0
+
 ## 0.2.7
 
 ### Patch Changes
