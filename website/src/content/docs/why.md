@@ -1,6 +1,6 @@
 ---
 title: Why Patter
-description: Where Patter fits among narrative tools like Ink, Yarn Spinner, and articy:draft, indie-first but team-ready, files on disk, a screenplay surface for writers, and one bundle that plays identically on every engine.
+description: Where Patter fits among narrative tools like Ink, Yarn Spinner, and articy:draft, how it sits beside its sibling Storylet Studio, indie-first but team-ready, files on disk, a screenplay surface for writers, and one bundle that plays identically on every engine.
 sidebar:
   label: Why Patter (and how it compares)
 ---
@@ -110,6 +110,14 @@ Patter is lighter and file-based: no server, no node graph to untangle as the st
 and the source lives in your repo next to the rest of the game. If you want a screenplay
 your writers own in git or Perforce rather than a database they connect to, Patter is the fit.
 
+**Alongside Storylet Studio.** [Storylet Studio](https://storylet.studio) is the sibling
+project: storylets, which are chunks of story with a condition on the front, dealt to the
+player when they fit. **You don't need it.** Patter knows nothing about Storylet Studio, and
+nothing in a scene refers to it unless you put it there yourself. What the two share is your
+game's state: both read and write the same `@world` values, so a conversation running here and
+a beat chosen there work from one picture of the world. If you run both, the division that
+works is that Storylet Studio decides which beat happens and Patter performs it.
+
 ## When Patter is *not* the right call
 
 - You want a pure visual **node graph** as the primary authoring metaphor: Articy or a
@@ -118,6 +126,10 @@ your writers own in git or Perforce rather than a database they connect to, Patt
   your existing VCS for collaboration (lock-aware, with structural merge), which scales to
   large teams but is check-out-and-merge, not simultaneous co-editing.
 - You're already deep in **Ink** and happy writing markup: there's little reason to move.
+- **Choosing what happens next** is the spine of your game rather than the conversation
+  itself: a pool of beats, each with a condition on the front, dealt as the world changes.
+  That's a storylet system, and [Storylet Studio](https://storylet.studio) is built for it.
+  The two pair well: it picks the beat, Patter performs it.
 
 ## Ready to look closer?
 

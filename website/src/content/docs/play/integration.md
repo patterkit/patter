@@ -38,6 +38,10 @@ the PRNG position, and any pending choice (saved as its exact option set and rep
 verbatim on load, so conditions aren't re-evaluated and the PRNG never double-draws).
 **Locale is not in the save**: it's presentation, not game state. A saved position
 that points at content you've since deleted resumes best-effort rather than throwing.
+**`@world` is not in it either**: it's your game's state, reached through the resolver you
+bind, so your game saves it. That is also what makes running Patter beside
+[Storylet Studio](https://storylet.studio)'s engine safe: both exclude `@world` from their own
+saves, your game saves its one world once, and nothing is written twice.
 
 Each runtime round-trips **its own** save format, so saves are semantically equivalent
 across engines, not byte-identical.

@@ -9,6 +9,8 @@ Patter has two halves: you **write** in Patterpad, and you **play** what you wri
 with a Patterplay runtime. Here is the path from zero to a story running in your
 game. New to the ideas? Skim [Core concepts](/concepts/) or
 [how it fits together](/architecture/).
+[PatterKit: A Branching Dialogue System](https://wildwinter.medium.com/patterkit-a-branching-dialogue-system-e0250e6ce045)
+introduces the project: where it came from, what is in it, and why it works this way.
 
 :::tip[Prefer to learn by playing?]
 The repo ships an **interactive tour** (`examples/projects/tour.patter`): a playable Patter story that walks you
