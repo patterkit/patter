@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-31
+
 ### Changed
 
 - **The Windows icon script fails where the fault is, rather than a minute later somewhere else.** Off
