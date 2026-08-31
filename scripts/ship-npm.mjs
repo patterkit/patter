@@ -1,6 +1,6 @@
 // The whole npm-library release, end to end, in one command.
 //
-//   npm run ship:npm                 push what is committed, wait for the PR, show it, ask, publish
+//   npm run ship:npm                 push what is committed, wait for the PR, run its CI, ask, publish
 //   npm run ship:npm -- --yes        no prompt
 //   npm run ship:npm -- --dry-run    show the plan and stop
 //
@@ -15,6 +15,12 @@
 // and invents a message is deciding what your change was. It refuses a dirty tree and tells you what is
 // still loose.
 //
+// Step 3 exists because the PR's CI does not run itself: this repo requires approval for first-time
+// contributors, `github-actions[bot]` is one, and the PR is merged long before anyone approves it. Every
+// changeset-release/main run in this repo's history is `action_required` or a zero-job `failure`, which
+// from the outside is indistinguishable from a gate that passes. Approving runs the suite and merges
+// nothing; a red result stops here rather than at the prompt below.
+//
 // The merge in the middle is a REAL GATE. Merging the Version Packages PR publishes to npm, and npm
 // versions cannot meaningfully be unpublished, so this stops and asks unless given --yes.
 
@@ -22,7 +28,7 @@ import { execSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { findVersionPr, waitForVersionPr, plannedBumps, confirmPublish, waitForNpm } from "./lib/version-pr.mjs";
+import { findVersionPr, waitForVersionPr, plannedBumps, confirmPublish, waitForNpm, approveAndWaitForPrCi } from "./lib/version-pr.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const out = (cmd) => execSync(cmd, { cwd: root, encoding: "utf8" }).trim();
@@ -36,7 +42,7 @@ const run = (cmd) => {
   if (dryRun) { console.log(`  [dry-run] ${cmd}`); return ""; }
   return execSync(cmd, { cwd: root, stdio: "inherit", encoding: "utf8" }) ?? "";
 };
-const step = (n, msg) => console.log(`\n[${n}/4] ${msg}`);
+const step = (n, msg) => console.log(`\n[${n}/5] ${msg}`);
 
 // --- preflight, the same rules ship:cli enforces -----------------------------
 if (out("git rev-parse --abbrev-ref HEAD") !== "main") die("not on main");
@@ -85,8 +91,24 @@ if (dryRun) {
   console.log(`  PR #${pr} is open`);
 } else console.log(`  PR #${pr} was already open`);
 
-// --- 3. the gate -------------------------------------------------------------
-step(3, "merging it (this publishes to npm)");
+// --- 3. the PR's own CI, which does not run itself ---------------------------
+//
+// Folded in here because it is otherwise a step in a document that nobody performs: the run is parked
+// awaiting approval, the PR is merged within the minute, and the tick never turns green in either
+// direction. Approving runs the suite; it does not merge anything, and the gate below still asks.
+step(3, "the PR's CI (parked awaiting approval, so nothing runs it by itself)");
+if (dryRun) {
+  console.log("  [dry-run] would approve the parked run and wait for it");
+} else {
+  const ci = approveAndWaitForPrCi(root, pr, (m) => console.log(m));
+  if (ci === "failed") {
+    die(`CI FAILED on PR #${pr}. Look before you publish: ${REPO}/pull/${pr}\n`
+      + "  (nothing was merged; npm versions cannot meaningfully be unpublished, so this stops here.)");
+  }
+}
+
+// --- 4. the gate -------------------------------------------------------------
+step(4, "merging it (this publishes to npm)");
 const bumps = pr ? plannedBumps(root, pr) : [];
 if (bumps.length) {
   console.log(bumps.map((b) => `    @patterkit/${b.pkg.padEnd(14)} ${b.from} -> ${b.to}`).join("\n"));
@@ -104,8 +126,8 @@ if (!yes && !(await confirmPublish(pr, null, REPO))) {
 run(`gh pr merge ${pr} --squash`);
 run("git pull -q --ff-only origin main");
 
-// --- 4. wait for the registry ------------------------------------------------
-step(4, "waiting for npm (the publish runs in CI, so this is not instant)");
+// --- 5. wait for the registry ------------------------------------------------
+step(5, "waiting for npm (the publish runs in CI, so this is not instant)");
 const failed = [];
 for (const b of bumps) {
   const pkg = `@patterkit/${b.pkg}`;

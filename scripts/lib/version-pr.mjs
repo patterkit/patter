@@ -28,6 +28,66 @@ export function waitForVersionPr(cwd, seconds = 240) {
 }
 
 /**
+ * The PR-side CI gate, which does not run by itself.
+ *
+ * A workflow run on the bot's PR is PARKED at `action_required`: this repo requires approval for
+ * first-time contributors, `github-actions[bot]` is one, and nobody approves it because the PR is merged
+ * within the minute. Every `changeset-release/main` CI run in this repo's history is either
+ * `action_required` or a zero-job `failure` for exactly that reason. A gate that has never once run looks
+ * from the outside precisely like a gate that passes, which is why this is done here rather than left as
+ * a step in a document.
+ *
+ * Approving is not the dangerous half of a release: it runs the suite, and the merge that follows is
+ * still confirmed separately. So this approves, waits, and REPORTS - it never merges on its own.
+ *
+ * Returns one of: "passed" | "failed" | "none" | "skipped".
+ */
+export function approveAndWaitForPrCi(cwd, pr, log = console.log, seconds = 900) {
+  // Matched on the PR's HEAD COMMIT, not just the branch name. The branch is reused for every release
+  // and its runs outlive the PRs they belong to, so "the latest run on changeset-release/main" is very
+  // often the parked one from LAST time - which, being a zero-job failure, would abort this release over
+  // a run that has nothing to do with it. (Found by running this against a freshly-merged release.)
+  const sha = sh(`gh pr view ${pr} --json headRefOid --jq .headRefOid`, { cwd });
+  const runOf = () => {
+    const json = sh('gh run list --branch changeset-release/main --workflow ci.yml --limit 10'
+      + ' --json databaseId,status,conclusion,headSha', { cwd });
+    return JSON.parse(json || "[]").find((x) => x.headSha === sha) ?? null;
+  };
+  // The run can lag the PR by a few seconds.
+  let r = null;
+  for (let waited = 0; waited < 60 && !r; waited += 6) {
+    r = runOf();
+    if (!r) execSync("sleep 6");
+  }
+  if (!r) { log(`  no CI run for ${sha.slice(0, 8)} - nothing to approve`); return "none"; }
+
+  if (r.status === "action_required" || r.status === "waiting") {
+    log(`  run ${r.databaseId} is parked awaiting approval - approving`);
+    try {
+      sh(`gh api -X POST repos/{owner}/{repo}/actions/runs/${r.databaseId}/approve`, { cwd });
+    } catch {
+      // Not fatal. The publish has its own gate (the `release` script runs the suite), so a failure to
+      // approve costs a second opinion rather than the only one.
+      log(`  could not approve it from here - approve it in the browser if you want it: ${r.databaseId}`);
+      return "skipped";
+    }
+  }
+
+  for (let waited = 0; waited < seconds; waited += 10) {
+    r = runOf();
+    if (!r) return "none";
+    if (r.status === "completed") {
+      log(`  CI ${r.conclusion} (run ${r.databaseId})`);
+      return r.conclusion === "success" ? "passed" : "failed";
+    }
+    if (waited === 0) log("  waiting for it to finish");
+    execSync("sleep 10");
+  }
+  log("  CI did not finish in time - not waiting any longer");
+  return "skipped";
+}
+
+/**
  * What a Version Packages PR would publish, read off its diff: [{ pkg, from, to }].
  *
  * Parsed from the unified diff rather than fetched per file: one call, and the minus/plus pair for a
