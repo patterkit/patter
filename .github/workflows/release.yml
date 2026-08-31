@@ -53,6 +53,16 @@ jobs:
         with:
           cwd: patter
           version: npm run version-packages
+          # `npm run release` is typecheck + build + test + `changeset publish`, in that order. The gate
+          # lives in the script rather than in a `needs:` on CI, because CI on main runs in PARALLEL with
+          # this workflow and nothing made the publish wait for it: a bad merge would reach npm before the
+          # suite finished, and npm versions cannot meaningfully be unpublished. The build comes before
+          # the tests deliberately (see ci.yml): the CLI bundle-smoke test runs dist/cli.js and SKIPS when
+          # no dist exists, so tests-first would quietly hollow that gate out.
+          #
+          # The PR-side gate does not exist despite appearances. Every `changeset-release/main` CI run has
+          # been `action_required` or a zero-job `failure`, because a run on the bot's PR waits for a
+          # maintainer to approve it and the PR is merged before anyone does.
           publish: npm run release
           # Publish to npm + push git tags, but do NOT create GitHub Release objects for the @patterkit/*
           # packages. Those empty releases (npm is the real artifact) kept stealing GitHub's "Latest"

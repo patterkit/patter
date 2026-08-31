@@ -27,7 +27,7 @@
     "ship:npm": "node scripts/ship-npm.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "npm run build && changeset publish"
+    "release": "npm run typecheck && npm run build && npm test && changeset publish"
   },
   "overrides": {
     "esbuild": "^0.28.2"
