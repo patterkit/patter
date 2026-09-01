@@ -29,7 +29,7 @@ import { evaluate, deserialiseAst, makePrng, toUint32 } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
-import { defaultFor } from "@wildwinter/scoperegistry";
+import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
@@ -411,7 +411,11 @@ interface FlowHost {
   /** Shared selector cursors (node id -> SelectorState) for `shared` memoried selectors. */
   sharedSelectors: Map<string, SelectorState>;
   /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value) for shared scene props. */
-  stageBags: Map<string, Record<string, ScalarValue>>;
+  /** Per-scene SHARED scene props. A PropertyBag rather than a bare record since
+   *  2026-09-02: seeding, name normalisation and the mutable-default clone were all
+   *  written out by hand here, and the shared bag already had them. The SAVE is
+   *  unchanged - bag.save() is a bare record, which is what the envelope carries. */
+  stageBags: Map<string, PropertyBag>;
   customRng?: () => number;
   /** Play a chosen option's prompt as its first beat (spec §5); default false. */
   replayPromptOnChoose?: boolean;
@@ -990,7 +994,7 @@ export class Engine {
       shared: this.host.shared.save(),
       sharedVisits: Object.fromEntries(this.host.sharedVisits),
       sharedSelectors: serialiseSelectors(this.host.sharedSelectors),
-      stageBags: Object.fromEntries([...this.host.stageBags].map(([s, bag]) => [s, { ...bag }])),
+      stageBags: Object.fromEntries([...this.host.stageBags].map(([s, bag]) => [s, bag.save()])),
       flows,
     };
   }
@@ -1004,7 +1008,16 @@ export class Engine {
     this.host.sharedSelectors.clear();
     for (const [id, st] of deserialiseSelectors(save.sharedSelectors)) this.host.sharedSelectors.set(id, st);
     this.host.stageBags.clear();
-    for (const [s, bag] of Object.entries(save.stageBags ?? {})) this.host.stageBags.set(s, { ...bag });
+    for (const [s, values] of Object.entries(save.stageBags ?? {})) {
+      // Seeded from the bundle's declarations first, then the saved values laid over: a
+      // property the save predates keeps its declared default rather than vanishing, and
+      // one the bundle has since dropped lands as a stray, exactly as before.
+      const shared = this.host.sceneSharedNames.get(s) ?? new Set<string>();
+      const decls = (this.host.bundle.scenes[s]?.sceneProps ?? []).filter((d) => shared.has(d.name.toLowerCase()));
+      const bag = new PropertyBag(decls as never);
+      bag.load(values);
+      this.host.stageBags.set(s, bag);
+    }
     this.flowsById.clear();
     for (const [id, snap] of Object.entries(save.flows)) {
       const flow = new Flow(id, this.host, this.defaultSeed);
@@ -1053,7 +1066,8 @@ export class Flow {
   // The SHARED halves live on the host (`host.shared` / `host.stageBags`). Each
   // resolver presents one merged scope, routing each property to its half by the
   // declared `shared` flag.
-  private sceneBags = new Map<string, Record<string, ScalarValue>>();
+  /** This flow's per-scene LOCAL scene props; see FlowHost.stageBags. */
+  private sceneBags = new Map<string, PropertyBag>();
 
   private readonly patterResolver: ScopeResolver = {
     get: (n) => (this.host.patterSharedNames.has(n) ? this.host.shared.get("patter", n) : this.local.get("patter", n)),
@@ -1068,13 +1082,15 @@ export class Flow {
       const s = this.currentSceneId;
       if (s === null) return undefined;
       const bag = this.host.sceneSharedNames.get(s)?.has(n) ? this.host.stageBags.get(s) : this.sceneBags.get(s);
-      return bag?.[n];
+      return bag?.get(n);
     },
     set: (n, v) => {
       const s = this.currentSceneId;
       if (s === null) return;
       const bag = this.host.sceneSharedNames.get(s)?.has(n) ? this.host.stageBags.get(s) : this.sceneBags.get(s);
-      if (bag) bag[n] = v;
+      // Silent: a scene-prop write is the engine's own, and the audit hook is what a state
+      // logger reads. Subscribers stay for a host that wants them.
+      if (bag) bag.set(n, v);
     },
   };
 
@@ -1402,7 +1418,7 @@ export class Flow {
   snapshot(): FlowSnapshot {
     return {
       scopes: this.local.save(), // owned scope "patter" = the NOT-shared globals (@scene saved separately)
-      sceneBags: Object.fromEntries([...this.sceneBags].map(([s, bag]) => [s, { ...bag }])),
+      sceneBags: Object.fromEntries([...this.sceneBags].map(([s, bag]) => [s, bag.save()])),
       rngState: this.rngState,
       visits: Object.fromEntries(this.visitCounts),
       cursor: {
@@ -1449,7 +1465,13 @@ export class Flow {
 
     // Restore the per-flow @scene bags, then the per-flow @patter globals. @scene
     // resolves through `sceneResolver` over these bags, so nothing else to reseed.
-    this.sceneBags = new Map(Object.entries(snap.sceneBags ?? {}).map(([s, bag]) => [s, { ...bag }]));
+    this.sceneBags = new Map(Object.entries(snap.sceneBags ?? {}).map(([s, values]) => {
+      const shared = this.host.sceneSharedNames.get(s) ?? new Set<string>();
+      const decls = (this.host.bundle.scenes[s]?.sceneProps ?? []).filter((d) => !shared.has(d.name.toLowerCase()));
+      const bag = new PropertyBag(decls as never);
+      bag.load(values);
+      return [s, bag] as const;
+    }));
     this.local = this.freshLocal();
     this.local.load(snap.scopes); // loads the owned not-shared globals; shared halves live on the host
 
@@ -1974,21 +1996,15 @@ export class Flow {
    */
   private seedScene(scene: CompiledScene): void {
     const shared = this.host.sceneSharedNames.get(scene.id) ?? new Set<string>();
+    // The bag's constructor IS this loop: lowercase the name, seed the declared default
+    // else the type's, and structuredClone it so two bags from one declaration set never
+    // share a mutable flags array. That last part was missing here.
+    const props = scene.sceneProps ?? [];
     if (!this.sceneBags.has(scene.id)) {
-      const bag: Record<string, ScalarValue> = {};
-      for (const decl of scene.sceneProps ?? []) {
-        const name = decl.name.toLowerCase();
-        if (!shared.has(name)) bag[name] = defaultFor(decl);
-      }
-      this.sceneBags.set(scene.id, bag);
+      this.sceneBags.set(scene.id, new PropertyBag(props.filter((d) => !shared.has(d.name.toLowerCase())) as never));
     }
     if (!this.host.stageBags.has(scene.id)) {
-      const bag: Record<string, ScalarValue> = {};
-      for (const decl of scene.sceneProps ?? []) {
-        const name = decl.name.toLowerCase();
-        if (shared.has(name)) bag[name] = defaultFor(decl);
-      }
-      this.host.stageBags.set(scene.id, bag);
+      this.host.stageBags.set(scene.id, new PropertyBag(props.filter((d) => shared.has(d.name.toLowerCase())) as never));
     }
 
     // `temporary` props are reseeded to their default on EVERY entry ("fresh each
@@ -1997,7 +2013,7 @@ export class Flow {
       if (!decl.temporary) continue;
       const name = decl.name.toLowerCase();
       const bag = shared.has(name) ? this.host.stageBags.get(scene.id) : this.sceneBags.get(scene.id);
-      if (bag) bag[name] = defaultFor(decl);
+      if (bag) bag.set(name, defaultFor(decl));
     }
   }
 }
