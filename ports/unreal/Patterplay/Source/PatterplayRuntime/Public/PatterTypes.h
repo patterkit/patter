@@ -105,6 +105,18 @@ struct FPatterPropertyRow
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Values;
 
+	/** A quality's ordered stage ladder: the closed-set twin of Values. Folded INTO
+	 *  Values until 2026-09-01, which the Storylet Engine's struct never did - the
+	 *  shared row has both, and a consumer should not have to read Type to know
+	 *  which kind of list it is holding. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FString> Stages;
+
+	/** False for a declared read-only property, so an inspector can disable it.
+	 *  Always true across Patterplay today; carried because the row is shared. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bWritable = true;
+
 	// True when Value currently equals Default (a reset button uses this to disable itself).
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bIsDefault = false;

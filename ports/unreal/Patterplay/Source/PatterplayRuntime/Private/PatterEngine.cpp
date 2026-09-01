@@ -428,7 +428,9 @@ TArray<FPatterPropertyRow> UPatterEngine::ListProperties() const
 		Row.Value = Ue(R.value.toDisplayString());
 		Row.Default = Ue(R.def.toDisplayString());
 		Row.bIsDefault = R.value.valueEquals(R.def);
-		for (const std::string& V : (R.type == "quality" ? R.stages : R.values)) Row.Values.Add(Ue(V));
+		for (const std::string& V : R.values) Row.Values.Add(Ue(V));
+		for (const std::string& V : R.stages) Row.Stages.Add(Ue(V));
+		Row.bWritable = R.writable;
 		Out.Add(Row);
 	}
 	return Out;
