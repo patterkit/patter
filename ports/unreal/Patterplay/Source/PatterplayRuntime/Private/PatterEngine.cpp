@@ -454,17 +454,18 @@ TArray<FPatterPropertyRow> UPatterEngine::ListProperties() const
 {
 	TArray<FPatterPropertyRow> Out;
 	if (!Engine) return Out;
-	for (const patter::PropertyRow& R : Engine->listProperties())
+	for (const patter::PropertyView& R : Engine->listProperties())
 	{
 		FPatterPropertyRow Row;
 		Row.Path = Ue(R.path);
 		Row.Name = Ue(R.name);
 		Row.Type = PropertyTypeFrom(R.type);
 		Row.Value = Ue(R.value.toDisplayString());
-		Row.Default = Ue(R.def.toDisplayString());
-		Row.bIsDefault = R.value.valueEquals(R.def);
-		for (const std::string& V : R.values) Row.Values.Add(Ue(V));
-		for (const std::string& V : R.stages) Row.Stages.Add(Ue(V));
+		Row.Default = Ue(R.defaultValue.toDisplayString());
+		Row.bIsDefault = R.value.valueEquals(R.defaultValue);
+		// optional on the shared row: absent and empty mean the same thing to a UI.
+		if (R.values) for (const std::string& V : *R.values) Row.Values.Add(Ue(V));
+		if (R.stages) for (const std::string& V : *R.stages) Row.Stages.Add(Ue(V));
 		Row.bWritable = R.writable;
 		Out.Add(Row);
 	}

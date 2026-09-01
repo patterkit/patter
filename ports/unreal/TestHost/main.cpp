@@ -673,6 +673,57 @@ static void runTraceLogSmoke()
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
 // the shared corpus, so exercise it directly - only shared @patter decls, each with type / value /
 // default / enum values, and a live setProperty reflected on the next read.
+// The save envelope's SHAPE, checked rather than round-tripped.
+//
+// Scene and stage state is held in a shared PropertyBag; the SAVE is still a flat
+// name -> value map per scene. A round-trip cannot tell the difference - a bag that
+// serialised itself would round-trip perfectly and still break every save on disk.
+// So this reads the JSON, and loads one edited by hand.
+static void runSaveShapeSmoke()
+{
+    Bundle b;
+    b.locales.defaultLocale = "en";
+    b.locales.included = { "en" };
+    b.strings["en"]["T"] = "hi";
+
+    Scene scene; scene.id = "s"; scene.gameId = "s";
+    { PropertyDecl d; d.name = "mood"; d.type = "string"; d.hasDefault = true; d.def = PatterValue::Str("calm");
+      d.hasShared = true; d.shared = false; scene.sceneProps.push_back(d); }
+    { PropertyDecl d; d.name = "alarm"; d.type = "boolean"; d.hasDefault = true; d.def = PatterValue::Bool(false);
+      d.hasShared = true; d.shared = true; scene.sceneProps.push_back(d); }
+    Block block; block.id = "b"; block.gameId = "b";
+    auto sn = std::make_shared<Node>(); sn->id = "sn"; sn->type = "snippet";
+    { Beat beat; beat.id = "T"; beat.kind = "text"; sn->beats.push_back(beat); }
+    sn->jump = std::make_shared<Jump>(); sn->jump->to = "END";
+    block.children.push_back(sn);
+    scene.blocks.push_back(block);
+    b.scenes["s"] = scene;
+
+    EngineOptions opts;
+    auto engine = std::make_shared<Engine>(b, opts);
+    Flow* flow = engine->openFlow("main", "s", "b");
+    for (int i = 0; i < 10; ++i) { StepResult r = flow->advance(); if (r.type == StepType::End) break; }
+    flow->setProperty("@scene.mood", PatterValue::Str("tense"));
+
+    std::string json = serializeState(*engine);
+    // Flat: the values sit directly under the scene id, with no bag wrapper around them.
+    if (json.find("\"stageBags\":{\"s\":{\"alarm\":") == std::string::npos)
+        fail("save shape", "stage bag is flat", json);
+    if (json.find("\"sceneBags\":{\"s\":{\"mood\":\"tense\"}") == std::string::npos)
+        fail("save shape", "scene bag is flat", json);
+
+    // A save edited by hand, in the format on disk today, still loads.
+    std::string hand = json;
+    size_t at = hand.find("\"mood\":\"tense\"");
+    if (at != std::string::npos) hand.replace(at, std::string("\"mood\":\"tense\"").size(), "\"mood\":\"furious\"");
+    auto engine2 = std::make_shared<Engine>(b, opts);
+    deserializeState(*engine2, hand);
+    Flow* f2 = engine2->getFlow("main");
+    const PatterValue* got = f2 ? f2->getProperty("@scene.mood") : nullptr;
+    if (!got || got->s != "furious")
+        fail("save shape", "a hand-edited value loads", got ? got->toDisplayString() : "<null>");
+}
+
 static void runInspectorSmoke()
 {
     Bundle b;
@@ -694,11 +745,13 @@ static void runInspectorSmoke()
     if (rows[0].name != "gold" || rows[0].path != "@gold" || !rows[0].writable)
         fail("inspector", "shared row shape", "name/path/writable wrong on the gold row");
 
-    if (rows[0].type != "number" || !rows[0].value.isNumber() || rows[0].value.n != 5 || rows[0].def.n != 5)
+    if (rows[0].type != "number" || !rows[0].value.isNumber() || rows[0].value.n != 5 || rows[0].defaultValue.n != 5)
         fail("inspector", "number row", "gold row wrong: " + rows[0].value.toDisplayString());
-    if (rows[1].values != std::vector<std::string>{ "calm", "tense" } || rows[1].value.s != "calm")
+    // values/stages are optional on the shared row: a row with no enum options has no vector,
+    // where the forked row carried an empty one.
+    if (!rows[1].values || *rows[1].values != std::vector<std::string>{ "calm", "tense" } || rows[1].value.s != "calm")
         fail("inspector", "enum row", "mood row wrong");
-    if (rows[2].type != "flags" || !rows[2].def.isFlags() || !rows[2].def.f.empty())
+    if (rows[2].type != "flags" || !rows[2].defaultValue.isFlags() || !rows[2].defaultValue.f.empty())
         fail("inspector", "flags default", "notes default should be empty flags");
 
     engine.setProperty("@gold", PatterValue::Num(42));
@@ -904,6 +957,7 @@ int main(int argc, char** argv)
     int s = runScripted(root.at("scripted"));
     int g = runGameData(root.at("gameData"));
     runInspectorSmoke();
+    runSaveShapeSmoke();
     runTraceLogSmoke();
     runOutlineSmoke();
     runDescribeSmoke();

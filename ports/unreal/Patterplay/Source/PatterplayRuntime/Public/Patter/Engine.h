@@ -21,6 +21,7 @@
 #include "Ast.h"
 #include "Dialect.h"        // the Patter dialect, and the shared evaluator it configures
 #include "Expr/Specificity.h"  // the shared matched-constraint scorer
+#include "Expr/PropertyBag.h"   // the shared state kernel: scene and stage props live in these
 #include "Interp.h"
 #include "StepResult.h"
 
@@ -109,24 +110,17 @@ namespace patter
     }
 
     // One shared @patter property for a live state inspector: ref, type, current value, declared
-    // default (for reset-to-default), and enum options. Mirrors the JS PropertyRow and the Unity /
-    // Godot ListProperties() row so all four runtimes expose the same inspection contract.
-    // The shape is @wildwinter/scoperegistry's property row, shared with the Storylet
-    // Engine: `path` is the addressable reference getProperty/setProperty take, `name`
-    // the bare declared name. `path` was called `ref` until 2026-09-01, when the JS
-    // runtime stopped forking that row type.
-    struct PropertyRow
+    // default (for reset-to-default), and enum options.
+    //
+    // The shared kernel's PropertyRow (Expr/PropertyBag.h) IS this row - name, type, value,
+    // defaultValue, enum values, the quality ladder, writable. Patter adds one thing: `path`,
+    // the addressable reference getProperty/setProperty take. So this extends rather than
+    // restates it, exactly as the JS runtime's PropertyView extends the same shared row.
+    // It was a full copy until 2026-09-02, which is how `def` and `defaultValue` came to be
+    // two names for one field.
+    struct PropertyView : PropertyRow
     {
-        std::string name;
         std::string path;
-        std::string type;
-        PatterValue value;
-        PatterValue def;
-        std::vector<std::string> values;
-        std::vector<std::string> stages;  // quality: the ordered stage ladder (an inspector offers these)
-        // Always true here: Patter has no read-only shared property, exactly as in the
-        // JS runtime. Carried because it is part of the shared row.
-        bool writable = true;
     };
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
@@ -229,6 +223,51 @@ namespace patter
         bool hasLast = false; std::string last;
     };
 
+    // ---- bags <-> the save envelope -----------------------------------------
+    //
+    // Scene and stage state lives in a PropertyBag; the SAVE stays a flat name -> value
+    // map per scene. The bag is a runtime detail, the envelope is a contract with every
+    // save already on disk.
+
+    /** A bundle PropertyDecl as the shared kernel's ScopeDeclaration: the same property in
+     *  the two vocabularies. `temporary` and `shared` are the engine's business, not the bag's. */
+    inline ScopeDeclaration toScopeDecl(const PropertyDecl& d)
+    {
+        ScopeDeclaration sd;
+        sd.name = d.name;
+        sd.type = d.type;
+        if (!d.values.empty()) sd.values = d.values;
+        if (!d.stages.empty()) sd.stages = d.stages;
+        if (d.hasDefault) sd.defaultValue = d.def;
+        return sd;
+    }
+
+    /** One half of a scene's props: the shared ones (stage bag) or the rest (scene bag). */
+    inline std::vector<ScopeDeclaration> declsFor(
+        const std::vector<PropertyDecl>& props, const std::set<std::string>* shared, bool wantShared)
+    {
+        std::vector<ScopeDeclaration> out;
+        for (const auto& d : props)
+        {
+            bool isShared = shared && shared->count(toLower(d.name)) > 0;
+            if (isShared == wantShared) out.push_back(toScopeDecl(d));
+        }
+        return out;
+    }
+
+    inline std::map<std::string, std::map<std::string, PatterValue>> saveBags(
+        const std::map<std::string, PropertyBag>& bags)
+    {
+        std::map<std::string, std::map<std::string, PatterValue>> out;
+        for (const auto& kv : bags)
+        {
+            std::map<std::string, PatterValue> flat;
+            for (const auto& e : kv.second.save()) flat[e.first] = e.second;
+            out[kv.first] = flat;
+        }
+        return out;
+    }
+
     struct FlowSnapshot
     {
         std::map<std::string, PatterValue> scopes;                                  // not-shared @patter
@@ -314,7 +353,7 @@ namespace patter
         std::map<std::string, std::set<std::string>> sceneSharedNames;
         std::map<std::string, int> sharedVisits;
         std::map<std::string, SelectorState> sharedSelectors;
-        std::map<std::string, std::map<std::string, PatterValue>> stageBags;
+        std::map<std::string, PropertyBag> stageBags;
         // Host scopes by token, already resolved: an embedder's binding where one was given, a
         // self-backed bag for every other token the bundle declares. Empty for a bundle with none.
         std::map<std::string, HostScope> hostScopes;
@@ -356,6 +395,36 @@ namespace patter
         std::vector<StepResult> played;
         StepResult stop;
     };
+
+    /** The reverse of saveBags: seed each bag from the BUNDLE's declarations, then lay the
+     *  saved values over. A property the save predates keeps its declared default rather than
+     *  vanishing, and one the bundle has since dropped lands as a stray. */
+    inline std::map<std::string, PropertyBag> loadBags(
+        const FlowHost& host,
+        const std::map<std::string, std::map<std::string, PatterValue>>& saved,
+        bool wantShared)
+    {
+        std::map<std::string, PropertyBag> out;
+        for (const auto& kv : saved)
+        {
+            const std::set<std::string>* shared = nullptr;
+            auto sn = host.sceneSharedNames.find(kv.first);
+            if (sn != host.sceneSharedNames.end()) shared = &sn->second;
+
+            std::vector<ScopeDeclaration> decls;
+            if (host.bundle)
+            {
+                auto sc = host.bundle->scenes.find(kv.first);
+                if (sc != host.bundle->scenes.end()) decls = declsFor(sc->second.sceneProps, shared, wantShared);
+            }
+            PropertyBag bag(&decls);
+            OrderedMap<std::string, PatterValue> values;
+            for (const auto& e : kv.second) values.set(e.first, e.second);
+            bag.load(values);
+            out.emplace(kv.first, std::move(bag));
+        }
+        return out;
+    }
 
     class Flow
     {
@@ -647,7 +716,7 @@ namespace patter
         {
             FlowSnapshot s;
             s.scopes = local_;
-            s.sceneBags = sceneBags_;
+            s.sceneBags = saveBags(sceneBags_);
             s.rngState = rngState_;
             s.visits = visitCounts_;
             s.flowEnded = flowEnded_;
@@ -692,7 +761,7 @@ namespace patter
                 }
                 frame.nextId.clear(); // live frames never carry it
             }
-            sceneBags_ = snap.sceneBags;
+            sceneBags_ = loadBags(*host_, snap.sceneBags, false);
             local_ = freshLocal();
             for (auto& kv : snap.scopes) local_[kv.first] = kv.second;
 
@@ -738,7 +807,7 @@ namespace patter
         /// Monotonic across the flow's life; survives clearLog so order is stable.
         int seq_ = 0;
         std::map<std::string, PatterValue> local_;
-        std::map<std::string, std::map<std::string, PatterValue>> sceneBags_;
+        std::map<std::string, PropertyBag> sceneBags_;
         uint32_t rngState_ = 0;
         bool started_ = false, flowEnded_ = false;
         // Closed by the engine (see close()). Terminal, and distinct from flowEnded_: an ENDED flow is
@@ -777,7 +846,7 @@ namespace patter
         {
             if (host_->patterSharedNames.count(n)) host_->sharedPatter[n] = v; else local_[n] = v;
         }
-        std::map<std::string, PatterValue>* sceneBagFor(const std::string& n)
+        PropertyBag* sceneBagFor(const std::string& n)
         {
             if (currentSceneId_.empty()) return nullptr;
             auto sn = host_->sceneSharedNames.find(currentSceneId_);
@@ -793,13 +862,16 @@ namespace patter
         {
             auto* bag = sceneBagFor(n);
             if (!bag) return nullptr;
-            auto it = bag->find(n);
-            return it != bag->end() ? &it->second : nullptr;
+            // Through values(), not get(): get() hands back an optional by value, and a
+            // pointer into a temporary is a dangling read. values() is the bag's storage.
+            return bag->values().get(n);
         }
         void sceneSet(const std::string& n, const PatterValue& v)
         {
             auto* bag = sceneBagFor(n);
-            if (bag) (*bag)[n] = v;
+            // Not silent: an engine write notifies subscribers and is audited, where a host
+            // write is silent but still audited. This is the engine's own write.
+            if (bag) bag->set(n, v);
         }
 
         // -- settle / entry --
@@ -1235,24 +1307,27 @@ namespace patter
             if (sn != host_->sceneSharedNames.end()) shared = &sn->second;
             auto isShared = [&](const std::string& name) { return shared && shared->count(name); };
 
+            // The bag's constructor IS the loop this replaced: lowercase the name, seed the
+            // declared default else the type's, and copy it so two bags seeded from one
+            // declaration set never share a mutable flags vector.
             if (!sceneBags_.count(scene.id))
             {
-                std::map<std::string, PatterValue> bag;
-                for (const auto& decl : scene.sceneProps) { std::string name = toLower(decl.name); if (!isShared(name)) bag[name] = propDefault(decl); }
-                sceneBags_[scene.id] = bag;
+                std::vector<ScopeDeclaration> decls = declsFor(scene.sceneProps, shared, false);
+                sceneBags_.emplace(scene.id, PropertyBag(&decls));
             }
             if (!host_->stageBags.count(scene.id))
             {
-                std::map<std::string, PatterValue> bag;
-                for (const auto& decl : scene.sceneProps) { std::string name = toLower(decl.name); if (isShared(name)) bag[name] = propDefault(decl); }
-                host_->stageBags[scene.id] = bag;
+                std::vector<ScopeDeclaration> decls = declsFor(scene.sceneProps, shared, true);
+                host_->stageBags.emplace(scene.id, PropertyBag(&decls));
             }
             for (const auto& decl : scene.sceneProps)
             {
                 if (!decl.temporary) continue;
                 std::string name = toLower(decl.name);
                 auto* bag = isShared(name) ? &host_->stageBags[scene.id] : &sceneBags_[scene.id];
-                (*bag)[name] = propDefault(decl);
+                // Through set, so the reset is audited: a temporary snapping back to its
+                // default is a state change, and a log that omits it is wrong.
+                bag->set(name, propDefault(decl));
             }
         }
 
@@ -1587,21 +1662,21 @@ namespace patter
         // The shared @patter properties for a live state inspector: each with its ref, type, current
         // value, declared default, and enum options. Per-flow (@local) properties are excluded, matching
         // JS engine.listProperties(). Values read fresh, so a live setProperty is reflected next call.
-        std::vector<PropertyRow> listProperties() const
+        std::vector<PropertyView> listProperties() const
         {
-            std::vector<PropertyRow> rows;
+            std::vector<PropertyView> rows;
             rows.reserve(host_.patterSharedDecls.size());
             for (const auto& d : host_.patterSharedDecls)
             {
-                PropertyRow r;
+                PropertyView r;
                 r.name = d.name;
                 r.path = "@" + d.name;
                 r.type = d.type;
-                r.values = d.values;
-                r.stages = d.stages;
-                r.def = propDefault(d);
+                if (!d.values.empty()) r.values = d.values;
+                if (!d.stages.empty()) r.stages = d.stages;
+                r.defaultValue = propDefault(d);
                 auto it = host_.sharedPatter.find(toLower(d.name));
-                r.value = it != host_.sharedPatter.end() ? it->second : r.def;
+                r.value = it != host_.sharedPatter.end() ? it->second : r.defaultValue;
                 rows.push_back(std::move(r));
             }
             return rows;
@@ -1720,7 +1795,7 @@ namespace patter
             s.shared = host_.sharedPatter;
             s.sharedVisits = host_.sharedVisits;
             s.sharedSelectors = host_.sharedSelectors;
-            s.stageBags = host_.stageBags;
+            s.stageBags = saveBags(host_.stageBags);
             for (auto& kv : flows_) s.flows[kv.first] = kv.second->snapshot();
             return s;
         }
@@ -1730,7 +1805,7 @@ namespace patter
             host_.sharedPatter = save.shared;
             host_.sharedVisits = save.sharedVisits;
             host_.sharedSelectors = save.sharedSelectors;
-            host_.stageBags = save.stageBags;
+            host_.stageBags = loadBags(host_, save.stageBags, true);
             flows_.clear();
             for (const auto& kv : save.flows)
             {
