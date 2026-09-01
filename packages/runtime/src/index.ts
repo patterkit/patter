@@ -16,6 +16,7 @@ export type {
   StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, WorldResolver, PropertyView,
   EngineSave, SaveGame, FlowSnapshot, SelectorSnapshot, SavedChoice, StackFrame,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
+  TraceEvent, TraceHandler, EngineTraceHandler, LogEntry, EngineLogEntry,
 } from "./engine.js";
 
 // The bundle inspector's runtime half: what a game may call, read off the asset with no Engine.

@@ -235,6 +235,64 @@ export interface ChoiceOption {
  */
 export type WorldResolver = ScopeResolver;
 
+/** What the engine DECIDED, as opposed to what it produced. A step tells you the line that
+ *  played; a trace event tells you why that line and not its siblings - which children were
+ *  eligible, where the selector's cursor stood, which choice options were live.
+ *
+ *  The reasoning is IN the entry, not implied by it. `select` carries every child it looked at
+ *  with its own verdict, the way a deal in the Storylet Engine carries every card it considered.
+ *  A log that recorded only the winner would answer "what happened" and not "why", and "why"
+ *  is the question a dialogue author cannot otherwise answer: the line you expected is missing
+ *  and nothing anywhere says which condition dropped it.
+ *
+ *  Patter's vocabulary, not the Storylet Engine's: there are no cards or hands here. The
+ *  structure is shared (an ordered retained log, `seq`, a flow-level and an engine-level tap);
+ *  the events are this engine's own. */
+export type TraceEvent =
+  | {
+      type: "select";
+      /** The group whose children were being chosen among. */
+      group: string;
+      /** `branch` | `sequence` | `run` | `choice`, and for `sequence` its order/exhaust policy. */
+      selector: string;
+      order?: string;
+      exhaust?: string;
+      /** Every child considered, in authored order, each with why it was or was not takeable. */
+      children: { id: string; eligible: boolean }[];
+      /** The child selected, or null when nothing was takeable. */
+      picked: string | null;
+    }
+  | {
+      type: "choice";
+      group: string;
+      /** Every option the group offered, with the ones a condition dropped marked. */
+      options: { id: string; eligible: boolean }[];
+    }
+  /** A choice the player answered. `option` is what they took. */
+  | { type: "chose"; group: string; option: string }
+  /** A choice with no takeable option and no eligible fallback, which falls through
+   *  silently. Also reported through `onDryChoice`, which stays: a log is an audit read
+   *  afterwards, that callback is live feedback a host acts on. */
+  | { type: "dry"; group: string }
+  | { type: "jump"; to: string; mode: "jump" | "call" }
+  /** One landed effect; `prev` is the value it replaced, so a reader can say "0 -> 1". */
+  | { type: "write"; target: string; value: ScalarValue; prev?: ScalarValue }
+  /** An expression that would not evaluate: never a silent pass, always visible. */
+  | { type: "diagnostic"; where: string; message: string };
+
+export type TraceHandler = (event: TraceEvent) => void;
+/** The engine-level tap: every flow's events, tagged with the flow id - one stream for tools. */
+export type EngineTraceHandler = (flow: string, event: TraceEvent) => void;
+
+/** A retained entry: the event plus its place in flow time. `seq` is monotonic across the
+ *  flow and survives clearLog, so two reads of the log agree about order. */
+export type LogEntry = TraceEvent & { seq: number; scene?: string };
+
+/** One entry on the ENGINE's log: the same event plus the flow it happened in. A run is
+ *  several flows over shared state, so "what happened in this run" is only answerable in one
+ *  ordered stream, and only if each line says who. */
+export type EngineLogEntry = LogEntry & { flow: string };
+
 export interface EngineOptions {
   /**
    * Custom float-in-[0,1) source for `random()` / shuffle, shared by all flows.
@@ -266,6 +324,11 @@ export interface EngineOptions {
    *  unchanged; this only makes the fall-through observable. The coverage harness uses it to flag choices
    *  that ran dry. Leave it unset in shipped games (zero cost). */
   onDryChoice?: (groupId: string) => void;
+  /** Retain a trace of the engine's DECISIONS (what it chose and why), readable through
+   *  `engine.log()` and `flow.log()`. Off by default: a shipped game pays nothing for a
+   *  debugging surface it never reads. `onDryChoice` above is unaffected and stays useful
+   *  with the log off - it is live feedback, not an audit read afterwards. */
+  log?: boolean;
 }
 
 /** One shared `@patter` property, for a live state inspector: its name and address, declared type,
@@ -308,6 +371,10 @@ interface SelectorState {
 
 /** Shared, read-mostly context the engine hands to every flow it owns. */
 interface FlowHost {
+  /** True when the run asked for a log; flows skip building entries otherwise. */
+  logEnabled: boolean;
+  /** A flow's events reach the ENGINE's stream through here, tagged with the flow id. */
+  emitEngine: (flow: string, event: TraceEvent, scene?: string) => void;
   bundle: Bundle;
   /** IDs-only build (`localisation.mode === "ids"`, no source-debug): the engine emits each beat's ID as
    *  its text and omits character display names, leaving localisation to the game (use `flow.interpolate`
@@ -390,6 +457,10 @@ export class Engine {
   /** The options this engine was built with - reused verbatim by `hotSwap` so the replacement
    *  engine keeps the same world resolver, custom RNG, and diagnostic hooks. */
   private readonly creationOptions: EngineOptions;
+  /** The run's ordered stream: every flow's events, each naming its flow. Empty and
+   *  unwritten unless `options.log` asked for it. */
+  private readonly engineLog: EngineLogEntry[] = [];
+  private readonly engineTraceHandlers = new Set<EngineTraceHandler>();
 
   constructor(bundle: Bundle, options: EngineOptions = {}) {
     this.creationOptions = options;
@@ -464,6 +535,8 @@ export class Engine {
     }
 
     this.host = {
+      logEnabled: options.log ?? false,
+      emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
       bundle, emitIds, strings, defaultStrings, castDisplay, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
       tagIndex: buildTagIndex(bundle), shared,
@@ -843,6 +916,32 @@ export class Engine {
 
   /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
    *  value, declared default (for reset), and enum options. Mirrors the Unity / Godot ports. */
+  /** The run's decisions, in order, each naming the flow it happened in. Empty unless the
+   *  run was opened with `log: true`. A flow's own log stays flow-local; this is the only
+   *  place a story spanning several flows reads as one sequence. */
+  log(): readonly EngineLogEntry[] {
+    return this.engineLog;
+  }
+
+  /** Drop the retained entries. `seq` does NOT restart: two reads of a log either side of a
+   *  clear still agree about what came first. */
+  clearLog(): void {
+    this.engineLog.length = 0;
+  }
+
+  /** Live tap on the run's decisions, for tooling that wants them as they happen rather than
+   *  retained. Returns its own unsubscribe. */
+  onTrace(handler: EngineTraceHandler): () => void {
+    this.engineTraceHandlers.add(handler);
+    return () => this.engineTraceHandlers.delete(handler);
+  }
+
+  private emitEngine(flow: string, event: TraceEvent, scene?: string): void {
+    for (const h of this.engineTraceHandlers) h(flow, event);
+    if (!this.host.logEnabled) return;
+    this.engineLog.push({ ...event, flow, seq: this.engineLog.length, ...(scene ? { scene } : {}) });
+  }
+
   listProperties(): PropertyView[] {
     return this.host.patterSharedDecls.map((d) => ({
       name: d.name,
@@ -984,6 +1083,9 @@ export class Flow {
   // `local`/`sceneBags`/`currentSceneId`; the host callbacks read current flow
   // fields). Rebuilding it per evaluation was the engine's hottest allocation.
   private readonly evalCtx: EvalContext;
+  private readonly flowLog: LogEntry[] = [];
+  /** Monotonic across the flow's life; survives clearLog so two reads agree on order. */
+  private flowSeq = 0;
 
   constructor(id: string, host: FlowHost, seed: number) {
     this.id = id;
@@ -1202,13 +1304,48 @@ export class Flow {
       if (frame.sceneId !== this.currentSceneId) this.currentSceneId = frame.sceneId; // resumed scene (no reseed)
       const children = this.childrenOf(frame.containerId);
       if (!children) { this.stack.pop(); continue; } // drifted container -> skip the frame
+      // A `run` container walks its children in order, skipping the ones whose condition
+      // does not hold. That skip IS the decision an author asks about - "why did my line
+      // not appear" - so the trace records the ones it walked past on the way, not only
+      // the one it entered. selectChild covers branch/sequence; this covers the default,
+      // which is what a block is.
+      const from = frame.index;
       while (frame.index < children.length && !this.eligible(children[frame.index]!)) frame.index++;
+      if (this.host.logEnabled && frame.index !== from) {
+        this.emit({
+          type: "select", group: frame.containerId, selector: "run",
+          children: children.slice(from, frame.index + 1)
+            .map((c, i) => ({ id: c.id, eligible: from + i === frame.index })),
+          picked: children[frame.index]?.id ?? null,
+        });
+      }
       if (frame.index >= children.length) { this.stack.pop(); continue; } // run exhausted -> resume caller
       this.enterChild(children[frame.index++]!); // advance past it: that's the gather/return point
     }
   }
 
   /** The options of a pending choice (empty when not at a choice point). */
+  /** This flow's decisions, in order. Empty unless the run was opened with `log: true`.
+   *  The engine's log carries the same events tagged with the flow; this one is what a
+   *  single conversation reads as. */
+  log(): readonly LogEntry[] {
+    return this.flowLog;
+  }
+
+  /** Drop the retained entries. `seq` keeps counting, so order survives a clear. */
+  clearLog(): void {
+    this.flowLog.length = 0;
+  }
+
+  /** Record one decision, on this flow's log and the engine's. Cheap to call with logging
+   *  off: the entry is never built. */
+  private emit(event: TraceEvent): void {
+    const scene = this.currentSceneId ?? undefined;
+    this.host.emitEngine(this.id, event, scene);
+    if (!this.host.logEnabled) return;
+    this.flowLog.push({ ...event, seq: this.flowSeq++, ...(scene ? { scene } : {}) });
+  }
+
   getChoices(): ChoiceOption[] {
     return this.pendingChoice?.options ?? [];
   }
@@ -1221,6 +1358,7 @@ export class Flow {
     if (!option) throw new Error(`unknown choice option: ${id}`);
     if (!option.eligible) throw new Error(`choice option is not eligible: ${id}`);
     const node = choice.byId.get(id)!;
+    this.emit({ type: "chose", group: choice.groupId, option: id });
     this.pendingChoice = null;
     // Optionally speak the chosen option's prompt back as its first beat (spec §5).
     this.pendingPromptBeat = this.host.replayPromptOnChoose ? this.promptBeatOf(node) ?? null : null;
@@ -1421,7 +1559,15 @@ export class Flow {
       options.push({ id: child.id, prompt: this.promptFor(child), eligible, gameData: child.gameData });
       byId.set(child.id, child);
     }
-    if (options.length > 0) { this.pendingChoice = { groupId: group.id, options, byId }; return; }
+    if (options.length > 0) {
+      // The offered set, including options a condition left ineligible: an author asking
+      // "why is that option greyed?" is asking about this moment, and a log of the taken
+      // option alone cannot answer it. Options hidden by secretUntilEligible are absent
+      // here too, exactly as the player sees them.
+      this.emit({ type: "choice", group: group.id, options: options.map((o) => ({ id: o.id, eligible: o.eligible })) });
+      this.pendingChoice = { groupId: group.id, options, byId };
+      return;
+    }
     // No normal option survives. Auto-follow the fallback if it is eligible (its own condition still
     // applies); otherwise the choice GATHERS - it contributes nothing and the run continues past it
     // (a dry choice falls through rather than deadlocking; the validator warns about choices that can
@@ -1430,6 +1576,10 @@ export class Flow {
     if (fallback) { this.enterChild(fallback); return; }
     // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks past it. The
     // behaviour is unchanged; the opt-in diagnostics hook makes this silent fall-through observable.
+    this.emit({ type: "dry", group: group.id });
+    // The callback stays beside the log deliberately. They are not the same thing: this is
+    // live feedback a host acts on the moment it happens, the log is read afterwards, and a
+    // shipped game runs with the log off and this hook still wired.
     this.host.onDryChoice?.(group.id);
   }
 
@@ -1449,6 +1599,7 @@ export class Flow {
    * hard-ends the flow regardless of the callstack.
    */
   private enterTarget(to: string, mode: "call" | "jump"): void {
+    this.emit({ type: "jump", to, mode });
     if (to === "END") { this.flowEnded = true; this.stack = []; return; }
 
     let sceneId: string;
@@ -1475,21 +1626,33 @@ export class Flow {
   // -- Selectors ------------------------------------------------------------
 
   private selectChild(group: CompiledGroup): SelectableNode | null {
+    const verdicts = group.children.map((c) => ({ id: c.id, eligible: this.eligible(c) }));
     const eligible = group.children.filter((c) => this.eligible(c));
-    if (eligible.length === 0) return null;
+    const order = group.options?.order ?? "sequential";
+    const exhaust = group.options?.exhaust ?? "once";
+    // The reasoning goes in the entry, not just the outcome: every child this looked at,
+    // with why it was or was not takeable. "The line I expected is missing" is only
+    // answerable if the log says which sibling was dropped and that it was dropped here.
+    const trace = (picked: SelectableNode | null): SelectableNode | null => {
+      this.emit({
+        type: "select", group: group.id, selector: group.selector ?? "default",
+        ...(group.selector === "sequence" ? { order, exhaust } : {}),
+        children: verdicts, picked: picked?.id ?? null,
+      });
+      return picked;
+    };
+
+    if (eligible.length === 0) return trace(null);
     const st = this.selectorState(group);
 
     switch (group.selector) {
       case "branch":
-        return eligible[0]!;
+        return trace(eligible[0]!);
 
-      case "sequence": {
-        const order = group.options?.order ?? "sequential";
-        const exhaust = group.options?.exhaust ?? "once";
-        return order === "shuffle" ? this.pickShuffle(eligible, exhaust, st)
+      case "sequence":
+        return trace(order === "shuffle" ? this.pickShuffle(eligible, exhaust, st)
           : order === "specificity" ? this.pickSpecificity(eligible, exhaust, st)
-          : this.pickSequential(eligible, exhaust, st);
-      }
+          : this.pickSequential(eligible, exhaust, st));
 
       case "run":
       case "choice":
@@ -1622,7 +1785,12 @@ export class Flow {
   private runEffects(effects: CompiledEffect[] | undefined): void {
     // SET-ONLY (spec §15): an effect mutates a property. Host events ride on gameData, not effects.
     for (const e of effects ?? []) {
-      this.setProperty(e.target, this.evalExpr(e.value));
+      const value = this.evalExpr(e.value);
+      // `prev` read before the write, so a reader can say "0 -> 1" without a second pass.
+      // Only paid for when the run asked for a log.
+      const prev = this.host.logEnabled ? this.getProperty(e.target) : undefined;
+      this.setProperty(e.target, value);
+      this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
     }
   }
 
