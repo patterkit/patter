@@ -625,13 +625,13 @@ namespace Patterkit.Patterplay
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
         /// default - for a debug inspector that lists + edits live state. (Per-flow `@patter` / `@scene`
         /// props live on a Flow.)</summary>
-        public List<PropertyRow> ListProperties()
+        public List<PropertyView> ListProperties()
         {
-            var rows = new List<PropertyRow>();
+            var rows = new List<PropertyView>();
             foreach (var d in _host.PatterSharedDecls)
             {
                 string name = d.Name.ToLowerInvariant();
-                rows.Add(new PropertyRow
+                rows.Add(new PropertyView
                 {
                     Path = "@" + d.Name,
                     Name = d.Name,
@@ -804,23 +804,14 @@ namespace Patterkit.Patterplay
         }
     }
 
-    /// <summary>A global property's declared shape + live value, for a debug inspector.</summary>
-    public sealed class PropertyRow
+    /// <summary>One shared @patter property, for a live state inspector: the row from
+    /// PropertyBag.cs - shared with the Storylet Engine - plus the address the getters and
+    /// setters take. This file declared its own PropertyRow until the shared bag was
+    /// vendored in and the two collided, which is the collision worth having: they were the
+    /// same concept, and only one of them carried the clone guard and the audit hook.</summary>
+    public sealed class PropertyView : PropertyRow
     {
-        // The shape is @wildwinter/scoperegistry's property row, shared with the Storylet
-        // Engine: Path is the addressable reference GetProperty and SetProperty take, Name
-        // the bare declared name. Path was called Ref until 2026-09-01, when the JS runtime
-        // stopped forking that row type.
         public string Path;         // "@hp"
-        public string Name;
-        public string Type;         // boolean | number | string | flags | enum | quality
-        public List<string> Values; // enum options
-        public List<string> Stages; // quality: the ordered stage ladder (an inspector offers these)
-        public PatterValue Value;
-        public PatterValue Default;
-        /// <summary>False for a declared read-only property, so an inspector can disable it.
-        /// The declaration always carried this; the row used to drop it.</summary>
-        public bool Writable = true;
     }
 
     // -- save-game records ------------------------------------------------------
