@@ -20,6 +20,10 @@ var _current_scene_id := ""           # "" = none
 var _stack: Array = []                # of { "scene":, "container":, "index": }
 var _active_snippet = null            # node Dictionary or null
 var _beat_index := 0
+
+## This flow's decision trace; see log(). `_seq` is monotonic and survives clear_log().
+var _log: Array = []
+var _seq := 0
 var _pending = null                   # { "group_id":, "options":[normalised], "by_id":{id:node} } or null
 var _pending_prompt_beat = null       # beat Dictionary or null
 var _pending_prompt_owner: String = "" # chosen option owning _pending_prompt_beat, re-derivable across a save in the choose->advance window
@@ -168,6 +172,40 @@ func is_closed() -> bool:
 
 # The options of the choice currently waiting for the player, or [] when none is pending. The same
 # list the `choice` step carries - re-readable, e.g. after restoring a save.
+## This flow's decisions, in order. Empty unless the run was created with {"log": true}.
+## The engine's log carries the same events tagged with the flow; this one is what a single
+## conversation reads as.
+func log() -> Array:
+	return _log
+
+
+## Drop the retained entries. `seq` keeps counting, so order survives a clear.
+func clear_log() -> void:
+	_log.clear()
+
+
+## Record one decision, on this flow's log and the engine's. Cheap with logging off: the
+## entry is never built.
+func _emit(event: Dictionary) -> void:
+	if not _host["log_enabled"]:
+		return
+	var scene = _current_scene_id if _current_scene_id != "" else null
+	var entry := event.duplicate()
+	entry["seq"] = _seq
+	_seq += 1
+	if scene != null:
+		entry["scene"] = scene
+	_log.append(entry)
+	# The engine's stream is the same Array instance, appended to directly: a callback
+	# would have to close over the engine, and that cycle is what test_debug_registry
+	# refuses. Each entry names its flow, since a run is several flows in one order.
+	var shared: Array = _host["engine_log"]
+	var wide := entry.duplicate()
+	wide["flow"] = id
+	wide["seq"] = shared.size()
+	shared.append(wide)
+
+
 func get_choices() -> Array:
 	return _pending["options"] if _pending != null else []
 
@@ -247,6 +285,7 @@ func choose(option_id: String) -> void:
 		push_error("unknown choice option: " + option_id)
 		return
 	var node = _pending["by_id"][option_id]
+	_emit({"type": "chose", "group": _pending["group_id"], "option": option_id})
 	_pending = null
 	_pending_prompt_beat = _prompt_beat_of(node) if _host["replay_prompt_on_choose"] else null
 	_pending_prompt_owner = node["id"] if _pending_prompt_beat != null else ""
@@ -344,8 +383,19 @@ func _settle() -> void:
 		if children == null:
 			_stack.pop_back()
 			continue
+		# A `run` container walks its children in order, skipping the ones whose condition
+		# does not hold. That skip IS the decision an author asks about, so the trace
+		# records the ones walked past, not only the one entered.
+		var _from: int = frame["index"]
 		while frame["index"] < children.size() and not _eligible(children[frame["index"]]):
 			frame["index"] += 1
+		if _host["log_enabled"] and frame["index"] != _from:
+			var seen: Array = []
+			for i in range(_from, mini(frame["index"] + 1, children.size())):
+				seen.append({"id": children[i]["id"], "eligible": i == frame["index"]})
+			var picked_id = children[frame["index"]]["id"] if frame["index"] < children.size() else null
+			_emit({"type": "select", "group": frame["container"], "selector": "run",
+				"children": seen, "picked": picked_id})
 		if frame["index"] >= children.size():
 			_stack.pop_back()
 			continue
@@ -421,12 +471,27 @@ func _setup_choice(group: Dictionary) -> void:
 		options.append(opt)
 		by_id[child["id"]] = child
 	if not options.is_empty():
+		# Including the ones a condition left ineligible: "why is that greyed out" is a
+		# question about the moment the choice was built.
+		var offered: Array = []
+		for o in options:
+			offered.append({"id": o["id"], "eligible": o["eligible"]})
+		_emit({"type": "choice", "group": group["id"], "options": offered})
 		_pending = {"group_id": group["id"], "options": options, "by_id": by_id}
 		return
 	for f in fallbacks:
 		if _eligible(f):
 			_enter_child(f)
 			return
+	# Nothing takeable and no eligible fallback: the choice runs dry and the flow walks past
+	# it. The behaviour is unchanged; this makes the silent fall-through observable.
+	_emit({"type": "dry", "group": group["id"]})
+	# Beside the log, not instead of it: the callback is live feedback a host acts on, the
+	# log is an audit read afterwards, and a shipped game runs with the log off and this
+	# still wired. Parity with the JS runtime's onDryChoice, which the ports never had.
+	var on_dry = _host.get("on_dry_choice")
+	if on_dry is Callable and (on_dry as Callable).is_valid():
+		(on_dry as Callable).call(group["id"])
 
 
 # -- jumps ---------------------------------------------------------------------
@@ -438,6 +503,7 @@ func _resolve_jump(jump) -> void:
 
 
 func _enter_target(to: String, mode: String) -> void:
+	_emit({"type": "jump", "to": to, "mode": mode})
 	if to == "END":
 		_flow_ended = true
 		_stack = []
@@ -475,25 +541,38 @@ func _enter_target(to: String, mode: String) -> void:
 
 func _select_child(group: Dictionary):
 	var eligible: Array = []
+	var verdicts: Array = []
 	for c in group.get("children", []):
-		if _eligible(c):
+		var ok := _eligible(c)
+		verdicts.append({"id": c["id"], "eligible": ok})
+		if ok:
 			eligible.append(c)
+	var sel: String = group.get("selector", "")
+	var o: Dictionary = group.get("options", {})
+	# The reasoning goes in the entry: every child looked at, with its verdict.
+	var trace := func(picked):
+		var ev := {"type": "select", "group": group["id"],
+			"selector": sel if sel != "" else "default", "children": verdicts,
+			"picked": picked["id"] if picked != null else null}
+		if sel == "sequence":
+			ev["order"] = o.get("order", "sequential")
+			ev["exhaust"] = o.get("exhaust", "once")
+		_emit(ev)
+		return picked
 	if eligible.is_empty():
-		return null
+		return trace.call(null)
 	var st := _selector_state_for(group)
-	var selector: String = group.get("selector", "")
-	if selector == "branch":
-		return eligible[0]
-	if selector == "sequence":
-		var opts: Dictionary = group.get("options", {})
-		var order: String = opts.get("order", "sequential")
-		var exhaust: String = opts.get("exhaust", "once")
+	if sel == "branch":
+		return trace.call(eligible[0])
+	if sel == "sequence":
+		var order: String = o.get("order", "sequential")
+		var exhaust: String = o.get("exhaust", "once")
 		if order == "shuffle":
-			return _pick_shuffle(eligible, exhaust, st)
+			return trace.call(_pick_shuffle(eligible, exhaust, st))
 		if order == "specificity":
-			return _pick_specificity(eligible, exhaust, st)
-		return _pick_sequential(eligible, exhaust, st)
-	return null
+			return trace.call(_pick_specificity(eligible, exhaust, st))
+		return trace.call(_pick_sequential(eligible, exhaust, st))
+	return null   # run / choice / default are handled in _enter_child, not here
 
 
 func _pick_sequential(eligible: Array, exhaust: String, st: Dictionary):
@@ -642,7 +721,14 @@ func _run_effects(effects: Array) -> void:
 		if PatterExpr.is_error(v):
 			push_error("effect on '%s' did not evaluate: %s" % [e["target"], v.message])
 			continue
+		# `prev` read before the write, so a reader can say "0 -> 1" in one pass. Only
+		# paid for when the run asked for a log.
+		var prev = get_property(e["target"]) if _host["log_enabled"] else null
 		set_property(e["target"], v)
+		var ev := {"type": "write", "target": e["target"], "value": v}
+		if prev != null:
+			ev["prev"] = prev
+		_emit(ev)
 
 
 func _eligible(node: Dictionary) -> bool:

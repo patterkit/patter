@@ -17,6 +17,9 @@ var _source_debug: bool = false  # source-only DEBUG build: strings are the sour
 # keeps the same seed source and settings.
 var _creation_options: Dictionary = {}
 
+## The run's ordered decision stream; see log().
+var _engine_log: Array = []
+
 
 func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_creation_options = options
@@ -30,6 +33,19 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_source_debug = loc.get("mode", "embedded") == "ids" and loc.get("sourceDebug", false)
 
 	_host = {
+		# The run's decision trace (parity with the JS runtime's engine.log()). Off unless
+		# asked for: a shipped game should pay nothing for a surface it never reads.
+		"log_enabled": bool(options.get("log", false)),
+		# The SHARED array, not a callable closing over `self`. A lambda here would capture the
+		# engine, _host holds the lambda, and the engine holds _host: a reference cycle that
+		# keeps the engine alive forever and makes the weak debug registry report a dead one.
+		# test_debug_registry caught exactly that, which is what it is for.
+		"engine_log": _engine_log,
+		# Diagnostics hook (opt-in, dev tooling): called with the choice's group id whenever a
+		# choice runs dry - no takeable option and no eligible fallback - so the silent
+		# fall-through is observable. Parity with the JS runtime's onDryChoice, which the
+		# three ports never had. Live feedback, distinct from the log's `dry` entry.
+		"on_dry_choice": options.get("on_dry_choice"),
 		"bundle": bundle,
 		"all_strings": all_strings,                 # kept so set_locale() can re-point the active table live
 		"locale": locale,
@@ -173,6 +189,19 @@ func _dedupe_tags(tags: Array) -> Array:
 	return out
 
 
+## The run's decisions, in order, each naming the flow it happened in. Empty unless the
+## engine was created with {"log": true}. A flow's own log stays flow-local; this is the
+## only place a story spanning several flows reads as one sequence.
+func log() -> Array:
+	return _engine_log
+
+
+## Drop the retained entries. `seq` does NOT restart, so two reads either side of a clear
+## still agree about what came first.
+func clear_log() -> void:
+	_engine_log.clear()
+
+
 func open_flow(id: String, scene: String = "", block: String = "", seed_value = null) -> PatterFlow:
 	var scene_id := _resolve_scene_ref(scene)
 	var block_id := _resolve_block_ref(scene_id, block)
@@ -181,6 +210,11 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	if _flows.has(id):
 		_flows[id].close()
 	var flow := PatterFlow.new(_host, float(seed_value) if seed_value != null else float(_default_seed))
+	# The flow knows its own name. `id` was declared on PatterFlow and never assigned, so it
+	# read "" for the life of the port; the JS runtime takes it in the constructor. The trace
+	# log needs it (every engine entry names the flow it happened in) and a host reading
+	# flow.id was getting nothing.
+	flow.id = id
 	_flows[id] = flow
 	flow.start(scene_id, block_id)
 	return flow

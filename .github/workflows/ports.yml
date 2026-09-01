@@ -44,6 +44,10 @@ jobs:
         run: ./godot --headless --path ports/godot --import || true
       - name: Conformance corpus (and the expr parity corpus beside it)
         run: ./godot --headless --path ports/godot --script res://test/test_corpus.gd -- "$PWD/packages/conformance/corpus.json"
+      # The decision trace. Its own test rather than a corpus case: the corpus pins what
+      # the engine PRODUCES, and this is about what it decided on the way.
+      - name: The event log records the decisions
+        run: ./godot --headless --path ports/godot --script res://test/test_trace_log.gd
 
   unity-runtime:
     runs-on: ubuntu-latest
