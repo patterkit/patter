@@ -418,7 +418,7 @@ func save_game() -> Dictionary:
 		"shared": _host["shared_patter"].duplicate(true),
 		"shared_visits": _host["shared_visits"].duplicate(true),
 		"shared_selectors": _host["shared_selectors"].duplicate(true),
-		"stage_bags": _host["stage_bags"].duplicate(true),
+		"stage_bags": PatterFlow._save_bags(_host["stage_bags"]),
 		"flows": flows,
 	}
 
@@ -430,7 +430,9 @@ func load_game(save: Dictionary) -> void:
 	_host["shared_patter"] = (save["shared"] as Dictionary).duplicate(true)
 	_host["shared_visits"] = (save["shared_visits"] as Dictionary).duplicate(true)
 	_host["shared_selectors"] = (save["shared_selectors"] as Dictionary).duplicate(true)
-	_host["stage_bags"] = (save["stage_bags"] as Dictionary).duplicate(true)
+	# Seeded from the bundle's declarations, then the saved values laid over - see
+	# PatterFlow._load_bags.
+	_host["stage_bags"] = PatterFlow._load_bags(_host, save.get("stage_bags", {}), true)
 	_flows = {}
 	for id in (save["flows"] as Dictionary).keys():
 		var flow := PatterFlow.new(_host, float(_default_seed))

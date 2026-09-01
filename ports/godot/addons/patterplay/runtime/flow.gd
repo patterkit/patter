@@ -342,13 +342,17 @@ func _scene_bag_for(n: String):
 
 func _scene_get(n: String):
 	var bag = _scene_bag_for(n)
-	return bag.get(n) if bag != null else null
+	# get_value, NOT get: these are PatterPropertyBag objects now, and Object.get(n) is a
+	# lookup of the MEMBER named n, which would quietly answer null for every property.
+	return bag.get_value(n) if bag != null else null
 
 
 func _scene_set(n: String, v) -> void:
 	var bag = _scene_bag_for(n)
 	if bag != null:
-		bag[n] = v
+		# Not silent: an engine write notifies subscribers and is audited, where a host
+		# write is silent but still audited. This is the engine's own write.
+		bag.set_value(n, v)
 
 
 # -- settle / entry ------------------------------------------------------------
@@ -895,26 +899,57 @@ func _resolve_character_name(character: String):
 
 func _seed_scene(scene: Dictionary) -> void:
 	var shared: Dictionary = _host["scene_shared_names"].get(scene["id"], {})
+	# The bag's constructor IS the loop this replaced: lowercase the name, seed the declared
+	# default else the type's, and deep-copy it so two bags seeded from one declaration set
+	# never share a mutable flags array.
+	var props: Array = scene.get("sceneProps", [])
 	if not _scene_bags.has(scene["id"]):
-		var flow_bag := {}
-		for decl in scene.get("sceneProps", []):
-			var fnm: String = str(decl["name"]).to_lower()
-			if not shared.has(fnm):
-				flow_bag[fnm] = PatterBundle.prop_default(decl)
-		_scene_bags[scene["id"]] = flow_bag
+		_scene_bags[scene["id"]] = PatterPropertyBag.new(_props_for(props, shared, false))
 	if not _host["stage_bags"].has(scene["id"]):
-		var stage_bag := {}
-		for decl in scene.get("sceneProps", []):
-			var snm: String = str(decl["name"]).to_lower()
-			if shared.has(snm):
-				stage_bag[snm] = PatterBundle.prop_default(decl)
-		_host["stage_bags"][scene["id"]] = stage_bag
+		_host["stage_bags"][scene["id"]] = PatterPropertyBag.new(_props_for(props, shared, true))
 	for decl in scene.get("sceneProps", []):
 		if not decl.get("temporary", false):
 			continue
 		var tnm: String = str(decl["name"]).to_lower()
 		var target_bag = _host["stage_bags"][scene["id"]] if shared.has(tnm) else _scene_bags[scene["id"]]
-		target_bag[tnm] = PatterBundle.prop_default(decl)
+		# Through set_value, so the reset is audited: a temporary snapping back to its
+		# default is a state change, and a log that omits it is wrong.
+		target_bag.set_value(tnm, PatterBundle.prop_default(decl))
+
+
+# The declarations for one half of a scene's props: the shared ones (stage bag) or the
+# rest (per-flow scene bag).
+static func _props_for(props: Array, shared: Dictionary, want_shared: bool) -> Array:
+	var out := []
+	for d in props:
+		if shared.has(str(d["name"]).to_lower()) == want_shared:
+			out.append(d)
+	return out
+
+
+# Bags -> the flat name/value Dictionaries the save format has always carried. The bags
+# are a runtime detail; the envelope is a contract with every save already on disk.
+static func _save_bags(bags: Dictionary) -> Dictionary:
+	var out := {}
+	for sid in bags:
+		out[sid] = bags[sid].save()
+	return out
+
+
+# The reverse: seed each bag from the BUNDLE's declarations, then lay the saved values
+# over. A property the save predates keeps its declared default rather than vanishing,
+# and one the bundle has since dropped lands as a stray - the old duplicate() did the
+# second but not the first.
+static func _load_bags(host: Dictionary, saved: Dictionary, want_shared: bool) -> Dictionary:
+	var out := {}
+	var scenes: Dictionary = host["bundle"].get("scenes", {})
+	for sid in saved:
+		var shared: Dictionary = host["scene_shared_names"].get(sid, {})
+		var props: Array = scenes.get(sid, {}).get("sceneProps", [])
+		var bag = PatterPropertyBag.new(_props_for(props, shared, want_shared))
+		bag.load(saved[sid])
+		out[sid] = bag
+	return out
 
 
 func _fresh_local() -> Dictionary:
@@ -948,7 +983,7 @@ func _snapshot_stack() -> Array:
 func snapshot() -> Dictionary:
 	return {
 		"scopes": _local.duplicate(true),
-		"scene_bags": _scene_bags.duplicate(true),
+		"scene_bags": _save_bags(_scene_bags),
 		"rng_state": _prng.a,
 		"visits": _visit_counts.duplicate(true),
 		"flow_ended": _flow_ended,
@@ -991,7 +1026,7 @@ func restore(snap: Dictionary) -> void:
 					if child["id"] == next_id:
 						f["index"] = i
 						break
-	_scene_bags = (snap["scene_bags"] as Dictionary).duplicate(true)
+	_scene_bags = _load_bags(_host, snap.get("scene_bags", {}), false)
 	_local = _fresh_local()
 	for k in (snap["scopes"] as Dictionary).keys():
 		_local[k] = snap["scopes"][k]

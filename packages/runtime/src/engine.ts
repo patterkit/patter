@@ -1088,8 +1088,10 @@ export class Flow {
       const s = this.currentSceneId;
       if (s === null) return;
       const bag = this.host.sceneSharedNames.get(s)?.has(n) ? this.host.stageBags.get(s) : this.sceneBags.get(s);
-      // Silent: a scene-prop write is the engine's own, and the audit hook is what a state
-      // logger reads. Subscribers stay for a host that wants them.
+      // NOT silent, which is the bag's rule rather than an accident: an engine write
+      // notifies subscribers and is audited, where a HOST write (an inspector poking a
+      // value) is silent but still audited. A scene-prop write during play is the
+      // engine's own, so it notifies.
       if (bag) bag.set(n, v);
     },
   };
