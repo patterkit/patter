@@ -67,6 +67,8 @@ namespace Patterkit.Patterplay.TestHost
             _jsonSaveLoad = false;
             Console.WriteLine($"  [PatterSave JSON] scripted save/load: {sj}");
 
+            RunSaveShapeCheck();
+
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
             RunLegacySaveRngCheck(ParseBundle(root.GetProperty("runtime")[0].GetProperty("bundle")));
@@ -192,6 +194,63 @@ namespace Patterkit.Patterplay.TestHost
                 return;
             }
             Console.WriteLine("  [legacy-save] a pre-fix save with a negative rngState loads");
+        }
+
+        /// <summary>The save envelope's SHAPE, checked rather than round-tripped.
+        ///
+        /// Scene and stage state is held in a shared PropertyBag; the SAVE is still a flat
+        /// name -> value map per scene. A round-trip cannot tell the difference - a bag that
+        /// serialised itself, declarations and all, would round-trip perfectly and still break
+        /// every save already on disk. So this reads the JSON, and loads one written by hand.</summary>
+        private static void RunSaveShapeCheck()
+        {
+            var b = new Bundle { Schema = "patter/bundle@0" };
+            b.Locales.Default = "en";
+            b.Locales.Included.Add("en");
+            b.Strings["en"] = new Dictionary<string, string> { ["T"] = "hi" };
+            var scene = new Scene { Id = "s", GameId = "s" };
+            scene.SceneProps.Add(new PropertyDecl { Name = "mood", Type = "string", Default = PatterValue.Str("calm"), Shared = false });
+            scene.SceneProps.Add(new PropertyDecl { Name = "alarm", Type = "boolean", Default = PatterValue.False, Shared = true });
+            scene.Blocks.Add(new Block { Id = "b", GameId = "b", Children = new List<Node>
+            {
+                new Node { Id = "sn", Type = "snippet",
+                    Beats = new List<Beat> { new Beat { Id = "T", Kind = "text" } },
+                    Jump = new Jump { To = "END" } },
+            } });
+            b.Scenes["s"] = scene;
+
+            int before = _fails;
+            var engine = new Engine(b, new EngineOptions());
+            var flow = engine.OpenFlow("main", "s", "b");
+            for (int i = 0; i < 10; i++) { var r = flow.Advance(); if (r == null || r.Type == StepType.End) break; }
+            flow.SetProperty("@scene.mood", PatterValue.Str("tense"));
+
+            string json = PatterSave.SerializeState(engine);
+            using var sdoc = JsonDocument.Parse(json);
+            var save = sdoc.RootElement.GetProperty("save");
+            var stage = save.GetProperty("StageBags").GetProperty("s");
+            Check("stage bag is flat", stage.TryGetProperty("alarm", out _) && !stage.TryGetProperty("values", out _), json);
+            var sceneJson = save.GetProperty("Flows").GetProperty("main").GetProperty("SceneBags").GetProperty("s");
+            Check("scene bag is flat", sceneJson.TryGetProperty("mood", out var m) && m.GetString() == "tense", json);
+
+            // A save written by hand, in the format on disk today, still loads.
+            var engine2 = new Engine(b, new EngineOptions());
+            engine2.OpenFlow("main", "s", "b");
+            string hand = json
+                .Replace("\"mood\":\"tense\"", "\"mood\":\"furious\"")
+                .Replace("\"alarm\":false", "\"alarm\":true");
+            PatterSave.DeserializeState(engine2, hand);
+            var f2 = engine2.GetFlow("main");
+            Check("a hand-edited scene value loads", f2.GetProperty("@scene.mood")?.AsString == "furious", hand);
+            Check("a hand-edited stage value loads", f2.GetProperty("@scene.alarm")?.AsBool == true, hand);
+            if (_fails == before) Console.WriteLine("  [save shape] flat bags in, flat bags out");
+        }
+
+        private static void Check(string what, bool ok, string detail)
+        {
+            if (ok) return;
+            _fails++;
+            Console.Error.WriteLine($"  FAIL {what}\n    {detail}");
         }
 
         private static void RunDescribeSmoke()

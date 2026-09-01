@@ -16,7 +16,7 @@ namespace Patterkit.Patterplay
         /// <summary>Monotonic across the flow's life; survives ClearLog so order is stable.</summary>
         private int _seq;
         private Dictionary<string, PatterValue> _local;                       // not-shared @patter
-        private Dictionary<string, Dictionary<string, PatterValue>> _sceneBags = new Dictionary<string, Dictionary<string, PatterValue>>();
+        private Dictionary<string, PropertyBag> _sceneBags = new Dictionary<string, PropertyBag>();
         private uint _rngState;
 
         private bool _started;
@@ -186,7 +186,7 @@ namespace Patterkit.Patterplay
         {
             if (_host.PatterSharedNames.Contains(n)) _host.SharedPatter[n] = v; else _local[n] = v;
         }
-        private Dictionary<string, PatterValue> SceneBagFor(string n)
+        private PropertyBag SceneBagFor(string n)
         {
             if (_currentSceneId == null) return null;
             bool shared = _host.SceneSharedNames.TryGetValue(_currentSceneId, out var names) && names.Contains(n);
@@ -196,12 +196,14 @@ namespace Patterkit.Patterplay
         private PatterValue SceneGet(string n)
         {
             var bag = SceneBagFor(n);
-            return bag != null && bag.TryGetValue(n, out var v) ? v : null;
+            return bag?.Get(n);
         }
         private void SceneSet(string n, PatterValue v)
         {
             var bag = SceneBagFor(n);
-            if (bag != null) bag[n] = v;
+            // Not silent: an engine write notifies subscribers and is audited, where a host write
+            // (an inspector poking a value) is silent but still audited. This is the engine's own.
+            if (bag != null) bag.Set(n, v);
         }
 
         // -- host API -----------------------------------------------------------
@@ -745,33 +747,22 @@ namespace Patterkit.Patterplay
         private void SeedScene(Scene scene)
         {
             var shared = _host.SceneSharedNames.TryGetValue(scene.Id, out var names) ? names : new HashSet<string>();
+            // The bag's constructor IS the loop this replaced: lowercase the name, seed the declared
+            // default else the type's, and copy it so two bags seeded from one declaration set never
+            // share a mutable flags list.
             if (!_sceneBags.ContainsKey(scene.Id))
-            {
-                var bag = new Dictionary<string, PatterValue>();
-                foreach (var decl in scene.SceneProps ?? new List<PropertyDecl>())
-                {
-                    string name = decl.Name.ToLowerInvariant();
-                    if (!shared.Contains(name)) bag[name] = Engine.PropDefault(decl);
-                }
-                _sceneBags[scene.Id] = bag;
-            }
+                _sceneBags[scene.Id] = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, false));
             if (!_host.StageBags.ContainsKey(scene.Id))
-            {
-                var bag = new Dictionary<string, PatterValue>();
-                foreach (var decl in scene.SceneProps ?? new List<PropertyDecl>())
-                {
-                    string name = decl.Name.ToLowerInvariant();
-                    if (shared.Contains(name)) bag[name] = Engine.PropDefault(decl);
-                }
-                _host.StageBags[scene.Id] = bag;
-            }
+                _host.StageBags[scene.Id] = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, true));
             foreach (var decl in scene.SceneProps ?? new List<PropertyDecl>())
             {
                 if (!decl.Temporary) continue;
                 string name = decl.Name.ToLowerInvariant();
                 var bag = shared.Contains(name) ? (_host.StageBags.TryGetValue(scene.Id, out var sb) ? sb : null)
                                                 : (_sceneBags.TryGetValue(scene.Id, out var fb) ? fb : null);
-                if (bag != null) bag[name] = Engine.PropDefault(decl);
+                // Through Set, so the reset is audited: a temporary snapping back to its default is
+                // a state change, and a log that omits it is wrong.
+                if (bag != null) bag.Set(name, Engine.PropDefault(decl));
             }
         }
 
@@ -789,7 +780,7 @@ namespace Patterkit.Patterplay
             return new FlowSnapshot
             {
                 Scopes = Engine.CloneBag(_local),
-                SceneBags = _sceneBags.ToDictionary(k => k.Key, k => Engine.CloneBag(k.Value)),
+                SceneBags = Engine.SaveBags(_sceneBags),
                 RngState = _rngState,
                 Visits = new Dictionary<string, int>(_visitCounts),
                 FlowEnded = _flowEnded,
@@ -836,8 +827,7 @@ namespace Patterkit.Patterplay
                 return frame;
             }).ToList();
 
-            _sceneBags = (snap.SceneBags ?? new Dictionary<string, Dictionary<string, PatterValue>>())
-                .ToDictionary(k => k.Key, k => Engine.CloneBag(k.Value));
+            _sceneBags = Engine.LoadBags(_host, snap.SceneBags, false);
             _local = FreshLocal();
             foreach (var kv in snap.Scopes ?? new Dictionary<string, PatterValue>()) _local[kv.Key] = kv.Value;
 

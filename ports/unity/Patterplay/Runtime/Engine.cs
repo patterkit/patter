@@ -154,7 +154,7 @@ namespace Patterkit.Patterplay
         public Dictionary<string, HashSet<string>> SceneSharedNames;
         public Dictionary<string, int> SharedVisits = new Dictionary<string, int>();
         public Dictionary<string, SelectorState> SharedSelectors = new Dictionary<string, SelectorState>();
-        public Dictionary<string, Dictionary<string, PatterValue>> StageBags = new Dictionary<string, Dictionary<string, PatterValue>>();
+        public Dictionary<string, PropertyBag> StageBags = new Dictionary<string, PropertyBag>();
         public Func<double> CustomRng;
         public bool ReplayPromptOnChoose;
         // Closed captions (#214): CaptionsOn shows caption cues in dialogue lines (default true); when
@@ -661,7 +661,7 @@ namespace Patterkit.Patterplay
                 Shared = CloneBag(_host.SharedPatter),
                 SharedVisits = new Dictionary<string, int>(_host.SharedVisits),
                 SharedSelectors = CloneSelectors(_host.SharedSelectors),
-                StageBags = _host.StageBags.ToDictionary(k => k.Key, k => CloneBag(k.Value)),
+                StageBags = SaveBags(_host.StageBags),
                 Flows = flows,
             };
         }
@@ -676,7 +676,7 @@ namespace Patterkit.Patterplay
             _host.SharedSelectors.Clear();
             foreach (var kv in save.SharedSelectors) _host.SharedSelectors[kv.Key] = kv.Value.Clone();
             _host.StageBags.Clear();
-            foreach (var kv in save.StageBags) _host.StageBags[kv.Key] = CloneBag(kv.Value);
+            foreach (var kv in LoadBags(_host, save.StageBags, true)) _host.StageBags[kv.Key] = kv.Value;
             _flows.Clear();
             foreach (var kv in save.Flows)
             {
@@ -777,6 +777,58 @@ namespace Patterkit.Patterplay
                 case "quality": return PatterValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
                 default: return PatterValue.False;
             }
+        }
+
+        /// <summary>A bundle PropertyDecl as the shared bag's ScopeDeclaration. The two describe the
+        /// same thing in the two vocabularies: patter's decl is a bundle record, ScopeDeclaration is
+        /// what the shared kernel seeds and lists from. Nothing is lost - `Temporary` and `Shared` are
+        /// the engine's business, not the bag's.</summary>
+        internal static ScopeDeclaration ToScopeDecl(PropertyDecl d) => new ScopeDeclaration
+        {
+            Name = d.Name, Type = d.Type, Values = d.Values, Stages = d.Stages, Default = d.Default,
+        };
+
+        /// <summary>One half of a scene's props: the shared ones (stage bag) or the rest (scene bag).</summary>
+        internal static List<ScopeDeclaration> DeclsFor(List<PropertyDecl> props, HashSet<string> shared, bool wantShared)
+        {
+            var out_ = new List<ScopeDeclaration>();
+            foreach (var d in props ?? new List<PropertyDecl>())
+                if (shared.Contains(d.Name.ToLowerInvariant()) == wantShared) out_.Add(ToScopeDecl(d));
+            return out_;
+        }
+
+        /// <summary>Bags -> the flat name/value maps the save format has always carried. The bag is a
+        /// runtime detail; the envelope is a contract with every save already on disk.</summary>
+        internal static Dictionary<string, Dictionary<string, PatterValue>> SaveBags(Dictionary<string, PropertyBag> bags)
+        {
+            var out_ = new Dictionary<string, Dictionary<string, PatterValue>>();
+            foreach (var kv in bags)
+            {
+                var flat = new Dictionary<string, PatterValue>();
+                foreach (var e in kv.Value.Save()) flat[e.Key] = e.Value;
+                out_[kv.Key] = flat;
+            }
+            return out_;
+        }
+
+        /// <summary>The reverse: seed each bag from the BUNDLE's declarations, then lay the saved
+        /// values over. A property the save predates keeps its declared default rather than
+        /// vanishing, and one the bundle has since dropped lands as a stray.</summary>
+        internal static Dictionary<string, PropertyBag> LoadBags(
+            FlowHost host, Dictionary<string, Dictionary<string, PatterValue>> saved, bool wantShared)
+        {
+            var out_ = new Dictionary<string, PropertyBag>();
+            foreach (var kv in saved ?? new Dictionary<string, Dictionary<string, PatterValue>>())
+            {
+                var shared = host.SceneSharedNames.TryGetValue(kv.Key, out var names) ? names : new HashSet<string>();
+                var props = host.Bundle.Scenes.TryGetValue(kv.Key, out var sc) ? sc.SceneProps : null;
+                var bag = new PropertyBag(DeclsFor(props, shared, wantShared));
+                var values = new OrderedMap<string, PatterValue>();
+                foreach (var e in kv.Value) values.Set(e.Key, e.Value);
+                bag.Load(values);
+                out_[kv.Key] = bag;
+            }
+            return out_;
         }
 
         internal static PatterValue PropDefault(PropertyDecl d)
