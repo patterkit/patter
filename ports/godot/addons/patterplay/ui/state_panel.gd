@@ -21,7 +21,7 @@ const REFRESH_SECONDS := 0.25
 
 var _body: VBoxContainer
 var _signature := ""
-var _value_widgets: Array = []   # of { "widget":, "type":, "engine":, "ref": }
+var _value_widgets: Array = []   # of { "widget":, "type":, "engine":, "path": }
 
 
 func _ready() -> void:
@@ -60,7 +60,7 @@ func _current_signature() -> String:
 	for e in _engines():
 		parts.append(str(e.get_instance_id()))
 		for row in e.list_properties():
-			parts.append(row["ref"])
+			parts.append(row["path"])
 	return "|".join(parts)
 
 
@@ -147,25 +147,25 @@ func _build_properties(e) -> void:
 func _build_property_row(e, row: Dictionary) -> void:
 	var line := HBoxContainer.new()
 	var label := Label.new()
-	label.text = row["ref"]
+	label.text = row["path"]
 	label.custom_minimum_size = Vector2(140, 0)
 	line.add_child(label)
 
 	var widget := _make_widget(e, row)
 	widget.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	line.add_child(widget)
-	_value_widgets.append({"widget": widget, "type": row["type"], "engine": e, "ref": row["ref"]})
+	_value_widgets.append({"widget": widget, "type": row["type"], "engine": e, "path": row["path"]})
 
 	var reset := Button.new()
 	reset.text = "↺"
 	reset.tooltip_text = "Reset to default"
-	reset.pressed.connect(_reset.bind(e, row["ref"], row["default"]))
+	reset.pressed.connect(_reset.bind(e, row["path"], row["default"]))
 	line.add_child(reset)
 	_body.add_child(line)
 
 
 func _make_widget(e, row: Dictionary) -> Control:
-	var ref: String = row["ref"]
+	var ref: String = row["path"]
 	match row["type"]:
 		"boolean":
 			var cb := CheckBox.new()
@@ -215,7 +215,7 @@ func _refresh_values() -> void:
 		var widget: Control = entry["widget"]
 		if widget.has_focus():
 			continue
-		var value = entry["engine"].get_property(entry["ref"])
+		var value = entry["engine"].get_property(entry["path"])
 		match entry["type"]:
 			"boolean":
 				(widget as CheckBox).set_pressed_no_signal(bool(value))

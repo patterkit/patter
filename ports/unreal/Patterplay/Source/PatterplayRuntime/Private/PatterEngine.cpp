@@ -422,7 +422,8 @@ TArray<FPatterPropertyRow> UPatterEngine::ListProperties() const
 	for (const patter::PropertyRow& R : Engine->listProperties())
 	{
 		FPatterPropertyRow Row;
-		Row.Ref = Ue(R.ref);
+		Row.Path = Ue(R.path);
+		Row.Name = Ue(R.name);
 		Row.Type = PropertyTypeFrom(R.type);
 		Row.Value = Ue(R.value.toDisplayString());
 		Row.Default = Ue(R.def.toDisplayString());

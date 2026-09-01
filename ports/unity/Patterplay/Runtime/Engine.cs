@@ -577,13 +577,17 @@ namespace Patterkit.Patterplay
                 string name = d.Name.ToLowerInvariant();
                 rows.Add(new PropertyRow
                 {
-                    Ref = "@" + d.Name,
+                    Path = "@" + d.Name,
                     Name = d.Name,
                     Type = d.Type,
                     Values = d.Values,
                     Stages = d.Stages,
                     Value = _host.SharedPatter.TryGetValue(name, out var v) ? v : PropDefault(d),
                     Default = PropDefault(d),
+                    // Always true: a shared @patter property has no read-only form here,
+                    // exactly as in the JS runtime. Carried because it is part of the
+                    // shared row shape, and read by the Storylet Engine, which does.
+                    Writable = true,
                 });
             }
             return rows;
@@ -747,13 +751,20 @@ namespace Patterkit.Patterplay
     /// <summary>A global property's declared shape + live value, for a debug inspector.</summary>
     public sealed class PropertyRow
     {
-        public string Ref;          // "@hp"
+        // The shape is @wildwinter/scoperegistry's property row, shared with the Storylet
+        // Engine: Path is the addressable reference GetProperty and SetProperty take, Name
+        // the bare declared name. Path was called Ref until 2026-09-01, when the JS runtime
+        // stopped forking that row type.
+        public string Path;         // "@hp"
         public string Name;
         public string Type;         // boolean | number | string | flags | enum | quality
         public List<string> Values; // enum options
         public List<string> Stages; // quality: the ordered stage ladder (an inspector offers these)
         public PatterValue Value;
         public PatterValue Default;
+        /// <summary>False for a declared read-only property, so an inspector can disable it.
+        /// The declaration always carried this; the row used to drop it.</summary>
+        public bool Writable = true;
     }
 
     // -- save-game records ------------------------------------------------------

@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `list_properties()` rows say `"path"` where they said `"ref"`, and now carry `"name"`
+  and `"writable"`.** The shape is `@wildwinter/scoperegistry`'s property row, shared with the
+  Storylet Engine. `"path"` holds exactly what `"ref"` held: the reference `get_property` and
+  `set_property` take. Reading a row's address means `row["path"]` now.
+
 ## [0.8.0] - 2026-09-01
 
 ### Removed

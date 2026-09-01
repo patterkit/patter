@@ -339,19 +339,25 @@ func get_property(ref: String):
 
 
 # Editable @patter properties (the shared / engine-scoped ones), for a live inspector.
-# Each row: { "ref":"@name", "type":, "value":, "default":, "values":[enum opts] }. Parity with
+# Each row: { "name":, "path":"@name", "type":, "value":, "default":, "values":[enum opts],
+# "stages":[ladder], "writable": }. The shape is @wildwinter/scoperegistry's property row,
+# shared with the Storylet Engine: "path" is the addressable reference get_property and
+# set_property take, "name" the bare declared name. It was "ref" until 2026-09-01, when the
+# JS runtime stopped forking that row type. Parity with
 # the Unity PatterStateWindow property inspector.
 func list_properties() -> Array:
 	var rows: Array = []
 	for d in _host["patter_shared_decls"]:
 		var nm: String = str(d["name"]).to_lower()
 		rows.append({
-			"ref": "@" + nm,
+			"name": nm,
+			"path": "@" + nm,
 			"type": d.get("type", "boolean"),
 			"value": _host["shared_patter"].get(nm),
 			"default": PatterBundle.prop_default(d),
 			"values": d.get("values", []),
 			"stages": d.get("stages", []),
+			"writable": d.get("writable", true),
 		})
 	return rows
 

@@ -111,14 +111,22 @@ namespace patter
     // One shared @patter property for a live state inspector: ref, type, current value, declared
     // default (for reset-to-default), and enum options. Mirrors the JS PropertyRow and the Unity /
     // Godot ListProperties() row so all four runtimes expose the same inspection contract.
+    // The shape is @wildwinter/scoperegistry's property row, shared with the Storylet
+    // Engine: `path` is the addressable reference getProperty/setProperty take, `name`
+    // the bare declared name. `path` was called `ref` until 2026-09-01, when the JS
+    // runtime stopped forking that row type.
     struct PropertyRow
     {
-        std::string ref;
+        std::string name;
+        std::string path;
         std::string type;
         PatterValue value;
         PatterValue def;
         std::vector<std::string> values;
         std::vector<std::string> stages;  // quality: the ordered stage ladder (an inspector offers these)
+        // Always true here: Patter has no read-only shared property, exactly as in the
+        // JS runtime. Carried because it is part of the shared row.
+        bool writable = true;
     };
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
@@ -1451,7 +1459,8 @@ namespace patter
             for (const auto& d : host_.patterSharedDecls)
             {
                 PropertyRow r;
-                r.ref = "@" + d.name;
+                r.name = d.name;
+                r.path = "@" + d.name;
                 r.type = d.type;
                 r.values = d.values;
                 r.stages = d.stages;

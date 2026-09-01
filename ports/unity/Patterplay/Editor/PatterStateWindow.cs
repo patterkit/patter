@@ -128,15 +128,15 @@ namespace Patterkit.Patterplay.Editor
             foreach (var row in rows)
             {
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField(row.Ref, GUILayout.Width(140));
+                EditorGUILayout.LabelField(row.Path, GUILayout.Width(140));
 
                 PatterValue edited = DrawValueField(engine, row);
-                if (edited != null && !edited.ValueEquals(row.Value)) engine.SetProperty(row.Ref, edited);
+                if (edited != null && !edited.ValueEquals(row.Value)) engine.SetProperty(row.Path, edited);
 
                 // Reset-to-default arrow.
                 using (new EditorGUI.DisabledScope(row.Value.ValueEquals(row.Default)))
                 {
-                    if (GUILayout.Button("↺", GUILayout.Width(24))) engine.SetProperty(row.Ref, row.Default);
+                    if (GUILayout.Button("↺", GUILayout.Width(24))) engine.SetProperty(row.Path, row.Default);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -162,7 +162,7 @@ namespace Patterkit.Patterplay.Editor
                 }
                 case "flags":
                 {
-                    string key = row.Ref;
+                    string key = row.Path;
                     string shown = _flagEdits.TryGetValue(key, out var buf) ? buf
                         : (row.Value.IsFlags ? string.Join(", ", row.Value.AsFlags) : "");
                     EditorGUI.BeginChangeCheck();

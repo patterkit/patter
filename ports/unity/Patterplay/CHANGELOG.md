@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `PropertyRow.Ref` is now `PropertyRow.Path`, and the row carries `Writable`.** The
+  shape is `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `Path` holds
+  exactly what `Ref` held: the reference `GetProperty` and `SetProperty` take. `Name` was already
+  there. Anything reading `row.Ref` reads `row.Path`.
+
 ## [0.8.0] - 2026-09-01
 
 ### Changed

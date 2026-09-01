@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: `FPatterPropertyRow::Ref` is now `Path`, with `Name` beside it.** The shape is
+  `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `Path` holds exactly
+  what `Ref` held: the reference GetProperty / SetProperty take. Blueprints reading `Ref` need
+  repointing at `Path`. The C++ core's `patter::PropertyRow` changed with it and gained `writable`.
+
 ## [0.8.0] - 2026-09-01
 
 ### Changed

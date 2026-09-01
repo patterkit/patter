@@ -81,8 +81,15 @@ struct FPatterPropertyRow
 {
 	GENERATED_BODY()
 
+	/** The addressable reference GetProperty / SetProperty take ("@hp"). Called Ref
+	 *  until 2026-09-01; the row shape is now @wildwinter/scoperegistry's, shared with
+	 *  the Storylet Engine, where the same field is Path. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	FString Ref;
+	FString Path;
+
+	/** The bare declared name ("hp"). */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Name;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	EPatterPropertyType Type = EPatterPropertyType::Boolean;

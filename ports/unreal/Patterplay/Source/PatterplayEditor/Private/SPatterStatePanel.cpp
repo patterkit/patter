@@ -66,7 +66,7 @@ FString SPatterStatePanel::Signature() const
 		{
 			for (const FPatterPropertyRow& R : Engine->ListProperties())
 			{
-				S += R.Ref + TEXT(",");
+				S += R.Path + TEXT(",");
 			}
 		}
 		S += TEXT(";");
@@ -179,7 +179,7 @@ void SPatterStatePanel::Rebuild()
 
 TSharedRef<SWidget> SPatterStatePanel::BuildRow(TWeakObjectPtr<UPatterEngine> Engine, const FPatterPropertyRow& Row)
 {
-	const FString Ref = Row.Ref;
+	const FString Ref = Row.Path;
 	const FString DefaultStr = Row.Default;
 
 	TSharedRef<SWidget> Editor = SNullWidget::NullWidget;

@@ -852,8 +852,10 @@ export class Engine {
       stages: d.stages,
       value: this.getProperty(`@${d.name}`),
       default: declDefault(d),
-      // The declaration's own answer, which this row used to drop on the floor: an
-      // inspector could not tell a read-only property from a writable one.
+      // Part of the shared row. Always true here today: `toDecl` never sets it, because
+      // Patter has no read-only shared property. The Storylet Engine does declare them
+      // and its panels disable the editor accordingly, so the field is carried rather
+      // than dropped - and the day a read-only @patter property exists, the row says so.
       writable: d.writable ?? true,
     }));
   }

@@ -33,6 +33,20 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: a property row's address is `path`, not `ref`, and the row carries `name` and
+  `writable`.** `listProperties()` returns `PropertyView`, which extends the row type from
+  `@wildwinter/scoperegistry` rather than redeclaring it here. `path` holds exactly what `ref`
+  held: the reference `getProperty` / `setProperty` take. `name` is the bare declared name.
+  `writable` is always true here, because Patter has no read-only shared property; it is carried
+  because the row is shared with the Storylet Engine, which does declare them.
+
+  The fork it replaces was not free. A quality's `stages` was added to the local copy and so never
+  reached the shared type, and the Storylet Engine - reading the same property model through the
+  same registry - could not carry a ladder at all: it edited a quality as free text on every
+  platform it ships. One row, one place to add the next field.
+
 ## [0.8.0] - 2026-09-01
 
 ### Changed

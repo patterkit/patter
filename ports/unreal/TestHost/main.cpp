@@ -619,9 +619,14 @@ static void runInspectorSmoke()
     Engine engine(b, opts);
     auto rows = engine.listProperties();
 
-    std::vector<std::string> refs; for (const auto& r : rows) refs.push_back(r.ref);
-    if (refs != std::vector<std::string>{ "@gold", "@mood", "@notes" })
-        fail("inspector", "listProperties", "unexpected refs (got " + [&]{ std::string o; for (auto& x : refs) o += x + " "; return o; }() + ")");
+    std::vector<std::string> paths; for (const auto& r : rows) paths.push_back(r.path);
+    if (paths != std::vector<std::string>{ "@gold", "@mood", "@notes" })
+        fail("inspector", "listProperties", "unexpected paths (got " + [&]{ std::string o; for (auto& x : paths) o += x + " "; return o; }() + ")");
+
+    // The row is the shared shape now, so the two fields the old local one lacked are
+    // part of the contract: the bare name beside the address, and writable.
+    if (rows[0].name != "gold" || rows[0].path != "@gold" || !rows[0].writable)
+        fail("inspector", "shared row shape", "name/path/writable wrong on the gold row");
 
     if (rows[0].type != "number" || !rows[0].value.isNumber() || rows[0].value.n != 5 || rows[0].def.n != 5)
         fail("inspector", "number row", "gold row wrong: " + rows[0].value.toDisplayString());
