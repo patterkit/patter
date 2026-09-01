@@ -23,6 +23,8 @@
       "@patterkit/play-helpers": ["packages/play-helpers/src/index.ts"],
       "@patterkit/ops": ["packages/ops/src/index.ts"],
       "@wildwinter/expr": ["../expr/packages/expr/src/index.ts"],
+      "@wildwinter/toolkit": ["../expr/packages/toolkit/src/index.ts"],
+      "@wildwinter/toolkit/archive": ["../expr/packages/toolkit/src/archive.ts"],
       "@wildwinter/scoperegistry": ["../expr/packages/scoperegistry/src/index.ts"],
       "@wildwinter/expr-editor": ["../expr/packages/expr-editor/src/index.ts"]
     }

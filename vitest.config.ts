@@ -8,8 +8,8 @@ import { existsSync } from "node:fs";
 // `../expr` checkout exists (maintainers, CI), alias to its source so the two repos can evolve
 // together; otherwise fall back to the published npm packages in node_modules, so a plain clone
 // of this repo runs the whole suite with no sibling checkout.
-const expr = (pkg: string): string | undefined => {
-  const src = new URL(`../expr/packages/${pkg}/src/index.ts`, import.meta.url);
+const expr = (pkg: string, entry = "index"): string | undefined => {
+  const src = new URL(`../expr/packages/${pkg}/src/${entry}.ts`, import.meta.url);
   return existsSync(src) ? fileURLToPath(src) : undefined;
 };
 
@@ -25,6 +25,11 @@ export default defineConfig({
       "@patterkit/ops": fileURLToPath(new URL("./packages/ops/src/index.ts", import.meta.url)),
       // @wildwinter/simple-vc-lib resolves from the npm registry via node_modules - no alias.
       ...(expr("expr") ? { "@wildwinter/expr": expr("expr")! } : {}),
+      // The SUBPATH first: Vite matches aliases by prefix, in order, so a bare
+      // "@wildwinter/toolkit" listed first would swallow "/archive" and rewrite it
+      // to index.ts/archive.
+      ...(expr("toolkit", "archive") ? { "@wildwinter/toolkit/archive": expr("toolkit", "archive")! } : {}),
+      ...(expr("toolkit") ? { "@wildwinter/toolkit": expr("toolkit")! } : {}),
       ...(expr("scoperegistry") ? { "@wildwinter/scoperegistry": expr("scoperegistry")! } : {}),
     },
   },
