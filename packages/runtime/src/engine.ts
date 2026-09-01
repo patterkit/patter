@@ -25,7 +25,7 @@
 // plus every live flow's scopes + PRNG + cursor.
 // ---------------------------------------------------------------------------
 
-import { evaluate, deserialiseAst } from "@wildwinter/expr";
+import { evaluate, deserialiseAst, makePrng, toUint32 } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
@@ -980,7 +980,7 @@ export class Flow {
   constructor(id: string, host: FlowHost, seed: number) {
     this.id = id;
     this.host = host;
-    this.rngState = seed >>> 0;
+    this.rngState = toUint32(seed);
     this.local = this.freshLocal();
 
     const scopes = { ...host.shared.toEvalContext().scopes }; // shared @patter bag + foreign resolvers
@@ -1281,7 +1281,7 @@ export class Flow {
 
   /** @internal Restore this flow from a snapshot. */
   restore(snap: FlowSnapshot): void {
-    this.rngState = snap.rngState >>> 0;
+    this.rngState = toUint32(snap.rngState);
     this.visitCounts = new Map(Object.entries(snap.visits ?? {}));
     const c = snap.cursor;
     this.started = true;
@@ -1641,14 +1641,19 @@ export class Flow {
     this.host.sharedVisits.set(id, (this.host.sharedVisits.get(id) ?? 0) + 1);
   }
 
-  /** Next float in [0, 1): the shared custom PRNG, or this flow's serialisable mulberry32. */
+  /** Next float in [0, 1): the shared custom PRNG, or this flow's serialisable mulberry32.
+   *
+   *  The mixing is @wildwinter/expr's makePrng, not a copy inline here. It is a
+   *  fixed published algorithm that both product families need and neither
+   *  owns, and it existed thirteen times across the two of them. `rngState` is
+   *  still the serialisable position, so saves are unaffected: a generator is
+   *  made from it, drawn once, and the new state written back. */
   private readonly rng = (): number => {
     if (this.host.customRng) return this.host.customRng();
-    const a = (this.rngState + 0x6d2b79f5) | 0;
-    this.rngState = a;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    const prng = makePrng(this.rngState);
+    const draw = prng.next();
+    this.rngState = prng.state();
+    return draw;
   };
 
   // -- Strings / beats ------------------------------------------------------

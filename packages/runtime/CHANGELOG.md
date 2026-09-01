@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **`rngState` is now written UNSIGNED in a save.** It was accumulated with
+  `| 0`, so more than half of all saves carried a negative number where the
+  schema says uint32. The draws were unaffected (signed and unsigned
+  accumulation produce bit-identical draws), but the native ports could not read
+  those saves back: Unity threw, and C++ read them through undefined behaviour.
+
+  Old saves still load here, because restore already coerced, and the native
+  ports now coerce too. No gameplay changes.
+
+- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order.
+  They are compared as multisets, so a duplicated flag still counts. A flags
+  value IS a set, and its stored order was an artefact of the order somebody
+  happened to add things in: `set_flags(@f, +red)` then `+blue` compared UNEQUAL
+  to the same two flags added the other way round. An expression that relied on
+  that will change answer.
+
+- The PRNG is now `@wildwinter/expr`'s `makePrng` rather than a copy inline here.
+  Same algorithm, same draws; mulberry32 existed thirteen times across the two
+  product families and is a fixed published algorithm neither owns.
+
 ## 0.5.1
 
 ### Patch Changes
