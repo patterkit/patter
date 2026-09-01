@@ -73,12 +73,33 @@ func _initialize() -> void:
 	for e in engine.log():
 		_expect(e["flow"] == "main", "each engine entry names the flow it happened in")
 
+	# The panel SHOWS it. A log nothing displays is a log nobody reads, and the panel is the
+	# only place an author meets it. Patterplay has no state-panel test of its own (the
+	# Storylet Engine does), so this covers the view as well as the runtime.
+	var panel = load("res://addons/patterplay/ui/state_panel.gd").new()
+	panel.engine = engine
+	root.add_child(panel)
+	await process_frame
+	var shown := _text_of(panel)
+	_expect(shown.contains("select"), "the panel renders the decision log")
+	_expect(shown.contains("sn_gated (x)"), "and marks the sibling that was dropped")
+	panel.queue_free()
+
 	engine.clear_log()
 	_expect(engine.log().is_empty(), "clear_log empties the engine's stream")
 	_expect(not flow.log().is_empty(), "a flow's own log is its own")
 
 	print("test_trace_log: %s" % ("ALL PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
+
+
+func _text_of(n: Node) -> String:
+	var out := ""
+	if n is Label:
+		out += (n as Label).text + "\n"
+	for c in n.get_children():
+		out += _text_of(c)
+	return out
 
 
 func _drain(flow) -> void:

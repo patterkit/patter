@@ -23,6 +23,15 @@ var _body: VBoxContainer
 var _signature := ""
 var _value_widgets: Array = []   # of { "widget":, "type":, "engine":, "path": }
 
+## The decision log's per-kind filters. The vocabulary is this engine's: `select` is a
+## group choosing among its children, `chose` is the player answering a choice, `dry` is a
+## choice that fell through with nothing takeable.
+const LOG_KINDS := ["select", "choice", "chose", "dry", "jump", "write"]
+const LOG_KIND_LABELS := ["Select", "Choice", "Chose", "Dry", "Jump", "Write"]
+var _log_kind_on: Dictionary = {}
+var _log_autoscroll := true
+var _log_boxes: Array = []       # of { "engine":, "scroll":, "text": }
+
 
 func _ready() -> void:
 	# Debug-only tool: stay inert in a release export (OS.is_debug_build() is false there), so it is
@@ -77,6 +86,7 @@ func _tick() -> void:
 func _rebuild() -> void:
 	_signature = _current_signature()
 	_value_widgets.clear()
+	_log_boxes.clear()
 	for child in _body.get_children():
 		child.queue_free()
 
@@ -96,6 +106,7 @@ func _rebuild() -> void:
 		idx += 1
 		_build_save_load(e)
 		_build_properties(e)
+		_build_log(e)
 		_body.add_child(HSeparator.new())
 
 
@@ -209,6 +220,130 @@ func _make_widget(e, row: Dictionary) -> Control:
 
 
 # -- live value refresh (skip whatever the user is editing) --------------------
+
+## The run's decisions: what the engine CHOSE, not what it produced. A step says which line
+## played; this says why THAT line and not its siblings. Mirrors the Storylet Engine's log
+## panel - per-kind filters, autoscroll, copy, clear - with this engine's vocabulary.
+func _build_log(e) -> void:
+	var caption := Label.new()
+	caption.text = "Log (decisions)"
+	_body.add_child(caption)
+
+	if not e.has_method("log"):
+		_body.add_child(_hint("  (this engine build has no log)"))
+		return
+	if (e.log() as Array).is_empty():
+		_body.add_child(_hint("  (empty - create the engine with {\"log\": true} to record decisions)"))
+
+	var kinds_row := HBoxContainer.new()
+	for i in LOG_KINDS.size():
+		var kind: String = LOG_KINDS[i]
+		if not _log_kind_on.has(kind):
+			_log_kind_on[kind] = true
+		var cb := CheckBox.new()
+		cb.text = LOG_KIND_LABELS[i]
+		cb.button_pressed = _log_kind_on[kind]
+		cb.toggled.connect(_on_log_kind.bind(kind))
+		kinds_row.add_child(cb)
+	_body.add_child(kinds_row)
+
+	var tools_row := HBoxContainer.new()
+	var auto_cb := CheckBox.new()
+	auto_cb.text = "Autoscroll"
+	auto_cb.tooltip_text = "Scroll to the latest entry on every refresh."
+	auto_cb.button_pressed = _log_autoscroll
+	auto_cb.toggled.connect(func(on: bool) -> void: _log_autoscroll = on)
+	tools_row.add_child(auto_cb)
+	var copy_btn := Button.new()
+	copy_btn.text = "Copy"
+	copy_btn.tooltip_text = "Copy the visible (filtered) log to the clipboard."
+	copy_btn.pressed.connect(_copy_log.bind(e))
+	tools_row.add_child(copy_btn)
+	var clear_btn := Button.new()
+	clear_btn.text = "Clear"
+	clear_btn.tooltip_text = "Drop the retained entries. Cosmetic - no game state changes."
+	clear_btn.pressed.connect(_clear_log.bind(e))
+	tools_row.add_child(clear_btn)
+	_body.add_child(tools_row)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size = Vector2(0, 150)
+	var text := Label.new()
+	text.autowrap_mode = TextServer.AUTOWRAP_OFF
+	text.text = "\n".join(_visible_log_lines(e))
+	scroll.add_child(text)
+	_body.add_child(scroll)
+	_log_boxes.append({"engine": e, "scroll": scroll, "text": text})
+
+
+func _on_log_kind(on: bool, kind: String) -> void:
+	_log_kind_on[kind] = on
+	_refresh_log()
+
+
+func _clear_log(e) -> void:
+	e.clear_log()
+	_refresh_log()
+
+
+func _copy_log(e) -> void:
+	DisplayServer.clipboard_set("\n".join(_visible_log_lines(e)))
+
+
+func _visible_log_lines(e) -> Array:
+	var lines: Array = []
+	for entry in e.log():
+		if _log_kind_on.get(str(entry["type"]), true):
+			lines.append(_format_log_entry(entry))
+	return lines
+
+
+## Redraw the log text in place, without rebuilding the panel: a filter toggle should not
+## interrupt a field somebody is editing.
+func _refresh_log() -> void:
+	for box in _log_boxes:
+		var label: Label = box["text"]
+		label.text = "\n".join(_visible_log_lines(box["engine"]))
+		if _log_autoscroll:
+			var scroll: ScrollContainer = box["scroll"]
+			scroll.set_deferred("scroll_vertical", int(1 << 30))
+
+
+static func _show_log_value(v) -> String:
+	return "<unset>" if v == null else PatterValues.show(v)
+
+
+## One line per entry. A `select` names the children it walked and their verdicts, because
+## that is the whole point: "why is my line missing" is unanswerable from the winner alone.
+static func _format_log_entry(e: Dictionary) -> String:
+	var stamp := "[%d] " % int(e.get("seq", 0))
+	# The run's log names the flow; a flow's own would only repeat its heading.
+	if e.has("flow"):
+		stamp += "%s " % str(e["flow"])
+	match str(e["type"]):
+		"select":
+			var parts: Array = []
+			for c in e.get("children", []):
+				parts.append("%s%s" % [c["id"], "" if c["eligible"] else " (x)"])
+			return "%sselect %s [%s]: %s -> %s" % [stamp, e.get("group", ""), e.get("selector", ""),
+				", ".join(parts), str(e.get("picked", "(nothing)"))]
+		"choice":
+			var opts: Array = []
+			for o in e.get("options", []):
+				opts.append("%s%s" % [o["id"], "" if o["eligible"] else " (greyed)"])
+			return "%schoice %s: %s" % [stamp, e.get("group", ""), ", ".join(opts)]
+		"chose":
+			return "%schose %s -> %s" % [stamp, e.get("group", ""), e.get("option", "")]
+		"dry":
+			return "%sdry %s (nothing takeable, no eligible fallback)" % [stamp, e.get("group", "")]
+		"jump":
+			return "%sjump %s (%s)" % [stamp, e.get("to", ""), e.get("mode", "")]
+		"write":
+			return "%swrite %s: %s -> %s" % [stamp, e.get("target", ""),
+				_show_log_value(e.get("prev")), _show_log_value(e.get("value"))]
+	return "%s(unknown)" % stamp
+
 
 func _refresh_values() -> void:
 	for entry in _value_widgets:
