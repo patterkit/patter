@@ -159,6 +159,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
 	TArray<FPatterPropertyRow> ListProperties() const;
 
+	// The run's decisions, in order, each naming the flow it happened in. Empty unless the engine
+	// was created with a log (see FPatterDebug / the options). A debug UI reads this to answer
+	// "why that line and not its siblings", which no step result can.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
+	TArray<FPatterLogEntry> GetLog() const;
+
+	// Drop the retained entries. Cosmetic: no game state changes, and Seq keeps counting.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
+	void ClearLog();
+
 	// The authored structure as a nested tree: scenes -> blocks -> children (groups + snippets, groups
 	// preserved) -> a snippet's beats, each carrying its static data. Static (no flow). For editor / dev
 	// tooling that builds against the writer's structure, e.g. a Sequencer of subsequences per beat.

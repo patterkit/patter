@@ -174,7 +174,69 @@ void SPatterStatePanel::Rebuild()
 				BuildRow(Engine, Row)
 			];
 		}
+
+		BuildLog(Engine);
 	}
+}
+
+/** The run's decisions: what the engine CHOSE, not what it produced. A step says which line
+ *  played; this says why THAT line and not its siblings. Matches the Godot panel and the Unity
+ *  window, and the Storylet Engine's before them. */
+void SPatterStatePanel::BuildLog(UPatterEngine* Engine)
+{
+	Body->AddSlot().AutoHeight().Padding(10.f, 10.f, 10.f, 2.f)
+	[
+		SNew(STextBlock)
+		.Text(LOCTEXT("LogSection", "Log (decisions)"))
+		.ColorAndOpacity(FSlateColor::UseSubduedForeground())
+	];
+
+	const TArray<FPatterLogEntry> Entries = Engine->GetLog();
+	if (Entries.Num() == 0)
+	{
+		Body->AddSlot().AutoHeight().Padding(16.f, 0.f, 10.f, 6.f)
+		[
+			SNew(STextBlock).Text(LOCTEXT("LogEmpty", "(empty - create the engine with logging on)"))
+		];
+		return;
+	}
+
+	for (const FPatterLogEntry& E : Entries)
+	{
+		Body->AddSlot().AutoHeight().Padding(14.f, 1.f, 10.f, 1.f)
+		[
+			SNew(STextBlock).Text(FText::FromString(FormatLogEntry(E)))
+		];
+	}
+}
+
+/** One line per entry. A `select` names the children it walked AND their verdicts, the losing
+ *  one marked (x), because naming only the winner answers what happened and not why. */
+FString SPatterStatePanel::FormatLogEntry(const FPatterLogEntry& E)
+{
+	FString Stamp = FString::Printf(TEXT("[%d] "), E.Seq);
+	if (!E.Flow.IsEmpty()) Stamp += E.Flow + TEXT(" ");
+
+	TArray<FString> Parts;
+	for (const FPatterLogConsidered& C : E.Considered)
+		Parts.Add(C.bEligible ? C.Id : C.Id + (E.Type == TEXT("choice") ? TEXT(" (greyed)") : TEXT(" (x)")));
+	const FString Joined = FString::Join(Parts, TEXT(", "));
+
+	if (E.Type == TEXT("select"))
+		return FString::Printf(TEXT("%sselect %s [%s]: %s -> %s"), *Stamp, *E.Subject, *E.Selector,
+			*Joined, E.Picked.IsEmpty() ? TEXT("(nothing)") : *E.Picked);
+	if (E.Type == TEXT("choice"))
+		return FString::Printf(TEXT("%schoice %s: %s"), *Stamp, *E.Subject, *Joined);
+	if (E.Type == TEXT("chose"))
+		return FString::Printf(TEXT("%schose %s -> %s"), *Stamp, *E.Subject, *E.Picked);
+	if (E.Type == TEXT("dry"))
+		return FString::Printf(TEXT("%sdry %s (nothing takeable, no eligible fallback)"), *Stamp, *E.Subject);
+	if (E.Type == TEXT("jump"))
+		return FString::Printf(TEXT("%sjump %s (%s)"), *Stamp, *E.Subject, *E.Detail);
+	if (E.Type == TEXT("write"))
+		return FString::Printf(TEXT("%swrite %s: %s -> %s"), *Stamp, *E.Subject,
+			E.bHasPrev ? *E.Prev : TEXT("<unset>"), *E.Value);
+	return Stamp + TEXT("(unknown)");
 }
 
 TSharedRef<SWidget> SPatterStatePanel::BuildRow(TWeakObjectPtr<UPatterEngine> Engine, const FPatterPropertyRow& Row)

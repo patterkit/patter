@@ -415,6 +415,41 @@ void UPatterEngine::SetPropertyFlags(const FString& Ref, const TArray<FString>& 
 	Engine->setProperty(Std(Ref), patter::PatterValue::Flags(std::move(Flags)));
 }
 
+TArray<FPatterLogEntry> UPatterEngine::GetLog() const
+{
+	TArray<FPatterLogEntry> Out;
+	if (!Engine) return Out;
+	for (const patter::LogEntry& E : Engine->log())
+	{
+		FPatterLogEntry Row;
+		Row.Type = Ue(E.type);
+		Row.Seq = E.seq;
+		Row.Flow = Ue(E.flow);
+		Row.Scene = Ue(E.scene);
+		Row.Subject = Ue(E.subject);
+		Row.Picked = Ue(E.picked);
+		Row.Selector = Ue(E.selector);
+		Row.Detail = Ue(E.detail);
+		Row.Value = Ue(E.value.toDisplayString());
+		Row.bHasPrev = E.hasPrev;
+		if (E.hasPrev) Row.Prev = Ue(E.prev.toDisplayString());
+		for (const auto& C : E.considered)
+		{
+			FPatterLogConsidered Item;
+			Item.Id = Ue(C.first);
+			Item.bEligible = C.second;
+			Row.Considered.Add(Item);
+		}
+		Out.Add(Row);
+	}
+	return Out;
+}
+
+void UPatterEngine::ClearLog()
+{
+	if (Engine) Engine->clearLog();
+}
+
 TArray<FPatterPropertyRow> UPatterEngine::ListProperties() const
 {
 	TArray<FPatterPropertyRow> Out;

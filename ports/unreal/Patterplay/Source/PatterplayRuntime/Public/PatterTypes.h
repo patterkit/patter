@@ -76,6 +76,69 @@ struct FPatterOption
 // One shared @patter property for the Runtime State inspector: its ref, type, current value and
 // declared default (as display strings), enum options, and whether it currently sits at its
 // default (so a reset button can disable). Mirrors patter::PropertyRow and the Unity / Godot row.
+/** One retained decision, for a debug UI: what the engine CHOSE, not what it produced. A step
+ *  says which line played; this says why THAT line and not its siblings. `Considered` carries
+ *  every child or option looked at with its verdict, which is the whole point: naming only the
+ *  winner answers what happened and not why. */
+USTRUCT(BlueprintType)
+struct FPatterLogConsidered
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Id;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bEligible = false;
+};
+
+USTRUCT(BlueprintType)
+struct FPatterLogEntry
+{
+	GENERATED_BODY()
+
+	/** select | choice | chose | dry | jump | write */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Type;
+
+	/** Monotonic across the flow; survives ClearLog, so order is stable. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	int32 Seq = 0;
+
+	/** The flow this happened in. A run is several flows in one order. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Flow;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Scene;
+
+	/** Group / target / jump destination, whichever the type names. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Subject;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterLogConsidered> Considered;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Picked;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Selector;
+
+	/** The jump's mode, where the type is `jump`. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Detail;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Value;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Prev;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasPrev = false;
+};
+
 USTRUCT(BlueprintType)
 struct FPatterPropertyRow
 {

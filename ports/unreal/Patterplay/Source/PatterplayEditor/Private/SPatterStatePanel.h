@@ -9,6 +9,7 @@
 class SVerticalBox;
 class UPatterEngine;
 struct FPatterPropertyRow;
+struct FPatterLogEntry;
 
 class SPatterStatePanel : public SCompoundWidget
 {
@@ -35,6 +36,10 @@ private:
 
 	// One property's row: label, a type-aware editor, and a reset-to-default button.
 	TSharedRef<SWidget> BuildRow(TWeakObjectPtr<UPatterEngine> Engine, const FPatterPropertyRow& Row);
+
+	/** The decision log section, under the properties. */
+	void BuildLog(UPatterEngine* Engine);
+	static FString FormatLogEntry(const FPatterLogEntry& E);
 
 	EActiveTimerReturnType OnRefresh(double InCurrentTime, float InDeltaTime);
 
