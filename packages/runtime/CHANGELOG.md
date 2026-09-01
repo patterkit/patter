@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
 ### Changed
 
 - **`rngState` is now written UNSIGNED in a save.** It was accumulated with

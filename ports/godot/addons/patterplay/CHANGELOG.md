@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
 ### Removed
 
 - **BREAKING: `Mulberry32` is now `PatterMulberry32`.** It was the one class in

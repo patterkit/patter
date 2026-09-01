@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
 ### Changed
 
 - **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so
