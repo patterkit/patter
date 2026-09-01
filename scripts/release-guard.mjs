@@ -88,9 +88,19 @@ const covered = new Set();
 /** The .changeset/ directory AS OF `head`, not as of the working copy: pointing the guard at a past
  *  range must judge it by the changesets that existed then, or every historical check is answered by
  *  whatever happens to be pending today. */
-const changesetFiles = head === "HEAD"
-  ? readdirSync(join(root, ".changeset"))
-  : out(`git ls-tree --name-only ${head}:.changeset`).split("\n").filter(Boolean);
+const listAt = (ref) => {
+  // A ref with no .changeset tree at all is "nothing covered", not a crash: git exits
+  // non-zero and execSync throws, so the guard died with a stack trace where it should
+  // have reported. Reachable whenever the head of the range predates the adoption of
+  // changesets, or removed them - which is every historical range in a repo adopting
+  // them now, and was the first thing the Storylet Engine's copy of this hit.
+  try {
+    return out(`git ls-tree --name-only ${ref}:.changeset 2>/dev/null`).split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+const changesetFiles = head === "HEAD" ? readdirSync(join(root, ".changeset")) : listAt(head);
 const readChangeset = (f) => head === "HEAD"
   ? readFileSync(join(root, ".changeset", f), "utf8")
   : out(`git show ${head}:.changeset/${f}`);
