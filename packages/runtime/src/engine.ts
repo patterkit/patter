@@ -336,15 +336,15 @@ export interface EngineOptions {
  *  current value, declared default (for reset), enum options or a quality's stages, and whether it
  *  can be written. Mirrors the Unity / Godot ports' ListProperties.
  *
- *  The row itself is @wildwinter/scoperegistry's, shared with the Storylet Engine, which reads the
- *  same expr property model through the same registry. This file declared its own until 2026-09-01,
- *  identical bar the address field's name and a missing `writable` - and the fork is why `stages`
- *  could be added here and stay absent from the shared type for months, leaving the other family
- *  editing a quality as free text. `path` is the addressable reference `getProperty`/`setProperty`
- *  take (`@patter.gold`); `name` is the bare declared name. */
-export interface PropertyView extends PropertyRow {
-  path: string;
-}
+ *  An ALIAS now. This was the shared row plus a `path`, declared here because the shared row had
+ *  no address field - and the Storylet Engine had forked it for the same reason, in the same
+ *  shape, in three of its runtimes. `path` moved into the shared row on 2026-09-02, so there is
+ *  nothing left to add; the name survives because it is exported API and reads well at call
+ *  sites, not because the type differs.
+ *
+ *  The fork is also why `stages` could be added here and stay absent from the shared type for
+ *  months, leaving the other family editing a quality as free text. */
+export type PropertyView = PropertyRow;
 
 /** Options for opening a flow. */
 export interface OpenFlowOptions {
@@ -511,7 +511,10 @@ export class Engine {
     const patterLocalDecls = props.filter((p) => !(p.shared ?? true)).map(toDecl);
     const patterSharedNames = new Set(patterSharedDecls.map((d) => d.name.toLowerCase()));
 
-    const shared = new ScopeRegistry().defineOwned("patter", patterSharedDecls);
+    // "@patter." so a row addresses itself the way getProperty takes it. `@gold` also
+    // resolves - splitRef defaults an unqualified name to the patter scope - but the
+    // qualified form is the address, and the shorthand is a shorthand.
+    const shared = new ScopeRegistry().defineOwned("patter", patterSharedDecls, "@patter.");
     const hostBound = new Set<string>();
     // The host's World Properties resolver binds `@world`; its declarations (types, read-only) come from
     // the compiled bundle's declared world properties. An explicit binding always wins over the self-backed
@@ -950,7 +953,9 @@ export class Engine {
   listProperties(): PropertyView[] {
     return this.host.patterSharedDecls.map((d) => ({
       name: d.name,
-      path: `@${d.name}`,
+      // The qualified address, matching what the bag composes for every other scope.
+      // `@gold` still resolves on input; it is the shorthand, not the address.
+      path: `@patter.${d.name}`,
       type: d.type as PropertyType,
       values: d.values,
       stages: d.stages,
@@ -1986,7 +1991,7 @@ export class Flow {
 
   /** The per-flow registry: the NOT-shared `@patter` globals (the shared ones live on the host). */
   private freshLocal(): ScopeRegistry {
-    return new ScopeRegistry().defineOwned("patter", this.host.patterLocalDecls);
+    return new ScopeRegistry().defineOwned("patter", this.host.patterLocalDecls, "@patter.");
   }
 
   /**

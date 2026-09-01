@@ -32,6 +32,12 @@ const Values := preload("values.gd")
 ## through set_value so the firing rule applies.
 var values: Dictionary = {}
 
+## The address prefix this bag's rows carry, SEPARATOR INCLUDED ("@patter.",
+## "@scene.", "world.", "deck.<id>."). The prefix carries its own separator rather
+## than the bag assuming a dot, because a prefix is not always a bare scope token.
+## Empty means a row's path is its name.
+var path_prefix: String = ""
+
 var _decls: Dictionary = {}   # normalised name -> declaration Dictionary
 var _subscribers: Array[Callable] = []
 var _auditors: Array[Callable] = []
@@ -41,6 +47,7 @@ var _normalise: Callable
 func _init(declarations: Array = [], opts: Dictionary = {}) -> void:
 	var norm = opts.get("normalise")
 	_normalise = norm if norm is Callable else func(n: String) -> String: return n.to_lower()
+	path_prefix = str(opts.get("path_prefix", ""))
 	_seed(declarations)
 
 
@@ -136,6 +143,7 @@ func rows() -> Array:
 		var d: Dictionary = _decls[name]
 		var row := {
 			"name": name,
+			"path": path_prefix + name,
 			"type": str(d.get("type", "")),
 			"value": get_value(name),
 			"default": _copy_value(Values.to_value(d.get("default", default_for(d)))),
@@ -143,6 +151,11 @@ func rows() -> Array:
 		}
 		if d.has("values"):
 			row["values"] = d["values"]
+		# The quality ladder. It belongs on the row so an examiner can offer the stages
+		# instead of a free-text box, and it was missing here (and in the TS and C++
+		# bags, but not the C# one) until 2026-09-02.
+		if d.has("stages"):
+			row["stages"] = d["stages"]
 		out.append(row)
 	return out
 
@@ -158,7 +171,7 @@ func declarations() -> Array:
 ## A `new(...)` on this base here would hand back a bare bag, and every `as` cast on a
 ## clone would answer null.
 func clone():
-	var c = (get_script() as GDScript).new([], {"normalise": _normalise})
+	var c = (get_script() as GDScript).new([], {"normalise": _normalise, "path_prefix": path_prefix})
 	c._decls = _decls.duplicate()
 	for k in values:
 		c.values[k] = _copy_value(values[k])

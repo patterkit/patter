@@ -85,6 +85,11 @@ namespace patter
     struct PropertyRow
     {
         std::string name;
+        /** The address this property answers to - what getProperty/setProperty take.
+         *  Composed by the bag from its pathPrefix and the name, so a row is
+         *  self-describing. Both product families forked this row to add exactly this
+         *  field, once per runtime. */
+        std::string path;
         std::string type;
         PatterValue value;
         PatterValue defaultValue;
@@ -116,8 +121,9 @@ namespace patter
         /** Name normalisation policy: lowercase by default (the registry's
          *  long-standing contract); a product whose names are case-significant
          *  passes identity instead. */
-        explicit PropertyBag(const std::vector<ScopeDeclaration>* declarations = nullptr, Normalise normalise = nullptr)
-            : norm_(normalise ? std::move(normalise) : Normalise(&LowercaseName))
+        explicit PropertyBag(const std::vector<ScopeDeclaration>* declarations = nullptr, Normalise normalise = nullptr,
+                             std::string pathPrefix = "")
+            : pathPrefix_(std::move(pathPrefix)), norm_(normalise ? std::move(normalise) : Normalise(&LowercaseName))
         {
             seed(declarations);
         }
@@ -182,7 +188,7 @@ namespace patter
                 std::optional<PatterValue> value = get(pair.first);
                 out.push_back(RowFor(pair.second,
                     value.has_value() ? *value : pair.second.defaultOrTypeDefault(),
-                    std::nullopt, pair.first));
+                    std::nullopt, pair.first, pathPrefix_));
             }
             return out;
         }
@@ -234,14 +240,20 @@ namespace patter
             const ScopeDeclaration& d,
             const PatterValue& value,
             std::optional<bool> writable,
-            const std::string& name = "")
+            const std::string& name = "",
+            const std::string& pathPrefix = "")
         {
             PropertyRow row;
             row.name = name.empty() ? LowercaseName(d.name) : name;
+            row.path = pathPrefix + row.name;
             row.type = d.type;
             row.value = value;
             row.defaultValue = d.defaultOrTypeDefault();
             row.values = d.values;
+            // The quality ladder, so an examiner can offer the stages instead of a
+            // free-text box. Missing here (and in the TS and Godot bags, but not the
+            // C# one) until 2026-09-02.
+            row.stages = d.stages;
             row.writable = writable.has_value() ? *writable : d.writable.value_or(true);
             return row;
         }
@@ -289,6 +301,10 @@ namespace patter
         std::vector<Entry> subscribers_;
         std::vector<Entry> auditors_;
         uint64_t nextListenerId_ = 1;
+        /** The address prefix this bag's rows carry, SEPARATOR INCLUDED ("@patter.",
+         *  "@scene.", "world.", "deck.<id>."). The prefix carries its own separator rather
+         *  than the bag assuming a dot, because a prefix is not always a bare scope token. */
+        std::string pathPrefix_;
         Normalise norm_;
     };
 }

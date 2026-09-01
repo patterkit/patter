@@ -31,18 +31,20 @@ describe("engine.listProperties", () => {
   it("lists shared @patter properties with type, value, default, and enum values", () => {
     const engine = new Engine(bundle);
     const rows = engine.listProperties();
-    expect(rows.map((r) => r.path)).toEqual(["@gold", "@mood", "@flags"]); // @local is per-flow, not shared
+    // The QUALIFIED address: a row reports `@patter.gold`, where `@gold` is the shorthand
+    // that still resolves on input (setProperty below uses it deliberately).
+    expect(rows.map((r) => r.path)).toEqual(["@patter.gold", "@patter.mood", "@patter.flags"]); // @local is per-flow, not shared
 
-    const gold = rows.find((r) => r.path === "@gold")!;
+    const gold = rows.find((r) => r.path === "@patter.gold")!;
     expect(gold.type).toBe("number");
     expect(gold.value).toBe(5);
     expect(gold.default).toBe(5);
 
-    const mood = rows.find((r) => r.path === "@mood")!;
+    const mood = rows.find((r) => r.path === "@patter.mood")!;
     expect(mood.values).toEqual(["calm", "tense"]);
     expect(mood.value).toBe("calm");
 
-    const flags = rows.find((r) => r.path === "@flags")!;
+    const flags = rows.find((r) => r.path === "@patter.flags")!;
     expect(flags.default).toEqual([]); // no declared default -> type default
   });
 
@@ -51,15 +53,15 @@ describe("engine.listProperties", () => {
   // the fork dropped: the bare name, and whether the property can be written.
   it("carries the shared row's name and writable, not just the address", () => {
     const engine = new Engine(bundle);
-    const gold = engine.listProperties().find((r) => r.path === "@gold")!;
+    const gold = engine.listProperties().find((r) => r.path === "@patter.gold")!;
     expect(gold.name).toBe("gold");
-    expect(gold.path).toBe("@gold");
+    expect(gold.path).toBe("@patter.gold");
     expect(gold.writable).toBe(true);
   });
 
   it("reflects a live setProperty in the row's value (fresh read each call)", () => {
     const engine = new Engine(bundle);
     engine.setProperty("@gold", 42);
-    expect(engine.listProperties().find((r) => r.path === "@gold")!.value).toBe(42);
+    expect(engine.listProperties().find((r) => r.path === "@patter.gold")!.value).toBe(42);
   });
 });

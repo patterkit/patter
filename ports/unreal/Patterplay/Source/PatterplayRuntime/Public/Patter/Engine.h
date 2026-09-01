@@ -120,7 +120,10 @@ namespace patter
     // two names for one field.
     struct PropertyView : PropertyRow
     {
-        std::string path;
+        // Nothing of its own left: `path` moved onto the shared PropertyRow on 2026-09-02,
+        // because both product families had forked that row to add exactly this field. The
+        // name stays as listProperties()'s return type; re-declaring path here would SHADOW
+        // the inherited one - written on the derived, read as empty through a PropertyRow&.
     };
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
@@ -1670,7 +1673,10 @@ namespace patter
             {
                 PropertyView r;
                 r.name = d.name;
-                r.path = "@" + d.name;
+                // The QUALIFIED address, matching what the shared bag composes for every other
+                // scope. `@gold` still resolves on input - splitRef defaults an unqualified name to
+                // the patter scope - but it is the shorthand, not the address a row reports.
+                r.path = "@patter." + d.name;
                 r.type = d.type;
                 if (!d.values.empty()) r.values = d.values;
                 if (!d.stages.empty()) r.stages = d.stages;

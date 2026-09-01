@@ -385,7 +385,10 @@ func list_properties() -> Array:
 		var nm: String = str(d["name"]).to_lower()
 		rows.append({
 			"name": nm,
-			"path": "@" + nm,
+			# The QUALIFIED address, matching what the shared bag composes for every other
+			# scope. `@gold` still resolves on input - splitRef defaults an unqualified name to
+			# the patter scope - but it is the shorthand, not the address a row reports.
+			"path": "@patter." + nm,
 			"type": d.get("type", "boolean"),
 			"value": _host["shared_patter"].get(nm),
 			"default": PatterBundle.prop_default(d),

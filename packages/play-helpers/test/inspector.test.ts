@@ -38,7 +38,7 @@ describe("createPropertyInspector", () => {
     const insp = createPropertyInspector(engine, { container, pollMs: 0 });
 
     const refs = Array.from(insp.el.querySelectorAll(".pp-insp-ref")).map((e) => e.textContent);
-    expect(refs).toEqual(["@gold", "@met", "@name", "@mood"]);
+    expect(refs).toEqual(["@patter.gold", "@patter.met", "@patter.name", "@patter.mood"]);
     expect(insp.el.querySelector(".pp-insp-row input[type=number]")).toBeTruthy();  // gold
     expect(insp.el.querySelector(".pp-insp-row input[type=checkbox]")).toBeTruthy(); // met
     expect(insp.el.querySelector(".pp-insp-row select")).toBeTruthy();               // mood (enum)

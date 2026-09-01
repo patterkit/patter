@@ -72,15 +72,23 @@ namespace Patterkit.Patterplay
     public class PropertyRow
     {
         public string Name;
+        /// <summary>The address this property answers to - what GetProperty/SetProperty
+        /// take. Composed by the bag from its PathPrefix and the name, so a row is
+        /// self-describing. Both product families forked this row to add exactly this
+        /// field, once per runtime.</summary>
+        public string Path;
         public string Type;
         public PatterValue Value;
         public PatterValue Default;
         public List<string> Values;
-        /// <summary>A quality's ladder, when this row is one. Present on the JS
-        /// and Godot rows since the qualities work and absent here, so the same
-        /// public listProperties() answered differently on two runtimes; added
-        /// 2026-08-29 so it does not. Nothing in the shipped examiners reads it
-        /// yet - it is API surface for a host that wants to show a ladder.</summary>
+        /// <summary>A quality's ladder, when this row is one, so an examiner can offer
+        /// the stages instead of a free-text box.
+        ///
+        /// This said the JS and Godot rows had carried it "since the qualities work".
+        /// They did not: the field was on all four ROW types, and only this runtime's
+        /// RowFor ever populated it, so a quality row came out ladderless on three of
+        /// four. Fixed 2026-09-02, and the claim corrected with it - a comment asserting
+        /// parity is worth exactly as much as the check behind it.</summary>
         public List<string> Stages;
         public bool Writable;
     }
@@ -101,9 +109,17 @@ namespace Patterkit.Patterplay
         /// passes identity (storylets does).</summary>
         private readonly Func<string, string> _norm;
 
-        public PropertyBag(IEnumerable<ScopeDeclaration> declarations = null, Func<string, string> normalise = null)
+        /// <summary>The address prefix this bag's rows carry, SEPARATOR INCLUDED
+        /// ("@patter.", "@scene.", "world.", "deck.&lt;id&gt;."). The prefix carries its own
+        /// separator rather than the bag assuming a dot, because a prefix is not always a
+        /// bare scope token. Empty means a row's path is its name.</summary>
+        public string PathPrefix { get; private set; } = "";
+
+        public PropertyBag(IEnumerable<ScopeDeclaration> declarations = null, Func<string, string> normalise = null,
+                           string pathPrefix = "")
         {
             _norm = normalise ?? (n => n.ToLowerInvariant());
+            PathPrefix = pathPrefix ?? "";
             Seed(declarations);
         }
 
@@ -166,7 +182,7 @@ namespace Patterkit.Patterplay
         public List<PropertyRow> Rows()
         {
             var rows = new List<PropertyRow>();
-            foreach (var pair in _decls) rows.Add(RowFor(pair.Value, Get(pair.Key), null, pair.Key));
+            foreach (var pair in _decls) rows.Add(RowFor(pair.Value, Get(pair.Key), null, pair.Key, PathPrefix));
             return rows;
         }
 
@@ -181,7 +197,7 @@ namespace Patterkit.Patterplay
         /// duplicated, the normalisation policy carried, subscriptions NOT carried.</summary>
         public PropertyBag Clone()
         {
-            var c = new PropertyBag(null, _norm);
+            var c = new PropertyBag(null, _norm, PathPrefix);
             foreach (var pair in _decls) c._decls.Set(pair.Key, pair.Value);
             foreach (var pair in Values) c.Values.Set(pair.Key, pair.Value);
             return c;
@@ -212,11 +228,14 @@ namespace Patterkit.Patterplay
             foreach (var pair in values) Values.Set(_norm(pair.Key), pair.Value);
         }
 
-        internal static PropertyRow RowFor(ScopeDeclaration d, PatterValue value, bool? writable, string name = null)
+        internal static PropertyRow RowFor(ScopeDeclaration d, PatterValue value, bool? writable, string name = null,
+                                           string pathPrefix = "")
         {
+            string rowName = name ?? d.Name.ToLowerInvariant();
             return new PropertyRow
             {
-                Name = name ?? d.Name.ToLowerInvariant(),
+                Name = rowName,
+                Path = pathPrefix + rowName,
                 Type = d.Type,
                 Value = value,
                 Default = d.DefaultOrTypeDefault(),

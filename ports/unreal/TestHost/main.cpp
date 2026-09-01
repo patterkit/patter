@@ -737,12 +737,14 @@ static void runInspectorSmoke()
     auto rows = engine.listProperties();
 
     std::vector<std::string> paths; for (const auto& r : rows) paths.push_back(r.path);
-    if (paths != std::vector<std::string>{ "@gold", "@mood", "@notes" })
+    // The QUALIFIED address: a row reports `@patter.gold`, where `@gold` is the shorthand
+    // that still resolves on input (splitRef defaults an unqualified name to the patter scope).
+    if (paths != std::vector<std::string>{ "@patter.gold", "@patter.mood", "@patter.notes" })
         fail("inspector", "listProperties", "unexpected paths (got " + [&]{ std::string o; for (auto& x : paths) o += x + " "; return o; }() + ")");
 
     // The row is the shared shape now, so the two fields the old local one lacked are
     // part of the contract: the bare name beside the address, and writable.
-    if (rows[0].name != "gold" || rows[0].path != "@gold" || !rows[0].writable)
+    if (rows[0].name != "gold" || rows[0].path != "@patter.gold" || !rows[0].writable)
         fail("inspector", "shared row shape", "name/path/writable wrong on the gold row");
 
     if (rows[0].type != "number" || !rows[0].value.isNumber() || rows[0].value.n != 5 || rows[0].defaultValue.n != 5)

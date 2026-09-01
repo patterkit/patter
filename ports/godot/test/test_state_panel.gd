@@ -59,8 +59,10 @@ func _process(_delta: float) -> bool:
 			_check("the Live Link's state is reported", body.contains("Live Link"), body)
 			_check("save and load are offered", body.contains("Save State"), body)
 			# The properties the engine declares, by their addresses.
-			_check("a declared property is listed", body.contains("@gold"), body)
-			_check("and so is the enum", body.contains("@mood"), body)
+			# The QUALIFIED address, which is what the panel shows now: a row reports
+			# "@patter.gold" where "@gold" is the shorthand that still resolves on input.
+			_check("a declared property is listed", body.contains("@patter.gold"), body)
+			_check("and so is the enum", body.contains("@patter.mood"), body)
 			# The log section exists even before anything has been decided.
 			_check("the decision log has a section", body.contains("Log (decisions)"), body)
 			var flow = _engine.open_flow("main", "s", "b")

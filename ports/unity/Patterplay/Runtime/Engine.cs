@@ -633,7 +633,10 @@ namespace Patterkit.Patterplay
                 string name = d.Name.ToLowerInvariant();
                 rows.Add(new PropertyView
                 {
-                    Path = "@" + d.Name,
+                    // The QUALIFIED address, matching what the shared bag composes for every other
+                    // scope. `@gold` still resolves on input - splitRef defaults an unqualified name to
+                    // the patter scope - but it is the shorthand, not the address a row reports.
+                    Path = "@patter." + d.Name,
                     Name = d.Name,
                     Type = d.Type,
                     Values = d.Values,
@@ -856,14 +859,15 @@ namespace Patterkit.Patterplay
         }
     }
 
-    /// <summary>One shared @patter property, for a live state inspector: the row from
-    /// PropertyBag.cs - shared with the Storylet Engine - plus the address the getters and
-    /// setters take. This file declared its own PropertyRow until the shared bag was
-    /// vendored in and the two collided, which is the collision worth having: they were the
-    /// same concept, and only one of them carried the clone guard and the audit hook.</summary>
+    /// <summary>One shared @patter property, for a live state inspector.
+    ///
+    /// Nothing of its own left: `Path` moved onto the shared PropertyRow on 2026-09-02,
+    /// because BOTH product families had forked that row to add exactly this field, once
+    /// per runtime. The name stays as the return type of ListProperties - it is public API
+    /// and reads well - but the shape is the shared row's, and re-declaring Path here would
+    /// now SHADOW the inherited one: set on the derived, read as empty through the base.</summary>
     public sealed class PropertyView : PropertyRow
     {
-        public string Path;         // "@hp"
     }
 
     // -- save-game records ------------------------------------------------------
