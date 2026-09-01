@@ -604,6 +604,72 @@ static int runGameData(const JsonValue& arr)
     return pass;
 }
 
+// The decision trace: what the engine CHOSE, not what it produced. Its whole point is that the
+// REASONING is in the entry - a select names every child it looked at with its verdict - so this
+// asserts the considered list, not merely that something was logged. Off unless asked for,
+// because a shipped game should pay nothing for a debugging surface it never reads.
+static void runTraceLogSmoke()
+{
+    Bundle b;
+    { PropertyDecl d; d.name = "gate"; d.type = "boolean"; d.hasDefault = true; d.def = PatterValue::Bool(false); b.properties.push_back(d); }
+
+    // Two snippets under one block: the first gated on a condition that is false. The block is
+    // a `run` container, which is the commonest decision in the engine.
+    auto gated = std::make_shared<Node>(); gated->type = "snippet"; gated->id = "sn_gated";
+    {   // @gate, built directly rather than parsed: the AST is the compiled form.
+        auto node = std::make_shared<AstNode>();
+        const_cast<AstNode*>(node.get())->tag = AstTag::ScopedVar;
+        const_cast<AstNode*>(node.get())->scope = "patter";
+        const_cast<AstNode*>(node.get())->name = "gate";
+        gated->condition = std::make_shared<Expression>();
+        gated->condition->ast = node;
+    }
+    { Beat beat; beat.id = "T_no"; beat.kind = "text"; gated->beats.push_back(beat); }
+    auto open = std::make_shared<Node>(); open->type = "snippet"; open->id = "sn_open";
+    { Beat beat; beat.id = "T_yes"; beat.kind = "text"; open->beats.push_back(beat); }
+
+    Block block; block.id = "b"; block.name = "B"; block.children = { gated, open };
+    Scene scene; scene.id = "s"; scene.name = "S"; scene.blocks = { block };
+    b.scenes["s"] = scene;
+
+    { // off unless asked for
+        EngineOptions quiet; Engine e(b, quiet);
+        Flow* f = e.openFlow("main", "s", "b");
+        for (int i = 0; i < 20 && f->advance().type != StepType::End; i++) {}
+        if (!e.log().empty() || !f->log().empty())
+            fail("trace", "off by default", "a run that did not ask for a log has one");
+    }
+
+    EngineOptions opts; opts.log = true;
+    Engine engine(b, opts);
+    Flow* flow = engine.openFlow("main", "s", "b");
+    for (int i = 0; i < 20 && flow->advance().type != StepType::End; i++) {}
+
+    if (flow->log().empty()) { fail("trace", "empty", "a played flow logged nothing"); return; }
+
+    const LogEntry* sel = nullptr;
+    for (const auto& e : flow->log()) if (e.type == "select") { sel = &e; break; }
+    if (!sel) { fail("trace", "select", "the skip past an ineligible sibling was not recorded"); return; }
+    if (sel->considered.size() != 2)
+        fail("trace", "reasoning", "the select does not name both children it walked");
+    else if (sel->considered[0].first != "sn_gated" || sel->considered[0].second
+          || sel->considered[1].first != "sn_open" || !sel->considered[1].second)
+        fail("trace", "reasoning", "the select does not say WHICH sibling was dropped");
+    if (sel->picked != "sn_open") fail("trace", "picked", "the pick was not recorded");
+
+    for (size_t i = 1; i < flow->log().size(); i++)
+        if (flow->log()[i].seq <= flow->log()[i - 1].seq)
+            fail("trace", "seq", "seq is not a monotonic ordering of the flow");
+    for (const auto& e : engine.log())
+        if (e.flow != "main") fail("trace", "flow tag", "an engine entry does not name its flow");
+
+    engine.clearLog();
+    if (!engine.log().empty()) fail("trace", "clearLog", "the engine's stream did not empty");
+    if (flow->log().empty()) fail("trace", "flow-local", "clearing the engine emptied a flow's own log");
+
+    std::cout << "  [trace] decisions logged: " << flow->log().size() << ", with the dropped sibling named\n";
+}
+
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
 // the shared corpus, so exercise it directly - only shared @patter decls, each with type / value /
 // default / enum values, and a live setProperty reflected on the next read.
@@ -838,6 +904,7 @@ int main(int argc, char** argv)
     int s = runScripted(root.at("scripted"));
     int g = runGameData(root.at("gameData"));
     runInspectorSmoke();
+    runTraceLogSmoke();
     runOutlineSmoke();
     runDescribeSmoke();
 
