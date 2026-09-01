@@ -7,6 +7,51 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so
+  `check_flags` results and stored flag lists that hold the same members are equal
+  however they were built. They are compared as multisets, so a duplicated flag
+  still counts.
+
+  This is a behaviour change to existing content, and it is a fix rather than a
+  preference: a flags value IS a set, and its stored order was an artefact of the
+  order somebody happened to add things in. `set_flags(@f, +red)` then `+blue`
+  compared UNEQUAL to the same two flags added the other way round, a difference
+  no author can see and none intends. An expression that relied on two
+  equal-membered flag values comparing unequal will change answer.
+
+### Fixed
+
+- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32),
+  so every runtime lands on the same first draw for every seed. Seeds outside the
+  range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different
+  answer here from the JS runtime.
+- **Undefined behaviour when a seed or a saved PRNG state left `int64` range.**
+  `static_cast<uint32_t>` on an out-of-range double is UB, and it really was
+  undefined: the shipped line produced `0` at `-O0` and garbage at `-O2`. It
+  reached the SAVE path as well as the seed, where the JS runtime's signed
+  `rngState` hit it for more than half of all saves.
+- **Numbers render the way JavaScript's `String(n)` renders them.** `jsNumber`
+  used a 1e15 integral cutoff and a fixed `%.15g`, so `1e16` printed as `1e+16`
+  and `0.1 + 0.2` as `0.3`. This is visible wherever a number reaches displayed
+  text through interpolation.
+- **`==` between a whole number and a float.** `3` and `3.0` compared unequal;
+  the reference has one number type, so they are the same value.
+
+### Changed
+
+- `PatterValue`, `PatterKind`, `Mulberry32`, the AST and the evaluator moved to
+  `Public/Patter/Expr/`, generated from a single shared source also used by the
+  Storylet Engine. Types, namespace and members are unchanged.
+- **`Patter/Expression.h` is now a forwarding header.** It remains part of the
+  public surface and still compiles, so an existing `#include` is safe. New code
+  should include `Patter/Dialect.h`.
+- **`Patter/Dialect.h` is new**: the built-ins split out of the evaluator, which
+  is the seam that lets both plugins run one evaluator source. `Mulberry32` gains
+  `state()` / `setState()` in place of a public `a` field.
+
+
 ## [0.7.1] - 2026-08-30
 
 ### Added

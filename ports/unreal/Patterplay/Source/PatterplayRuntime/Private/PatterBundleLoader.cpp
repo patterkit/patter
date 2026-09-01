@@ -77,26 +77,38 @@ namespace
 		return Out;
 	}
 
+}
+
+namespace patter
+{
+	/** How to read an Unreal FJsonValue, for the shared AST deserialiser. Six
+	 *  accessors: everything else about deserialising is in the shared source. */
+	template <>
+	struct AstJson<TSharedPtr<FJsonValue>>
+	{
+		using J = TSharedPtr<FJsonValue>;
+		static bool isArray(const J& v) { return v.IsValid() && v->Type == EJson::Array; }
+		static bool isString(const J& v) { return v.IsValid() && v->Type == EJson::String; }
+		static std::size_t size(const J& v) { return static_cast<std::size_t>(v->AsArray().Num()); }
+		static const J& at(const J& v, std::size_t i) { return v->AsArray()[static_cast<int32>(i)]; }
+		// Std() is the loader's existing FString conversion, declared above.
+		static std::string str(const J& v) { return Std(v->AsString()); }
+		static double num(const J& v) { return v->AsNumber(); }
+		static bool boolean(const J& v) { return v->AsBool(); }
+	};
+}
+
+namespace
+{
+
+	// The tag dispatch is the SHARED deserialiser (Patter/Expr/Ast.h). All this
+	// layer supplies is how to READ an Unreal FJsonValue, which is the only part
+	// that was ever library-specific. The per-tag arity checks that used to live
+	// here moved into the shared source, so every host in both families now has
+	// them; this loader was the only one of six that did.
 	patter::AstPtr ToAst(const TSharedPtr<FJsonValue>& V)
 	{
-		if (!V.IsValid() || V->Type != EJson::Array) throw std::runtime_error("bundle: expression node is not a tagged array");
-		const TArray<TSharedPtr<FJsonValue>>& A = V->AsArray();
-		if (A.Num() < 1) throw std::runtime_error("bundle: empty expression node");
-		std::string Tag = Std(A[0]->AsString());
-		// Each tag has a fixed arity; a forward-version / corrupt node with too few elements would index
-		// out of bounds, and an unknown tag would silently evaluate as false - so reject both.
-		auto Arity = [&](int32 N) { if (A.Num() < N) throw std::runtime_error("bundle: malformed '" + Tag + "' expression node"); };
-		auto N = std::make_shared<patter::AstNode>();
-		if (Tag == "b") { Arity(2); N->tag = patter::AstTag::Bool; N->b = A[1]->AsBool(); }
-		else if (Tag == "n") { Arity(2); N->tag = patter::AstTag::Number; N->n = A[1]->AsNumber(); }
-		else if (Tag == "s") { Arity(2); N->tag = patter::AstTag::Str; N->s = Std(A[1]->AsString()); }
-		else if (Tag == "sv") { Arity(3); N->tag = patter::AstTag::ScopedVar; N->scope = Std(A[1]->AsString()); N->name = Std(A[2]->AsString()); }
-		else if (Tag == "u") { Arity(3); N->tag = patter::AstTag::Unary; N->op = Std(A[1]->AsString()); N->operand = ToAst(A[2]); }
-		else if (Tag == "bin") { Arity(4); N->tag = patter::AstTag::Binary; N->op = Std(A[1]->AsString()); N->left = ToAst(A[2]); N->right = ToAst(A[3]); }
-		else if (Tag == "fd") { Arity(3); N->tag = patter::AstTag::FlagDelta; N->sign = Std(A[1]->AsString()); N->name = Std(A[2]->AsString()); }
-		else if (Tag == "call") { Arity(2); N->tag = patter::AstTag::Call; N->fn = Std(A[1]->AsString()); for (int32 i = 2; i < A.Num(); ++i) N->args.push_back(ToAst(A[i])); }
-		else throw std::runtime_error("bundle: unknown expression tag '" + Tag + "'");
-		return N;
+		return patter::DeserialiseAstFrom<TSharedPtr<FJsonValue>>(V);
 	}
 
 	patter::Expression ToExpr(const TSharedPtr<FJsonObject>& O) { patter::Expression E; E.ast = ToAst(O->Values.FindRef(TEXT("ast"))); return E; }

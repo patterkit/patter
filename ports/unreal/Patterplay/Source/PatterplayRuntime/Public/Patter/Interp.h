@@ -81,7 +81,7 @@ namespace patter
                 return out;
             }
             case PatterKind::Bool: return v.b ? "true" : "false";
-            case PatterKind::Number: return PatterValue::jsNumber(v.n);
+            case PatterKind::Number: return PatterValue::JsNumber(v.n);
             default: return v.s;
         }
     }

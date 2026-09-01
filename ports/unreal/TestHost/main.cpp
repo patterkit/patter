@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
+#include <limits>
+#include <cmath>
 #include <sstream>
 #include <iostream>
 #include <queue>
@@ -52,21 +54,11 @@ static std::shared_ptr<GameData> parseGameData(const JsonValue& e)
     return gd;
 }
 
-static AstPtr parseAst(const JsonValue& e)
-{
-    const std::string& tag = e.arr[0].str;
-    auto node = std::make_shared<AstNode>();
-    if (tag == "b") { node->tag = AstTag::Bool; node->b = e.arr[1].b; }
-    else if (tag == "n") { node->tag = AstTag::Number; node->n = e.arr[1].num; }
-    else if (tag == "s") { node->tag = AstTag::Str; node->s = e.arr[1].str; }
-    else if (tag == "sv") { node->tag = AstTag::ScopedVar; node->scope = e.arr[1].str; node->name = e.arr[2].str; }
-    else if (tag == "u") { node->tag = AstTag::Unary; node->op = e.arr[1].str; node->operand = parseAst(e.arr[2]); }
-    else if (tag == "bin") { node->tag = AstTag::Binary; node->op = e.arr[1].str; node->left = parseAst(e.arr[2]); node->right = parseAst(e.arr[3]); }
-    else if (tag == "fd") { node->tag = AstTag::FlagDelta; node->sign = e.arr[1].str; node->name = e.arr[2].str; }
-    else if (tag == "call") { node->tag = AstTag::Call; node->fn = e.arr[1].str; for (size_t i = 2; i < e.arr.size(); ++i) node->args.push_back(parseAst(e.arr[i])); }
-    else throw std::runtime_error("unknown ast tag: " + tag);
-    return node;
-}
+// One line, because the tag dispatch is the SHARED source (Patter/Expr/Ast.h),
+// parameterised on the JSON type. This host's JsonValue matches the default
+// AstJson accessors, so there is nothing to specialise. It also gains the arity
+// checks the UE loader had and this one did not.
+static AstPtr parseAst(const JsonValue& e) { return DeserialiseAstFrom<JsonValue>(e); }
 
 static Expression parseExpr(const JsonValue& e) { Expression x; x.ast = parseAst(e.at("ast")); return x; }
 
@@ -340,7 +332,7 @@ static std::string dump(const JsonValue& v)
         case JsonValue::Object: { std::string s = "{"; bool f = true; for (auto& kv : v.obj) { if (!f) s += ","; f = false; s += "\"" + kv.first + "\":" + dump(kv.second); } return s + "}"; }
         case JsonValue::Array: { std::string s = "["; for (size_t i = 0; i < v.arr.size(); ++i) { if (i) s += ","; s += dump(v.arr[i]); } return s + "]"; }
         case JsonValue::String: return "\"" + v.str + "\"";
-        case JsonValue::Number: return PatterValue::jsNumber(v.num);
+        case JsonValue::Number: return PatterValue::JsNumber(v.num);
         case JsonValue::Bool: return v.b ? "true" : "false";
         default: return "null";
     }
@@ -369,16 +361,47 @@ static int runExpressions(const JsonValue& arr)
             for (auto& kv : *bags)
             {
                 const std::string token = kv.first;
-                ctx.scopes[token] = [bags, token](const std::string& n) -> const PatterValue* {
-                    auto& bag = (*bags)[token]; auto it = bag.find(n); return it != bag.end() ? &it->second : nullptr;
-                };
+                ctx.scopes[token] = std::make_shared<FnScope>(
+                    [bags, token](const std::string& n) -> std::optional<PatterValue> {
+                        auto& bag = (*bags)[token];
+                        auto it = bag.find(n);
+                        return it != bag.end() ? std::optional<PatterValue>(it->second) : std::nullopt;
+                    });
             }
+            // The dialect's host hooks live in PatterHost, reached through
+            // ctx.host; it must outlive the evaluation, so it is a local here.
             std::shared_ptr<Mulberry32> rng;
-            if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(static_cast<int64_t>(seed->num)); ctx.nextRandom = [rng]() { return rng->next(); }; }
-            PatterValue actual = evaluate(*node, ctx);
-            PatterValue expected = toValue(c.at("expected"));
-            if (actual.valueEquals(expected)) ++pass;
-            else fail("expr", name, "expected " + valueToJson(expected).str + ", got " + actual.toDisplayString());
+            PatterHost evalHost;
+            if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(seed->num); evalHost.nextRandom = [rng]() { return rng->next(); }; }
+            ctx.host = &evalHost;
+
+            // `expectError` cases pin the TYPING contract: which operand
+            // combinations the evaluator must REFUSE. Without them a runtime
+            // that never raises passes every value case and is still wrong
+            // about most of the language. Needed for the expr parity corpus,
+            // which is mostly made of them.
+            const bool expectError = c.find("expectError") != nullptr;
+            std::string error;
+            bool raised = false;
+            PatterValue actual;
+            try { actual = Evaluate(node, ctx, PatterDialect()); }
+            catch (const std::exception& ex) { raised = true; error = ex.what(); }
+
+            if (expectError)
+            {
+                if (raised) ++pass;
+                else fail("expr", name, "expected an eval error, got " + actual.toDisplayString());
+            }
+            else if (raised)
+            {
+                fail("expr", name, "unexpected error: " + error);
+            }
+            else
+            {
+                PatterValue expected = toValue(c.at("expected"));
+                if (actual.valueEquals(expected)) ++pass;
+                else fail("expr", name, "expected " + valueToJson(expected).str + ", got " + actual.toDisplayString());
+            }
         }
         catch (const std::exception& ex) { fail("expr", name, ex.what()); }
     }
@@ -405,11 +428,14 @@ static int runSpecificity(const JsonValue& arr)
             for (auto& kv : *bags)
             {
                 const std::string token = kv.first;
-                ctx.scopes[token] = [bags, token](const std::string& n) -> const PatterValue* {
-                    auto& bag = (*bags)[token]; auto it = bag.find(n); return it != bag.end() ? &it->second : nullptr;
-                };
+                ctx.scopes[token] = std::make_shared<FnScope>(
+                    [bags, token](const std::string& n) -> std::optional<PatterValue> {
+                        auto& bag = (*bags)[token];
+                        auto it = bag.find(n);
+                        return it != bag.end() ? std::optional<PatterValue>(it->second) : std::nullopt;
+                    });
             }
-            int actual = matchedSpec(*node, ctx, true);
+            int actual = matchedSpec(node, ctx, true);
             int expected = static_cast<int>(c.at("expected").num);
             if (actual == expected) ++pass;
             else fail("spec", name, "expected " + std::to_string(expected) + ", got " + std::to_string(actual));
@@ -430,7 +456,7 @@ static int runRuntime(const JsonValue& arr)
             Bundle bundle = parseBundle(c.at("bundle"));
             EngineOptions opts;
             std::shared_ptr<Mulberry32> rng;
-            if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(static_cast<int64_t>(seed->num)); opts.rng = [rng]() { return rng->next(); }; }
+            if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(seed->num); opts.rng = [rng]() { return rng->next(); }; }
             if (const JsonValue* loc = c.find("locale")) opts.locale = loc->str;
 
             Engine engine(bundle, opts);
@@ -714,6 +740,84 @@ static void runOutlineSmoke()
         fail("outline", "breadcrumb", "flat beat breadcrumb wrong");
 }
 
+
+// --- the @wildwinter/expr parity corpus ------------------------------------
+//
+// A SECOND corpus, authored in ../expr and vendored here, holding the
+// primitives both product families share and neither family's own corpus
+// tests: seed coercion, the PRNG draw and state sequence, operator typing,
+// short-circuiting, value equality and the comparison rules. The evaluator is
+// exercised only incidentally by the Patterplay corpus (through walking a
+// scene), so a divergence in expr itself failed nothing anywhere until this
+// existed. It caught two, on the day it was written.
+//
+// Its `expressions` section has the same shape as ours and goes through the
+// same runExpressions above. Only the PRNG section is new.
+
+static double exprSeed(const JsonValue& v)
+{
+    // JSON has no literal for the non-finite doubles, and they are exactly the
+    // interesting coercion cases, so the corpus carries them as strings.
+    if (v.type == JsonValue::String)
+    {
+        if (v.str == "NaN") return std::numeric_limits<double>::quiet_NaN();
+        if (v.str == "Infinity") return std::numeric_limits<double>::infinity();
+        if (v.str == "-Infinity") return -std::numeric_limits<double>::infinity();
+        throw std::runtime_error("unknown seed literal: " + v.str);
+    }
+    return v.num;
+}
+
+static int runExprPrng(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        Mulberry32 prng(exprSeed(c.at("seed")));
+
+        const uint32_t wantSeed = static_cast<uint32_t>(c.at("expectSeedState").num);
+        if (prng.state() != wantSeed)
+        {
+            fail("expr/prng", name, "seed state " + std::to_string(prng.state())
+                + ", expected " + std::to_string(wantSeed));
+            continue;
+        }
+
+        const auto& states = c.at("expectStates").arr;
+        const auto& draws = c.at("expectDraws").arr;
+        bool ok = true;
+        for (size_t i = 0; i < states.size() && ok; ++i)
+        {
+            const double d = prng.next();
+            // The corpus pins the draw's NUMERATOR, an exact uint32, so no port
+            // is held to another language's float printing.
+            const uint32_t gotDraw = static_cast<uint32_t>(llround(d * 4294967296.0));
+            const uint32_t wantDraw = static_cast<uint32_t>(draws[i].num);
+            const uint32_t wantState = static_cast<uint32_t>(states[i].num);
+            if (gotDraw != wantDraw)
+            {
+                fail("expr/prng", name, "draw " + std::to_string(i + 1) + " is "
+                    + std::to_string(gotDraw) + ", expected " + std::to_string(wantDraw));
+                ok = false;
+            }
+            else if (prng.state() != wantState)
+            {
+                fail("expr/prng", name, "state after draw " + std::to_string(i + 1) + " is "
+                    + std::to_string(prng.state()) + ", expected " + std::to_string(wantState));
+                ok = false;
+            }
+            else if (!(d >= 0.0 && d < 1.0))
+            {
+                fail("expr/prng", name, "draw " + std::to_string(i + 1) + " outside [0, 1)");
+                ok = false;
+            }
+        }
+        if (ok) ++pass;
+    }
+    return pass;
+}
+
 int main(int argc, char** argv)
 {
     std::string path = argc > 1 ? argv[1] : "corpus.json";
@@ -734,6 +838,26 @@ int main(int argc, char** argv)
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
+
+    // The expr parity corpus sits beside ours, vendored from ../expr. Absent is
+    // a FAILURE, not a skip: a parity gate that quietly does nothing when its
+    // fixture is missing is the shape of check this codebase has been bitten by.
+    {
+        const size_t slash = path.find_last_of("/\\");
+        const std::string exprPath =
+            (slash == std::string::npos ? std::string() : path.substr(0, slash + 1)) + "expr-corpus.json";
+        std::ifstream exprFile(exprPath);
+        if (!exprFile) { std::cerr << "expr parity corpus not found: " << exprPath << "\n"; return 2; }
+        std::stringstream exprBuf; exprBuf << exprFile.rdbuf();
+        JsonValue exprRoot = JsonParser(exprBuf.str()).parse();
+        const JsonValue& xprng = exprRoot.at("prng");
+        const JsonValue& xexpr = exprRoot.at("expressions");
+        int xp = runExprPrng(xprng);
+        int xe = runExpressions(xexpr);
+        std::cout << "expr corpus v" << static_cast<int>(exprRoot.at("version").num)
+            << " - prng: " << xp << "/" << xprng.arr.size()
+            << "  expressions: " << xe << "/" << xexpr.arr.size() << "\n";
+    }
     std::cout << (g_fails == 0 ? "ALL PASS" : (std::to_string(g_fails) + " FAILED")) << "\n";
     return g_fails == 0 ? 0 : 1;
 }

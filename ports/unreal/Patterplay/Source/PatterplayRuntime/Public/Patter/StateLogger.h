@@ -63,7 +63,7 @@ namespace patter
         switch (v.kind)
         {
             case PatterKind::Bool: return v.b ? "true" : "false";
-            case PatterKind::Number: return PatterValue::jsNumber(v.n); // String(n) == JSON.stringify(n)
+            case PatterKind::Number: return PatterValue::JsNumber(v.n); // String(n) == JSON.stringify(n)
             case PatterKind::Str: return loggerdetail::jsonQuote(v.s);
             case PatterKind::Flags:
             {

@@ -325,7 +325,11 @@ namespace patter
             FlowSnapshot f;
             f.scopes = toValueMap(v.get("scopes"));
             f.sceneBags = toBagMap(v.get("sceneBags"));
-            f.rngState = static_cast<uint32_t>(v.num("rngState"));
+            // The JS runtime accumulated this state with `| 0` until 0.x, so saves in
+            // the wild carry it SIGNED. Casting a negative double straight to
+            // uint32_t is undefined behaviour (it gave 0 at -O0 and garbage at -O2),
+            // so it goes through the same ToUint32 the seed does.
+            f.rngState = Mulberry32::ToUint32(v.num("rngState"));
             f.visits = toIntMap(v.get("visits"));
             f.flowEnded = v.boolean("flowEnded");
             f.currentSceneId = v.str("currentSceneId");

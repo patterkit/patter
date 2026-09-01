@@ -16,8 +16,11 @@
 #include <utility>
 #include <iostream>
 #include "PatterValue.h"
+#include "Mulberry32.h"   // ToUint32: the shared JS seed coercion
 #include "Bundle.h"
-#include "Expression.h"
+#include "Ast.h"
+#include "Dialect.h"        // the Patter dialect, and the shared evaluator it configures
+#include "Expr/Specificity.h"  // the shared matched-constraint scorer
 #include "Interp.h"
 #include "StepResult.h"
 
@@ -182,43 +185,24 @@ namespace patter
         }
     }
 
-    inline bool truthy(const PatterValue& v)
-    {
-        switch (v.kind)
-        {
-            case PatterKind::Bool: return v.b;
-            case PatterKind::Number: return v.n != 0;
-            case PatterKind::Str: return v.s != "";
-            case PatterKind::Flags: return !v.f.empty();
-            default: return false;
-        }
-    }
+    /** Truthiness for a bare condition. One line, because the rule is on the
+     *  SHARED value type. */
+    inline bool truthy(const PatterValue& v) { return v.truthy(); }
 
     // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
     // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
-    // Free function + ctx-parameterised so the conformance TestHost can score a bare AST against injected
-    // scopes; Flow::specScore calls it with the live flow eval context.
-    inline int matchedSpec(const AstNode& node, const EvalContext& ctx, bool want)
+    // Matched-constraint specificity is the SHARED scorer (Patter/Expr/Specificity.h,
+    // vendored from expr/ports/unreal). Until 2026-09-01 it was inline here and the
+    // Storylet Engine had its own module: one scorer, six hand transliterations. It
+    // takes truthiness as a callback, so it never needed to know a value type, a
+    // dialect or a scope, which makes it the purest thing in the family to share.
+    inline int matchedSpec(const AstPtr& nodePtr, EvalContext& ctx, bool want)
     {
-        if (node.tag == AstTag::Binary && (node.op == "and" || node.op == "or"))
+        return MatchedSpecificity(nodePtr, [&ctx](const AstPtr& n)
         {
-            bool behaveAsAnd = (node.op == "and") == want; // De Morgan under negation
-            int l = matchedSpec(*node.left, ctx, want);
-            int r = matchedSpec(*node.right, ctx, want);
-            if (behaveAsAnd) return (l > 0 && r > 0) ? l + r : 0;
-            return l > r ? l : r;
-        }
-        if (node.tag == AstTag::Unary && node.op == "not")
-            return matchedSpec(*node.operand, ctx, !want); // flip polarity
-        if (node.tag == AstTag::Call && node.fn == "check_flags")
-        {
-            int operands = static_cast<int>(node.args.size()) - 1; // args[0] is the flags source
-            if (operands < 1) operands = 1;
-            bool hit = truthy(evaluate(node, ctx));
-            if (want) return hit ? operands : 0;
-            return hit ? 0 : 1;
-        }
-        return (truthy(evaluate(node, ctx)) == want) ? 1 : 0; // atom
+            try { return truthy(Evaluate(n, ctx, PatterDialect())); }
+            catch (const std::exception&) { return false; }   // an eval error scores as false
+        }, want);
     }
 
     // ----- save records --------------------------------------------------------
@@ -306,7 +290,7 @@ namespace patter
     struct EngineOptions
     {
         std::function<double()> rng;                  // shared custom PRNG (runtime corpus cases)
-        bool hasSeed = false; int64_t seed = 0;       // per-flow built-in PRNG (scripted corpus cases)
+        bool hasSeed = false; double seed = 0;        // per-flow built-in PRNG (scripted corpus cases)
         std::string locale;
         bool replayPromptOnChoose = false;
         bool closedCaptions = true;                   // #214: show caption cues in dialogue lines (default)
@@ -328,22 +312,36 @@ namespace patter
     class Flow
     {
     public:
-        Flow(std::string id, FlowHost* host, int64_t seed) : id_(std::move(id)), host_(host)
+        Flow(std::string id, FlowHost* host, double seed) : id_(std::move(id)), host_(host)
         {
-            rngState_ = static_cast<uint32_t>(seed);
+            rngState_ = Mulberry32::ToUint32(seed);
             local_ = freshLocal();
-            evalCtx_.scopes["patter"] = [this](const std::string& n) { return patterGet(n); };
-            evalCtx_.scopes["scene"] = [this](const std::string& n) { return sceneGet(n); };
+            // FnScope wraps a lambda as the shared IScopeSource. `get` returns an
+            // optional rather than a pointer, because the Storylet Engine's scopes
+            // compose values on the fly and cannot hand back a stable address.
+            auto fnScope = [](std::function<const PatterValue*(const std::string&)> f)
+            {
+                return std::make_shared<FnScope>([f](const std::string& n) -> std::optional<PatterValue>
+                {
+                    const PatterValue* v = f(n);
+                    return v ? std::optional<PatterValue>(*v) : std::nullopt;
+                });
+            };
+            evalCtx_.scopes["patter"] = fnScope([this](const std::string& n) { return patterGet(n); });
+            evalCtx_.scopes["scene"] = fnScope([this](const std::string& n) { return sceneGet(n); });
             // Declared host scopes (@world): bound by the embedder or self-backed by the engine.
             // Registering them is what stops "@world.x" reading as a graceful false.
             for (const auto& kv : host_->hostScopes)
             {
                 const HostScope* scope = &kv.second;
-                evalCtx_.scopes[kv.first] = [scope](const std::string& n) { return scope->get(n); };
+                evalCtx_.scopes[kv.first] = fnScope([scope](const std::string& n) { return scope->get(n); });
             }
-            evalCtx_.nextRandom = [this]() { return rng(); };
-            evalCtx_.visits = [this](const std::string& id) { auto it = visitCounts_.find(id); return it != visitCounts_.end() ? it->second : 0; };
-            evalCtx_.patterVisits = [this](const std::string& id) { auto it = host_->sharedVisits.find(id); return it != host_->sharedVisits.end() ? it->second : 0; };
+            // The dialect's host hooks. The shared EvalContext carries them as an
+            // opaque `const void*`; PatterDialect casts it back to PatterHost.
+            evalHost_.nextRandom = [this]() { return rng(); };
+            evalHost_.visits = [this](const std::string& id) { auto it = visitCounts_.find(id); return it != visitCounts_.end() ? it->second : 0; };
+            evalHost_.patterVisits = [this](const std::string& id) { auto it = host_->sharedVisits.find(id); return it != host_->sharedVisits.end() ? it->second : 0; };
+            evalCtx_.host = &evalHost_;
             // The quality channel: a property's stage ladder, from wherever the declaration lives -
             // @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
             evalCtx_.qualities = [this](const std::string& scope, const std::string& name) { return stagesFor(scope, name); };
@@ -680,6 +678,8 @@ namespace patter
         std::map<std::string, SelectorState> selectors_;
         std::map<std::string, int> visitCounts_;
         EvalContext evalCtx_;
+        // The dialect's host hooks, held by the flow so evalCtx_.host stays valid.
+        PatterHost evalHost_;
 
         void clearPending() { hasPendingChoice_ = false; pendingGroupId_.clear(); pendingOptions_.clear(); pendingById_.clear(); }
 
@@ -963,7 +963,7 @@ namespace patter
         // specificity. Scored against this flow's live eval context via the free matchedSpec.
         int specScore(const Node* node)
         {
-            return node->condition ? matchedSpec(*node->condition->ast, evalCtx_, true) : 0;
+            return node->condition ? matchedSpec(node->condition->ast, evalCtx_, true) : 0;
         }
         SelectorState& selectorStateFor(const Node* group)
         {
@@ -981,7 +981,7 @@ namespace patter
             if (!node->condition) return true;
             return truthy(evalExpr(*node->condition));
         }
-        PatterValue evalExpr(const Expression& expr) { return evaluate(*expr.ast, evalCtx_); }
+        PatterValue evalExpr(const Expression& expr) { return Evaluate(expr.ast, evalCtx_, PatterDialect()); }
         void enter(const std::string& id)
         {
             visitCounts_[id] = visitCounts_.count(id) ? visitCounts_[id] + 1 : 1;
@@ -990,10 +990,14 @@ namespace patter
         double rng()
         {
             if (host_->customRng) return host_->customRng();
-            rngState_ = rngState_ + 0x6d2b79f5u;
-            uint32_t t = (rngState_ ^ (rngState_ >> 15)) * (1u | rngState_);
-            t = (t + ((t ^ (t >> 7)) * (61u | t))) ^ t;
-            return (t ^ (t >> 14)) / 4294967296.0;
+            // The shared Mulberry32, not a copy of the mixing inline here. This
+            // file carried its own until 2026-09-01, so Patterplay shipped the
+            // algorithm twice in C++ alone. rngState_ is still the serialisable
+            // position, so saves are unaffected.
+            Mulberry32 prng(rngState_);
+            const double draw = prng.next();
+            rngState_ = prng.state();
+            return draw;
         }
 
         // -- strings / beats --
@@ -1150,7 +1154,7 @@ namespace patter
             auto ds = allStrings.find(bundle.locales.defaultLocale); if (ds != allStrings.end()) host_.defaultStrings = ds->second;
 
             for (const auto& c : bundle.cast) if (!c.displayName.empty()) host_.castDisplay[c.name] = c.displayName;
-            defaultSeed_ = options.hasSeed ? static_cast<uint32_t>(options.seed) : 0x9e3779b9u;
+            defaultSeed_ = options.hasSeed ? Mulberry32::ToUint32(options.seed) : 0x9e3779b9u;
 
             for (const auto& kv : bundle.scenes)
             {
