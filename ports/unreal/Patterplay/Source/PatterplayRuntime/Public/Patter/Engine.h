@@ -118,13 +118,13 @@ namespace patter
     // restates it, exactly as the JS runtime's PropertyView extends the same shared row.
     // It was a full copy until 2026-09-02, which is how `def` and `defaultValue` came to be
     // two names for one field.
-    struct PropertyView : PropertyRow
-    {
-        // Nothing of its own left: `path` moved onto the shared PropertyRow on 2026-09-02,
-        // because both product families had forked that row to add exactly this field. The
-        // name stays as listProperties()'s return type; re-declaring path here would SHADOW
-        // the inherited one - written on the derived, read as empty through a PropertyRow&.
-    };
+    /** An ALIAS. `path` moved onto the shared PropertyRow on 2026-09-02, because both
+     *  product families had forked that row to add exactly this field. The name stays as
+     *  listProperties()'s return type; an empty derived struct would be worse, because a
+     *  bag's own row could never satisfy it - and re-declaring `path` on it would SHADOW
+     *  the inherited one, written on the derived and read as empty through a PropertyRow&.
+     *  The Storylet Engine's C++ runtime resolves this the same way. */
+    using PropertyView = PropertyRow;
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
     // (scenes -> blocks -> groups/snippets -> beats), mirroring the JS BeatInfo / OutlineNode / etc.

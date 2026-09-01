@@ -625,13 +625,13 @@ namespace Patterkit.Patterplay
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
         /// default - for a debug inspector that lists + edits live state. (Per-flow `@patter` / `@scene`
         /// props live on a Flow.)</summary>
-        public List<PropertyView> ListProperties()
+        public List<PropertyRow> ListProperties()
         {
-            var rows = new List<PropertyView>();
+            var rows = new List<PropertyRow>();
             foreach (var d in _host.PatterSharedDecls)
             {
                 string name = d.Name.ToLowerInvariant();
-                rows.Add(new PropertyView
+                rows.Add(new PropertyRow
                 {
                     // The QUALIFIED address, matching what the shared bag composes for every other
                     // scope. `@gold` still resolves on input - splitRef defaults an unqualified name to
@@ -859,16 +859,12 @@ namespace Patterkit.Patterplay
         }
     }
 
-    /// <summary>One shared @patter property, for a live state inspector.
-    ///
-    /// Nothing of its own left: `Path` moved onto the shared PropertyRow on 2026-09-02,
-    /// because BOTH product families had forked that row to add exactly this field, once
-    /// per runtime. The name stays as the return type of ListProperties - it is public API
-    /// and reads well - but the shape is the shared row's, and re-declaring Path here would
-    /// now SHADOW the inherited one: set on the derived, read as empty through the base.</summary>
-    public sealed class PropertyView : PropertyRow
-    {
-    }
+    // PropertyView is gone. It was PropertyRow plus a `Path`, and the Storylet Engine had
+    // forked the same row for the same reason in its own runtimes; `Path` moved onto the
+    // shared PropertyRow on 2026-09-02, so there was nothing left to hold. ListProperties
+    // returns the shared row itself - C# has no type alias to keep the old name alive with
+    // (the TS and C++ runtimes do, and use one), and an empty subclass would be a type a
+    // bag's own row could never satisfy.
 
     // -- save-game records ------------------------------------------------------
 

@@ -225,7 +225,7 @@ namespace Patterkit.Patterplay.Editor
             }
         }
 
-        private PatterValue DrawValueField(Engine engine, PropertyView row)
+        private PatterValue DrawValueField(Engine engine, PropertyRow row)
         {
             switch (row.Type)
             {
