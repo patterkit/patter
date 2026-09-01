@@ -1,5 +1,21 @@
 # @patterkit/compiler
 
+## 0.2.5
+
+### Patch Changes
+
+- 2a16584: Move to @wildwinter/expr 0.5.0 and the new @wildwinter/toolkit.
+
+  Opaque ids, the FNV-1a hash, JSON5 source parsing, the find/replace matcher and
+  the archive guards now come from @wildwinter/toolkit instead of being
+  maintained here and, separately, in the Storylet Engine. No behaviour change:
+  the implementations moved, they were not rewritten.
+
+- Updated dependencies [2a16584]
+  - @patterkit/core@0.2.2
+  - @patterkit/model@0.4.1
+  - @patterkit/dialect@0.1.7
+
 ## 0.2.4
 
 ### Patch Changes
