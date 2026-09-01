@@ -6,6 +6,27 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-01
+
+### Changed
+
+- **A condition comparing flags no longer depends on the order they were added.** `@f == [red, blue]`
+  now matches a value built as `+blue` then `+red`, and every Patterplay runtime agrees with the editor
+  about it. A flags value is a set; its stored order was an artefact of the order somebody happened to
+  write the outcomes in, which nothing in Patterpad ever showed you. A condition that was quietly false
+  for that reason will start passing, which is the answer it should always have given.
+
+- **Saves your game writes can be read by the Unity, Unreal and Godot runtimes.** The random-number
+  state was recorded as a signed number, so more than half of all saves carried a value the native
+  runtimes rejected: Unity threw on load and the C++ one read it through undefined behaviour. Patterpad
+  and the JS runtime always coped, so this never showed up here, which is exactly why it lasted. Saves
+  written before this release still load everywhere.
+
+- Under the hood, the expression language and the shared authoring pieces come from `@wildwinter/expr`
+  and `@wildwinter/toolkit` rather than copies kept here. One implementation, shared with the Storylet
+  Engine, so a fix lands once instead of twice.
+
+
 ## [0.15.0] - 2026-08-31
 
 ### Changed
