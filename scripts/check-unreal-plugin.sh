@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# GENERATED - vendored from expr/tooling/check-unreal-plugin.sh by scripts/vendor-ports.mjs.
+# Do not edit here; edit the shared source and re-run the script.
 # Compile the Patterplay UE plugin modules for real, with Unreal.
 #
 # The standalone TestHost (ports/unreal/TestHost/build.sh) compiles the std-only
