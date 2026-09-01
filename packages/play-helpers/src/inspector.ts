@@ -13,7 +13,7 @@
 //   // ...later: inspector.destroy();
 // ---------------------------------------------------------------------------
 
-import type { Engine, PropertyRow } from "@patterkit/runtime";
+import type { Engine, PropertyView } from "@patterkit/runtime";
 import { serializeState, deserializeState } from "./save.js";
 import type { PropertyValue } from "./properties.js";
 
@@ -115,13 +115,13 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
 
   const rowRefreshers: Array<() => void> = [];
 
-  const buildRow = (row: PropertyRow): void => {
+  const buildRow = (row: PropertyView): void => {
     const r = doc.createElement("div");
     r.className = "pp-insp-row";
     const label = doc.createElement("span");
     label.className = "pp-insp-ref";
-    label.textContent = row.ref;
-    label.title = row.ref;
+    label.textContent = row.path;
+    label.title = row.path;
     const ctl = doc.createElement("div");
     ctl.className = "pp-insp-ctl";
     const reset = doc.createElement("button");
@@ -135,23 +135,23 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
     // `read` pushes the live engine value into the editor, but never while that editor has focus
     // (so it can't wipe what you're typing). `syncReset` disables the ↺ when the value is the default.
     let read: () => void;
-    const commit = (v: PropertyValue): void => { engine.setProperty(row.ref, v); syncReset(); };
+    const commit = (v: PropertyValue): void => { engine.setProperty(row.path, v); syncReset(); };
     const focused = (node: Element): boolean => doc.activeElement === node;
-    function syncReset(): void { reset.disabled = sameValue(engine.getProperty(row.ref), row.default); }
-    reset.addEventListener("click", () => { engine.setProperty(row.ref, row.default); read(); syncReset(); });
+    function syncReset(): void { reset.disabled = sameValue(engine.getProperty(row.path), row.default); }
+    reset.addEventListener("click", () => { engine.setProperty(row.path, row.default); read(); syncReset(); });
 
     if (row.type === "boolean") {
       const cb = doc.createElement("input");
       cb.type = "checkbox";
       cb.addEventListener("change", () => commit(cb.checked));
       ctl.appendChild(cb);
-      read = () => { if (!focused(cb)) cb.checked = engine.getProperty(row.ref) === true; };
+      read = () => { if (!focused(cb)) cb.checked = engine.getProperty(row.path) === true; };
     } else if (row.type === "number") {
       const inp = doc.createElement("input");
       inp.type = "number";
       inp.addEventListener("change", () => commit(Number(inp.value)));
       ctl.appendChild(inp);
-      read = () => { if (!focused(inp)) inp.value = String(engine.getProperty(row.ref) ?? ""); };
+      read = () => { if (!focused(inp)) inp.value = String(engine.getProperty(row.path) ?? ""); };
     } else if (row.type === "enum" || row.type === "quality") {
       // A quality edits as a dropdown of its STAGES - the ladder is closed, like an enum's values.
       const sel = doc.createElement("select");
@@ -162,21 +162,21 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
       }
       sel.addEventListener("change", () => commit(sel.value));
       ctl.appendChild(sel);
-      read = () => { if (!focused(sel)) sel.value = String(engine.getProperty(row.ref) ?? ""); };
+      read = () => { if (!focused(sel)) sel.value = String(engine.getProperty(row.path) ?? ""); };
     } else if (row.type === "flags") {
       const inp = doc.createElement("input");
       inp.type = "text";
       inp.placeholder = "comma, separated, flags";
       inp.addEventListener("change", () => commit(inp.value.split(",").map((s) => s.trim()).filter((s) => s.length > 0)));
       ctl.appendChild(inp);
-      read = () => { if (!focused(inp)) { const v = engine.getProperty(row.ref); inp.value = Array.isArray(v) ? v.join(", ") : ""; } };
+      read = () => { if (!focused(inp)) { const v = engine.getProperty(row.path); inp.value = Array.isArray(v) ? v.join(", ") : ""; } };
     } else {
       // string (and any unrecognised type) -> a text field
       const inp = doc.createElement("input");
       inp.type = "text";
       inp.addEventListener("change", () => commit(inp.value));
       ctl.appendChild(inp);
-      read = () => { if (!focused(inp)) inp.value = String(engine.getProperty(row.ref) ?? ""); };
+      read = () => { if (!focused(inp)) inp.value = String(engine.getProperty(row.path) ?? ""); };
     }
 
     read();

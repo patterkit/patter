@@ -13,7 +13,7 @@ export { Engine, Flow } from "./engine.js";
 // type a parsed .patterc without depending on @patterkit/model directly.
 export type { Bundle } from "@patterkit/model";
 export type {
-  StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, WorldResolver, PropertyRow,
+  StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, WorldResolver, PropertyView,
   EngineSave, SaveGame, FlowSnapshot, SelectorSnapshot, SavedChoice, StackFrame,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
 } from "./engine.js";

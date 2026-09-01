@@ -29,7 +29,7 @@ import { evaluate, deserialiseAst, makePrng, toUint32 } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
-import type { ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
+import type { PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
@@ -268,16 +268,18 @@ export interface EngineOptions {
   onDryChoice?: (groupId: string) => void;
 }
 
-/** One shared `@patter` property, for a live state inspector: its ref, declared type, current value,
- *  declared default (for reset), and enum options. Mirrors the Unity / Godot ports' ListProperties. */
-export interface PropertyRow {
-  ref: string;
-  type: PropertyType;
-  value: ScalarValue | undefined;
-  default: ScalarValue;
-  values?: string[];
-  /** A quality's ordered stage ladder (lets an inspector offer stages instead of free text). */
-  stages?: string[];
+/** One shared `@patter` property, for a live state inspector: its name and address, declared type,
+ *  current value, declared default (for reset), enum options or a quality's stages, and whether it
+ *  can be written. Mirrors the Unity / Godot ports' ListProperties.
+ *
+ *  The row itself is @wildwinter/scoperegistry's, shared with the Storylet Engine, which reads the
+ *  same expr property model through the same registry. This file declared its own until 2026-09-01,
+ *  identical bar the address field's name and a missing `writable` - and the fork is why `stages`
+ *  could be added here and stay absent from the shared type for months, leaving the other family
+ *  editing a quality as free text. `path` is the addressable reference `getProperty`/`setProperty`
+ *  take (`@patter.gold`); `name` is the bare declared name. */
+export interface PropertyView extends PropertyRow {
+  path: string;
 }
 
 /** Options for opening a flow. */
@@ -841,14 +843,18 @@ export class Engine {
 
   /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
    *  value, declared default (for reset), and enum options. Mirrors the Unity / Godot ports. */
-  listProperties(): PropertyRow[] {
+  listProperties(): PropertyView[] {
     return this.host.patterSharedDecls.map((d) => ({
-      ref: `@${d.name}`,
+      name: d.name,
+      path: `@${d.name}`,
       type: d.type as PropertyType,
       values: d.values,
       stages: d.stages,
       value: this.getProperty(`@${d.name}`),
       default: declDefault(d),
+      // The declaration's own answer, which this row used to drop on the floor: an
+      // inspector could not tell a read-only property from a writable one.
+      writable: d.writable ?? true,
     }));
   }
 

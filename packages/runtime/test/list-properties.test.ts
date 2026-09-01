@@ -31,24 +31,35 @@ describe("engine.listProperties", () => {
   it("lists shared @patter properties with type, value, default, and enum values", () => {
     const engine = new Engine(bundle);
     const rows = engine.listProperties();
-    expect(rows.map((r) => r.ref)).toEqual(["@gold", "@mood", "@flags"]); // @local is per-flow, not shared
+    expect(rows.map((r) => r.path)).toEqual(["@gold", "@mood", "@flags"]); // @local is per-flow, not shared
 
-    const gold = rows.find((r) => r.ref === "@gold")!;
+    const gold = rows.find((r) => r.path === "@gold")!;
     expect(gold.type).toBe("number");
     expect(gold.value).toBe(5);
     expect(gold.default).toBe(5);
 
-    const mood = rows.find((r) => r.ref === "@mood")!;
+    const mood = rows.find((r) => r.path === "@mood")!;
     expect(mood.values).toEqual(["calm", "tense"]);
     expect(mood.value).toBe("calm");
 
-    const flags = rows.find((r) => r.ref === "@flags")!;
+    const flags = rows.find((r) => r.path === "@flags")!;
     expect(flags.default).toEqual([]); // no declared default -> type default
+  });
+
+  // The row is @wildwinter/scoperegistry's, shared with the Storylet Engine, rather
+  // than a local interface that happened to look like it. These two fields are what
+  // the fork dropped: the bare name, and whether the property can be written.
+  it("carries the shared row's name and writable, not just the address", () => {
+    const engine = new Engine(bundle);
+    const gold = engine.listProperties().find((r) => r.path === "@gold")!;
+    expect(gold.name).toBe("gold");
+    expect(gold.path).toBe("@gold");
+    expect(gold.writable).toBe(true);
   });
 
   it("reflects a live setProperty in the row's value (fresh read each call)", () => {
     const engine = new Engine(bundle);
     engine.setProperty("@gold", 42);
-    expect(engine.listProperties().find((r) => r.ref === "@gold")!.value).toBe(42);
+    expect(engine.listProperties().find((r) => r.path === "@gold")!.value).toBe(42);
   });
 });
