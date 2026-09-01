@@ -1,0 +1,8 @@
+Library/
+Temp/
+Logs/
+UserSettings/
+obj/
+# Copied in by scripts/check-unity-editor.sh for the duration of a run.
+Assets/Samples/
+Assets/Samples.meta

@@ -48,6 +48,40 @@ jobs:
       # the engine PRODUCES, and this is about what it decided on the way.
       - name: The event log records the decisions
         run: ./godot --headless --path ports/godot --script res://test/test_trace_log.gd
+      # The Runtime State panel, headless. Nothing else runs the walk it does: the registry,
+      # each engine's properties and log, and the Live Link's status.
+      - name: The state panel draws what it is given
+        run: ./godot --headless --path ports/godot --script res://test/test_state_panel.gd
+
+  # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
+  # makes that hard: an installed, activated Unity compiles from the command line, and
+  # `scripts/check-unity-editor.sh` does exactly that in one step. What a GitHub-HOSTED
+  # runner lacks is Unity itself, and installing it there is what needs credentials. Two ways
+  # to close it, neither blocked on anything:
+  #   - run `npm run check:unity-editor` before a release (no secret, no CI);
+  #   - or point a SELF-HOSTED runner at a machine with Unity, where the same script is a step.
+  # The `unity-editor` job below is the third way, for a hosted runner, and skips itself unless
+  # a UNITY_LICENSE secret exists. Matches the Storylet Engine's unity-demo job.
+  unity-editor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - id: gate
+        run: echo "licensed=${{ secrets.UNITY_LICENSE != '' }}" >> "$GITHUB_OUTPUT"
+      - name: No Unity licence configured
+        if: steps.gate.outputs.licensed != 'true'
+        run: |
+          echo "::notice::Skipped. The Editor assembly and the samples are not compiled without"
+          echo "::notice::a UNITY_LICENSE secret, so a break there reaches a human by hand."
+      - uses: game-ci/unity-test-runner@v4
+        if: steps.gate.outputs.licensed == 'true'
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: ports/unity/PatterplayDemo
+          testMode: EditMode
 
   unity-runtime:
     runs-on: ubuntu-latest

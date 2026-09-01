@@ -27,7 +27,8 @@
     "ship:npm": "node scripts/ship-npm.mjs",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "npm run typecheck && npm run build && npm test && changeset publish"
+    "release": "npm run typecheck && npm run build && npm test && changeset publish",
+    "check:unity-editor": "./scripts/check-unity-editor.sh"
   },
   "overrides": {
     "esbuild": "^0.28.2"
