@@ -1,59 +1,20 @@
 @tool
-extends VBoxContainer
-
-# The bundle summary view: the rows the Inspector section draws
-# (patter_bundle_inspector_plugin.gd), and the same content every runtime's bundle inspector shows,
-# in the same order, under the same headings - identity, addresses, host properties, story
-# properties, game data, counts. The data is PatterDescribe.describe_bundle, which is the JS
-# reference ported, so two people on two engines reading the same asset see the same rows.
+# The bundle Inspector view: what Patterplay shows about a bundle.
 #
-# Contrast the state panel (ui/state_panel.gd), which is the LIVE property examiner: it needs a
-# running game and edits what it shows. This needs neither and edits nothing.
-
-var _selected: PatterBundleResource
-var _summary: RichTextLabel
-var _sections: VBoxContainer
-
-
-func _ready() -> void:
-	if _summary != null:
-		return
-	_summary = RichTextLabel.new()
-	_summary.bbcode_enabled = true
-	_summary.fit_content = true
-	add_child(_summary)
-	_sections = VBoxContainer.new()
-	add_child(_sections)
-	_refresh()
+# The FRAME - the widgets, the selection, the redraw, and the two states that
+# are not about content (nothing selected, and a bundle that failed to load) -
+# is the SHARED source, vendored beside the runtime as expr/bundle_view.gd. It
+# is shared because this exact pair already drifted once: the Unreal
+# equivalents diverged on the error state, and one of them stopped saying
+# anything at all when a bundle had not parsed.
+#
+# What stays here is `_render`, which is the point of the view.
+extends "res://addons/patterplay/runtime/expr/bundle_view.gd"
 
 
-## Point the view at a bundle (safe before _ready: the selection is stashed and rendered when the
-## node enters the tree).
-func set_bundle_resource(res: PatterBundleResource) -> void:
-	_selected = res
-	if _summary != null:
-		_refresh()
-
-
-func _refresh() -> void:
-	if _sections == null:
-		return   # not in the tree yet; _ready() renders the stashed selection
-	for c in _sections.get_children():
-		c.queue_free()
-
-	if _selected == null:
-		_summary.text = "[i]No bundle selected.[/i]"
-		return
-
-	# A broken bundle still imports: say so first, and loudly.
-	if not _selected.is_valid():
-		var lines: Array[String] = []
-		for e in _selected.get_errors():
-			lines.append("- " + str(e))
-		_summary.text = "[b][color=red]Bundle failed to load[/color][/b]\n\n" + "\n".join(lines)
-		return
-
-	var d := PatterDescribe.describe_bundle(_selected.get_bundle())
+func _render(res: Resource) -> void:
+	var selected := res as PatterBundleResource
+	var d := PatterDescribe.describe_bundle(selected.get_bundle())
 	var identity: Dictionary = d["identity"]
 	var counts: Dictionary = d["counts"]
 	var version := str(identity["version"])
@@ -140,22 +101,3 @@ func _property_label(p: Dictionary) -> String:
 	if not bool(p["has_default"]):
 		label += "  [color=gray](no default)[/color]"
 	return label
-
-
-func _add_section(title: String) -> void:
-	var label := RichTextLabel.new()
-	label.bbcode_enabled = true
-	label.fit_content = true
-	label.text = "[b]%s[/b]" % title.to_upper()
-	label.modulate = Color(0.75, 0.75, 0.75)
-	_sections.add_child(label)
-
-
-func _add_row(text: String, muted: bool = false) -> void:
-	var label := RichTextLabel.new()
-	label.bbcode_enabled = true
-	label.fit_content = true
-	label.text = text
-	if muted:
-		label.modulate = Color(0.7, 0.7, 0.7)
-	_sections.add_child(label)

@@ -6,6 +6,7 @@
 extends SceneTree
 
 var _fails := 0
+var _dialect: Dictionary = PatterDialect.dialect()
 
 
 func _initialize() -> void:
@@ -30,7 +31,48 @@ func _initialize() -> void:
 
 	_run_describe_smoke()
 
-	print("expressions: %d  specificity: %d  runtime: %d  scripted: %d  gameData: %d" % [e, sp, r, s, g])
+	print("expressions: %d/%d  specificity: %d/%d  runtime: %d/%d  scripted: %d/%d  gameData: %d/%d" % [
+		e, root["expressions"].size(), sp, root.get("specificity", []).size(),
+		r, root["runtime"].size(), s, root["scripted"].size(), g, root["gameData"].size()])
+
+	# Every case must PASS, not merely not fail. Until 2026-09-01 this host printed
+	# bare pass counts and exited on _fails alone, so a runner that died before its
+	# loop reported "specificity: 0" and still said ALL PASS. That happened, during
+	# the work that added the section below, and nothing caught it: the counts are
+	# the check, so assert them.
+	_expect_all("expressions", e, root["expressions"].size())
+	_expect_all("specificity", sp, root.get("specificity", []).size())
+	_expect_all("runtime", r, root["runtime"].size())
+	_expect_all("scripted", s, root["scripted"].size())
+	_expect_all("gameData", g, root["gameData"].size())
+
+	# The expr parity corpus sits beside ours, vendored from ../expr. Absent is a
+	# FAILURE, not a skip: a parity gate that quietly does nothing when its fixture
+	# is missing is the shape of check this codebase has been bitten by.
+	var expr_path := path.get_base_dir().path_join("expr-corpus.json")
+	var expr_text := FileAccess.get_file_as_string(expr_path)
+	if expr_text == "":
+		push_error("expr parity corpus not found: " + expr_path)
+		quit(2)
+		return
+	var expr_root = JSON.parse_string(expr_text)
+	if not (expr_root is Dictionary):
+		push_error("expr parity corpus is not valid JSON")
+		quit(2)
+		return
+	var x_prng: Array = expr_root["prng"]
+	var x_expr: Array = expr_root["expressions"]
+	var xp := _run_expr_prng(x_prng)
+	var xe_result := _run_expr_expressions(x_expr)
+	var xe: int = xe_result[0]
+	var unrunnable: int = xe_result[1]
+	print("expr corpus v%d - prng: %d/%d  expressions: %d/%d" % [
+		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size() - unrunnable])
+	if unrunnable > 0:
+		print("  GAP: %d expectError cases cannot run here - PatterExpr has no is_error();" % unrunnable)
+		print("       it push_error()s and returns a fallback value, so a refusal is")
+		print("       indistinguishable from an answer. See _run_expr_expressions.")
+
 	print("ALL PASS" if _fails == 0 else ("%d FAILED" % _fails))
 	quit(0 if _fails == 0 else 1)
 
@@ -84,6 +126,13 @@ func _run_describe_smoke() -> void:
 		_fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts")
 
 
+# A section that passed fewer cases than it holds has a runner that stopped early,
+# which is invisible if only failures are counted.
+func _expect_all(section: String, passed: int, total: int) -> void:
+	if passed != total:
+		_fail(section, "section total", "%d of %d cases passed; the runner did not finish" % [passed, total])
+
+
 func _fail(section: String, name: String, detail: String) -> void:
 	_fails += 1
 	push_error("  FAIL [%s] %s: %s" % [section, name, detail])
@@ -106,15 +155,128 @@ func _run_expressions(arr: Array) -> int:
 			var bag: Dictionary = bags[token]
 			ctx["scopes"][token] = func(n): return bag.get(n)
 		if c.has("seed"):
-			var rng := Mulberry32.new(int(c["seed"]))
+			var rng := PatterMulberry32.new(int(c["seed"]))
 			ctx["next_random"] = func(): return rng.next()
-		var actual = PatterExpr.evaluate(c["ast"], ctx)
+		var actual = PatterExpr.evaluate(c["ast"], ctx, _dialect)
 		var expected = PatterValues.to_value(c["expected"])
 		if PatterValues.value_equals(actual, expected):
 			pass_count += 1
 		else:
 			_fail("expr", name, "expected %s, got %s" % [str(expected), str(actual)])
 	return pass_count
+
+
+
+# -- the @wildwinter/expr parity corpus -------------------------------------------
+#
+# A SECOND corpus, authored in ../expr and vendored here, holding the primitives
+# both product families share and neither family's own corpus tests: seed
+# coercion, the PRNG draw and state sequence, operator typing, short-circuiting,
+# value equality and the comparison rules.
+
+
+# JSON has no literal for the non-finite doubles, and they are exactly the
+# interesting coercion cases, so the corpus carries them as strings.
+static func _expr_seed(v: Variant) -> float:
+	if typeof(v) == TYPE_STRING:
+		match v:
+			"NaN": return NAN
+			"Infinity": return INF
+			"-Infinity": return -INF
+	return float(v)
+
+
+func _run_expr_prng(cases: Array) -> int:
+	var pass_count := 0
+	for c in cases:
+		var name: String = c["name"]
+		var prng := PatterMulberry32.new(_expr_seed(c["seed"]))
+
+		var want_seed := int(c["expectSeedState"])
+		if prng.a != want_seed:
+			_fail("expr/prng", name, "seed state %d, expected %d" % [prng.a, want_seed])
+			continue
+
+		var states: Array = c["expectStates"]
+		var draws: Array = c["expectDraws"]
+		var ok := true
+		for i in states.size():
+			var d := prng.next()
+			# The corpus pins the draw's NUMERATOR, an exact uint32, so no port is
+			# held to another language's float printing.
+			var got_draw := int(round(d * 4294967296.0))
+			if got_draw != int(draws[i]):
+				_fail("expr/prng", name, "draw %d is %d, expected %d" % [i + 1, got_draw, int(draws[i])])
+				ok = false
+				break
+			if prng.a != int(states[i]):
+				_fail("expr/prng", name, "state after draw %d is %d, expected %d" % [i + 1, prng.a, int(states[i])])
+				ok = false
+				break
+			if d < 0.0 or d >= 1.0:
+				_fail("expr/prng", name, "draw %d is %f, outside [0, 1)" % [i + 1, d])
+				ok = false
+				break
+		if ok:
+			pass_count += 1
+	return pass_count
+
+
+# The expr corpus's expression cases. Same shape as ours, with one addition:
+# `expectError` cases, which pin the TYPING contract - which operand combinations
+# the evaluator must REFUSE.
+#
+# This port cannot run those yet. PatterExpr signals a bad expression with
+# push_error() and then returns a FALLBACK VALUE (0.0 for a division by zero or a
+# mixed-type `+`, false for an unknown operator), so a caller cannot tell a
+# refusal from an answer, and neither can this runner. The other three Patterplay
+# runtimes raise. Storylets' GDScript port solved this years-equivalent ago with an
+# EvalError object and an is_error() predicate (runtime/expression.gd), which is the
+# shape to copy.
+#
+# So the gap is COUNTED AND PRINTED on every run rather than skipped quietly, and
+# the moment PatterExpr grows an is_error() the cases start running here with no
+# change to this file.
+func _run_expr_expressions(cases: Array) -> Array:
+	var pass_count := 0
+	var unrunnable := 0
+	# Probed on an instance, and CALLED through call(): GDScript resolves a static
+	# call at parse time, so naming PatterExpr.is_error() directly would be a parse
+	# error today rather than a graceful gap. call() defers it to runtime, which is
+	# what lets this file compile now and start running the cases the moment the
+	# method lands.
+	var expr_probe := PatterExpr.new()
+	var can_detect_errors: bool = expr_probe.has_method("is_error")
+
+	for c in cases:
+		var name: String = c["name"]
+		var expect_error: bool = c.get("expectError", false)
+		if expect_error and not can_detect_errors:
+			unrunnable += 1
+			continue
+
+		var ctx := {"scopes": {}}
+		for token in c["scopes"].keys():
+			var bag := {}
+			for prop in c["scopes"][token].keys():
+				bag[prop] = PatterValues.to_value(c["scopes"][token][prop])
+			ctx["scopes"][token] = func(n): return bag.get(n)
+
+		var actual = PatterExpr.evaluate(c["ast"], ctx, _dialect)
+		if expect_error:
+			if expr_probe.call("is_error", actual):
+				pass_count += 1
+			else:
+				_fail("expr", name, "expected an eval error, got %s" % str(actual))
+		elif can_detect_errors and expr_probe.call("is_error", actual):
+			_fail("expr", name, "unexpected error: %s" % str(actual))
+		else:
+			var expected = PatterValues.to_value(c["expected"])
+			if PatterValues.value_equals(actual, expected):
+				pass_count += 1
+			else:
+				_fail("expr", name, "expected %s, got %s" % [str(expected), str(actual)])
+	return [pass_count, unrunnable]
 
 
 # -- specificity ---------------------------------------------------------------
@@ -129,7 +291,10 @@ func _run_specificity(arr: Array) -> int:
 			for prop in c["scopes"][scope].keys():
 				bag[prop] = PatterValues.to_value(c["scopes"][scope][prop])
 			ctx["scopes"][scope] = func(n): return bag.get(n)
-		var actual := PatterFlow._matched_spec(c["ast"], ctx, true)
+		var truthy := func(n: Array) -> bool:
+			var v = PatterExpr.evaluate(n, ctx, _dialect)
+			return false if PatterExpr.is_error(v) else PatterValues.truthy(v)
+		var actual := PatterSpecificity.matched_specificity(c["ast"], truthy)
 		var expected := int(c["expected"])
 		if actual == expected:
 			pass_count += 1
@@ -146,7 +311,7 @@ func _run_runtime(arr: Array) -> int:
 		var name: String = c["name"]
 		var options := {}
 		if c.has("seed"):
-			var rng := Mulberry32.new(int(c["seed"]))
+			var rng := PatterMulberry32.new(int(c["seed"]))
 			options["rng"] = func(): return rng.next()
 		if c.has("locale"):
 			options["locale"] = c["locale"]

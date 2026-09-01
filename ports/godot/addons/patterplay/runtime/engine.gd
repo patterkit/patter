@@ -105,7 +105,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_host["host_tokens"] = _host["host_scopes"].keys()
 
 	if options.has("seed"):
-		_default_seed = int(options["seed"]) & 0xffffffff
+		_default_seed = PatterMulberry32.to_uint32(float(options["seed"]))
 
 	for sid in bundle["scenes"].keys():
 		var scene: Dictionary = bundle["scenes"][sid]
@@ -180,7 +180,7 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	# the shared world. Replacing is a reset - contrast run_flow(), which reuses.
 	if _flows.has(id):
 		_flows[id].close()
-	var flow := PatterFlow.new(_host, int(seed_value) if seed_value != null else _default_seed)
+	var flow := PatterFlow.new(_host, float(seed_value) if seed_value != null else float(_default_seed))
 	_flows[id] = flow
 	flow.start(scene_id, block_id)
 	return flow
@@ -393,7 +393,7 @@ func load_game(save: Dictionary) -> void:
 	_host["stage_bags"] = (save["stage_bags"] as Dictionary).duplicate(true)
 	_flows = {}
 	for id in (save["flows"] as Dictionary).keys():
-		var flow := PatterFlow.new(_host, _default_seed)
+		var flow := PatterFlow.new(_host, float(_default_seed))
 		flow.restore(save["flows"][id])
 		_flows[id] = flow
 

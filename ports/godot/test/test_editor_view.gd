@@ -87,5 +87,12 @@ func _run() -> void:
 	_check("a broken bundle says so rather than rendering nothing", broken_text.contains("Bundle failed to load"))
 	_check("and says where it broke", broken_text.contains("line"), broken_text.substr(0, 120))
 
+
+	# The empty state the SHARED frame owns (expr/bundle_view.gd). The broken
+	# bundle is already covered above; this was the one neither family checked.
+	view.set_bundle_resource(null)
+	var empty_text := _text_of(view)
+	_check("nothing selected says so", empty_text.contains("No bundle selected"), empty_text.substr(0, 60))
+
 	print("EDITOR VIEW %s" % ("ALL PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(0 if _fails == 0 else 1)

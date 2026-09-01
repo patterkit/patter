@@ -6,6 +6,70 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING: `Mulberry32` is now `PatterMulberry32`.** It was the one class in
+  this addon without a `Patter` prefix, and `class_name` registers in Godot's
+  PROJECT-WIDE namespace: a bare `Mulberry32` collided with any other addon, or
+  your own code, that wanted the name. If you used `Mulberry32` directly, rename
+  it; nothing else in the addon exposed it.
+
+### Changed
+
+- **BREAKING: the evaluator now REFUSES a bad expression instead of returning a
+  fallback value.** `PatterExpr.evaluate` previously called `push_error()` and
+  returned `0.0` for a division by zero or a mixed-type `+`, `false` for an
+  unknown operator, and silently coerced any non-number to `0.0` (so `"a" < "b"`
+  answered false). It now returns a `PatterExpr.EvalError`, which callers test
+  with `PatterExpr.is_error(v)`, matching what the JS, Unity and Unreal runtimes
+  have always done.
+
+  A condition that errors is now ineligible rather than quietly false, and its
+  diagnostic is reported. Content that leant on the old fallbacks will behave
+  differently, and in every case we found the new behaviour is the one the other
+  three runtimes already gave.
+
+### Changed
+
+- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so
+  `check_flags` results and stored flag lists that hold the same members are equal
+  however they were built. They are compared as multisets, so a duplicated flag
+  still counts.
+
+  This is a behaviour change to existing content, and it is a fix rather than a
+  preference: a flags value IS a set, and its stored order was an artefact of the
+  order somebody happened to add things in. `set_flags(@f, +red)` then `+blue`
+  compared UNEQUAL to the same two flags added the other way round, a difference
+  no author can see and none intends. An expression that relied on two
+  equal-membered flag values comparing unequal will change answer.
+
+### Added
+
+- **`PatterDialect`**: the built-ins (`random`, `check_flags`, `set_flags`,
+  `visits`, `seen`, `patter_visits`, `patter_seen`) split out of the evaluator, so
+  the evaluator is configured by a dialect rather than fusing one. This is what
+  lets Patterplay and the Storylet Engine run the same evaluator source.
+- **`PatterSpecificity`**: the matched-constraint scorer, previously inline in
+  `flow.gd`.
+
+### Fixed
+
+- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32),
+  so every runtime lands on the same first draw for every seed. Seeds outside the
+  range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different
+  answer here from the JS runtime.
+- **Numbers render the way JavaScript's `String(n)` renders them.** `js_number`
+  used a 1e15 cutoff and `String.num`'s 14-decimal default, so `0.1 + 0.2` showed
+  as `0.3`, `1e16` as `10000000000000000.0` with a trailing `.0`, and `1/3` lost
+  two digits. `NAN` printed as `nan`. This is visible wherever a number reaches
+  displayed text through `{@ref}` interpolation.
+- **An effect whose value does not evaluate now writes nothing.** It previously
+  stored the evaluator's fallback (`0.0`, or `false`) into the property, which is
+  a corrupted save rather than a caught bug.
+- **`==` between a whole number and a float.** `3` and `3.0` compared unequal;
+  the reference has one number type, so they are the same value.
+
+
 ## [0.7.1] - 2026-08-30
 
 ### Added

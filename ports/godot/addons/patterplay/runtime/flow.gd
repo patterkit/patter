@@ -9,7 +9,7 @@ var id: String
 var _host: Dictionary
 var _local: Dictionary = {}
 var _scene_bags: Dictionary = {}
-var _prng := Mulberry32.new(0)  # the seeded PRNG; its `a` is the saved rng_state
+var _prng := PatterMulberry32.new(0)  # the seeded PRNG; its `a` is the saved rng_state
 
 var _started := false
 var _flow_ended := false
@@ -26,11 +26,12 @@ var _pending_prompt_owner: String = "" # chosen option owning _pending_prompt_be
 var _selectors: Dictionary = {}
 var _visit_counts: Dictionary = {}
 var _eval_ctx: Dictionary
+var _dialect: Dictionary = PatterDialect.dialect()
 
 
-func _init(host: Dictionary, seed_value: int) -> void:
+func _init(host: Dictionary, seed_value: float) -> void:
 	_host = host
-	_prng = Mulberry32.new(seed_value)
+	_prng = PatterMulberry32.new(seed_value)
 	_local = _fresh_local()
 	_eval_ctx = {
 		"scopes": {
@@ -602,33 +603,16 @@ func _pick_specificity(eligible: Array, exhaust: String, st: Dictionary):
 func _spec_score(node: Dictionary) -> int:
 	if not node.has("condition"):
 		return 0
-	return _matched_spec(node["condition"]["ast"], _eval_ctx, true)
+	var ctx := _eval_ctx
+	var truthy := func(n: Array) -> bool: return PatterValues.truthy(_spec_atom(n, ctx))
+	return PatterSpecificity.matched_specificity(node["condition"]["ast"], truthy)
 
 
-# matched-specificity: how many atomic constraints are actively holding this condition TRUE against the
-# live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
-# Static + ctx-parameterised so the conformance runner can score a bare AST against injected scopes.
-static func _matched_spec(node: Array, ctx: Dictionary, want: bool) -> int:
-	var tag = node[0]
-	if tag == "bin" and (node[1] == "and" or node[1] == "or"):
-		var behave_as_and: bool = (node[1] == "and") == want # De Morgan under negation
-		var l := _matched_spec(node[2], ctx, want)
-		var r := _matched_spec(node[3], ctx, want)
-		if behave_as_and:
-			return (l + r) if (l > 0 and r > 0) else 0
-		return l if l > r else r
-	if tag == "u" and node[1] == "not":
-		return _matched_spec(node[2], ctx, not want) # flip polarity
-	if tag == "call" and node[1] == "check_flags":
-		var operands := node.size() - 3 # ["call","check_flags",source,fd...]
-		if operands < 1:
-			operands = 1
-		var hit := PatterValues.truthy(PatterExpr.evaluate(node, ctx))
-		if want:
-			return operands if hit else 0
-		return 0 if hit else 1
-	# Atom: its truth matching the wanted polarity contributes one constraint.
-	return 1 if (PatterValues.truthy(PatterExpr.evaluate(node, ctx)) == want) else 0
+# One atom's value for specificity scoring. An eval error scores as false, the
+# same reading the JS scorer gives a throwing atom.
+static func _spec_atom(node: Array, ctx: Dictionary) -> Variant:
+	var v = PatterExpr.evaluate(node, ctx, PatterDialect.dialect())
+	return false if PatterExpr.is_error(v) else v
 
 
 func _fill_ids(eligible: Array, stick: bool, ln: int) -> Array:
@@ -650,17 +634,32 @@ func _selector_state_for(group: Dictionary) -> Dictionary:
 
 func _run_effects(effects: Array) -> void:
 	for e in effects:
-		set_property(e["target"], _eval_expr(e["value"]))
+		var v = _eval_expr(e["value"])
+		# An effect whose value does not evaluate writes NOTHING. Before the
+		# evaluator could refuse, a bad expression silently stored its fallback
+		# (0.0, or false) into the property, which is a corrupted save rather
+		# than a caught bug.
+		if PatterExpr.is_error(v):
+			push_error("effect on '%s' did not evaluate: %s" % [e["target"], v.message])
+			continue
+		set_property(e["target"], v)
 
 
 func _eligible(node: Dictionary) -> bool:
 	if not node.has("condition"):
 		return true
-	return PatterValues.truthy(_eval_expr(node["condition"]))
+	var v = _eval_expr(node["condition"])
+	# An eval error is never a silent pass: the node is ineligible and the
+	# diagnostic surfaces. truthy() would answer false for an EvalError anyway;
+	# this says it on purpose, and reports why.
+	if PatterExpr.is_error(v):
+		push_error("condition did not evaluate: %s" % v.message)
+		return false
+	return PatterValues.truthy(v)
 
 
 func _eval_expr(expr: Dictionary):
-	return PatterExpr.evaluate(expr["ast"], _eval_ctx)
+	return PatterExpr.evaluate(expr["ast"], _eval_ctx, _dialect)
 
 
 func _enter(nid: String) -> void:
@@ -672,7 +671,7 @@ func _rng() -> float:
 	var custom = _host.get("custom_rng")
 	if custom != null:
 		return custom.call()
-	return _prng.next()  # the same mixing as Mulberry32.next(), no longer duplicated inline
+	return _prng.next()  # the same mixing as PatterMulberry32.next(), no longer duplicated inline
 
 
 # -- strings / beats -----------------------------------------------------------
@@ -881,7 +880,9 @@ func snapshot() -> Dictionary:
 
 
 func restore(snap: Dictionary) -> void:
-	_prng.a = int(snap["rng_state"]) & 0xffffffff  # int() survives a JSON save/load round-trip
+	# Through to_uint32, not a bare mask: the JS runtime persisted this state SIGNED
+	# until it was fixed, so saves in the wild carry a negative number here.
+	_prng.a = PatterMulberry32.to_uint32(float(snap["rng_state"]))
 	_visit_counts = (snap["visits"] as Dictionary).duplicate(true)
 	_started = true
 	_flow_ended = snap["flow_ended"]

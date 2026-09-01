@@ -1,224 +1,35 @@
-# The expression evaluator + the Patter dialect - a port of @wildwinter/expr's evaluate.ts and
-# @patterkit/dialect. Walks a compiled AST (the corpus's tagged-tuple Array form) against a context
-# (scope resolvers + host hooks). Same operator typing, short-circuiting, value-equality, and built-ins.
+# The Patter expression evaluator: a thin shim over the SHARED implementation.
 #
-# ctx = {
-#   "scopes": { token: Callable(name) -> value-or-null },
-#   "next_random": Callable() -> float (or null),
-#   "visits": Callable(id) -> int (or null),
-#   "patter_visits": Callable(id) -> int (or null),
-# }
+# The algorithm lives once, in expr/ports/godot/expr_eval.gd, vendored beside
+# this file as expr/expr_eval.gd. This file exists only to give it a Patterplay
+# identity: `class_name PatterExpr`, so every existing caller in this addon and
+# in any game reads exactly as it did before.
+#
+# The shared source deliberately declares NO class_name. Godot registers
+# class_name in a PROJECT-WIDE namespace, so if both this addon and the Storylet
+# Engine's vendored the same named class, installing both in one game would be a
+# hard editor error. Identity belongs to the installing plugin; the shared source
+# stays anonymous. See expr/docs/port-sharing.md.
+#
+# The dialect (Patter's own built-ins) is PatterDialect; the evaluator takes it
+# as a parameter, which is what lets one file serve two products.
 class_name PatterExpr
 
+const Impl := preload("expr/expr_eval.gd")
 
-static func evaluate(node: Array, ctx: Dictionary):
-	var tag = node[0]
-	match tag:
-		"b":
-			return node[1]
-		"n":
-			return PatterValues.to_value(node[1])
-		"s":
-			return node[1]
-		"sv":
-			var scope = node[1]
-			var name = node[2]
-			var scopes: Dictionary = ctx["scopes"]
-			if not scopes.has(scope):
-				return false
-			var v = scopes[scope].call(name)
-			return v if v != null else false
-		"call":
-			return _eval_call(node, ctx)
-		"fd":
-			push_error("flagdelta node is only valid as an argument to a flag-delta function")
-			return false
-		"u":
-			if node[1] == "not":
-				var v = evaluate(node[2], ctx)
-				return not v if typeof(v) == TYPE_BOOL else false
-			var n = evaluate(node[2], ctx)
-			return -n if typeof(n) == TYPE_FLOAT else 0.0
-		"bin":
-			return _eval_binary(node, ctx)
-	push_error("unknown ast node")
-	return false
+## The eval-error type. GDScript has no exceptions, so a refusal is a returned
+## object; callers test with is_error().
+const EvalError := Impl.EvalError
 
 
-static func _eval_binary(node: Array, ctx: Dictionary):
-	var op = node[1]
-	if op == "and":
-		var l = evaluate(node[2], ctx)
-		if typeof(l) != TYPE_BOOL or not l:
-			return false
-		var r = evaluate(node[3], ctx)
-		return r if typeof(r) == TYPE_BOOL else false
-	if op == "or":
-		var l = evaluate(node[2], ctx)
-		if typeof(l) == TYPE_BOOL and l:
-			return true
-		var r = evaluate(node[3], ctx)
-		return r if typeof(r) == TYPE_BOOL else false
-
-	var left = evaluate(node[2], ctx)
-	var right = evaluate(node[3], ctx)
-
-	# Quality (expr 0.4.0): when either operand REFERENCES a quality, ordering compares by ladder
-	# POSITION and arithmetic is refused. == / != fall through to plain value equality - the compiler's
-	# validator holds stage names to the ladder, so a bad name never gets this far from source.
-	var l_ladder = _ladder_of(node[2], ctx)
-	var r_ladder = _ladder_of(node[3], ctx)
-	var ladder = l_ladder if l_ladder != null else r_ladder
-	if ladder != null:
-		var ordering: bool = op == ">" or op == ">=" or op == "<" or op == "<="
-		if ordering and l_ladder != null and r_ladder != null and l_ladder != r_ladder:
-			push_error("'%s' compares two different qualities, whose stage orders are unrelated" % op)
-			return false
-		match op:
-			">":
-				return _stage_index(left, ladder, op) > _stage_index(right, ladder, op)
-			">=":
-				return _stage_index(left, ladder, op) >= _stage_index(right, ladder, op)
-			"<":
-				return _stage_index(left, ladder, op) < _stage_index(right, ladder, op)
-			"<=":
-				return _stage_index(left, ladder, op) <= _stage_index(right, ladder, op)
-			"+", "-", "*", "/":
-				push_error("'%s' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it" % op)
-				return false
-
-	match op:
-		"==":
-			return PatterValues.value_equals(left, right)
-		"!=":
-			return not PatterValues.value_equals(left, right)
-		">":
-			return _num(left) > _num(right)
-		">=":
-			return _num(left) >= _num(right)
-		"<":
-			return _num(left) < _num(right)
-		"<=":
-			return _num(left) <= _num(right)
-		"+":
-			if typeof(left) == TYPE_FLOAT and typeof(right) == TYPE_FLOAT:
-				return left + right
-			if typeof(left) == TYPE_STRING and typeof(right) == TYPE_STRING:
-				return left + right
-			push_error("'+' requires two numbers or two strings")
-			return 0.0
-		"-":
-			return _num(left) - _num(right)
-		"*":
-			return _num(left) * _num(right)
-		"/":
-			var d = _num(right)
-			if d == 0.0:
-				push_error("division by zero")
-				return 0.0
-			return _num(left) / d
-	push_error("unknown operator")
-	return false
+static func error(message: String) -> Impl.EvalError:
+	return Impl.error(message)
 
 
-static func _num(v) -> float:
-	return v if typeof(v) == TYPE_FLOAT else 0.0
+static func is_error(v) -> bool:
+	return Impl.is_error(v)
 
 
-# The ladder behind an operand NODE, when the context's quality channel says it references one
-# (null otherwise). The node carries the scope+name the channel needs; values are plain strings.
-static func _ladder_of(node, ctx: Dictionary):
-	if not ctx.has("qualities") or typeof(node) != TYPE_ARRAY or node.size() < 3 or node[0] != "sv":
-		return null
-	return ctx["qualities"].call(node[1], node[2])
-
-
-# Index of a stage in a ladder; an unknown stage is an ERROR naming the value and the ladder (a
-# drifted save is exactly what lands here), never a silent never-match.
-static func _stage_index(value, ladder: Array, op: String) -> int:
-	if typeof(value) != TYPE_STRING:
-		push_error("'%s' on a quality compares stages, got a non-string" % op)
-		return 0
-	var i := ladder.find(value)
-	if i < 0:
-		push_error('"%s" is not a stage of this quality (stages: %s)' % [value, ", ".join(ladder)])
-		return 0
-	return i
-
-
-static func _eval_call(node: Array, ctx: Dictionary):
-	var fn = node[1]
-	var args: Array = node.slice(2)
-	# advance() is the language's own (expr 0.4.0): the NEXT stage in the argument's ladder,
-	# saturating at the last. Patter's dialect defines no advance, so the core one always runs.
-	if fn == "advance":
-		if args.size() != 1:
-			push_error("advance() takes exactly 1 argument, got %d" % args.size())
-			return ""
-		var ladder = _ladder_of(args[0], ctx)
-		if ladder == null:
-			push_error("advance() needs a quality reference (@scope.name of a quality property)")
-			return ""
-		var current := _stage_index(evaluate(args[0], ctx), ladder, "advance")
-		return str(ladder[mini(current + 1, ladder.size() - 1)])
-	match fn:
-		"random":
-			if args.size() != 2 or ctx.get("next_random") == null:
-				push_error("random(a, b) requires 2 args and a PRNG")
-				return 0.0
-			var a = evaluate(args[0], ctx)
-			var b = evaluate(args[1], ctx)
-			var lo = min(a, b)
-			var hi = max(a, b)
-			return floor(ctx["next_random"].call() * (hi - lo + 1.0)) + lo
-		"check_flags":
-			var flags := _read_flags(args[0] if args.size() > 0 else null, ctx)
-			for i in range(1, args.size()):
-				var arg = args[i]
-				var has_flag := flags.has(arg[2])
-				if (arg[1] == "+") != has_flag:
-					return false
-			return true
-		"set_flags":
-			var result := _read_flags(args[0] if args.size() > 0 else null, ctx).duplicate()
-			for i in range(1, args.size()):
-				var arg = args[i]
-				if arg[1] == "+":
-					if not result.has(arg[2]):
-						result.append(arg[2])
-				else:
-					result.erase(arg[2])
-			return result
-		"visits":
-			return float(_host_int(ctx, "visits", _node_id(args, ctx)))
-		"seen":
-			return _host_int(ctx, "visits", _node_id(args, ctx)) > 0
-		"patter_visits":
-			return float(_host_int(ctx, "patter_visits", _node_id(args, ctx)))
-		"patter_seen":
-			return _host_int(ctx, "patter_visits", _node_id(args, ctx)) > 0
-	push_error("unknown function '%s'" % fn)
-	return false
-
-
-static func _host_int(ctx: Dictionary, key: String, id: String) -> int:
-	var cb = ctx.get(key)
-	return int(cb.call(id)) if cb != null else 0
-
-
-static func _node_id(args: Array, ctx: Dictionary) -> String:
-	if args.is_empty():
-		return ""
-	var v = evaluate(args[0], ctx)
-	return v if typeof(v) == TYPE_STRING else ""
-
-
-static func _read_flags(arg, ctx: Dictionary) -> Array:
-	if arg == null:
-		return []
-	var v = evaluate(arg, ctx)
-	if typeof(v) == TYPE_ARRAY:
-		return v
-	if typeof(v) == TYPE_BOOL and not v:
-		return []
-	return []
+## Evaluate `node` in `ctx` under `dialect`; a scalar value or an EvalError.
+static func evaluate(node: Array, ctx: Dictionary, dialect: Dictionary) -> Variant:
+	return Impl.evaluate(node, ctx, dialect)
