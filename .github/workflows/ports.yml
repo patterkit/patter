@@ -1,0 +1,102 @@
+# The Patterplay ports, built and run on every push.
+#
+# Until 2026-09-01 the three ports were exercised in CI only by the release
+# workflows (play-godot / play-unity / play-unreal), which fire on a version tag.
+# So a change that broke a port stayed green for as long as nobody cut a release,
+# and the conformance corpus - the thing that is supposed to be the parity
+# contract - was not a gate on the commit that broke it. Storylets' equivalent
+# (storylets/.github/workflows/ports.yml) has run per-push since 2026-08-29;
+# this is the matching half.
+#
+# Nothing here needs a licence or a game engine:
+#   - Godot really is Godot, headless, running the addon's corpus TestHost.
+#   - Unity's runtime is pure C#, so the dotnet TestHost compiles the same files
+#     the asmdefs ship and replays the corpus.
+#   - Unreal's core is std-only C++, so clang compiles it with no UE at all.
+#
+# Each of these also replays the @wildwinter/expr parity corpus, which is
+# vendored at packages/conformance/expr-corpus.json and kept honest by the
+# expr-corpus-sync job below.
+name: Ports
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  GODOT_VERSION: "4.3-stable"
+
+jobs:
+  godot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install headless Godot ${{ env.GODOT_VERSION }}
+        run: |
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fSL "$url" -o godot.zip
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}_linux.x86_64" godot
+          chmod +x godot
+      # Once, so the class_name registrations exist before any script runs.
+      - name: Import project (registers the class_name globals)
+        run: ./godot --headless --path ports/godot --import || true
+      - name: Conformance corpus (and the expr parity corpus beside it)
+        run: ./godot --headless --path ports/godot --script res://test/test_corpus.gd -- "$PWD/packages/conformance/corpus.json"
+
+  unity-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      # Compiles the same Runtime/**/*.cs the Unity asmdefs ship.
+      - name: C# runtime against the corpus
+        run: dotnet run --project ports/unity/TestHost -- packages/conformance/corpus.json
+
+  unreal-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # build.sh compiles the std-only core with clang and runs it against the
+      # committed corpus.json. No Unreal involved.
+      - name: std C++ core against the corpus
+        run: ./ports/unreal/TestHost/build.sh
+
+  # The @wildwinter/expr parity corpus is authored in ../expr and VENDORED here as
+  # packages/conformance/expr-corpus.json, so the port test hosts above run with no
+  # assumption that expr is checked out beside this repo. That copy can go stale, and
+  # a stale copy is worse than none: every port would pass a contract that no longer
+  # matches the one the Storylet Engine is held to, which is the exact drift this
+  # whole exercise exists to stop.
+  expr-corpus-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: patter
+      - name: Checkout @wildwinter/expr (the corpus is authored there)
+        uses: actions/checkout@v5
+        with:
+          repository: wildwinter/expr
+          path: expr
+      - name: The vendored expr corpus matches the authored one
+        run: |
+          if ! diff -q expr/packages/conformance/corpus.json \
+                       patter/packages/conformance/expr-corpus.json; then
+            echo "::error::The vendored expr corpus is out of date."
+            echo "Run 'node scripts/sync-conformance.mjs' in ../expr and commit the result here."
+            diff -u expr/packages/conformance/corpus.json \
+                    patter/packages/conformance/expr-corpus.json | head -40
+            exit 1
+          fi
+          echo "vendored expr corpus is current"
+      # The evaluator itself is now ONE implementation, authored in expr/ports and
+      # vendored into this addon. A hand edit to the vendored copy is how six
+      # transliterations of the same 200 lines started; this is what stops a
+      # seventh. The script exits 1 on any difference, in either direction.
+      - name: The vendored shared port sources match the authored ones
+        working-directory: expr
+        run: node scripts/vendor-ports.mjs --check

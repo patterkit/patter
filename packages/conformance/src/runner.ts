@@ -13,7 +13,7 @@
 // ports must reproduce it for seeded `random()` / shuffle.
 // ---------------------------------------------------------------------------
 
-import { evaluate, deserialiseAst } from "@wildwinter/expr";
+import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
@@ -196,12 +196,8 @@ export function runGameDataCase(c: GameDataCase): GameData {
 
 /** Small deterministic PRNG (mulberry32) - byte-identical to the engine's. */
 export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  // @wildwinter/expr's makePrng, not a fourth copy of the mixing inside this
+  // repo. Same algorithm, same draws; it just lives in one place now.
+  const prng = makePrng(seed);
+  return () => prng.next();
 }

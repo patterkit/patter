@@ -1,0 +1,4211 @@
+{
+  "version": 1,
+  "prng": [
+    {
+      "name": "seed zero",
+      "seed": 0,
+      "expectSeedState": 0,
+      "expectStates": [
+        1831565813,
+        3663131626,
+        1199730143,
+        3031295956
+      ],
+      "expectDraws": [
+        1144304738,
+        1416247,
+        958946056,
+        627933444
+      ]
+    },
+    {
+      "name": "seed one",
+      "seed": 1,
+      "expectSeedState": 1,
+      "expectStates": [
+        1831565814,
+        3663131627,
+        1199730144,
+        3031295957
+      ],
+      "expectDraws": [
+        2693262067,
+        11749833,
+        2265367787,
+        4213581821
+      ]
+    },
+    {
+      "name": "seed forty-two",
+      "seed": 42,
+      "expectSeedState": 42,
+      "expectStates": [
+        1831565855,
+        3663131668,
+        1199730185,
+        3031295998
+      ],
+      "expectDraws": [
+        2581720956,
+        1925393290,
+        3661312704,
+        2876485805
+      ]
+    },
+    {
+      "name": "seed negative one",
+      "seed": -1,
+      "expectSeedState": 4294967295,
+      "expectStates": [
+        1831565812,
+        3663131625,
+        1199730142,
+        3031295955
+      ],
+      "expectDraws": [
+        3850105811,
+        813802916,
+        3073704848,
+        4054706436
+      ]
+    },
+    {
+      "name": "seed negative forty-two",
+      "seed": -42,
+      "expectSeedState": 4294967254,
+      "expectStates": [
+        1831565771,
+        3663131584,
+        1199730101,
+        3031295914
+      ],
+      "expectDraws": [
+        380665563,
+        1024582575,
+        936117768,
+        3925118404
+      ]
+    },
+    {
+      "name": "seed fractional 2.5",
+      "seed": 2.5,
+      "expectSeedState": 2,
+      "expectStates": [
+        1831565815,
+        3663131628,
+        1199730145,
+        3031295958
+      ],
+      "expectDraws": [
+        3153583793,
+        1395857638,
+        1225337227,
+        2310499808
+      ]
+    },
+    {
+      "name": "seed fractional -2.5",
+      "seed": -2.5,
+      "expectSeedState": 4294967294,
+      "expectStates": [
+        1831565811,
+        3663131624,
+        1199730141,
+        3031295954
+      ],
+      "expectDraws": [
+        677713132,
+        210922997,
+        3337126793,
+        725220637
+      ]
+    },
+    {
+      "name": "seed 2^32",
+      "seed": 4294967296,
+      "expectSeedState": 0,
+      "expectStates": [
+        1831565813,
+        3663131626,
+        1199730143,
+        3031295956
+      ],
+      "expectDraws": [
+        1144304738,
+        1416247,
+        958946056,
+        627933444
+      ]
+    },
+    {
+      "name": "seed 2^32 + 1",
+      "seed": 4294967297,
+      "expectSeedState": 1,
+      "expectStates": [
+        1831565814,
+        3663131627,
+        1199730144,
+        3031295957
+      ],
+      "expectDraws": [
+        2693262067,
+        11749833,
+        2265367787,
+        4213581821
+      ]
+    },
+    {
+      "name": "seed uint32 max",
+      "seed": 4294967295,
+      "expectSeedState": 4294967295,
+      "expectStates": [
+        1831565812,
+        3663131625,
+        1199730142,
+        3031295955
+      ],
+      "expectDraws": [
+        3850105811,
+        813802916,
+        3073704848,
+        4054706436
+      ]
+    },
+    {
+      "name": "seed 1e18",
+      "seed": 1000000000000000000,
+      "expectSeedState": 2808348672,
+      "expectStates": [
+        344947189,
+        2176513002,
+        4008078815,
+        1544677332
+      ],
+      "expectDraws": [
+        2768649970,
+        2896632030,
+        1878583439,
+        1479682013
+      ]
+    },
+    {
+      "name": "seed 1e19",
+      "seed": 10000000000000000000,
+      "expectSeedState": 2313682944,
+      "expectStates": [
+        4145248757,
+        1681847274,
+        3513413087,
+        1050011604
+      ],
+      "expectDraws": [
+        3802796870,
+        2473517270,
+        1070484268,
+        353218858
+      ]
+    },
+    {
+      "name": "seed NaN",
+      "seed": "NaN",
+      "expectSeedState": 0,
+      "expectStates": [
+        1831565813,
+        3663131626,
+        1199730143,
+        3031295956
+      ],
+      "expectDraws": [
+        1144304738,
+        1416247,
+        958946056,
+        627933444
+      ]
+    },
+    {
+      "name": "seed Infinity",
+      "seed": "Infinity",
+      "expectSeedState": 0,
+      "expectStates": [
+        1831565813,
+        3663131626,
+        1199730143,
+        3031295956
+      ],
+      "expectDraws": [
+        1144304738,
+        1416247,
+        958946056,
+        627933444
+      ]
+    },
+    {
+      "name": "seed -Infinity",
+      "seed": "-Infinity",
+      "expectSeedState": 0,
+      "expectStates": [
+        1831565813,
+        3663131626,
+        1199730143,
+        3031295956
+      ],
+      "expectDraws": [
+        1144304738,
+        1416247,
+        958946056,
+        627933444
+      ]
+    }
+  ],
+  "expressions": [
+    {
+      "name": "and short-circuits on a false left",
+      "src": "@v.no and (@v.n / @v.zero > 1)",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "sv",
+          "v",
+          "no"
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "bin",
+            "/",
+            [
+              "sv",
+              "v",
+              "n"
+            ],
+            [
+              "sv",
+              "v",
+              "zero"
+            ]
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "or short-circuits on a true left",
+      "src": "@v.yes or (@v.n / @v.zero > 1)",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "sv",
+          "v",
+          "yes"
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "bin",
+            "/",
+            [
+              "sv",
+              "v",
+              "n"
+            ],
+            [
+              "sv",
+              "v",
+              "zero"
+            ]
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "and does not short-circuit on a true left",
+      "src": "@v.yes and (@v.n / @v.zero > 1)",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "sv",
+          "v",
+          "yes"
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "bin",
+            "/",
+            [
+              "sv",
+              "v",
+              "n"
+            ],
+            [
+              "sv",
+              "v",
+              "zero"
+            ]
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "or does not short-circuit on a false left",
+      "src": "@v.no or (@v.n / @v.zero > 1)",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "sv",
+          "v",
+          "no"
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "bin",
+            "/",
+            [
+              "sv",
+              "v",
+              "n"
+            ],
+            [
+              "sv",
+              "v",
+              "zero"
+            ]
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "and returns the right operand when the left is true",
+      "src": "@v.yes and @v.no",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "sv",
+          "v",
+          "yes"
+        ],
+        [
+          "sv",
+          "v",
+          "no"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "or returns the right operand when the left is false",
+      "src": "@v.no or @v.yes",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "sv",
+          "v",
+          "no"
+        ],
+        [
+          "sv",
+          "v",
+          "yes"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "and rejects a numeric left",
+      "src": "@v.n and @v.yes",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "yes"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "and rejects a numeric right",
+      "src": "@v.yes and @v.n",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "sv",
+          "v",
+          "yes"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "or rejects a numeric left",
+      "src": "@v.n or @v.yes",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "yes"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "or rejects a string right",
+      "src": "@v.no or @v.s",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "sv",
+          "v",
+          "no"
+        ],
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "not rejects a number",
+      "src": "not @v.n",
+      "ast": [
+        "u",
+        "not",
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "not rejects a string",
+      "src": "not @v.s",
+      "ast": [
+        "u",
+        "not",
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "not negates a boolean",
+      "src": "not @v.no",
+      "ast": [
+        "u",
+        "not",
+        [
+          "sv",
+          "v",
+          "no"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "unary minus rejects a boolean",
+      "src": "-@v.yes",
+      "ast": [
+        "u",
+        "neg",
+        [
+          "sv",
+          "v",
+          "yes"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "unary minus rejects a string",
+      "src": "-@v.s",
+      "ast": [
+        "u",
+        "neg",
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "unary minus negates a number",
+      "src": "-@v.n",
+      "ast": [
+        "u",
+        "neg",
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": -3
+    },
+    {
+      "name": "unary minus on a negative number",
+      "src": "-@v.neg",
+      "ast": [
+        "u",
+        "neg",
+        [
+          "sv",
+          "v",
+          "neg"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 2
+    },
+    {
+      "name": "addition of two numbers",
+      "src": "@v.n + @w.n",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 8
+    },
+    {
+      "name": "subtraction of two numbers",
+      "src": "@v.n - @w.n",
+      "ast": [
+        "bin",
+        "-",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": -2
+    },
+    {
+      "name": "multiplication of two numbers",
+      "src": "@v.n * @w.n",
+      "ast": [
+        "bin",
+        "*",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 15
+    },
+    {
+      "name": "division of two numbers is not integer division",
+      "src": "@v.n / @w.n",
+      "ast": [
+        "bin",
+        "/",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 0.6
+    },
+    {
+      "name": "addition concatenates two strings",
+      "src": "@v.s + @v.t",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "s"
+        ],
+        [
+          "sv",
+          "v",
+          "t"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": "abcd"
+    },
+    {
+      "name": "addition rejects a number and a string",
+      "src": "@v.n + @v.s",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "addition rejects a string and a number",
+      "src": "@v.s + @v.n",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "s"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "addition rejects two booleans",
+      "src": "@v.yes + @v.no",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "yes"
+        ],
+        [
+          "sv",
+          "v",
+          "no"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "subtraction rejects two strings",
+      "src": "@v.s - @v.t",
+      "ast": [
+        "bin",
+        "-",
+        [
+          "sv",
+          "v",
+          "s"
+        ],
+        [
+          "sv",
+          "v",
+          "t"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "multiplication rejects a string",
+      "src": "@v.s * @v.n",
+      "ast": [
+        "bin",
+        "*",
+        [
+          "sv",
+          "v",
+          "s"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "division by zero is refused",
+      "src": "@v.n / @v.zero",
+      "ast": [
+        "bin",
+        "/",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "zero"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "division of zero by a number is fine",
+      "src": "@v.zero / @v.n",
+      "ast": [
+        "bin",
+        "/",
+        [
+          "sv",
+          "v",
+          "zero"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 0
+    },
+    {
+      "name": "less than on numbers",
+      "src": "@v.n < @w.n",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "greater than on numbers",
+      "src": "@v.n > @w.n",
+      "ast": [
+        "bin",
+        ">",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "less than or equal, when equal",
+      "src": "@v.n <= @v.n",
+      "ast": [
+        "bin",
+        "<=",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "greater than or equal, when equal",
+      "src": "@v.n >= @v.n",
+      "ast": [
+        "bin",
+        ">=",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "less than on negatives",
+      "src": "@v.neg < @v.zero",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "neg"
+        ],
+        [
+          "sv",
+          "v",
+          "zero"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "ordering rejects two strings",
+      "src": "@v.s < @v.t",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "s"
+        ],
+        [
+          "sv",
+          "v",
+          "t"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "ordering rejects two booleans",
+      "src": "@v.no < @v.yes",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "no"
+        ],
+        [
+          "sv",
+          "v",
+          "yes"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "ordering rejects a number and a string",
+      "src": "@v.n < @v.s",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "ordering rejects two flag lists",
+      "src": "@v.tags < @w.tags",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "tags"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expectError": true
+    },
+    {
+      "name": "numbers compare equal by value",
+      "src": "@v.n == @v.n",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "strings compare equal by value",
+      "src": "@v.s == @w.s",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "s"
+        ],
+        [
+          "sv",
+          "w",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "booleans compare equal by value",
+      "src": "@v.no == @v.no",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "no"
+        ],
+        [
+          "sv",
+          "v",
+          "no"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "a number and a string are unequal, not an error",
+      "src": "@v.n == @v.s",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "a number and a boolean are unequal, not an error",
+      "src": "@v.zero == @v.no",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "zero"
+        ],
+        [
+          "sv",
+          "v",
+          "no"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "inequality negates equality",
+      "src": "@v.n != @w.n",
+      "ast": [
+        "bin",
+        "!=",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "sv",
+          "w",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "flags with the same members are equal",
+      "src": "@v.tags == @w.tags",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "tags"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "flags in a different order are still equal",
+      "src": "@v.tags == @w.reordered",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "reordered"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "flags of different lengths are unequal",
+      "src": "@v.tags == @w.longer",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "longer"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "flags of the same length with different members are unequal",
+      "src": "@v.tags == @w.swapped",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "swapped"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "a duplicated flag is not the same as two distinct ones",
+      "src": "@w.dupe == @v.tags",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "w",
+          "dupe"
+        ],
+        [
+          "sv",
+          "v",
+          "tags"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "an empty flag list equals itself",
+      "src": "@w.empty == @w.empty",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "w",
+          "empty"
+        ],
+        [
+          "sv",
+          "w",
+          "empty"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "an empty flag list is not a populated one",
+      "src": "@w.empty == @v.tags",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "w",
+          "empty"
+        ],
+        [
+          "sv",
+          "v",
+          "tags"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "flags and a string are unequal, not an error",
+      "src": "@v.tags == @v.s",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "v",
+          "s"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "flags and a number are unequal, not an error",
+      "src": "@v.tags == @v.n",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "v",
+          "n"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "flags inequality is order-insensitive too",
+      "src": "@v.tags != @w.reordered",
+      "ast": [
+        "bin",
+        "!=",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "reordered"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "flags inequality still separates different members",
+      "src": "@v.tags != @w.swapped",
+      "ast": [
+        "bin",
+        "!=",
+        [
+          "sv",
+          "v",
+          "tags"
+        ],
+        [
+          "sv",
+          "w",
+          "swapped"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "an absent scope resolves to false",
+      "src": "@gone.anything",
+      "ast": [
+        "sv",
+        "gone",
+        "anything"
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "an absent scope is false, so `not` of it is true",
+      "src": "not @gone.anything",
+      "ast": [
+        "u",
+        "not",
+        [
+          "sv",
+          "gone",
+          "anything"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "an absent scope short-circuits an and",
+      "src": "@gone.anything and (@v.n / @v.zero > 1)",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "sv",
+          "gone",
+          "anything"
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "bin",
+            "/",
+            [
+              "sv",
+              "v",
+              "n"
+            ],
+            [
+              "sv",
+              "v",
+              "zero"
+            ]
+          ],
+          [
+            "n",
+            1
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": false
+    },
+    {
+      "name": "a bare true literal",
+      "src": "true",
+      "ast": [
+        "b",
+        true
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "a numeric literal",
+      "src": "7",
+      "ast": [
+        "n",
+        7
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 7
+    },
+    {
+      "name": "a string literal",
+      "src": "\"hi\"",
+      "ast": [
+        "s",
+        "hi"
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": "hi"
+    },
+    {
+      "name": "multiplication binds tighter than addition",
+      "src": "@v.n + @w.n * 2",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "n"
+        ],
+        [
+          "bin",
+          "*",
+          [
+            "sv",
+            "w",
+            "n"
+          ],
+          [
+            "n",
+            2
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 13
+    },
+    {
+      "name": "parentheses override precedence",
+      "src": "(@v.n + @w.n) * 2",
+      "ast": [
+        "bin",
+        "*",
+        [
+          "bin",
+          "+",
+          [
+            "sv",
+            "v",
+            "n"
+          ],
+          [
+            "sv",
+            "w",
+            "n"
+          ]
+        ],
+        [
+          "n",
+          2
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": 16
+    },
+    {
+      "name": "and binds tighter than or",
+      "src": "@v.no and @v.yes or @v.yes",
+      "ast": [
+        "bin",
+        "or",
+        [
+          "bin",
+          "and",
+          [
+            "sv",
+            "v",
+            "no"
+          ],
+          [
+            "sv",
+            "v",
+            "yes"
+          ]
+        ],
+        [
+          "sv",
+          "v",
+          "yes"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    },
+    {
+      "name": "comparison binds tighter than and",
+      "src": "@v.n < @w.n and @w.n > @v.zero",
+      "ast": [
+        "bin",
+        "and",
+        [
+          "bin",
+          "<",
+          [
+            "sv",
+            "v",
+            "n"
+          ],
+          [
+            "sv",
+            "w",
+            "n"
+          ]
+        ],
+        [
+          "bin",
+          ">",
+          [
+            "sv",
+            "w",
+            "n"
+          ],
+          [
+            "sv",
+            "v",
+            "zero"
+          ]
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "n": 3,
+          "zero": 0,
+          "neg": -2,
+          "s": "ab",
+          "t": "cd",
+          "yes": true,
+          "no": false,
+          "tags": [
+            "red",
+            "blue"
+          ]
+        },
+        "w": {
+          "n": 5,
+          "s": "ab",
+          "tags": [
+            "red",
+            "blue"
+          ],
+          "reordered": [
+            "blue",
+            "red"
+          ],
+          "longer": [
+            "red",
+            "blue",
+            "green"
+          ],
+          "swapped": [
+            "red",
+            "green"
+          ],
+          "dupe": [
+            "red",
+            "red"
+          ],
+          "empty": []
+        }
+      },
+      "expected": true
+    }
+  ]
+}
