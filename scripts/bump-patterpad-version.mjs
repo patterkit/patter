@@ -74,8 +74,11 @@ console.log(`
 Next steps (review the diffs first):
   git add packages/patterpad/package.json packages/patterpad/CHANGELOG.md
   git commit -m "Patterpad ${version}"
-  git tag v${version}
-  git push && git push --tags          # the tag triggers the Patterpad release pipeline
+  git push
+  git tag v${version} && git push origin v${version}
+                                       # push the tag BY NAME, never "git push --tags",
+                                       # which also pushes every other local tag GitHub
+                                       # has not seen; the tag triggers the pipeline
                                        # (builds + signs mac/win/linux, publishes installers
                                        # + the electron-updater feeds to the GitHub Release)
 `);

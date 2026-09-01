@@ -129,7 +129,17 @@ console.log(`
 Next steps (review the diffs first):
   git add <the files above>            # commit the bump
   git commit -m "Patterplay ${version}"
-  git tag play-js-v${version} && git tag play-unity-v${version} && git tag play-godot-v${version} && git tag play-unreal-v${version}
-  git push && git push --tags          # tags trigger the release pipelines
-                                       # (npm publishes @patterkit/runtime on the next main release run)
+  git push
+
+  git tag play-js-v${version}     && git push origin play-js-v${version}
+  git tag play-unity-v${version}  && git push origin play-unity-v${version}
+  git tag play-godot-v${version}  && git push origin play-godot-v${version}
+  git tag play-unreal-v${version} && git push origin play-unreal-v${version}
+
+  # ONE AT A TIME, and never "git push --tags". GitHub creates NO workflow run at
+  # all for tags pushed together beyond the first few: on 2026-09-01 all four went
+  # up in one push, fired nothing, and the tag ruleset then forbade the delete that
+  # would have let them be pushed again. Four correct tags, no release, and the
+  # recovery needed a workflow_dispatch added to every pipeline.
+  # (npm publishes @patterkit/runtime on the next main release run.)
 `);
