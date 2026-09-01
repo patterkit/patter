@@ -29,6 +29,7 @@ import { evaluate, deserialiseAst, makePrng, toUint32 } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
+import { defaultFor } from "@wildwinter/scoperegistry";
 import type { PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
@@ -950,7 +951,7 @@ export class Engine {
       values: d.values,
       stages: d.stages,
       value: this.getProperty(`@${d.name}`),
-      default: declDefault(d),
+      default: defaultFor(d),
       // Part of the shared row. Always true here today: `toDecl` never sets it, because
       // Patter has no read-only shared property. The Storylet Engine does declare them
       // and its panels disable the editor accordingly, so the field is carried rather
@@ -1977,7 +1978,7 @@ export class Flow {
       const bag: Record<string, ScalarValue> = {};
       for (const decl of scene.sceneProps ?? []) {
         const name = decl.name.toLowerCase();
-        if (!shared.has(name)) bag[name] = sceneDefault(decl);
+        if (!shared.has(name)) bag[name] = defaultFor(decl);
       }
       this.sceneBags.set(scene.id, bag);
     }
@@ -1985,7 +1986,7 @@ export class Flow {
       const bag: Record<string, ScalarValue> = {};
       for (const decl of scene.sceneProps ?? []) {
         const name = decl.name.toLowerCase();
-        if (shared.has(name)) bag[name] = sceneDefault(decl);
+        if (shared.has(name)) bag[name] = defaultFor(decl);
       }
       this.host.stageBags.set(scene.id, bag);
     }
@@ -1996,7 +1997,7 @@ export class Flow {
       if (!decl.temporary) continue;
       const name = decl.name.toLowerCase();
       const bag = shared.has(name) ? this.host.stageBags.get(scene.id) : this.sceneBags.get(scene.id);
-      if (bag) bag[name] = sceneDefault(decl);
+      if (bag) bag[name] = defaultFor(decl);
     }
   }
 }
@@ -2049,37 +2050,12 @@ function toDecl(decl: PropertyDecl): ScopeDeclaration {
   return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default };
 }
 
-/** A shared-decl's value for reset-to-default: its declared default, else the type default.
- *  A quality seeds at its FIRST stage - the ladder's start is the story's start. */
-function declDefault(d: ScopeDeclaration): ScalarValue {
-  if (d.default !== undefined) return d.default;
-  switch (d.type) {
-    case "number": return 0;
-    case "string": return "";
-    case "flags": return [];
-    case "enum": return d.values?.[0] ?? "";
-    case "quality": return d.stages?.[0] ?? "";
-    default: return false; // boolean (and any unknown) → false
-  }
-}
 
 /** A host-scope declaration (`@world.x`) → registry declaration. */
 function toForeignDecl(decl: HostScopeDecl): ScopeDeclaration {
   return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default, writable: decl.writable };
 }
 
-/** The seed value for a host-scope property: its declared default, else the type default. */
-function hostScopeDefault(decl: HostScopeDecl): ScalarValue {
-  if (decl.default !== undefined) return decl.default;
-  switch (decl.type) {
-    case "boolean": return false;
-    case "number": return 0;
-    case "string": return "";
-    case "flags": return [];
-    case "enum": return decl.values?.[0] ?? "";
-    case "quality": return decl.stages?.[0] ?? "";
-  }
-}
 
 /** Build a live in-memory `{ get, set }` resolver for a self-backed host scope (the standalone `@world`):
  *  a plain bag seeded from declaration defaults. Declared-but-unseeded names still read `undefined`; an
@@ -2092,25 +2068,13 @@ function selfBackedResolver(decls: HostScopeDecl[]): ScopeResolver {
   // already normalise (patterSharedNames / sceneSharedNames); this resolver was the one that did not.
   const key = (name: string): string => name.toLowerCase();
   const bag = new Map<string, ScalarValue>();
-  for (const d of decls) bag.set(key(d.name), hostScopeDefault(d));
+  for (const d of decls) bag.set(key(d.name), defaultFor(d));
   return {
     get: (name) => bag.get(key(name)),
     set: (name, value) => { bag.set(key(name), value); },
   };
 }
 
-/** The seed value for a scene-local property (its `default`, else the type default). */
-function sceneDefault(decl: PropertyDecl): ScalarValue {
-  if (decl.default !== undefined) return decl.default;
-  switch (decl.type) {
-    case "boolean": return false;
-    case "number": return 0;
-    case "string": return "";
-    case "flags": return [];
-    case "enum": return decl.values?.[0] ?? "";
-    case "quality": return decl.stages?.[0] ?? "";
-  }
-}
 
 function truthy(v: ScalarValue): boolean {
   if (typeof v === "boolean") return v;
