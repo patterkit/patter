@@ -54,6 +54,14 @@ namespace Patterkit.Patterplay
         /// <summary>Closed captions (#214): show caption cues in dialogue lines. Default true (full text);
         /// false strips the cues. Toggle live with Engine.SetClosedCaptions.</summary>
         public bool ClosedCaptions = true;
+        /// <summary>Retain a trace of the engine's DECISIONS, readable through Engine.Log() and
+        /// Flow.Log(). Off by default: a shipped game pays nothing for a debugging surface it
+        /// never reads.</summary>
+        public bool Log;
+        /// <summary>Diagnostics hook (opt-in, dev tooling): fired with the choice's group id
+        /// whenever a choice runs dry. Unaffected by Log and useful with it off - it is live
+        /// feedback, not an audit read afterwards.</summary>
+        public Action<string> OnDryChoice;
         /// <summary>Live game state per host-scope token (`"world"` -> your resolver). A binding WINS over
         /// the self-backed bag for that token; tokens the bundle declares and you do not bind are self-backed
         /// from their defaults. Leave null for the standalone case.</summary>
@@ -88,8 +96,41 @@ namespace Patterkit.Patterplay
         public Dictionary<string, Node> ById;
     }
 
+    /// <summary>One retained decision: what the engine chose and why, not what it produced.
+    /// `Type` is select | choice | chose | dry | jump | write | diagnostic; `Seq` is monotonic
+    /// across the flow and survives ClearLog. Parity with the JS runtime's LogEntry.</summary>
+    public sealed class LogEntry
+    {
+        public string Type;
+        public int Seq;
+        public string Scene;
+        /// <summary>The flow this happened in. Set on the ENGINE's stream, where a run is
+        /// several flows in one order; null on a flow's own log, which already says whose it is.</summary>
+        public string Flow;
+        /// <summary>Group / target / jump destination, whichever the type names.</summary>
+        public string Subject;
+        /// <summary>Every child or option considered, with its verdict: the REASONING, not
+        /// just the outcome. "Why is my line missing" is only answerable from this.</summary>
+        public List<(string Id, bool Eligible)> Considered;
+        public string Picked;
+        public string Selector;
+        public PatterValue Value;
+        public PatterValue Prev;
+        public string Detail;
+    }
+
     internal sealed class FlowHost
     {
+        /// <summary>True when the run asked for a log; flows skip building entries otherwise.</summary>
+        public bool LogEnabled;
+        /// <summary>The engine's ordered stream, shared by reference so a flow appends to it
+        /// without holding the engine (which would be a cycle).</summary>
+        public List<LogEntry> EngineLog;
+        /// <summary>Called with the group id when a choice runs dry - no takeable option and no
+        /// eligible fallback - so the silent fall-through is observable. Parity with the JS
+        /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct from
+        /// the log's `dry` entry: a shipped game runs with the log off and this still wired.</summary>
+        public Action<string> OnDryChoice;
         public Bundle Bundle;
         public bool EmitIds; // IDs-only build: emit beat IDs + omit character names (the game localises)
         public Dictionary<string, string> Strings;
@@ -139,6 +180,18 @@ namespace Patterkit.Patterplay
         // engine keeps the same seed source and settings.
         private readonly EngineOptions _creationOptions;
         private readonly bool _sourceDebug; // source-only DEBUG build: strings are the source language, not shippable
+
+        /// <summary>The run's ordered decision stream; see Log().</summary>
+        private readonly List<LogEntry> _engineLog = new List<LogEntry>();
+
+        /// <summary>The run's decisions, in order, each naming the flow it happened in. Empty
+        /// unless the run was opened with Log = true. A flow's own log stays flow-local; this is
+        /// the only place a story spanning several flows reads as one sequence.</summary>
+        public IReadOnlyList<LogEntry> Log() => _engineLog;
+
+        /// <summary>Drop the retained entries. Seq does NOT restart, so two reads either side of
+        /// a clear still agree about what came first.</summary>
+        public void ClearLog() => _engineLog.Clear();
 
         public Engine(Bundle bundle, EngineOptions options = null)
         {
@@ -205,6 +258,9 @@ namespace Patterkit.Patterplay
 
             _host = new FlowHost
             {
+                LogEnabled = options.Log,
+                EngineLog = _engineLog,
+                OnDryChoice = options.OnDryChoice,
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,

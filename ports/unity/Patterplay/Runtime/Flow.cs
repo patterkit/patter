@@ -12,6 +12,9 @@ namespace Patterkit.Patterplay
     {
         public string Id { get; }
         private readonly FlowHost _host;
+        private readonly List<LogEntry> _log = new List<LogEntry>();
+        /// <summary>Monotonic across the flow's life; survives ClearLog so order is stable.</summary>
+        private int _seq;
         private Dictionary<string, PatterValue> _local;                       // not-shared @patter
         private Dictionary<string, Dictionary<string, PatterValue>> _sceneBags = new Dictionary<string, Dictionary<string, PatterValue>>();
         private uint _rngState;
@@ -252,6 +255,31 @@ namespace Patterkit.Patterplay
 
         public List<ChoiceOption> GetChoices() => _pendingChoice?.Options ?? new List<ChoiceOption>();
 
+        /// <summary>This flow's decisions, in order. Empty unless the run was opened with
+        /// Log = true. The engine's log carries the same events tagged with the flow; this one
+        /// is what a single conversation reads as.</summary>
+        public IReadOnlyList<LogEntry> Log() => _log;
+
+        /// <summary>Drop the retained entries. Seq keeps counting, so order survives a clear.</summary>
+        public void ClearLog() => _log.Clear();
+
+        /// <summary>Record one decision, on this flow's log and the engine's. Cheap with logging
+        /// off: the entry is never built. The engine's list is appended to by reference - a
+        /// callback would have to capture the engine, and that cycle is what Godot's weak debug
+        /// registry refused.</summary>
+        private void Emit(LogEntry e)
+        {
+            if (!_host.LogEnabled) return;
+            e.Scene = _currentSceneId;
+            e.Seq = _seq++;
+            _log.Add(e);
+            _host.EngineLog.Add(new LogEntry {
+                Type = e.Type, Scene = e.Scene, Flow = Id, Seq = _host.EngineLog.Count,
+                Subject = e.Subject, Considered = e.Considered, Picked = e.Picked,
+                Selector = e.Selector, Value = e.Value, Prev = e.Prev, Detail = e.Detail,
+            });
+        }
+
         public void Choose(string id)
         {
             var choice = _pendingChoice;
@@ -260,6 +288,7 @@ namespace Patterkit.Patterplay
             if (option == null) throw new Exception($"unknown choice option: {id}");
             if (!option.Eligible) throw new Exception($"choice option is not eligible: {id}");
             var node = choice.ById[id];
+            Emit(new LogEntry { Type = "chose", Subject = choice.GroupId, Picked = id });
             _pendingChoice = null;
             _pendingPromptBeat = _host.ReplayPromptOnChoose ? PromptBeatOf(node) : null;
             _pendingPromptOwnerId = _pendingPromptBeat != null ? node.Id : null;
@@ -316,7 +345,20 @@ namespace Patterkit.Patterplay
                 if (frame.SceneId != _currentSceneId) _currentSceneId = frame.SceneId;
                 var children = ChildrenOf(frame.ContainerId);
                 if (children == null) { _stack.RemoveAt(_stack.Count - 1); continue; }
+                // A `run` container walks its children in order, skipping the ones whose
+                // condition does not hold. That skip IS the decision an author asks about,
+                // so the trace records the ones walked past, not only the one entered.
+                int from = frame.Index;
                 while (frame.Index < children.Count && !Eligible(children[frame.Index])) frame.Index++;
+                if (_host.LogEnabled && frame.Index != from)
+                {
+                    var seen = new List<(string, bool)>();
+                    for (int i = from; i <= frame.Index && i < children.Count; i++)
+                        seen.Add((children[i].Id, i == frame.Index));
+                    Emit(new LogEntry { Type = "select", Subject = frame.ContainerId, Selector = "run",
+                        Considered = seen,
+                        Picked = frame.Index < children.Count ? children[frame.Index].Id : null });
+                }
                 if (frame.Index >= children.Count) { _stack.RemoveAt(_stack.Count - 1); continue; }
                 EnterChild(children[frame.Index++]);
             }
@@ -371,9 +413,21 @@ namespace Patterkit.Patterplay
                 options.Add(new ChoiceOption { Id = child.Id, Prompt = PromptFor(child), Eligible = eligible, GameData = child.GameData });
                 byId[child.Id] = child;
             }
-            if (options.Count > 0) { _pendingChoice = new ChoiceStateInternal { GroupId = group.Id, Options = options, ById = byId }; return; }
+            if (options.Count > 0)
+            {
+                // Including the options a condition left ineligible: "why is that greyed out"
+                // is a question about the moment the choice was built.
+                Emit(new LogEntry { Type = "choice", Subject = group.Id,
+                    Considered = options.Select(o => (o.Id, o.Eligible)).ToList() });
+                _pendingChoice = new ChoiceStateInternal { GroupId = group.Id, Options = options, ById = byId };
+                return;
+            }
             var fallback = fallbacks.FirstOrDefault(Eligible);
-            if (fallback != null) EnterChild(fallback);
+            if (fallback != null) { EnterChild(fallback); return; }
+            // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
+            // past it. The behaviour is unchanged; this makes the silent fall-through observable.
+            Emit(new LogEntry { Type = "dry", Subject = group.Id });
+            _host.OnDryChoice?.Invoke(group.Id);
         }
 
         // -- jumps --------------------------------------------------------------
@@ -386,6 +440,7 @@ namespace Patterkit.Patterplay
 
         private void EnterTarget(string to, string mode)
         {
+            Emit(new LogEntry { Type = "jump", Subject = to, Detail = mode });
             if (to == "END") { _flowEnded = true; _stack = new List<StackFrame>(); return; }
 
             string sceneId, containerId;
@@ -412,19 +467,28 @@ namespace Patterkit.Patterplay
 
         private Node SelectChild(Node group)
         {
+            var considered = group.Children.Select(c => (c.Id, Eligible(c))).ToList();
             var eligible = group.Children.Where(Eligible).ToList();
-            if (eligible.Count == 0) return null;
+            string sel = group.Selector ?? "default";
+            // The reasoning goes in the entry: every child looked at, with its verdict.
+            Node Trace(Node picked)
+            {
+                Emit(new LogEntry { Type = "select", Subject = group.Id, Selector = sel,
+                    Considered = considered, Picked = picked?.Id });
+                return picked;
+            }
+            if (eligible.Count == 0) return Trace(null);
             var st = SelectorStateFor(group);
             switch (group.Selector)
             {
-                case "branch": return eligible[0];
+                case "branch": return Trace(eligible[0]);
                 case "sequence":
                 {
                     string order = group.Options?.Order ?? "sequential";
                     string exhaust = group.Options?.Exhaust ?? "once";
-                    return order == "shuffle" ? PickShuffle(eligible, exhaust, st)
+                    return Trace(order == "shuffle" ? PickShuffle(eligible, exhaust, st)
                         : order == "specificity" ? PickSpecificity(eligible, exhaust, st)
-                        : PickSequential(eligible, exhaust, st);
+                        : PickSequential(eligible, exhaust, st));
                 }
                 default: return null;
             }
@@ -539,7 +603,14 @@ namespace Patterkit.Patterplay
         private void RunEffects(List<Effect> effects)
         {
             foreach (var e in effects ?? new List<Effect>())
-                SetProperty(e.Target, EvalExpr(e.Value));
+            {
+                var value = EvalExpr(e.Value);
+                // Prev read before the write, so a reader can say "0 -> 7" in one pass. Only
+                // paid for when the run asked for a log.
+                var prev = _host.LogEnabled ? GetProperty(e.Target) : null;
+                SetProperty(e.Target, value);
+                Emit(new LogEntry { Type = "write", Subject = e.Target, Value = value, Prev = prev });
+            }
         }
 
         private bool Eligible(Node node)

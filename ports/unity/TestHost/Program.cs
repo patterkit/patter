@@ -70,6 +70,9 @@ namespace Patterkit.Patterplay.TestHost
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
             RunLegacySaveRngCheck(ParseBundle(root.GetProperty("runtime")[0].GetProperty("bundle")));
+            // runtime[1] is "choice with greyed option, pick the eligible": a fixture that actually
+            // exercises the thing under test, rather than one that happens to be first.
+            RunTraceLogCheck(ParseBundle(root.GetProperty("runtime")[1].GetProperty("bundle")));
 
             Console.WriteLine($"expressions: {e}  specificity: {sp}  runtime: {r}  scripted: {s}  gameData: {g}");
 
@@ -110,6 +113,49 @@ namespace Patterkit.Patterplay.TestHost
         /// and a test that makes its own serializer proves only that the converter
         /// compiles.
         /// </summary>
+        /// <summary>
+        /// The decision trace: what the engine CHOSE, not what it produced. Its point is that
+        /// the reasoning is IN the entry - a select names every child it looked at with its
+        /// verdict - so this asserts the considered list, not merely that something was logged.
+        /// Off unless asked for, because a shipped game should pay nothing for it.
+        /// </summary>
+        private static void RunTraceLogCheck(Bundle bundle)
+        {
+            var quiet = new Engine(bundle, new EngineOptions { Seed = 1 });
+            var qf = quiet.OpenFlow("main");
+            for (int i = 0; i < 20 && qf.Advance().Type != StepType.End; i++) { }
+            if (quiet.Log().Count != 0 || qf.Log().Count != 0)
+                Fail("trace", "off by default", "a run that did not ask for a log has one");
+
+            var engine = new Engine(bundle, new EngineOptions { Seed = 1, Log = true });
+            var flow = engine.OpenFlow("main");
+            for (int i = 0; i < 20 && flow.Advance().Type != StepType.End; i++) { }
+
+            if (flow.Log().Count == 0) { Fail("trace", "empty", "a played flow logged nothing"); return; }
+
+            // THE POINT: the entry carries the reasoning, not just the outcome. This fixture
+            // offers a choice with one option a condition greys out, so the entry has to name
+            // both - "why is that greyed" is unanswerable from the taken option alone.
+            var choice = flow.Log().FirstOrDefault(e => e.Type == "choice");
+            if (choice == null) Fail("trace", "choice", "the offered choice was not recorded");
+            else if (choice.Considered == null || !choice.Considered.Any(o => o.Eligible)
+                     || !choice.Considered.Any(o => !o.Eligible))
+                Fail("trace", "reasoning",
+                    "the choice entry does not carry both the live and the greyed option");
+
+            var seqs = flow.Log().Select(e => e.Seq).ToList();
+            if (!seqs.SequenceEqual(seqs.OrderBy(x => x)) || seqs.Distinct().Count() != seqs.Count)
+                Fail("trace", "seq", "seq is not a monotonic ordering of the flow");
+            if (engine.Log().Any(e => e.Flow != "main"))
+                Fail("trace", "flow tag", "an engine entry does not name the flow it happened in");
+
+            engine.ClearLog();
+            if (engine.Log().Count != 0) Fail("trace", "ClearLog", "the engine's stream did not empty");
+            if (flow.Log().Count == 0) Fail("trace", "flow-local", "clearing the engine emptied a flow's own log");
+
+            Console.WriteLine($"  [trace] decisions logged: {flow.Log().Count}, with the greyed option named");
+        }
+
         private static void RunLegacySaveRngCheck(Bundle bundle)
         {
             const uint expected = 3663143971u;      // the bits
