@@ -332,19 +332,10 @@ export interface EngineOptions {
   log?: boolean;
 }
 
-/** One shared `@patter` property, for a live state inspector: its name and address, declared type,
- *  current value, declared default (for reset), enum options or a quality's stages, and whether it
- *  can be written. Mirrors the Unity / Godot ports' ListProperties.
- *
- *  An ALIAS now. This was the shared row plus a `path`, declared here because the shared row had
- *  no address field - and the Storylet Engine had forked it for the same reason, in the same
- *  shape, in three of its runtimes. `path` moved into the shared row on 2026-09-02, so there is
- *  nothing left to add; the name survives because it is exported API and reads well at call
- *  sites, not because the type differs.
- *
- *  The fork is also why `stages` could be added here and stay absent from the shared type for
- *  months, leaving the other family editing a quality as free text. */
-export type PropertyView = PropertyRow;
+// PropertyView is gone. It was the shared PropertyRow plus a `path`, and `path` moved onto
+// that row on 2026-09-02 - so the name was a synonym, and a synonym for a shared type is
+// how the two families drifted in the first place: the same row called PropertyView here,
+// ScopePropertyRow there, PropertyRow in the kernel. listProperties() returns PropertyRow.
 
 /** Options for opening a flow. */
 export interface OpenFlowOptions {
@@ -950,7 +941,7 @@ export class Engine {
     this.engineLog.push({ ...event, flow, seq: this.engineLog.length, ...(scene ? { scene } : {}) });
   }
 
-  listProperties(): PropertyView[] {
+  listProperties(): PropertyRow[] {
     return this.host.patterSharedDecls.map((d) => ({
       name: d.name,
       // The qualified address, matching what the bag composes for every other scope.

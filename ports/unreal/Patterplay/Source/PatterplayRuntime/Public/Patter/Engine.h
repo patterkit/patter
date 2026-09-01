@@ -115,16 +115,13 @@ namespace patter
     // The shared kernel's PropertyRow (Expr/PropertyBag.h) IS this row - name, type, value,
     // defaultValue, enum values, the quality ladder, writable. Patter adds one thing: `path`,
     // the addressable reference getProperty/setProperty take. So this extends rather than
-    // restates it, exactly as the JS runtime's PropertyView extends the same shared row.
+    // restates it, exactly as the JS runtime does with the same shared row.
     // It was a full copy until 2026-09-02, which is how `def` and `defaultValue` came to be
     // two names for one field.
-    /** An ALIAS. `path` moved onto the shared PropertyRow on 2026-09-02, because both
-     *  product families had forked that row to add exactly this field. The name stays as
-     *  listProperties()'s return type; an empty derived struct would be worse, because a
-     *  bag's own row could never satisfy it - and re-declaring `path` on it would SHADOW
-     *  the inherited one, written on the derived and read as empty through a PropertyRow&.
-     *  The Storylet Engine's C++ runtime resolves this the same way. */
-    using PropertyView = PropertyRow;
+    // PropertyView is gone. It was the shared PropertyRow plus a `path`, and `path` moved
+    // onto that row on 2026-09-02 - so the name was a synonym, and a synonym for a shared
+    // type is how the two families drifted: the same row called PropertyView here,
+    // ScopePropertyRow there, PropertyRow in the kernel. listProperties() returns PropertyRow.
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
     // (scenes -> blocks -> groups/snippets -> beats), mirroring the JS BeatInfo / OutlineNode / etc.
@@ -1665,13 +1662,13 @@ namespace patter
         // The shared @patter properties for a live state inspector: each with its ref, type, current
         // value, declared default, and enum options. Per-flow (@local) properties are excluded, matching
         // JS engine.listProperties(). Values read fresh, so a live setProperty is reflected next call.
-        std::vector<PropertyView> listProperties() const
+        std::vector<PropertyRow> listProperties() const
         {
-            std::vector<PropertyView> rows;
+            std::vector<PropertyRow> rows;
             rows.reserve(host_.patterSharedDecls.size());
             for (const auto& d : host_.patterSharedDecls)
             {
-                PropertyView r;
+                PropertyRow r;
                 r.name = d.name;
                 // The QUALIFIED address, matching what the shared bag composes for every other
                 // scope. `@gold` still resolves on input - splitRef defaults an unqualified name to

@@ -12,8 +12,12 @@ export { Engine, Flow } from "./engine.js";
 // The compiled-bundle type the Engine constructor consumes (from the shared model), so hosts can
 // type a parsed .patterc without depending on @patterkit/model directly.
 export type { Bundle } from "@patterkit/model";
+// The examiner row listProperties() returns, for the same reason: it is the shared kernel's
+// (@wildwinter/scoperegistry, the property implementation both product families use), and a
+// host typing a row should not have to depend on the kernel to name it.
+export type { PropertyRow } from "@wildwinter/scoperegistry";
 export type {
-  StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, WorldResolver, PropertyView,
+  StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, WorldResolver,
   EngineSave, SaveGame, FlowSnapshot, SelectorSnapshot, SavedChoice, StackFrame,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
   TraceEvent, TraceHandler, EngineTraceHandler, LogEntry, EngineLogEntry,

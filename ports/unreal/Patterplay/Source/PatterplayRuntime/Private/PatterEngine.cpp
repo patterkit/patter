@@ -454,7 +454,7 @@ TArray<FPatterPropertyRow> UPatterEngine::ListProperties() const
 {
 	TArray<FPatterPropertyRow> Out;
 	if (!Engine) return Out;
-	for (const patter::PropertyView& R : Engine->listProperties())
+	for (const patter::PropertyRow& R : Engine->listProperties())
 	{
 		FPatterPropertyRow Row;
 		Row.Path = Ue(R.path);

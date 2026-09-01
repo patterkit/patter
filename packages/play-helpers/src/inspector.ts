@@ -13,7 +13,7 @@
 //   // ...later: inspector.destroy();
 // ---------------------------------------------------------------------------
 
-import type { Engine, PropertyView } from "@patterkit/runtime";
+import type { Engine, PropertyRow } from "@patterkit/runtime";
 import { serializeState, deserializeState } from "./save.js";
 import type { PropertyValue } from "./properties.js";
 
@@ -115,7 +115,7 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
 
   const rowRefreshers: Array<() => void> = [];
 
-  const buildRow = (row: PropertyView): void => {
+  const buildRow = (row: PropertyRow): void => {
     const r = doc.createElement("div");
     r.className = "pp-insp-row";
     const label = doc.createElement("span");
