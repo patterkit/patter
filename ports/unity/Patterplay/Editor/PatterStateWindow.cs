@@ -68,8 +68,91 @@ namespace Patterkit.Patterplay.Editor
                 EditorGUILayout.Space();
                 DrawReadOnlyState(engine);
                 EditorGUILayout.Space();
+                DrawLog(engine);
+                EditorGUILayout.Space();
             }
             EditorGUILayout.EndScrollView();
+        }
+
+        // -- The decision log ---------------------------------------------------
+
+        /// <summary>The engine's per-kind log filters. The vocabulary is this engine's: `select`
+        /// is a group choosing among its children, `chose` is the player answering a choice,
+        /// `dry` is a choice that fell through with nothing takeable.</summary>
+        private static readonly string[] LogKinds = { "select", "choice", "chose", "dry", "jump", "write" };
+        private static readonly string[] LogKindLabels = { "Select", "Choice", "Chose", "Dry", "Jump", "Write" };
+        private readonly Dictionary<string, bool> _logKindOn = new Dictionary<string, bool>();
+        private Vector2 _logScroll;
+
+        /// <summary>The run's decisions: what the engine CHOSE, not what it produced. A step says
+        /// which line played; this says why THAT line and not its siblings. Mirrors the Storylet
+        /// Engine's log panel, in this engine's vocabulary.</summary>
+        private void DrawLog(Engine engine)
+        {
+            EditorGUILayout.LabelField("Log (decisions)", EditorStyles.boldLabel);
+            var entries = engine.Log();
+            if (entries.Count == 0)
+            {
+                EditorGUILayout.LabelField("  (empty - build the Engine with EngineOptions { Log = true })");
+                return;
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            for (int i = 0; i < LogKinds.Length; i++)
+            {
+                if (!_logKindOn.ContainsKey(LogKinds[i])) _logKindOn[LogKinds[i]] = true;
+                _logKindOn[LogKinds[i]] = GUILayout.Toggle(_logKindOn[LogKinds[i]], LogKindLabels[i], GUILayout.Width(64));
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("Copy", GUILayout.Width(60)))
+                EditorGUIUtility.systemCopyBuffer = string.Join("\n", VisibleLogLines(engine));
+            if (GUILayout.Button("Clear", GUILayout.Width(60))) engine.ClearLog();
+            EditorGUILayout.EndHorizontal();
+
+            _logScroll = EditorGUILayout.BeginScrollView(_logScroll, GUILayout.Height(150));
+            foreach (var line in VisibleLogLines(engine)) EditorGUILayout.LabelField(line);
+            EditorGUILayout.EndScrollView();
+        }
+
+        private List<string> VisibleLogLines(Engine engine)
+        {
+            var lines = new List<string>();
+            foreach (var e in engine.Log())
+                if (!_logKindOn.TryGetValue(e.Type, out var on) || on) lines.Add(FormatLogEntry(e));
+            return lines;
+        }
+
+        private static string ShowLogValue(PatterValue v) => v == null ? "<unset>" : v.ToDisplayString();
+
+        /// <summary>One line per entry. A `select` names the children it walked AND their verdicts,
+        /// because that is the whole point: "why is my line missing" is unanswerable from the
+        /// winner alone.</summary>
+        private static string FormatLogEntry(LogEntry e)
+        {
+            string stamp = $"[{e.Seq}] ";
+            if (!string.IsNullOrEmpty(e.Flow)) stamp += e.Flow + " ";
+            switch (e.Type)
+            {
+                case "select":
+                {
+                    var parts = e.Considered == null ? new List<string>()
+                        : e.Considered.Select(c => c.Eligible ? c.Id : c.Id + " (x)").ToList();
+                    return $"{stamp}select {e.Subject} [{e.Selector}]: {string.Join(", ", parts)} -> {e.Picked ?? "(nothing)"}";
+                }
+                case "choice":
+                {
+                    var opts = e.Considered == null ? new List<string>()
+                        : e.Considered.Select(o => o.Eligible ? o.Id : o.Id + " (greyed)").ToList();
+                    return $"{stamp}choice {e.Subject}: {string.Join(", ", opts)}";
+                }
+                case "chose":  return $"{stamp}chose {e.Subject} -> {e.Picked}";
+                case "dry":    return $"{stamp}dry {e.Subject} (nothing takeable, no eligible fallback)";
+                case "jump":   return $"{stamp}jump {e.Subject} ({e.Detail})";
+                case "write":  return $"{stamp}write {e.Subject}: {ShowLogValue(e.Prev)} -> {ShowLogValue(e.Value)}";
+            }
+            return stamp + "(unknown)";
         }
 
         // -- Save / Load --------------------------------------------------------
