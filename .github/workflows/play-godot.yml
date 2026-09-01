@@ -12,14 +12,19 @@ on:
   # pushed alongside several others (0.8.0 went out as four tags in one push and
   # fired nothing), and the tag ruleset forbids deleting one to push it again, so
   # without this a release can become permanently unreachable. The job reads its
-  # version from GITHUB_REF_NAME either way, and still refuses a tag whose version
-  # disagrees with the manifest.
+  # version from the input below when dispatched, and still refuses a version that
+  # disagrees with the manifest, so this is exactly as safe as the tag path.
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.8.0 (must match the manifest and an existing play-godot-v<version> tag)"
+        required: true
 
 permissions:
   contents: write
 
 env:
+  PLAY_REF: ${{ inputs.version && format('play-godot-v{0}', inputs.version) || github.ref_name }}
   GODOT_VERSION: "4.3-stable"
 
 jobs:
@@ -30,7 +35,7 @@ jobs:
 
       - name: Check the tag matches the addon version (bump via `npm run bump:play`)
         run: |
-          version="${GITHUB_REF_NAME#play-godot-v}"
+          version="${PLAY_REF#play-godot-v}"
           manifest=$(sed -n 's/^version="\(.*\)"$/\1/p' ports/godot/addons/patterplay/plugin.cfg)
           [ "$manifest" = "$version" ] || { echo "plugin.cfg says $manifest but the tag says $version"; exit 1; }
           grep -q "^## \[${version}\] - [0-9]" ports/godot/addons/patterplay/CHANGELOG.md \
@@ -52,14 +57,14 @@ jobs:
 
       - name: Package the addon
         run: |
-          version="${GITHUB_REF_NAME#play-godot-v}"
+          version="${PLAY_REF#play-godot-v}"
           echo "ASSET=patterplay-godot-${version}.zip" >> "$GITHUB_ENV"
           ( cd ports/godot/addons && zip -r "../../../patterplay-godot-${version}.zip" patterplay )
 
       - name: Release notes = this version's changelog section
         id: relnotes
         run: |
-          version="${GITHUB_REF_NAME#play-godot-v}"
+          version="${PLAY_REF#play-godot-v}"
           awk -v ver="$version" 'index($0, "## [" ver "]") == 1 {f=1; next} /^## \[/ {f=0} f' \
             ports/godot/addons/patterplay/CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "no changelog section for ${version}"; exit 1; }

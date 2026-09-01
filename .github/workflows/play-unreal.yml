@@ -15,12 +15,19 @@ on:
   # pushed alongside several others (0.8.0 went out as four tags in one push and
   # fired nothing), and the tag ruleset forbids deleting one to push it again, so
   # without this a release can become permanently unreachable. The job reads its
-  # version from GITHUB_REF_NAME either way, and still refuses a tag whose version
-  # disagrees with the manifest.
+  # version from the input below when dispatched, and still refuses a version that
+  # disagrees with the manifest, so this is exactly as safe as the tag path.
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, e.g. 0.8.0 (must match the manifest and an existing play-unreal-v<version> tag)"
+        required: true
 
 permissions:
   contents: write
+
+env:
+  PLAY_REF: ${{ inputs.version && format('play-unreal-v{0}', inputs.version) || github.ref_name }}
 
 jobs:
   release:
@@ -30,7 +37,7 @@ jobs:
 
       - name: Check the tag matches the plugin version (bump via `npm run bump:play`)
         run: |
-          version="${GITHUB_REF_NAME#play-unreal-v}"
+          version="${PLAY_REF#play-unreal-v}"
           manifest=$(node -p "JSON.parse(require('fs').readFileSync('ports/unreal/Patterplay/Patterplay.uplugin','utf8')).VersionName")
           [ "$manifest" = "$version" ] || { echo "Patterplay.uplugin says $manifest but the tag says $version"; exit 1; }
           grep -q "^## \[${version}\] - [0-9]" ports/unreal/Patterplay/CHANGELOG.md \
@@ -41,7 +48,7 @@ jobs:
 
       - name: Package the UE plugin
         run: |
-          version="${GITHUB_REF_NAME#play-unreal-v}"
+          version="${PLAY_REF#play-unreal-v}"
           echo "ASSET=patterplay-unreal-${version}.zip" >> "$GITHUB_ENV"
           # Source-only, always: never ship engine build output, even if a checkout ever carries it.
           ( cd ports/unreal && zip -r "../../patterplay-unreal-${version}.zip" Patterplay PatterplayDemo \
@@ -51,7 +58,7 @@ jobs:
       - name: Release notes = this version's changelog section
         id: relnotes
         run: |
-          version="${GITHUB_REF_NAME#play-unreal-v}"
+          version="${PLAY_REF#play-unreal-v}"
           awk -v ver="$version" 'index($0, "## [" ver "]") == 1 {f=1; next} /^## \[/ {f=0} f' \
             ports/unreal/Patterplay/CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           [ -s "$RUNNER_TEMP/release-notes.md" ] || { echo "no changelog section for ${version}"; exit 1; }
