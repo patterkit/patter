@@ -9,18 +9,16 @@
 // ---------------------------------------------------------------------------
 
 import type { Scene } from "@patterkit/model";
+import { makePrng } from "@wildwinter/expr";
 
 export type Rng = () => number;
 
 /** mulberry32 - a tiny deterministic PRNG (seed in, reproducible stream out). */
 export function makeRng(seed: number): Rng {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  // @wildwinter/expr's makePrng, not a fourth copy of the mixing inside this
+  // repo. Same algorithm, same draws; it just lives in one place now.
+  const prng = makePrng(seed);
+  return () => prng.next();
 }
 
 export interface Generated {

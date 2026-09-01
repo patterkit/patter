@@ -1,3 +1,4 @@
+import { fnv32 } from "@wildwinter/toolkit";   // FNV-1a: a published algorithm, shared
 // ---------------------------------------------------------------------------
 // Slug + hash helpers.
 //
@@ -19,14 +20,7 @@ export function slug(name: string): string {
   return s || "_";
 }
 
-function fnv32(input: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
+
 
 /** Deterministic 4-char base-36 hash of a string (FNV-1a 32-bit). */
 export function hash4(input: string): string {

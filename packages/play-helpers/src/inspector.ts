@@ -58,7 +58,11 @@ function injectStyle(doc: Document): void {
   (doc.head ?? doc.documentElement).appendChild(s);
 }
 
-/** Value equality that also handles flags arrays (order-sensitive, like the stored value). */
+/** Has the DISPLAYED value changed? Order-sensitive on purpose, and deliberately
+ *  NOT the language's value equality, which compares flags as a set: this asks
+ *  whether the row needs redrawing, and the row renders the list in its stored
+ *  order, so a reordering is a change here even though it is not a change to
+ *  what the value means. */
 function sameValue(a: PropertyValue | undefined, b: PropertyValue | undefined): boolean {
   if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => x === b[i]);
   return a === b;

@@ -18,6 +18,7 @@ import { parseSource } from "@patterkit/core";
 import type { ProjectFile } from "@patterkit/model";
 import { findProjectFile, walkFiles } from "./load.js";
 import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
+import { ARCHIVE_ENTRY_OPTS } from "@wildwinter/toolkit/archive";
 
 /** The source-shard extensions a document carries (the merge-friendly truth). */
 export const SHARD_EXTENSIONS = [".patterflow", ".patterloc", ".patterx", ".patterproj"] as const;
@@ -34,8 +35,9 @@ export interface DocumentManifest {
 // re-packing unchanged source yields an identical document. createFolders must
 // stay off: JSZip stamps implicit folder entries with new Date() regardless of
 // the file's `date` option, which leaks wall-clock time into the bytes.
-const FIXED_DATE = new Date("2000-01-01T00:00:00Z");
-const ENTRY_OPTS = { date: FIXED_DATE, createFolders: false } as const;
+// The reproducibility settings are @wildwinter/toolkit's: a fixed entry date
+// and no folder entries, so an unchanged project packs to the same bytes.
+const ENTRY_OPTS = ARCHIVE_ENTRY_OPTS;
 
 /** Pack a project's source shards into a `.patterpack` document (zip bytes). */
 export async function runPack(startPath: string): Promise<Buffer> {

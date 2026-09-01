@@ -27,6 +27,7 @@ import { runMerge } from "./merge.js";
 import type { MergeResult } from "./merge.js";
 import type { DocumentManifest } from "./pack.js";
 import type { PlannedWrite } from "./write.js";
+import { escapesTarget, isUnsafeEntry } from "@wildwinter/toolkit/archive";
 
 const MANIFEST = "patter.manifest.json";
 
@@ -199,23 +200,11 @@ export async function runUnpackMerge(
   return { shards, writes, sidecars, conflicts, warnings, provenance };
 }
 
-/** True if a document entry is an absolute path or would escape the target dir.
- *
- *  A screen on the NAME, and the cheap half of the answer. `containedWrite` below is the check that
- *  actually holds, because a name is not a path: this cannot know what the name resolves to once it is
- *  joined to a target, and `normalize` does not treat `\` as a separator away from Windows.
- *
- *  Note what normalises, because the comment here used to credit the wrong half: it is JSZip's READER,
- *  not its writer, that collapses `..`. A traversal entry does not survive `loadAsync` however the zip
- *  was produced, so neither this nor `containedWrite` can currently be reached through it. They are
- *  kept for a different zip library or a future JSZip, and `pack.test.ts` pins the normalisation so
- *  that assumption fails loudly rather than silently. */
-export function isUnsafeEntry(name: string): boolean {
-  if (isAbsolute(name) || /^[a-zA-Z]:/.test(name)) return true;
-  const norm = normalize(name);
-  return norm === ".." || norm.startsWith(".." + sep) || norm.startsWith("../");
-}
-
+// The entry guards are @wildwinter/toolkit's. Both families had a correct copy,
+// which is the state BEFORE a drift rather than proof there will not be one: a
+// subtle weakening of one is a vulnerability nobody reads a diff for.
+// Re-exported so nothing that imports it has to move.
+export { isUnsafeEntry } from "@wildwinter/toolkit/archive";
 /**
  * Join `name` onto `dir` and refuse the result unless it lands INSIDE `dir`.
  *

@@ -20,6 +20,7 @@ import { walkNodes, PROJECT_LOCALE_SCENE } from "@patterkit/model";
 import type { Group, Snippet, LocaleFile } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
+import { findMatcher } from "@wildwinter/toolkit";   // the escaped, global find regex
 
 export interface ReplaceOptions {
   /** The literal text to find (not a regex: special characters match themselves). */
@@ -55,13 +56,7 @@ export interface ReplacePlan {
   scenes: number;
 }
 
-/** Build the find matcher, or null for an empty query. Global so every occurrence in a string is replaced. */
-function matcher(opts: ReplaceOptions): RegExp | null {
-  if (!opts.query) return null;
-  const esc = opts.query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // literal: escape regex metacharacters
-  const body = opts.wholeWord ? `\\b${esc}\\b` : esc;
-  return new RegExp(body, opts.caseSensitive ? "g" : "gi");
-}
+
 
 /**
  * Plan a project-wide replacement. Walks the default-locale string shards (the source prose), substitutes
@@ -69,7 +64,7 @@ function matcher(opts: ReplaceOptions): RegExp | null {
  */
 export function runReplace(loaded: LoadedProject, opts: ReplaceOptions): ReplacePlan {
   const plan: ReplacePlan = { hits: [], writes: [], shards: [], scenes: 0 };
-  const re = matcher(opts);
+  const re = findMatcher(opts);
   if (!re) return plan;
   const def = loaded.project.locales.default;
 
