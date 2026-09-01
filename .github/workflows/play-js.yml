@@ -15,6 +15,13 @@ name: Patterplay JS release
 on:
   push:
     tags: ["play-js-v*"]
+  # Re-runnable by hand against an EXISTING tag. GitHub creates no run for a tag
+  # pushed alongside several others (0.8.0 went out as four tags in one push and
+  # fired nothing), and the tag ruleset forbids deleting one to push it again, so
+  # without this a release can become permanently unreachable. The job reads its
+  # version from GITHUB_REF_NAME either way, and still refuses a tag whose version
+  # disagrees with the manifest.
+  workflow_dispatch:
 
 permissions:
   contents: write
