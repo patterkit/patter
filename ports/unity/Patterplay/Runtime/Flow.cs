@@ -34,19 +34,26 @@ namespace Patterkit.Patterplay
         private Dictionary<string, int> _visitCounts = new Dictionary<string, int>();
 
         private readonly EvalContext _evalCtx;
+        private readonly PatterHost _evalHost;
 
-        internal Flow(string id, FlowHost host, long seed)
+        internal Flow(string id, FlowHost host, double seed)
         {
             Id = id;
             _host = host;
-            _rngState = unchecked((uint)seed);
+            _rngState = Mulberry32.ToUint32(seed);
             _local = FreshLocal();
 
-            _evalCtx = new EvalContext
+            // The dialect's host hooks. The shared EvalContext carries them as an
+            // opaque object; PatterDialect casts it back to PatterHost.
+            _evalHost = new PatterHost
             {
                 NextRandom = Rng,
                 Visits = id2 => _visitCounts.TryGetValue(id2, out var v) ? v : 0,
                 PatterVisits = id2 => _host.SharedVisits.TryGetValue(id2, out var v) ? v : 0,
+            };
+            _evalCtx = new EvalContext
+            {
+                Host = _evalHost,
                 // The quality channel: a property's stage ladder, from wherever the declaration lives -
                 // @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
                 Qualities = StagesFor,
@@ -506,27 +513,18 @@ namespace Patterkit.Patterplay
             return node.Condition != null ? MatchedSpec(node.Condition.Ast, _evalCtx, true) : 0;
         }
 
-        // matched-specificity: how many atomic constraints are actively holding this condition TRUE against
-        // the live state, walked with a De-Morgan polarity flag (parity contract, mirrors the JS reference).
-        // Static + ctx-parameterised so the conformance runner can score a bare AST against injected scopes.
-        internal static int MatchedSpec(AstNode node, EvalContext ctx, bool want)
+        // Matched-constraint specificity is the SHARED scorer (Expr/Specificity.cs,
+        // vendored from expr/ports/unity). Until 2026-09-01 it was inline here and the
+        // Storylet Engine had its own module: one scorer, six hand transliterations. It
+        // takes truthiness as a callback, so it never needed to know a value type, a
+        // dialect or a scope, which makes it the purest thing in the family to share.
+        internal static int MatchedSpec(ExprNode node, EvalContext ctx, bool want)
         {
-            if (node is Binary bin && (bin.Op == "and" || bin.Op == "or"))
+            return Specificity.MatchedSpecificity(node, n =>
             {
-                bool behaveAsAnd = (bin.Op == "and") == want; // De Morgan under negation
-                int l = MatchedSpec(bin.Left, ctx, want);
-                int r = MatchedSpec(bin.Right, ctx, want);
-                return behaveAsAnd ? (l > 0 && r > 0 ? l + r : 0) : Math.Max(l, r);
-            }
-            if (node is Unary u && u.Op == "not")
-                return MatchedSpec(u.Operand, ctx, !want); // flip polarity
-            if (node is Call call && call.Name == "check_flags")
-            {
-                int operands = Math.Max(1, call.Args.Length - 1); // Args[0] is the flags source
-                bool hit = Truthy(Expr.Evaluate(node, ctx));
-                return want ? (hit ? operands : 0) : (hit ? 0 : 1);
-            }
-            return Truthy(Expr.Evaluate(node, ctx)) == want ? 1 : 0; // atom
+                try { return Truthy(Expr.Evaluate(n, ctx, PatterDialect.Instance)); }
+                catch (EvalError) { return false; }   // an eval error scores as false
+            }, want);
         }
 
         private SelectorState SelectorStateFor(Node group)
@@ -550,7 +548,7 @@ namespace Patterkit.Patterplay
             return Truthy(EvalExpr(node.Condition));
         }
 
-        private PatterValue EvalExpr(Expression expr) => Expr.Evaluate(expr.Ast, _evalCtx);
+        private PatterValue EvalExpr(Expression expr) => Expr.Evaluate(expr.Ast, _evalCtx, PatterDialect.Instance);
 
         private void Enter(string id)
         {
@@ -561,13 +559,14 @@ namespace Patterkit.Patterplay
         private double Rng()
         {
             if (_host.CustomRng != null) return _host.CustomRng();
-            unchecked
-            {
-                _rngState = _rngState + 0x6d2b79f5u;
-                uint t = (_rngState ^ (_rngState >> 15)) * (1u | _rngState);
-                t = (t + ((t ^ (t >> 7)) * (61u | t))) ^ t;
-                return (t ^ (t >> 14)) / 4294967296.0;
-            }
+            // The shared Mulberry32, not a copy of the mixing inline here. This
+            // file carried its own until 2026-09-01, so Patterplay shipped the
+            // algorithm twice in C# alone. _rngState is still the serialisable
+            // position, so saves are unaffected.
+            var prng = new Mulberry32(_rngState);
+            double draw = prng.Next();
+            _rngState = prng.State;
+            return draw;
         }
 
         // -- strings / beats ----------------------------------------------------
@@ -806,16 +805,8 @@ namespace Patterkit.Patterplay
 
         // -- helpers ------------------------------------------------------------
 
-        internal static bool Truthy(PatterValue v)
-        {
-            switch (v.Kind)
-            {
-                case PatterKind.Bool: return v.AsBool;
-                case PatterKind.Number: return v.AsNumber != 0;
-                case PatterKind.Str: return v.AsString != "";
-                case PatterKind.Flags: return v.AsFlags.Count > 0;
-                default: return false;
-            }
-        }
+        /// <summary>Truthiness for a bare condition. One line, because the rule is
+        /// on the SHARED value type.</summary>
+        internal static bool Truthy(PatterValue v) => v.Truthy;
     }
 }

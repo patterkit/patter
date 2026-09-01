@@ -69,8 +69,27 @@ namespace Patterkit.Patterplay.TestHost
 
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
+            RunLegacySaveRngCheck(ParseBundle(root.GetProperty("runtime")[0].GetProperty("bundle")));
 
             Console.WriteLine($"expressions: {e}  specificity: {sp}  runtime: {r}  scripted: {s}  gameData: {g}");
+
+            // The expr parity corpus sits beside ours, vendored from ../expr. Absent is
+            // a FAILURE, not a skip: a parity gate that quietly does nothing when its
+            // fixture is missing is the shape of check this codebase has been bitten by.
+            string exprPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".", "expr-corpus.json");
+            if (!File.Exists(exprPath))
+            {
+                Console.Error.WriteLine($"expr parity corpus not found: {exprPath}");
+                return 2;
+            }
+            using var exprDoc = JsonDocument.Parse(File.ReadAllText(exprPath));
+            var exprRoot = exprDoc.RootElement;
+            var xprng = exprRoot.GetProperty("prng");
+            var xexpr = exprRoot.GetProperty("expressions");
+            int xp = RunExprPrng(xprng);
+            int xe = RunExpressions(xexpr);
+            Console.WriteLine($"expr corpus v{exprRoot.GetProperty("version").GetInt32()}"
+                + $" - prng: {xp}/{xprng.GetArrayLength()}  expressions: {xe}/{xexpr.GetArrayLength()}");
             Console.WriteLine(_fails == 0 ? "ALL PASS" : $"{_fails} FAILED");
             return _fails == 0 ? 0 : 1;
         }
@@ -78,6 +97,57 @@ namespace Patterkit.Patterplay.TestHost
         // describeBundle: the bundle inspector's runtime half. Not a corpus case - this adds no runtime
         // behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference
         // or two inspectors describe the same asset differently. Mirrors the JS test's fixture.
+        /// <summary>
+        /// An OLD save must still load. The JS runtime accumulated rngState with `| 0`
+        /// until 2026-09-01, so saves in the wild carry a NEGATIVE number where the
+        /// schema says uint32 - over half of them. Newtonsoft's default binding throws
+        /// an OverflowException on those, which is a player unable to load their game,
+        /// so PatterSave registers a converter that coerces with the same ToUint32
+        /// every other runtime uses.
+        ///
+        /// Deliberately through PatterSave.DeserializeState rather than a serializer
+        /// built here: the converter being REGISTERED is the thing that can regress,
+        /// and a test that makes its own serializer proves only that the converter
+        /// compiles.
+        /// </summary>
+        private static void RunLegacySaveRngCheck(Bundle bundle)
+        {
+            const uint expected = 3663143971u;      // the bits
+            const int  asWritten = -631823325;      // how the pre-fix JS wrote them
+
+            var engine = new Engine(bundle, new EngineOptions { Seed = 12345 });
+            engine.OpenFlow("main");
+            string json = PatterSave.SerializeState(engine);
+
+            // Age it: put in a state high enough that the old `| 0` made it negative.
+            string legacy = System.Text.RegularExpressions.Regex.Replace(
+                json, "\"RngState\":-?\\d+", "\"RngState\":" + asWritten);
+            if (legacy == json)
+            {
+                Fail("legacy-save", "envelope", "no RngState in the save to age; the check would prove nothing");
+                return;
+            }
+
+            try
+            {
+                PatterSave.DeserializeState(engine, legacy);
+            }
+            catch (Exception ex)
+            {
+                Fail("legacy-save", "DeserializeState", $"a pre-fix save threw {ex.GetType().Name}: {ex.Message}");
+                return;
+            }
+
+            // Round-trip it back out: the signed number must have landed on the same bits.
+            string restored = PatterSave.SerializeState(engine);
+            if (!restored.Contains("\"RngState\":" + expected))
+            {
+                Fail("legacy-save", "round trip", $"restored envelope does not carry RngState {expected}");
+                return;
+            }
+            Console.WriteLine("  [legacy-save] a pre-fix save with a negative rngState loads");
+        }
+
         private static void RunDescribeSmoke()
         {
             var b = new Bundle
@@ -230,6 +300,77 @@ namespace Patterkit.Patterplay.TestHost
 
         // -- expressions --------------------------------------------------------
 
+
+        // -- the @wildwinter/expr parity corpus ---------------------------------
+        //
+        // A SECOND corpus, authored in ../expr and vendored here, holding the
+        // primitives both product families share and neither family's own corpus
+        // tests: seed coercion, the PRNG draw and state sequence, operator typing,
+        // short-circuiting, value equality and the comparison rules. Its
+        // `expressions` section has the same shape as ours and reuses
+        // RunExpressions; only the PRNG section is new.
+
+        /// <summary>JSON has no literal for the non-finite doubles, and they are exactly
+        /// the interesting coercion cases, so the corpus carries them as strings.</summary>
+        private static double ExprSeed(JsonElement v)
+        {
+            if (v.ValueKind != JsonValueKind.String) return v.GetDouble();
+            switch (v.GetString())
+            {
+                case "NaN": return double.NaN;
+                case "Infinity": return double.PositiveInfinity;
+                case "-Infinity": return double.NegativeInfinity;
+                default: throw new Exception($"unknown seed literal: {v.GetString()}");
+            }
+        }
+
+        private static int RunExprPrng(JsonElement arr)
+        {
+            int pass = 0;
+            foreach (var c in arr.EnumerateArray())
+            {
+                string name = c.GetProperty("name").GetString();
+                var prng = new Mulberry32(ExprSeed(c.GetProperty("seed")));
+
+                uint wantSeed = c.GetProperty("expectSeedState").GetUInt32();
+                if (prng.State != wantSeed)
+                {
+                    Fail("expr/prng", name, $"seed state {prng.State}, expected {wantSeed}");
+                    continue;
+                }
+
+                var states = c.GetProperty("expectStates");
+                var draws = c.GetProperty("expectDraws");
+                bool ok = true;
+                for (int i = 0; i < states.GetArrayLength() && ok; i++)
+                {
+                    double d = prng.Next();
+                    // The corpus pins the draw's NUMERATOR, an exact uint32, so no port
+                    // is held to another language's float printing.
+                    uint gotDraw = (uint)Math.Round(d * 4294967296.0);
+                    uint wantDraw = draws[i].GetUInt32();
+                    uint wantState = states[i].GetUInt32();
+                    if (gotDraw != wantDraw)
+                    {
+                        Fail("expr/prng", name, $"draw {i + 1} is {gotDraw}, expected {wantDraw}");
+                        ok = false;
+                    }
+                    else if (prng.State != wantState)
+                    {
+                        Fail("expr/prng", name, $"state after draw {i + 1} is {prng.State}, expected {wantState}");
+                        ok = false;
+                    }
+                    else if (!(d >= 0.0 && d < 1.0))
+                    {
+                        Fail("expr/prng", name, $"draw {i + 1} is {d}, outside [0, 1)");
+                        ok = false;
+                    }
+                }
+                if (ok) pass++;
+            }
+            return pass;
+        }
+
         private static int RunExpressions(JsonElement arr)
         {
             int pass = 0;
@@ -246,11 +387,36 @@ namespace Patterkit.Patterplay.TestHost
                         foreach (var p in scope.Value.EnumerateObject()) bag[p.Name] = ToValue(p.Value);
                         ctx.Scopes[scope.Name] = new BagScope(bag);
                     }
-                    if (c.TryGetProperty("seed", out var seed)) ctx.NextRandom = new Mulberry32(seed.GetInt64()).Next;
-                    var actual = Expr.Evaluate(node, ctx);
-                    var expected = ToValue(c.GetProperty("expected"));
-                    if (actual.ValueEquals(expected)) pass++;
-                    else Fail("expr", name, $"expected {expected}, got {actual}");
+                    var evalHost = new PatterHost();
+                    if (c.TryGetProperty("seed", out var seed)) evalHost.NextRandom = new Mulberry32(seed.GetDouble()).Next;
+                    ctx.Host = evalHost;
+
+                    // `expectError` cases pin the TYPING contract: which operand
+                    // combinations the evaluator must REFUSE. Without them a runtime
+                    // that never raises passes every value case and is still wrong
+                    // about most of the language. Needed for the expr parity corpus,
+                    // which is mostly made of them.
+                    bool expectError = c.TryGetProperty("expectError", out _);
+                    PatterValue actual = default;
+                    string error = null;
+                    try { actual = Expr.Evaluate(node, ctx, PatterDialect.Instance); }
+                    catch (Exception ex) { error = ex.Message; }
+
+                    if (expectError)
+                    {
+                        if (error != null) pass++;
+                        else Fail("expr", name, $"expected an eval error, got {actual}");
+                    }
+                    else if (error != null)
+                    {
+                        Fail("expr", name, $"unexpected error: {error}");
+                    }
+                    else
+                    {
+                        var expected = ToValue(c.GetProperty("expected"));
+                        if (actual.ValueEquals(expected)) pass++;
+                        else Fail("expr", name, $"expected {expected}, got {actual}");
+                    }
                 }
                 catch (Exception ex) { Fail("expr", name, ex.Message); }
             }
@@ -650,23 +816,25 @@ namespace Patterkit.Patterplay.TestHost
             return outd;
         }
 
-        private static AstNode ParseAst(JsonElement e)
+        // The tag dispatch is the SHARED deserialiser (Expr/Ast.cs); this only
+        // turns System.Text.Json's JsonElement into plain objects.
+        private static ExprNode ParseAst(JsonElement e) => Ast.DeserialiseAst((IReadOnlyList<object>)ToTree(e));
+
+        private static object ToTree(JsonElement e)
         {
-            string tag = e[0].GetString();
-            switch (tag)
+            switch (e.ValueKind)
             {
-                case "b": return new BoolNode { Value = e[1].GetBoolean() };
-                case "n": return new NumberNode { Value = e[1].GetDouble() };
-                case "s": return new StringNode { Value = e[1].GetString() };
-                case "sv": return new ScopedVar { Scope = e[1].GetString(), Name = e[2].GetString() };
-                case "u": return new Unary { Op = e[1].GetString(), Operand = ParseAst(e[2]) };
-                case "bin": return new Binary { Op = e[1].GetString(), Left = ParseAst(e[2]), Right = ParseAst(e[3]) };
-                case "fd": return new FlagDelta { Sign = e[1].GetString(), Name = e[2].GetString() };
-                case "call":
-                    var args = new List<AstNode>();
-                    for (int i = 2; i < e.GetArrayLength(); i++) args.Add(ParseAst(e[i]));
-                    return new Call { Name = e[1].GetString(), Args = args.ToArray() };
-                default: throw new Exception($"unknown ast tag: {tag}");
+                case JsonValueKind.True: return true;
+                case JsonValueKind.False: return false;
+                case JsonValueKind.Number: return e.GetDouble();
+                case JsonValueKind.String: return e.GetString();
+                case JsonValueKind.Array:
+                {
+                    var list = new List<object>();
+                    foreach (var item in e.EnumerateArray()) list.Add(ToTree(item));
+                    return list;
+                }
+                default: throw new EvalError($"unsupported ast token kind: {e.ValueKind}");
             }
         }
 

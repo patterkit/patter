@@ -1,295 +1,47 @@
-// The expression evaluator + the Patter dialect - a faithful port of
-// @wildwinter/expr's evaluate.ts and @patterkit/dialect. Walks a compiled AstNode
-// against an EvalContext (scope bags + host hooks for PRNG / visit counts), with the
-// same operator typing, short-circuiting, value-equality, and built-in functions
-// (random, check_flags, set_flags, seen, visits, patter_*). Verified against the
-// conformance corpus's expression cases.
+// The Patter expression evaluator: a thin shim over the SHARED implementation.
+//
+// The algorithm lives once, in expr/ports/unity/Expr.cs, vendored beside this
+// file as Expr/Expr.cs. It brings in IScopeSource, MissingPolicy, ScopeDef,
+// EvalContext, EvalHelpers, FunctionDef, Dialect and Expr.Evaluate, all
+// directly into this package's namespace.
+//
+// Shipping the shared code as its own assembly definition would break the
+// moment a game installed both this and the Storylet Engine, because Unity
+// requires asmdef names to be unique project-wide. So it lives inside this
+// package's own Runtime asmdef. Identity belongs to the installing package,
+// never to the shared source. See expr/docs/port-sharing.md.
+//
+// Patter's own built-ins (random / check_flags / set_flags / seen / visits /
+// patter_*) are Dialect.cs. What stays here is the error type, which the shared
+// source expects the family to provide, and the two scope adapters.
 
 using System;
 using System.Collections.Generic;
 
 namespace Patterkit.Patterplay
 {
-    public sealed class EvalException : Exception
+    /// <summary>An expression that cannot be evaluated. The shared evaluator
+    /// throws this, which is why it is declared here rather than there.
+    /// Renamed from EvalException on 2026-09-01, so both families spell it the
+    /// same and one evaluator can throw it.</summary>
+    public sealed class EvalError : Exception
     {
-        public EvalException(string message) : base(message) { }
+        public EvalError(string message) : base(message) { }
     }
 
-    /// <summary>A scope the evaluator reads from. A static bag wraps a dictionary; a host can
-    /// supply a resolver for live game state (e.g. a foreign @world scope).</summary>
-    public interface IScope
-    {
-        bool TryGet(string name, out PatterValue value);
-    }
-
-    public sealed class BagScope : IScope
+    /// <summary>A static bag scope over a plain dictionary.</summary>
+    public sealed class BagScope : IScopeSource
     {
         private readonly Dictionary<string, PatterValue> _bag;
         public BagScope(Dictionary<string, PatterValue> bag) { _bag = bag; }
-        public bool TryGet(string name, out PatterValue value) => _bag.TryGetValue(name, out value);
+        public PatterValue Get(string name) => _bag.TryGetValue(name, out var v) ? v : null;
     }
 
-    public sealed class ResolverScope : IScope
+    /// <summary>A scope backed by a host callback.</summary>
+    public sealed class ResolverScope : IScopeSource
     {
-        private readonly Func<string, PatterValue> _get; // returns null when absent
+        private readonly Func<string, PatterValue> _get;
         public ResolverScope(Func<string, PatterValue> get) { _get = get; }
-        public bool TryGet(string name, out PatterValue value) { value = _get(name); return value != null; }
-    }
-
-    public sealed class EvalContext
-    {
-        /// <summary>Scope token (e.g. "patter", "scene") -> the scope. A missing scope reads as false.</summary>
-        public Dictionary<string, IScope> Scopes = new Dictionary<string, IScope>();
-        /// <summary>Next float in [0,1) for random() - required only if an expression calls random().</summary>
-        public Func<double> NextRandom;
-        /// <summary>Times this flow entered a node (visits/seen). Null => 0.</summary>
-        public Func<string, int> Visits;
-        /// <summary>Times any flow entered a node, world-wide (patter_visits/patter_seen). Null => 0.</summary>
-        public Func<string, int> PatterVisits;
-        /// <summary>Scopes whose missing property is an error rather than graceful-false. Default: none.</summary>
-        public HashSet<string> ThrowOnMissing = new HashSet<string>();
-        /// <summary>The quality channel (expr 0.4.0): "is @scope.name a quality, and what is its ladder?"
-        /// Null when the bundle declares no quality - evaluation is then byte-identical to before.
-        /// A stage's runtime value is its NAME (a plain string); the ladder makes ordering compare by
-        /// position and advance() step. Mirrors the JS EvalContext.qualities.</summary>
-        public Func<string, string, List<string>> Qualities;
-    }
-
-    public static class Expr
-    {
-        public static PatterValue Evaluate(AstNode node, EvalContext ctx)
-        {
-            switch (node)
-            {
-                case BoolNode b: return PatterValue.Bool(b.Value);
-                case NumberNode n: return PatterValue.Num(n.Value);
-                case StringNode s: return PatterValue.Str(s.Value);
-
-                case ScopedVar sv:
-                {
-                    if (!ctx.Scopes.TryGetValue(sv.Scope, out var scope) || scope == null)
-                        return PatterValue.False; // scope context absent -> graceful false
-                    if (!scope.TryGet(sv.Name, out var val) || val == null)
-                    {
-                        if (ctx.ThrowOnMissing.Contains(sv.Scope))
-                            throw new EvalException($"@{sv.Scope}.{sv.Name} is not declared on the current {sv.Scope}.");
-                        return PatterValue.False;
-                    }
-                    return val;
-                }
-
-                case Call call: return EvalCall(call, ctx);
-
-                case FlagDelta _:
-                    throw new EvalException("flagdelta node is only valid as an argument to a flag-delta function");
-
-                case Unary u:
-                {
-                    if (u.Op == "not")
-                    {
-                        var v = Evaluate(u.Operand, ctx);
-                        if (!v.IsBool) throw new EvalException($"'not' requires a boolean operand, got {Kind(v)}");
-                        return PatterValue.Bool(!v.AsBool);
-                    }
-                    var num = Evaluate(u.Operand, ctx);
-                    if (!num.IsNumber) throw new EvalException($"unary '-' requires a numeric operand, got {Kind(num)}");
-                    return PatterValue.Num(-num.AsNumber);
-                }
-
-                case Binary bin: return EvalBinary(bin, ctx);
-
-                default:
-                    throw new EvalException("unknown ast node");
-            }
-        }
-
-        private static PatterValue EvalBinary(Binary n, EvalContext ctx)
-        {
-            // Short-circuit operators first.
-            if (n.Op == "and")
-            {
-                var l = Evaluate(n.Left, ctx);
-                if (!l.IsBool) throw new EvalException($"'and' requires boolean operands, left is {Kind(l)}");
-                if (!l.AsBool) return PatterValue.False;
-                var r = Evaluate(n.Right, ctx);
-                if (!r.IsBool) throw new EvalException($"'and' requires boolean operands, right is {Kind(r)}");
-                return PatterValue.Bool(r.AsBool);
-            }
-            if (n.Op == "or")
-            {
-                var l = Evaluate(n.Left, ctx);
-                if (!l.IsBool) throw new EvalException($"'or' requires boolean operands, left is {Kind(l)}");
-                if (l.AsBool) return PatterValue.True;
-                var r = Evaluate(n.Right, ctx);
-                if (!r.IsBool) throw new EvalException($"'or' requires boolean operands, right is {Kind(r)}");
-                return PatterValue.Bool(r.AsBool);
-            }
-
-            var left = Evaluate(n.Left, ctx);
-            var right = Evaluate(n.Right, ctx);
-
-            // Quality (expr 0.4.0): when either operand REFERENCES a quality, ordering compares by
-            // ladder POSITION (the stage names are chosen by authors, not alphabetised) and arithmetic
-            // is refused. == and != fall through to plain value equality, unchanged - the validator
-            // holds stage names to the ladder at compile time.
-            var lLadder = LadderOf(n.Left, ctx);
-            var rLadder = LadderOf(n.Right, ctx);
-            var ladder = lLadder ?? rLadder;
-            if (ladder != null)
-            {
-                bool ordering = n.Op == ">" || n.Op == ">=" || n.Op == "<" || n.Op == "<=";
-                if (ordering && lLadder != null && rLadder != null && !SameLadder(lLadder, rLadder))
-                {
-                    throw new EvalException($"'{n.Op}' compares two different qualities, whose stage orders are unrelated");
-                }
-                switch (n.Op)
-                {
-                    case ">": return PatterValue.Bool(StageIndex(left, ladder, ">") > StageIndex(right, ladder, ">"));
-                    case ">=": return PatterValue.Bool(StageIndex(left, ladder, ">=") >= StageIndex(right, ladder, ">="));
-                    case "<": return PatterValue.Bool(StageIndex(left, ladder, "<") < StageIndex(right, ladder, "<"));
-                    case "<=": return PatterValue.Bool(StageIndex(left, ladder, "<=") <= StageIndex(right, ladder, "<="));
-                    case "+": case "-": case "*": case "/":
-                        throw new EvalException($"'{n.Op}' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it");
-                }
-            }
-
-            switch (n.Op)
-            {
-                case "==": return PatterValue.Bool(left.ValueEquals(right));
-                case "!=": return PatterValue.Bool(!left.ValueEquals(right));
-                case ">": AssertNumbers(left, right, ">"); return PatterValue.Bool(left.AsNumber > right.AsNumber);
-                case ">=": AssertNumbers(left, right, ">="); return PatterValue.Bool(left.AsNumber >= right.AsNumber);
-                case "<": AssertNumbers(left, right, "<"); return PatterValue.Bool(left.AsNumber < right.AsNumber);
-                case "<=": AssertNumbers(left, right, "<="); return PatterValue.Bool(left.AsNumber <= right.AsNumber);
-                case "+":
-                    if (left.IsNumber && right.IsNumber) return PatterValue.Num(left.AsNumber + right.AsNumber);
-                    if (left.IsString && right.IsString) return PatterValue.Str(left.AsString + right.AsString);
-                    throw new EvalException($"'+' requires two numbers or two strings, got {Kind(left)} and {Kind(right)}");
-                case "-": AssertNumbers(left, right, "-"); return PatterValue.Num(left.AsNumber - right.AsNumber);
-                case "*": AssertNumbers(left, right, "*"); return PatterValue.Num(left.AsNumber * right.AsNumber);
-                case "/":
-                    AssertNumbers(left, right, "/");
-                    if (right.AsNumber == 0) throw new EvalException("division by zero");
-                    return PatterValue.Num(left.AsNumber / right.AsNumber);
-                default:
-                    throw new EvalException($"unknown operator '{n.Op}'");
-            }
-        }
-
-        private static PatterValue EvalCall(Call call, EvalContext ctx)
-        {
-            // `advance` is the language's own (expr 0.4.0): the NEXT stage in the argument's ladder,
-            // saturating at the last. Patter's dialect defines no advance, so the core one always runs.
-            if (call.Name == "advance")
-            {
-                if (call.Args.Length != 1) throw new EvalException($"advance() takes exactly 1 argument, got {call.Args.Length}");
-                var ladder = LadderOf(call.Args[0], ctx);
-                if (ladder == null) throw new EvalException("advance() needs a quality reference (@scope.name of a quality property)");
-                var current = StageIndex(Evaluate(call.Args[0], ctx), ladder, "advance");
-                return PatterValue.Str(ladder[Math.Min(current + 1, ladder.Count - 1)]);
-            }
-            switch (call.Name)
-            {
-                case "random":
-                {
-                    if (call.Args.Length != 2) throw new EvalException("random(a, b) requires exactly 2 arguments");
-                    if (ctx.NextRandom == null) throw new EvalException("random() called without a PRNG in context");
-                    var a = Evaluate(call.Args[0], ctx);
-                    var b = Evaluate(call.Args[1], ctx);
-                    if (!a.IsNumber || !b.IsNumber) throw new EvalException("random(a, b) arguments must be numbers");
-                    if (a.AsNumber != Math.Floor(a.AsNumber) || b.AsNumber != Math.Floor(b.AsNumber))
-                        throw new EvalException("random(a, b) arguments must be integers");
-                    double lo = Math.Min(a.AsNumber, b.AsNumber), hi = Math.Max(a.AsNumber, b.AsNumber);
-                    return PatterValue.Num(Math.Floor(ctx.NextRandom() * (hi - lo + 1)) + lo);
-                }
-                case "check_flags":
-                {
-                    var flags = ReadFlags(call.Args.Length > 0 ? call.Args[0] : null, ctx, "check_flags");
-                    for (int i = 1; i < call.Args.Length; i++)
-                    {
-                        if (!(call.Args[i] is FlagDelta fd))
-                            throw new EvalException("check_flags() flag args must be +flagName or -flagName");
-                        bool has = flags.Contains(fd.Name);
-                        if (fd.Sign == "+" ? !has : has) return PatterValue.False;
-                    }
-                    return PatterValue.True;
-                }
-                case "set_flags":
-                {
-                    var result = new List<string>(ReadFlags(call.Args.Length > 0 ? call.Args[0] : null, ctx, "set_flags"));
-                    for (int i = 1; i < call.Args.Length; i++)
-                    {
-                        if (!(call.Args[i] is FlagDelta fd))
-                            throw new EvalException("set_flags() flag args must be +flagName or -flagName");
-                        if (fd.Sign == "+") { if (!result.Contains(fd.Name)) result.Add(fd.Name); }
-                        else { result.Remove(fd.Name); }
-                    }
-                    return PatterValue.Flags(result);
-                }
-                case "visits": return PatterValue.Num(ctx.Visits != null ? ctx.Visits(NodeId(call, ctx, "visits")) : 0);
-                case "seen": return PatterValue.Bool((ctx.Visits != null ? ctx.Visits(NodeId(call, ctx, "seen")) : 0) > 0);
-                case "patter_visits": return PatterValue.Num(ctx.PatterVisits != null ? ctx.PatterVisits(NodeId(call, ctx, "patter_visits")) : 0);
-                case "patter_seen": return PatterValue.Bool((ctx.PatterVisits != null ? ctx.PatterVisits(NodeId(call, ctx, "patter_seen")) : 0) > 0);
-                default:
-                    throw new EvalException($"unknown function '{call.Name}'");
-            }
-        }
-
-        private static List<string> ReadFlags(AstNode arg, EvalContext ctx, string fn)
-        {
-            if (arg == null) throw new EvalException($"{fn}() requires at least one argument (the flags variable)");
-            var v = Evaluate(arg, ctx);
-            if (v.IsFlags) return new List<string>(v.AsFlags);
-            if (v.IsBool && !v.AsBool) return new List<string>(); // empty flags
-            throw new EvalException($"{fn}() first argument must be a flags property");
-        }
-
-        private static string NodeId(Call call, EvalContext ctx, string fn)
-        {
-            if (call.Args.Length < 1) throw new EvalException($"{fn}(id) requires a string node id");
-            var v = Evaluate(call.Args[0], ctx);
-            if (!v.IsString) throw new EvalException($"{fn}(id) requires a string node id");
-            return v.AsString;
-        }
-
-        /// <summary>The ladder behind an operand NODE, when the context's quality channel says it
-        /// references one. The node carries the scope+name the channel needs; values are plain strings.</summary>
-        private static List<string> LadderOf(AstNode node, EvalContext ctx)
-        {
-            if (ctx.Qualities == null || !(node is ScopedVar sv)) return null;
-            return ctx.Qualities(sv.Scope, sv.Name);
-        }
-
-        /// <summary>Index of a stage in a ladder; an unknown stage is an ERROR naming the value and the
-        /// ladder (a drifted save is exactly what lands here), never a silent never-match.</summary>
-        private static int StageIndex(PatterValue value, List<string> ladder, string op)
-        {
-            if (!value.IsString) throw new EvalException($"'{op}' on a quality compares stages, got {Kind(value)}");
-            var i = ladder.IndexOf(value.AsString);
-            if (i < 0) throw new EvalException($"\"{value.AsString}\" is not a stage of this quality (stages: {string.Join(", ", ladder)})");
-            return i;
-        }
-
-        private static bool SameLadder(List<string> a, List<string> b)
-        {
-            if (a.Count != b.Count) return false;
-            for (int i = 0; i < a.Count; i++) if (a[i] != b[i]) return false;
-            return true;
-        }
-
-        private static void AssertNumbers(PatterValue l, PatterValue r, string op)
-        {
-            if (!l.IsNumber || !r.IsNumber)
-                throw new EvalException($"'{op}' requires numeric operands, got {Kind(l)} and {Kind(r)}");
-        }
-
-        private static string Kind(PatterValue v) => v.Kind switch
-        {
-            PatterKind.Bool => "boolean",
-            PatterKind.Number => "number",
-            PatterKind.Str => "string",
-            PatterKind.Flags => "object",
-            _ => "unknown",
-        };
+        public PatterValue Get(string name) => _get(name);
     }
 }

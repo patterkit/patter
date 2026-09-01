@@ -6,6 +6,47 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Flags compare as a SET.** `==` and `!=` on a flags value now ignore order, so
+  `check_flags` results and stored flag lists that hold the same members are equal
+  however they were built. They are compared as multisets, so a duplicated flag
+  still counts.
+
+  This is a behaviour change to existing content, and it is a fix rather than a
+  preference: a flags value IS a set, and its stored order was an artefact of the
+  order somebody happened to add things in. `set_flags(@f, +red)` then `+blue`
+  compared UNEQUAL to the same two flags added the other way round, a difference
+  no author can see and none intends. An expression that relied on two
+  equal-membered flag values comparing unequal will change answer.
+
+### Fixed
+
+- **The PRNG seed is coerced the way JavaScript coerces it** (ECMA-262 ToUint32),
+  so every runtime lands on the same first draw for every seed. Seeds outside the
+  range of a 64-bit integer (`1e19`, `Infinity`) previously gave a different
+  answer here from the JS runtime.
+- **A save written before this release now loads.** The JS runtime accumulated
+  `rngState` with `| 0`, so more than half of all saves carry a NEGATIVE number
+  where the schema says uint32. Newtonsoft refused those with an
+  `OverflowException`, which meant a player could not load their own game. Saves
+  are read through the same ToUint32 as everything else now, and land on the
+  identical PRNG position. Pinned by a regression check in the corpus TestHost.
+- **Numbers render the way JavaScript's `String(n)` renders them** for values
+  above 2^63. `JsNumber` cast to `long`, so `1e20` printed as
+  `9223372036854775807`.
+- **`==` between a whole number and a float.** `3` and `3.0` compared unequal;
+  the reference has one number type, so they are the same value.
+- The PRNG seed is a `double` rather than a `long`, matching the JS API, so the
+  coercion happens once and in one place instead of at every call site.
+
+### Changed
+
+- `PatterValue`, `PatterKind` and `Mulberry32` moved to `Runtime/Expr/`, where
+  they are generated from a single shared source also used by the Storylet
+  Engine. The types, namespace and members are unchanged; only the files moved.
+
+
 ## [0.7.1] - 2026-08-30
 
 ### Added

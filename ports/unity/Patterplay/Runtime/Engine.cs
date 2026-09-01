@@ -48,7 +48,7 @@ namespace Patterkit.Patterplay
         /// corpus cases inject a seeded one here; scripted cases use the per-flow Seed instead.</summary>
         public Func<double> Rng;
         /// <summary>Default seed for each flow's built-in serialisable PRNG.</summary>
-        public long? Seed;
+        public double? Seed;
         public string Locale;
         public bool ReplayPromptOnChoose;
         /// <summary>Closed captions (#214): show caption cues in dialogue lines. Default true (full text);
@@ -127,7 +127,7 @@ namespace Patterkit.Patterplay
     public sealed class Engine
     {
         private readonly FlowHost _host;
-        private readonly long _defaultSeed;
+        private readonly double _defaultSeed;
         private readonly Dictionary<string, Flow> _flows = new Dictionary<string, Flow>();
         private readonly Dictionary<string, string> _sceneGameIdToId = new Dictionary<string, string>();
         private readonly Dictionary<string, Dictionary<string, string>> _blockGameIdToId = new Dictionary<string, Dictionary<string, string>>();
@@ -160,7 +160,7 @@ namespace Patterkit.Patterplay
             foreach (var c in bundle.Cast ?? new List<Cast>())
                 if (!string.IsNullOrEmpty(c.DisplayName)) castDisplay[c.Name] = c.DisplayName;
 
-            _defaultSeed = unchecked((uint)(options.Seed ?? 0x9e3779b9));
+            _defaultSeed = Mulberry32.ToUint32(options.Seed ?? 0x9e3779b9);
 
             var nodeIndex = new Dictionary<string, Node>();
             var blockToScene = new Dictionary<string, string>();
@@ -299,7 +299,7 @@ namespace Patterkit.Patterplay
         /// </summary>
         public void SetClosedCaptions(bool on) => _host.CaptionsOn = on;
 
-        public Flow OpenFlow(string id, string scene = null, string block = null, long? seed = null)
+        public Flow OpenFlow(string id, string scene = null, string block = null, double? seed = null)
         {
             string sceneId = ResolveSceneRef(scene);
             string blockId = ResolveBlockRef(sceneId, block);

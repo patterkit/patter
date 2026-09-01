@@ -1,18 +1,13 @@
-// The compiled expression AST, mirroring @wildwinter/expr's published tagged-tuple
-// form (the corpus ships these, so a runtime needs no parser):
+// AST - the in-memory expression tree. Port of @wildwinter/expr's ast.ts.
+//
+// The node classes are the SHARED source, vendored from expr/ports/unity/Ast.cs
+// to Expr/Ast.cs beside this, so Patterplay and the Storylet Engine walk the
+// same shape. Deserialising into them is NOT shared: that needs a JSON type and
+// each package ships its own (Patterplay's is ParseAst, in PatterBundleLoader
+// and the corpus TestHost).
+//
 //   ["b",v] ["n",v] ["s",v] ["sv",scope,name] ["u",op,operand]
 //   ["bin",op,left,right] ["call",name,...args] ["fd",sign,name]
-
-namespace Patterkit.Patterplay
-{
-    public abstract class AstNode { }
-
-    public sealed class BoolNode : AstNode { public bool Value; }
-    public sealed class NumberNode : AstNode { public double Value; }
-    public sealed class StringNode : AstNode { public string Value; }
-    public sealed class ScopedVar : AstNode { public string Scope; public string Name; }
-    public sealed class Unary : AstNode { public string Op; public AstNode Operand; }
-    public sealed class Binary : AstNode { public string Op; public AstNode Left; public AstNode Right; }
-    public sealed class Call : AstNode { public string Name; public AstNode[] Args; }
-    public sealed class FlagDelta : AstNode { public string Sign; public string Name; }
-}
+//
+// Dialect-agnostic: scope tokens and function names are plain strings here;
+// meaning is supplied by a Dialect (see Dialect.cs).

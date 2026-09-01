@@ -48,12 +48,33 @@ namespace Patterkit.Patterplay
         }
     }
 
+    /// <summary>
+    /// Reads a persisted uint that may have been written SIGNED. The JS runtime accumulated
+    /// its rngState with `| 0` until this was fixed, so saves in the wild carry a negative
+    /// number where the schema says uint32; Newtonsoft's default binding throws an
+    /// OverflowException on those. Coerce with the same ToUint32 every other runtime uses,
+    /// so an old save loads and lands on the identical PRNG position.
+    /// </summary>
+    public sealed class Uint32Converter : JsonConverter<uint>
+    {
+        public override void WriteJson(JsonWriter w, uint v, JsonSerializer s) => w.WriteValue(v);
+
+        public override uint ReadJson(JsonReader r, Type t, uint existing, bool hasExisting, JsonSerializer s)
+        {
+            var tok = JToken.Load(r);
+            return Mulberry32.ToUint32((double)tok);
+        }
+    }
+
     public static class PatterSave
     {
         public const string Schema = "patter/save@0";
 
         private static readonly JsonSerializer Serializer =
-            JsonSerializer.Create(new JsonSerializerSettings { Converters = { new PatterValueConverter() } });
+            JsonSerializer.Create(new JsonSerializerSettings
+            {
+                Converters = { new PatterValueConverter(), new Uint32Converter() },
+            });
 
         /// <summary>Serialise the whole game (shared state, visits, every live flow) to a tagged JSON string.</summary>
         public static string SerializeState(Engine engine)

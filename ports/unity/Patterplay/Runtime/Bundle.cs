@@ -178,7 +178,7 @@ namespace Patterkit.Patterplay
 
     public sealed class Expression
     {
-        public AstNode Ast;
+        public ExprNode Ast;
     }
 
     public sealed class Effect

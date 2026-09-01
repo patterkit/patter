@@ -152,25 +152,27 @@ namespace Patterkit.Patterplay
             return list;
         }
 
-        private static AstNode ParseAst(JArray e)
+        // The tag dispatch is the SHARED deserialiser (Expr/Ast.cs). It takes a
+        // NORMALISED tree, so all this layer does is turn Newtonsoft's JToken into
+        // plain objects. That conversion is genuinely library-specific; the dispatch
+        // it used to sit beside was not, and existed six times across the family.
+        private static ExprNode ParseAst(JArray e) => Ast.DeserialiseAst((IReadOnlyList<object>)ToTree(e));
+
+        private static object ToTree(JToken token)
         {
-            string tag = (string)e[0];
-            switch (tag)
+            switch (token.Type)
             {
-                case "b": return new BoolNode { Value = (bool)e[1] };
-                case "n": return new NumberNode { Value = (double)e[1] };
-                case "s": return new StringNode { Value = (string)e[1] };
-                case "sv": return new ScopedVar { Scope = (string)e[1], Name = (string)e[2] };
-                case "u": return new Unary { Op = (string)e[1], Operand = ParseAst((JArray)e[2]) };
-                case "bin": return new Binary { Op = (string)e[1], Left = ParseAst((JArray)e[2]), Right = ParseAst((JArray)e[3]) };
-                case "fd": return new FlagDelta { Sign = (string)e[1], Name = (string)e[2] };
-                case "call":
+                case JTokenType.Boolean: return token.Value<bool>();
+                case JTokenType.Integer:
+                case JTokenType.Float: return token.Value<double>();
+                case JTokenType.String: return token.Value<string>();
+                case JTokenType.Array:
                 {
-                    var args = new List<AstNode>();
-                    for (int i = 2; i < e.Count; i++) args.Add(ParseAst((JArray)e[i]));
-                    return new Call { Name = (string)e[1], Args = args.ToArray() };
+                    var list = new List<object>();
+                    foreach (var item in (JArray)token) list.Add(ToTree(item));
+                    return list;
                 }
-                default: throw new Exception($"unknown ast tag: {tag}");
+                default: throw new EvalError($"unsupported ast token kind: {token.Type}");
             }
         }
 
