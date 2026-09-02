@@ -13,6 +13,39 @@ runtime behaviour.
   `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `Path` holds exactly
   what `Ref` held: the reference GetProperty / SetProperty take. Blueprints reading `Ref` need
   repointing at `Path`. The C++ core's `patter::PropertyRow` changed with it and gained `writable`.
+- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms
+  have always resolved on input and still do - an unqualified name defaults to the `patter`
+  scope - so `GetProperty("@gold")` is unaffected. What changed is the address a row REPORTS,
+  which is what a state panel displays and what an inspector writes back through. It matches
+  what `@scene` and the other family's scopes have always looked like.
+
+- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in
+  hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows
+  entering one scene now never share a mutable flags list, and a `temporary` property's reset on
+  re-entry goes through the bag, which means a state logger sees it. **The save format is
+  unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's
+  declarations before laying saved values over, so a property a save predates keeps its default.
+- **BREAKING: the C++ core's `patter::PropertyView` is gone; `listProperties()` returns
+  `patter::PropertyRow`.** It was the shared row plus a `path`, and `path` is on the shared row
+  now. The Blueprint-facing `FPatterPropertyRow` is unchanged. Re-declaring `path` on a derived
+  struct would have SHADOWED the inherited one - written on the derived, read as empty through a
+  `PropertyRow&`.
+
+### Added
+
+- **A decision log, and `OnDryChoice`.** Opening a run with `bLog` records what the engine
+  decided and why - each choice with the options it offered, the ones it greyed out and the
+  reason, each jump, each property write with the value it replaced. `GetLog()` is the whole
+  run in order, a `Flow`'s own log is flow-local, and `OnTrace` streams entries live rather than
+  retaining them. `OnDryChoice` fires when a choice runs dry - no takeable option, no eligible
+  fallback - so the silent fall-through is observable; it survives alongside the log because it is
+  live feedback, not a record.
+
+### Fixed
+
+- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the
+  stages instead of a free-text box, and the code that builds rows never filled it in - on this
+  runtime and two others. Every quality row came out without one.
 
 ## [0.8.0] - 2026-09-01
 

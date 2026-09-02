@@ -36,8 +36,8 @@ version number always means the same runtime behaviour. This package is versione
 ### Changed
 
 - **BREAKING: a property row's address is `path`, not `ref`, and the row carries `name` and
-  `writable`.** `listProperties()` returns `PropertyView`, which extends the row type from
-  `@wildwinter/scoperegistry` rather than redeclaring it here. `path` holds exactly what `ref`
+  `writable`.** `listProperties()` returns the row type from `@wildwinter/scoperegistry` itself,
+  rather than a local interface redeclaring it. `path` holds exactly what `ref`
   held: the reference `getProperty` / `setProperty` take. `name` is the bare declared name.
   `writable` is always true here, because Patter has no read-only shared property; it is carried
   because the row is shared with the Storylet Engine, which does declare them.
@@ -46,6 +46,39 @@ version number always means the same runtime behaviour. This package is versione
   reached the shared type, and the Storylet Engine - reading the same property model through the
   same registry - could not carry a ladder at all: it edited a quality as free text on every
   platform it ships. One row, one place to add the next field.
+- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms
+  have always resolved on input and still do - an unqualified name defaults to the `patter`
+  scope - so `getProperty("@gold")` is unaffected. What changed is the address a row REPORTS,
+  which is what a state panel displays and what an inspector writes back through. It matches
+  what `@scene` and the other family's scopes have always looked like.
+
+- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in
+  hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows
+  entering one scene now never share a mutable flags list, and a `temporary` property's reset on
+  re-entry goes through the bag, which means a state logger sees it. **The save format is
+  unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's
+  declarations before laying saved values over, so a property a save predates keeps its default.
+- **BREAKING: `PropertyView` is gone; `listProperties()` returns `PropertyRow`.** It was the
+  shared row plus a `path`, and `path` is on the shared row now, so the name was a second name
+  for one type. `PropertyRow` is re-exported from `@patterkit/runtime`, so naming a row needs no
+  dependency on `@wildwinter/scoperegistry`.
+- **Requires `@wildwinter/scoperegistry` ^0.4.0**, which is where the row's `path` lives.
+
+### Added
+
+- **A decision log, and `onDryChoice`.** Opening a run with `log: true` records what the engine
+  decided and why - each choice with the options it offered, the ones it greyed out and the
+  reason, each jump, each property write with the value it replaced. `Engine.log()` is the whole
+  run in order, a `Flow`'s own log is flow-local, and `onTrace` streams entries live rather than
+  retaining them. `onDryChoice` fires when a choice runs dry - no takeable option, no eligible
+  fallback - so the silent fall-through is observable; it survives alongside the log because it is
+  live feedback, not a record.
+
+### Fixed
+
+- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the
+  stages instead of a free-text box, and the code that builds rows never filled it in - on this
+  runtime and two others. Every quality row came out without one.
 
 ## [0.8.0] - 2026-09-01
 

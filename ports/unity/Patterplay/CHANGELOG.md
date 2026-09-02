@@ -12,6 +12,38 @@ same runtime behaviour.
   shape is `@wildwinter/scoperegistry`'s property row, shared with the Storylet Engine. `Path` holds
   exactly what `Ref` held: the reference `GetProperty` and `SetProperty` take. `Name` was already
   there. Anything reading `row.Ref` reads `row.Path`.
+- **BREAKING: a row's address is the qualified one, `@patter.gold`, not `@gold`.** Both forms
+  have always resolved on input and still do - an unqualified name defaults to the `patter`
+  scope - so `GetProperty("@gold")` is unaffected. What changed is the address a row REPORTS,
+  which is what a state panel displays and what an inspector writes back through. It matches
+  what `@scene` and the other family's scopes have always looked like.
+
+- **Scene and stage state is held in the shared property bag.** `@scene` properties lived in
+  hand-rolled maps that duplicated the bag's own seeding, so they missed its guards: two flows
+  entering one scene now never share a mutable flags list, and a `temporary` property's reset on
+  re-entry goes through the bag, which means a state logger sees it. **The save format is
+  unchanged** - a flat name/value map per scene, and a load that seeds from the bundle's
+  declarations before laying saved values over, so a property a save predates keeps its default.
+- **BREAKING: `PropertyView` is gone; `ListProperties()` returns `List<PropertyRow>`.** It was
+  `PropertyRow` plus a `Path`, and `Path` is on the shared row now. C# has no type alias to keep
+  the old name alive with, and an empty subclass would be a type a bag's own row could never
+  satisfy.
+
+### Added
+
+- **A decision log, and `OnDryChoice`.** Opening a run with `EngineOptions.Log` records what the engine
+  decided and why - each choice with the options it offered, the ones it greyed out and the
+  reason, each jump, each property write with the value it replaced. `Engine.Log()` is the whole
+  run in order, a `Flow`'s own log is flow-local, and `OnTrace` streams entries live rather than
+  retaining them. `OnDryChoice` fires when a choice runs dry - no takeable option, no eligible
+  fallback - so the silent fall-through is observable; it survives alongside the log because it is
+  live feedback, not a record.
+
+### Fixed
+
+- **A quality row carries its ladder.** `stages` was on the row so an examiner could offer the
+  stages instead of a free-text box, and the code that builds rows never filled it in - on this
+  runtime and two others. Every quality row came out without one.
 
 ## [0.8.0] - 2026-09-01
 
