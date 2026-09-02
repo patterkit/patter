@@ -36,6 +36,6 @@
   "dependencies": {
     "@patterkit/model": "0.4.1",
     "@wildwinter/expr": "^0.5.0",
-    "@wildwinter/scoperegistry": "^0.3.0"
+    "@wildwinter/scoperegistry": "^0.4.0"
   }
 }
