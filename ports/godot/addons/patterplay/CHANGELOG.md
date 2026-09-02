@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-02
+
 ### Added
 
 - **`list_bags()` on the engine and on a flow, and `flows()` on the engine.** What a state

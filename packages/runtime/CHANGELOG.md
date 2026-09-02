@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-02
+
 ### Added
 
 - **`Engine.listBags()` and `Flow.listBags()`.** The kernel bags with the path each answers

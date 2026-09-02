@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-02
+
 ### Added
 
 - **`Engine::listBags()`, `Flow::listBags()` and `Engine::flows()`.** What a state logger

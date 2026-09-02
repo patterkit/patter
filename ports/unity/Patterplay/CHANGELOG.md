@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-02
+
 ### Added
 
 - **`Engine.ListBags()`, `Flow.ListBags()` and `Engine.Flows()`.** What a state logger mounts;
