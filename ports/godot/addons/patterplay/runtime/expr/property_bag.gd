@@ -57,7 +57,14 @@ func _seed(declarations: Array) -> void:
 		_decls[name] = d
 		# Deep-copied so bags seeded from one declaration set never share a
 		# mutable default (flags arrays).
-		values[name] = _copy_value(Values.to_value(d.get("default", default_for(d))))
+		#
+		# default_for(d), NOT d.get("default", default_for(d)): the second re-implements
+		# the first half of default_for's own rule, and gets it wrong. Dictionary.get
+		# falls back only when the KEY IS ABSENT, so a declaration carrying an explicit
+		# null default skipped the rule and seeded null - a `number` holding nil, which
+		# nothing downstream expects. The other three runtimes treat null and absent
+		# alike (TS `??`, C# `!= null`, C++ optional), and now so does this one.
+		values[name] = _copy_value(Values.to_value(default_for(d)))
 
 
 ## The type default for a declaration with no explicit default.
@@ -146,7 +153,7 @@ func rows() -> Array:
 			"path": path_prefix + name,
 			"type": str(d.get("type", "")),
 			"value": get_value(name),
-			"default": _copy_value(Values.to_value(d.get("default", default_for(d)))),
+			"default": _copy_value(Values.to_value(default_for(d))),
 			"writable": bool(d.get("writable", true)),
 		}
 		if d.has("values"):
