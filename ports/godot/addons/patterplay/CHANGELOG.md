@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-02
+
 ### Changed
 
 - **BREAKING: `list_properties()` rows say `"path"` where they said `"ref"`, and now carry `"name"`

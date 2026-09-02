@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-02
+
 ### Changed
 
 - **BREAKING: `PropertyRow.Ref` is now `PropertyRow.Path`, and the row carries `Writable`.** The

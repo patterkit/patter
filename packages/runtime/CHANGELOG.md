@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-02
+
 ### Changed
 
 - **BREAKING: a property row's address is `path`, not `ref`, and the row carries `name` and

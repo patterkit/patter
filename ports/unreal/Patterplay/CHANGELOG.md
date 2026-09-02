@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-02
+
 ### Changed
 
 - **BREAKING: `FPatterPropertyRow::Ref` is now `Path`, with `Name` beside it.** The shape is
