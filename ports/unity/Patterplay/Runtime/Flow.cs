@@ -15,7 +15,7 @@ namespace Patterkit.Patterplay
         private readonly List<LogEntry> _log = new List<LogEntry>();
         /// <summary>Monotonic across the flow's life; survives ClearLog so order is stable.</summary>
         private int _seq;
-        private Dictionary<string, PatterValue> _local;                       // not-shared @patter
+        private PropertyBag _local;                                           // not-shared @patter
         private Dictionary<string, PropertyBag> _sceneBags = new Dictionary<string, PropertyBag>();
         private uint _rngState;
 
@@ -173,18 +173,29 @@ namespace Patterkit.Patterplay
 
         /// <summary>True once the engine has closed this flow.</summary>
         public bool IsClosed => _closed;
+        /// <summary>THIS flow's own kernel bags: its not-shared @patter half and its per-scene
+        /// @scene props, each prefixed with the flow id so one path space holds every flow. The
+        /// shared halves are the Engine's ListBags.</summary>
+        public List<LogMount> ListBags()
+        {
+            var mounts = new List<LogMount> { new LogMount { Bag = _local, PathPrefix = $"{Id}/@patter." } };
+            foreach (var pair in _sceneBags)
+                mounts.Add(new LogMount { Bag = pair.Value, PathPrefix = $"{Id}/@scene:{pair.Key}." });
+            return mounts;
+        }
+
         public bool IsEnded() => _flowEnded;
 
         // -- scope resolvers ----------------------------------------------------
 
         private PatterValue PatterGet(string n)
         {
-            if (_host.PatterSharedNames.Contains(n)) return _host.SharedPatter.TryGetValue(n, out var v) ? v : null;
-            return _local.TryGetValue(n, out var lv) ? lv : null;
+            if (_host.PatterSharedNames.Contains(n)) return _host.SharedPatter.Get(n);
+            return _local.Get(n);
         }
         private void PatterSet(string n, PatterValue v)
         {
-            if (_host.PatterSharedNames.Contains(n)) _host.SharedPatter[n] = v; else _local[n] = v;
+            if (_host.PatterSharedNames.Contains(n)) _host.SharedPatter.Set(n, v); else _local.Set(n, v);
         }
         private PropertyBag SceneBagFor(string n)
         {
@@ -766,11 +777,11 @@ namespace Patterkit.Patterplay
             }
         }
 
-        private Dictionary<string, PatterValue> FreshLocal()
+        /// <summary>This flow's NOT-shared @patter half, in a bag for the same reasons as the
+        /// shared one.</summary>
+        private PropertyBag FreshLocal()
         {
-            var d = new Dictionary<string, PatterValue>();
-            foreach (var decl in _host.PatterLocalDecls) d[decl.Name.ToLowerInvariant()] = Engine.PropDefault(decl);
-            return d;
+            return new PropertyBag(_host.PatterLocalDecls.Select(Engine.ToScopeDecl), null, "@patter.");
         }
 
         // -- save / restore -----------------------------------------------------
@@ -779,7 +790,7 @@ namespace Patterkit.Patterplay
         {
             return new FlowSnapshot
             {
-                Scopes = Engine.CloneBag(_local),
+                Scopes = Engine.FlatOf(_local),
                 SceneBags = Engine.SaveBags(_sceneBags),
                 RngState = _rngState,
                 Visits = new Dictionary<string, int>(_visitCounts),
@@ -829,7 +840,7 @@ namespace Patterkit.Patterplay
 
             _sceneBags = Engine.LoadBags(_host, snap.SceneBags, false);
             _local = FreshLocal();
-            foreach (var kv in snap.Scopes ?? new Dictionary<string, PatterValue>()) _local[kv.Key] = kv.Value;
+            _local.Load(Engine.OrderedOf(snap.Scopes));
 
             _activeSnippet = null;
             if (snap.ActiveSnippetId != null && _host.NodeIndex.TryGetValue(snap.ActiveSnippetId, out var node) && node.IsSnippet)

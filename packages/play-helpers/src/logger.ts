@@ -21,7 +21,7 @@
 
 import type { Engine, StepResult } from "@patterkit/runtime";
 import { createStateLogger as createKernelStateLogger, diffState } from "@wildwinter/scoperegistry";
-import type { BagMount, ScalarValue, StateChange, StateSnapshot } from "@wildwinter/scoperegistry";
+import type { LogMount, ScalarValue, StateChange, StateSnapshot } from "@wildwinter/scoperegistry";
 
 // Re-exported: these were declared here, and a host importing them from
 // @patterkit/play-helpers should not have to care that they moved.
@@ -101,7 +101,7 @@ export function createStateLogger(engine: Engine, opts: StateLoggerOptions = {})
   const kernel = createKernelStateLogger({
     // Re-read on every capture: openFlow and loadGame both replace bags, and the kernel
     // re-mounts whatever it is handed.
-    mounts: (): BagMount[] => [...engine.listBags(), ...engine.flows().flatMap((f) => f.listBags())],
+    mounts: (): LogMount[] => [...engine.listBags(), ...engine.flows().flatMap((f) => f.listBags())],
     extra: () => visitState(engine),
   }, { sink: opts.sink, label: tag });
 

@@ -30,7 +30,7 @@ import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
-import type { BagMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
+import type { LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
@@ -890,8 +890,8 @@ export class Engine {
    *
    * loadGame() replaces every bag, so re-enumerate after a load.
    */
-  listBags(): BagMount[] {
-    const mounts: BagMount[] = [{ bag: this.host.shared.ownedBag("patter") }];
+  listBags(): LogMount[] {
+    const mounts: LogMount[] = [{ bag: this.host.shared.ownedBag("patter") }];
     for (const [sceneId, bag] of this.host.stageBags) mounts.push({ bag, pathPrefix: `@scene:${sceneId}.` });
     return mounts;
   }
@@ -1361,8 +1361,8 @@ export class Flow {
    * props, each prefixed with the flow id so one path space holds every flow. The shared
    * halves are the Engine's listBags.
    */
-  listBags(): BagMount[] {
-    const mounts: BagMount[] = [{ bag: this.local.ownedBag("patter"), pathPrefix: `${this.id}/@patter.` }];
+  listBags(): LogMount[] {
+    const mounts: LogMount[] = [{ bag: this.local.ownedBag("patter"), pathPrefix: `${this.id}/@patter.` }];
     for (const [sceneId, bag] of this.sceneBags) mounts.push({ bag, pathPrefix: `${this.id}/@scene:${sceneId}.` });
     return mounts;
   }

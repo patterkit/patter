@@ -144,7 +144,10 @@ namespace Patterkit.Patterplay
         public Dictionary<string, string> SceneGameIdToId;
         public Dictionary<string, Dictionary<string, string>> BlockGameIdToId;
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
-        public Dictionary<string, PatterValue> SharedPatter;
+        /// <summary>The @patter globals. A bag, not a map: it is what carries the audit hook a
+        /// state logger pushes from, and the clone guard on a mutable default. "@patter." is the
+        /// address a row reports, and here also the log path - there is one shared globals bag.</summary>
+        public PropertyBag SharedPatter;
         /// <summary>Host scopes by token, already resolved: an embedder's binding where one was given,
         /// a self-backed bag for every other token the bundle declares. Empty for a bundle with none.</summary>
         public Dictionary<string, IHostScope> HostScopes = new Dictionary<string, IHostScope>();
@@ -245,8 +248,7 @@ namespace Patterkit.Patterplay
             var localDecls = props.Where(p => !(p.Shared ?? true)).ToList();
             var sharedNames = new HashSet<string>(sharedDecls.Select(d => d.Name.ToLowerInvariant()));
 
-            var sharedPatter = new Dictionary<string, PatterValue>();
-            foreach (var d in sharedDecls) sharedPatter[d.Name.ToLowerInvariant()] = PropDefault(d);
+            var sharedPatter = new PropertyBag(sharedDecls.Select(ToScopeDecl), null, "@patter.");
 
             var sceneSharedNames = new Dictionary<string, HashSet<string>>();
             foreach (var kv in bundle.Scenes)
@@ -369,6 +371,26 @@ namespace Patterkit.Patterplay
         }
 
         public Flow GetFlow(string id) => _flows.TryGetValue(id, out var f) ? f : null;
+
+        /// <summary>Every currently-open flow. Parity with the JS runtime's flows() and the
+        /// Godot / C++ ports: a state logger mounts each flow's own bags, so it has to be able
+        /// to ask an engine for them.</summary>
+        public List<Flow> Flows() => new List<Flow>(_flows.Values);
+
+        /// <summary>The SHARED kernel bags with the path each answers to in a log: the @patter
+        /// globals, and one per scene for the shared @scene props. Parity with the Storylet
+        /// Engine's ListBags - it is what a state logger mounts.
+        ///
+        /// A stage bag's LOG path is "@scene:&lt;sceneId&gt;." where its address is "@scene.": a
+        /// property is addressed relative to a flow's current scene, but a log spans scenes and
+        /// has to say which one. LoadGame replaces every bag, so re-enumerate after a load.</summary>
+        public List<LogMount> ListBags()
+        {
+            var mounts = new List<LogMount> { new LogMount { Bag = _host.SharedPatter } };
+            foreach (var pair in _host.StageBags)
+                mounts.Add(new LogMount { Bag = pair.Value, PathPrefix = $"@scene:{pair.Key}." });
+            return mounts;
+        }
         /// <summary>Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a
         /// host still holding it cannot keep advancing it into the shared world.</summary>
         public void CloseFlow(string id)
@@ -602,7 +624,7 @@ namespace Patterkit.Patterplay
         {
             foreach (var f in _flows.Values) f.Close(); // finish them, don't just forget them
             _flows.Clear();
-            foreach (var d in _host.PatterSharedDecls) _host.SharedPatter[d.Name.ToLowerInvariant()] = PropDefault(d);
+            _host.SharedPatter.Reseed(_host.PatterSharedDecls.Select(ToScopeDecl));
             _host.SharedVisits.Clear();
             _host.SharedSelectors.Clear();
             _host.StageBags.Clear();
@@ -612,14 +634,14 @@ namespace Patterkit.Patterplay
         {
             var (scope, name) = SplitRef(refStr, t => t == "scene" || t == "patter");
             if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            return _host.SharedPatter.TryGetValue(name, out var v) ? v : null;
+            return _host.SharedPatter.Get(name);
         }
 
         public void SetProperty(string refStr, PatterValue value)
         {
             var (scope, name) = SplitRef(refStr, t => t == "scene" || t == "patter");
             if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            _host.SharedPatter[name] = value;
+            _host.SharedPatter.Set(name, value);
         }
 
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
@@ -641,7 +663,7 @@ namespace Patterkit.Patterplay
                     Type = d.Type,
                     Values = d.Values,
                     Stages = d.Stages,
-                    Value = _host.SharedPatter.TryGetValue(name, out var v) ? v : PropDefault(d),
+                    Value = _host.SharedPatter.Get(name) ?? PropDefault(d),
                     Default = PropDefault(d),
                     // Always true: a shared @patter property has no read-only form here,
                     // exactly as in the JS runtime. Carried because it is part of the
@@ -661,7 +683,7 @@ namespace Patterkit.Patterplay
             return new SaveGame
             {
                 Version = 2,
-                Shared = CloneBag(_host.SharedPatter),
+                Shared = FlatOf(_host.SharedPatter),
                 SharedVisits = new Dictionary<string, int>(_host.SharedVisits),
                 SharedSelectors = CloneSelectors(_host.SharedSelectors),
                 StageBags = SaveBags(_host.StageBags),
@@ -672,8 +694,10 @@ namespace Patterkit.Patterplay
         public void LoadGame(SaveGame save)
         {
             if (save.Version != 2) throw new Exception($"unsupported save version: {save.Version}");
-            _host.SharedPatter.Clear();
-            foreach (var kv in save.Shared) _host.SharedPatter[kv.Key] = kv.Value;
+            // Seeded from the declarations, then the saved values laid over: a property the
+            // save predates keeps its default rather than vanishing.
+            _host.SharedPatter = new PropertyBag(_host.PatterSharedDecls.Select(ToScopeDecl), null, "@patter.");
+            _host.SharedPatter.Load(OrderedOf(save.Shared));
             _host.SharedVisits.Clear();
             foreach (var kv in save.SharedVisits) _host.SharedVisits[kv.Key] = kv.Value;
             _host.SharedSelectors.Clear();
@@ -832,6 +856,22 @@ namespace Patterkit.Patterplay
                 out_[kv.Key] = bag;
             }
             return out_;
+        }
+
+        /// <summary>One bag as the flat name/value map the save envelope carries.</summary>
+        internal static Dictionary<string, PatterValue> FlatOf(PropertyBag bag)
+        {
+            var flat = new Dictionary<string, PatterValue>();
+            foreach (var e in bag.Save()) flat[e.Key] = e.Value;
+            return flat;
+        }
+
+        /// <summary>The reverse, for PropertyBag.Load.</summary>
+        internal static OrderedMap<string, PatterValue> OrderedOf(Dictionary<string, PatterValue> flat)
+        {
+            var values = new OrderedMap<string, PatterValue>();
+            foreach (var e in flat ?? new Dictionary<string, PatterValue>()) values.Set(e.Key, e.Value);
+            return values;
         }
 
         internal static PatterValue PropDefault(PropertyDecl d)
