@@ -61,7 +61,11 @@ export function approveAndWaitForPrCi(cwd, pr, log = console.log, seconds = 900)
   }
   if (!r) { log(`  no CI run for ${sha.slice(0, 8)} - nothing to approve`); return "none"; }
 
-  if (r.status === "action_required" || r.status === "waiting") {
+  // A parked run reports `status: "completed"` with `conclusion: "action_required"` - it is not
+  // pending, it has finished by refusing to start. Testing only `status` therefore never approved
+  // anything, fell through to the wait below, read the conclusion as not-success and called a
+  // release FAILED that had never run. (Hit on the Patterplay 0.9.0 cut, 2026-09-02.)
+  if (r.status === "action_required" || r.status === "waiting" || r.conclusion === "action_required") {
     log(`  run ${r.databaseId} is parked awaiting approval - approving`);
     try {
       sh(`gh api -X POST repos/{owner}/{repo}/actions/runs/${r.databaseId}/approve`, { cwd });
@@ -76,7 +80,9 @@ export function approveAndWaitForPrCi(cwd, pr, log = console.log, seconds = 900)
   for (let waited = 0; waited < seconds; waited += 10) {
     r = runOf();
     if (!r) return "none";
-    if (r.status === "completed") {
+    // An approved run goes back to queued/in_progress, but for a moment still reports the parked
+    // result; treating that as the verdict would fail the release we just unblocked.
+    if (r.status === "completed" && r.conclusion !== "action_required") {
       log(`  CI ${r.conclusion} (run ${r.databaseId})`);
       return r.conclusion === "success" ? "passed" : "failed";
     }
