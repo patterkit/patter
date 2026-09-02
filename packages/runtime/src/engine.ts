@@ -30,7 +30,7 @@ import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
-import type { PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
+import type { BagMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
@@ -879,6 +879,23 @@ export class Engine {
     return [...this.flowsById.values()];
   }
 
+  /**
+   * The SHARED kernel bags with the path each answers to in a log: the `@patter` globals,
+   * and one per scene for the shared `@scene` props. Parity with the Storylet Engine's
+   * listBags of the same name - it is what a state logger mounts.
+   *
+   * A stage bag's log path is `@scene:<sceneId>.`, not the bag's own `@scene.`: a property
+   * is ADDRESSED relative to a flow's current scene, but a log spans scenes and has to say
+   * which one. That is why a mount may override the bag's prefix.
+   *
+   * loadGame() replaces every bag, so re-enumerate after a load.
+   */
+  listBags(): BagMount[] {
+    const mounts: BagMount[] = [{ bag: this.host.shared.ownedBag("patter") }];
+    for (const [sceneId, bag] of this.host.stageBags) mounts.push({ bag, pathPrefix: `@scene:${sceneId}.` });
+    return mounts;
+  }
+
   /** Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
    *  holding it cannot keep advancing it into the shared world (see {@link Flow.close}). */
   closeFlow(id: string): void {
@@ -1339,7 +1356,17 @@ export class Flow {
     }
   }
 
-  /** The options of a pending choice (empty when not at a choice point). */
+  /**
+   * THIS flow's own kernel bags: its not-shared `@patter` half and its per-scene `@scene`
+   * props, each prefixed with the flow id so one path space holds every flow. The shared
+   * halves are the Engine's listBags.
+   */
+  listBags(): BagMount[] {
+    const mounts: BagMount[] = [{ bag: this.local.ownedBag("patter"), pathPrefix: `${this.id}/@patter.` }];
+    for (const [sceneId, bag] of this.sceneBags) mounts.push({ bag, pathPrefix: `${this.id}/@scene:${sceneId}.` });
+    return mounts;
+  }
+
   /** This flow's decisions, in order. Empty unless the run was opened with `log: true`.
    *  The engine's log carries the same events tagged with the flow; this one is what a
    *  single conversation reads as. */
@@ -1361,6 +1388,7 @@ export class Flow {
     this.flowLog.push({ ...event, seq: this.flowSeq++, ...(scene ? { scene } : {}) });
   }
 
+  /** The options of a pending choice (empty when not at a choice point). */
   getChoices(): ChoiceOption[] {
     return this.pendingChoice?.options ?? [];
   }
