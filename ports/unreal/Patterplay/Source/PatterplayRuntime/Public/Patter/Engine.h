@@ -22,6 +22,7 @@
 #include "Dialect.h"        // the Patter dialect, and the shared evaluator it configures
 #include "Expr/Specificity.h"  // the shared matched-constraint scorer
 #include "Expr/PropertyBag.h"   // the shared state kernel: scene and stage props live in these
+#include "Expr/StateLogger.h"   // LogMount: what listBags() hands a state logger
 #include "Interp.h"
 #include "StepResult.h"
 
@@ -255,14 +256,38 @@ namespace patter
         return out;
     }
 
+    /** The @patter globals bag: prefixed "@patter.", which is both the address a row reports
+     *  and the log path - there is one shared globals bag. */
+    inline std::shared_ptr<PropertyBag> makeSharedPatter(const std::vector<PropertyDecl>& props)
+    {
+        std::vector<ScopeDeclaration> decls;
+        for (const auto& d : props) decls.push_back(toScopeDecl(d));
+        return std::make_shared<PropertyBag>(&decls, nullptr, "@patter.");
+    }
+
+    /** One bag as the flat name/value map the save envelope carries, and back. */
+    inline std::map<std::string, PatterValue> flatOf(const PropertyBag& bag)
+    {
+        std::map<std::string, PatterValue> flat;
+        for (const auto& e : bag.save()) flat[e.first] = e.second;
+        return flat;
+    }
+
+    inline OrderedMap<std::string, PatterValue> orderedOf(const std::map<std::string, PatterValue>& flat)
+    {
+        OrderedMap<std::string, PatterValue> values;
+        for (const auto& e : flat) values.set(e.first, e.second);
+        return values;
+    }
+
     inline std::map<std::string, std::map<std::string, PatterValue>> saveBags(
-        const std::map<std::string, PropertyBag>& bags)
+        const std::map<std::string, std::shared_ptr<PropertyBag>>& bags)
     {
         std::map<std::string, std::map<std::string, PatterValue>> out;
         for (const auto& kv : bags)
         {
             std::map<std::string, PatterValue> flat;
-            for (const auto& e : kv.second.save()) flat[e.first] = e.second;
+            for (const auto& e : kv.second->save()) flat[e.first] = e.second;
             out[kv.first] = flat;
         }
         return out;
@@ -346,14 +371,17 @@ namespace patter
         std::map<std::string, std::string> sceneGameIdToId;
         std::map<std::string, std::map<std::string, std::string>> blockGameIdToId;
         std::map<std::string, std::vector<std::string>> tagIndex;   // author tags (#215): node id -> accumulated
-        std::map<std::string, PatterValue> sharedPatter;
+        /** The @patter globals. A bag, not a map: it carries the audit hook a state logger
+         *  pushes from, and the clone guard on a mutable default. Shared by pointer so a flow
+         *  writes through the same one. */
+        std::shared_ptr<PropertyBag> sharedPatter;
         std::vector<PropertyDecl> patterSharedDecls;
         std::vector<PropertyDecl> patterLocalDecls;
         std::set<std::string> patterSharedNames;
         std::map<std::string, std::set<std::string>> sceneSharedNames;
         std::map<std::string, int> sharedVisits;
         std::map<std::string, SelectorState> sharedSelectors;
-        std::map<std::string, PropertyBag> stageBags;
+        std::map<std::string, std::shared_ptr<PropertyBag>> stageBags;
         // Host scopes by token, already resolved: an embedder's binding where one was given, a
         // self-backed bag for every other token the bundle declares. Empty for a bundle with none.
         std::map<std::string, HostScope> hostScopes;
@@ -399,12 +427,12 @@ namespace patter
     /** The reverse of saveBags: seed each bag from the BUNDLE's declarations, then lay the
      *  saved values over. A property the save predates keeps its declared default rather than
      *  vanishing, and one the bundle has since dropped lands as a stray. */
-    inline std::map<std::string, PropertyBag> loadBags(
+    inline std::map<std::string, std::shared_ptr<PropertyBag>> loadBags(
         const FlowHost& host,
         const std::map<std::string, std::map<std::string, PatterValue>>& saved,
         bool wantShared)
     {
-        std::map<std::string, PropertyBag> out;
+        std::map<std::string, std::shared_ptr<PropertyBag>> out;
         for (const auto& kv : saved)
         {
             const std::set<std::string>* shared = nullptr;
@@ -417,10 +445,10 @@ namespace patter
                 auto sc = host.bundle->scenes.find(kv.first);
                 if (sc != host.bundle->scenes.end()) decls = declsFor(sc->second.sceneProps, shared, wantShared);
             }
-            PropertyBag bag(&decls);
+            auto bag = std::make_shared<PropertyBag>(&decls);
             OrderedMap<std::string, PatterValue> values;
             for (const auto& e : kv.second) values.set(e.first, e.second);
-            bag.load(values);
+            bag->load(values);
             out.emplace(kv.first, std::move(bag));
         }
         return out;
@@ -712,10 +740,24 @@ namespace patter
         std::string stripCaptions(const std::string& text) { return patter::stripCaptions(text, host_->captionOpen, host_->captionClose); }
 
         // -- save / restore --
+        /** THIS flow's own kernel bags: its not-shared @patter half and its per-scene @scene
+         *  props, each prefixed with the flow id so one path space holds every flow. The shared
+         *  halves are the Engine's listBags. */
+        std::vector<LogMount> listBags()
+        {
+            std::vector<LogMount> mounts;
+            mounts.push_back(LogMount{local_, id_ + "/@patter."});
+            for (auto& kv : sceneBags_)
+            {
+                mounts.push_back(LogMount{kv.second, id_ + "/@scene:" + kv.first + "."});
+            }
+            return mounts;
+        }
+
         FlowSnapshot snapshot() const
         {
             FlowSnapshot s;
-            s.scopes = local_;
+            s.scopes = flatOf(*local_);
             s.sceneBags = saveBags(sceneBags_);
             s.rngState = rngState_;
             s.visits = visitCounts_;
@@ -763,7 +805,7 @@ namespace patter
             }
             sceneBags_ = loadBags(*host_, snap.sceneBags, false);
             local_ = freshLocal();
-            for (auto& kv : snap.scopes) local_[kv.first] = kv.second;
+            local_->load(orderedOf(snap.scopes));
 
             activeSnippet_ = nullptr;
             if (!snap.activeSnippetId.empty())
@@ -806,8 +848,8 @@ namespace patter
         std::vector<LogEntry> log_;
         /// Monotonic across the flow's life; survives clearLog so order is stable.
         int seq_ = 0;
-        std::map<std::string, PatterValue> local_;
-        std::map<std::string, PropertyBag> sceneBags_;
+        std::shared_ptr<PropertyBag> local_;   // this flow's not-shared @patter half
+        std::map<std::string, std::shared_ptr<PropertyBag>> sceneBags_;
         uint32_t rngState_ = 0;
         bool started_ = false, flowEnded_ = false;
         // Closed by the engine (see close()). Terminal, and distinct from flowEnded_: an ENDED flow is
@@ -836,23 +878,21 @@ namespace patter
         {
             if (host_->patterSharedNames.count(n))
             {
-                auto it = host_->sharedPatter.find(n);
-                return it != host_->sharedPatter.end() ? &it->second : nullptr;
+                return host_->sharedPatter->values().get(n);
             }
-            auto it = local_.find(n);
-            return it != local_.end() ? &it->second : nullptr;
+            return local_->values().get(n);
         }
         void patterSet(const std::string& n, const PatterValue& v)
         {
-            if (host_->patterSharedNames.count(n)) host_->sharedPatter[n] = v; else local_[n] = v;
+            if (host_->patterSharedNames.count(n)) host_->sharedPatter->set(n, v); else local_->set(n, v);
         }
         PropertyBag* sceneBagFor(const std::string& n)
         {
             if (currentSceneId_.empty()) return nullptr;
             auto sn = host_->sceneSharedNames.find(currentSceneId_);
             bool shared = sn != host_->sceneSharedNames.end() && sn->second.count(n);
-            if (shared) { auto it = host_->stageBags.find(currentSceneId_); return it != host_->stageBags.end() ? &it->second : nullptr; }
-            auto it = sceneBags_.find(currentSceneId_); return it != sceneBags_.end() ? &it->second : nullptr;
+            if (shared) { auto it = host_->stageBags.find(currentSceneId_); return it != host_->stageBags.end() ? it->second.get() : nullptr; }
+            auto it = sceneBags_.find(currentSceneId_); return it != sceneBags_.end() ? sceneBags_.at(currentSceneId_).get() : nullptr;
         }
         const PatterValue* sceneGet(const std::string& n) const
         {
@@ -1313,29 +1353,30 @@ namespace patter
             if (!sceneBags_.count(scene.id))
             {
                 std::vector<ScopeDeclaration> decls = declsFor(scene.sceneProps, shared, false);
-                sceneBags_.emplace(scene.id, PropertyBag(&decls));
+                sceneBags_.emplace(scene.id, std::make_shared<PropertyBag>(&decls));
             }
             if (!host_->stageBags.count(scene.id))
             {
                 std::vector<ScopeDeclaration> decls = declsFor(scene.sceneProps, shared, true);
-                host_->stageBags.emplace(scene.id, PropertyBag(&decls));
+                host_->stageBags.emplace(scene.id, std::make_shared<PropertyBag>(&decls));
             }
             for (const auto& decl : scene.sceneProps)
             {
                 if (!decl.temporary) continue;
                 std::string name = toLower(decl.name);
-                auto* bag = isShared(name) ? &host_->stageBags[scene.id] : &sceneBags_[scene.id];
+                PropertyBag* bag = isShared(name) ? host_->stageBags[scene.id].get() : sceneBags_[scene.id].get();
                 // Through set, so the reset is audited: a temporary snapping back to its
                 // default is a state change, and a log that omits it is wrong.
                 bag->set(name, propDefault(decl));
             }
         }
 
-        std::map<std::string, PatterValue> freshLocal()
+        /** This flow's NOT-shared @patter half, in a bag for the same reasons as the shared one. */
+        std::shared_ptr<PropertyBag> freshLocal()
         {
-            std::map<std::string, PatterValue> d;
-            for (const auto& decl : host_->patterLocalDecls) d[toLower(decl.name)] = propDefault(decl);
-            return d;
+            std::vector<ScopeDeclaration> decls;
+            for (const auto& d : host_->patterLocalDecls) decls.push_back(toScopeDecl(d));
+            return std::make_shared<PropertyBag>(&decls, nullptr, "@patter.");
         }
     };
 
@@ -1394,7 +1435,7 @@ namespace patter
                 if (shared) { host_.patterSharedDecls.push_back(p); host_.patterSharedNames.insert(toLower(p.name)); }
                 else host_.patterLocalDecls.push_back(p);
             }
-            for (const auto& d : host_.patterSharedDecls) host_.sharedPatter[toLower(d.name)] = propDefault(d);
+            host_.sharedPatter = makeSharedPatter(host_.patterSharedDecls);
 
             for (const auto& kv : bundle.scenes)
             {
@@ -1503,6 +1544,34 @@ namespace patter
             return raw;
         }
         Flow* getFlow(const std::string& id) { auto it = flows_.find(id); return it != flows_.end() ? it->second.get() : nullptr; }
+
+        /** Every currently-open flow. Parity with the JS runtime's flows() and the Godot / C#
+         *  ports: a state logger mounts each flow's own bags, so it has to be able to ask. */
+        std::vector<Flow*> flows()
+        {
+            std::vector<Flow*> out;
+            out.reserve(flows_.size());
+            for (const auto& kv : flows_) out.push_back(kv.second.get());
+            return out;
+        }
+
+        /** The SHARED kernel bags with the path each answers to in a log: the @patter globals,
+         *  and one per scene for the shared @scene props. Parity with the Storylet Engine's
+         *  listBags - it is what a state logger mounts.
+         *
+         *  A stage bag's LOG path is `@scene:<sceneId>.` where its address is `@scene.`: a
+         *  property is addressed relative to a flow's current scene, but a log spans scenes.
+         *  loadGame() replaces every bag, so re-enumerate after a load. */
+        std::vector<LogMount> listBags()
+        {
+            std::vector<LogMount> mounts;
+            mounts.push_back(LogMount{host_.sharedPatter, std::nullopt});
+            for (auto& kv : host_.stageBags)
+            {
+                mounts.push_back(LogMount{kv.second, "@scene:" + kv.first + "."});
+            }
+            return mounts;
+        }
         /** The same flow as an OWNING handle, for a wrapper that outlives the map entry (see `flows_`).
          *  Empty for an id that is not open, which is the honest answer: the wrapper reads as closed. */
         std::shared_ptr<Flow> flowPtr(const std::string& id)
@@ -1634,8 +1703,7 @@ namespace patter
         {
             for (auto& kv : flows_) kv.second->close(); // finish them, don't just forget them
             flows_.clear();
-            host_.sharedPatter.clear();
-            for (const auto& d : host_.patterSharedDecls) host_.sharedPatter[toLower(d.name)] = propDefault(d);
+            host_.sharedPatter = makeSharedPatter(host_.patterSharedDecls);
             host_.sharedVisits.clear();
             host_.sharedSelectors.clear();
             host_.stageBags.clear();
@@ -1647,8 +1715,7 @@ namespace patter
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
             auto hs = host_.hostScopes.find(sp.first);
             if (hs != host_.hostScopes.end()) return hs->second.get(sp.second);
-            auto it = host_.sharedPatter.find(sp.second);
-            return it != host_.sharedPatter.end() ? &it->second : nullptr;
+            return host_.sharedPatter->values().get(sp.second);
         }
         void setProperty(const std::string& ref, const PatterValue& value)
         {
@@ -1656,7 +1723,7 @@ namespace patter
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
             auto hs = host_.hostScopes.find(sp.first);
             if (hs != host_.hostScopes.end()) { hs->second.set(sp.second, value); return; }
-            host_.sharedPatter[sp.second] = value;
+            host_.sharedPatter->set(sp.second, value);
         }
 
         // The shared @patter properties for a live state inspector: each with its ref, type, current
@@ -1678,8 +1745,8 @@ namespace patter
                 if (!d.values.empty()) r.values = d.values;
                 if (!d.stages.empty()) r.stages = d.stages;
                 r.defaultValue = propDefault(d);
-                auto it = host_.sharedPatter.find(toLower(d.name));
-                r.value = it != host_.sharedPatter.end() ? it->second : r.defaultValue;
+                const PatterValue* held = host_.sharedPatter->values().get(toLower(d.name));
+                r.value = held ? *held : r.defaultValue;
                 rows.push_back(std::move(r));
             }
             return rows;
@@ -1795,7 +1862,7 @@ namespace patter
         {
             SaveGame s;
             s.version = 2;
-            s.shared = host_.sharedPatter;
+            s.shared = flatOf(*host_.sharedPatter);
             s.sharedVisits = host_.sharedVisits;
             s.sharedSelectors = host_.sharedSelectors;
             s.stageBags = saveBags(host_.stageBags);
@@ -1805,7 +1872,10 @@ namespace patter
         void loadGame(const SaveGame& save)
         {
             if (save.version != 2) throw std::runtime_error("unsupported save version");
-            host_.sharedPatter = save.shared;
+            // Seeded from the declarations, then the saved values laid over: a property the
+            // save predates keeps its default rather than vanishing.
+            host_.sharedPatter = makeSharedPatter(host_.patterSharedDecls);
+            host_.sharedPatter->load(orderedOf(save.shared));
             host_.sharedVisits = save.sharedVisits;
             host_.sharedSelectors = save.sharedSelectors;
             host_.stageBags = loadBags(host_, save.stageBags, true);

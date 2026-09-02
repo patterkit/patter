@@ -1,33 +1,34 @@
-// State logger: a debug companion that watches the mutable runtime state - `@patter` globals,
-// per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed
-// between captures. logStep traces each played step, including the gameData payload. Built on
-// Engine::saveGame(), so it sees exactly what a save persists.
+// The Patterplay state logger: the ADAPTER half, plus logStep, which is this product's own.
 //
-// The port of play-helpers' logger.ts: the flattened path scheme (`@patter.x`, `@scene:scene.x`,
-// `visit:nodeId`, `flowId/...`) and the line format (`tag path: from -> to`, `<unset>` for
-// missing) are the cross-runtime contract; only the traversal of the native save shape differs.
-// std-only (no Unreal types) so the clang TestHost can drive it; the sink is a callback
-// defaulting to nothing wired (hosts pass their log idiom, e.g. UE_LOG through a lambda).
+// The core - push-based property logging on the PropertyBag audit hook, the diff for what has
+// no hook, the re-mount that survives a load - is the shared kernel's, vendored as
+// Patter/Expr/StateLogger.h and shared with the Storylet Engine.
+//
+// This used to diff whole saveGame() snapshots, so it reported the NET change between
+// captures: a value that changed and changed back was invisible, and every write was late.
+// StateChange and diffState are the kernel's now (`from`/`to` are std::optional, where this
+// file had a bool beside each value).
+//
+// Paths, unchanged:
+//   @patter.x            the shared globals
+//   @scene:<sceneId>.x   the shared scene props
+//   visit:<nodeId>       shared visit counts
+//   <flowId>/...         the same three, per flow (its not-shared halves)
+
 #pragma once
 
-#include <algorithm>
-#include <cstdio>
 #include <functional>
 #include <map>
+#include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 #include "Engine.h"
+#include "Expr/StateLogger.h"
 
 namespace patter
 {
-    struct StateChange
-    {
-        std::string path;
-        bool hasFrom = false; PatterValue from;
-        bool hasTo = false; PatterValue to;
-    };
-
     namespace loggerdetail
     {
         inline std::string jsonQuote(const std::string& s)
@@ -96,56 +97,72 @@ namespace patter
 
     /// The sorted set of paths that differ between two snapshots (added / removed / changed).
     /// std::map iterates in key order, so the result is already path-sorted like the JS logger's.
+    /** The visit counts, which live in no bag and so have no audit hook: the kernel diffs
+     *  these on capture(), which is all this logger used to do for everything. */
+    inline StateSnapshot visitState(Engine& engine)
+    {
+        SaveGame save = engine.saveGame();
+        StateSnapshot out;
+        for (const auto& kv : save.sharedVisits) out.set("visit:" + kv.first, PatterValue::Num(kv.second));
+        for (const auto& fkv : save.flows)
+        {
+            for (const auto& kv : fkv.second.visits)
+                out.set(fkv.first + "/visit:" + kv.first, PatterValue::Num(kv.second));
+        }
+        return out;
+    }
+
+    /** The changed paths between two whole-game snapshots, for callers holding the flat map
+     *  snapshotState returns. Delegates to the kernel's diff, so there is one rule, not two. */
     inline std::vector<StateChange> diffState(const std::map<std::string, PatterValue>& prev,
                                               const std::map<std::string, PatterValue>& next)
     {
-        std::vector<StateChange> changes;
-        auto p = prev.begin(); auto n = next.begin();
-        auto emit = [&changes](const std::string& path, const PatterValue* from, const PatterValue* to)
-        {
-            const std::string f = from ? formatStateValue(*from) : "<unset>";
-            const std::string t = to ? formatStateValue(*to) : "<unset>";
-            if (f == t) return;
-            StateChange c; c.path = path;
-            if (from) { c.hasFrom = true; c.from = *from; }
-            if (to) { c.hasTo = true; c.to = *to; }
-            changes.push_back(std::move(c));
-        };
-        while (p != prev.end() || n != next.end())
-        {
-            if (n == next.end() || (p != prev.end() && p->first < n->first)) { emit(p->first, &p->second, nullptr); ++p; }
-            else if (p == prev.end() || n->first < p->first) { emit(n->first, nullptr, &n->second); ++n; }
-            else { emit(p->first, &p->second, &n->second); ++p; ++n; }
-        }
-        return changes;
+        return diffState(orderedOf(prev), orderedOf(next));
     }
 
-    /// Create with an engine and a sink; call capture() after each advance/choose to log mutations.
-    class StateLogger
+    /** Patterplay's state logger: the kernel logger plus logStep.
+     *
+     *  Named PatterStateLog rather than StateLogger because the kernel's class - vendored into
+     *  this namespace - is the StateLogger now. */
+    class PatterStateLog
     {
     public:
         using Sink = std::function<void(const std::string&)>;
 
-        explicit StateLogger(Engine& engine, Sink sink = nullptr, const std::string& label = "")
+        explicit PatterStateLog(Engine& engine, Sink sink = nullptr, const std::string& label = "")
             : engine_(engine), sink_(std::move(sink)), tag_(label.empty() ? "" : "[" + label + "] ")
         {
-            baseline_ = snapshotState(engine_);
+            StateLoggerAdapter adapter;
+            Engine* enginePtr = &engine;
+            // Re-read on every capture: openFlow and loadGame both replace bags, and the kernel
+            // re-mounts whatever it is handed.
+            adapter.mounts = [enginePtr]()
+            {
+                std::vector<LogMount> mounts = enginePtr->listBags();
+                for (Flow* f : enginePtr->flows())
+                {
+                    std::vector<LogMount> own = f->listBags();
+                    mounts.insert(mounts.end(), own.begin(), own.end());
+                }
+                return mounts;
+            };
+            adapter.extra = [enginePtr]() { return visitState(*enginePtr); };
+
+            StateLoggerOptions opts;
+            opts.sink = sink_;
+            opts.label = tag_;
+            kernel_ = std::make_unique<StateLogger>(std::move(adapter), std::move(opts));
         }
 
-        /// The current flattened state (no logging).
+        /** The current flattened state (no logging): the whole game, off the save envelope. */
         std::map<std::string, PatterValue> snapshot() { return snapshotState(engine_); }
 
-        /// Diff since the last capture, log each change, and re-baseline. Returns the changes.
-        std::vector<StateChange> capture()
-        {
-            auto next = snapshotState(engine_);
-            auto changes = diffState(baseline_, next);
-            baseline_ = std::move(next);
-            for (const auto& c : changes)
-                emit(tag_ + c.path + ": " + (c.hasFrom ? formatStateValue(c.from) : "<unset>")
-                     + " -> " + (c.hasTo ? formatStateValue(c.to) : "<unset>"));
-            return changes;
-        }
+        /** Everything since the last capture: the property writes already logged as they landed,
+         *  plus the visit counts, diffed and re-baselined. */
+        std::vector<StateChange> capture() { return kernel_->capture(); }
+
+        /** Unhook the bag auditors. The logger is inert afterwards. */
+        void dispose() { kernel_->dispose(); }
 
         /// Trace one played step (line / text / game-event / choice / end), including any gameData.
         void logStep(const StepResult& step)
@@ -189,6 +206,6 @@ namespace patter
         Engine& engine_;
         Sink sink_;
         std::string tag_;
-        std::map<std::string, PatterValue> baseline_;
+        std::unique_ptr<StateLogger> kernel_;
     };
 }

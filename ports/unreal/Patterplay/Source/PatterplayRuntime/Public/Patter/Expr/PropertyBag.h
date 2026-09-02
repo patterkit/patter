@@ -133,6 +133,9 @@ namespace patter
          *  go through set() so the firing rule applies. */
         const OrderedMap<std::string, PatterValue>& values() const { return values_; }
 
+        /** The address prefix this bag composes its rows' paths from, separator included. */
+        const std::string& pathPrefix() const { return pathPrefix_; }
+
         std::optional<PatterValue> get(const std::string& name) const
         {
             const PatterValue* v = values_.get(norm_(name));
