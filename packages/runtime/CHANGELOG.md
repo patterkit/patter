@@ -33,6 +33,25 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **`Engine.listBags()` and `Flow.listBags()`.** The kernel bags with the path each answers
+  to in a log - the shared `@patter` globals and per-scene props on the engine, a flow's own
+  halves prefixed with its id. Parity with the Storylet Engine's method of the same name; it
+  is what a state logger mounts. A stage bag's LOG path is `@scene:<sceneId>.` where its
+  address is `@scene.`, because a log spans scenes and has to say which one.
+
+### Changed
+
+- **The state logger watches the property bags instead of diffing save snapshots.** A
+  property write is logged when it LANDS, on the bag's audit hook, rather than at the next
+  capture. The visit counts live in no bag, so those are still diffed - which is all this
+  logger used to do for everything. What it buys: a diff can only report the NET change
+  between two captures, so a value that changed and changed back was invisible, and every
+  write was reported late. The core is shared with the Storylet Engine, which has always
+  worked this way.
+- **Requires `@wildwinter/scoperegistry` ^0.5.0**, which carries the shared state logger.
+
 ## [0.9.0] - 2026-09-02
 
 ### Changed

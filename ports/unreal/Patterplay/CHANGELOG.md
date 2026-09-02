@@ -7,6 +7,36 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`Engine::listBags()`, `Flow::listBags()` and `Engine::flows()`.** What a state logger
+  mounts; parity with the JS runtime and the other ports.
+
+### Changed
+
+- **The state logger watches the property bags instead of diffing save snapshots.** A
+  property write is logged when it LANDS, on the bag's audit hook, rather than at the next
+  capture. The visit counts live in no bag, so those are still diffed - which is all this
+  logger used to do for everything. What it buys: a diff can only report the NET change
+  between two captures, so a value that changed and changed back was invisible, and every
+  write was reported late. The core is shared with the Storylet Engine, which has always
+  worked this way.
+- **The `@patter` globals, and a flow's not-shared half, live in a property bag.** They were
+  plain maps here while the JS runtime held them in a bag; a bag is what carries the audit
+  hook the logger pushes from. **The save format is unchanged** - the same flat map, and a
+  load seeds from the declarations before laying saved values over.
+- **BREAKING: the C++ core's state logger object is `patter::PatterStateLog`, not
+  `patter::StateLogger`.** The shared kernel's class is vendored into this namespace and owns
+  that name. `StateChange` is the kernel's too: `from` and `to` are `std::optional` where
+  this core had a bool beside each value. The Blueprint API is unchanged.
+
+### Fixed
+
+- **A declaration with an explicit `null` default seeds the type's default.** Two halves of
+  one rule disagreed: the seeding read the key directly, where `default_for` treats null and
+  absent alike, so a `number` could hold nil. Unreachable from an exported bundle; a
+  hand-written or third-party one could do it.
+
 ## [0.9.0] - 2026-09-02
 
 ### Changed
