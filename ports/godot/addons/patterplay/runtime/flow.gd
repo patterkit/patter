@@ -7,7 +7,7 @@ extends RefCounted
 
 var id: String
 var _host: Dictionary
-var _local: Dictionary = {}
+var _local   # PatterPropertyBag: this flow's not-shared @patter half
 var _scene_bags: Dictionary = {}
 var _prng := PatterMulberry32.new(0)  # the seeded PRNG; its `a` is the saved rng_state
 
@@ -320,15 +320,15 @@ func set_property(ref: String, value) -> void:
 
 func _patter_get(n: String):
 	if _host["patter_shared_names"].has(n):
-		return _host["shared_patter"].get(n)
-	return _local.get(n)
+		return _host["shared_patter"].get_value(n)
+	return _local.get_value(n)
 
 
 func _patter_set(n: String, v) -> void:
 	if _host["patter_shared_names"].has(n):
-		_host["shared_patter"][n] = v
+		_host["shared_patter"].set_value(n, v)
 	else:
-		_local[n] = v
+		_local.set_value(n, v)
 
 
 func _scene_bag_for(n: String):
@@ -952,11 +952,9 @@ static func _load_bags(host: Dictionary, saved: Dictionary, want_shared: bool) -
 	return out
 
 
-func _fresh_local() -> Dictionary:
-	var d := {}
-	for decl in _host["patter_local_decls"]:
-		d[str(decl["name"]).to_lower()] = PatterBundle.prop_default(decl)
-	return d
+func _fresh_local():
+	# This flow's NOT-shared @patter half, in a bag for the same reasons as the shared one.
+	return PatterPropertyBag.new(_host["patter_local_decls"], {"path_prefix": "@patter."})
 
 
 # -- save / restore ------------------------------------------------------------
@@ -980,9 +978,19 @@ func _snapshot_stack() -> Array:
 	return out
 
 
+## THIS flow's own kernel bags: its not-shared @patter half and its per-scene @scene props,
+## each prefixed with the flow id so one path space holds every flow. The shared halves are
+## the engine's list_bags.
+func list_bags() -> Array:
+	var mounts: Array = [{"bag": _local, "path_prefix": "%s/@patter." % id}]
+	for sid in _scene_bags:
+		mounts.append({"bag": _scene_bags[sid], "path_prefix": "%s/@scene:%s." % [id, sid]})
+	return mounts
+
+
 func snapshot() -> Dictionary:
 	return {
-		"scopes": _local.duplicate(true),
+		"scopes": _local.save(),
 		"scene_bags": _save_bags(_scene_bags),
 		"rng_state": _prng.a,
 		"visits": _visit_counts.duplicate(true),
@@ -1028,8 +1036,7 @@ func restore(snap: Dictionary) -> void:
 						break
 	_scene_bags = _load_bags(_host, snap.get("scene_bags", {}), false)
 	_local = _fresh_local()
-	for k in (snap["scopes"] as Dictionary).keys():
-		_local[k] = snap["scopes"][k]
+	_local.load(snap["scopes"] as Dictionary)
 	_active_snippet = null
 	var asid: String = snap["active_snippet_id"]
 	if asid != "" and _host["node_index"].has(asid):

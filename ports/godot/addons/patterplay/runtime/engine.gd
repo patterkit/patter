@@ -61,7 +61,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		"block_gameid_to_id": _block_gameid_to_id,
 		"block_by_id": {},
 		"tag_index": {},
-		"shared_patter": {},
+		"shared_patter": null,   # a PatterPropertyBag, built once the declarations are split
 		"patter_shared_decls": [],
 		"patter_local_decls": [],
 		"patter_shared_names": {},
@@ -147,8 +147,11 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 			_host["patter_shared_names"][str(p["name"]).to_lower()] = true
 		else:
 			_host["patter_local_decls"].append(p)
-	for d in _host["patter_shared_decls"]:
-		_host["shared_patter"][str(d["name"]).to_lower()] = PatterBundle.prop_default(d)
+	# The @patter globals live in a bag, like every other scope: it is what carries the
+	# audit hook a state logger pushes from, and the clone guard on a mutable default.
+	# "@patter." is the address a row reports; the LOG path is the same here, because
+	# there is only one shared globals bag.
+	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
 
 	for sid in bundle["scenes"].keys():
 		var names := {}
@@ -220,6 +223,12 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	return flow
 
 
+## Every currently-open flow. Parity with the JS runtime's flows() and the C# / C++ ports:
+## a state logger mounts each flow's own bags, so it has to be able to ask for them.
+func flows() -> Array:
+	return _flows.values()
+
+
 func get_flow(id: String) -> PatterFlow:
 	return _flows.get(id)
 
@@ -267,9 +276,11 @@ func reset() -> void:
 	for fid in _flows:
 		_flows[fid].close()  # finish them, don't just forget them
 	_flows = {}
-	_host["shared_patter"] = {}
-	for d in _host["patter_shared_decls"]:
-		_host["shared_patter"][str(d["name"]).to_lower()] = PatterBundle.prop_default(d)
+	# The @patter globals live in a bag, like every other scope: it is what carries the
+	# audit hook a state logger pushes from, and the clone guard on a mutable default.
+	# "@patter." is the address a row reports; the LOG path is the same here, because
+	# there is only one shared globals bag.
+	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
 	_host["shared_visits"] = {}
 	_host["shared_selectors"] = {}
 	_host["stage_bags"] = {}
@@ -369,7 +380,7 @@ func get_property(ref: String):
 		return null
 	if _host["host_scopes"].has(sp[0]):
 		return _host["host_scopes"][sp[0]]["get"].call(sp[1])
-	return _host["shared_patter"].get(sp[1])
+	return _host["shared_patter"].get_value(sp[1])
 
 
 # Editable @patter properties (the shared / engine-scoped ones), for a live inspector.
@@ -390,7 +401,7 @@ func list_properties() -> Array:
 			# the patter scope - but it is the shorthand, not the address a row reports.
 			"path": "@patter." + nm,
 			"type": d.get("type", "boolean"),
-			"value": _host["shared_patter"].get(nm),
+			"value": _host["shared_patter"].get_value(nm),
 			"default": PatterBundle.prop_default(d),
 			"values": d.get("values", []),
 			"stages": d.get("stages", []),
@@ -407,10 +418,26 @@ func set_property(ref: String, value) -> void:
 	if _host["host_scopes"].has(sp[0]):
 		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
 		return
-	_host["shared_patter"][sp[1]] = value
+	_host["shared_patter"].set_value(sp[1], value)
 
 
 # -- save / load ---------------------------------------------------------------
+
+## The SHARED kernel bags with the path each answers to in a log: the @patter globals, and
+## one per scene for the shared @scene props. Parity with the Storylet Engine's list_bags -
+## it is what a state logger mounts.
+##
+## A stage bag's LOG path is "@scene:<sceneId>." where its address is "@scene.": a property
+## is addressed relative to a flow's current scene, but a log spans scenes and has to say
+## which one. That is why a mount may override the bag's own prefix.
+##
+## load_game() replaces every bag, so re-enumerate after a load.
+func list_bags() -> Array:
+	var mounts: Array = [{"bag": _host["shared_patter"]}]
+	for sid in _host["stage_bags"]:
+		mounts.append({"bag": _host["stage_bags"][sid], "path_prefix": "@scene:%s." % sid})
+	return mounts
+
 
 func save_game() -> Dictionary:
 	var flows := {}
@@ -418,7 +445,7 @@ func save_game() -> Dictionary:
 		flows[id] = _flows[id].snapshot()
 	return {
 		"version": 2,
-		"shared": _host["shared_patter"].duplicate(true),
+		"shared": _host["shared_patter"].save(),
 		"shared_visits": _host["shared_visits"].duplicate(true),
 		"shared_selectors": _host["shared_selectors"].duplicate(true),
 		"stage_bags": PatterFlow._save_bags(_host["stage_bags"]),
@@ -430,7 +457,10 @@ func load_game(save: Dictionary) -> void:
 	if save.get("version", 0) != 2:
 		push_error("unsupported save version")
 		return
-	_host["shared_patter"] = (save["shared"] as Dictionary).duplicate(true)
+	# Seeded from the declarations, then the saved values laid over: a property the save
+	# predates keeps its default rather than vanishing.
+	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
+	_host["shared_patter"].load(save["shared"] as Dictionary)
 	_host["shared_visits"] = (save["shared_visits"] as Dictionary).duplicate(true)
 	_host["shared_selectors"] = (save["shared_selectors"] as Dictionary).duplicate(true)
 	# Seeded from the bundle's declarations, then the saved values laid over - see

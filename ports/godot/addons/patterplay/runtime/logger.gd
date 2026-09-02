@@ -1,30 +1,43 @@
-# PatterStateLogger: a debug companion that watches the mutable runtime state - `@patter` globals,
-# per-scene `@scene` props, and visit counts (shared + per-flow) - and reports what changed between
-# captures. `log_step` traces each played step, including the `gameData` payload. Built on
-# `engine.save_game()`, so it sees exactly what a save persists.
+# PatterStateLogger - this addon's NAME for the shared state logger, plus the two
+# Patterplay-shaped pieces the kernel asks for, and log_step, which is this product's own.
 #
-# The port of play-helpers' logger.ts: the flattened path scheme (`@patter.x`, `@scene:scene.x`,
-# `visit:nodeId`, `flowId/...`) and the line format (`tag path: from -> to`, `<unset>` for missing)
-# are the cross-runtime contract; only the traversal of the native save shape differs.
+# The core is expr/ports/godot/state_logger.gd, vendored beside this file as
+# runtime/expr/state_logger.gd and shared with the Storylet Engine: property writes are
+# PUSHED on the PropertyBag audit hook as they land, and only what has no hook (here, the
+# visit counts) is diffed on capture(). This logger used to diff whole save_game()
+# snapshots, which could only ever report the NET change between captures - a value that
+# changed and changed back was invisible, and every write was reported late.
+#
+# The flattened path scheme (`@patter.x`, `@scene:scene.x`, `visit:nodeId`, `flowId/...`)
+# and the line format (`tag path: from -> to`, `<unset>` for missing) are the cross-runtime
+# contract and are unchanged; the shared core renders values through the same js_number
+# rules this file used to implement itself.
 #
 #   var logger := PatterStateLogger.new(engine)          # sink defaults to print
 #   var step = flow.advance()
 #   logger.log_step(step)
-#   logger.capture()                                     # logs every mutation since the last capture
+#   logger.capture()                                     # visit counts; writes logged already
 class_name PatterStateLogger
-extends RefCounted
+extends "res://addons/patterplay/runtime/expr/state_logger.gd"
 
 var _engine
-var _sink: Callable
-var _tag: String
-var _baseline: Dictionary
 
 
 func _init(engine, sink: Callable = Callable(), label: String = "") -> void:
 	_engine = engine
-	_sink = sink if sink.is_valid() else func(line: String) -> void: print(line)
-	_tag = "[%s] " % label if label != "" else ""
-	_baseline = PatterStateLogger.snapshot_state(engine)
+	var opts := {"label": "[%s] " % label if label != "" else ""}
+	if sink.is_valid():
+		opts["sink"] = sink
+	# Re-read on every capture: open_flow and load_game both replace bags, and the core
+	# re-mounts whatever it is handed.
+	super._init(
+		func() -> Array:
+			var mounts: Array = engine.list_bags()
+			for f in engine.flows():
+				mounts.append_array(f.list_bags())
+			return mounts,
+		func() -> Dictionary: return PatterStateLogger._visit_state(engine),
+		opts)
 
 
 ## Flatten the engine's whole-game state into a path -> value map (shared scopes + every live flow).
@@ -50,53 +63,27 @@ static func snapshot_state(engine) -> Dictionary:
 	return out
 
 
-## The sorted list of paths that differ between two snapshots. Each change is
-## { "path": String, "from": Variant, "to": Variant } with null for absent sides.
-static func diff_state(prev: Dictionary, next: Dictionary) -> Array:
-	var keys := {}
-	for k in prev: keys[k] = true
-	for k in next: keys[k] = true
-	var sorted := keys.keys()
-	sorted.sort()
-	var changes: Array = []
-	for path in sorted:
-		var from = prev.get(path)
-		var to = next.get(path)
-		if format_value(from) != format_value(to):
-			changes.append({ "path": path, "from": from, "to": to })
-	return changes
+## The visit counts, which live in no bag and so have no audit hook: the core diffs these on
+## capture(), which is all this logger used to do for everything.
+static func _visit_state(engine) -> Dictionary:
+	var save: Dictionary = engine.save_game()
+	var out := {}
+	for id in save["shared_visits"]:
+		out["visit:%s" % id] = save["shared_visits"][id]
+	for fid in save["flows"]:
+		for id in save["flows"][fid]["visits"]:
+			out["%s/visit:%s" % [fid, id]] = save["flows"][fid]["visits"][id]
+	return out
 
 
-## JSON.stringify-compatible rendering (the logger line contract); null -> "<unset>".
-## Whole floats print as integers ("1", not "1.0"): JS numbers make no int/float distinction,
-## and a JSON round-trip (e.g. a save/load) turns Godot ints into floats - the value is the
-## same value, so it must render the same way.
-static func format_value(v) -> String:
-	if v == null:
-		return "<unset>"
-	if v is float and is_finite(v) and v == floor(v) and absf(v) < 9007199254740992.0:
-		return str(int(v))
-	return JSON.stringify(v)
-
-
-## The current flattened state (no logging).
+## The current flattened state (no logging): the whole game, off the save envelope.
 func snapshot() -> Dictionary:
 	return PatterStateLogger.snapshot_state(_engine)
 
 
-## Diff since the last capture, log each change, and re-baseline. Returns the changes.
-func capture() -> Array:
-	var next := PatterStateLogger.snapshot_state(_engine)
-	var changes := PatterStateLogger.diff_state(_baseline, next)
-	_baseline = next
-	for c in changes:
-		_sink.call("%s%s: %s -> %s" % [_tag, c["path"], format_value(c["from"]), format_value(c["to"])])
-	return changes
-
-
 ## Trace one played step (line / text / game-event / choice / end), including any gameData.
 func log_step(step: Dictionary) -> void:
-	_sink.call(_tag + _describe(step))
+	_sink.call(_label + _describe(step))
 
 
 static func _describe(step: Dictionary) -> String:
