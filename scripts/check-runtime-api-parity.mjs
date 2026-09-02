@@ -27,14 +27,24 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 const SURFACES = {
   js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
   unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
-  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd", "ports/godot/addons/patterplay/runtime/save.gd"] },
+  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd",
+      // The vendored shared core the logger extends: diff_state and friends are declared
+      // there and inherited, and the addon ships both files.
+      "ports/godot/addons/patterplay/runtime/expr/state_logger.gd",
+      "ports/godot/addons/patterplay/runtime/save.gd"] },
   unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
   bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h"] },
 };
 
 /** How a declaration of `name` looks in each language. */
 const DECL = {
-  js: (n) => new RegExp(`(^|\\n)\\s*(export\\s+function\\s+|get\\s+)?${n}\\s*[(<]`), // class method / getter / exported function
+  js: (n) => new RegExp(
+    // a class method / getter / exported function ...
+    `(^|\\n)\\s*(export\\s+function\\s+|get\\s+)?${n}\\s*[(<]`
+    // ... or a RE-EXPORT: `export { diffState }` is how this package exposes a member whose
+    // implementation moved into the shared kernel, and it is no less part of the surface for
+    // being declared elsewhere.
+    + `|export\\s*(type\\s*)?\\{[^}]*\\b${n}\\b[^}]*\\}`),
   unity: (n) => new RegExp(`\\b(public|internal)\\b[^;\\n]*\\b${n}\\s*[({=]`), // method or expression-bodied property
   godot: (n) => new RegExp(`\\n(static\\s+)?func\\s+${n}\\s*\\(`),
   unreal: (n) => new RegExp(`\\b${n}\\s*\\(`),
