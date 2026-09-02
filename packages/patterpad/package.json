@@ -31,7 +31,7 @@
     "@fontsource/newsreader": "^5.2.10",
     "@patterkit/core": "0.2.2",
     "@patterkit/model": "0.4.1",
-    "@patterkit/ops": "0.6.0",
+    "@patterkit/ops": "0.7.0",
     "@patterkit/patterpad-surface": "0.0.0",
     "@patterkit/runtime": "0.9.0",
     "@wildwinter/app-shell": "^0.35.1",
