@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-03
+
 ### Fixed
 
 - **Open Recent over an open project showed only the first scene.** The shared session opens the new
