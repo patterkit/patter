@@ -184,18 +184,7 @@ body.resizing main.panes { transition: none; }
 .suggestion-popover .sg-before { margin: 0.1rem 0 0; padding: 0.2rem 0.5rem; border-left: 2px solid var(--line); color: var(--muted); font: 0.82rem var(--font-ui); white-space: pre-wrap; }
 .suggestion-popover .sg-after { margin: 0.1rem 0 0; padding: 0.2rem 0.5rem; border-left: 2px solid var(--accent); color: var(--ink); font: 0.82rem var(--font-ui); white-space: pre-wrap; }
 
-/* Transient toast (a save the VCS refused). Bottom-right, above the hint bar. */
-.toast {
-  position: fixed; right: 1rem; bottom: 2.2rem; z-index: 40; max-width: 26rem;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  padding: 0.55rem 0.8rem; color: var(--ink); font: 0.8rem/1.4 var(--font-ui);
-  /* Long unbroken tokens (e.g. a file path) must wrap INSIDE the box, not spill past the background. */
-  overflow-wrap: anywhere; white-space: pre-line;
-  box-shadow: var(--shadow-2); animation: var(--anim-panel-in, none);
-}
-.toast.error { border-color: var(--danger); color: var(--danger); }
-.toast.closing { animation: var(--anim-panel-out); } /* eased dismiss (closeWithExit), mirroring the enter */
-.toast[hidden] { display: none; }
+/* The toast is the shell's now (@wildwinter/app-shell/toast.css). */
 /* The search control is a BUTTON (opens the search window), styled to read as one - a magnifier + a
    centred, bold label - so it isn't mistaken for a text field. The ⌘F hint is pinned right. */
 .nav-search { position: relative; display: flex; align-items: center; justify-content: center; gap: 0.4rem; width: 100%; cursor: pointer; margin-bottom: 0.4rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.4rem 0.55rem; color: var(--ink-soft); font: 600 0.78rem var(--font-ui); }

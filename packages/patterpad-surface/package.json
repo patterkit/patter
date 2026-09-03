@@ -29,7 +29,7 @@
     "@fontsource/source-serif-4": "^5.2.9",
     "@patterkit/core": "0.2.3",
     "@patterkit/model": "0.5.0",
-    "@wildwinter/app-shell": "^0.35.1",
+    "@wildwinter/app-shell": "^0.37.0",
     "prosemirror-commands": "^1.6.0",
     "prosemirror-history": "^1.4.0",
     "prosemirror-inputrules": "^1.4.0",

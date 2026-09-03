@@ -22,7 +22,6 @@ import "@fontsource/ibm-plex-mono/400.css";
 
 import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";
-import { closeWithExit } from "@patterkit/patterpad-surface/exit";
 import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
@@ -46,6 +45,8 @@ import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
+import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
+import { toast } from "@wildwinter/app-shell";
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
 import { PANEL_KEEP_CLEAR } from "./panel.js";
@@ -119,7 +120,6 @@ const projectNameEl = $("project-name");
 const sceneSuffixEl = $("scene-suffix");
 const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
 const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
-const toastEl = $("toast");        // transient feedback (a save refused by the VCS)
 const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bottom-left exit pill
 const recentsEl = $("recents");
 const recentsLabel = $("recents-label");
@@ -764,18 +764,8 @@ async function refreshVcStatus(): Promise<void> {
   applySceneVc();
 }
 
-let toastTimer = 0;
-let toastSeq = 0; // bumped per show; the dismiss only hides if it's still the current toast (no stale hide)
-/** A transient bottom-corner message - currently a save the VCS refused (who holds the lock). */
-function toast(msg: string, kind: "error" | "info" = "info"): void {
-  const id = ++toastSeq;
-  toastEl.textContent = msg;
-  toastEl.className = `toast ${kind}`; // resets any `.closing` left from a prior dismiss
-  toastEl.hidden = false;
-  window.clearTimeout(toastTimer);
-  // Eased dismiss: play the exit animation, then hide - unless a newer toast has since taken over.
-  toastTimer = window.setTimeout(() => closeWithExit(toastEl, () => { if (toastSeq === id) toastEl.hidden = true; }), kind === "error" ? 7000 : 4000);
-}
+// The toast is the shell's (@wildwinter/app-shell toast.ts): both apps had one and agreed on
+// nothing but the sentences. It mounts its own node, so the `#toast` div is gone from the HTML.
 
 // --- side panes (slide / collapse) -------------------------------------------
 // The two side panes slide to full-bleed; the open/closed state is remembered per user. Closed means
@@ -2268,7 +2258,7 @@ function openVoiceScript(): void {
 async function voiceScriptExport(): Promise<void> {
   voStatus.textContent = "Exporting…";
   const res = await window.patter.exportVoiceScript(voEverythingInput.checked);
-  if (res.ok) { voDialogEl.close(); toast(`Voice script exported to ${res.path}`); } // done -> close, confirm via toast
+  if (res.ok) { voDialogEl.close(); toast(`Voice script exported to ${res.path}`, "ok"); } // done -> close, confirm via toast
   else if (res.canceled) voStatus.textContent = "";
   else voStatus.textContent = `Export failed: ${res.error ?? "unknown error"}`;
 }
@@ -2327,7 +2317,7 @@ async function buildBundle(): Promise<void> {
     // Show where it landed RELATIVE to the project root when it's inside (the common dist/ case), so the
     // toast reads cleanly; fall back to the absolute path for an output written elsewhere.
     const where = relToProject(res.path);
-    toast(`Bundle published\n${where}`);
+    toast(`Bundle published\n${where}`, "ok");
   } else toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
@@ -2337,7 +2327,7 @@ async function buildAudioManifest(): Promise<void> {
   const res = await window.patter.buildAudioManifest();
   if (res.ok) {
     const where = relToProject(res.path);
-    toast(`Audio manifest updated\n${where}`);
+    toast(`Audio manifest updated\n${where}`, "ok");
   } else toast(res.error ? `Audio manifest failed: ${res.error}` : "Audio manifest failed", "error");
 }
 
@@ -2348,7 +2338,7 @@ async function exportScript(): Promise<void> {
   const res = await window.patter.exportScript();
   if (res.ok) {
     const where = relToProject(res.path);
-    toast(`Script published\n${where}`);
+    toast(`Script published\n${where}`, "ok");
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
