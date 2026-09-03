@@ -44,20 +44,22 @@ func _init(engine, sink: Callable = Callable(), label: String = "") -> void:
 static func snapshot_state(engine) -> Dictionary:
 	var save: Dictionary = engine.save_game()
 	var out := {}
-	for name in save["shared"]:
-		out["@patter.%s" % name] = save["shared"][name]
-	for scene in save["stage_bags"]:
-		for name in save["stage_bags"][scene]:
-			out["@scene:%s.%s" % [scene, name]] = save["stage_bags"][scene][name]
-	for id in save["shared_visits"]:
-		out["visit:%s" % id] = save["shared_visits"][id]
+	var shared: Dictionary = save["shared"]["patter"]
+	for name in shared:
+		out["@patter.%s" % name] = shared[name]
+	for scene in save["stageBags"]:
+		for name in save["stageBags"][scene]:
+			out["@scene:%s.%s" % [scene, name]] = save["stageBags"][scene][name]
+	for id in save["sharedVisits"]:
+		out["visit:%s" % id] = save["sharedVisits"][id]
 	for fid in save["flows"]:
 		var snap: Dictionary = save["flows"][fid]
-		for name in snap["scopes"]:
-			out["%s/@patter.%s" % [fid, name]] = snap["scopes"][name]
-		for scene in snap["scene_bags"]:
-			for name in snap["scene_bags"][scene]:
-				out["%s/@scene:%s.%s" % [fid, scene, name]] = snap["scene_bags"][scene][name]
+		var scopes: Dictionary = snap["scopes"]["patter"]
+		for name in scopes:
+			out["%s/@patter.%s" % [fid, name]] = scopes[name]
+		for scene in snap["sceneBags"]:
+			for name in snap["sceneBags"][scene]:
+				out["%s/@scene:%s.%s" % [fid, scene, name]] = snap["sceneBags"][scene][name]
 		for id in snap["visits"]:
 			out["%s/visit:%s" % [fid, id]] = snap["visits"][id]
 	return out
@@ -68,8 +70,8 @@ static func snapshot_state(engine) -> Dictionary:
 static func _visit_state(engine) -> Dictionary:
 	var save: Dictionary = engine.save_game()
 	var out := {}
-	for id in save["shared_visits"]:
-		out["visit:%s" % id] = save["shared_visits"][id]
+	for id in save["sharedVisits"]:
+		out["visit:%s" % id] = save["sharedVisits"][id]
 	for fid in save["flows"]:
 		for id in save["flows"][fid]["visits"]:
 			out["%s/visit:%s" % [fid, id]] = save["flows"][fid]["visits"][id]

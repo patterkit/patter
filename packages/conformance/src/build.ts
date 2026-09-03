@@ -9,7 +9,11 @@
 // ---------------------------------------------------------------------------
 
 import { compileExpression, exportBundle } from "@patterkit/compiler";
-import type { Corpus, ExpressionCase, Fixtures, GameDataCase, RuntimeCase, ScriptedCase, SpecificityCase } from "./types.js";
+import { Engine } from "@patterkit/runtime";
+import { SAVE_SCHEMA } from "@patterkit/model";
+import type { SaveEnvelope } from "@patterkit/model";
+import { envelopeKeyPaths, runScript } from "./runner.js";
+import type { Corpus, ExpressionCase, Fixtures, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
 
 export function buildCorpus(fixtures: Fixtures): Corpus {
   const expressions: ExpressionCase[] = fixtures.expressions.map((f) => ({
@@ -67,5 +71,23 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     expected: f.expected, // hand-authored contract, carried through unchanged
   }));
 
-  return { version: 2, expressions, specificity, runtime, scripted, gameData };
+  // A save written by the REFERENCE at build time: play the setup, then serialise exactly as
+  // play-helpers' serializeState does. The envelope lands in the corpus verbatim, so every port reads a
+  // document another runtime wrote - the one thing a self round-trip can never check.
+  const saves: SaveCase[] = fixtures.saves.map((f) => {
+    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
+    const options = f.seed !== undefined ? { seed: f.seed } : {};
+    const { engine } = runScript(new Engine(bundle, options), f.setup, { bundle, options });
+    const envelope: SaveEnvelope = { schema: SAVE_SCHEMA, save: JSON.parse(JSON.stringify(engine.saveGame())) };
+    return {
+      name: f.name,
+      bundle,
+      ...(f.seed !== undefined ? { seed: f.seed } : {}),
+      envelope,
+      keyPaths: envelopeKeyPaths(envelope),
+      script: f.script,
+    };
+  });
+
+  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves };
 }

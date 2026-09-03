@@ -19,8 +19,9 @@ import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
 import type { StepResult } from "@patterkit/runtime";
-import type { GameData } from "@patterkit/model";
-import type { ExpressionCase, GameDataCase, RuntimeCase, ScriptedCase, SpecificityCase, TranscriptStep } from "./types.js";
+import { SAVE_SCHEMA } from "@patterkit/model";
+import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
+import type { ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptStep } from "./types.js";
 
 /** Evaluate one expression case; returns the actual value to compare with `expected`. */
 export function runExpressionCase(c: ExpressionCase): ScalarValue {
@@ -80,13 +81,17 @@ export function runRuntimeCase(c: RuntimeCase, maxSteps = 1000): TranscriptStep[
  * must match: `saveLoad` = serialise -> brand-new engine -> restore; the
  * current flow survives by id; ops without output must yield empty chunks.
  */
-export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
-  const options = c.seed !== undefined ? { seed: c.seed } : {};
-  let engine = new Engine(c.bundle, options);
-  let current = "";
-
+/**
+ * Run a script's ops against a LIVE engine, returning the transcript chunk each op produced
+ * (index-aligned with the script) and the engine that ends up live - `saveLoad` and `hotSwap` replace
+ * it. Shared by the scripted cases (fresh engine) and the save cases (an engine that has just loaded a
+ * save written elsewhere); a port's runner has the same split.
+ */
+export function runScript(
+  engine: Engine, ops: ScriptOp[], ctx: { bundle: Bundle; bundleB?: Bundle; options: { seed?: number } }, current = "",
+): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
-  for (const op of c.script) {
+  for (const op of ops) {
     const chunk: TranscriptStep[] = [];
     switch (op.op) {
       case "openFlow":
@@ -114,7 +119,7 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
       }
       case "saveLoad": {
         const blob = JSON.parse(JSON.stringify(engine.saveGame()));
-        engine = new Engine(c.bundle, options);
+        engine = new Engine(ctx.bundle, ctx.options);
         engine.loadGame(blob);
         break;
       }
@@ -122,7 +127,7 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
         // Live bundle refresh: the whole game carried onto the EDITED bundle. The reference runner
         // uses Engine.hotSwap (save -> fresh engine on bundleB -> load); a port without the helper
         // does the same three calls with its own save API. Drift resolves per §9.8.
-        engine = engine.hotSwap(c.bundleB!);
+        engine = engine.hotSwap(ctx.bundleB!);
         break;
       case "setLocale":
         engine.setLocale(op.locale); // live language switch - subsequent beats render in the new locale
@@ -147,7 +152,53 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
     }
     chunks.push(chunk);
   }
-  return chunks;
+  return { chunks, engine };
+}
+
+export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
+  const options = c.seed !== undefined ? { seed: c.seed } : {};
+  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options }).chunks;
+}
+
+/**
+ * Load a save written by the JS reference into a FRESH engine and continue the script: the reference's
+ * own copy of what every port does through its own save boundary. Before continuing, the loaded state
+ * is written back and its key paths held to the fixture's - a runtime that loads the envelope and
+ * writes a different shape has not adopted the contract, it has merely tolerated it.
+ */
+export function runSaveCase(c: SaveCase): TranscriptStep[][] {
+  const options = c.seed !== undefined ? { seed: c.seed } : {};
+  const engine = new Engine(c.bundle, options);
+  if (c.envelope.schema !== SAVE_SCHEMA) throw new Error(`not a ${SAVE_SCHEMA} envelope`);
+  engine.loadGame(JSON.parse(JSON.stringify(c.envelope.save)));
+  const back = envelopeKeyPaths({ schema: SAVE_SCHEMA, save: JSON.parse(JSON.stringify(engine.saveGame())) });
+  if (back.join("\n") !== c.keyPaths.join("\n")) {
+    const missing = c.keyPaths.filter((k) => !back.includes(k));
+    const extra = back.filter((k) => !c.keyPaths.includes(k));
+    throw new Error(`re-serialised save has different key paths; missing: [${missing.join(", ")}] extra: [${extra.join(", ")}]`);
+  }
+  return runScript(engine, c.script, { bundle: c.bundle, options }).chunks;
+}
+
+/**
+ * Every key path in an envelope, sorted: `save/flows/main/cursor/stack[0]/sceneId`. Containers are
+ * included (so an empty `sharedSelectors` still shows), array elements are indexed, and leaf TYPES are
+ * not recorded - shape, not values. Ports compute the same over their own serialisation and compare
+ * with the case's `keyPaths`. Sort is by code unit (ordinal), which every language can match.
+ */
+export function envelopeKeyPaths(env: SaveEnvelope): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown, path: string): void => {
+    if (Array.isArray(v)) {
+      if (path) out.push(path);
+      v.forEach((x, i) => walk(x, `${path}[${i}]`));
+    } else if (v !== null && typeof v === "object") {
+      if (path) out.push(path);
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) walk(x, path ? `${path}/${k}` : k);
+    } else out.push(path);
+  };
+  walk(env, "");
+  return out.sort();
 }
 
 /** Normalise a StepResult, keeping the fields the contract pins (drops undefined). */

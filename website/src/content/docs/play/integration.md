@@ -43,8 +43,12 @@ bind, so your game saves it. That is also what makes running Patter beside
 [Storylet Studio](https://storylet.studio)'s engine safe: both exclude `@world` from their own
 saves, your game saves its one world once, and nothing is written twice.
 
-Each runtime round-trips **its own** save format, so saves are semantically equivalent
-across engines, not byte-identical.
+**Every runtime writes and reads the same save format**, `patter/save@0`, so a save crosses
+engines: a game that saves from a web build loads in Godot, a Patterpad Play-window save loads in
+Unity. The shape is the JS runtime's, documented in `@patterkit/model`, and the conformance corpus
+holds every engine to it by carrying a save the JS runtime wrote that each engine must load, write
+back in the same shape, and continue. Semantically equivalent is the promise, not byte-identical:
+key order and number formatting can differ between engines, and nothing should compare the text.
 
 The **`@patterkit/play-helpers`** package wraps this for storage:
 

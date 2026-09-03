@@ -961,19 +961,88 @@ func _fresh_local():
 
 # The stack, each frame stamped with the id of the child it would run next (mirrors the JS
 # runtime's StackFrame.nextId): a frame saved at its container's end gets no stamp.
+# -- the save shape --------------------------------------------------------------
+#
+# A save is written in the FAMILY's shape: `patter/save@0`, the JS reference's, documented in
+# @patterkit/model and design/patter-schema.md 9. camelCase literal keys, the execution position
+# under `cursor`, a pending choice as `{groupId, options}`, scopes two-level (`{"patter": {...}}`),
+# selector cursors with every key optional. Every Patterplay runtime writes and reads exactly this, so
+# a save crosses engines. Until 0.11.0 this addon wrote snake_case keys with the cursor fields flat,
+# which loaded nowhere else and refused a JS save on its first key
+# (from-storylets/save-shape-across-engines, 2026-09-03); restore() and load_game() still READ that
+# shape, so a player's save on disk keeps loading.
+
+## Read `canonical` if present, else the pre-0.11.0 `legacy` key, else null.
+static func _k(d: Dictionary, canonical: String, legacy: String):
+	if d.has(canonical):
+		return d[canonical]
+	return d.get(legacy, null)
+
+
+## A scope map is `{"patter": {name: value}}` in the family's shape; this addon wrote the inner map
+## bare. A bare map's values are scalars and arrays, never Dictionaries, which tells the two apart.
+static func _unwrap_scope(scopes, token: String) -> Dictionary:
+	if not (scopes is Dictionary):
+		return {}
+	var d: Dictionary = scopes
+	if d.has(token) and d[token] is Dictionary:
+		return d[token]
+	return d
+
+
+## Selector cursors in the family's shape: every key optional, present once used - `seq` after the
+## first sequential pick, `bag` once a shuffle has drawn, `last` once there is a no-repeat memory.
+## The live entries carry `bag_init`, which is not written: a present `bag` means the same thing.
+static func _save_selectors(live: Dictionary) -> Dictionary:
+	var out := {}
+	for id in live:
+		var st: Dictionary = live[id]
+		var s := {}
+		if st.has("seq"):
+			s["seq"] = st["seq"]
+		if st.has("bag"):
+			s["bag"] = (st["bag"] as Array).duplicate()
+		if st.has("last"):
+			s["last"] = st["last"]
+		out[id] = s
+	return out
+
+
+static func _load_selectors(saved) -> Dictionary:
+	var out := {}
+	if not (saved is Dictionary):
+		return out
+	for id in saved:
+		var s: Dictionary = saved[id]
+		var st := {}
+		if s.has("seq"):
+			st["seq"] = int(s["seq"])
+		if s.has("bag"):
+			st["bag"] = (s["bag"] as Array).duplicate()
+			st["bag_init"] = true
+		elif s.get("bag_init", false):   # a pre-0.11.0 entry carried the flag explicitly
+			st["bag"] = []
+			st["bag_init"] = true
+		if s.has("last"):
+			st["last"] = s["last"]
+		out[id] = st
+	return out
+
+
+## Live frames are {scene, container, index}; the save carries {sceneId, containerId, index, nextId?}.
+## Each frame is stamped with the id of the child it would run next, so a restore against an EDITED
+## bundle re-finds the position by id rather than trusting the raw index (spec 9.8). A frame at its
+## container's end has no next child and no stamp.
 func _snapshot_stack() -> Array:
 	var out: Array = []
 	for f in _stack:
-		var frame: Dictionary = f.duplicate(true)
+		var frame := {"sceneId": f["scene"], "containerId": f["container"], "index": int(f["index"])}
 		var children = _children_of(f["container"])
-		if children == null:
-			out.append(frame)
-			continue
-		var kids: Array = children
-		var idx: int = int(f["index"])
-		if idx < kids.size():
-			var child: Dictionary = kids[idx]
-			frame["next_id"] = child["id"]
+		if children != null:
+			var kids: Array = children
+			var idx: int = int(f["index"])
+			if idx < kids.size():
+				frame["nextId"] = (kids[idx] as Dictionary)["id"]
 		out.append(frame)
 	return out
 
@@ -989,63 +1058,82 @@ func list_bags() -> Array:
 
 
 func snapshot() -> Dictionary:
+	var pending = null
+	if _pending != null:
+		pending = {"groupId": _pending["group_id"], "options": (_pending["options"] as Array).duplicate(true)}
 	return {
-		"scopes": _local.save(),
-		"scene_bags": _save_bags(_scene_bags),
-		"rng_state": _prng.a,
+		"scopes": {"patter": _local.save()},
+		"sceneBags": _save_bags(_scene_bags),
+		"rngState": _prng.a,
 		"visits": _visit_counts.duplicate(true),
-		"flow_ended": _flow_ended,
-		"current_scene_id": _current_scene_id,
-		# Stamp each frame with the id of the child it would run next ("next_id"), so a restore
-		# against an EDITED bundle re-finds the position by id, not the raw index (spec 9.8).
-		"stack": _snapshot_stack(),
-		"active_snippet_id": _active_snippet["id"] if _active_snippet != null else "",
-		"beat_index": _beat_index,
-		"pending_group_id": _pending["group_id"] if _pending != null else "",
-		"pending_options": (_pending["options"] as Array).duplicate(true) if _pending != null else [],
-		"pending_prompt_owner": _pending_prompt_owner,
-		"selectors": _selectors.duplicate(true),
+		"cursor": {
+			"flowEnded": _flow_ended,
+			"currentSceneId": _current_scene_id if _current_scene_id != "" else null,
+			"stack": _snapshot_stack(),
+			"activeSnippetId": _active_snippet["id"] if _active_snippet != null else null,
+			"beatIndex": _beat_index,
+			"pendingChoice": pending,
+			"pendingPromptOwnerId": _pending_prompt_owner if _pending_prompt_owner != "" else null,
+			"selectors": _save_selectors(_selectors),
+		},
 	}
 
 
 func restore(snap: Dictionary) -> void:
+	# The family's shape, or the snake_case flat shape this addon wrote before 0.11.0 (`cursor` absent).
+	var legacy := not snap.has("cursor")
+	var c: Dictionary = snap if legacy else snap["cursor"]
 	# Through to_uint32, not a bare mask: the JS runtime persisted this state SIGNED
 	# until it was fixed, so saves in the wild carry a negative number here.
-	_prng.a = PatterMulberry32.to_uint32(float(snap["rng_state"]))
-	_visit_counts = (snap["visits"] as Dictionary).duplicate(true)
+	_prng.a = PatterMulberry32.to_uint32(float(_k(snap, "rngState", "rng_state")))
+	_visit_counts = (snap.get("visits", {}) as Dictionary).duplicate(true)
 	_started = true
-	_flow_ended = snap["flow_ended"]
-	_beat_index = int(snap["beat_index"])
-	_current_scene_id = snap["current_scene_id"]
+	_flow_ended = bool(_k(c, "flowEnded", "flow_ended"))
+	_beat_index = int(_k(c, "beatIndex", "beat_index"))
+	var csid = _k(c, "currentSceneId", "current_scene_id")
+	_current_scene_id = str(csid) if csid != null else ""
 	# Re-bind each frame to the CURRENT bundle: prefer the saved next-child id (survives siblings
 	# inserted / removed / reordered before the cursor); fall back to the raw index when absent or
 	# its node drifted out of the bundle (spec 9.8 best-effort).
-	_stack = (snap["stack"] as Array).duplicate(true)
-	for f in _stack:  # JSON save/load turns the cursor index into a float; it must stay an int to index children
-		f["index"] = int(f["index"])
-		var next_id: String = f.get("next_id", "")
-		f.erase("next_id")  # live frames never carry it
-		if next_id != "":
+	_stack = []
+	for saved_frame in (c.get("stack", []) as Array):
+		var sf: Dictionary = saved_frame
+		var f := {"scene": str(_k(sf, "sceneId", "scene")), "container": str(_k(sf, "containerId", "container")), "index": int(sf["index"])}
+		var next_id = _k(sf, "nextId", "next_id")
+		if next_id != null and str(next_id) != "":
 			var children = _children_of(f["container"])
 			if children != null:
 				var kids: Array = children
 				for i in range(kids.size()):
 					var child: Dictionary = kids[i]
-					if child["id"] == next_id:
+					if child["id"] == str(next_id):
 						f["index"] = i
 						break
-	_scene_bags = _load_bags(_host, snap.get("scene_bags", {}), false)
+		_stack.append(f)
+	var scene_bags = _k(snap, "sceneBags", "scene_bags")
+	_scene_bags = _load_bags(_host, scene_bags if scene_bags is Dictionary else {}, false)
 	_local = _fresh_local()
-	_local.load(snap["scopes"] as Dictionary)
+	_local.load(_unwrap_scope(snap.get("scopes", {}), "patter"))
 	_active_snippet = null
-	var asid: String = snap["active_snippet_id"]
-	if asid != "" and _host["node_index"].has(asid):
-		var node: Dictionary = _host["node_index"][asid]
+	var asid = _k(c, "activeSnippetId", "active_snippet_id")
+	if asid != null and str(asid) != "" and _host["node_index"].has(str(asid)):
+		var node: Dictionary = _host["node_index"][str(asid)]
 		if node.get("type", "") == "snippet":
 			_active_snippet = node
-	_selectors = (snap["selectors"] as Dictionary).duplicate(true)
+	_selectors = _load_selectors(c.get("selectors", {}))
+	# Replay the saved option set VERBATIM: re-deriving would re-evaluate conditions and could change
+	# the choice under the player. Options whose nodes drifted out of the bundle are dropped; a choice
+	# with no surviving options dissolves (spec 9.8).
 	_pending = null
-	var saved_options: Array = snap["pending_options"]
+	var saved_options: Array = []
+	var group_id := ""
+	var pc = c.get("pendingChoice", null)
+	if pc is Dictionary:
+		saved_options = (pc as Dictionary).get("options", [])
+		group_id = str((pc as Dictionary).get("groupId", ""))
+	elif legacy:
+		saved_options = snap.get("pending_options", [])
+		group_id = str(snap.get("pending_group_id", ""))
 	if not saved_options.is_empty():
 		var options: Array = []
 		var by_id: Dictionary = {}
@@ -1053,14 +1141,15 @@ func restore(snap: Dictionary) -> void:
 			if not _host["node_index"].has(o["id"]):
 				continue
 			by_id[o["id"]] = _host["node_index"][o["id"]]
-			options.append(o.duplicate(true))
+			options.append((o as Dictionary).duplicate(true))
 		if not options.is_empty():
-			_pending = {"group_id": snap["pending_group_id"], "options": options, "by_id": by_id}
+			_pending = {"group_id": group_id, "options": options, "by_id": by_id}
 
 	# A save taken between choose() and the next advance() left a prompt still to be replayed;
 	# re-derive it from the chosen option (dropped if that option drifted out of the bundle).
 	_pending_prompt_beat = null
-	_pending_prompt_owner = snap.get("pending_prompt_owner", "")
+	var ppo = _k(c, "pendingPromptOwnerId", "pending_prompt_owner")
+	_pending_prompt_owner = str(ppo) if ppo != null else ""
 	if _pending_prompt_owner != "" and _host["node_index"].has(_pending_prompt_owner):
 		_pending_prompt_beat = _prompt_beat_of(_host["node_index"][_pending_prompt_owner])
 	if _pending_prompt_beat == null:

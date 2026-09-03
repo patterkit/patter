@@ -135,9 +135,11 @@ _link.Observe("main", flow.CurrentScene, step.Id, PatterDebugLink.TypeName(step.
 ## Save and load
 
 `PatterSave.SerializeState(engine)` and `DeserializeState(...)` round-trip the whole run: every
-flow's position, the shared state, visit counts, and the PRNG, as a tagged JSON envelope
-(the same shape `@patterkit/play-helpers` uses on the JS side). Persist the string wherever you
-keep saves. → [Save/load & Game Data](/play/integration/)
+flow's position, the shared state, visit counts, and the PRNG, as a tagged JSON envelope. It is the
+**same `patter/save@0` format every Patterplay runtime uses**, so a save written by a web build or by
+Patterpad loads here, and a save written here loads in Godot or Unreal. Saves written by this package
+before 0.11.0 (its old PascalCase shape) still load, and are written back in the shared shape on the
+next save. Persist the string wherever you keep saves. → [Save/load & Game Data](/play/integration/)
 
 ## Next
 

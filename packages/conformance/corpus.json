@@ -9351,5 +9351,528 @@
         "vol": 1
       }
     }
+  ],
+  "saves": [
+    {
+      "name": "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0vpxcpn",
+          "structureHash": "03ibej8"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "laps",
+                "type": "number",
+                "default": 0
+              }
+            ],
+            "blocks": [
+              {
+                "id": "loop",
+                "type": "block",
+                "name": "Loop",
+                "children": [
+                  {
+                    "id": "seq",
+                    "type": "group",
+                    "selector": "sequence",
+                    "children": [
+                      {
+                        "id": "one",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "two",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "gate",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "visits('loop') < 2",
+                      "ast": [
+                        "bin",
+                        "<",
+                        [
+                          "call",
+                          "visits",
+                          [
+                            "s",
+                            "loop"
+                          ]
+                        ],
+                        [
+                          "n",
+                          2
+                        ]
+                      ]
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@scene.laps",
+                        "value": {
+                          "src": "@scene.laps + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "laps"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "loop"
+                    }
+                  },
+                  {
+                    "id": "done",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "TD",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second",
+            "TD": "laps={@scene.laps}"
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 2,
+          "shared": {
+            "patter": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "loop": 1,
+            "seq": 1,
+            "one": 1
+          },
+          "sharedSelectors": {},
+          "stageBags": {
+            "s": {}
+          },
+          "flows": {
+            "main": {
+              "scopes": {
+                "patter": {}
+              },
+              "sceneBags": {
+                "s": {
+                  "laps": 0
+                }
+              },
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "loop": 1,
+                "seq": 1,
+                "one": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "loop",
+                    "index": 1,
+                    "nextId": "gate"
+                  }
+                ],
+                "activeSnippetId": "one",
+                "beatIndex": 1,
+                "pendingChoice": null,
+                "pendingPromptOwnerId": null,
+                "selectors": {
+                  "seq": {
+                    "seq": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/selectors/seq",
+        "save/flows/main/cursor/selectors/seq/seq",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/nextId",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/sceneBags",
+        "save/flows/main/sceneBags/s",
+        "save/flows/main/sceneBags/s/laps",
+        "save/flows/main/scopes",
+        "save/flows/main/scopes/patter",
+        "save/flows/main/visits",
+        "save/flows/main/visits/loop",
+        "save/flows/main/visits/one",
+        "save/flows/main/visits/s",
+        "save/flows/main/visits/seq",
+        "save/shared",
+        "save/shared/patter",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/loop",
+        "save/sharedVisits/one",
+        "save/sharedVisits/s",
+        "save/sharedVisits/seq",
+        "save/stageBags",
+        "save/stageBags/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "second"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TD",
+              "text": "laps=1"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a save written by the JS reference loads elsewhere at a pending choice, options replayed",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0fs4jz7",
+          "structureHash": "0fsmkaf"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "left",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "left_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_l",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "right",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "right_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "TR",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "C_r",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "C_l": "Left",
+            "C_r": "Right",
+            "TR": "went right"
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 2,
+          "shared": {
+            "patter": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "g": 1
+          },
+          "sharedSelectors": {},
+          "stageBags": {
+            "s": {}
+          },
+          "flows": {
+            "main": {
+              "scopes": {
+                "patter": {}
+              },
+              "sceneBags": {
+                "s": {}
+              },
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "g": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": null,
+                "beatIndex": 0,
+                "pendingChoice": {
+                  "groupId": "g",
+                  "options": [
+                    {
+                      "id": "left",
+                      "prompt": {
+                        "kind": "text",
+                        "text": "Left"
+                      },
+                      "eligible": true
+                    },
+                    {
+                      "id": "right",
+                      "prompt": {
+                        "kind": "text",
+                        "text": "Right"
+                      },
+                      "eligible": true
+                    }
+                  ]
+                },
+                "pendingPromptOwnerId": null,
+                "selectors": {}
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingChoice/groupId",
+        "save/flows/main/cursor/pendingChoice/options",
+        "save/flows/main/cursor/pendingChoice/options[0]",
+        "save/flows/main/cursor/pendingChoice/options[0]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[0]/id",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
+        "save/flows/main/cursor/pendingChoice/options[1]",
+        "save/flows/main/cursor/pendingChoice/options[1]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[1]/id",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/sceneBags",
+        "save/flows/main/sceneBags/s",
+        "save/flows/main/scopes",
+        "save/flows/main/scopes/patter",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g",
+        "save/flows/main/visits/s",
+        "save/shared",
+        "save/shared/patter",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g",
+        "save/sharedVisits/s",
+        "save/stageBags",
+        "save/stageBags/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "choose",
+          "id": "right"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "TR",
+              "text": "went right"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

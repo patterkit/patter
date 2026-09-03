@@ -1,9 +1,10 @@
 # PatterSave: wrap the engine's whole-game snapshot in the tagged `patter/save@0` envelope so a
 # host can drop it into a file and restore it safely (a foreign blob is refused instead of
-# corrupting a run). The envelope keys (`schema`, `save`) are the cross-runtime contract; the save
-# body is this runtime's own `save_game()` dictionary, like every other port (Unity's PatterSave,
-# play-helpers' save.ts). Reading also accepts a bare version-2 snapshot, so `.patterstate` files
-# written before the envelope existed still load.
+# corrupting a run). The whole envelope is the cross-runtime contract: `schema` + `save`, the save in
+# the FAMILY's shape (patter/save@0, the JS reference's, written identically by every Patterplay
+# runtime), so a file written by any of them loads here and this addon's files load anywhere. Reading
+# also accepts a bare version-2 snapshot, so `.patterstate` files written before the envelope existed
+# still load, and the snake_case shape this addon wrote before 0.11.0.
 #
 #   var json := PatterSave.serialize_state(engine)       # -> envelope JSON string
 #   var ok := PatterSave.deserialize_state(engine, json) # false (with push_error) on a foreign blob

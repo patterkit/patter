@@ -59,6 +59,13 @@ namespace Patterkit.Patterplay.TestHost
                 r = rr; s = ss; g = gg;
             }
 
+            // Envelopes written by the JS reference, loaded through THIS package's own boundary. The
+            // section must exist: a family the harness cannot run is a check that cannot fail.
+            if (!root.TryGetProperty("saves", out var savesArr)) { Console.Error.WriteLine("corpus has no saves section"); return 2; }
+            int sv = RunSaves(savesArr);
+            Console.WriteLine($"  [saves] envelopes written by the JS reference, loaded here + continued: {sv}/{savesArr.GetArrayLength()}");
+            if (sv != savesArr.GetArrayLength()) Fail("saves", "section total", $"{sv} of {savesArr.GetArrayLength()} passed");
+
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.
             _loader = ParseBundle;
@@ -178,10 +185,10 @@ namespace Patterkit.Patterplay.TestHost
 
             // Age it: put in a state high enough that the old `| 0` made it negative.
             string legacy = System.Text.RegularExpressions.Regex.Replace(
-                json, "\"RngState\":-?\\d+", "\"RngState\":" + asWritten);
+                json, "\"rngState\":-?\\d+", "\"rngState\":" + asWritten);
             if (legacy == json)
             {
-                Fail("legacy-save", "envelope", "no RngState in the save to age; the check would prove nothing");
+                Fail("legacy-save", "envelope", "no rngState in the save to age; the check would prove nothing");
                 return;
             }
 
@@ -197,9 +204,9 @@ namespace Patterkit.Patterplay.TestHost
 
             // Round-trip it back out: the signed number must have landed on the same bits.
             string restored = PatterSave.SerializeState(engine);
-            if (!restored.Contains("\"RngState\":" + expected))
+            if (!restored.Contains("\"rngState\":" + expected))
             {
-                Fail("legacy-save", "round trip", $"restored envelope does not carry RngState {expected}");
+                Fail("legacy-save", "round trip", $"restored envelope does not carry rngState {expected}");
                 return;
             }
             Console.WriteLine("  [legacy-save] a pre-fix save with a negative rngState loads");
@@ -237,9 +244,16 @@ namespace Patterkit.Patterplay.TestHost
             string json = PatterSave.SerializeState(engine);
             using var sdoc = JsonDocument.Parse(json);
             var save = sdoc.RootElement.GetProperty("save");
-            var stage = save.GetProperty("StageBags").GetProperty("s");
+            // The family's shape: camelCase literals, the cursor under `cursor`, scopes two-level. This
+            // port wrote PascalCase off reflection until 0.11.0, and nothing here noticed because the
+            // check read the same PascalCase back.
+            var stage = save.GetProperty("stageBags").GetProperty("s");
             Check("stage bag is flat", stage.TryGetProperty("alarm", out _) && !stage.TryGetProperty("values", out _), json);
-            var sceneJson = save.GetProperty("Flows").GetProperty("main").GetProperty("SceneBags").GetProperty("s");
+            var flowJson = save.GetProperty("flows").GetProperty("main");
+            Check("scopes are two-level (owned scope -> name -> value)", flowJson.GetProperty("scopes").TryGetProperty("patter", out _), json);
+            Check("the cursor is nested", flowJson.TryGetProperty("cursor", out var cur) && cur.TryGetProperty("pendingChoice", out _), json);
+            Check("no PascalCase key survives", !save.TryGetProperty("StageBags", out _) && !save.TryGetProperty("Flows", out _), json);
+            var sceneJson = flowJson.GetProperty("sceneBags").GetProperty("s");
             Check("scene bag is flat", sceneJson.TryGetProperty("mood", out var m) && m.GetString() == "tense", json);
 
             // A save written by hand, in the format on disk today, still loads.
@@ -684,11 +698,21 @@ namespace Patterkit.Patterplay.TestHost
                     var bundleB = c.TryGetProperty("bundleB", out var bb) ? _loader(bb) : null;
                     long? seed = c.TryGetProperty("seed", out var sd) ? sd.GetInt64() : (long?)null;
                     var opts = new EngineOptions { Seed = seed };
-                    var engine = new Engine(bundle, opts);
-                    string current = "";
-                    bool ok = true;
+                    var (ok, _) = RunScript(new Engine(bundle, opts), bundle, bundleB, opts, c.GetProperty("script"), name, "");
+                    if (ok) pass++;
+                }
+                catch (Exception ex) { Fail("scripted", name, ex.Message); }
+            }
+            return pass;
+        }
 
-                    foreach (var op in c.GetProperty("script").EnumerateArray())
+        /// <summary>Run a script's ops against a LIVE engine, returning whether every op matched and the
+        /// engine that ends up live (saveLoad / hotSwap replace it). Shared by the scripted cases and the
+        /// saves cases, whose engine arrives already loaded from an envelope another runtime wrote.</summary>
+        private static (bool ok, Engine engine) RunScript(Engine engine, Bundle bundle, Bundle bundleB, EngineOptions opts, JsonElement script, string name, string current)
+        {
+            bool ok = true;
+                    foreach (var op in script.EnumerateArray())
                     {
                         var chunk = new List<object>();
                         string kind = op.GetProperty("op").GetString();
@@ -789,11 +813,69 @@ namespace Patterkit.Patterplay.TestHost
                         var expected = expectChunk.ValueKind == JsonValueKind.Array ? expectChunk : (JsonElement?)null;
                         if (!MatchChunk(chunk, expected)) { ok = false; Fail("scripted", name, $"op {kind}: mismatch (got {Dump(chunk)})"); break; }
                     }
+            return (ok, engine);
+        }
+
+        // -- saves: an envelope the JS reference wrote, loaded through THIS package's own boundary -----
+
+        private static int RunSaves(JsonElement arr)
+        {
+            int pass = 0;
+            foreach (var c in arr.EnumerateArray())
+            {
+                string name = c.GetProperty("name").GetString();
+                try
+                {
+                    var bundle = _loader(c.GetProperty("bundle"));
+                    long? seed = c.TryGetProperty("seed", out var sd) ? sd.GetInt64() : (long?)null;
+                    var opts = new EngineOptions { Seed = seed };
+                    var engine = new Engine(bundle, opts);
+                    // Writer and reader are different runtimes here, which no self round-trip can test.
+                    // Then the package must write the loaded state back in the same shape (key paths)
+                    // before continuing: loading a shape is not the same as adopting it.
+                    PatterSave.DeserializeState(engine, c.GetProperty("envelope").GetRawText());
+                    using var backDoc = JsonDocument.Parse(PatterSave.SerializeState(engine));
+                    var got = new List<string>();
+                    KeyPaths(backDoc.RootElement, "", got);
+                    got.Sort(StringComparer.Ordinal);
+                    var want = new List<string>();
+                    foreach (var k in c.GetProperty("keyPaths").EnumerateArray()) want.Add(k.GetString());
+                    if (!got.SequenceEqual(want))
+                    {
+                        var missing = want.Where(k => !got.Contains(k));
+                        var extra = got.Where(k => !want.Contains(k));
+                        throw new Exception($"re-serialised save has different key paths; missing: [{string.Join(", ", missing)}] extra: [{string.Join(", ", extra)}]");
+                    }
+                    var (ok, _) = RunScript(engine, bundle, null, opts, c.GetProperty("script"), name, "");
                     if (ok) pass++;
                 }
-                catch (Exception ex) { Fail("scripted", name, ex.Message); }
+                catch (Exception ex) { Fail("saves", name, ex.Message); }
             }
             return pass;
+        }
+
+        /// <summary>Every key path in a value: `save/flows/main/cursor/stack[0]/sceneId`. Containers
+        /// included, array elements indexed, leaf types not recorded. Mirrors the JS runner's
+        /// envelopeKeyPaths; the caller sorts ordinally.</summary>
+        private static void KeyPaths(JsonElement v, string path, List<string> into)
+        {
+            switch (v.ValueKind)
+            {
+                case JsonValueKind.Array:
+                {
+                    if (path != "") into.Add(path);
+                    int i = 0;
+                    foreach (var x in v.EnumerateArray()) KeyPaths(x, $"{path}[{i++}]", into);
+                    break;
+                }
+                case JsonValueKind.Object:
+                {
+                    if (path != "") into.Add(path);
+                    foreach (var prop in v.EnumerateObject()) KeyPaths(prop.Value, path == "" ? prop.Name : $"{path}/{prop.Name}", into);
+                    break;
+                }
+                default: into.Add(path); break;
+            }
         }
 
         // -- gameData -----------------------------------------------------------

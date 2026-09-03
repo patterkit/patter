@@ -35,6 +35,7 @@ import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
 import type {
+  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, FlowSnapshot, SaveGame,
   Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet,
   CompiledEffect, Beat, LineBeat, TextBeat, GameData, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
 } from "@patterkit/model";
@@ -45,80 +46,13 @@ type SelectableNode = CompiledGroup | CompiledSnippet;
 // per evaluation was the engine's hottest path (every condition / effect / slot).
 const astCache = new WeakMap<Expression, ExprNode>();
 
-/** A property-state snapshot: owned scope -> property name -> value. */
-export type EngineSave = Record<string, Record<string, ScalarValue>>;
-
-/** Serialised `sequence` selector visit state for one group (spec §4 / §7). */
-export interface SelectorSnapshot {
-  seq?: number;            // sequential cursor (visits taken)
-  bag?: string[];          // shuffle: child ids still undrawn this pass
-  last?: string;           // last child id picked (no-immediate-repeat)
-}
-
-/** One entry on a flow's continuation stack: a position within a container's children. */
-export interface StackFrame {
-  sceneId: string;
-  /** A block id or a run-group id (both are sequential containers). */
-  containerId: string;
-  index: number;
-  /** SNAPSHOT-ONLY (never set on a live frame): the id of the child at `index` when the save was
-   *  taken. On restore the child is re-found by this id, so a save survives siblings being inserted,
-   *  removed, or reordered before the cursor (live bundle refresh / patched-game saves). Absent (an
-   *  older save, or a frame saved at its container's end) falls back to the raw `index`. */
-  nextId?: string;
-}
-
-/** The serialised cursor + scopes + PRNG of a single flow. */
-export interface FlowSnapshot {
-  /** This flow's owned-scope values = the NOT-shared `@patter` globals (under token "patter"). */
-  scopes: EngineSave;
-  /** Per-scene NOT-shared `@scene` bags (scene id -> name -> value); persist across re-entries (spec §7). */
-  sceneBags: Record<string, Record<string, ScalarValue>>;
-  /** This flow's built-in PRNG position (mulberry32 state). */
-  rngState: number;
-  /** This flow's per-node entry counts (node id -> times entered by this flow). */
-  visits: Record<string, number>;
-  cursor: {
-    flowEnded: boolean;
-    currentSceneId: string | null;
-    /** The continuation stack (call frames + the active block run). */
-    stack: StackFrame[];
-    activeSnippetId: string | null;
-    beatIndex: number;
-    /** The pending choice's exact option set, REPLAYED on load (schema 9.3). */
-    pendingChoice: SavedChoice | null;
-    /** The chosen option owning a prompt still to be replayed (save taken between choose + advance).
-     *  Optional / absent in older saves -> no pending prompt. */
-    pendingPromptOwnerId?: string | null;
-    /** This flow's `sequence` selector cursors. */
-    selectors: Record<string, SelectorSnapshot>;
-  };
-}
-
-/**
- * A pending choice as saved: the option set the player was shown, restored
- * verbatim - re-deriving on load would re-evaluate conditions (consuming PRNG
- * draws a second time) and could mutate the choice under the player.
- */
-export interface SavedChoice {
-  groupId: string;
-  options: ChoiceOption[];
-}
-
-/** A full resumable save-game: shared `@patter` state + every live flow. */
-export interface SaveGame {
-  version: number;
-  /** Shared `@patter` globals (owned scope "patter"). */
-  shared: EngineSave;
-  /** World-wide per-node entry counts (node id -> times entered by any flow). */
-  sharedVisits: Record<string, number>;
-  /** Shared selector cursors (node id -> snapshot) for `shared` memoried selectors. */
-  sharedSelectors: Record<string, SelectorSnapshot>;
-  /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value) - the shared scene props. */
-  stageBags: Record<string, Record<string, ScalarValue>>;
-  /** Each live flow's snapshot, keyed by flow id. */
-  flows: Record<string, FlowSnapshot>;
-}
+// The save shape is the FAMILY's contract and lives in @patterkit/model (`SaveGame` and friends, with
+// the reasoning). Re-exported here so `import type { SaveGame } from "@patterkit/runtime"` keeps
+// working; this engine's saveGame() output IS that document, and every port writes the same.
+export type {
+  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoiceOption, SavedChoicePrompt,
+  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope,
+} from "@patterkit/model";
 
 /** What `Flow.advance()` surfaces to the host at each stop. */
 export type StepResult =

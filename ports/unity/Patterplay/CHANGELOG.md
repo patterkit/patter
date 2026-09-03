@@ -6,6 +6,17 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Saves cross engines.** `PatterSave` now writes and reads the family's `patter/save@0` shape - the JS
+  reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad loads
+  here, and a save written here loads in Godot or Unreal. Until now this package wrote PascalCase keys
+  (`StageBags`, `Flows`) and a one-level `Shared` off reflection, which loaded nowhere else, and a JS
+  save loaded here threw on its first nested object. The envelope is now built and read by literal key.
+  **A save written by this package before 0.11.0 still loads** and is written back in the shared shape.
+  The conformance corpus now carries a save the JS reference wrote, which this package must load, write
+  back with the same key paths, and continue (from-storylets/save-shape-across-engines).
+
 ## [0.10.0] - 2026-09-02
 
 ### Added

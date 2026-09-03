@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
-import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runGameDataCase, cases } from "../src/index.js";
+import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -61,6 +61,18 @@ describe("gameData cases (merge-at-read defaults)", () => {
   for (const c of corpus.gameData) {
     it(c.name, () => {
       expect(runGameDataCase(c)).toEqual(c.expected);
+    });
+  }
+});
+
+describe("save cases (a save written by the reference loads, writes back the same shape, and continues)", () => {
+  for (const c of corpus.saves) {
+    it(c.name, () => {
+      const actual = runSaveCase(c);
+      c.script.forEach((op, i) => {
+        const expected = "expect" in op ? op.expect ?? [] : [];
+        expect(actual[i], `op ${i} (${op.op})`).toEqual(expected);
+      });
     });
   }
 });

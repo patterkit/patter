@@ -4,6 +4,7 @@
 //
 //   build.sh   (compiles + runs against packages/conformance/corpus.json)
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
@@ -492,24 +493,14 @@ static int runRuntime(const JsonValue& arr)
 
 static int envelopeRoundTrips = 0;
 
-int runScripted(const JsonValue& arr)
+// Run a script's ops against a LIVE engine, returning whether every op matched and the engine that
+// ends up live (saveLoad / hotSwap replace it). Shared by the scripted cases and the saves cases, whose
+// engine arrives already loaded from an envelope another runtime wrote.
+static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine> engine, const Bundle& bundle, const Bundle& bundleB,
+    const EngineOptions& opts, const JsonValue& script, const std::string& name, std::string current)
 {
-    int pass = 0;
-    for (const auto& c : arr.arr)
-    {
-        std::string name = c.at("name").str;
-        try
-        {
-            Bundle bundle = parseBundle(c.at("bundle"));
-            // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, spec 9.8).
-            Bundle bundleB;
-            if (const JsonValue* bb = c.find("bundleB")) bundleB = parseBundle(*bb);
-            EngineOptions opts;
-            if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
-            auto engine = std::make_shared<Engine>(bundle, opts);
-            std::string current;
-            bool ok = true;
-            for (const auto& op : c.at("script").arr)
+    bool ok = true;
+            for (const auto& op : script.arr)
             {
                 JsonValue chunk = JsonValue::Arr();
                 std::string kind = op.at("op").str;
@@ -574,7 +565,106 @@ int runScripted(const JsonValue& arr)
                 bool match = expect ? matchValue(chunk, *expect) : (chunk.arr.empty());
                 if (!match) { ok = false; fail("scripted", name, "op " + kind + ": mismatch (got " + dump(chunk) + ")"); break; }
             }
-            if (ok) ++pass;
+    return { ok, engine };
+}
+
+// JSON text of a parsed value, for handing the corpus's envelope to the save boundary as a STRING -
+// which is how a game hands it over, and the only entry the boundary has.
+static std::string jsonText(const JsonValue& v)
+{
+    using patter::loggerdetail::jsonQuote;
+    switch (v.type)
+    {
+        case JsonValue::Null: return "null";
+        case JsonValue::Bool: return v.b ? "true" : "false";
+        case JsonValue::Number:
+        {
+            char buf[64]; std::snprintf(buf, sizeof buf, "%.17g", v.num); return buf;
+        }
+        case JsonValue::String: return jsonQuote(v.str);
+        case JsonValue::Array:
+        {
+            std::string out = "[";
+            for (size_t i = 0; i < v.arr.size(); ++i) { if (i) out += ","; out += jsonText(v.arr[i]); }
+            return out + "]";
+        }
+        case JsonValue::Object:
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : v.obj) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + jsonText(kv.second); }
+            return out + "}";
+        }
+    }
+    return "null";
+}
+
+// Every key path in a value: "save/flows/main/cursor/stack[0]/sceneId". Containers included, array
+// elements indexed, leaf types not recorded. Mirrors the JS runner's envelopeKeyPaths; the caller sorts.
+static void keyPaths(const JsonValue& v, const std::string& path, std::vector<std::string>& into)
+{
+    if (v.isArray())
+    {
+        if (!path.empty()) into.push_back(path);
+        for (size_t i = 0; i < v.arr.size(); ++i) keyPaths(v.arr[i], path + "[" + std::to_string(i) + "]", into);
+    }
+    else if (v.isObject())
+    {
+        if (!path.empty()) into.push_back(path);
+        for (const auto& kv : v.obj) keyPaths(kv.second, path.empty() ? kv.first : path + "/" + kv.first, into);
+    }
+    else into.push_back(path);
+}
+
+// -- saves: an envelope the JS reference wrote, loaded through THIS core's own boundary ---------------
+static int runSaves(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            Bundle bundle = parseBundle(c.at("bundle"));
+            EngineOptions opts;
+            if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
+            auto engine = std::make_shared<Engine>(bundle, opts);
+            // Writer and reader are different runtimes here, which no self round-trip can test. Then the
+            // core must write the loaded state back in the same shape (key paths) before continuing:
+            // loading a shape is not the same as adopting it.
+            deserializeState(*engine, jsonText(c.at("envelope")));
+            JsonValue back = JsonParser(serializeState(*engine)).parse();
+            std::vector<std::string> got; keyPaths(back, "", got); std::sort(got.begin(), got.end());
+            std::vector<std::string> want; for (const auto& k : c.at("keyPaths").arr) want.push_back(k.str);
+            if (got != want)
+            {
+                std::string missing, extra;
+                for (const auto& k : want) if (std::find(got.begin(), got.end(), k) == got.end()) missing += (missing.empty() ? "" : ", ") + k;
+                for (const auto& k : got) if (std::find(want.begin(), want.end(), k) == want.end()) extra += (extra.empty() ? "" : ", ") + k;
+                throw std::runtime_error("re-serialised save has different key paths; missing: [" + missing + "] extra: [" + extra + "]");
+            }
+            if (runScript(engine, bundle, Bundle{}, opts, c.at("script"), name, "").first) ++pass;
+        }
+        catch (const std::exception& ex) { fail("saves", name, ex.what()); }
+    }
+    return pass;
+}
+
+int runScripted(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            Bundle bundle = parseBundle(c.at("bundle"));
+            // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, spec 9.8).
+            Bundle bundleB;
+            if (const JsonValue* bb = c.find("bundleB")) bundleB = parseBundle(*bb);
+            EngineOptions opts;
+            if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
+            auto engine = std::make_shared<Engine>(bundle, opts);
+            if (runScript(engine, bundle, bundleB, opts, c.at("script"), name, "").first) ++pass;
         }
         catch (const std::exception& ex) { fail("scripted", name, ex.what()); }
     }
@@ -1013,6 +1103,13 @@ int main(int argc, char** argv)
     int r = runRuntime(root.at("runtime"));
     int s = runScripted(root.at("scripted"));
     int g = runGameData(root.at("gameData"));
+    // Envelopes written by the JS reference, loaded through this core's own boundary. The section
+    // must exist: a family the harness cannot run is a check that cannot fail.
+    const JsonValue* savesArr = root.find("saves");
+    if (!savesArr) { std::cerr << "corpus has no saves section\n"; return 2; }
+    int sv = runSaves(*savesArr);
+    std::cout << "  [saves] envelopes written by the JS reference, loaded here + continued: " << sv << "/" << savesArr->arr.size() << "\n";
+    if (sv != static_cast<int>(savesArr->arr.size())) fail("saves", "section total", std::to_string(sv) + " of " + std::to_string(savesArr->arr.size()) + " passed");
     runInspectorSmoke();
     runSaveShapeSmoke();
     runTraceLogSmoke();

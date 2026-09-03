@@ -28,7 +28,14 @@ func _initialize() -> void:
 	var r := _run_runtime(root["runtime"])
 	var s := _run_scripted(root["scripted"])
 	var g := _run_gamedata(root["gameData"])
+	if not root.has("saves"):
+		push_error("corpus has no saves section - a family the harness cannot run is a check that cannot fail")
+		quit(2)
+		return
+	var sv := _run_saves(root["saves"])
 
+	print("saves: %d/%d  (envelopes written by the JS reference, loaded here and continued)" % [sv, root["saves"].size()])
+	_expect_all("saves", sv, root["saves"].size())
 	_run_describe_smoke()
 
 	print("expressions: %d/%d  specificity: %d/%d  runtime: %d/%d  scripted: %d/%d  gameData: %d/%d" % [
@@ -362,76 +369,134 @@ func _run_scripted(arr: Array) -> int:
 		var options := {}
 		if c.has("seed"):
 			options["seed"] = int(c["seed"])
-		var engine := PatterEngine.new(c["bundle"], options)
-		var current := ""
-		var ok := true
-		for op in c["script"]:
-			var chunk: Array = []
-			var kind: String = op["op"]
-			match kind:
-				"openFlow":
-					engine.open_flow(op["flow"], op.get("scene", ""), op.get("block", ""), op.get("seed"))
-					current = op["flow"]
-				"useFlow":
-					current = op["flow"]
-				"advance":
-					chunk.append(engine.get_flow(current).advance())
-				"choose":
-					engine.get_flow(current).choose(op["id"])
-				"goto":
-					# Host navigation by address. No transcript of its own; the next advance shows where
-					# it landed. expectResult pins the returned bool.
-					var moved: bool = engine.get_flow(current).goto(op["scene"], op.get("block", ""))
-					if op.has("expectResult") and moved != bool(op["expectResult"]):
-						push_error("goto %s: expected %s, got %s" % [op["scene"], op["expectResult"], moved])
-						return false
-				"saveLoad":
-					# Round-trip through the patter/save@0 envelope (runtime/save.gd), asserting the
-					# flattened state survives - which exercises the StateLogger's snapshot/diff too
-					# (parity brief B1/B2).
-					var before := PatterStateLogger.snapshot_state(engine)
-					var json := PatterSave.serialize_state(engine)
-					engine = PatterEngine.new(c["bundle"], options)
-					if not PatterSave.deserialize_state(engine, json):
-						_fail("scripted", c.get("name", "?"), "envelope refused its own serialization")
-					if not PatterStateLogger.diff_state(before, PatterStateLogger.snapshot_state(engine)).is_empty():
-						_fail("scripted", c.get("name", "?"), "envelope round-trip changed flattened state")
-				"hotSwap":
-					# Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
-					var swap_blob := engine.save_game()
-					engine = PatterEngine.new(c["bundleB"], options)
-					engine.load_game(swap_blob)
-				"setLocale":
-					engine.set_locale(op["locale"])
-				"setClosedCaptions":
-					engine.set_closed_captions(op["on"])
-				"expectCast":
-					# Static structure query: no transcript, expectResult pins the exact list INCLUDING
-					# order. No scene = the declared project cast.
-					var got: Array = []
-					if not op.has("scene"):
-						got = engine.get_cast()
-					elif not op.has("block"):
-						got = engine.cast_for_scene(op["scene"])
-					else:
-						got = engine.cast_for_block(op["scene"], op["block"])
-					var want: Array = op["expectResult"]
-					if not _deep_equal(got, want):
-						ok = false
-						_fail("scripted", name, "expectCast: expected %s, got %s" % [JSON.stringify(want), JSON.stringify(got)])
-						break
-				"reset":
-					engine.reset()
-					current = ""
-			var expected = op.get("expect", null)
-			var matched := _deep_equal(chunk, expected) if expected != null else chunk.is_empty()
-			if not matched:
-				ok = false
-				_fail("scripted", name, "op %s: mismatch (got %s)" % [kind, JSON.stringify(chunk)])
-				break
-		if ok:
+		var holder := {"engine": PatterEngine.new(c["bundle"], options)}
+		if _run_script(holder, c["script"], c["bundle"], c.get("bundleB", {}), options, name):
 			pass_count += 1
 	return pass_count
+
+## Run a script's ops against a LIVE engine held in `holder["engine"]` (saveLoad / hotSwap replace
+## it, and GDScript passes objects by value). Shared by the scripted cases and the saves cases, whose
+## engine arrives already loaded from an envelope another runtime wrote.
+func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: Dictionary, options: Dictionary, name: String) -> bool:
+	var current := ""
+	var ok := true
+	for op in ops:
+		var chunk: Array = []
+		var kind: String = op["op"]
+		match kind:
+			"openFlow":
+				holder["engine"].open_flow(op["flow"], op.get("scene", ""), op.get("block", ""), op.get("seed"))
+				current = op["flow"]
+			"useFlow":
+				current = op["flow"]
+			"advance":
+				chunk.append(holder["engine"].get_flow(current).advance())
+			"choose":
+				holder["engine"].get_flow(current).choose(op["id"])
+			"goto":
+				# Host navigation by address. No transcript of its own; the next advance shows where
+				# it landed. expectResult pins the returned bool.
+				var moved: bool = holder["engine"].get_flow(current).goto(op["scene"], op.get("block", ""))
+				if op.has("expectResult") and moved != bool(op["expectResult"]):
+					push_error("goto %s: expected %s, got %s" % [op["scene"], op["expectResult"], moved])
+					return false
+			"saveLoad":
+				# Round-trip through the patter/save@0 envelope (runtime/save.gd), asserting the
+				# flattened state survives - which exercises the StateLogger's snapshot/diff too
+				# (parity brief B1/B2).
+				var before := PatterStateLogger.snapshot_state(holder["engine"])
+				var json := PatterSave.serialize_state(holder["engine"])
+				holder["engine"] = PatterEngine.new(bundle, options)
+				if not PatterSave.deserialize_state(holder["engine"], json):
+					_fail("scripted", name, "envelope refused its own serialization")
+				if not PatterStateLogger.diff_state(before, PatterStateLogger.snapshot_state(holder["engine"])).is_empty():
+					_fail("scripted", name, "envelope round-trip changed flattened state")
+			"hotSwap":
+				# Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
+				var swap_blob: Dictionary = holder["engine"].save_game()
+				holder["engine"] = PatterEngine.new(bundle_b, options)
+				holder["engine"].load_game(swap_blob)
+			"setLocale":
+				holder["engine"].set_locale(op["locale"])
+			"setClosedCaptions":
+				holder["engine"].set_closed_captions(op["on"])
+			"expectCast":
+				# Static structure query: no transcript, expectResult pins the exact list INCLUDING
+				# order. No scene = the declared project cast.
+				var got: Array = []
+				if not op.has("scene"):
+					got = holder["engine"].get_cast()
+				elif not op.has("block"):
+					got = holder["engine"].cast_for_scene(op["scene"])
+				else:
+					got = holder["engine"].cast_for_block(op["scene"], op["block"])
+				var want: Array = op["expectResult"]
+				if not _deep_equal(got, want):
+					ok = false
+					_fail("scripted", name, "expectCast: expected %s, got %s" % [JSON.stringify(want), JSON.stringify(got)])
+					break
+			"reset":
+				holder["engine"].reset()
+				current = ""
+		var expected = op.get("expect", null)
+		var matched := _deep_equal(chunk, expected) if expected != null else chunk.is_empty()
+		if not matched:
+			ok = false
+			_fail("scripted", name, "op %s: mismatch (got %s)" % [kind, JSON.stringify(chunk)])
+			break
+	return ok
+
+
+# -- saves: an envelope the JS reference wrote, loaded through THIS addon's own boundary ------------
+
+func _run_saves(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var options := {}
+		if c.has("seed"):
+			options["seed"] = int(c["seed"])
+		var holder := {"engine": PatterEngine.new(c["bundle"], options)}
+		# Writer and reader are different runtimes here, which no self round-trip can test. Then the
+		# addon must write the loaded state back in the same shape (key paths) before continuing.
+		if not PatterSave.load_state(holder["engine"], c["envelope"]):
+			_fail("saves", name, "the JS-written envelope was refused")
+			continue
+		var back: Dictionary = PatterSave.save_state(holder["engine"])
+		var got: Array = _key_paths(back, "", [])
+		var want: Array = c["keyPaths"]
+		if got != want:
+			var missing := want.filter(func(k): return not got.has(k))
+			var extra := got.filter(func(k): return not want.has(k))
+			_fail("saves", name, "re-serialised save has different key paths\n    missing: %s\n    extra: %s" % [str(missing), str(extra)])
+			continue
+		if _run_script(holder, c["script"], c["bundle"], {}, options, name):
+			pass_count += 1
+	return pass_count
+
+
+## Every key path in a value, sorted by code unit: `save/flows/main/cursor/stack[0]/sceneId`.
+## Containers included, array elements indexed, leaf types not recorded (shape, not values). The JS
+## runner's envelopeKeyPaths is the reference for this walk.
+func _key_paths(v, path: String, out: Array) -> Array:
+	if v is Array:
+		if path != "":
+			out.append(path)
+		var arr: Array = v
+		for i in range(arr.size()):
+			_key_paths(arr[i], "%s[%d]" % [path, i], out)
+	elif v is Dictionary:
+		if path != "":
+			out.append(path)
+		var d: Dictionary = v
+		for k in d:
+			_key_paths(d[k], ("%s/%s" % [path, k]) if path != "" else str(k), out)
+	else:
+		out.append(path)
+	if path == "":
+		out.sort()
+	return out
+
 
 
 # -- gameData ------------------------------------------------------------------

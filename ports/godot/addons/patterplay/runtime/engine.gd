@@ -440,37 +440,42 @@ func list_bags() -> Array:
 
 
 func save_game() -> Dictionary:
+	# The FAMILY's shape (patter/save@0): see PatterFlow's save-shape notes for why, and PatterSave for
+	# the envelope around this.
 	var flows := {}
 	for id in _flows.keys():
 		flows[id] = _flows[id].snapshot()
 	return {
 		"version": 2,
-		"shared": _host["shared_patter"].save(),
-		"shared_visits": _host["shared_visits"].duplicate(true),
-		"shared_selectors": _host["shared_selectors"].duplicate(true),
-		"stage_bags": PatterFlow._save_bags(_host["stage_bags"]),
+		"shared": {"patter": _host["shared_patter"].save()},
+		"sharedVisits": _host["shared_visits"].duplicate(true),
+		"sharedSelectors": PatterFlow._save_selectors(_host["shared_selectors"]),
+		"stageBags": PatterFlow._save_bags(_host["stage_bags"]),
 		"flows": flows,
 	}
 
 
 func load_game(save: Dictionary) -> void:
-	if save.get("version", 0) != 2:
+	if int(save.get("version", 0)) != 2:
 		push_error("unsupported save version")
 		return
 	# Seeded from the declarations, then the saved values laid over: a property the save
-	# predates keeps its default rather than vanishing.
+	# predates keeps its default rather than vanishing. Reads the family's camelCase shape and the
+	# snake_case one this addon wrote before 0.11.0.
 	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
-	_host["shared_patter"].load(save["shared"] as Dictionary)
-	_host["shared_visits"] = (save["shared_visits"] as Dictionary).duplicate(true)
-	_host["shared_selectors"] = (save["shared_selectors"] as Dictionary).duplicate(true)
-	# Seeded from the bundle's declarations, then the saved values laid over - see
-	# PatterFlow._load_bags.
-	_host["stage_bags"] = PatterFlow._load_bags(_host, save.get("stage_bags", {}), true)
+	_host["shared_patter"].load(PatterFlow._unwrap_scope(save.get("shared", {}), "patter"))
+	var visits = PatterFlow._k(save, "sharedVisits", "shared_visits")
+	_host["shared_visits"] = (visits as Dictionary).duplicate(true) if visits is Dictionary else {}
+	_host["shared_selectors"] = PatterFlow._load_selectors(PatterFlow._k(save, "sharedSelectors", "shared_selectors"))
+	# Seeded from the bundle's declarations, then the saved values laid over - see PatterFlow._load_bags.
+	var stage = PatterFlow._k(save, "stageBags", "stage_bags")
+	_host["stage_bags"] = PatterFlow._load_bags(_host, stage if stage is Dictionary else {}, true)
 	_flows = {}
-	for id in (save["flows"] as Dictionary).keys():
+	for id in (save.get("flows", {}) as Dictionary).keys():
 		var flow := PatterFlow.new(_host, float(_default_seed))
 		flow.restore(save["flows"][id])
 		_flows[id] = flow
+
 
 
 # -- ref resolution ------------------------------------------------------------

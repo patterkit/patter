@@ -1026,3 +1026,121 @@ export const DEFAULT_CAPTION_DELIMITERS: CaptionDelimiters = { open: "[", close:
 /** The default caption character: a cast member named `SFX` whose lines are pure captions (omitted when
  *  captions are off). Applies even to a project that pins no `closedCaptions`. */
 export const DEFAULT_CAPTION_CHARACTER = "SFX";
+
+// ---------------------------------------------------------------------------
+// Save format: `patter/save@0` - the FAMILY's contract, not any one runtime's.
+//
+// Every Patterplay runtime (JS, Unity, Unreal, Godot) writes exactly this shape and reads it, so a
+// save crosses engines: a game that saves from a web build loads in Godot, a Patterpad Play-window
+// save loads in Unity. The JS reference is canonical (its output IS this document), and the shape
+// lives HERE rather than in the runtime so that the runtime implements a type it does not get to
+// invent - the rule the Storylet Engine holds its four runtimes to, and the reason its saves crossed
+// first time while ours crossed nowhere: three ports, three key namings, and nothing that said which
+// was right (from-storylets/save-shape-across-engines, 2026-09-03; design/patter-schema.md 9).
+//
+// Keys are camelCase literals, values are bare scalars, `@world` is never here (the host owns it), and
+// semantic parity is what the conformance corpus pins - byte parity is not required, key-path parity is.
+// ---------------------------------------------------------------------------
+
+export const SAVE_SCHEMA = "patter/save@0";
+/** The `save.version` inside the envelope. Bumped only when a reader would MISREAD an older save. */
+export const SAVE_VERSION = 2;
+
+/** The tagged envelope a host stores: `serializeState` writes it, `deserializeState` refuses anything else. */
+export interface SaveEnvelope {
+  schema: typeof SAVE_SCHEMA;
+  save: SaveGame;
+}
+
+/** A property-state snapshot: owned scope -> property name -> value (`{ patter: { gold: 7 } }`). */
+export type EngineSave = Record<string, Record<string, ScalarValue>>;
+
+/** Serialised `sequence` selector visit state for one group (spec §4 / §7). Every key is OPTIONAL and
+ *  present only once the selector has used it: `seq` after the first sequential pick, `bag` once a
+ *  shuffle has drawn, `last` once there is a no-immediate-repeat memory. A port that stores "started"
+ *  flags derives them from key presence rather than writing them. */
+export interface SelectorSnapshot {
+  seq?: number;
+  bag?: string[];
+  last?: string;
+}
+
+/** One entry on a flow's continuation stack: a position within a container's children. */
+export interface StackFrame {
+  sceneId: string;
+  /** A block id or a run-group id (both are sequential containers). */
+  containerId: string;
+  index: number;
+  /** SNAPSHOT-ONLY (never on a live frame): the id of the child at `index` when the save was taken, so a
+   *  restore against an EDITED bundle re-finds the position by id. Absent when the frame sat at its
+   *  container's end (no next child), or in an older save. */
+  nextId?: string;
+}
+
+/** The prompt of a saved choice option: the choice text as a structured line/text beat. */
+export interface SavedChoicePrompt {
+  kind: "line" | "text";
+  text: string;
+  character?: string;
+  characterName?: string;
+  direction?: string;
+}
+
+/** One option of a pending choice, saved VERBATIM: re-deriving on load would re-evaluate conditions. */
+export interface SavedChoiceOption {
+  id: string;
+  prompt?: SavedChoicePrompt;
+  eligible: boolean;
+  gameData?: GameData;
+}
+
+/** A pending choice as saved: the option set the player was shown, replayed on load (schema 9.3). */
+export interface SavedChoice {
+  groupId: string;
+  options: SavedChoiceOption[];
+}
+
+/** The flow's execution position: where it is, and what it is waiting on. */
+export interface FlowCursor {
+  flowEnded: boolean;
+  currentSceneId: string | null;
+  /** The continuation stack (call frames + the active block run), root first. */
+  stack: StackFrame[];
+  activeSnippetId: string | null;
+  beatIndex: number;
+  /** Present (non-null) iff the flow is stopped at a choice. */
+  pendingChoice: SavedChoice | null;
+  /** The chosen option owning a prompt still to be replayed (a save taken between choose + advance).
+   *  Optional / null in older saves -> no pending prompt. */
+  pendingPromptOwnerId?: string | null;
+  /** This flow's (non-shared) selector cursors, keyed by group id. */
+  selectors: Record<string, SelectorSnapshot>;
+}
+
+/** The serialised cursor + scopes + PRNG of a single flow. */
+export interface FlowSnapshot {
+  /** This flow's owned-scope values = the NOT-shared `@patter` globals, under token "patter". */
+  scopes: EngineSave;
+  /** Per-scene NOT-shared `@scene` bags (scene id -> name -> value); persist across re-entries (spec §7). */
+  sceneBags: Record<string, Record<string, ScalarValue>>;
+  /** This flow's built-in PRNG position (mulberry32 state, uint32; older saves may carry it signed). */
+  rngState: number;
+  /** This flow's per-node entry counts (node id -> times entered by this flow). */
+  visits: Record<string, number>;
+  cursor: FlowCursor;
+}
+
+/** A full resumable save-game: shared `@patter` state + every live flow. */
+export interface SaveGame {
+  version: number;
+  /** Shared `@patter` globals (owned scope "patter"). */
+  shared: EngineSave;
+  /** World-wide per-node entry counts (node id -> times entered by any flow). */
+  sharedVisits: Record<string, number>;
+  /** Shared selector cursors (node id -> snapshot) for `shared` memoried selectors. */
+  sharedSelectors: Record<string, SelectorSnapshot>;
+  /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value) - the shared scene props. */
+  stageBags: Record<string, Record<string, ScalarValue>>;
+  /** Each live flow's snapshot, keyed by flow id. */
+  flows: Record<string, FlowSnapshot>;
+}

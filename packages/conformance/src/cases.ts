@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { Fixtures, RuntimeFixture, ScriptedFixture, GameDataFixture } from "./types.js";
+import type { Fixtures, GameDataFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
 import { castStringKey } from "@patterkit/model";
 
@@ -1525,6 +1525,22 @@ const scriptedQualityInsertion = {
   ],
 } satisfies ScriptedFixture;
 
+// A save written by the JS reference, loaded by every runtime. Derived from the scripted save/load
+// fixtures: everything before `saveLoad` is the SETUP the reference plays before writing the
+// envelope, everything after is what each port must reproduce having loaded it. The corpus carries the
+// envelope verbatim, so this is the one place the reader and the writer are different runtimes.
+const asSaveFixture = (f: ScriptedFixture, name: string): SaveFixture => {
+  const at = f.script.findIndex((op) => op.op === "saveLoad");
+  const opened = f.script.find((op): op is Extract<ScriptOp, { op: "openFlow" }> => op.op === "openFlow")!;
+  return {
+    name, project: f.project, scenes: f.scenes,
+    ...(f.locales ? { locales: f.locales } : {}),
+    ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    setup: f.script.slice(0, at),
+    script: [{ op: "useFlow", flow: opened.flow }, ...f.script.slice(at + 1)],
+  };
+};
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -1579,4 +1595,8 @@ export const cases: Fixtures = {
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedQualityInsertion],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
+  saves: [
+    asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
+    asSaveFixture(scriptedSaveLoadChoice, "a save written by the JS reference loads elsewhere at a pending choice, options replayed"),
+  ],
 };

@@ -4,15 +4,15 @@
 // safely (a foreign blob throws instead of corrupting a run).
 // ---------------------------------------------------------------------------
 
-import type { Engine, SaveGame } from "@patterkit/runtime";
+import type { Engine } from "@patterkit/runtime";
+import { SAVE_SCHEMA } from "@patterkit/model";
+import type { SaveEnvelope } from "@patterkit/model";
 
-export const SAVE_SCHEMA = "patter/save@0";
-
-export interface SaveEnvelope {
-  schema: typeof SAVE_SCHEMA;
-  /** The engine save-game: shared `@patter`/`@scene` state, visit counts, and every live flow. */
-  save: SaveGame;
-}
+// The envelope (`schema` + `save`) and the save shape inside it are the FAMILY's contract, defined in
+// @patterkit/model and written identically by every Patterplay runtime. Re-exported so existing
+// imports keep working.
+export { SAVE_SCHEMA };
+export type { SaveEnvelope };
 
 /** Capture the whole game as a tagged envelope (wraps `engine.saveGame()`). */
 export function saveState(engine: Engine): SaveEnvelope {

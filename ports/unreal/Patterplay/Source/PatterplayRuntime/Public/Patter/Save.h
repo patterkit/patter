@@ -1,7 +1,12 @@
 // Save / load: wrap the Engine's whole-game snapshot in the tagged `patter/save@0` envelope so a
 // host can drop it into a file and restore it safely (a foreign blob throws instead of corrupting
-// a run). The envelope keys (`schema`, `save`) are the cross-runtime contract; the save body is
-// this runtime's own shape, like every other port (Unity's PatterSave, play-helpers' save.ts).
+// a run). THE WHOLE ENVELOPE IS THE FAMILY'S CONTRACT: `patter/save@0`, the shape the JS reference
+// writes (@patterkit/model documents it; design/patter-schema.md 9), written and read identically by
+// every Patterplay runtime so a save crosses engines. camelCase literal keys, the execution position
+// under `cursor`, a pending choice as `{groupId, options}`, scopes two-level (`{"patter": {...}}`),
+// selector cursors with every key optional. Until 0.11.0 this port wrote its own flat shape, which a
+// JS save loaded into only partly: the flow came back and its pending choice did not
+// (from-storylets/save-shape-across-engines, 2026-09-03). Reading still accepts that shape.
 //
 // std-only, and deliberately self-contained: the core is JSON-library-agnostic (Bundle.h), so this
 // header carries its own compact JSON writer + reader for the SaveGame shape - which also makes the
@@ -50,14 +55,20 @@ namespace patter
             std::string out = "["; for (size_t i = 0; i < v.size(); ++i) { if (i) out += ","; out += jsonQuote(v[i]); } return out + "]";
         }
 
+        // Every key optional and present once used (the family's shape): `seq` after the first
+        // sequential pick, `bag` once a shuffle has drawn, `last` once there is a no-repeat memory. The
+        // "started" flags this core keeps (bagInit / hasLast) are derived from key presence on read.
         inline std::string selectorJson(const SelectorState& s)
         {
-            return "{\"seq\":" + std::to_string(s.seq)
-                 + ",\"bagInit\":" + (s.bagInit ? "true" : "false")
-                 + ",\"bag\":" + stringListJson(s.bag)
-                 + ",\"hasLast\":" + (s.hasLast ? "true" : "false")
-                 + ",\"last\":" + jsonQuote(s.last) + "}";
+            std::string out = "{"; bool first = true;
+            auto field = [&](const char* k, const std::string& v) { if (!first) out += ","; first = false; out += jsonQuote(k) + ":" + v; };
+            if (s.seq != 0) field("seq", std::to_string(s.seq));
+            if (s.bagInit) field("bag", stringListJson(s.bag));
+            if (s.hasLast) field("last", jsonQuote(s.last));
+            return out + "}";
         }
+
+        inline std::string nullableJson(const std::string& s) { return s.empty() ? std::string("null") : jsonQuote(s); }
 
         inline std::string selectorMapJson(const std::map<std::string, SelectorState>& m)
         {
@@ -78,11 +89,12 @@ namespace patter
             std::string out = "{\"id\":" + jsonQuote(o.id) + ",\"eligible\":" + (o.eligible ? "true" : "false");
             if (o.prompt)
             {
-                out += ",\"prompt\":{\"kind\":" + jsonQuote(o.prompt->kind)
-                     + ",\"text\":" + jsonQuote(o.prompt->text)
-                     + ",\"character\":" + jsonQuote(o.prompt->character)
-                     + ",\"characterName\":" + jsonQuote(o.prompt->characterName)
-                     + ",\"direction\":" + jsonQuote(o.prompt->direction) + "}";
+                // Optional prompt fields are absent, not empty, when the option has none (the JS shape).
+                out += ",\"prompt\":{\"kind\":" + jsonQuote(o.prompt->kind) + ",\"text\":" + jsonQuote(o.prompt->text);
+                if (!o.prompt->character.empty()) out += ",\"character\":" + jsonQuote(o.prompt->character);
+                if (!o.prompt->characterName.empty()) out += ",\"characterName\":" + jsonQuote(o.prompt->characterName);
+                if (!o.prompt->direction.empty()) out += ",\"direction\":" + jsonQuote(o.prompt->direction);
+                out += "}";
             }
             if (o.gameData) out += ",\"gameData\":" + valueMapJson(*o.gameData);
             return out + "}";
@@ -91,32 +103,42 @@ namespace patter
         inline std::string flowJson(const FlowSnapshot& f)
         {
             std::string out = "{";
-            out += "\"scopes\":" + valueMapJson(f.scopes);
+            out += "\"scopes\":{\"patter\":" + valueMapJson(f.scopes) + "}";
             out += ",\"sceneBags\":" + bagMapJson(f.sceneBags);
             out += ",\"rngState\":" + std::to_string(static_cast<unsigned long long>(f.rngState));
             out += ",\"visits\":" + intMapJson(f.visits);
-            out += std::string(",\"flowEnded\":") + (f.flowEnded ? "true" : "false");
-            out += ",\"currentSceneId\":" + jsonQuote(f.currentSceneId);
+            // The execution position sits under `cursor`, as the JS reference writes it. An absent id
+            // is null, not "" (this core keeps "" for none).
+            out += ",\"cursor\":{";
+            out += std::string("\"flowEnded\":") + (f.flowEnded ? "true" : "false");
+            out += ",\"currentSceneId\":" + nullableJson(f.currentSceneId);
             out += ",\"stack\":[";
             for (size_t i = 0; i < f.stack.size(); ++i)
             {
                 if (i) out += ",";
                 const StackFrame& fr = f.stack[i];
                 out += "{\"sceneId\":" + jsonQuote(fr.sceneId) + ",\"containerId\":" + jsonQuote(fr.containerId)
-                     + ",\"index\":" + std::to_string(fr.index) + ",\"nextId\":" + jsonQuote(fr.nextId) + "}";
+                     + ",\"index\":" + std::to_string(fr.index);
+                if (!fr.nextId.empty()) out += ",\"nextId\":" + jsonQuote(fr.nextId);   // absent at a container's end
+                out += "}";
             }
             out += "]";
-            out += ",\"activeSnippetId\":" + jsonQuote(f.activeSnippetId);
+            out += ",\"activeSnippetId\":" + nullableJson(f.activeSnippetId);
             out += ",\"beatIndex\":" + std::to_string(f.beatIndex);
-            out += ",\"pendingGroupId\":" + jsonQuote(f.pendingGroupId);
-            out += ",\"pendingOptions\":[";
-            for (size_t i = 0; i < f.pendingOptions.size(); ++i) { if (i) out += ","; out += optionJson(f.pendingOptions[i]); }
-            out += "]";
-            out += ",\"pendingPromptOwnerId\":" + jsonQuote(f.pendingPromptOwnerId);
+            if (f.pendingOptions.empty()) out += ",\"pendingChoice\":null";
+            else
+            {
+                out += ",\"pendingChoice\":{\"groupId\":" + jsonQuote(f.pendingGroupId) + ",\"options\":[";
+                for (size_t i = 0; i < f.pendingOptions.size(); ++i) { if (i) out += ","; out += optionJson(f.pendingOptions[i]); }
+                out += "]}";
+            }
+            out += ",\"pendingPromptOwnerId\":" + nullableJson(f.pendingPromptOwnerId);
             out += ",\"selectors\":" + selectorMapJson(f.selectors);
-            return out + "}";
+            return out + "}}";
         }
     }
+
+
 
     /// Serialise the whole game (shared state, visits, every live flow) to a tagged JSON string.
     inline std::string serializeState(Engine& engine)
@@ -125,7 +147,7 @@ namespace patter
         SaveGame s = engine.saveGame();
         std::string out = "{\"schema\":" + jsonQuote(SAVE_SCHEMA) + ",\"save\":{";
         out += "\"version\":" + std::to_string(s.version);
-        out += ",\"shared\":" + valueMapJson(s.shared);
+        out += ",\"shared\":{\"patter\":" + valueMapJson(s.shared) + "}";   // owned scope -> name -> value
         out += ",\"sharedVisits\":" + intMapJson(s.sharedVisits);
         out += ",\"sharedSelectors\":" + selectorMapJson(s.sharedSelectors);
         out += ",\"stageBags\":" + bagMapJson(s.stageBags);
@@ -288,6 +310,19 @@ namespace patter
             return m;
         }
 
+        // `{"patter": {name: value}}` (the family's two-level shape) or a bare map (this port before
+        // 0.11.0). A bare map's values are scalars and arrays, never objects, which tells the two apart.
+        inline std::map<std::string, PatterValue> toScope(const JV* o)
+        {
+            if (o && o->t == JV::T::Obj && !o->obj.empty())
+            {
+                bool twoLevel = true;
+                for (const auto& kv : o->obj) if (kv.second.t != JV::T::Obj) { twoLevel = false; break; }
+                if (twoLevel) return toValueMap(o->get("patter"));
+            }
+            return toValueMap(o);
+        }
+
         inline std::map<std::string, int> toIntMap(const JV* o)
         {
             std::map<std::string, int> m;
@@ -299,9 +334,12 @@ namespace patter
         {
             SelectorState s;
             s.seq = static_cast<int>(v.num("seq"));
-            s.bagInit = v.boolean("bagInit");
-            if (const JV* bag = v.get("bag")) for (const auto& e : bag->arr) s.bag.push_back(e.s);
-            s.hasLast = v.boolean("hasLast");
+            // Presence IS the flag in the family's shape; the explicit booleans are this port's pre-0.11.0 keys.
+            const JV* bag = v.get("bag");
+            s.bagInit = (bag != nullptr) || v.boolean("bagInit");
+            if (bag) for (const auto& e : bag->arr) s.bag.push_back(e.s);
+            const JV* last = v.get("last");
+            s.hasLast = (last != nullptr && last->t == JV::T::Str) || v.boolean("hasLast");
             s.last = v.str("last");
             return s;
         }
@@ -320,10 +358,26 @@ namespace patter
             return m;
         }
 
+        inline ChoiceOption toOption(const JV& e)
+        {
+            ChoiceOption o;
+            o.id = e.str("id"); o.eligible = e.boolean("eligible");
+            if (const JV* p = e.get("prompt"))
+            {
+                auto prompt = std::make_shared<ChoicePrompt>();
+                prompt->kind = p->str("kind"); prompt->text = p->str("text");
+                prompt->character = p->str("character"); prompt->characterName = p->str("characterName");
+                prompt->direction = p->str("direction");
+                o.prompt = prompt;
+            }
+            if (const JV* gd = e.get("gameData")) o.gameData = std::make_shared<GameData>(toValueMap(gd));
+            return o;
+        }
+
         inline FlowSnapshot toFlow(const JV& v)
         {
             FlowSnapshot f;
-            f.scopes = toValueMap(v.get("scopes"));
+            f.scopes = toScope(v.get("scopes"));
             f.sceneBags = toBagMap(v.get("sceneBags"));
             // The JS runtime accumulated this state with `| 0` until 0.x, so saves in
             // the wild carry it SIGNED. Casting a negative double straight to
@@ -331,9 +385,13 @@ namespace patter
             // so it goes through the same ToUint32 the seed does.
             f.rngState = Mulberry32::ToUint32(v.num("rngState"));
             f.visits = toIntMap(v.get("visits"));
-            f.flowEnded = v.boolean("flowEnded");
-            f.currentSceneId = v.str("currentSceneId");
-            if (const JV* stack = v.get("stack"))
+            // The family nests the execution position under `cursor`; this port's pre-0.11.0 shape
+            // kept those fields flat on the flow. Same reads either way.
+            const JV* cursor = v.get("cursor");
+            const JV& c = cursor ? *cursor : v;
+            f.flowEnded = c.boolean("flowEnded");
+            f.currentSceneId = c.str("currentSceneId");   // null -> "" (this core's "none")
+            if (const JV* stack = c.get("stack"))
                 for (const auto& e : stack->arr)
                 {
                     StackFrame fr;
@@ -341,28 +399,23 @@ namespace patter
                     fr.index = static_cast<int>(e.num("index")); fr.nextId = e.str("nextId");
                     f.stack.push_back(std::move(fr));
                 }
-            f.activeSnippetId = v.str("activeSnippetId");
-            f.beatIndex = static_cast<int>(v.num("beatIndex"));
-            f.pendingGroupId = v.str("pendingGroupId");
-            if (const JV* opts = v.get("pendingOptions"))
-                for (const auto& e : opts->arr)
+            f.activeSnippetId = c.str("activeSnippetId");
+            f.beatIndex = static_cast<int>(c.num("beatIndex"));
+            if (const JV* pc = c.get("pendingChoice"))
+            {
+                if (pc->t == JV::T::Obj)
                 {
-                    ChoiceOption o;
-                    o.id = e.str("id"); o.eligible = e.boolean("eligible");
-                    if (const JV* p = e.get("prompt"))
-                    {
-                        auto prompt = std::make_shared<ChoicePrompt>();
-                        prompt->kind = p->str("kind"); prompt->text = p->str("text");
-                        prompt->character = p->str("character"); prompt->characterName = p->str("characterName");
-                        prompt->direction = p->str("direction");
-                        o.prompt = prompt;
-                    }
-                    if (const JV* gd = e.get("gameData"))
-                        o.gameData = std::make_shared<GameData>(toValueMap(gd));
-                    f.pendingOptions.push_back(std::move(o));
+                    f.pendingGroupId = pc->str("groupId");
+                    if (const JV* opts = pc->get("options")) for (const auto& e : opts->arr) f.pendingOptions.push_back(toOption(e));
                 }
-            f.pendingPromptOwnerId = v.str("pendingPromptOwnerId");
-            f.selectors = toSelectorMap(v.get("selectors"));
+            }
+            else   // pre-0.11.0: the group id and options flat on the flow
+            {
+                f.pendingGroupId = c.str("pendingGroupId");
+                if (const JV* opts = c.get("pendingOptions")) for (const auto& e : opts->arr) f.pendingOptions.push_back(toOption(e));
+            }
+            f.pendingPromptOwnerId = c.str("pendingPromptOwnerId");
+            f.selectors = toSelectorMap(c.get("selectors"));
             return f;
         }
     }
@@ -385,7 +438,7 @@ namespace patter
 
         SaveGame s;
         s.version = static_cast<int>(saveObj->num("version"));
-        s.shared = toValueMap(saveObj->get("shared"));
+        s.shared = toScope(saveObj->get("shared"));
         s.sharedVisits = toIntMap(saveObj->get("sharedVisits"));
         s.sharedSelectors = toSelectorMap(saveObj->get("sharedSelectors"));
         s.stageBags = toBagMap(saveObj->get("stageBags"));

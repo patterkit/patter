@@ -1,18 +1,16 @@
 @tool
 extends SceneTree
 
-# The save envelope's SHAPE, pinned before scene/stage state moved from hand-rolled
-# Dictionaries onto the shared PropertyBag.
+# The save envelope's SHAPE, pinned deliberately: it is the FAMILY's (`patter/save@0`, the JS
+# reference's, documented in @patterkit/model and design/patter-schema.md 9), not this addon's.
 #
-# The bags are a saved-game format. Whatever they are held in at runtime, `save_game()`
-# must keep writing a flat name -> value Dictionary, and must keep reading one written by
-# a build that predates the change. A bag that serialised itself - values plus its
-# declarations - would round-trip perfectly in a test that only saves and loads, and
-# would still have broken every save on disk.
-#
-# So this checks two different things, and the second is the one that matters:
-#   1. what save_game() writes is flat, and survives JSON
-#   2. a HAND-WRITTEN save, in the old format, still loads
+# Until 0.11.0 this addon wrote snake_case keys with the cursor fields flat on the flow, which
+# round-tripped perfectly through its own save_game()/load_game() and loaded in no other runtime -
+# a save written by a web build died here on its first key. A test that only saves and loads cannot
+# see that, so this one checks three things:
+#   1. what save_game() writes is the family's shape (camelCase, cursor nested, scopes two-level)
+#   2. a HAND-WRITTEN save in that shape, as the JS reference writes it, loads
+#   3. a HAND-WRITTEN save in the PRE-0.11.0 shape still loads, because players have them on disk
 #
 #   godot --headless --path ports/godot --script res://test/test_save_shape.gd
 
@@ -25,7 +23,7 @@ func _initialize() -> void:
 		"schema": "patter/bundle@0",
 		"locales": {"default": "en", "included": ["en"]},
 		"strings": {"en": {"T": "hi"}},
-		"properties": [],
+		"properties": [{"name": "gold", "type": "number", "default": 0, "shared": true}],
 		"scenes": {"s": {"id": "s", "gameId": "s",
 			"sceneProps": [
 				{"name": "mood", "type": "string", "default": "calm", "shared": false},
@@ -48,32 +46,69 @@ func _initialize() -> void:
 
 	var save: Dictionary = engine.save_game()
 
-	# 1. the stage bag is a flat name -> value map, not a serialised bag
-	var stage: Dictionary = save["stage_bags"]["s"]
+	# 1. the family's shape
+	_check("top-level keys are the family's", save.has("sharedVisits") and save.has("stageBags") and save.has("sharedSelectors"), str(save.keys()))
+	_check("no snake_case key survives", not save.has("shared_visits") and not save.has("stage_bags"), str(save.keys()))
+	_check("shared scopes are two-level", save["shared"].has("patter"), str(save["shared"]))
+	var stage: Dictionary = save["stageBags"]["s"]
 	_check("stage bag is flat", stage.has("alarm") and not stage.has("values"), str(stage))
-	_check("stage value is the scalar itself", typeof(stage["alarm"]) == TYPE_BOOL, str(stage))
-
-	# and so is the flow's scene bag
-	var scene: Dictionary = save["flows"]["main"]["scene_bags"]["s"]
+	var fsnap: Dictionary = save["flows"]["main"]
+	_check("flow scopes are two-level", fsnap["scopes"].has("patter"), str(fsnap["scopes"]))
+	_check("the cursor is nested", fsnap.has("cursor") and fsnap["cursor"].has("pendingChoice") and fsnap["cursor"].has("stack"), str(fsnap.keys()))
+	_check("cursor fields are not flat on the flow", not fsnap.has("flow_ended") and not fsnap.has("flowEnded"), str(fsnap.keys()))
+	var scene: Dictionary = fsnap["sceneBags"]["s"]
 	_check("scene bag is flat", scene.has("mood") and not scene.has("values"), str(scene))
 	_check("the write landed in it", scene["mood"] == "tense", str(scene))
+	_check("an ended flow has a null pending choice, not an empty list", fsnap["cursor"]["pendingChoice"] == null, str(fsnap["cursor"]))
 
 	# JSON is the transport: anything not a plain value would not survive it
 	var round_tripped = JSON.parse_string(JSON.stringify(save))
 	_check("the envelope survives JSON", round_tripped != null and
-		round_tripped["flows"]["main"]["scene_bags"]["s"]["mood"] == "tense", str(round_tripped))
+		round_tripped["flows"]["main"]["sceneBags"]["s"]["mood"] == "tense", str(round_tripped))
 
-	# 2. a save written by hand, in the format on disk today, still loads
+	# 2. a save written by hand in the family's shape - what the JS reference writes - loads
 	var engine2 = EngineT.new(bundle, {})
-	var hand := {
+	var family := {
 		"version": 2,
-		"shared": {},
+		"shared": {"patter": {"gold": 7}},
+		"sharedVisits": {"s": 1, "b": 1, "sn": 1},
+		"sharedSelectors": {},
+		"stageBags": {"s": {"alarm": true}},
+		"flows": {"main": {
+			"scopes": {"patter": {}},
+			"sceneBags": {"s": {"mood": "furious"}},
+			"rngState": 1,
+			"visits": {"s": 1, "b": 1, "sn": 1},
+			"cursor": {
+				"flowEnded": false,
+				"currentSceneId": "s",
+				"stack": [{"sceneId": "s", "containerId": "b", "index": 0, "nextId": "sn"}],
+				"activeSnippetId": null,
+				"beatIndex": 0,
+				"pendingChoice": null,
+				"pendingPromptOwnerId": null,
+				"selectors": {},
+			},
+		}},
+	}
+	engine2.load_game(family)
+	var f2 = engine2.get_flow("main")
+	_check("a family-shape scene value loads", f2.get_property("@scene.mood") == "furious", str(f2.get_property("@scene.mood")))
+	_check("a family-shape stage value loads", f2.get_property("@scene.alarm") == true, str(f2.get_property("@scene.alarm")))
+	_check("a family-shape shared global loads", f2.get_property("@gold") == 7, str(f2.get_property("@gold")))
+	_check("the stack came back", f2.current_scene() == "s", str(f2.current_scene()))
+
+	# 3. a save written by hand in the PRE-0.11.0 shape (snake_case, flat cursor) still loads
+	var engine3 = EngineT.new(bundle, {})
+	var legacy := {
+		"version": 2,
+		"shared": {"gold": 3},
 		"shared_visits": {},
 		"shared_selectors": {},
 		"stage_bags": {"s": {"alarm": true}},
 		"flows": {"main": {
 			"scopes": {},
-			"scene_bags": {"s": {"mood": "furious"}},
+			"scene_bags": {"s": {"mood": "wary"}},
 			"rng_state": 1.0,
 			"visits": {},
 			"flow_ended": false,
@@ -87,12 +122,14 @@ func _initialize() -> void:
 			"selectors": {},
 		}},
 	}
-	engine2.load_game(hand)
-	var f2 = engine2.get_flow("main")
-	_check("a hand-written scene value loads", f2.get_property("@scene.mood") == "furious",
-		str(f2.get_property("@scene.mood")))
-	_check("a hand-written stage value loads", f2.get_property("@scene.alarm") == true,
-		str(f2.get_property("@scene.alarm")))
+	engine3.load_game(legacy)
+	var f3 = engine3.get_flow("main")
+	_check("a pre-0.11.0 scene value still loads", f3.get_property("@scene.mood") == "wary", str(f3.get_property("@scene.mood")))
+	_check("a pre-0.11.0 stage value still loads", f3.get_property("@scene.alarm") == true, str(f3.get_property("@scene.alarm")))
+	_check("a pre-0.11.0 bare shared map still loads", f3.get_property("@gold") == 3, str(f3.get_property("@gold")))
+	# and it is written back in the family's shape, so the file is upgraded on the next save
+	var resaved: Dictionary = engine3.save_game()
+	_check("a legacy save is written back in the family's shape", resaved.has("stageBags") and resaved["flows"]["main"].has("cursor"), str(resaved.keys()))
 
 	print("test_save_shape: " + ("ALL PASS" if _fails == 0 else str(_fails) + " FAILED"))
 	quit(1 if _fails > 0 else 0)

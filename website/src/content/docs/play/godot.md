@@ -102,10 +102,12 @@ link.observe("main", flow.current_scene(), step.get("id", ""), step["type"])
 
 ## Save and load
 
-The engine serialises the whole run: every flow's position, the shared `@patter` / `@scene`
-state, visit counts, and the seeded random generator: to a JSON `.patterstate` blob, so a save
-round-trips through its own save format (semantically equivalent to the other engines, not
-byte-identical across them).
+`PatterSave.serialize_state(engine)` and `deserialize_state(engine, json)` round-trip the whole
+run: every flow's position, the shared `@patter` / `@scene` state, visit counts, and the seeded random
+generator, as a tagged JSON envelope. It is the **same `patter/save@0` format every Patterplay runtime
+uses**, so a save written by a web build or by Patterpad loads here, and a save written here loads in
+Unity or Unreal. Saves written by this addon before 0.11.0 (its old snake_case shape) still load, and
+are written back in the shared shape on the next save.
 → [Save/load & Game Data](/play/integration/)
 
 ## Exporting your game

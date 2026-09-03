@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ScalarValue, AstNode } from "@wildwinter/expr";
-import type { Bundle, ProjectFile, Scene, LocaleFile, GameData, GameDataNodeKind } from "@patterkit/model";
+import type { Bundle, ProjectFile, Scene, LocaleFile, GameData, GameDataNodeKind, SaveEnvelope } from "@patterkit/model";
 
 export type ScopeBag = Record<string, ScalarValue>;
 
@@ -147,6 +147,27 @@ export interface GameDataCase {
   expected: GameData;
 }
 
+/**
+ * A save written by the JS REFERENCE, carried verbatim, which every runtime must load through its own
+ * save boundary (PatterSave / deserializeState) and then continue the script. This is the one place in
+ * the corpus where the writer and the reader are different runtimes - which no self round-trip can
+ * test, and is exactly how three ports came to hold three save shapes while every `saveLoad` op passed
+ * (from-storylets/save-shape-across-engines, 2026-09-03). `keyPaths` is what the port's OWN
+ * re-serialisation of the loaded state must reproduce: semantic parity is checked by the script, shape
+ * parity by the paths, byte parity is not required.
+ */
+export interface SaveCase {
+  name: string;
+  bundle: Bundle;
+  seed?: number;
+  /** `{ schema: "patter/save@0", save }` exactly as `@patterkit/play-helpers` serializeState writes it. */
+  envelope: SaveEnvelope;
+  /** Every key path in `envelope`, sorted (`save/flows/main/cursor/stack[0]/sceneId`); containers included. */
+  keyPaths: string[];
+  /** Continues from the loaded state; starts with `useFlow`, since nothing opened a flow in this engine. */
+  script: ScriptOp[];
+}
+
 export interface Corpus {
   version: number;
   expressions: ExpressionCase[];
@@ -154,6 +175,7 @@ export interface Corpus {
   runtime: RuntimeCase[];
   scripted: ScriptedCase[];
   gameData: GameDataCase[];
+  saves: SaveCase[];
 }
 
 // --- Authoring fixtures (source form, compiled into the corpus) -------------
@@ -215,10 +237,23 @@ export interface ScriptedFixture {
   script: ScriptOp[];
 }
 
+export interface SaveFixture {
+  name: string;
+  project: ProjectFile;
+  scenes: Scene[];
+  locales?: LocaleFile[];
+  seed?: number;
+  /** Played by the reference engine at corpus-build time; the envelope is what it saves afterwards. */
+  setup: ScriptOp[];
+  /** What every runtime must reproduce having loaded that envelope. */
+  script: ScriptOp[];
+}
+
 export interface Fixtures {
   expressions: ExpressionFixture[];
   specificity: SpecificityFixture[];
   runtime: RuntimeFixture[];
   scripted: ScriptedFixture[];
   gameData: GameDataFixture[];
+  saves: SaveFixture[];
 }

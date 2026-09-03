@@ -7,6 +7,17 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Saves cross engines.** `Patter/Save.h` now writes and reads the family's `patter/save@0` shape - the
+  JS reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad
+  loads here, and a save written here loads in Unity or Godot. Until now this plugin kept the execution
+  position flat and a pending choice as `pendingGroupId` + `pendingOptions`, so a JS save loaded here
+  with its flow intact and its choice silently gone: `GetChoices()` came back empty and the conversation
+  could not continue. **A save written by this plugin before 0.11.0 still loads** and is written back in
+  the shared shape. The conformance corpus now carries a save the JS reference wrote, which this plugin
+  must load, write back with the same key paths, and continue (from-storylets/save-shape-across-engines).
+
 ## [0.10.0] - 2026-09-02
 
 ### Added

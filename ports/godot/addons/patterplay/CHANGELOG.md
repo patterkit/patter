@@ -6,6 +6,17 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Saves cross engines.** The addon now writes and reads the family's `patter/save@0` shape - the JS
+  reference's, documented in `@patterkit/model` - so a save written by a web build or by Patterpad loads
+  here, and a save written here loads in Unity or Unreal. Until now it wrote snake_case keys
+  (`shared_visits`, `stage_bags`) with the cursor fields flat, which loaded nowhere else, and a JS save
+  died here on its first key. **A save written by this addon before 0.11.0 still loads** and is written
+  back in the shared shape. `test_save_shape.gd` pins the shape from both sides, and the conformance
+  corpus now carries a save the JS reference wrote, which this addon must load, write back with the same
+  key paths, and continue (from-storylets/save-shape-across-engines).
+
 ## [0.10.0] - 2026-09-02
 
 ### Added
