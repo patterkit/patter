@@ -33,6 +33,18 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **The `patter/save@0` shape is the family's contract, and its types live in `@patterkit/model`.**
+  `SaveEnvelope`, `SaveGame`, `FlowSnapshot`, `FlowCursor` and the rest are exported from the model
+  with `SAVE_SCHEMA`, and re-exported here so existing imports keep working. Nothing this runtime
+  writes has changed: its output was always this shape. The three native ports now write and read
+  it too, so a save crosses engines, and the conformance corpus carries a save this runtime wrote
+  that every runtime must load, write back with the same key paths, and continue.
+- **A host-scope declaration's `writable: false` is pinned as the story's promise**, refused whether
+  the scope is bound by the game or self-backed. This runtime always did so; the test now says it
+  in one place, and the three native ports match it from this version.
+
 ## [0.10.0] - 2026-09-02
 
 ### Added
