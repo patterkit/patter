@@ -90,8 +90,8 @@ describe("hint content matches the state", () => {
   it("a free-text start offers promotion to dialogue", () => {
     expect(keys(caret("P1", "say", 0))).toContain("Tab");
   });
-  it("a game-event atom offers its delete affordance", () => {
-    expect(keys(onAtom("gameEvent"))).toEqual(["×"]);
+  it("a game-event atom says a keystroke puts a line above it, Enter one below, and offers its delete affordance", () => {
+    expect(keys(onAtom("gameEvent"))).toEqual(["type", "Enter", "×"]);
   });
 });
 

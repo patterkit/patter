@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A snippet that opens with a game event can take a line above it.** An option body of "game event
+  and a jump" had no way in: typing with the game event (or the whole bubble) selected fell through
+  to the editor's default, which replaced the selection with the letter, so the game event, or the
+  bubble, vanished. Now a keystroke over a selected game event inserts a line above it and carries on
+  into that line (the cast list for a dialogue line, the text for prose), a keystroke over a selected
+  bubble seeds its first line the same way, Enter on a selected game event adds a line below it, and
+  a bubble that opens with a game event shows a slim "+" strip on its top edge for the mouse. A
+  keystroke over any other selected node (a choice, an option) no longer deletes it.
+
 ## [0.16.1] - 2026-09-03
 
 ### Fixed

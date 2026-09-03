@@ -33,8 +33,9 @@ export function multiSelectHints(state: EditorState): Hint[] | null {
 export function hintsFor(s: ZoneState): Hint[] {
   if (!s.beat) return [];
 
-  // the game-event atom (no zone) - removed via the affordance, not a key
-  if (!s.zone) return [{ key: "×", label: "delete game event" }];
+  // the game-event atom (no zone): typing puts a line above it, Enter one below; removed via the
+  // affordance, not a key
+  if (!s.zone) return [{ key: "type", label: "line above" }, { key: "Enter", label: "line below" }, { key: "×", label: "delete game event" }];
 
   const hints = zoneHints(s);
   // At the LEFT edge of a group's first bubble, Backspace is a no-op (it never

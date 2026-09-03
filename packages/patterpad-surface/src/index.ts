@@ -19,7 +19,7 @@ export type { ZoneState, ZoneCtx, BeatCtx, NodeCtx, ZoneRole, BeatKind } from ".
 export { arrowLeft, arrowRight, navKeymap } from "./navigation.js";
 export { acceptCue, cueSuggestions } from "./cuezone.js";
 export { openDirection, closeDirection, removeDirection } from "./direction.js";
-export { enter, endBubble, prependLine } from "./lines.js";
+export { enter, endBubble, prependLine, insertLineBefore } from "./lines.js";
 export { backspace, deleteSelectionGuarded } from "./delete.js";
 export { toggleLineType, flipToFreeText, promoteToDialogue } from "./linetype.js";
 export { canInsertSpecial, insertJump, setSnippetJump, insertGameEvent, deleteAtomAt } from "./special.js";

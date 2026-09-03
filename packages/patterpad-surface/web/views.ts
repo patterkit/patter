@@ -11,6 +11,7 @@ import type { Node as PMNode } from "prosemirror-model";
 import { colourFor } from "../src/colour.js";
 import { deleteAtomAt } from "../src/special.js";
 import { setBlockName, insertBlock, insertOptionAfter, seedSnippet, seedBeatInSnippet } from "../src/groups.js";
+import { insertLineBefore } from "../src/lines.js";
 import { groupLabel } from "../src/grouplabel.js";
 import { createActionMenu } from "./actionmenu.js";
 import { makeDragHandle } from "./dnd.js";
@@ -333,13 +334,26 @@ export const snippetView: NodeViewConstructor = (node, view, getPos) => {
   // An un-entered (beat-less) bubble - a branch's else leaf, or a jump-only bubble - shows a
   // generic click-to-add ghost; the click injects a type-following line above any jump (§9).
   const ghost = ghostSnippet(view, getPos, seedBeatInSnippet, "add a line"); ghost.classList.add("bubble-ghost");
+  // A bubble that OPENS with a game event (an option body of "game event + jump", say) has no text to
+  // click into above the atom, so a slim hover-revealed "+" strip sits on its top edge and injects a
+  // type-following line there (insertLineBefore) - the mouse's way to what typing over the selected
+  // atom does (2026-09-03). Shown only while the first beat is an atom (CSS, .atom-first).
+  const above = document.createElement("div"); above.className = "bubble-above"; above.contentEditable = "false";
+  above.dataset.tip = "add a line above"; above.setAttribute("aria-label", "add a line above");
+  const abovePlus = document.createElement("span"); abovePlus.className = "ghost-plus"; abovePlus.textContent = "+"; above.appendChild(abovePlus);
+  above.addEventListener("mousedown", (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const pos = getPos(); if (pos == null) return;
+    const tr = insertLineBefore(view.state, pos + 1); // the first beat's position
+    if (tr) { view.dispatch(tr); view.focus(); }
+  });
   const addAfter = addAfterButton(view, getPos); addAfter.classList.add("bubble-after"); // "+" in the gap below
-  dom.append(drag, dots, cond, contentDOM, ghost, jump, addAfter);
+  dom.append(drag, dots, cond, above, contentDOM, ghost, jump, addAfter);
   // Clicking anywhere on the bubble that ISN'T an editable beat, the ghost, the drag grip, or a button
   // selects the whole snippet - its border / padding, the gaps around the beats, the read-only
   // condition / jump chrome. A generous hit target (the thin gutter alone was too hard to land).
   dom.addEventListener("mousedown", (e) => {
-    if ((e.target as Element).closest(".beat, .ghost-snippet, .drag-handle, button")) return; // those handle their own clicks
+    if ((e.target as Element).closest(".beat, .ghost-snippet, .bubble-above, .drag-handle, button")) return; // those handle their own clicks
     selectNodeOnClick(e, view, getPos);
   });
   wireContextMenu(dom, view, getPos);
@@ -367,7 +381,10 @@ export const snippetView: NodeViewConstructor = (node, view, getPos) => {
   };
   // Double-click the jump chip -> follow the divert to its target (the host switches scene if needed).
   jump.addEventListener("dblclick", (e) => { if (!jumpTo || jumpTo === "END") return; e.preventDefault(); e.stopPropagation(); jumpNav?.(jumpTo); });
-  const paintEmpty = (n: typeof node): void => { dom.classList.toggle("is-empty", n.childCount === 0); }; // beat-less -> ghost
+  const paintEmpty = (n: typeof node): void => {
+    dom.classList.toggle("is-empty", n.childCount === 0);                            // beat-less -> ghost
+    dom.classList.toggle("atom-first", n.firstChild?.type.name === "gameEvent");     // opens with an atom -> "+" strip above
+  };
   paintCondition(node); paintJump(node); paintEmpty(node);
   // Re-resolve the humanized labels on a rename / target-list change (refreshJumpLabels): force BOTH the
   // jump chip AND the condition tag past their unchanged guards. The condition tag humanizes `visits(id)`

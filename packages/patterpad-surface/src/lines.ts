@@ -15,12 +15,12 @@
 // no raw jump bookkeeping needed. New snippets get a fresh id.
 // ---------------------------------------------------------------------------
 
-import { TextSelection, type Command, type EditorState } from "prosemirror-state";
+import { TextSelection, NodeSelection, type Command, type EditorState } from "prosemirror-state";
 import type { Node as PMNode } from "prosemirror-model";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 import { context, type ZoneState } from "./context.js";
-import { cueText, zoneContentStart, zoneContentEnd, findBeatById } from "./zoneutil.js";
+import { cueText, zoneContentStart, zoneContentEnd, findBeatById, emptyBeatNode, prevBeatKind } from "./zoneutil.js";
 
 /** A fresh beat mirroring the current one, plus the caret offset to its say content. */
 function mirroredBeat(c: ZoneState): { node: PMNode; sayOffset: number } {
@@ -73,6 +73,17 @@ export function replaceSayText(state: EditorState, beatId: string, text: string)
 export const enter: Command = (state, dispatch) => {
   const c = context(state);
   if (c.inPrompt) return true; // a choice prompt is a single line: swallow Enter (no split, no new beat)
+  // A SELECTED game-event atom: Enter adds a type-following line after it, as Enter at the end of a
+  // line would - the only keyboard way to put a line below an atom that ends a bubble (2026-09-03).
+  if (c.beat?.kind === "gameEvent" && state.selection instanceof NodeSelection && c.snippet) {
+    if (!dispatch) return true;
+    const at = c.beat.pos + c.beat.node.nodeSize;
+    const node = emptyBeatNode(prevBeatKind(state.doc, at));
+    const tr = state.tr.insert(at, node);
+    landOnBeat(tr, node.attrs.id as string);
+    dispatch(tr.scrollIntoView());
+    return true;
+  }
   if (!c.beat || (c.beat.kind !== "line" && c.beat.kind !== "prose") || !c.snippet) return false;
   if (!dispatch) return true;
 
@@ -95,6 +106,23 @@ export const enter: Command = (state, dispatch) => {
   dispatch(tr.scrollIntoView());
   return true;
 };
+
+/**
+ * Insert a fresh, type-following line directly BEFORE the beat at `beatPos` (a game event, in
+ * practice: a text beat can be typed above by other means). The one way to put a line above an
+ * atom that opens a bubble - an option body of "game event + jump", say - which until now had no way
+ * in: typing with the atom selected fell through to ProseMirror's default and replaced it with the
+ * text (2026-09-03). Lands like any new line: a dialogue line opens the cast popup, so the keystroke
+ * that asked for it can carry straight on into the new line.
+ */
+export function insertLineBefore(state: EditorState, beatPos: number): import("prosemirror-state").Transaction | null {
+  const beat = state.doc.nodeAt(beatPos);
+  if (!beat || beat.type.spec.group !== "beat") return null;
+  const node = emptyBeatNode(prevBeatKind(state.doc, beatPos));
+  const tr = state.tr.insert(beatPos, node);
+  landOnBeat(tr, node.attrs.id as string);
+  return tr.scrollIntoView();
+}
 
 /**
  * Insert a fresh dialogue line at the TOP of a snippet (the hover "+" affordance).

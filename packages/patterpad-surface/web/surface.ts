@@ -18,13 +18,13 @@ import type { PropertyDecl } from "@patterkit/model";
 import { openScene, saveScene } from "../src/load.js";
 import { navKeymap } from "../src/navigation.js";
 import { openDirection, closeDirection } from "../src/direction.js";
-import { enter, endBubble } from "../src/lines.js";
+import { enter, endBubble, insertLineBefore } from "../src/lines.js";
 import { backspace, deleteSelectionGuarded } from "../src/delete.js";
 import { toggleLineType, flipToFreeText, promoteToDialogue } from "../src/linetype.js";
 import { context } from "../src/context.js";
 import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js";
 import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
-import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining } from "../src/groups.js";
+import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
 import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
 import { setSnippetJump, insertJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, type JumpData } from "./targetpicker.js";
@@ -290,6 +290,11 @@ function caretMidY(v: EditorView): number | null {
  * The speaker is a TOKEN, not editable text: a caret must never rest INSIDE a populated cue. If one
  * lands there (a click, an arrow step), select the whole name - the popup then opens to replace it.
  */
+/** A key that would insert a character: one printable key, no command modifier. */
+function isPrintableKey(e: KeyboardEvent): boolean {
+  return e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+}
+
 function normalizeCueSelection(state: EditorState): EditorState {
   const c = context(state);
   if (state.selection.empty && c.zone?.role === "cue" && c.zone.textLen > 0) {
@@ -583,6 +588,21 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       lastInputWasPointer = false;
       lastKeyWasVertical = event.key === "ArrowUp" || event.key === "ArrowDown";
       if (slash.handleKeyDown(v, event)) return true;
+      // A printable key with a NODE selected. ProseMirror's default replaces the selection with the
+      // text, and text cannot live where an atom or a bubble does, so the selected thing was deleted
+      // and the letter landed wherever fitted - a snippet of "game event + jump" lost its atom, a
+      // selected bubble lost everything (2026-09-03). Instead: a selected game event gets a
+      // type-following line ABOVE it, a selected bubble gets its first line seeded, and the keystroke
+      // carries on into that line (the cast popup for a dialogue line, the say for prose). Any other
+      // selected node (a group) swallows the key rather than vanish.
+      if (isEditable && isPrintableKey(event) && v.state.selection instanceof NodeSelection) {
+        const { node, from } = v.state.selection;
+        const tr = node.type.name === "gameEvent" ? insertLineBefore(v.state, from)
+          : node.type.name === "snippet" ? seedBeatInSnippet(v.state, from) : null;
+        if (!tr) return true;
+        v.dispatch(tr);
+        return popup.handleKeyDown(v, event); // a fresh cue takes the letter as its filter; a say lets it type
+      }
       if (popup.handleKeyDown(v, event)) return true;
       if (event.key === " ") { const tr = flipToFreeText(v.state); if (tr) { v.dispatch(tr); popup.close(); return true; } }
       if (event.key === "Tab") {

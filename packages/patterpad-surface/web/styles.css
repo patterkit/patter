@@ -209,6 +209,19 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   background: color-mix(in oklab, var(--accent) 12%, transparent);
 }
 .ghost-plus { font: 300 1.4rem/1 var(--font-ui); }
+/* "+ line above": a bubble that OPENS with a game-event atom has nothing to click into above it, so
+   a slim strip on its top edge, hover-revealed like the "+" below, injects a line there. Hidden
+   unless the bubble is .atom-first. */
+.bubble-above { display: none; }
+.bubble.atom-first > .bubble-above {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 1.15rem; margin: 0 0 0.25rem; cursor: pointer; user-select: none; opacity: 0;
+  border: 1px dashed color-mix(in oklab, var(--muted) 50%, transparent); border-radius: var(--radius-sm);
+  color: var(--muted); transition: opacity var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+.bubble.atom-first > .bubble-above .ghost-plus { font-size: 1rem; }
+.bubble.atom-first:hover > .bubble-above { opacity: 1; }
+.bubble.atom-first > .bubble-above:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 5%, transparent); }
 /* An un-entered, beat-less bubble breathes instead of reading as a heavy empty card:
    - Truly empty (a branch's else leaf): a quiet DASHED placeholder, not a solid surface.
    - Jump-only: stays a soft bubble (the jump IS its content), just compact; the click-to-add
