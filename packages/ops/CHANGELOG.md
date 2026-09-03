@@ -1,5 +1,12 @@
 # @patterkit/ops
 
+## 0.7.3
+
+### Patch Changes
+
+- 27d92dc: The not-in-project check decides from paths, not from what is in memory. It compared the disk walk with the loaded file lists, so a shard that appeared under its folder after the project was opened was reported as outside the project while sitting exactly where the loader reads from. Patterpad hit this on a scene's first save, whose edit trail creates the authoring shard. The folder is the rule now, as it is for the loader.
+- 14a0ccc: A Patter file outside the project's folders is reported by name: the message gives its path relative to the project and the folder this project reads that kind from (`Move it under scenes/, or delete it.`), and a second project file names the one that is read. The CLI prints that message as is.
+
 ## 0.7.2
 
 ### Patch Changes
