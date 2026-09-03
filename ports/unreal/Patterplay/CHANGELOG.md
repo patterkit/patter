@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-03
+
 ### Fixed
 
 - **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The core let a

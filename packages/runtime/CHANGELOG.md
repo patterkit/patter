@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-03
+
 ### Changed
 
 - **The `patter/save@0` shape is the family's contract, and its types live in `@patterkit/model`.**
