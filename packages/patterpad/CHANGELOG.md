@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-09-03
+
 ### Fixed
 
 - **A snippet that opens with a game event can take a line above it.** An option body of "game event
