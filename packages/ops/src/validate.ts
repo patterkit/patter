@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, statSync } from "node:fs";
+import { basename, relative } from "node:path";
 import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
@@ -92,14 +93,24 @@ export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
     ...loaded.localeFiles,
     ...loaded.authoringFiles,
   ]);
-  const kind: Record<string, string> = {
-    ".patterflow": "scene", ".patterloc": "locale", ".patterx": "authoring", ".patterproj": "project",
+  // The message names the file, relative to the project, and the folder this project reads that kind
+  // from: "this file" with no file was the one thing a reader could not act on (2026-09-03).
+  const layout = { flow: "scenes/", strings: "loc/", authoring: "authoring/", ...loaded.project.layout };
+  const kind: Record<string, { what: string; home: string | null }> = {
+    ".patterflow": { what: "scene", home: layout.flow },
+    ".patterloc": { what: "strings", home: layout.strings },
+    ".patterx": { what: "authoring", home: layout.authoring },
+    ".patterproj": { what: "project", home: null },
   };
   const out: HygieneIssue[] = [];
-  for (const [ext, what] of Object.entries(kind)) {
+  for (const [ext, { what, home }] of Object.entries(kind)) {
     for (const file of walkFiles(loaded.root, ext)) {
       if (collected.has(file)) continue;
-      out.push({ file, message: `a ${what} shard outside the project's layout - nothing loads it, so its content is not in the project (move it under the configured folder, or delete it)` });
+      const rel = relative(loaded.root, file);
+      const message = home
+        ? `${rel} is a ${what} file outside the project's folders: nothing loads it, so none of it is in the project. Move it under ${home}, or delete it.`
+        : `${rel} is a second project file: only ${basename(loaded.projectFile)} is read. Delete it, or move it out of the project.`;
+      out.push({ file, message });
     }
   }
   return out;

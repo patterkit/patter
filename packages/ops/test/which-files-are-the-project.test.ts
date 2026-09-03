@@ -12,10 +12,11 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runInit, applyWrites, loadProject, runValidate } from "../src/index.js";
+import { parseSource } from "@patterkit/core";
 
 function project(): string {
   const dir = join(mkdtempSync(join(tmpdir(), "patter-files-")), "game");
@@ -36,8 +37,37 @@ describe("a shard outside the layout is reported, not silently ignored", () => {
     const r = runValidate(loadProject(dir));
     expect(r.orphans).toHaveLength(1);
     expect(r.orphans[0]!.file).toMatch(/stray\.patterflow$/);
-    expect(r.orphans[0]!.message).toMatch(/outside the project's layout/);
+    // The message is the whole story on its own: which file, relative to the project, and where this
+    // project would read it from. A bar that said "this file" named nothing a reader could act on.
+    expect(r.orphans[0]!.message).toBe(
+      "stray.patterflow is a scene file outside the project's folders: nothing loads it, so none of it is in the project. Move it under scenes/, or delete it.");
     expect(r.ok).toBe(false); // it must fail a check, or it is not reported at all
+  });
+
+  it("names the folder THIS project reads from, not the default", () => {
+    const dir = project();
+    const pf = join(dir, "which_files.patterproj");
+    const proj = parseSource(readFileSync(pf, "utf8")) as Record<string, unknown>;
+    writeFileSync(pf, JSON.stringify({ ...proj, layout: { flow: "story/" } }, null, 2));
+    mkdirSync(join(dir, "story"), { recursive: true });
+    writeFileSync(join(dir, "story", "home.patterflow"), flow("scn_home", "Home"));
+    writeFileSync(join(dir, "scenes", "stray.patterflow"), flow("scn_stray", "Stray")); // the old folder
+    const r = runValidate(loadProject(dir));
+    // Both files under the old folder are named, the seeded start scene included.
+    expect(r.orphans.map((o) => o.message)).toEqual([
+      "scenes/start.patterflow is a scene file outside the project's folders: nothing loads it, so none of it is in the project. Move it under story/, or delete it.",
+      "scenes/stray.patterflow is a scene file outside the project's folders: nothing loads it, so none of it is in the project. Move it under story/, or delete it.",
+    ]);
+  });
+
+  it("names the real project file when a second one is lying about", () => {
+    const dir = project();
+    mkdirSync(join(dir, "old"));
+    writeFileSync(join(dir, "old", "backup.patterproj"), readFileSync(join(dir, "which_files.patterproj"), "utf8"));
+    const r = runValidate(loadProject(dir));
+    expect(r.orphans.map((o) => o.message)).toEqual([
+      "old/backup.patterproj is a second project file: only which_files.patterproj is read. Delete it, or move it out of the project.",
+    ]);
   });
 
   it("says nothing about a clean project", () => {

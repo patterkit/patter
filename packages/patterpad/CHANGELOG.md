@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A problem about a file now names the file.** The problems bar said "This file sits outside the
+  project's folders" about a file it never named, and "Go to issue" has nowhere to go for a file with
+  no node in the story. Not-in-project, merge-conflict, stale-build and tidy-up problems now give the
+  path relative to the project, and the not-in-project one says which folder this project would read
+  it from.
+
 ## [0.16.0] - 2026-09-01
 
 ### Changed

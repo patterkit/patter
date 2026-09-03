@@ -271,7 +271,7 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
       for (const i of hygiene) console.error(`  [hygiene] ${i.file}: ${i.message}`);
       for (const i of staleBundles) console.error(`  [stale-bundle] ${i.file}: ${i.message}`);
       for (const i of unresolvedMerges) console.error(`  [unresolved-merge] ${i.file}: ${i.message}`);
-      for (const i of orphans) console.error(`  [not-in-project] ${i.file}: ${i.message}`);
+      for (const i of orphans) console.error(`  [not-in-project] ${i.message}`); // the message names the file
       // Advisory, and outside `ok` and the count: a gate whose writer is not authored yet is the normal
       // state mid-work, and must never fail a build.
       for (const i of reachability) console.error(`  [unreachable] ${i.nodeId}: ${i.message}  (${i.src})`);

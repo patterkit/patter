@@ -919,6 +919,15 @@ function fixLabel(fix: NonNullable<Problem["fix"]>): string {
   return "Fix";
 }
 
+/** A path as the project sees it: relative to the open project's folder, or as given when it lies
+ *  elsewhere (or nothing is open). Undefined stays undefined, so callers can fall back to a phrase. */
+function relToProject(path: string): string;
+function relToProject(path: string | undefined): string | undefined;
+function relToProject(path: string | undefined): string | undefined {
+  if (!path) return path;
+  return project && path.startsWith(project.root) ? path.slice(project.root.length).replace(/^[/\\]/, "") : path;
+}
+
 /** Friendly category names for the problems bar (the CLI keeps the precise technical codes). */
 const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
   structure: "Structure", condition: "Condition", interpolation: "Text",
@@ -931,9 +940,13 @@ const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
  *  technical tells softened (spec citations dropped, `@prop` shown as “prop”). The CLI is unchanged. */
 function humanizeProblem(p: Problem): { tag: string; message: string } {
   const tag = PROBLEM_CATEGORY[p.category] ?? "Problem";
-  if (p.category === "stale-bundle") return { tag, message: "Your playable build is out of date. It refreshes the next time you export." };
-  if (p.category === "merge") return { tag, message: "This file still has an unresolved merge conflict in it." };
-  if (p.category === "not-in-project") return { tag, message: "This file sits outside the project's folders, so nothing opens it and none of it is in your story. Move it in, or delete it." };
+  // A problem about a FILE names it, relative to the project: "this file" with no file was the one
+  // thing a reader could not act on, since these have no node for "Go to issue" to reveal (2026-09-03).
+  const where = relToProject(p.file);
+  if (p.category === "stale-bundle") return { tag, message: `Your playable build${where ? ` (${where})` : ""} is out of date. It refreshes the next time you export.` };
+  if (p.category === "merge") return { tag, message: `${where ?? "This file"} still has an unresolved merge conflict in it.` };
+  if (p.category === "not-in-project") return { tag, message: p.message }; // already writer-facing, and names the file
+  if (p.category === "hygiene") return { tag, message: where ? `${where}: ${p.message}` : p.message };
   if (p.category === "spelling") return { tag, message: p.message }; // already writer-facing (#177)
   const speaker = /'([^']+)' is not in the project cast/.exec(p.message);
   switch (p.detail) {
@@ -2289,7 +2302,7 @@ async function buildBundle(): Promise<void> {
   if (res.ok) {
     // Show where it landed RELATIVE to the project root when it's inside (the common dist/ case), so the
     // toast reads cleanly; fall back to the absolute path for an output written elsewhere.
-    const where = res.path && res.path.startsWith(project.root) ? res.path.slice(project.root.length).replace(/^[/\\]/, "") : res.path;
+    const where = relToProject(res.path);
     toast(`Bundle published\n${where}`);
   } else toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
@@ -2299,7 +2312,7 @@ async function buildAudioManifest(): Promise<void> {
   if (!project) return;
   const res = await window.patter.buildAudioManifest();
   if (res.ok) {
-    const where = res.path && res.path.startsWith(project.root) ? res.path.slice(project.root.length).replace(/^[/\\]/, "") : res.path;
+    const where = relToProject(res.path);
     toast(`Audio manifest updated\n${where}`);
   } else toast(res.error ? `Audio manifest failed: ${res.error}` : "Audio manifest failed", "error");
 }
@@ -2310,7 +2323,7 @@ async function exportScript(): Promise<void> {
   if (!project) return;
   const res = await window.patter.exportScript();
   if (res.ok) {
-    const where = res.path && res.path.startsWith(project.root) ? res.path.slice(project.root.length).replace(/^[/\\]/, "") : res.path;
+    const where = relToProject(res.path);
     toast(`Script published\n${where}`);
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
@@ -2324,7 +2337,7 @@ async function exportPatterpack(): Promise<void> {
   await persistComments();            // pending comments
   const res = await window.patter.exportPatterpack();
   if (res.ok) {
-    const where = res.path && res.path.startsWith(project.root) ? res.path.slice(project.root.length).replace(/^[/\\]/, "") : res.path;
+    const where = relToProject(res.path);
     toast(`Patterpack exported\n${where}`);
   } else if (!res.canceled) toast(res.error ? `Export failed: ${res.error}` : "Export failed", "error");
 }
@@ -2386,7 +2399,7 @@ async function exportPlayableHtml(): Promise<void> {
   if (!project) return;
   const res = await window.patter.exportPlayableHtml();
   if (res.ok) {
-    const where = res.path && res.path.startsWith(project.root) ? res.path.slice(project.root.length).replace(/^[/\\]/, "") : res.path;
+    const where = relToProject(res.path);
     toast(`Playable HTML published\n${where}`);
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
