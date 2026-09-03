@@ -1,6 +1,7 @@
 #include "PatterEngine.h"
 #include "PatterBundle.h"
 #include "PatterDebug.h"
+#include "PatterWorld.h"
 #include "Patter/Engine.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
 
@@ -179,7 +180,20 @@ bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
 
 // ----- UPatterEngine ----------------------------------------------------------
 
-UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle)
+namespace
+{
+	// The core takes its host scopes at construction, so every path that builds a core (Create, HotSwap)
+	// asks the same question: is a world bound? Rebuilt from the retained object rather than from a
+	// retained options struct, because the object is what the game holds and what GC must keep.
+	patter::EngineOptions OptionsFor(UPatterWorld* World)
+	{
+		patter::EngineOptions Opts;
+		if (World) Opts.hostScopes["world"] = World->MakeHostScope();
+		return Opts;
+	}
+}
+
+UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)
 {
 	if (!Bundle || !Bundle->Raw())
 	{
@@ -188,10 +202,13 @@ UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle)
 	}
 	UPatterEngine* E = NewObject<UPatterEngine>(GetTransientPackage());
 	E->BundleRef = Bundle;
-	try { E->Engine = MakePimpl<patter::Engine>(*Bundle->Raw()); }
+	E->WorldRef = World;
+	try { E->Engine = MakePimpl<patter::Engine>(*Bundle->Raw(), OptionsFor(World)); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
 	return E;
 }
+
+UPatterWorld* UPatterEngine::GetBoundWorld() const { return WorldRef; }
 
 UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
 {
@@ -333,7 +350,7 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 		const patter::SaveGame Snapshot = Engine->saveGame();
 		const std::string Locale = Engine->locale();
 		const bool bCaptions = Engine->closedCaptions();
-		Engine = MakePimpl<patter::Engine>(*NewBundle->Raw());
+		Engine = MakePimpl<patter::Engine>(*NewBundle->Raw(), OptionsFor(WorldRef)); // the world stays bound across the swap
 		Engine->loadGame(Snapshot);
 		Engine->setLocale(Locale);
 		Engine->setClosedCaptions(bCaptions);

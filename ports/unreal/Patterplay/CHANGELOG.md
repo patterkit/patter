@@ -7,6 +7,24 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The core let a
+  bound scope's `set` straight through, so the story's own promise held only for the self-backed bag;
+  now `'@world.x' is read-only` is thrown from either, as the JS runtime always has. Pinned in the
+  TestHost. Also pinned: `Patterplay.World` exercises the wrapper's `Create(Bundle, World)` path.
+
+### Added
+
+- **`UPatterWorld`: the game's `@world` container, bound at `UPatterEngine::Create(Bundle, World)`.** Typed
+  `Set*` / `Get*`, `Has`, `Names`, `SetReadOnly` for the game's own read-only policy, and an `OnChanged`
+  delegate that tells host writes from story writes; `GetBoundWorld()` says which you have. The binding
+  survives `HotSwap` / `ApplyLiveBundle`, a save never carries the container and a load never writes it.
+  Until now the wrapper took no host scopes at all and a game sharing `@world` with anything else had to
+  build `patter::Engine` by hand on a copied bundle, which is the code the wrapper exists to spare
+  people. Same shape as the Storylet Engine's `UStoryletWorld`, so a project running both reads one API
+  (from-storylets/unreal-wrapper-host-scopes). `Patterplay.World` is the automation case.
+
 ### Changed
 
 - **Saves cross engines.** `Patter/Save.h` now writes and reads the family's `patter/save@0` shape - the

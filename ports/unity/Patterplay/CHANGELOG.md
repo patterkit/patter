@@ -6,6 +6,17 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The package let a
+  bound `IHostScope`'s `Set` straight through, so the story's own promise held only for the self-backed
+  bag; now `'@world.x' is read-only` is thrown from either, as the JS runtime always has. Pinned in the
+  TestHost (from-storylets/unreal-wrapper-host-scopes).
+- **`Engine.GetProperty` / `SetProperty` resolve host-scope refs.** They knew only `@patter` and `@scene`, so
+  `engine.SetProperty("@world.x", …)` silently landed in the shared `@patter` bag as a stray and
+  `GetProperty` read back nothing. They now route through the bound or self-backed scope, as a Flow does
+  and as every other runtime's engine-level accessor does.
+
 ### Changed
 
 - **Saves cross engines.** `PatterSave` now writes and reads the family's `patter/save@0` shape - the JS

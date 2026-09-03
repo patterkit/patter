@@ -89,6 +89,30 @@ resolution via `PatterAudioResolver`; audio files are not bundled (playback is y
 call), so point its **Audio Root** at a Patter audio folder to hear it, or leave it empty to
 play silently.
 
+## Your game's state
+
+Hand the engine your `@world` values through **`EngineOptions.HostScopes`**: an `IHostScope` per
+token (`Get` / `Set`, keyed by property name) that the story reads before every condition and writes
+through on an effect. Bind the same object to anything else that shares those values:
+
+```csharp
+sealed class WorldScope : IHostScope
+{
+    public readonly Dictionary<string, PatterValue> Values = new() { ["time_of_day"] = PatterValue.Str("night") };
+    public PatterValue Get(string name) => Values.TryGetValue(name, out var v) ? v : null;   // null = unset
+    public void Set(string name, PatterValue value) => Values[name] = value;
+}
+
+var world = new WorldScope();
+var engine = Bundle.CreateEngine(new EngineOptions { HostScopes = new() { ["world"] = world } });
+```
+
+Leave `HostScopes` null and the engine **self-backs** `@world` from the declared defaults. A property
+declared `writable: false` in the project is the *story's* promise: the engine refuses the story's
+write with `'@world.x' is read-only`, bound or self-backed, and a per-name policy of your own is
+yours to refuse from `Set`. The scope is never in a Patter save: your game saves it once.
+→ [World Properties](/play/world-properties/)
+
 ## Send the story somewhere
 
 The game can also decide where the story goes. `RunFlow` plays an

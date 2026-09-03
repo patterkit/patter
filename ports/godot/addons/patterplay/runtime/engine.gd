@@ -118,6 +118,29 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 			"get": func(n): return bag.get(str(n).to_lower()),
 			"set": func(n, v): bag[str(n).to_lower()] = v,
 		}
+	# A declaration's "writable": false is the STORY's promise, and the engine refuses the story's
+	# write whether the scope is bound or self-backed - the JS reference has always done so, and this
+	# addon let a bound scope's set straight through until 2026-09-03
+	# (from-storylets/unreal-wrapper-host-scopes). A per-name read-only a GAME keeps on its own scope
+	# is a different thing, and the scope refuses that itself. push_error and no write, the bag's own
+	# convention (GDScript has no throw); same sentence as the reference.
+	for spec in bundle.get("scopeRegistry", {}).get("scopes", []):
+		var token := str(spec.get("token", ""))
+		if token == "" or not _host["host_scopes"].has(token):
+			continue
+		var scope_read_only: bool = spec.get("writable", true) == false
+		var read_only := {}
+		for d in spec.get("declarations", []):
+			if d.get("writable", true) == false and str(d.get("name", "")) != "":
+				read_only[str(d["name"]).to_lower()] = true
+		if not scope_read_only and read_only.is_empty():
+			continue
+		var inner: Callable = _host["host_scopes"][token]["set"]
+		_host["host_scopes"][token]["set"] = func(n, v):
+			if scope_read_only or read_only.has(str(n).to_lower()):
+				push_error("'@%s.%s' is read-only" % [token, n])
+				return
+			inner.call(n, v)
 	_host["host_tokens"] = _host["host_scopes"].keys()
 
 	if options.has("seed"):

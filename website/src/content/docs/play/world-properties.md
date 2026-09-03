@@ -67,6 +67,13 @@ already do.
 
 ## The native ports
 
-Wiring a live host resolver is a JavaScript-runtime feature today. The Unity, Unreal, and Godot
-runtimes resolve `@world` from its declared defaults (the self-backed path above); a live resolver in
-those engines is on the roadmap. See [Compatibility](/compatibility/).
+Every runtime takes a live host resolver, in its own idiom, and self-backs `@world` when you give it
+none:
+
+- **Unity**: `EngineOptions.HostScopes`, an `IHostScope` per token → [Unity](/play/unity/#your-games-state)
+- **Unreal**: a `UPatterWorld` bound at `UPatterEngine::Create(Bundle, World)` → [Unreal](/play/unreal/#your-games-state)
+- **Godot**: the `host_scopes` option, a `get` / `set` pair per token → [Godot](/play/godot/#your-games-state)
+
+The rules are the same everywhere: `@world` is never in a Patter save, a `writable: false`
+declaration is refused by the engine with the same sentence (`'@world.x' is read-only`), bound or
+self-backed, and a per-name policy your game keeps on its own container is the container's to refuse.

@@ -15,6 +15,7 @@
 
 class UPatterBundle;
 class UPatterEngine;
+class UPatterWorld;
 namespace patter { class Engine; class Flow; }
 
 UCLASS(BlueprintType)
@@ -90,8 +91,19 @@ class PATTERPLAYRUNTIME_API UPatterEngine : public UObject
 
 public:
 	// Construct a play-ready engine on a (parsed) bundle. Returns nullptr (and logs) on error.
+	//
+	// `World` is the GAME's @world container (UPatterWorld): bind one and the story reads and writes your
+	// values through it, and anything else bound to the same object - the Storylet Engine, your own
+	// systems - sees the same state. Leave it null and the engine self-backs @world from the declared
+	// defaults, which is right for a run that never leaves the engine. The binding survives HotSwap /
+	// ApplyLiveBundle and is never written by a load: @world is not in a Patter save, the host saves its
+	// container once. Same shape as UStoryletEngine::Create(Bundle, ..., World).
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	static UPatterEngine* Create(UPatterBundle* Bundle);
+	static UPatterEngine* Create(UPatterBundle* Bundle, UPatterWorld* World = nullptr);
+
+	// The @world container bound at Create, or null for a self-backed engine.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	UPatterWorld* GetBoundWorld() const;
 
 	// Open (and start) a named flow at a scene (its id or gameId; empty = the first scene).
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
@@ -222,6 +234,11 @@ public:
 private:
 	UPROPERTY()
 	TObjectPtr<UPatterBundle> BundleRef = nullptr;
+
+	// The game's @world container, when one was bound: held so GC keeps it and so a hot swap can re-bind
+	// the fresh core to the same object (the core copies its host scopes at construction).
+	UPROPERTY()
+	TObjectPtr<UPatterWorld> WorldRef = nullptr;
 
 	// Tier-1 refresh: the core points its string tables INTO this bundle, so it must outlive the
 	// swap (the structural bundle above still owns the nodes).

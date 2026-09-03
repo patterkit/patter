@@ -27,6 +27,42 @@ enum class EPatterPropertyType : uint8
 	Quality
 };
 
+UENUM(BlueprintType)
+enum class EPatterValueKind : uint8
+{
+	Boolean,
+	Number,
+	String,   // a string property, an enum value, or a quality's stage
+	Flags
+};
+
+/** A Patter value crossing the Blueprint boundary: what a UPatterWorld holds and reports. Shaped
+ *  like the Storylet Engine's FStoryletValue, so a project running both reads one shape. `Display`
+ *  is the stringified rendering ("true", a JS-stable number, the raw string, flags comma-joined). */
+USTRUCT(BlueprintType)
+struct FPatterValue
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	EPatterValueKind Kind = EPatterValueKind::Boolean;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bBool = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double Number = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString String;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FString> Flags;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Display;
+};
+
 /** One author Game Data value: name, value type, and the value as a display string. Carried by
  *  delivered steps (host events ride on Game Data) and by the structure-introspection beats. */
 USTRUCT(BlueprintType)

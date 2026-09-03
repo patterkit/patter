@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `writable: false` host declaration is refused by the engine, bound or self-backed.** The addon let a
+  bound scope's `set` Callable straight through, so the story's own promise held only for the self-backed
+  bag; now the write is refused with `push_error("'@world.x' is read-only")` and no write from either, as
+  the JS runtime always has. Pinned in `test_corpus.gd` (from-storylets/unreal-wrapper-host-scopes).
+
 ### Changed
 
 - **Saves cross engines.** The addon now writes and reads the family's `patter/save@0` shape - the JS

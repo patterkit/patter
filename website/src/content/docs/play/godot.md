@@ -50,6 +50,26 @@ buttons. The tour also shows per-line audio resolution via `PatterAudio`; audio 
 bundled (playback is your platform call), so point its **audio base** at a Patter audio folder
 to hear it, or leave it unset to play silently.
 
+## Your game's state
+
+Hand the engine your `@world` values through the **`host_scopes`** option: a `get` / `set` pair of
+Callables per token, keyed by property name, that the story reads before every condition and writes
+through on an effect. Bind the same store to anything else that shares those values:
+
+```gdscript
+var world := {"time_of_day": "night", "knows_road": false}
+var engine := PatterEngine.new(bundle, {"host_scopes": {"world": {
+    "get": func(n): return world.get(n),          # null = unset
+    "set": func(n, v): world[n] = v,
+}}})
+```
+
+Leave `host_scopes` out and the engine **self-backs** `@world` from the declared defaults. A property
+declared `writable: false` in the project is the *story's* promise: the engine refuses the story's
+write with a `push_error` (`'@world.x' is read-only`) and no write, bound or self-backed, and a
+per-name policy of your own is yours to refuse from `set`. The store is never in a Patter save: your
+game saves it once. → [World Properties](/play/world-properties/)
+
 ## Send the story somewhere
 
 The game can also decide where the story goes. `run_flow` plays an

@@ -1461,6 +1461,29 @@ namespace patter
                 if (spec.token.empty() || host_.hostScopes.count(spec.token)) continue;   // the binding wins
                 host_.hostScopes[spec.token] = selfBackedScope(spec);
             }
+            // A declaration's `writable: false` is the STORY's promise, and the engine refuses the story's
+            // write whether the scope is bound or self-backed - the JS reference has always done so
+            // (scoperegistry wraps every foreign resolver with the declared flags), and this core let a
+            // bound scope's set straight through until 2026-09-03 (from-storylets/unreal-wrapper-host-
+            // scopes). A per-name read-only a GAME keeps on its own container is a different thing, and
+            // the container refuses that itself. Same message as the reference, so a host sees one
+            // sentence from every runtime.
+            for (const HostScopeSpec& spec : bundle.scopeRegistry.scopes)
+            {
+                auto it = host_.hostScopes.find(spec.token);
+                if (spec.token.empty() || it == host_.hostScopes.end()) continue;
+                const bool scopeReadOnly = spec.hasWritable && !spec.writable;
+                std::set<std::string> readOnly;
+                for (const HostScopeDecl& d : spec.declarations) if (d.hasWritable && !d.writable) readOnly.insert(toLower(d.name));
+                if (!scopeReadOnly && readOnly.empty()) continue;
+                const std::string token = spec.token;
+                const auto inner = it->second.set;
+                it->second.set = [inner, readOnly, scopeReadOnly, token](const std::string& n, const PatterValue& v)
+                {
+                    if (scopeReadOnly || readOnly.count(toLower(n))) throw std::runtime_error("'@" + token + "." + n + "' is read-only");
+                    inner(n, v);
+                };
+            }
             for (const auto& kv : host_.hostScopes) host_.hostTokens.insert(kv.first);
         }
 

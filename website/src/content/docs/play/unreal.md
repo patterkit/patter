@@ -57,6 +57,37 @@ shows per-line audio resolution via `UPatterAudio`; audio files are not bundled 
 your platform call), so point its **Audio Root** at a Patter audio folder to hear it, or leave
 it empty to play silently.
 
+## Your game's state
+
+Give the engine your `@world` values in a **`UPatterWorld`** when you create it. The story reads
+them through it before every condition, effects write back into it, and anything else you bind to
+the same object, your own systems or the Storylet Engine's `UStoryletWorld`, sees the same values:
+
+```cpp
+UPatterWorld* World = NewObject<UPatterWorld>(this);
+World->SetString(TEXT("time_of_day"), TEXT("night"));
+World->SetBool(TEXT("knows_road"), false);
+World->SetReadOnly(TEXT("time_of_day"), true);   // yours alone: a story write is refused
+UPatterEngine* Engine = UPatterEngine::Create(Bundle, World);
+
+World->OnChanged.AddDynamic(this, &AMyActor::OnWorldChanged);   // (Name, Value, bFromStory)
+```
+
+Everything on `UPatterWorld` is Blueprint-callable: typed `Set*` / `Get*`, `Has`, `Names`,
+`SetReadOnly`, and an `OnChanged` delegate that tells your own writes from the story's. Names match
+case-insensitively, as the story's references do. Leave `World` out of `Create` and the engine
+**self-backs** `@world` from the declared defaults, which is right for a run that never leaves the
+engine; `GetBoundWorld()` says which you have.
+
+Two read-only rules meet here and stay distinct. A property declared **`writable: false`** in the
+project is the *story's* promise, refused by the engine whether or not a world is bound.
+**`SetReadOnly`** is the *game's* policy, a name the story may read but this game will not let it
+write. Either refusal fails the step and logs why, never crashes, and neither binds your own `Set*`
+calls. The container is never in a Patter save: your game saves it once, however it already saves
+things, and a load never writes through it. The binding survives `HotSwap` and `ApplyLiveBundle`.
+It is the same shape as the Storylet Engine's `UStoryletEngine::Create(Bundle, …, World)`, so a
+project running both reads one API. → [World Properties](/play/world-properties/)
+
 ## Send the story somewhere
 
 The game can also decide where the story goes. `RunFlow` plays an

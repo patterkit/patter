@@ -37,6 +37,7 @@ func _initialize() -> void:
 	print("saves: %d/%d  (envelopes written by the JS reference, loaded here and continued)" % [sv, root["saves"].size()])
 	_expect_all("saves", sv, root["saves"].size())
 	_run_describe_smoke()
+	_run_host_scope_writable_check()
 
 	print("expressions: %d/%d  specificity: %d/%d  runtime: %d/%d  scripted: %d/%d  gameData: %d/%d" % [
 		e, root["expressions"].size(), sp, root.get("specificity", []).size(),
@@ -152,6 +153,60 @@ func _expect_all(section: String, passed: int, total: int) -> void:
 func _fail(section: String, name: String, detail: String) -> void:
 	_fails += 1
 	push_error("  FAIL [%s] %s: %s" % [section, name, detail])
+
+
+# A host-scope declaration's "writable": false is refused by the ENGINE, whether the scope is bound by
+# the game or self-backed. The JS reference always did; this addon let a bound scope's set through
+# unchecked until 2026-09-03. Not a corpus case: the script grammar has no "this op must refuse", so
+# it is pinned here beside the other checks the corpus cannot express. GDScript has no throw: a
+# refusal is a push_error and NO write, so the assertion is on what landed.
+func _run_host_scope_writable_check() -> void:
+	var bundle := {
+		"schema": "patter/bundle@0",
+		"locales": {"default": "en", "included": ["en"]},
+		"strings": {"en": {"T": "hi"}},
+		"properties": [],
+		"scopeRegistry": {"version": 1, "scopes": [
+			{"token": "world", "declarations": [
+				{"name": "clock", "type": "string", "default": "day", "writable": false},
+				{"name": "known", "type": "boolean", "default": false},
+			]},
+		]},
+		"scenes": {"s": {"id": "s", "gameId": "s", "blocks": [{"id": "b", "gameId": "b", "children": [
+			{"id": "sn", "type": "snippet", "beats": [{"id": "T", "kind": "text"}],
+				"onEnter": [
+					{"kind": "set", "target": "@world.known", "value": {"src": "true", "ast": ["b", true]}},
+					{"kind": "set", "target": "@world.clock", "value": {"src": "\"night\"", "ast": ["s", "night"]}},
+				],
+				"jump": {"to": "END"}},
+		]}]}},
+	}
+	for bound in [false, true]:
+		var label := "bound" if bound else "self-backed"
+		# A bound scope has no defaults: the GAME owns its values, and seeds them itself.
+		var store := {"clock": "day", "known": false}
+		var options := {}
+		if bound:
+			options["host_scopes"] = {"world": {
+				"get": func(n): return store.get(str(n)),
+				"set": func(n, v): store[str(n)] = v,
+			}}
+		var engine := PatterEngine.new(bundle, options)
+		# The refused write is a push_error, which this headless host must expect rather than count.
+		var flow := engine.open_flow("main", "s", "b")
+		flow.advance()
+		if bound and store["clock"] != "day":
+			_fail("host-scope", label, "a story write to a writable:false declaration landed in the game's scope: %s" % str(store["clock"]))
+		if engine.get_property("@world.clock") != "day":
+			_fail("host-scope", label, "a story write to a writable:false declaration changed the value: %s" % str(engine.get_property("@world.clock")))
+		if engine.get_property("@world.known") != true:
+			_fail("host-scope", label, "a writable declaration was refused too")
+		# The host's own path through the engine is refused too, as in the reference.
+		engine.set_property("@world.clock", "night")
+		if engine.get_property("@world.clock") != "day":
+			_fail("host-scope", label, "engine.set_property on a writable:false declaration was not refused")
+	if _fails == 0:
+		print("  [host-scope] writable:false is the story's promise, refused bound or self-backed")
 
 
 # -- expressions ---------------------------------------------------------------

@@ -769,6 +769,63 @@ static void runTraceLogSmoke()
 // name -> value map per scene. A round-trip cannot tell the difference - a bag that
 // serialised itself would round-trip perfectly and still break every save on disk.
 // So this reads the JSON, and loads one edited by hand.
+// A host-scope declaration's `writable: false` is refused by the ENGINE, whether the scope is bound by
+// the game or self-backed. The JS reference always did; this core let a bound scope's set straight
+// through until 2026-09-03 (from-storylets/unreal-wrapper-host-scopes). Not a corpus case: the script
+// grammar has no "this op must throw", so it is pinned here beside the other checks the corpus cannot
+// express. The refusal surfaces from openFlow, since a flow settles into its first snippet on open.
+static void runHostScopeWritableSmoke()
+{
+    const char* json = R"JSON({
+      "schema": "patter/bundle@0", "locales": { "default": "en", "included": ["en"] },
+      "strings": { "en": { "T": "hi" } }, "properties": [],
+      "scopeRegistry": { "version": 1, "scopes": [ { "token": "world", "declarations": [
+        { "name": "clock", "type": "string", "default": "day", "writable": false },
+        { "name": "known", "type": "boolean", "default": false } ] } ] },
+      "scenes": { "s": { "id": "s", "gameId": "s", "blocks": [ { "id": "b", "gameId": "b", "children": [
+        { "id": "sn", "type": "snippet", "beats": [ { "id": "T", "kind": "text" } ],
+          "onEnter": [ { "kind": "set", "target": "@world.known", "value": { "src": "true", "ast": ["b", true] } },
+                       { "kind": "set", "target": "@world.clock", "value": { "src": "\"night\"", "ast": ["s", "night"] } } ],
+          "jump": { "to": "END" } } ] } ] } } })JSON";
+    Bundle bundle = parseBundle(JsonParser(json).parse());
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const bool bound = pass == 1;
+        const std::string label = bound ? "bound" : "self-backed";
+        // A bound scope has no defaults: the GAME owns its values and seeds them itself.
+        auto store = std::make_shared<std::map<std::string, PatterValue>>();
+        (*store)["clock"] = PatterValue::Str("day"); (*store)["known"] = PatterValue::Bool(false);
+        EngineOptions opts;
+        if (bound)
+        {
+            HostScope scope;
+            scope.get = [store](const std::string& n) -> const PatterValue* { auto it = store->find(n); return it == store->end() ? nullptr : &it->second; };
+            scope.set = [store](const std::string& n, const PatterValue& v) { (*store)[n] = v; };
+            opts.hostScopes["world"] = scope;
+        }
+        Engine engine(bundle, opts);
+        std::string message;
+        try { engine.openFlow("main", "s", "b")->advance(); }
+        catch (const std::exception& ex) { message = ex.what(); }
+        if (message.find("'@world.clock' is read-only") == std::string::npos)
+            fail("host-scope", label, "a story write to a writable:false declaration was not refused (got: " + (message.empty() ? "no error" : message) + ")");
+        if (bound && (*store)["clock"].s != "day")
+            fail("host-scope", label, "the refused write still landed in the game's scope");
+        const PatterValue* clock = engine.getProperty("@world.clock");
+        if (!clock || clock->s != "day") fail("host-scope", label, "a story write to a writable:false declaration changed the value");
+        // The host's own path through the engine is refused too, as in the reference.
+        message.clear();
+        try { engine.setProperty("@world.clock", PatterValue::Str("night")); }
+        catch (const std::exception& ex) { message = ex.what(); }
+        if (message.find("is read-only") == std::string::npos) fail("host-scope", label, "engine.setProperty on a writable:false declaration was not refused");
+        // And a writable name still lands.
+        engine.setProperty("@world.known", PatterValue::Bool(true));
+        const PatterValue* known = engine.getProperty("@world.known");
+        if (!known || !known->b) fail("host-scope", label, "a writable declaration was refused too");
+    }
+    std::cout << "  [host-scope] writable:false is the story's promise, refused bound or self-backed\n";
+}
+
 static void runSaveShapeSmoke()
 {
     Bundle b;
@@ -1112,6 +1169,7 @@ int main(int argc, char** argv)
     if (sv != static_cast<int>(savesArr->arr.size())) fail("saves", "section total", std::to_string(sv) + " of " + std::to_string(savesArr->arr.size()) + " passed");
     runInspectorSmoke();
     runSaveShapeSmoke();
+    runHostScopeWritableSmoke();
     runTraceLogSmoke();
     runOutlineSmoke();
     runDescribeSmoke();

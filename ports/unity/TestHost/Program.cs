@@ -75,6 +75,7 @@ namespace Patterkit.Patterplay.TestHost
             Console.WriteLine($"  [PatterSave JSON] scripted save/load: {sj}");
 
             RunSaveShapeCheck();
+            RunHostScopeWritableCheck();
 
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
@@ -218,6 +219,71 @@ namespace Patterkit.Patterplay.TestHost
         /// name -> value map per scene. A round-trip cannot tell the difference - a bag that
         /// serialised itself, declarations and all, would round-trip perfectly and still break
         /// every save already on disk. So this reads the JSON, and loads one written by hand.</summary>
+        // A host-scope declaration's `writable: false` is refused by the ENGINE, whether the scope is bound
+        // by the game or self-backed. The JS reference always did; this package let a bound scope's Set
+        // through unchecked until 2026-09-03. Not a corpus case: the script grammar has no "this op must
+        // throw", so it is pinned here, beside the other checks the corpus cannot express.
+        private sealed class RecordingScope : IHostScope
+        {
+            public readonly Dictionary<string, PatterValue> Values = new Dictionary<string, PatterValue>();
+            public PatterValue Get(string name) => Values.TryGetValue(name, out var v) ? v : null;
+            public void Set(string name, PatterValue value) { Values[name] = value; }
+        }
+
+        private static void RunHostScopeWritableCheck()
+        {
+            var b = new Bundle { Schema = "patter/bundle@0" };
+            b.Locales.Default = "en";
+            b.Locales.Included.Add("en");
+            b.Strings["en"] = new Dictionary<string, string> { ["T"] = "hi" };
+            b.ScopeRegistry = new HostScopeRegistry();
+            b.ScopeRegistry.Scopes.Add(new HostScopeSpec { Token = "world", Declarations = new List<HostScopeDecl>
+            {
+                new HostScopeDecl { Name = "clock", Type = "string", Default = PatterValue.Str("day"), Writable = false },
+                new HostScopeDecl { Name = "known", Type = "boolean", Default = PatterValue.False },
+            } });
+            var scene = new Scene { Id = "s", GameId = "s" };
+            scene.Blocks.Add(new Block { Id = "b", GameId = "b", Children = new List<Node>
+            {
+                new Node { Id = "sn", Type = "snippet",
+                    Beats = new List<Beat> { new Beat { Id = "T", Kind = "text" } },
+                    OnEnter = new List<Effect>
+                    {
+                        new Effect { Target = "@world.known", Value = new Expression { Ast = Ast.DeserialiseAst(new List<object> { "b", true }) } },
+                        new Effect { Target = "@world.clock", Value = new Expression { Ast = Ast.DeserialiseAst(new List<object> { "s", "night" }) } },
+                    },
+                    Jump = new Jump { To = "END" } },
+            } });
+            b.Scenes["s"] = scene;
+
+            foreach (var bound in new[] { false, true })
+            {
+                var label = bound ? "bound" : "self-backed";
+                var scope = new RecordingScope();
+                var opts = new EngineOptions();
+                if (bound) opts.HostScopes = new Dictionary<string, IHostScope> { ["world"] = scope };
+                var engine = new Engine(b, opts);
+                string message = null;
+                // The refusal surfaces from OpenFlow: a flow settles into its first snippet on open and
+                // runs that snippet's effects there, before any Advance.
+                try { engine.OpenFlow("main", "s", "b").Advance(); } catch (Exception ex) { message = ex.Message; }
+                if (message == null || !message.Contains("'@world.clock' is read-only"))
+                    Fail("host-scope", label, $"a story write to a writable:false declaration was not refused (got: {message ?? "no error"})");
+                if (bound && scope.Values.ContainsKey("clock"))
+                    Fail("host-scope", label, "the refused write still landed in the game's scope");
+                // The host's own path through the engine is refused too, as in the reference.
+                message = null;
+                try { engine.SetProperty("@world.clock", PatterValue.Str("night")); } catch (Exception ex) { message = ex.Message; }
+                if (message == null || !message.Contains("is read-only"))
+                    Fail("host-scope", label, "engine.SetProperty on a writable:false declaration was not refused");
+                // And a writable name still lands.
+                engine.SetProperty("@world.known", PatterValue.True);
+                if (engine.GetProperty("@world.known")?.AsBool != true)
+                    Fail("host-scope", label, "a writable declaration was refused too");
+            }
+            if (_fails == 0) Console.WriteLine("  [host-scope] writable:false is the story's promise, refused bound or self-backed");
+        }
+
         private static void RunSaveShapeCheck()
         {
             var b = new Bundle { Schema = "patter/bundle@0" };

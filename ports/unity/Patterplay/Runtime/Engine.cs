@@ -42,6 +42,36 @@ namespace Patterkit.Patterplay
         public void Set(string name, PatterValue value) { _bag[Key(name)] = value; }
     }
 
+    /// <summary>A host scope with the declaration's `writable: false` enforced on the STORY's writes. Wraps
+    /// a bound or self-backed scope only when the spec declares something read-only; otherwise the scope
+    /// is used as it is.</summary>
+    internal sealed class WritableGuard : IHostScope
+    {
+        private readonly IHostScope _inner;
+        private readonly string _token;
+        private readonly bool _scopeReadOnly;
+        private readonly HashSet<string> _readOnly;
+
+        private WritableGuard(IHostScope inner, string token, bool scopeReadOnly, HashSet<string> readOnly)
+        { _inner = inner; _token = token; _scopeReadOnly = scopeReadOnly; _readOnly = readOnly; }
+
+        public static IHostScope For(HostScopeSpec spec, IHostScope inner)
+        {
+            bool scopeReadOnly = spec.Writable == false;
+            var readOnly = new HashSet<string>();
+            foreach (var d in spec.Declarations ?? new List<HostScopeDecl>())
+                if (d != null && d.Name != null && d.Writable == false) readOnly.Add(d.Name.ToLowerInvariant());
+            return scopeReadOnly || readOnly.Count > 0 ? new WritableGuard(inner, spec.Token, scopeReadOnly, readOnly) : null;
+        }
+
+        public PatterValue Get(string name) => _inner.Get(name);
+        public void Set(string name, PatterValue value)
+        {
+            if (_scopeReadOnly || _readOnly.Contains(name.ToLowerInvariant())) throw new EvalError($"'@{_token}.{name}' is read-only");
+            _inner.Set(name, value);
+        }
+    }
+
     public sealed class EngineOptions
     {
         /// <summary>Custom float-in-[0,1) source, shared by all flows (NOT captured by save). Runtime
@@ -288,6 +318,18 @@ namespace Patterkit.Patterplay
                     if (spec == null || string.IsNullOrEmpty(spec.Token)) continue;
                     if (_host.HostScopes.ContainsKey(spec.Token)) continue;   // the embedder's binding wins
                     _host.HostScopes[spec.Token] = new SelfBackedScope(spec.Declarations);
+                }
+            // A declaration's `writable: false` is the STORY's promise, and the engine refuses the story's
+            // write whether the scope is bound or self-backed - the JS reference has always done so, and
+            // this package let a bound scope's Set straight through until 2026-09-03
+            // (from-storylets/unreal-wrapper-host-scopes). A per-name read-only a GAME keeps on its own
+            // scope is a different thing, and the scope refuses that itself. Same message as the reference.
+            if (bundle.ScopeRegistry != null)
+                foreach (var spec in bundle.ScopeRegistry.Scopes)
+                {
+                    if (spec == null || string.IsNullOrEmpty(spec.Token) || !_host.HostScopes.TryGetValue(spec.Token, out var inner)) continue;
+                    var guard = WritableGuard.For(spec, inner);
+                    if (guard != null) _host.HostScopes[spec.Token] = guard;
                 }
         }
 
@@ -630,17 +672,25 @@ namespace Patterkit.Patterplay
             _host.StageBags.Clear();
         }
 
+        // A host-scope ref ("@world.x") resolves through the bound or self-backed scope, as it does on a
+        // Flow and in every other runtime's engine-level accessor. Until 2026-09-03 this pair knew only
+        // `scene` and `patter`, so "@world.x" split as a @patter name and landed in the shared bag as a
+        // stray - a silent miss the host-scope writable check caught (from-storylets/unreal-wrapper-host-scopes).
+        private bool IsEngineScopeToken(string t) => t == "scene" || t == "patter" || _host.HostScopes.ContainsKey(t);
+
         public PatterValue GetProperty(string refStr)
         {
-            var (scope, name) = SplitRef(refStr, t => t == "scene" || t == "patter");
+            var (scope, name) = SplitRef(refStr, IsEngineScopeToken);
             if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            if (_host.HostScopes.TryGetValue(scope, out var host)) return host.Get(name);
             return _host.SharedPatter.Get(name);
         }
 
         public void SetProperty(string refStr, PatterValue value)
         {
-            var (scope, name) = SplitRef(refStr, t => t == "scene" || t == "patter");
+            var (scope, name) = SplitRef(refStr, IsEngineScopeToken);
             if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            if (_host.HostScopes.TryGetValue(scope, out var host)) { host.Set(name, value); return; }
             _host.SharedPatter.Set(name, value);
         }
 
