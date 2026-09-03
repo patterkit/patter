@@ -209,6 +209,28 @@ describe("project session: create -> open -> read -> save -> play", () => {
     expect(project.currentRoot()).toBeNull();
   });
 
+  it("a problem says which scene its node is in, so Go to issue can switch scenes first", async () => {
+    // An empty snippet in a scene OTHER than the open one: the bar showed "This snippet is empty" and
+    // "Go to issue" did nothing, because the surface reveals only within the open scene (the Hamlet
+    // demo, 2026-09-03). The problem now carries its scene.
+    const dir = mkdtempSync(join(tmpdir(), "pp-problem-scene-"));
+    const opened = await project.createProject(dir, "Where");
+    project.openProject(dir);
+    const made = await project.createScene("Elsewhere");
+    expect(made.ok).toBe(true);
+    const far = made.sceneId!;
+    const flow = `{ schema: "patter/flow@0", scene: { id: "${far}", type: "scene", name: "Elsewhere", blocks: [
+      { id: "blk_far", type: "block", name: "Far", children: [ { id: "sn_hollow", type: "snippet", beats: [] } ] } ] } }`;
+    const loc = `{ schema: "patter/strings@0", scene: "${far}", locale: "en", default: true, strings: {} }`;
+    expect((await project.saveScene(far, flow, loc)).ok).toBe(true);
+    // (A bare empty snippet is pruned on save, so the block itself reads as empty; either way the
+    // problem is in the far scene and must say so.)
+    const there = project.validate().problems.filter((p) => p.nodeId === "sn_hollow" || p.nodeId === "blk_far");
+    expect(there.length).toBeGreaterThan(0);
+    for (const p of there) expect(p.sceneId).toBe(far);
+    expect(far).not.toBe(opened.scenes[0]!.id);
+  });
+
   it("validates the tavern example (problems panel feed)", () => {
     project.openProject(TAVERN);
     const dto = project.validate();

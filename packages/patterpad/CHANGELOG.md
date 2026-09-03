@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **"Go to issue" reaches a problem in another scene.** The problems bar could only reveal a node in
+  the open scene, so a problem elsewhere (an empty snippet in a scene you were not looking at, say)
+  answered the click with nothing and no way to find it. Each problem now knows its scene: the bar
+  names the scene up front when it is not the open one, and switches to it before revealing the node.
+
 ## [0.16.2] - 2026-09-03
 
 ### Fixed

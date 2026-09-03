@@ -278,6 +278,8 @@ const stub = {
   validate: async () => ({
     ok: false,
     problems: [
+      // A problem in ANOTHER scene: the bar names the scene up front and Go to issue switches to it.
+      { category: "structure", severity: "error", detail: "empty-snippet", message: "snippet 'sn_street_hollow' has no beats and no jump", nodeId: "sn_street_hollow", sceneId: "scn_street" },
       // Each problem carries a quick-fix; applying one flips its flag so it clears on re-validate.
       ...(propDeclared ? [] : [{ category: "condition", severity: "error", detail: "condition", message: "unknown property '@strength'", nodeId: "opt_intimidate", fix: { kind: "declare-property", name: "strength", propType: "number" } }]),
       ...(castAdded ? [] : [{ category: "structure", severity: "error", detail: "unknown-character", message: "character 'BO' is not in the project cast", nodeId: "L_bo_reply", fix: { kind: "add-to-cast", character: "BO" } }]),

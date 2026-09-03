@@ -658,6 +658,10 @@ export interface Problem {
   message: string;
   /** Offending node / beat id, where applicable (for jump-to-site). */
   nodeId?: string;
+  /** The scene that node lives in, so "Go to issue" can switch scenes first: the surface can only
+   *  reveal a node in the OPEN scene, and a problem elsewhere used to answer a click with nothing
+   *  (2026-09-03). Absent when the problem has no node, or the node is not in any scene. */
+  sceneId?: string;
   /** A code (structural) or field (condition) qualifier. */
   detail?: string;
   /** Offending file (hygiene / bundle / merge issues). */

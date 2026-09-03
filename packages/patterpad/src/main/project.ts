@@ -1105,6 +1105,22 @@ function applyLiveSource(p: LoadedProject, live: { sceneId: string; flow: string
   } catch { /* loc is optional / may be empty - keep the disk copy */ }
 }
 
+/** Every node id in the project (scene, block, group, snippet, beat) mapped to its scene's id. */
+function sceneIndex(p: LoadedProject): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const scene of p.scenes) {
+    map.set(scene.id, scene.id);
+    for (const block of scene.blocks) {
+      map.set(block.id, scene.id);
+      walkNodes<Group | Snippet>(block.children, (n) => {
+        map.set(n.id, scene.id);
+        if (n.type === "snippet") for (const b of n.beats ?? []) map.set(b.id, scene.id);
+      });
+    }
+  }
+  return map;
+}
+
 /** Validate the whole project (the CLI's checks), flattened for the problems panel. Reflects disk,
  *  unless `live` is given: that scene's unsaved in-memory source is validated instead (so problems
  *  track edits live, not just on save). */
@@ -1164,6 +1180,9 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
       // but a scene the author thinks exists does not (from-storylets/load-issues-and-the-strict-loader).
       ...r.orphans.map((i): Problem => ({ category: "not-in-project", severity: "warning", message: i.message, file: i.file })),
     ];
+    // Which scene each node-bearing problem is in, so the renderer can switch to it before revealing.
+    const sceneOf = sceneIndex(fresh);
+    for (const p of problems) { const s = p.nodeId ? sceneOf.get(p.nodeId) : undefined; if (s) p.sceneId = s; }
     return { ok: r.ok, problems };
   } catch (e) {
     return { ok: false, problems: [{ category: "structure", severity: "error", message: e instanceof Error ? e.message : String(e) }] };

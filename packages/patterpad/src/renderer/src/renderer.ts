@@ -1001,8 +1001,12 @@ function paintProblems(): void {
   renderStepperBar(problembarEl, {
     items: problems.map((p) => {
       const { tag, message } = humanizeProblem(p);
+      // A problem in ANOTHER scene says which, up front: "This snippet is empty" about a bubble that is
+      // not on screen gave nothing to look for (the Hamlet demo, 2026-09-03). One in the open scene
+      // stays as it was; the name would only be noise there.
+      const elsewhere = p.sceneId && p.sceneId !== currentSceneId ? project?.scenes.find((s) => s.id === p.sceneId)?.name : undefined;
       // `kindClass` is how severity colour stays app-side: the bar paints nothing itself.
-      return { kind: tag, kindClass: `sev-${p.severity}`, text: message };
+      return { kind: tag, kindClass: `sev-${p.severity}`, text: elsewhere ? `${elsewhere} · ${message}` : message };
     }),
     at: problemAt,
     // The tone follows the CURRENT problem, not the worst one, which is what the old `.warning` class on
@@ -1012,13 +1016,21 @@ function paintProblems(): void {
     onStep: (next) => {
       problemAt = next;
       paintProblems();
-      const id = problems[problemAt]?.nodeId;
-      if (id) surface?.revealNode(id);
+      void goToProblem(problems[problemAt]);
     },
-    onGo: (i) => { const id = problems[i]?.nodeId; if (id) surface?.revealNode(id); },
+    onGo: (i) => { void goToProblem(problems[i]); },
     actions: [problemFixEl],
     // No `empty`: no problems, no problems bar. This one is ambient, not a mode.
   });
+}
+
+/** Take the author to a problem's node: switch to its scene first when it lives elsewhere (the surface
+ *  reveals only within the open scene, so a problem in another scene used to answer "Go to issue" with
+ *  nothing, 2026-09-03), then reveal it. A problem with no node (a file-level one) has nowhere to go. */
+async function goToProblem(p: Problem | undefined): Promise<void> {
+  if (!p?.nodeId) return;
+  if (p.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
+  surface?.revealNode(p.nodeId);
 }
 
 async function applyCurrentFix(): Promise<void> {
