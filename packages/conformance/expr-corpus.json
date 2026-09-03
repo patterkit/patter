@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "prng": [
     {
       "name": "seed zero",
@@ -4206,6 +4206,175 @@
         }
       },
       "expected": true
+    }
+  ],
+  "registry": [
+    {
+      "name": "a read-only declaration refuses a write",
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3,
+          "writable": false
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expectError": true,
+      "expected": 3
+    },
+    {
+      "name": "a declaration with no flag takes the write",
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expected": 9
+    },
+    {
+      "name": "a declaration marked writable takes the write",
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3,
+          "writable": true
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expected": 9
+    },
+    {
+      "name": "a refused write leaves a flags value exactly as seeded",
+      "declarations": [
+        {
+          "name": "marks",
+          "type": "flags",
+          "default": [
+            "a"
+          ],
+          "writable": false
+        }
+      ],
+      "set": {
+        "name": "marks",
+        "value": [
+          "a",
+          "b"
+        ]
+      },
+      "expectError": true,
+      "expected": [
+        "a"
+      ]
+    },
+    {
+      "name": "a refusal on one declaration does not touch its neighbour",
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3,
+          "writable": false
+        },
+        {
+          "name": "mood",
+          "type": "string",
+          "default": "calm"
+        }
+      ],
+      "set": {
+        "name": "mood",
+        "value": "tense"
+      },
+      "expected": "tense"
+    },
+    {
+      "name": "a read-only scope default covers a declaration that says nothing",
+      "scope": {
+        "writable": false
+      },
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expectError": true,
+      "expected": 3
+    },
+    {
+      "name": "a declaration's own flag overrides a read-only scope default",
+      "scope": {
+        "writable": false
+      },
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3,
+          "writable": true
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expected": 9
+    },
+    {
+      "name": "a declaration's own flag overrides a writable scope default",
+      "scope": {
+        "writable": true
+      },
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3,
+          "writable": false
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expectError": true,
+      "expected": 3
+    },
+    {
+      "name": "a scope that says nothing is writable",
+      "scope": {},
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "expected": 9
     }
   ]
 }

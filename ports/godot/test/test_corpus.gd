@@ -66,8 +66,17 @@ func _initialize() -> void:
 	var xe_result := _run_expr_expressions(x_expr)
 	var xe: int = xe_result[0]
 	var unrunnable: int = xe_result[1]
-	print("expr corpus v%d - prng: %d/%d  expressions: %d/%d" % [
-		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size() - unrunnable])
+	# A family the corpus carries and this harness does not run is a check that
+	# cannot fail here, so a missing key is a failure, not a skip.
+	if not expr_root.has("registry"):
+		push_error("expr parity corpus has no registry family")
+		quit(2)
+		return
+	var x_reg: Array = expr_root["registry"]
+	var xr := _run_expr_registry(x_reg)
+	_expect_all("expr/registry", xr, x_reg.size())
+	print("expr corpus v%d - prng: %d/%d  expressions: %d/%d  registry: %d/%d" % [
+		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size() - unrunnable, xr, x_reg.size()])
 	if unrunnable > 0:
 		print("  GAP: %d expectError cases cannot run here - PatterExpr has no is_error();" % unrunnable)
 		print("       it push_error()s and returns a fallback value, so a refusal is")
@@ -465,3 +474,54 @@ func _deep_equal(a, b) -> bool:
 					return false
 			return true
 	return a == b
+
+
+# -- the expr parity corpus: registry ---------------------------------------------
+#
+# The scope kernel's `writable` rule: decl.writable ?? scope.writable ?? true.
+#
+# This port has no ScopeRegistry - Patterplay mounts its host scopes by hand - so a
+# case with a "scope" is run by FOLDING the scope default into each declaration that
+# says nothing of its own, then seeding the bag. The fold is the rule, written down
+# once; what these nine cases pin here is the shared PropertyBag, which is the code
+# that actually refuses. The value is read back on BOTH outcomes.
+func _run_expr_registry(cases: Array) -> int:
+	var pass_count := 0
+	for c in cases:
+		var name: String = c["name"]
+		var scope: Dictionary = c.get("scope", {})
+		var decls: Array = []
+		for d in c["declarations"]:
+			var decl: Dictionary = (d as Dictionary).duplicate()
+			decl["default"] = PatterValues.to_value(d["default"])
+			if not decl.has("writable") and scope.has("writable"):
+				decl["writable"] = scope["writable"]
+			decls.append(decl)
+		var set_name: String = c["set"]["name"]
+		var value = PatterValues.to_value(c["set"]["value"])
+		var expect_error: bool = c.get("expectError", false)
+		var expected = PatterValues.to_value(c["expected"])
+
+		var bag := PatterPropertyBag.new(decls)
+		var change: Dictionary = bag.set_value(set_name, value)
+		var error: String = str(change["error"]) if change.has("error") else ""
+		var read_back = bag.get_value(set_name)
+
+		var ok := true
+		if expect_error:
+			if error == "":
+				_fail("expr/registry", name, "expected a read-only refusal, the write landed")
+				ok = false
+			elif not error.contains("is read-only"):
+				_fail("expr/registry", name, "refused, but not as read-only: " + error)
+				ok = false
+		elif error != "":
+			_fail("expr/registry", name, "unexpected refusal: " + error)
+			ok = false
+		if not PatterValues.value_equals(read_back, expected):
+			_fail("expr/registry", name, "read back %s, expected %s" % [
+				PatterValues.show(read_back), PatterValues.show(expected)])
+			ok = false
+		if ok:
+			pass_count += 1
+	return pass_count
