@@ -77,6 +77,7 @@ run("git pull -q --ff-only origin main");
 console.log("\nwaiting for npm (the publish runs in CI, so this is not instant)");
 const failed = [];
 for (const b of bumps) {
+  if (b.private) continue;                         // versioned by the cascade, never on npm
   const pkg = `@patterkit/${b.pkg}`;
   process.stdout.write(`  ${pkg}@${b.to} ... `);
   if (waitForNpm(pkg, b.to)) console.log("live");

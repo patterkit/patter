@@ -7,6 +7,8 @@
 // --prefer-online poll.
 
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 
 const sh = (cmd, opts = {}) => execSync(cmd, { encoding: "utf8", ...opts }).trim();
@@ -47,46 +49,64 @@ export function approveAndWaitForPrCi(cwd, pr, log = console.log, seconds = 900)
   // and its runs outlive the PRs they belong to, so "the latest run on changeset-release/main" is very
   // often the parked one from LAST time - which, being a zero-job failure, would abort this release over
   // a run that has nothing to do with it. (Found by running this against a freshly-merged release.)
-  const sha = sh(`gh pr view ${pr} --json headRefOid --jq .headRefOid`, { cwd });
-  const runOf = () => {
+  //
+  // And the head MOVES: every push to main (a runtime release, say) makes the bot re-version the PR,
+  // which force-pushes a new head. Read once, this waited for a run on a head that no longer existed,
+  // found none, reported "nothing to approve", and the merge went ahead while the real head's runs
+  // were still queued - they died with the branch a second after the squash. (The 0.11.0 ship,
+  // 2026-09-03.) So the head is re-read on every poll, a verdict counts only for the head that is
+  // still current once it is in, and "no run" is never a green light.
+  const headOf = () => sh(`gh pr view ${pr} --json headRefOid --jq .headRefOid`, { cwd });
+  const runOf = (sha) => {
     const json = sh('gh run list --branch changeset-release/main --workflow ci.yml --limit 10'
       + ' --json databaseId,status,conclusion,headSha', { cwd });
     return JSON.parse(json || "[]").find((x) => x.headSha === sha) ?? null;
   };
-  // The run can lag the PR by a few seconds.
-  let r = null;
-  for (let waited = 0; waited < 60 && !r; waited += 6) {
-    r = runOf();
-    if (!r) execSync("sleep 6");
-  }
-  if (!r) { log(`  no CI run for ${sha.slice(0, 8)} - nothing to approve`); return "none"; }
+  const parked = (r) => r.status === "action_required" || r.status === "waiting" || r.conclusion === "action_required";
 
-  // A parked run reports `status: "completed"` with `conclusion: "action_required"` - it is not
-  // pending, it has finished by refusing to start. Testing only `status` therefore never approved
-  // anything, fell through to the wait below, read the conclusion as not-success and called a
-  // release FAILED that had never run. (Hit on the Patterplay 0.9.0 cut, 2026-09-02.)
-  if (r.status === "action_required" || r.status === "waiting" || r.conclusion === "action_required") {
-    log(`  run ${r.databaseId} is parked awaiting approval - approving`);
-    try {
-      sh(`gh api -X POST repos/{owner}/{repo}/actions/runs/${r.databaseId}/approve`, { cwd });
-    } catch {
-      // Not fatal. The publish has its own gate (the `release` script runs the suite), so a failure to
-      // approve costs a second opinion rather than the only one.
-      log(`  could not approve it from here - approve it in the browser if you want it: ${r.databaseId}`);
-      return "skipped";
-    }
-  }
-
+  let sha = headOf();
+  const approved = new Set();
   for (let waited = 0; waited < seconds; waited += 10) {
-    r = runOf();
-    if (!r) return "none";
+    const now = headOf();
+    if (now !== sha) {
+      log(`  PR #${pr} moved from ${sha.slice(0, 8)} to ${now.slice(0, 8)} (the bot re-versioned it) - following`);
+      sha = now;
+    }
+    const r = runOf(sha);
+    if (!r) {
+      // The run can lag the push by a few seconds; a head with no run at all after the whole wait is
+      // something to look at, not something to merge past.
+      if (waited === 0) log(`  waiting for a CI run on ${sha.slice(0, 8)}`);
+      execSync("sleep 10");
+      continue;
+    }
+    // A parked run reports `status: "completed"` with `conclusion: "action_required"` - it is not
+    // pending, it has finished by refusing to start. Testing only `status` therefore never approved
+    // anything, fell through to the wait below, read the conclusion as not-success and called a
+    // release FAILED that had never run. (Hit on the Patterplay 0.9.0 cut, 2026-09-02.)
+    if (parked(r) && !approved.has(r.databaseId)) {
+      log(`  run ${r.databaseId} is parked awaiting approval - approving`);
+      approved.add(r.databaseId);
+      try {
+        sh(`gh api -X POST repos/{owner}/{repo}/actions/runs/${r.databaseId}/approve`, { cwd });
+      } catch {
+        // Not fatal. The publish has its own gate (the `release` script runs the suite), so a failure to
+        // approve costs a second opinion rather than the only one.
+        log(`  could not approve it from here - approve it in the browser if you want it: ${r.databaseId}`);
+        return "skipped";
+      }
+      execSync("sleep 10");
+      continue;
+    }
     // An approved run goes back to queued/in_progress, but for a moment still reports the parked
     // result; treating that as the verdict would fail the release we just unblocked.
-    if (r.status === "completed" && r.conclusion !== "action_required") {
+    if (r.status === "completed" && !parked(r)) {
+      // The verdict is only worth having if the head it was for is still the head being merged.
+      if (headOf() !== sha) continue;
       log(`  CI ${r.conclusion} (run ${r.databaseId})`);
       return r.conclusion === "success" ? "passed" : "failed";
     }
-    if (waited === 0) log("  waiting for it to finish");
+    if (waited % 60 === 0) log("  waiting for it to finish");
     execSync("sleep 10");
   }
   log("  CI did not finish in time - not waiting any longer");
@@ -112,7 +132,12 @@ export function plannedBumps(cwd, pr) {
     const plus = /^\+\s*"version":\s*"([^"]+)"/.exec(line);
     // Only a PAIR is a bump. A lone + line is a dependency range being rewritten, not a release.
     if (plus && from) {
-      bumps.push({ pkg: file.replace(/\/package\.json$/, "").replace(/^packages\//, ""), from, to: plus[1] });
+      // A private package rides the same cascade (the corpus depends on the model) and gets a version
+      // bump like any other, but never reaches npm: waiting for it there hangs, then throws. Read the
+      // manifest so the caller can list it and skip the wait. (Hit on the 0.11.0 ship, 2026-09-03.)
+      let priv = false;
+      try { priv = !!JSON.parse(readFileSync(join(cwd, file), "utf8")).private; } catch { /* not local */ }
+      bumps.push({ pkg: file.replace(/\/package\.json$/, "").replace(/^packages\//, ""), from, to: plus[1], private: priv });
       from = null;
     }
   }

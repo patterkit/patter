@@ -105,13 +105,17 @@ if (dryRun) {
     die(`CI FAILED on PR #${pr}. Look before you publish: ${REPO}/pull/${pr}\n`
       + "  (nothing was merged; npm versions cannot meaningfully be unpublished, so this stops here.)");
   }
+  if (ci === "none") {
+    die(`no CI run appeared for PR #${pr}'s head. Look before you publish: ${REPO}/pull/${pr}\n`
+      + "  (nothing was merged. Approve or re-run its CI there, then: npm run release:npm)");
+  }
 }
 
 // --- 4. the gate -------------------------------------------------------------
 step(4, "merging it (this publishes to npm)");
 const bumps = pr ? plannedBumps(root, pr) : [];
 if (bumps.length) {
-  console.log(bumps.map((b) => `    @patterkit/${b.pkg.padEnd(14)} ${b.from} -> ${b.to}`).join("\n"));
+  console.log(bumps.map((b) => `    @patterkit/${b.pkg.padEnd(14)} ${b.from} -> ${b.to}${b.private ? "  (private: versioned, never published)" : ""}`).join("\n"));
 } else if (!dryRun) {
   die(`PR #${pr} bumps nothing - look at it before merging: ${REPO}/pull/${pr}`);
 }
@@ -130,6 +134,7 @@ run("git pull -q --ff-only origin main");
 step(5, "waiting for npm (the publish runs in CI, so this is not instant)");
 const failed = [];
 for (const b of bumps) {
+  if (b.private) continue;                         // versioned by the cascade, never on npm
   const pkg = `@patterkit/${b.pkg}`;
   process.stdout.write(`  ${pkg}@${b.to} ... `);
   if (waitForNpm(pkg, b.to)) console.log("live");

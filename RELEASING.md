@@ -26,6 +26,8 @@ versions.
 
 ```sh
 npm run ship:npm               # push -> wait -> show -> ask -> merge -> verify
+# Cut any runtime release (release:play) BEFORE this: every push to main makes the bot
+# re-version the PR, and ship:npm follows the moving head rather than merging past it.
 npm run ship:npm -- --dry-run  # plan only: pushes nothing, merges nothing
 npm run ship:npm -- --yes      # no prompt
 ```
