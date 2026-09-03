@@ -8,6 +8,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **Open Recent over an open project showed only the first scene.** The shared session opens the new
+  project and then runs the close hook for the old one, and Patterpad's hook tore down whatever was
+  loaded, which by then was the new project. The rest of its scenes never streamed in. The hook now
+  closes only a project that is still the current one.
+- **Switching projects flushes what you were typing first.** An edit still inside the autosave
+  debounce was dropped when Open Recent, Open, Open Patterpack or New Project switched projects
+  underneath it. The switch now waits for the outgoing project's save, Notes, comments and remembered
+  place, as Close Project always did.
 - **A problem about a file now names the file.** The problems bar said "This file sits outside the
   project's folders" about a file it never named, and "Go to issue" has nowhere to go for a file with
   no node in the story. Not-in-project, merge-conflict, stale-build and tidy-up problems now give the

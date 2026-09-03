@@ -11,6 +11,8 @@ import { loadProject, extractLoc } from "@patterkit/ops";
 import { walkNodes } from "@patterkit/model";
 import { parseSource, canonicalStringify } from "@patterkit/core";
 import * as project from "../src/main/project.js";
+import { createProjectSession } from "@wildwinter/app-shell/session";
+import type { OpenedProject } from "../src/shared/api.js";
 
 // The PINNED tavern fixture (frozen), not the live examples/tavern editable scratch.
 const TAVERN = resolve(dirname(fileURLToPath(import.meta.url)), "../../../test-fixtures/tavern-example.patter");
@@ -182,6 +184,29 @@ describe("project session: create -> open -> read -> save -> play", () => {
     expect((await project.saveScene(sceneId, src.flowSource, loc, "Ian Thomas")).ok).toBe(true);
     expect(existsSync(join(dir, "authoring", "start.patterx"))).toBe(true);
     expect(project.validate().problems.filter((p) => p.category === "not-in-project")).toEqual([]);
+  });
+
+  it("Open Recent over an open project leaves the NEW project loaded (the shell closes the old one after)", async () => {
+    // The shell's session opens the replacement first and only then hands the app's close hook the
+    // OUTGOING session, so a failed open leaves the current project alone. A hook that tore down module
+    // state on every call wiped the project that had just opened: hydrate() answered null and the nav
+    // kept the one landing scene (2026-09-03). The hook below is the one index.ts has.
+    const dir = mkdtempSync(join(tmpdir(), "pp-openover-"));
+    await project.createProject(dir, "Second");
+    const session = createProjectSession<OpenedProject, { root: string }>({
+      store: { get: () => ({ recents: [] }), touchProject: () => {}, forgetProject: () => {}, clearLastProject: () => {} },
+      close: (ending) => { if (project.isCurrent(ending)) project.closeProject(); },
+      open: (path) => { const p = project.openProject(path); return { session: p, root: p.root, name: p.name, reply: { root: p.root } }; },
+    });
+    session.openAt(TAVERN);
+    expect(project.hydrate()?.sceneIds.length ?? 0).toBeGreaterThan(1);
+    session.openAt(dir);                                   // Open Recent while the tavern is open
+    expect(project.hydrate()?.name).toBe("Second");
+    session.openAt(dir);                                   // the SAME project over itself: identity, not root
+    expect(project.hydrate()?.name).toBe("Second");
+    session.closeCurrent();                                // File > Close still lets go for real
+    expect(project.hydrate()).toBeNull();
+    expect(project.currentRoot()).toBeNull();
   });
 
   it("validates the tavern example (problems panel feed)", () => {

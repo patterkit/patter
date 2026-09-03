@@ -372,7 +372,23 @@ export function openProject(path: string, preferLanding?: string): OpenedProject
   if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // drop a pending rebuild for the old project
   lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
   syncAudioIndex();            // start / stop the Audio Folders watcher for the new project (#206)
-  return summarise(loaded);
+  lastOpened = summarise(loaded);
+  return lastOpened;
+}
+
+/** The summary `openProject` last handed out: the shell keeps it as the session object, and hands it
+ *  back to the app's close hook. Identity, not root: reopening the SAME project must still read as a
+ *  new open. */
+let lastOpened: OpenedProject | null = null;
+
+/** Is `session` the project this module currently holds? The shell's session opens the replacement
+ *  FIRST and only then closes the outgoing one (so a failed open leaves the current project alone), and
+ *  hands the close hook the OUTGOING session object. A hook that tore down module state on every call
+ *  wiped the project that had just opened: Open Recent over an open project left nothing loaded, and
+ *  the renderer's hydrate got null, so the nav kept the one landing scene (2026-09-03). The hook asks
+ *  this first, and a session that has already been replaced needs no teardown: openProject did it. */
+export function isCurrent(session: OpenedProject): boolean {
+  return lastOpened !== null && session === lastOpened;
 }
 
 /** Let the project go (File ▸ Close Project). The mirror of `openProject`'s reset: everything it clears
@@ -381,6 +397,7 @@ export function openProject(path: string, preferLanding?: string): OpenedProject
  *  starting with "is a project open?", which the menu reads to enable this very item. */
 export function closeProject(): void {
   loaded = null;
+  lastOpened = null;
   shards = new Map();
   hydrated = false;
   playLocale = null;

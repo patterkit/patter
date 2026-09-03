@@ -2191,20 +2191,32 @@ function showWelcome(state: BootState): void {
   signalReady(); // the welcome screen is up - safe to reveal the window (no-op if already revealed)
 }
 
+/** Leave the open project properly BEFORE main is asked to switch: flush a text edit still inside the
+ *  autosave debounce, pending Notes and comments, and the remembered place. After the switch it is
+ *  too late: main answers for the NEW project, so the old scene's save is refused as unknown, and
+ *  showProject clears currentSceneId first, which writeScene reads as "nothing to write". A no-op
+ *  with nothing open. (Found beside the open-over fix, 2026-09-03.) */
+async function leaveProject(): Promise<void> {
+  if (!project) return;
+  if (surface) await save();
+  await persistDocs();
+  await persistComments();
+  flushRemember();
+}
+
 async function openPath(path: string): Promise<void> {
+  await leaveProject();
   try { await showProject(await window.patter.openPath(path)); }
   catch { showWelcome(await window.patter.forget(path)); } // moved / deleted -> drop it, back to welcome
 }
 
-async function openDialog(): Promise<void> { const r = await window.patter.openDialog(); if (r) await showProject(r); }
+async function openDialog(): Promise<void> { await leaveProject(); const r = await window.patter.openDialog(); if (r) await showProject(r); }
 
 /** File ▸ Save As: flush every pending edit (so the on-disk bytes are current), then ask main to duplicate
  *  the project folder to a name / location the user picks and open the copy. Carries on in the duplicate. */
 async function saveAs(): Promise<void> {
   if (!project) return; // nothing open
-  if (surface) await save(); // pending text edits
-  await persistDocs();                // pending Notes
-  await persistComments();            // pending comments
+  await leaveProject(); // pending text edits, Notes, comments, and the remembered place
   const r = await window.patter.saveAs();
   if (r) await showProject(r);
 }
@@ -2345,6 +2357,7 @@ async function exportPatterpack(): Promise<void> {
 /** File ▸ Open Patterpack: pick a `.patterpack` file, choose a destination folder, unpack, and switch to
  *  the new project (main runs both dialogs). Null when either picker is cancelled. */
 async function openPatterpack(): Promise<void> {
+  await leaveProject();
   const r = await window.patter.openPatterpack();
   if (r) await showProject(r);
 }
@@ -2605,6 +2618,7 @@ async function createDialog(): Promise<void> {
   if (!name) return;                                  // cancelled the name step
   const vcs = createVcsSel.value as VcsKind;          // the chosen version-control system
   const buildBundle = createBuildInput.value.trim() || undefined; // where Build Bundle will write
+  await leaveProject();
   const r = await window.patter.createDialog(name, vcs, buildBundle); // pick a location, then scaffold <name>.patter
   if (r) await showProject(r);
 }

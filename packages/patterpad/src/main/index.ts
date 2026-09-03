@@ -149,7 +149,12 @@ const session = createProjectSession<OpenedProject, OpenResult>({
   },
   // The teardown half the shell runs first: main holds a whole project's worth of state behind
   // `loaded`, and every IPC that reads it would keep answering for a project the author has closed.
-  close: () => {
+  close: (ending) => {
+    // Called AFTER the replacement has opened (see the shell's contract), with the OUTGOING session.
+    // When an open has already replaced it, `openProject` did the teardown and everything below now
+    // describes the NEW project: tearing down here left nothing loaded (Open Recent over an open
+    // project showed one scene, 2026-09-03). Only a session that is still current is closed for real.
+    if (!project.isCurrent(ending)) return;
     project.closeProject();
     currentRoot = null;      // the second-instance jump-in-place guard must not point at a closed project
     searchFocus = undefined; // and the search window's ranking anchor belongs to that project too
