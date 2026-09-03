@@ -34,10 +34,25 @@ scope, not a set of arbitrary host scopes to register.
 
 ## Read-only properties
 
-Whether the story may write a given `@world` value is fixed when you declare it (the **Read-only**
-switch in Patterpad). A read-only property can be read in a condition, but an effect that tries to set
-it is a validation error. That comes from the property's declaration in the bundle, so it holds
-whether or not your resolver provides a `set`.
+Four things, and they are the same four in Storylet Studio, in the same order, so a game running
+both engines sees one rule:
+
+1. **Read-only is the story's promise, declared on the property** (`writable: false` in the
+   project, the **Read-only** switch in Patterpad). A condition can still read `@world.alarm`;
+   an effect that sets it is a **validation error**, so a scene cannot move the game's state by
+   mistake.
+2. **The runtime keeps the promise too.** If a bundle somehow carries such a write, the engine
+   refuses it with `'alarm' is read-only` and nothing changes. Your resolver's `set` is never
+   called for a read-only property.
+3. **A resolver with no `set` makes the whole of `@world` read-only to the story**, whatever the
+   declarations say. That is the game's policy rather than the story's promise; both apply.
+4. **Your game is never bound, through its own resolver.** Bind one and the game moves `@world`
+   whenever it likes, read-only or not. Bind none, and the engine's self-backed bag keeps the
+   declaration for every caller: a read-only value then holds its default for the whole run. If
+   the game must move it, bind a resolver.
+
+There is no write-only: a declared property can always be read by the story. If the game holds a
+value the story should not see, do not declare it.
 
 ## If you don't bind a resolver
 
