@@ -159,7 +159,7 @@ function changedSourceStringIds(prevLocSource: string | null, nextLocSource: str
  *  existing authoring, so comments / docs / status are untouched): the scene-level author trail plus a
  *  per-STRING `modifiedAt` for each source string whose text changed - the latter is what makes a
  *  translated line go stale on the next localisation export (loc / report read `modifiedAt` per id). */
-function editTrailWrite(s: SceneShards, sceneId: string, author: string | undefined, changedStringIds: string[]): { path: string; content: string } {
+function editTrailWrite(s: SceneShards, sceneId: string, author: string | undefined, changedStringIds: string[]): { path: string; content: string; af: AuthoringFile } {
   return authoringWrite(s, (af) => {
     const now = new Date().toISOString();
     const edits = { ...af.edits };
@@ -696,13 +696,18 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     if (!writes.length) return { ok: true }; // nothing changed -> leave the shards (and the edit-trail) untouched
     // Which SOURCE strings changed - so each gets a fresh `modifiedAt` (the localisation-staleness signal).
     const changedStringIds = locChanged ? changedSourceStringIds(prevLoc, locSource) : [];
-    if (author || changedStringIds.length) writes.push(editTrailWrite(s, sceneId, author, changedStringIds));
+    const trail = author || changedStringIds.length ? editTrailWrite(s, sceneId, author, changedStringIds) : null;
+    if (trail) writes.push(trail);
     const res = await commitWrites(writes);
     if (res.ok) {
       sourceMirror.set(sceneId, { flow: flowSource, loc: locSource }); // the mirror now matches what we wrote
       // Keep the in-memory project current with the save, so validate / play don't re-read disk.
       try { if (loaded) applyLiveSource(loaded, { sceneId, flow: flowSource, loc: locSource }); }
       catch (e) { console.warn(`patterpad: saved scene ${sceneId} but couldn't refresh the in-memory copy (reloads on reopen):`, e); }
+      // The edit trail is an authoring-shard write like any other, and on a scene's FIRST save it CREATES
+      // the shard: left out of the model, that new file read as "not in project" to a check that compared
+      // disk with these lists (the Hamlet demo, 2026-09-03). Same sync as commitAuthoring.
+      if (trail) syncAuthoringModel(s, trail.af);
     }
     return res;
   });

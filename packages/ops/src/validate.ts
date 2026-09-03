@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, statSync } from "node:fs";
-import { basename, relative } from "node:path";
+import { basename, isAbsolute, join, relative } from "node:path";
 import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
@@ -87,14 +87,13 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
  * becomes a question the author can answer.
  */
 export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
-  const collected = new Set([
-    loaded.projectFile,
-    ...Object.values(loaded.sceneFiles),
-    ...loaded.localeFiles,
-    ...loaded.authoringFiles,
-  ]);
+  // Decided from PATHS, not from what happens to be in memory. This first compared the disk walk with
+  // the loaded file lists, which is only right while those lists track every file: a shard that
+  // appeared under its folder after the project was opened (another tool, a checkout, a colleague's
+  // sync) was reported as outside the project while sitting exactly where the loader reads from
+  // (the Hamlet demo, 2026-09-03). The loader collects by folder, so the folder is the rule.
   // The message names the file, relative to the project, and the folder this project reads that kind
-  // from: "this file" with no file was the one thing a reader could not act on (2026-09-03).
+  // from: "this file" with no file was the one thing a reader could not act on.
   const layout = { flow: "scenes/", strings: "loc/", authoring: "authoring/", ...loaded.project.layout };
   const kind: Record<string, { what: string; home: string | null }> = {
     ".patterflow": { what: "scene", home: layout.flow },
@@ -102,10 +101,14 @@ export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
     ".patterx": { what: "authoring", home: layout.authoring },
     ".patterproj": { what: "project", home: null },
   };
+  const inside = (file: string, dir: string): boolean => {
+    const r = relative(dir, file);
+    return r !== "" && !r.startsWith("..") && !isAbsolute(r);
+  };
   const out: HygieneIssue[] = [];
   for (const [ext, { what, home }] of Object.entries(kind)) {
     for (const file of walkFiles(loaded.root, ext)) {
-      if (collected.has(file)) continue;
+      if (home ? inside(file, join(loaded.root, home)) : file === loaded.projectFile) continue;
       const rel = relative(loaded.root, file);
       const message = home
         ? `${rel} is a ${what} file outside the project's folders: nothing loads it, so none of it is in the project. Move it under ${home}, or delete it.`

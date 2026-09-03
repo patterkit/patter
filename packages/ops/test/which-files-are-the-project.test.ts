@@ -70,6 +70,18 @@ describe("a shard outside the layout is reported, not silently ignored", () => {
     ]);
   });
 
+  it("is not fooled by a file that arrived under its folder AFTER the project was loaded", () => {
+    // Patterpad keeps a project in memory for hours; another tool (or a colleague's sync) drops a shard
+    // into the right folder meanwhile. The loader would collect it on the next open, so it is IN the
+    // project, whatever the stale in-memory lists say (the Hamlet demo, 2026-09-03).
+    const dir = project();
+    const loaded = loadProject(dir);
+    mkdirSync(join(dir, "authoring"), { recursive: true });
+    writeFileSync(join(dir, "authoring", "start.patterx"), JSON.stringify({ schema: "patter/authoring@0", scene: "scn_start" }));
+    writeFileSync(join(dir, "scenes", "later.patterflow"), flow("scn_later", "Later"));
+    expect(runValidate(loaded).orphans).toEqual([]);
+  });
+
   it("says nothing about a clean project", () => {
     expect(runValidate(loadProject(project())).orphans).toEqual([]);
   });
