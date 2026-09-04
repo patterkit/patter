@@ -68,7 +68,7 @@ jobs:
         working-directory: patter
         run: npm test
 
-      - name: Build the patterplay.min.js drop-in (play-helpers builds it: runtime + helpers, one global)
+      - name: Build the patterplay.min.js drop-in (play-helpers builds it, runtime + helpers under one global)
         working-directory: patter
         run: npm run build -w @patterkit/runtime -w @patterkit/play-helpers
 
