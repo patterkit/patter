@@ -6,6 +6,15 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The tour demo no longer stops a Godot 4.3 project from opening.** It called
+  `AudioStreamWAV.load_from_file`, which is 4.4+, and Godot parses every script in a project when the
+  project OPENS - so on 4.3 that one demo file failed to parse and took the whole project with it,
+  addon, runtime and the author's own game. The call now goes through `ClassDB` so nothing 4.4-only
+  is named at parse time, and 4.3 runs the tour without audio, which is what this README always
+  promised. Found by a new CI step that parses every script in the addon, one at a time.
+
 ## [0.12.0] - 2026-09-04
 
 ### Changed

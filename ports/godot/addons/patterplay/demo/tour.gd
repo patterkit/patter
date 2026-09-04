@@ -86,7 +86,14 @@ func _play_clip(beat_id: String) -> void:
 	var path: String = _audio.resolve(beat_id)
 	if path == "":
 		return
-	var stream := AudioStreamWAV.load_from_file(path)
+	# `AudioStreamWAV.load_from_file` is 4.4+, and this script must PARSE on 4.3: Godot parses every
+	# script when a project opens, so naming a 4.4-only symbol here would stop a 4.3 project loading
+	# AT ALL - addon, runtime and the author's own game with it. Both the check and the call go
+	# through ClassDB, which is an object, so nothing 4.4-only is named at parse time and 4.3 simply
+	# runs the tour without audio (this addon's README: the tour's audio playback needs 4.4+).
+	if not ClassDB.class_has_method("AudioStreamWAV", "load_from_file"):
+		return
+	var stream: AudioStream = ClassDB.call("class_call_static", "AudioStreamWAV", "load_from_file", path)
 	if stream != null:
 		_player.stream = stream
 		_player.play()
