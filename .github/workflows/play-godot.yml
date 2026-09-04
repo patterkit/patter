@@ -52,6 +52,16 @@ jobs:
       - name: Import project (registers the class_name globals)
         run: ./godot --headless --path ports/godot --import || true
 
+      # Every script in the addon parses. Godot parses the lot when a project OPENS, so one bad file
+      # stops the whole project loading, and the addon is what the author blames. Nothing above would
+      # see it: a named `--script` run parses only what that script reaches, and `--import` says
+      # NOTHING about a broken script (verified cold, 2026-09-04: it exits 0 and prints no error), so
+      # the `|| true` above is not what hides this - only a per-file check finds it.
+      # From the Storylets side, who shipped exactly this in three Godot releases
+      # (from-storylets/godot-addon-scripts-are-never-all-parsed).
+      - name: Every addon script parses
+        run: GODOT="$PWD/godot" ports/godot/test/parse_check.sh
+
       - name: Verify parity (corpus TestHost - gates the release)
         run: ./godot --headless --path ports/godot --script res://test/test_corpus.gd -- "$PWD/packages/conformance/corpus.json"
 
