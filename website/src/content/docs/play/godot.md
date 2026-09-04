@@ -9,8 +9,8 @@ Patterplay for Godot is the **pure-GDScript Patterplay runtime**: no web view, n
 extension to compile. It loads a `.patterc` [bundle](/format/overview/) and plays it
 directly, held to the same [shared test suite](/compatibility/) as every other engine.
 
-> Verified on Godot 4.7. The runtime uses only plain GDScript (no scene-tree types), so it also
-> runs headless.
+> Needs Godot 4.4 or newer; verified on 4.7, which every release is gated on. The runtime uses
+> only plain GDScript (no scene-tree types), so it also runs headless.
 
 ## Install
 

@@ -12,8 +12,8 @@ Full documentation: **[the Godot guide](https://patterkit.dev/play/godot/)**.
 
 Drop this `patterplay/` folder into your project's `addons/` directory and enable the plugin
 in *Project ▸ Project Settings ▸ Plugins*. The runtime works with or without the editor plugin
-enabled; enabling it just registers the helper classes. Requires Godot 4.x (the tour demo's
-optional audio playback needs 4.4+).
+enabled; enabling it just registers the helper classes. Requires **Godot 4.4 or newer**, and is
+verified on 4.7, which every release is gated on.
 
 ## Play a flow
 

@@ -30,6 +30,13 @@ if [ ! -x "$godot" ]; then
   exit 0
 fi
 
+# Import FIRST, or every script that names a `class_name` from this addon reports a false parse error:
+# the globals live in the project's script cache, which is per engine version, so a check run against
+# a cold or foreign cache says 15 of 34 files are broken when the addon is perfectly fine (met while
+# verifying this on 4.4, 2026-09-04). CI does the import in its own step; this makes the script honest
+# when a person runs it by hand too. Its exit code is deliberately ignored, as it is in the workflows.
+"$godot" --headless --path "$project" --import >/dev/null 2>&1 || true
+
 broken=0
 count=0
 while IFS= read -r file; do

@@ -6,14 +6,15 @@ same runtime behaviour.
 
 ## [Unreleased]
 
-### Fixed
+### Changed
 
-- **The tour demo no longer stops a Godot 4.3 project from opening.** It called
-  `AudioStreamWAV.load_from_file`, which is 4.4+, and Godot parses every script in a project when the
-  project OPENS - so on 4.3 that one demo file failed to parse and took the whole project with it,
-  addon, runtime and the author's own game. The call now goes through `ClassDB` so nothing 4.4-only
-  is named at parse time, and 4.3 runs the tour without audio, which is what this README always
-  promised. Found by a new CI step that parses every script in the addon, one at a time.
+- **This addon needs Godot 4.4 or newer, and is verified on 4.7.** The floor was never stated
+  ("Godot 4.x") and never tested: CI gated on 4.3, where the tour demo did not even parse, because it
+  calls `AudioStreamWAV.load_from_file` (4.4+). Godot parses every script in a project when the
+  project OPENS, so on 4.3 that one demo file took the whole project with it - addon, runtime, and
+  the author's own game. Now the floor is stated, the gate is the current stable, and a CI step
+  parses every script in the addon one at a time so the claim cannot drift again. Verified on real
+  4.4 and 4.7 engines; on 4.3 the demo still will not parse, which is what a floor means.
 
 ## [0.12.0] - 2026-09-04
 

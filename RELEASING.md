@@ -306,7 +306,8 @@ the runtime plugin plus a ready-to-open **PatterplayDemo sample project** (its `
 finds the plugin beside it via `AdditionalPluginDirectories`). The zips carry only what
 users need (plugin + demos + README + CHANGELOG); TestHosts and corpus material never ship. No engine
 install is needed for the Unity/Unreal gates (both run on a plain ubuntu runner); the
-Godot job downloads Godot `4.3-stable` headless. No secrets beyond the default
+Godot job downloads Godot `4.7-stable` headless (the addon's floor is 4.4; the gate is the
+current stable, and `ports/godot/test/parse_check.sh` parses every addon script on it). No secrets beyond the default
 `GITHUB_TOKEN`.
 
 ## CI note
