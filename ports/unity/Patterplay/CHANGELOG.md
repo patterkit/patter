@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  the JS runtime's: `patterplay.min.js`, the browser drop-in, is now built by `@patterkit/play-helpers`
+  and carries the play helpers (save / load, state logger, inspectors, Live Link) as well as the
+  runtime on the one `Patterplay` global, so a plain web page can write the family's save text with
+  no bundler. This plugin is unchanged; a save it writes still loads there and back.
+
 ## [0.11.0] - 2026-09-03
 
 ### Fixed
