@@ -73,6 +73,22 @@ for ordinary library work that brings its own changeset, `ship:cli` when there i
 changeset yet and the standalone binaries need tagging afterwards. All three share
 `scripts/lib/version-pr.mjs`.
 
+## When the Release run fails right after a workflow edit
+
+The Changesets bot pushes `changeset-release/main` with the workflow token, and GitHub refuses any
+push from that token that creates or changes a file under `.github/workflows/`. That is fine while
+the branch exists (the bot's push only adds its version commit), but the branch is deleted every time
+a Version Packages PR merges. So: edit a workflow on main while no Version Packages PR is open, and
+the next Release run fails at "Create Version PR or publish to npm" with
+`refusing to allow a GitHub App to create or update workflow ... without workflows permission`
+(2026-09-04, play-js.yml). Recovery is one push from a person, then a re-run:
+
+```sh
+git push origin main:refs/heads/changeset-release/main   # the branch now exists at main's tip
+```
+
+The bot's next push moves that ref by its own commit alone, which the token may do.
+
 ## The changeset guard
 
 A push that moves a published package's source with no changeset covering it is refused, by a
