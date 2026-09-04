@@ -32,11 +32,11 @@
   </div>
 
   <!-- The self-contained Patterplay runtime (build it first: npm run build -w @patterkit/runtime). -->
-  <script src="../../packages/runtime/dist/patterplay.min.js"></script>
+  <script src="../../packages/play-helpers/dist/patterplay.min.js"></script>
   <!-- The pre-compiled demo bundle: window.PATTER_BUNDLE (regenerate with: node gen.mjs). -->
   <script src="./bundle.js"></script>
   <script>
-    const { Engine } = window.Patterplay;
+    const { Engine, serializeState, deserializeState } = window.Patterplay; // the drop-in carries the play helpers too
     const BUNDLE = window.PATTER_BUNDLE;
     const SAVE_KEY = "patterplay.dropin.save";
     const startScene = Object.keys(BUNDLE.scenes)[0];
@@ -80,15 +80,14 @@
 
     document.getElementById("restart").onclick = newGame;
     document.getElementById("save").onclick = () => {
-      // The whole game in one blob - this is exactly what @patterkit/play-helpers
-      // wraps as serializeState(engine).
-      localStorage.setItem(SAVE_KEY, JSON.stringify(engine.saveGame()));
+      // The family's save text (patter/save@0): the same envelope every runtime writes and reads.
+      localStorage.setItem(SAVE_KEY, serializeState(engine));
     };
     document.getElementById("load").onclick = () => {
       const blob = localStorage.getItem(SAVE_KEY);
       if (!blob) return alert("No save yet.");
       engine = new Engine(BUNDLE);
-      engine.loadGame(JSON.parse(blob));
+      deserializeState(engine, blob); // throws on a blob that is not a Patter save
       flow = engine.getFlow("main");
       stage.innerHTML = ""; add("text", "(resumed from save)");
       run();

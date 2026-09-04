@@ -15,11 +15,13 @@ Three equivalent channels - pick whichever fits how you work; **no npm is requir
 - **Release zip**: `patterplay-js-<version>.zip` on every
   [`play-js-v*` GitHub Release](https://github.com/patterkit/patter/releases) - this
   runtime as a plain download, symmetric with the Unity / Unreal / Godot plugin zips.
-  It carries `patterplay.min.js` (the `<script>` drop-in), the module builds under
-  `dist/` (ESM + CJS + types, for vendoring into your own build), this README, the
-  CHANGELOG, and two `demos/` (the zero-build drop-in page and the interactive tour).
+  It carries `patterplay.min.js` (the `<script>` drop-in: this runtime plus
+  `@patterkit/play-helpers` under one global), the module builds under `dist/` (ESM + CJS +
+  types, for vendoring into your own build), this README, the CHANGELOG, and two `demos/`
+  (the zero-build drop-in page and the interactive tour).
 - **npm**: `npm install @patterkit/runtime` (same version as the zip).
-- **CDN**: `patterplay.min.js` via unpkg/jsDelivr, or loose on the same Release.
+- **CDN**: `patterplay.min.js` via unpkg/jsDelivr from `@patterkit/play-helpers` (the package
+  that builds it), or loose on the same Release.
 
 ## Use it (npm / bundler)
 
@@ -58,19 +60,22 @@ its own system, then applies `{@ref}` replacement with **`flow.interpolate(yourS
 ## Drop-in (`<script>`)
 
 `patterplay.min.js` is a single self-contained, minified IIFE - every dependency
-inlined - for plain HTML pages with no bundler:
+inlined - for plain HTML pages with no bundler. It carries this runtime AND
+[`@patterkit/play-helpers`](../play-helpers) on the one `Patterplay` global, so a plain
+page can also write and read the family's save text:
 
 ```html
-<script src="https://unpkg.com/@patterkit/runtime/dist/patterplay.min.js"></script>
+<script src="https://unpkg.com/@patterkit/play-helpers/dist/patterplay.min.js"></script>
 <script>
-  const { Engine } = window.Patterplay;     // also: Flow, gameDataFields, gameDataValue, effectiveGameData
-  const flow = new Engine(BUNDLE).openFlow("main", { scene: "square" });
-  // ...advance() / choose() exactly as above.
+  const { Engine, serializeState, deserializeState } = window.Patterplay; // also: Flow, gameDataFields, createStateLogger, ...
+  const engine = new Engine(BUNDLE);
+  const flow = engine.openFlow("main", { scene: "square" });
+  // ...advance() / choose() exactly as above; localStorage.setItem("slot1", serializeState(engine)) to save.
 </script>
 ```
 
-Build it locally with `npm run build -w @patterkit/runtime` (emits
-`dist/patterplay.min.js`).
+It is built by the play-helpers package, the one that depends on both: `npm run build -w
+@patterkit/play-helpers` (emits `packages/play-helpers/dist/patterplay.min.js`).
 
 ## Demos
 

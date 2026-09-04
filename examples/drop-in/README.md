@@ -38,10 +38,11 @@ from inside this folder, `npm run gen` does the same thing.)
 writes as `<name>.patterc`) wrapped as `window.PATTER_BUNDLE`. In a real game you
 would ship the `.patterc` and `fetch()` it instead.
 
-Save / load here calls `engine.saveGame()` / `loadGame()` directly. The
-[`@patterkit/play-helpers`](../../packages/play-helpers) companion wraps these (plus
-runtime property setters, a state logger, the Patterpad Live Link client, and audio
-resolution) for module hosts:
+Save / load use `serializeState` / `deserializeState` straight off `window.Patterplay`:
+the drop-in carries [`@patterkit/play-helpers`](../../packages/play-helpers) as well as
+the runtime (plus its property setters, state logger, Patterpad Live Link client, and
+audio resolution), so a plain page writes the family's save text with no bundler. The
+same names come from the npm package for module hosts:
 
 ```js
 import { serializeState, deserializeState } from "@patterkit/play-helpers";

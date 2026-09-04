@@ -23,11 +23,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "./patterplay.min.js": "./dist/patterplay.min.js"
+    }
   },
-  "unpkg": "./dist/patterplay.min.js",
-  "jsdelivr": "./dist/patterplay.min.js",
   "files": [
     "dist",
     "README.md",

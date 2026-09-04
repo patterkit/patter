@@ -1,7 +1,7 @@
 {
   "name": "@patterkit/play-helpers",
   "version": "0.5.1",
-  "description": "Thin game-integration helpers around @patterkit/runtime: save/load serialisation, runtime property setters, a state logger, the Patterpad Live Link client + hot reload, a property inspector, and audio resolution. The Patterplay JS companion.",
+  "description": "Thin game-integration helpers around @patterkit/runtime: save/load serialisation, runtime property setters, a state logger, the Patterpad Live Link client + hot reload, a property inspector, and audio resolution. The Patterplay JS companion, and the home of the patterplay.min.js browser drop-in (runtime + helpers under one global).",
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",
@@ -23,15 +23,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./patterplay.min.js": "./dist/patterplay.min.js"
   },
+  "unpkg": "./dist/patterplay.min.js",
+  "jsdelivr": "./dist/patterplay.min.js",
   "files": [
     "dist",
     "README.md"
   ],
   "sideEffects": false,
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean"
+    "build": "tsup"
   },
   "dependencies": {
     "@patterkit/model": "^0.5.0",

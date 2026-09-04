@@ -136,7 +136,8 @@ never published.)
    bumps the affected packages, fixes their internal dependency ranges, and writes
    CHANGELOGs.
 3. Merging that PR publishes the bumped packages to npm (with provenance) and tags
-   them. `@patterkit/runtime` carries the `patterplay.min.js` drop-in for unpkg/jsDelivr.
+   them. `@patterkit/play-helpers` builds and carries the `patterplay.min.js` drop-in (runtime +
+   helpers under one global) for unpkg/jsDelivr and the play-js release; the runtime alone is the library.
 
 **No npm secret is needed.** Publishing authenticates with npm **trusted publishing
 (OIDC)**: each `@patterkit` package trusts this repo + `.github/workflows/release.yml` on

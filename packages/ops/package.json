@@ -38,6 +38,7 @@
     "pdfkit": "^0.19.1"
   },
   "devDependencies": {
-    "@types/pdfkit": "^0.17.6"
+    "@types/pdfkit": "^0.17.6",
+    "esbuild": "^0.28.2"
   }
 }

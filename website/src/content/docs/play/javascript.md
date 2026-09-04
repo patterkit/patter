@@ -19,7 +19,9 @@ Node app. Two ways in: a **zero-build drop-in** for a plain HTML page, or the
 ```
 
 Grab `patterplay.min.js` from the [downloads page](/download/) or a CDN. It's a single
-self-contained file: no module loader, no bundler. The same release also carries
+self-contained file: no module loader, no bundler. It carries the runtime **and**
+`@patterkit/play-helpers` under the one `Patterplay` global, so `Patterplay.serializeState(engine)`
+writes the family's save text from a plain page (see [Helpers](#helpers-state-and-localisation)). The same release also carries
 **`patterplay-js-<version>.zip`** - the whole JS runtime as a plain download, symmetric with
 the Unity / Unreal / Godot plugin zips: the drop-in, the module builds (for vendoring into
 your own build), the changelog, and two bundled demos (a zero-build drop-in page and the
@@ -122,6 +124,7 @@ the last.
   (exactly what `saveGame()` does), typed property setters, a state logger, a live state inspector
   (below), and the [live refresh & debug](/play/live-debug/) link, including
   `applyLiveBundle` so editor saves land in the running game. Optional, but it saves boilerplate.
+  The drop-in carries all of it on `window.Patterplay`; the npm package is the module form.
   → [Save/load & Game Data](/play/integration/)
 - **Read your Game Data and tags** off each step to drive audio and visuals; supply your `@world`
   values; emit host events. → [Save/load & Game Data](/play/integration/)

@@ -1,5 +1,5 @@
 // Minimal dependency-free static server rooted at the REPO ROOT, so the drop-in
-// page can reach both ./bundle.js and ../../packages/runtime/dist/patterplay.min.js.
+// page can reach both ./bundle.js and ../../packages/play-helpers/dist/patterplay.min.js.
 //   node serve.mjs [port]   then open /examples/drop-in/index.html
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";

@@ -5,7 +5,8 @@ name: Patterplay JS release
 # Gated on the full JS test suite (which replays the conformance corpus through this runtime,
 # the cross-engine reference), it attaches to the matching GitHub Release:
 #   - patterplay-js-<ver>.zip    the JS runtime as a plain download, symmetric with the three
-#                                engine-plugin zips: patterplay.min.js + the module builds
+#                                engine-plugin zips: patterplay.min.js (runtime + play-helpers,
+#                                one global, built by play-helpers) + the module builds
 #                                (dist/) + README + CHANGELOG + demos/ (the zero-build drop-in
 #                                page and the interactive tour, audio-less). No npm needed.
 #   - patterplay.min.js          the <script> drop-in, loose, for a one-file grab
@@ -67,9 +68,9 @@ jobs:
         working-directory: patter
         run: npm test
 
-      - name: Build the patterplay.min.js drop-in
+      - name: Build the patterplay.min.js drop-in (play-helpers builds it: runtime + helpers, one global)
         working-directory: patter
-        run: npm run -w @patterkit/runtime build
+        run: npm run build -w @patterkit/runtime -w @patterkit/play-helpers
 
       - name: Assemble the patterplay-js zip
         working-directory: patter
@@ -80,7 +81,7 @@ jobs:
 
           # The runtime: the drop-in at the top, module builds under dist/.
           mkdir -p "${out}/dist"
-          cp packages/runtime/dist/patterplay.min.js packages/runtime/dist/patterplay.min.js.map "${out}/"
+          cp packages/play-helpers/dist/patterplay.min.js packages/play-helpers/dist/patterplay.min.js.map "${out}/"
           cp packages/runtime/dist/index.js packages/runtime/dist/index.js.map \
              packages/runtime/dist/index.cjs packages/runtime/dist/index.cjs.map \
              packages/runtime/dist/index.d.ts packages/runtime/dist/index.d.cts "${out}/dist/"
@@ -90,8 +91,8 @@ jobs:
           mkdir -p "${out}/demos/drop-in"
           cp examples/drop-in/index.html examples/drop-in/bundle.js examples/drop-in/README.md \
              examples/drop-in/patterplay-icon.svg "${out}/demos/drop-in/"
-          cp packages/runtime/dist/patterplay.min.js "${out}/demos/drop-in/"
-          sed -i 's|\.\./\.\./packages/runtime/dist/patterplay.min.js|./patterplay.min.js|' "${out}/demos/drop-in/index.html"
+          cp packages/play-helpers/dist/patterplay.min.js "${out}/demos/drop-in/"
+          sed -i 's|\.\./\.\./packages/play-helpers/dist/patterplay.min.js|./patterplay.min.js|' "${out}/demos/drop-in/index.html"
 
           # Demo 2: the interactive tour (audio-less; node serve.mjs).
           node examples/tour-web/build.mjs
@@ -121,7 +122,7 @@ jobs:
           body_path: ${{ runner.temp }}/release-notes.md
           files: |
             ${{ env.JS_ZIP }}
-            patter/packages/runtime/dist/patterplay.min.js
+            patter/packages/play-helpers/dist/patterplay.min.js
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

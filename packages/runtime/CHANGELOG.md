@@ -33,6 +33,16 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **`patterplay.min.js` moved to `@patterkit/play-helpers`, and carries the helpers.** The browser
+  drop-in used to be this package's own build, runtime alone, so a plain page with no bundler could
+  play but not write the family's save text. It is now built by the play-helpers package (the one
+  that depends on both) with the runtime AND the helpers under the one `Patterplay` global. The
+  play-js release still ships it loose and in the zip; on a CDN it now lives at
+  `@patterkit/play-helpers/dist/patterplay.min.js`, and this npm package no longer contains it.
+  (Asked for by the Storylets side, whose drop-in took the same shape the same day.)
+
 ## [0.11.0] - 2026-09-03
 
 ### Changed

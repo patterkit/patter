@@ -8,6 +8,25 @@ the host wiring most games end up writing anyway.
 npm install @patterkit/play-helpers
 ```
 
+## Drop-in (`<script>`)
+
+This package also builds **`patterplay.min.js`**, the zero-build browser drop-in: one classic
+script, everything inlined, defining `window.Patterplay` with the runtime **and** these helpers
+on it. It ships loose on every `play-js-v*` GitHub Release, inside `patterplay-js-<version>.zip`,
+and from a CDN:
+
+```html
+<script src="https://unpkg.com/@patterkit/play-helpers/dist/patterplay.min.js"></script>
+<script>
+  const { Engine, serializeState, deserializeState } = window.Patterplay;
+  const engine = new Engine(BUNDLE);
+  // ...play; then localStorage.setItem("slot1", serializeState(engine)) to save.
+</script>
+```
+
+Two script tags (this and the Storylet Engine's `storyletengine.min.js`) is the whole
+integration for a page running both families with no bundler.
+
 ## Save / load
 
 Wrap the engine's whole-game snapshot in a tagged, versioned envelope - drop it into

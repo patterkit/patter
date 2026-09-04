@@ -38,10 +38,11 @@ four runtimes are the same version and [tested to match](/play/overview/):
 <Downloads kind="plugins" />
 
 The JS runtime is also on npm as `@patterkit/runtime` (plus the optional
-`@patterkit/play-helpers`), or from a CDN:
+`@patterkit/play-helpers`), or from a CDN. The drop-in carries both under one global and is
+served from the helpers package:
 
 ```html
-<script src="https://unpkg.com/@patterkit/runtime/dist/patterplay.min.js"></script>
+<script src="https://unpkg.com/@patterkit/play-helpers/dist/patterplay.min.js"></script>
 ```
 
 See [The Engine API](/play/engine/) and the per-engine guides to get started.
