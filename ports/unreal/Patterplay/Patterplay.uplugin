@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 19,
-	"VersionName": "0.11.0",
+	"Version": 20,
+	"VersionName": "0.12.0",
 	"FriendlyName": "Patterplay",
 	"Description": "Patterplay runtime for Unreal Engine. Loads compiled .patterc bundles and plays Patter branching narrative, exposed to Blueprint and C++. Every Patterplay runtime plays the same bundle with the same behaviour.",
 	"Category": "Gameplay",

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-04
+
 ### Changed
 
 - **`patterplay.min.js` moved to `@patterkit/play-helpers`, and carries the helpers.** The browser
