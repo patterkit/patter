@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-09-04
+
 ### Changed
 
 - **This addon needs Godot 4.4 or newer, and is verified on 4.7.** The floor was never stated
