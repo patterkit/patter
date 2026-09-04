@@ -4,7 +4,7 @@
 // runs the same handlers as the welcome buttons. The menu is rebuilt whenever recents change so
 // File > Open Recent stays current.
 
-import { app, shell, Menu, type BrowserWindow, type MenuItemConstructorOptions } from "electron";
+import { app, shell, Menu, BrowserWindow, type MenuItemConstructorOptions } from "electron";
 import { resolve, sep } from "node:path";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 // The suite-standard Edit items. Their LABELS and ACCELERATORS are family grammar and come from
@@ -124,7 +124,19 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { role: "cut" },
         { role: "copy" },
         { role: "paste" },
-        { role: "selectAll" },
+        // NOT the native role: it selects the whole DOM, which in the editor is the whole scene
+        // (and scrolls to the end of it). The main window scopes it to the field the caret is in;
+        // any other window (the detached search / coverage tools) gets exactly the native behaviour,
+        // since `send` only reaches the main window.
+        {
+          label: "Select All",
+          accelerator: "CmdOrCtrl+A",
+          click: () => {
+            const focused = BrowserWindow.getFocusedWindow();
+            if (focused && focused !== win) { focused.webContents.selectAll(); return; }
+            send("select-all");
+          },
+        },
         { type: "separator" },
         // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
         // inside it - the copy takes fresh ids throughout, so it never aliases the original.

@@ -19,6 +19,7 @@ import { openScene, saveScene } from "../src/load.js";
 import { navKeymap } from "../src/navigation.js";
 import { openDirection, closeDirection } from "../src/direction.js";
 import { enter, endBubble, insertLineBefore } from "../src/lines.js";
+import { selectAllInBeat } from "../src/selectall.js";
 import { backspace, deleteSelectionGuarded } from "../src/delete.js";
 import { toggleLineType, flipToFreeText, promoteToDialogue } from "../src/linetype.js";
 import { context } from "../src/context.js";
@@ -252,6 +253,10 @@ export interface SurfaceHandle {
   /** ProseMirror history undo / redo - so the host's Edit menu drives the real editor history. */
   undo(): void;
   redo(): void;
+  /** Edit > Select All, scoped to the field the caret is in (src/selectall.ts): the spoken text of a
+   *  dialogue line, a text line's words, a direction, a choice prompt. False when the editor has no
+   *  such field to select (no caret in a beat), so the host can fall back to its own select-all. */
+  selectAllInBeat(): boolean;
   sceneName(): string;
   focus(): void;
   destroy(): void;
@@ -543,6 +548,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
           "Mod-t": toggleLineType, "Alt-t": toggleLineType, // Cmd-T is browser new-tab; Alt-T in the harness
         }),
         keymap({ "Mod-b": fmtKey(patterSchema.marks.strong), "Mod-i": fmtKey(patterSchema.marks.em) }),
+        // Ahead of baseKeymap, whose Mod-a selects the whole document (see src/selectall.ts).
+        keymap({ "Mod-a": selectAllInBeat }),
         keymap(navKeymap),
         keymap(baseKeymap),
         multiSelectState(),       // the discontiguous chunk-selection set (groups §6)
@@ -974,6 +981,9 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (!tr) return false;
       view.dispatch(tr);
       return true;
+    },
+    selectAllInBeat() {
+      return selectAllInBeat(view.state, view.dispatch);
     },
     duplicate() {
       // A node-selected block / group / snippet duplicates itself; otherwise duplicate the chunk the

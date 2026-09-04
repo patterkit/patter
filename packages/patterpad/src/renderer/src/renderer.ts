@@ -1014,6 +1014,16 @@ function paintProblems(): void {
   });
 }
 
+/** Edit > Select All. In the editor it means the field the caret is in, never the whole scene
+ *  (patterpad-surface/src/selectall.ts); anywhere else - a settings field, the notes box, a text
+ *  input - it means what it always did, which is why this does not just call the surface. */
+function selectAllCommand(): void {
+  if (surface?.view.hasFocus() && surface.selectAllInBeat()) return;
+  const el = document.activeElement;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.select();
+  else document.execCommand("selectAll");
+}
+
 /** Take the author to a problem's node: switch to its scene first when it lives elsewhere (the surface
  *  reveals only within the open scene, so a problem in another scene used to answer "Go to issue" with
  *  nothing, 2026-09-03), then reveal it. A problem with no node (a file-level one) has nowhere to go. */
@@ -2752,6 +2762,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "play") void play();
   else if (cmd === "play-from-start") void playFromStart();
+  else if (cmd === "select-all") selectAllCommand();
   else if (cmd === "duplicate") surface?.duplicate();
   else if (cmd === "undo") surface?.undo();
   else if (cmd === "redo") surface?.redo();

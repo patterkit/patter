@@ -8,6 +8,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **Cmd/Ctrl-A in the editor selects the field you are typing in, not the whole scene.** It selected
+  the entire document and scrolled to the end of it, with nothing highlighted where you were looking.
+  Now it selects a dialogue line's spoken words (never the character: that is a token the cast list
+  owns), a text line's words, a direction when the caret is in one, or a choice option's prompt. On a
+  game event it does nothing, since an atom holds no text. Both routes to the key are fixed: the
+  editor's own shortcut and Edit ▸ Select All, which was Electron's native role and knew nothing
+  about the story model, the same finding as Undo and Redo before it. Other fields, and the detached
+  search window, select all of their text as they always did.
 - **"Go to issue" reaches a problem in another scene.** The problems bar could only reveal a node in
   the open scene, so a problem elsewhere (an empty snippet in a scene you were not looking at, say)
   answered the click with nothing and no way to find it. Each problem now knows its scene: the bar
