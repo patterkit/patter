@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.3] - 2026-09-04
+
 ### Fixed
 
 - **Cmd/Ctrl-A in the editor selects the field you are typing in, not the whole scene.** It selected
