@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  the Godot addon's: it now states the Godot version it needs (4.4 or newer, verified on 4.7), which
+  had never been stated and never been tested. Nothing in this runtime changed.
+
 ## [0.12.0] - 2026-09-04
 
 ### Changed
