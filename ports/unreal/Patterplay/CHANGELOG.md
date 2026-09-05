@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-05
+
 ### Changed
 
 - **A `writable: false` host declaration is the STORY's promise, and only the story's: the game
