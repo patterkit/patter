@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/dialect",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "The Patter dialect for @wildwinter/expr (scopes shared/scene/flow, built-in functions), an ExpressionSchema builder from property declarations, and the inline {@ref} interpolation helpers (spec §16).",
   "type": "module",
   "license": "MIT",
