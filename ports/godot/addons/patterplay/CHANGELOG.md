@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **A `writable: false` host declaration is the STORY's promise, and only the story's: the game
+  writes it.** The engine's own `set_property` now writes a read-only `@world` property, self-backed or bound;
+  an effect that writes one is refused exactly as before, with the same sentence. Until now every
+  caller was refused alike, so a game could not advance its own clock through the engine. Matches the
+  JS reference and the Storylet Engine (from-storylets/host-writes-to-read-only-world).
+
 ## [0.12.1] - 2026-09-04
 
 ### Changed

@@ -144,12 +144,16 @@ namespace patter
 
         /** Write a property. Engine writes (the default) notify subscribers;
          *  pass silent = true for a host write, which reaches only the audit
-         *  hook. Throws on a read-only property. Returns the change. */
-        BagChange set(const std::string& name, const PatterValue& value, bool silent = false, const std::string& reason = "")
+         *  hook, and host = true when the caller IS the host: `writable: false`
+         *  is the story's promise, so the game's own surface is never refused by
+         *  it (ruled 2026-09-05). The two are separate: one says who hears the
+         *  write, the other who may make it. Throws on a read-only property.
+         *  Returns the change. */
+        BagChange set(const std::string& name, const PatterValue& value, bool silent = false, const std::string& reason = "", bool host = false)
         {
             std::string n = norm_(name);
             const ScopeDeclaration* decl = decls_.get(n);
-            if (decl && decl->writable.has_value() && !*decl->writable)
+            if (!host && decl && decl->writable.has_value() && !*decl->writable)
             {
                 throw EvalError("'" + name + "' is read-only");
             }

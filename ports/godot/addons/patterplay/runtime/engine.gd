@@ -33,6 +33,10 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_source_debug = loc.get("mode", "embedded") == "ids" and loc.get("sourceDebug", false)
 
 	_host = {
+		# Per host token, the names a STORY may not write ("*" = the whole scope). The game writes
+		# them freely: "writable": false is the story's promise, not a lock on the value's owner
+		# (from-storylets/host-writes-to-read-only-world). Flows read this on their own write path.
+		"story_read_only": {},
 		# The run's decision trace (parity with the JS runtime's engine.log()). Off unless
 		# asked for: a shipped game should pay nothing for a surface it never reads.
 		"log_enabled": bool(options.get("log", false)),
@@ -118,29 +122,25 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 			"get": func(n): return bag.get(str(n).to_lower()),
 			"set": func(n, v): bag[str(n).to_lower()] = v,
 		}
-	# A declaration's "writable": false is the STORY's promise, and the engine refuses the story's
-	# write whether the scope is bound or self-backed - the JS reference has always done so, and this
-	# addon let a bound scope's set straight through until 2026-09-03
-	# (from-storylets/unreal-wrapper-host-scopes). A per-name read-only a GAME keeps on its own scope
-	# is a different thing, and the scope refuses that itself. push_error and no write, the bag's own
-	# convention (GDScript has no throw); same sentence as the reference.
+	# A declaration's "writable": false is the STORY's promise and ONLY the story's: the engine
+	# refuses an effect's write, bound or self-backed, and lets the GAME write the value it owns
+	# (ruled across the family 2026-09-05, from-storylets/host-writes-to-read-only-world - this
+	# wrapped the resolver until then, which refused a game its own clock through set_property).
+	# So the read-only names are recorded here and consulted on the STORY's path alone
+	# (_write_property with host=false). push_error and no write, the bag's own convention
+	# (GDScript has no throw); same sentence as the reference.
 	for spec in bundle.get("scopeRegistry", {}).get("scopes", []):
 		var token := str(spec.get("token", ""))
 		if token == "" or not _host["host_scopes"].has(token):
 			continue
-		var scope_read_only: bool = spec.get("writable", true) == false
 		var read_only := {}
+		if spec.get("writable", true) == false:
+			read_only["*"] = true   # the whole scope: every name in it is the story's to read only
 		for d in spec.get("declarations", []):
 			if d.get("writable", true) == false and str(d.get("name", "")) != "":
 				read_only[str(d["name"]).to_lower()] = true
-		if not scope_read_only and read_only.is_empty():
-			continue
-		var inner: Callable = _host["host_scopes"][token]["set"]
-		_host["host_scopes"][token]["set"] = func(n, v):
-			if scope_read_only or read_only.has(str(n).to_lower()):
-				push_error("'@%s.%s' is read-only" % [token, n])
-				return
-			inner.call(n, v)
+		if not read_only.is_empty():
+			_host["story_read_only"][token] = read_only
 	_host["host_tokens"] = _host["host_scopes"].keys()
 
 	if options.has("seed"):
@@ -433,15 +433,34 @@ func list_properties() -> Array:
 	return rows
 
 
+## Write a shared property by ref. The GAME's surface, so it writes with HOST authority: a host
+## declaration's "writable": false is the story's promise not to write the value, never a lock on
+## the game that owns it. The story's own writes go through _write_property(.., false).
 func set_property(ref: String, value) -> void:
+	_write_property(ref, value, true)
+
+
+## The write itself. `host` says WHO is writing, which is all "writable": false cares about.
+func _write_property(ref: String, value, host: bool) -> void:
 	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
 	if sp[0] == "scene":
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return
 	if _host["host_scopes"].has(sp[0]):
+		if not host and _story_refuses(sp[0], sp[1]):
+			push_error("'@%s.%s' is read-only" % [sp[0], sp[1]])
+			return
 		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
 		return
-	_host["shared_patter"].set_value(sp[1], value)
+	_host["shared_patter"].set_value(sp[1], value, {"host": host} if host else {})
+
+
+## Is this host property read-only TO THE STORY? (A whole read-only scope is recorded as "*".)
+func _story_refuses(token: String, name: String) -> bool:
+	if not _host["story_read_only"].has(token):
+		return false
+	var names: Dictionary = _host["story_read_only"][token]
+	return names.has("*") or names.has(str(name).to_lower())
 
 
 # -- save / load ---------------------------------------------------------------

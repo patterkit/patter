@@ -4282,6 +4282,58 @@
       ]
     },
     {
+      "name": "a read-only declaration takes a HOST write",
+      "declarations": [
+        {
+          "name": "hp",
+          "type": "number",
+          "default": 3,
+          "writable": false
+        }
+      ],
+      "set": {
+        "name": "hp",
+        "value": 9
+      },
+      "host": true,
+      "expected": 9
+    },
+    {
+      "name": "a read-only declaration in a read-only scope takes a HOST write",
+      "scope": {
+        "writable": false
+      },
+      "declarations": [
+        {
+          "name": "clock",
+          "type": "string",
+          "default": "day"
+        }
+      ],
+      "set": {
+        "name": "clock",
+        "value": "night"
+      },
+      "host": true,
+      "expected": "night"
+    },
+    {
+      "name": "a host write to a writable declaration is an ordinary write",
+      "declarations": [
+        {
+          "name": "mood",
+          "type": "string",
+          "default": "calm"
+        }
+      ],
+      "set": {
+        "name": "mood",
+        "value": "tense"
+      },
+      "host": true,
+      "expected": "tense"
+    },
+    {
       "name": "a refusal on one declaration does not touch its neighbour",
       "declarations": [
         {

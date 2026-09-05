@@ -385,6 +385,10 @@ namespace patter
         // Host scopes by token, already resolved: an embedder's binding where one was given, a
         // self-backed bag for every other token the bundle declares. Empty for a bundle with none.
         std::map<std::string, HostScope> hostScopes;
+        // Per host token, the names a STORY may not write ("*" = the whole scope). The game writes them
+        // freely: `writable: false` is the story's promise, not a lock on the value's owner (ruled across
+        // the family 2026-09-05, from-storylets/host-writes-to-read-only-world). Flows read this too.
+        std::map<std::string, std::set<std::string>> storyReadOnly;
         std::set<std::string> hostTokens;
         std::function<double()> customRng;
         bool replayPromptOnChoose = false;
@@ -413,6 +417,14 @@ namespace patter
         // self-backed bag for that token; declared tokens you do not bind are self-backed.
         std::map<std::string, HostScope> hostScopes;
     };
+
+    // Is this host property read-only TO THE STORY? ("*" = the whole scope was declared read-only.)
+    inline bool storyRefuses(const FlowHost& host, const std::string& token, const std::string& name)
+    {
+        auto it = host.storyReadOnly.find(token);
+        if (it == host.storyReadOnly.end()) return false;
+        return it->second.count("*") > 0 || it->second.count(toLower(name)) > 0;
+    }
 
     // ----- Flow ----------------------------------------------------------------
 
@@ -719,11 +731,21 @@ namespace patter
             return hs != host_->hostScopes.end() ? hs->second.get(sp.second) : nullptr;
         }
 
-        void setProperty(const std::string& ref, const PatterValue& value)
+        // Write a property by ref. The GAME's surface, so a host declaration's `writable: false` binds
+        // the story, not the game that owns the value. Effects use writeProperty(.., false).
+        void setProperty(const std::string& ref, const PatterValue& value) { writeProperty(ref, value, true); }
+
+        // The write itself. `host` says WHO is writing, which is all `writable: false` cares about.
+        void writeProperty(const std::string& ref, const PatterValue& value, bool host)
         {
             auto sp = splitRef(ref, host_->hostTokens);
             if (sp.first == "patter") patterSet(sp.second, value);
-            else if (auto hs = host_->hostScopes.find(sp.first); hs != host_->hostScopes.end()) hs->second.set(sp.second, value);
+            else if (auto hs = host_->hostScopes.find(sp.first); hs != host_->hostScopes.end())
+            {
+                if (!host && storyRefuses(*host_, sp.first, sp.second))
+                    throw std::runtime_error("'@" + sp.first + "." + sp.second + "' is read-only");
+                hs->second.set(sp.second, value);
+            }
             else if (sp.first == "scene")
             {
                 if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
@@ -1214,7 +1236,7 @@ namespace patter
                 LogEntry e; e.type = "write"; e.subject = ef.target; e.value = value;
                 if (host_->logEnabled)
                     if (const PatterValue* pv = getProperty(ef.target)) { e.prev = *pv; e.hasPrev = true; }
-                setProperty(ef.target, value);
+                writeProperty(ef.target, value, false);   // the STORY writes: a read-only host property refuses it
                 emit(std::move(e));
             }
         }
@@ -1462,27 +1484,20 @@ namespace patter
                 host_.hostScopes[spec.token] = selfBackedScope(spec);
             }
             // A declaration's `writable: false` is the STORY's promise, and the engine refuses the story's
-            // write whether the scope is bound or self-backed - the JS reference has always done so
-            // (scoperegistry wraps every foreign resolver with the declared flags), and this core let a
-            // bound scope's set straight through until 2026-09-03 (from-storylets/unreal-wrapper-host-
-            // scopes). A per-name read-only a GAME keeps on its own container is a different thing, and
-            // the container refuses that itself. Same message as the reference, so a host sees one
-            // sentence from every runtime.
+            // write whether the scope is bound or self-backed - and ONLY the story's: the GAME writes the
+            // value it owns, through setProperty, whatever the flag says (ruled across the family
+            // 2026-09-05, from-storylets/host-writes-to-read-only-world; this WRAPPED the resolver until
+            // then, which refused a game its own clock). A per-name read-only a GAME keeps on its own
+            // container is a third thing, and the container refuses that itself. Same message as the
+            // reference, so a host sees one sentence from every runtime.
             for (const HostScopeSpec& spec : bundle.scopeRegistry.scopes)
             {
                 auto it = host_.hostScopes.find(spec.token);
                 if (spec.token.empty() || it == host_.hostScopes.end()) continue;
-                const bool scopeReadOnly = spec.hasWritable && !spec.writable;
                 std::set<std::string> readOnly;
+                if (spec.hasWritable && !spec.writable) readOnly.insert("*");   // the whole scope
                 for (const HostScopeDecl& d : spec.declarations) if (d.hasWritable && !d.writable) readOnly.insert(toLower(d.name));
-                if (!scopeReadOnly && readOnly.empty()) continue;
-                const std::string token = spec.token;
-                const auto inner = it->second.set;
-                it->second.set = [inner, readOnly, scopeReadOnly, token](const std::string& n, const PatterValue& v)
-                {
-                    if (scopeReadOnly || readOnly.count(toLower(n))) throw std::runtime_error("'@" + token + "." + n + "' is read-only");
-                    inner(n, v);
-                };
+                if (!readOnly.empty()) host_.storyReadOnly[spec.token] = readOnly;
             }
             for (const auto& kv : host_.hostScopes) host_.hostTokens.insert(kv.first);
         }
@@ -1740,13 +1755,15 @@ namespace patter
             if (hs != host_.hostScopes.end()) return hs->second.get(sp.second);
             return host_.sharedPatter->values().get(sp.second);
         }
+        // Write a shared property by ref. The GAME's surface: a host declaration's `writable: false` is
+        // the story's promise about the story's writes, never a lock on the value's owner.
         void setProperty(const std::string& ref, const PatterValue& value)
         {
             auto sp = splitRef(ref, host_.hostTokens);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
             auto hs = host_.hostScopes.find(sp.first);
             if (hs != host_.hostScopes.end()) { hs->second.set(sp.second, value); return; }
-            host_.sharedPatter->set(sp.second, value);
+            host_.sharedPatter->set(sp.second, value, false, "", true);
         }
 
         // The shared @patter properties for a live state inspector: each with its ref, type, current

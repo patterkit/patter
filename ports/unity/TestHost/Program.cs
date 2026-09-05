@@ -271,11 +271,15 @@ namespace Patterkit.Patterplay.TestHost
                     Fail("host-scope", label, $"a story write to a writable:false declaration was not refused (got: {message ?? "no error"})");
                 if (bound && scope.Values.ContainsKey("clock"))
                     Fail("host-scope", label, "the refused write still landed in the game's scope");
-                // The host's own path through the engine is refused too, as in the reference.
+                // The GAME's own path through the engine is NOT refused: `writable: false` is the story's
+                // promise about the story's writes, never a lock on the value's owner (ruled across the
+                // family 2026-09-05, from-storylets/host-writes-to-read-only-world).
                 message = null;
                 try { engine.SetProperty("@world.clock", PatterValue.Str("night")); } catch (Exception ex) { message = ex.Message; }
-                if (message == null || !message.Contains("is read-only"))
-                    Fail("host-scope", label, "engine.SetProperty on a writable:false declaration was not refused");
+                if (message != null)
+                    Fail("host-scope", label, $"the GAME's SetProperty on a writable:false declaration was refused: {message}");
+                if (engine.GetProperty("@world.clock")?.AsString != "night")
+                    Fail("host-scope", label, "the game's write did not land");
                 // And a writable name still lands.
                 engine.SetProperty("@world.known", PatterValue.True);
                 if (engine.GetProperty("@world.known")?.AsBool != true)
@@ -553,7 +557,10 @@ namespace Patterkit.Patterplay.TestHost
 
                 var bag = new PropertyBag(decls);
                 string error = null;
-                try { bag.Set(setName, value); } catch (Exception ex) { error = ex.Message; }
+                // `host: true` makes the write as the HOST, whom `writable: false` never bound: it is
+                // the STORY's promise (expr corpus, 2026-09-05).
+                bool asHost = c.TryGetProperty("host", out var hv) && hv.GetBoolean();
+                try { bag.Set(setName, value, host: asHost); } catch (Exception ex) { error = ex.Message; }
                 var readBack = bag.Get(setName);
 
                 bool ok = true;

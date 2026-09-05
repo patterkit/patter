@@ -813,11 +813,15 @@ static void runHostScopeWritableSmoke()
             fail("host-scope", label, "the refused write still landed in the game's scope");
         const PatterValue* clock = engine.getProperty("@world.clock");
         if (!clock || clock->s != "day") fail("host-scope", label, "a story write to a writable:false declaration changed the value");
-        // The host's own path through the engine is refused too, as in the reference.
+        // The GAME's own path through the engine is NOT refused: `writable: false` is the story's promise
+        // about the story's writes, never a lock on the value's owner (ruled across the family
+        // 2026-09-05, from-storylets/host-writes-to-read-only-world).
         message.clear();
         try { engine.setProperty("@world.clock", PatterValue::Str("night")); }
         catch (const std::exception& ex) { message = ex.what(); }
-        if (message.find("is read-only") == std::string::npos) fail("host-scope", label, "engine.setProperty on a writable:false declaration was not refused");
+        if (!message.empty()) fail("host-scope", label, "the GAME's setProperty on a writable:false declaration was refused: " + message);
+        const PatterValue* moved = engine.getProperty("@world.clock");
+        if (!moved || moved->s != "night") fail("host-scope", label, "the game's write did not land");
         // And a writable name still lands.
         engine.setProperty("@world.known", PatterValue::Bool(true));
         const PatterValue* known = engine.getProperty("@world.known");
@@ -1076,7 +1080,10 @@ static int runExprRegistry(const JsonValue& arr)
 
         PropertyBag bag(&decls);
         std::optional<std::string> error;
-        try { bag.set(setName, value); } catch (const std::exception& ex) { error = ex.what(); }
+        // `host: true` makes the write as the HOST, whom `writable: false` never bound: it is the
+        // STORY's promise (expr corpus, 2026-09-05).
+        const bool asHost = c.has("host") && c.at("host").b;
+        try { bag.set(setName, value, false, "", asHost); } catch (const std::exception& ex) { error = ex.what(); }
         std::optional<PatterValue> readBack = bag.get(setName);
 
         bool ok = true;

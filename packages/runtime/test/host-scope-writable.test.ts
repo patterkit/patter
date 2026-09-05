@@ -1,13 +1,16 @@
-// A host-scope declaration's `writable: false` is the STORY's promise, refused by the engine whether
-// the scope is bound by the game or self-backed. This runtime has always done so (the registry wraps
-// every foreign resolver with the declared flags); the three native ports let a bound scope's write
-// straight through until 2026-09-03, which the Unreal wrapper work found
-// (from-storylets/unreal-wrapper-host-scopes). Each port's harness now pins the same two cases with
-// the same sentence, and this is the reference they match, written out so the contract is in one
-// place rather than implied by a registry test.
+// A host-scope declaration's `writable: false` is the STORY's promise, and ONLY the story's: the
+// engine refuses an effect's write, bound or self-backed, and lets the GAME write the value it owns.
 //
-// Distinct from a per-name read-only a GAME keeps on its own container (UPatterWorld.SetReadOnly and
-// its kin), which that container refuses itself. Two rules, two owners.
+// The refusal half has always been here (the registry wraps every foreign resolver with the declared
+// flags); the three native ports let a bound scope's write straight through until 2026-09-03
+// (from-storylets/unreal-wrapper-host-scopes). The permission half is newer: until 2026-09-05 the
+// shared kernel refused EVERY caller, so a game could not move its own clock through
+// `setProperty` - which blocked this project's coverage driver and the Storylet Engine's venue
+// content alike (from-storylets/host-writes-to-read-only-world). The kernel now takes a host
+// authority on `set`, and this runtime passes it from its host surfaces and never from an effect.
+//
+// Distinct again from a per-name read-only a GAME keeps on its own container (UPatterWorld.SetReadOnly
+// and its kin), which that container refuses itself. Three rules, and each says whose it is.
 import { describe, it, expect } from "vitest";
 import { Engine } from "@patterkit/runtime";
 import { exportBundle } from "@patterkit/compiler";
@@ -29,9 +32,13 @@ const scene: Scene = {
         { kind: "set", target: "@world.known", value: "true" },
         { kind: "set", target: "@world.clock", value: '"night"' },
       ], jump: { to: "END" } },
+  ] },
+  // A block whose snippet writes nothing, so a flow can be opened without meeting the refusal.
+  { id: "quiet", type: "block", name: "Quiet", children: [
+    { id: "sn_q", type: "snippet", beats: [{ id: "Q", kind: "text" }], jump: { to: "END" } },
   ] }],
 };
-const en: LocaleFile = { schema: "patter/strings@0", scene: "s", locale: "en", strings: { T: "hi" } };
+const en: LocaleFile = { schema: "patter/strings@0", scene: "s", locale: "en", strings: { T: "hi", Q: "quiet" } };
 const bundle = exportBundle({ project, scenes: [scene], locales: [en] });
 
 describe.each([
@@ -52,10 +59,20 @@ describe.each([
     if (store) expect(store.get("clock")).toBe("day");
   });
 
-  it("refuses the host's own write through the engine too, and lets a writable name through", () => {
-    const { engine } = make();
-    expect(() => engine.setProperty("@world.clock", "night")).toThrow("is read-only");
+  it("lets the GAME write it through the engine: the flag binds the story, not its owner", () => {
+    const { engine, store } = make();
+    engine.setProperty("@world.clock", "night");
+    expect(engine.getProperty("@world.clock")).toBe("night");
+    if (store) expect(store.get("clock")).toBe("night"); // a bound resolver's set really is called
     engine.setProperty("@world.known", true);
     expect(engine.getProperty("@world.known")).toBe(true);
+  });
+
+  it("lets the game write it through an open flow's surface too", () => {
+    // Flow.setProperty is the same host surface; the story's effects take the other path.
+    const { engine } = make();
+    const flow = engine.openFlow("f", { scene: "s", block: "quiet" });
+    flow.setProperty("@world.clock", "dusk");
+    expect(engine.getProperty("@world.clock")).toBe("dusk");
   });
 });

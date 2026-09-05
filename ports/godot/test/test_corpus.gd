@@ -201,10 +201,14 @@ func _run_host_scope_writable_check() -> void:
 			_fail("host-scope", label, "a story write to a writable:false declaration changed the value: %s" % str(engine.get_property("@world.clock")))
 		if engine.get_property("@world.known") != true:
 			_fail("host-scope", label, "a writable declaration was refused too")
-		# The host's own path through the engine is refused too, as in the reference.
+		# The GAME's own path through the engine is NOT refused: "writable": false is the story's
+		# promise about the story's writes, never a lock on the value's owner (ruled across the
+		# family 2026-09-05, from-storylets/host-writes-to-read-only-world).
 		engine.set_property("@world.clock", "night")
-		if engine.get_property("@world.clock") != "day":
-			_fail("host-scope", label, "engine.set_property on a writable:false declaration was not refused")
+		if engine.get_property("@world.clock") != "night":
+			_fail("host-scope", label, "the GAME's set_property on a writable:false declaration was refused")
+		if bound and store["clock"] != "night":
+			_fail("host-scope", label, "the game's write never reached its own scope: %s" % str(store["clock"]))
 	if _fails == 0:
 		print("  [host-scope] writable:false is the story's promise, refused bound or self-backed")
 
@@ -621,9 +625,12 @@ func _run_expr_registry(cases: Array) -> int:
 		var value = PatterValues.to_value(c["set"]["value"])
 		var expect_error: bool = c.get("expectError", false)
 		var expected = PatterValues.to_value(c["expected"])
+		# `host: true` makes the write as the HOST, whom `writable: false` never bound: it is the
+		# STORY's promise (expr corpus, 2026-09-05).
+		var as_host: bool = c.get("host", false)
 
 		var bag := PatterPropertyBag.new(decls)
-		var change: Dictionary = bag.set_value(set_name, value)
+		var change: Dictionary = bag.set_value(set_name, value, {"host": as_host} if as_host else {})
 		var error: String = str(change["error"]) if change.has("error") else ""
 		var read_back = bag.get_value(set_name)
 

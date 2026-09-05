@@ -144,7 +144,12 @@ describe("cross-engine: runtime evaluation through a host resolver", () => {
     expect(flow.advance()).toEqual({ type: "end" });
   });
 
-  it("enforces per-property read-only on foreign writes (declared writable:false)", () => {
+  it("a declared writable:false foreign property still takes the GAME's write", () => {
+    // `writable: false` is the STORY's promise not to write the value; the game owns it and writes it
+    // whenever it likes, including through the engine's own surface (ruled across the family
+    // 2026-09-05, from-storylets/host-writes-to-read-only-world). The story half of the rule - an
+    // effect writing such a property, refused, bound or self-backed - is pinned in
+    // host-scope-writable.test.ts.
     const world: Record<string, ScalarValue> = { gold: 42, locked: 1 };
     const engine = engineFor(world);
     const flow = engine.openFlow("main", { scene: "play" });
@@ -153,8 +158,9 @@ describe("cross-engine: runtime evaluation through a host resolver", () => {
     engine.setProperty("@world.gold", 100);
     expect(world.gold).toBe(100);
 
-    // Read-only foreign prop: rejected even though the resolver has a setter.
-    expect(() => engine.setProperty("@world.locked", 9)).toThrow(/read-only/);
-    expect(world.locked).toBe(1);
+    // Read-only foreign prop: the host's write reaches it too, through the resolver's setter.
+    engine.setProperty("@world.locked", 9);
+    expect(world.locked).toBe(9);
+    expect(flow.getProperty("@world.locked")).toBe(9);
   });
 });

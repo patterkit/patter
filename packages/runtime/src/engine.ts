@@ -858,10 +858,16 @@ export class Engine {
     return this.host.shared.get(scope, name);
   }
 
-  /** Write a shared (`@patter` / foreign) property by ref. `@scene` refs are rejected (flow-level). */
+  /** Write a shared (`@patter` / foreign) property by ref. `@scene` refs are rejected (flow-level).
+   *
+   *  This is the GAME's surface, so it writes with host authority: a host-scope declaration's
+   *  `writable: false` is the story's promise not to write the value, never a lock on the game that
+   *  owns it. The story's own writes come through `Flow.runEffects`, which never claims it. (Ruled
+   *  across the family 2026-09-05, after a Storylets venue clock and this project's coverage driver
+   *  were each refused the one property they existed to move.) */
   setProperty(ref: string, value: ScalarValue): void {
     const { scope, name } = this.splitShared(ref);
-    this.host.shared.set(scope, name, value);
+    this.host.shared.set(scope, name, value, { host: true });
   }
 
   /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
@@ -1357,8 +1363,16 @@ export class Flow {
     return this.host.shared.get(scope, name); // foreign
   }
 
-  /** Write a property by ref (routed by scope, then by the property's `shared` flag). */
+  /** Write a property by ref (routed by scope, then by the property's `shared` flag). The GAME's
+   *  surface: it writes with host authority, so a `writable: false` host declaration does not refuse
+   *  it (see `Engine.setProperty`). The story's writes go through `writeProperty` instead. */
   setProperty(ref: string, value: ScalarValue): void {
+    this.writeProperty(ref, value, true);
+  }
+
+  /** The write itself. `host` says WHO is writing, which is the only thing `writable: false` cares
+   *  about: the story is refused, the game is not. */
+  private writeProperty(ref: string, value: ScalarValue, host: boolean): void {
     const { scope, name } = this.splitRef(ref);
     if (scope === "patter") {
       this.patterResolver.set!(name, value);
@@ -1368,7 +1382,7 @@ export class Flow {
       if (this.currentSceneId === null) throw new Error(`'${ref}': the flow has not entered a scene yet`);
       this.sceneResolver.set!(name, value);
     } else {
-      this.host.shared.set(scope, name, value); // foreign
+      this.host.shared.set(scope, name, value, host ? { host: true } : undefined); // foreign
     }
   }
 
@@ -1772,7 +1786,7 @@ export class Flow {
       // `prev` read before the write, so a reader can say "0 -> 1" without a second pass.
       // Only paid for when the run asked for a log.
       const prev = this.host.logEnabled ? this.getProperty(e.target) : undefined;
-      this.setProperty(e.target, value);
+      this.writeProperty(e.target, value, false); // the STORY writes: a read-only host property refuses it
       this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
     }
   }

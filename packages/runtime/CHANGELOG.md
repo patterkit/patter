@@ -33,6 +33,19 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **A `writable: false` host declaration is the STORY's promise, and only the story's: the game
+  writes it.** `Engine.setProperty` / `Flow.setProperty` are the game's surfaces, so they now write a
+  read-only `@world` property whether it is self-backed or bound to a resolver; an effect that writes
+  one is refused exactly as before, with the same sentence. Until now the runtime refused every
+  caller alike, so a game could not advance its own clock through the engine and a Patterplay
+  coverage driver on such a property killed the run - which is how both this project and the
+  Storylet Engine found it, on the same day, in different content
+  (from-storylets/host-writes-to-read-only-world). The rule now lives in the shared kernel
+  (`@wildwinter/scoperegistry` ^0.6.0, an explicit host authority on `set`), so both products mean
+  the same thing by the flag.
+
 ## [0.12.1] - 2026-09-04
 
 ### Changed

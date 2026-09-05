@@ -143,12 +143,16 @@ namespace Patterkit.Patterplay
 
         /// <summary>Write a property. Engine writes (the default) notify
         /// subscribers; pass silent: true for a host write, which reaches only the
-        /// audit hook. Throws on a read-only property. Returns the change.</summary>
-        public BagChange Set(string name, PatterValue value, bool silent = false, string reason = null)
+        /// audit hook, and host: true when the caller IS the host: `writable: false`
+        /// is the story's promise, so the game's own surface is never refused by it
+        /// (ruled 2026-09-05). The two are separate: one says who hears the write,
+        /// the other who may make it. Throws on a read-only property. Returns the
+        /// change.</summary>
+        public BagChange Set(string name, PatterValue value, bool silent = false, string reason = null, bool host = false)
         {
             var n = _norm(name);
             var decl = _decls.GetOrDefault(n);
-            if (decl != null && decl.Writable == false) throw new EvalError($"'{name}' is read-only");
+            if (!host && decl != null && decl.Writable == false) throw new EvalError($"'{name}' is read-only");
             var change = new BagChange
             {
                 Name = n,

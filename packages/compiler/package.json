@@ -38,6 +38,6 @@
     "@patterkit/core": "0.2.3",
     "@patterkit/dialect": "0.1.8",
     "@wildwinter/expr": "^0.5.0",
-    "@wildwinter/scoperegistry": "^0.5.0"
+    "@wildwinter/scoperegistry": "^0.6.0"
   }
 }

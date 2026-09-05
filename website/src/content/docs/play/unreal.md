@@ -80,7 +80,8 @@ case-insensitively, as the story's references do. Leave `World` out of `Create` 
 engine; `GetBoundWorld()` says which you have.
 
 Two read-only rules meet here and stay distinct. A property declared **`writable: false`** in the
-project is the *story's* promise, refused by the engine whether or not a world is bound.
+project is the *story's* promise, refused by the engine whether or not a world is bound - and only
+the story's: your own `SetProperty` writes it, because the value is the game's.
 **`SetReadOnly`** is the *game's* policy, a name the story may read but this game will not let it
 write. Either refusal fails the step and logs why, never crashes, and neither binds your own `Set*`
 calls. The container is never in a Patter save: your game saves it once, however it already saves

@@ -42,33 +42,20 @@ namespace Patterkit.Patterplay
         public void Set(string name, PatterValue value) { _bag[Key(name)] = value; }
     }
 
-    /// <summary>A host scope with the declaration's `writable: false` enforced on the STORY's writes. Wraps
-    /// a bound or self-backed scope only when the spec declares something read-only; otherwise the scope
-    /// is used as it is.</summary>
-    internal sealed class WritableGuard : IHostScope
+    /// <summary>The names a STORY may not write in a host scope ("*" = the whole scope). A declaration's
+    /// `writable: false` is the story's promise and only the story's: the GAME writes the value it owns,
+    /// through SetProperty, whatever the flag says (ruled across the family 2026-09-05,
+    /// from-storylets/host-writes-to-read-only-world). This used to WRAP the scope, which refused the
+    /// game its own clock too.</summary>
+    internal static class StoryReadOnly
     {
-        private readonly IHostScope _inner;
-        private readonly string _token;
-        private readonly bool _scopeReadOnly;
-        private readonly HashSet<string> _readOnly;
-
-        private WritableGuard(IHostScope inner, string token, bool scopeReadOnly, HashSet<string> readOnly)
-        { _inner = inner; _token = token; _scopeReadOnly = scopeReadOnly; _readOnly = readOnly; }
-
-        public static IHostScope For(HostScopeSpec spec, IHostScope inner)
+        public static HashSet<string> For(HostScopeSpec spec)
         {
-            bool scopeReadOnly = spec.Writable == false;
             var readOnly = new HashSet<string>();
+            if (spec.Writable == false) readOnly.Add("*");
             foreach (var d in spec.Declarations ?? new List<HostScopeDecl>())
                 if (d != null && d.Name != null && d.Writable == false) readOnly.Add(d.Name.ToLowerInvariant());
-            return scopeReadOnly || readOnly.Count > 0 ? new WritableGuard(inner, spec.Token, scopeReadOnly, readOnly) : null;
-        }
-
-        public PatterValue Get(string name) => _inner.Get(name);
-        public void Set(string name, PatterValue value)
-        {
-            if (_scopeReadOnly || _readOnly.Contains(name.ToLowerInvariant())) throw new EvalError($"'@{_token}.{name}' is read-only");
-            _inner.Set(name, value);
+            return readOnly;
         }
     }
 
@@ -181,6 +168,10 @@ namespace Patterkit.Patterplay
         /// <summary>Host scopes by token, already resolved: an embedder's binding where one was given,
         /// a self-backed bag for every other token the bundle declares. Empty for a bundle with none.</summary>
         public Dictionary<string, IHostScope> HostScopes = new Dictionary<string, IHostScope>();
+        /// <summary>Per host token, the names a STORY may not write ("*" = the whole scope). The game
+        /// writes them freely: `writable: false` is the story's promise, not a lock on the value's
+        /// owner (from-storylets/host-writes-to-read-only-world). Flows read this on their write path.</summary>
+        public Dictionary<string, HashSet<string>> StoryReadOnly = new Dictionary<string, HashSet<string>>();
         public List<PropertyDecl> PatterSharedDecls;
         public List<PropertyDecl> PatterLocalDecls;
         public HashSet<string> PatterSharedNames;
@@ -327,9 +318,9 @@ namespace Patterkit.Patterplay
             if (bundle.ScopeRegistry != null)
                 foreach (var spec in bundle.ScopeRegistry.Scopes)
                 {
-                    if (spec == null || string.IsNullOrEmpty(spec.Token) || !_host.HostScopes.TryGetValue(spec.Token, out var inner)) continue;
-                    var guard = WritableGuard.For(spec, inner);
-                    if (guard != null) _host.HostScopes[spec.Token] = guard;
+                    if (spec == null || string.IsNullOrEmpty(spec.Token) || !_host.HostScopes.ContainsKey(spec.Token)) continue;
+                    var readOnly = StoryReadOnly.For(spec);
+                    if (readOnly.Count > 0) _host.StoryReadOnly[spec.Token] = readOnly;
                 }
         }
 
@@ -686,12 +677,15 @@ namespace Patterkit.Patterplay
             return _host.SharedPatter.Get(name);
         }
 
+        /// <summary>Write a shared property by ref. The GAME's surface, so a host declaration's
+        /// `writable: false` does not refuse it: that is the story's promise about the story's writes
+        /// (from-storylets/host-writes-to-read-only-world). Effects write through Flow instead.</summary>
         public void SetProperty(string refStr, PatterValue value)
         {
             var (scope, name) = SplitRef(refStr, IsEngineScopeToken);
             if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
             if (_host.HostScopes.TryGetValue(scope, out var host)) { host.Set(name, value); return; }
-            _host.SharedPatter.Set(name, value);
+            _host.SharedPatter.Set(name, value, host: true);
         }
 
         /// <summary>The shared `@patter` global properties with their declared type, current value, and

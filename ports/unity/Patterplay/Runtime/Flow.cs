@@ -320,7 +320,13 @@ namespace Patterkit.Patterplay
             return _host.HostScopes.TryGetValue(scope, out var host) ? host.Get(name) : null;
         }
 
-        public void SetProperty(string refStr, PatterValue value)
+        /// <summary>Write a property by ref. The GAME's surface, so a host declaration's `writable: false`
+        /// binds the story, not the game that owns the value. Effects use WriteProperty(.., host: false).</summary>
+        public void SetProperty(string refStr, PatterValue value) => WriteProperty(refStr, value, true);
+
+        /// <summary>The write itself. `host` says WHO is writing, which is all `writable: false` cares
+        /// about: the story is refused, the game is not.</summary>
+        private void WriteProperty(string refStr, PatterValue value, bool host)
         {
             var (scope, name) = Engine.SplitRef(refStr, IsScopeToken);
             if (scope == "patter") PatterSet(name, value);
@@ -329,7 +335,13 @@ namespace Patterkit.Patterplay
                 if (_currentSceneId == null) throw new Exception($"'{refStr}': the flow has not entered a scene yet");
                 SceneSet(name, value);
             }
-            else if (_host.HostScopes.TryGetValue(scope, out var host)) host.Set(name, value);
+            else if (_host.HostScopes.TryGetValue(scope, out var hostScope))
+            {
+                if (!host && _host.StoryReadOnly.TryGetValue(scope, out var readOnly)
+                    && (readOnly.Contains("*") || readOnly.Contains(name.ToLowerInvariant())))
+                    throw new EvalError($"'@{scope}.{name}' is read-only");
+                hostScope.Set(name, value);
+            }
         }
 
         // -- settle / entry -----------------------------------------------------
@@ -621,7 +633,7 @@ namespace Patterkit.Patterplay
                 // Prev read before the write, so a reader can say "0 -> 7" in one pass. Only
                 // paid for when the run asked for a log.
                 var prev = _host.LogEnabled ? GetProperty(e.Target) : null;
-                SetProperty(e.Target, value);
+                WriteProperty(e.Target, value, false);   // the STORY writes: a read-only host property refuses it
                 Emit(new LogEntry { Type = "write", Subject = e.Target, Value = value, Prev = prev });
             }
         }

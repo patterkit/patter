@@ -303,7 +303,15 @@ func get_property(ref: String):
 	return null
 
 
+## Write a property by ref. The GAME's surface, so it writes with HOST authority: a host
+## declaration's "writable": false binds the story, not the game that owns the value. The story's
+## own writes (effects) go through _write_property(.., false).
 func set_property(ref: String, value) -> void:
+	_write_property(ref, value, true)
+
+
+## The write itself. `host` says WHO is writing, which is all "writable": false cares about.
+func _write_property(ref: String, value, host: bool) -> void:
 	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
 	if sp[0] == "patter":
 		_patter_set(sp[1], value)
@@ -313,6 +321,10 @@ func set_property(ref: String, value) -> void:
 			return
 		_scene_set(sp[1], value)
 	elif _host["host_scopes"].has(sp[0]):
+		if not host and _host["story_read_only"].has(sp[0]) \
+				and (_host["story_read_only"][sp[0]].has("*") or _host["story_read_only"][sp[0]].has(str(sp[1]).to_lower())):
+			push_error("'@%s.%s' is read-only" % [sp[0], sp[1]])
+			return
 		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
 
 
@@ -728,7 +740,7 @@ func _run_effects(effects: Array) -> void:
 		# `prev` read before the write, so a reader can say "0 -> 1" in one pass. Only
 		# paid for when the run asked for a log.
 		var prev = get_property(e["target"]) if _host["log_enabled"] else null
-		set_property(e["target"], v)
+		_write_property(e["target"], v, false)   # the STORY writes: a read-only host property refuses it
 		var ev := {"type": "write", "target": e["target"], "value": v}
 		if prev != null:
 			ev["prev"] = prev

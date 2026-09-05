@@ -101,13 +101,16 @@ func get_value(name: String) -> Variant:
 
 
 ## Write a property. Engine writes (the default) notify subscribers; pass
-## {"silent": true} for a host write, which reaches only the audit hook.
+## {"silent": true} for a host write, which reaches only the audit hook, and
+## {"host": true} when the caller IS the host: `writable: false` is the story's
+## promise, so the game's own surface is never refused by it (ruled 2026-09-05).
+## The two are separate: one says who hears the write, the other who may make it.
 ## Returns the change Dictionary {"name", "prev"?, "next", "silent",
 ## "reason"?}, or {"error": message} (with push_error) on a read-only
 ## property - the GDScript reading of the TS throw.
 func set_value(name: String, value, opts: Dictionary = {}) -> Dictionary:
 	var n: String = _normalise.call(name)
-	if _decls.has(n) and _decls[n].get("writable", true) == false:
+	if not bool(opts.get("host", false)) and _decls.has(n) and _decls[n].get("writable", true) == false:
 		var msg := "'%s' is read-only" % name
 		push_error("PatterPropertyBag: " + msg)
 		return {"error": msg}

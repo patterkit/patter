@@ -66,8 +66,9 @@ var engine := PatterEngine.new(bundle, {"host_scopes": {"world": {
 
 Leave `host_scopes` out and the engine **self-backs** `@world` from the declared defaults. A property
 declared `writable: false` in the project is the *story's* promise: the engine refuses the story's
-write with a `push_error` (`'@world.x' is read-only`) and no write, bound or self-backed, and a
-per-name policy of your own is yours to refuse from `set`. The store is never in a Patter save: your
+write with a `push_error` (`'@world.x' is read-only`) and no write, bound or self-backed. Your own
+`set_property` is not refused: the value is the game's. A per-name policy of your own is yours to
+refuse from `set`. The store is never in a Patter save: your
 game saves it once. → [World Properties](/play/world-properties/)
 
 ## Send the story somewhere
