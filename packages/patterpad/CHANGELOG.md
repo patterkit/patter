@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The macOS build signs again, so the 0.16.4 fix below is the first one that reaches you.** 0.16.4
+  was tagged and built, then stopped in the signing step: electron-builder creates its keychain with
+  one password and then unlocks it with another, and the macOS build image of 2026-08-31 started
+  refusing that. Its release never went live. Nothing in the app changed between the two versions.
+
 ## [0.16.4] - 2026-09-06
 
 ### Fixed
