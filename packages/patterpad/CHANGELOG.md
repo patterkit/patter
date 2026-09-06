@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Coverage Test can drive a `@world` property the story is not allowed to write.** A host property
+  declared `writable: false` is the story's promise never to write it, not a lock on the game that
+  owns the value, and a coverage run's drivers are the game's side of exactly those properties. So a
+  run over a project with one stopped on `'time_phase' is read-only`, refusing to vary the property
+  it was pointed at. The rule now binds the story alone: an outcome's write is still refused, the
+  compiler still refuses one at publish, and Patterpad's own tooling writes. Carries
+  `@patterkit/runtime` 0.13.0 and `@patterkit/ops` 0.7.5, where the fix was made and where all four
+  Patterplay runtimes took it, along with the shared kernel's explicit host authority.
+
 ## [0.16.3] - 2026-09-04
 
 ### Fixed
