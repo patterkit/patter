@@ -30,8 +30,14 @@ fi
 
 z40=0000000000000000000000000000000000000000
 
-while read -r _local_ref local_sha _remote_ref remote_sha; do
+while read -r _local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$z40" ] && continue                   # a branch deletion pushes nothing
+  # A TAG pushes no package source anywhere: Changesets publishes npm from main, and the tag
+  # pipelines build what the tag points at, gated in CI. A new tag passed here by accident (its
+  # merge-base with main is itself, so the range is empty), but MOVING one - which is how the
+  # conformance corpus asset is refreshed - hands the guard the whole history since the old tag
+  # and it refuses a push that releases nothing.
+  case "$remote_ref" in refs/tags/*) continue ;; esac
   if [ "$remote_sha" = "$z40" ]; then
     base=$(git merge-base "$local_sha" origin/main 2>/dev/null || echo "")  # a brand-new branch
     [ -z "$base" ] && continue
