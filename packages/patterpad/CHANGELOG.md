@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-09-06
+
 ### Fixed
 
 - **The macOS build signs again, so the 0.16.4 fix below is the first one that reaches you.** 0.16.4
