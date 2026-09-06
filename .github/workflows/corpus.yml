@@ -2,8 +2,12 @@ name: Corpus release
 
 # The conformance corpus is the cross-language parity contract, versioned with the
 # bundle schema. Tagging `bundle-schema-vN` verifies the corpus regenerates + passes,
-# then attaches corpus.json to that GitHub Release - the stable asset the native port
-# pipelines (Unity / Unreal / Godot) consume.
+# then attaches corpus.json to that GitHub Release - the stable asset an OUTSIDE runtime
+# pulls. Our own port pipelines (Unity / Unreal / Godot) replay the in-repo copy, so
+# nothing here re-checks this asset: it is only as fresh as the last time the tag was
+# moved, and it has to be MOVED (`git tag -f`) whenever the corpus changes, because the
+# tag names the schema version and the schema does not advance with the content. It went
+# two months stale that way. See RELEASING.md, "Conformance corpus".
 on:
   push:
     tags: ["bundle-schema-v*"]

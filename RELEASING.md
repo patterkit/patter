@@ -115,7 +115,7 @@ CI keys each pipeline off a tag prefix:
 | Prefix | Deliverable | Pipeline | Driven by |
 | --- | --- | --- | --- |
 | `@patterkit/<pkg>@<ver>` | the npm packages | `.github/workflows/release.yml` | **Changesets** (auto-tagged on publish) |
-| `bundle-schema-v*` | the conformance corpus (`corpus.json`) | `.github/workflows/corpus.yml` | manual tag |
+| `bundle-schema-v*` | the conformance corpus (`corpus.json`) | `.github/workflows/corpus.yml` | manual tag, MOVED on every corpus change |
 | `v*` (bare; Patterpad's alone) | the Patterpad desktop app | `.github/workflows/patterpad.yml` | manual tag |
 | `cli-v*` | standalone `patter` CLI binaries | `.github/workflows/cli.yml` | manual tag |
 | `play-js-v*` / `play-unity-v*` / `play-unreal-v*` / `play-godot-v*` | the Patterplay **runtime set** (JS drop-in + web demo / the three engine plugins), versioned in lockstep | `.github/workflows/play-js.yml` / `play-unity.yml` / `play-unreal.yml` / `play-godot.yml` | `npm run bump:play`, then manual tags |
@@ -168,12 +168,21 @@ Publish locally (fallback) with `npm run release` after the version PR is merged
 ## Conformance corpus
 
 ```sh
-git tag bundle-schema-v1 && git push origin bundle-schema-v1
+git tag -f bundle-schema-v1 && git push -f origin refs/tags/bundle-schema-v1
 ```
 
 The **Corpus release** workflow verifies the corpus regenerates byte-identical and
-passes, then attaches `corpus.json` to the GitHub Release - the stable asset the
-native port test harnesses pull.
+passes, then attaches `corpus.json` to the GitHub Release - the stable asset an
+outside runtime pulls (our own port pipelines replay the in-repo copy).
+
+**The tag is MOVED, not added, and it has to be moved whenever the corpus changes.**
+It names the bundle schema version, so it does not advance with the corpus content,
+and the point of the asset is a URL that stays put. The first version of this section
+gave `git tag bundle-schema-v1` with no `-f`, which fails on a tag that already exists,
+so the asset silently went two months and 87KB stale while the corpus gained the save
+shape, the registry cases and the host-authority cases. If the bundle schema itself ever
+changes, that is a new `bundle-schema-v2` and the old asset stays where it is, pinned to
+the schema it belongs to.
 
 ## Patterpad desktop app
 
