@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.4] - 2026-09-06
+
 ### Fixed
 
 - **Coverage Test can drive a `@world` property the story is not allowed to write.** A host property
