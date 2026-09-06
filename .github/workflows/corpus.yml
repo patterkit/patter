@@ -8,9 +8,20 @@ name: Corpus release
 # moved, and it has to be MOVED (`git tag -f`) whenever the corpus changes, because the
 # tag names the schema version and the schema does not advance with the content. It went
 # two months stale that way. See RELEASING.md, "Conformance corpus".
+#
+# The tag CANNOT be moved: the "protect tags" ruleset forbids update and deletion on every tag,
+# which is why the refresh is a workflow_dispatch that re-uploads the asset onto the release the
+# tag already points at. A release asset can be replaced; the tag it hangs off does not move, so
+# the download URL an outside runtime pulls stays exactly where it was.
 on:
   push:
     tags: ["bundle-schema-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing bundle-schema tag whose corpus.json to refresh"
+        default: bundle-schema-v1
+        required: true
 
 permissions:
   contents: write
@@ -41,8 +52,10 @@ jobs:
       - name: Attach corpus.json to the release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          overwrite_files: true   # a refresh REPLACES the asset on the release the tag already has
           make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
-          name: Conformance corpus ${{ github.ref_name }}
+          name: Conformance corpus ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           body: |
             `corpus.json` - the language-agnostic conformance corpus (expression and
             playthrough cases) that every Patterplay runtime (JavaScript, Unity, Unreal,

@@ -115,7 +115,7 @@ CI keys each pipeline off a tag prefix:
 | Prefix | Deliverable | Pipeline | Driven by |
 | --- | --- | --- | --- |
 | `@patterkit/<pkg>@<ver>` | the npm packages | `.github/workflows/release.yml` | **Changesets** (auto-tagged on publish) |
-| `bundle-schema-v*` | the conformance corpus (`corpus.json`) | `.github/workflows/corpus.yml` | manual tag, MOVED on every corpus change |
+| `bundle-schema-v*` | the conformance corpus (`corpus.json`) | `.github/workflows/corpus.yml` | manual tag per SCHEMA version; the asset is refreshed by re-running the workflow |
 | `v*` (bare; Patterpad's alone) | the Patterpad desktop app | `.github/workflows/patterpad.yml` | manual tag |
 | `cli-v*` | standalone `patter` CLI binaries | `.github/workflows/cli.yml` | manual tag |
 | `play-js-v*` / `play-unity-v*` / `play-unreal-v*` / `play-godot-v*` | the Patterplay **runtime set** (JS drop-in + web demo / the three engine plugins), versioned in lockstep | `.github/workflows/play-js.yml` / `play-unity.yml` / `play-unreal.yml` / `play-godot.yml` | `npm run bump:play`, then manual tags |
@@ -167,22 +167,33 @@ Publish locally (fallback) with `npm run release` after the version PR is merged
 
 ## Conformance corpus
 
+Refresh the published asset whenever the corpus changes:
+
 ```sh
-git tag -f bundle-schema-v1 && git push -f origin refs/tags/bundle-schema-v1
+gh workflow run corpus.yml -f tag=bundle-schema-v1
+```
+
+A NEW schema version is a new tag, and only then:
+
+```sh
+git tag bundle-schema-v2 && git push origin bundle-schema-v2
 ```
 
 The **Corpus release** workflow verifies the corpus regenerates byte-identical and
 passes, then attaches `corpus.json` to the GitHub Release - the stable asset an
-outside runtime pulls (our own port pipelines replay the in-repo copy).
+outside runtime pulls (our own port pipelines replay the in-repo copy, so nothing in
+CI re-checks the published file: it is only as fresh as the last refresh).
 
-**The tag is MOVED, not added, and it has to be moved whenever the corpus changes.**
-It names the bundle schema version, so it does not advance with the corpus content,
-and the point of the asset is a URL that stays put. The first version of this section
-gave `git tag bundle-schema-v1` with no `-f`, which fails on a tag that already exists,
-so the asset silently went two months and 87KB stale while the corpus gained the save
-shape, the registry cases and the host-authority cases. If the bundle schema itself ever
-changes, that is a new `bundle-schema-v2` and the old asset stays where it is, pinned to
-the schema it belongs to.
+**The tag does not move, and the asset does.** The tag names the bundle SCHEMA version,
+which does not advance with the corpus content, so the same tag has to carry newer
+corpora over time. Two things were learned the hard way here on 2026-09-06. This section
+first said to tag with no `-f`, which fails on a tag that already exists, and the asset
+silently went two months and 87KB stale while the corpus gained the save shape, the
+registry cases and the host-authority cases. Then `git tag -f` was refused too: the
+**"protect tags" ruleset forbids update and deletion on every tag in this repo**, which is
+worth knowing before planning any release around moving one. Re-uploading the asset onto
+the release the tag already points at does the job and is better, since the download URL
+an outside runtime pulls never changes.
 
 ## Patterpad desktop app
 

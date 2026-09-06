@@ -84,22 +84,53 @@ jobs:
           [ "$manifest" = "$version" ] || { echo "package.json says $manifest but the tag says $version"; exit 1; }
           grep -q "^## \[${version}\] - [0-9]" packages/patterpad/CHANGELOG.md \
             || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+      # We import the Developer ID cert OURSELVES and hand electron-builder the keychain, rather
+      # than giving it CSC_LINK and letting it do the import. Its own path is broken: it creates a
+      # keychain with a random password (macCodeSign.createKeychain) and then calls
+      # `security set-key-partition-list -k <the P12 password>` on it, so the two passwords are not
+      # the same one. macOS let that through until the macos-26-arm64 image of 2026-08-31, which
+      # re-validates the -k passphrase and answers "the user name or passphrase you entered is not
+      # correct". That is what failed v0.16.4 while every earlier release signed fine on the older
+      # image, and it is electron-builder's bug, not a secret gone bad. The CLI pipeline has always
+      # imported by hand and kept signing through the same image change, which is the shape copied
+      # here. With CSC_LINK unset, macPackager falls through to CSC_KEYCHAIN and discovers the
+      # identity in it.
+      - name: Import the Developer ID certificate (macOS only)
+        if: runner.os == 'macOS'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}             # base64 .p12
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          if [ -z "$CSC_LINK" ]; then echo "no CSC_LINK secret - refusing to ship an unsigned app"; exit 1; fi
+          echo "$CSC_LINK" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p actions /tmp/patterpad.keychain
+          security default-keychain -s /tmp/patterpad.keychain
+          security unlock-keychain -p actions /tmp/patterpad.keychain
+          security set-keychain-settings /tmp/patterpad.keychain   # no auto-lock during a long build
+          security import /tmp/cert.p12 -k /tmp/patterpad.keychain -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions /tmp/patterpad.keychain
+          rm /tmp/cert.p12
+          security find-identity -v -p codesigning /tmp/patterpad.keychain | grep "Developer ID Application"
       - name: Build, sign + publish
         working-directory: patter
         run: npm run -w @patterkit/patterpad ${{ matrix.script }} -- --publish always
         env:
           # electron-builder's GitHub publisher uploads to the release for this tag.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing + notarization - scoped to the mac job ONLY. These are NOT no-ops
-          # elsewhere: on Windows, electron-builder treats CSC_LINK as an Authenticode cert and
+          # macOS signing + notarization - scoped to the mac job ONLY, and the reason the cert
+          # never reaches another OS is now structural: the import step above is macOS-gated and
+          # CSC_LINK is set nowhere in this job. It was NEVER a no-op elsewhere: on Windows,
+          # electron-builder treats CSC_LINK as an Authenticode cert and
           # SIGNED the NSIS installer with the Apple Developer ID cert, baking its CN into
           # app-update.yml as the expected publisher - so every Windows auto-update downloaded,
           # failed signature verification, and silently gave up (#33). Windows ships genuinely
           # unsigned by policy (an Authenticode cert is not currently obtainable for a non-US
           # individual developer); unsigned + no publisherName = verification skipped = updates
           # install. See packages/patterpad/RELEASE.md.
-          CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          # NOT CSC_LINK: setting it puts electron-builder back on its own broken import (see the
+          # step above). The keychain we filled is passed instead, and only on macOS.
+          CSC_KEYCHAIN: ${{ runner.os == 'macOS' && '/tmp/patterpad.keychain' || '' }}
           APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
