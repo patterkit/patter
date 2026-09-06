@@ -36,6 +36,16 @@ run. The **end-user workaround is documented in [`docs/installation.md`](../../d
 npm run dist:win      # unsigned NSIS installer in ../../release
 ```
 
+**The Windows build log says `signing with signtool.exe` four times, and it signs nothing.**
+electron-builder prints that line before it looks for a certificate (`windowsCodeSign.js`), then finds
+none and skips at debug level, which the release log does not show. Do not read it as a certificate
+leaking into the Windows job. Checked on the published 0.16.5 installer rather than from the source: its
+PE Certificate Table is offset 0, size 0, so there is no Authenticode signature in the file at all. The
+real hazard was the opposite one and it is closed structurally: CSC_LINK reached the Windows job once
+and electron-builder signed the NSIS installer with the Apple Developer ID cert, baking its CN into
+app-update.yml so every Windows auto-update failed verification (#33). The cert is now imported in a
+macOS-gated step and CSC_LINK is set nowhere in the workflow.
+
 ## Linux - AppImage
 
 ```sh
