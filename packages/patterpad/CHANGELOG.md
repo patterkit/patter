@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.7] - 2026-09-07
+
 ### Fixed
 
 - **`/` ▸ Jump on an empty bubble sets the jump.** Picking a target did nothing at all, while the same
