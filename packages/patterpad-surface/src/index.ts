@@ -23,7 +23,7 @@ export { enter, endBubble, prependLine, insertLineBefore } from "./lines.js";
 export { selectAllInBeat } from "./selectall.js";
 export { backspace, deleteSelectionGuarded } from "./delete.js";
 export { toggleLineType, flipToFreeText, promoteToDialogue } from "./linetype.js";
-export { canInsertSpecial, insertJump, setSnippetJump, insertGameEvent, deleteAtomAt } from "./special.js";
+export { canInsertSpecial, insertJump, commitSlashJump, setSnippetJump, insertGameEvent, deleteAtomAt } from "./special.js";
 export { insertChunk, unwrapGroup, deleteChunk, wrapInGroup, wrapChunk, canWrap, setGroupProps, setSnippetCondition, insertOption, insertOptionAfter, moveChunk, moveNodeTo, setBlockName, insertBlock, type GroupKind, type GroupPropsPatch } from "./groups.js";
 export { hintsFor } from "./hints.js";
 export type { Hint } from "./hints.js";

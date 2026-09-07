@@ -27,11 +27,11 @@ import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js"
 import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
 import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
 import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
-import { setSnippetJump, insertJump } from "../src/special.js";
-import { openTargetPicker, closeTargetPicker, type JumpData } from "./targetpicker.js";
+import { setSnippetJump, commitSlashJump } from "../src/special.js";
+import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
 import { setPlayBlockHandler } from "./actionmenu.js";
 import { confirmDialog } from "./confirm.js";
-import { cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf } from "../src/zoneutil.js";
+import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
 import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu } from "./views.js";
 import { problemsPlugin, setProblemMarks, type ProblemMark } from "./problems.js";
@@ -488,9 +488,21 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   setDuplicateHandler(opts.onDuplicate ?? null);            // Duplicate hands the host its old -> new id map
   // `/jump`: open the shared picker BELOW THE CARET; on pick, insert (replace / split per special.ts).
   const slash = createSlashMenu((view) => {
+    // Remember WHICH bubble the menu was raised in, before the picker takes the focus: the triggering
+    // line can be gone by the time the author picks (#63), and the bubble is what they meant to route.
+    const from = context(view.state).snippet;
+    const snippetId = from ? (modelIdOf(from.node) ?? "") : "";
     openTargetPicker({
       anchor: { caretOf: view }, data: buildJumpData(), current: "", allowClear: false,
-      onPick: (target) => { if (target) { const tr = insertJump(view.state, target); if (tr) view.dispatch(tr); } },
+      onPick: (target) => {
+        if (!target) return;
+        // The bubble's position BEFORE the change, so the same rule the inspector's picker uses can map
+        // it: a bubble left beat-less by the jump keeps the inspector, instead of handing it to whichever
+        // neighbour the caret fell into.
+        const before = findByModelId(view.state.doc, snippetId, (n) => n.type.name === "snippet")?.pos;
+        const tr = commitSlashJump(view.state, target, snippetId);
+        if (tr) view.dispatch(before == null ? tr : keepBeatlessBubbleSelected(tr, before));
+      },
       afterClose: () => view.focus(),
     });
   });
@@ -614,7 +626,12 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         // Exiting the editor sweeps any unfinished, wholly-empty line the author started but never filled,
         // so it can't be stranded with no way to remove it. Skip while the cast popup owns input (a fresh
         // line mid character-pick is not abandoned) and never edit a read-only scene.
-        if (!isEditable || popup.isOpen()) return false;
+        //
+        // The same applies to the "/" menu and the jump picker, and it is not a nicety: those panels take
+        // the focus themselves, so this fired the moment one opened and swept away the very line the menu
+        // was raised on. `insertJump` then had nothing to consume and the author's pick did nothing at all
+        // (#63, still true in 0.16.6 - their capture shows the line vanishing before the pick).
+        if (!isEditable || popup.isOpen() || slash.isOpen() || isTargetPickerOpen()) return false;
         const tr = sweepEmptyBeats(v.state);
         if (tr) v.dispatch(tr);
         return false;

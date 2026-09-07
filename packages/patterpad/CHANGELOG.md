@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/` ▸ Jump on an empty bubble sets the jump.** Picking a target did nothing at all, while the same
+  jump set from the inspector worked. The picker takes the editor's focus when it opens, and the
+  blank line the menu was raised on was tidied away on that blur, so by the time you picked there was
+  no line left to turn into a jump. Blank lines are now left alone while the menu or the picker is
+  open, and the pick routes the bubble it was raised in even if something else clears the line first.
+  The inspector also stays on that bubble afterwards, rather than following the caret to its neighbour.
+  Reported by jlafos in #63, against 0.16.6, with a screen capture that showed the line vanishing.
+
+
 ## [0.16.6] - 2026-09-07
 
 ### Fixed

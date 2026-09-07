@@ -23,6 +23,10 @@ type Row =
 
 let active: { panel: HTMLElement; onDown: (e: PointerEvent) => void; anchor: HTMLElement | null; unfollow: () => void } | null = null;
 
+/** Is a picker on screen? The editor's blur-time housekeeping asks, because the picker TOOK that focus:
+ *  the author has not left their line, a panel is sitting on top of it (#63). */
+export function isTargetPickerOpen(): boolean { return active !== null; }
+
 export function closeTargetPicker(): void {
   if (!active) return;
   const { panel, onDown, unfollow } = active;
@@ -171,13 +175,17 @@ export function openTargetPicker(opts: {
   // built on the floating helper; this panel positioned once and then sat there, so scrolling the
   // inspector (its own scroller) or the editor slid the Jump row out from under its own picker.
   const unfollow = followOnScroll(place);
-  field.focus();
 
   const onDown = (e: PointerEvent): void => {
     const t = e.target as Node;
     if (panel.contains(t) || (opts.anchor instanceof HTMLElement && opts.anchor.contains(t))) return;
     close();
   };
-  setTimeout(() => document.addEventListener("pointerdown", onDown, true), 0);
+  // REGISTER BEFORE FOCUSING. Taking the focus blurs the editor, and the editor's blur-time housekeeping
+  // asks `isTargetPickerOpen()` before it sweeps blank lines - so with the registration last, the answer
+  // during that very blur was "no", and the line the `/` menu was raised on was swept out from under the
+  // picker it had just opened (#63).
   active = { panel, onDown, anchor: anchorEl, unfollow };
+  field.focus();
+  setTimeout(() => document.addEventListener("pointerdown", onDown, true), 0);
 }

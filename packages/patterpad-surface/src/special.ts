@@ -22,7 +22,7 @@ import { Fragment, type Node as PMNode } from "prosemirror-model";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
-import { cueText, prevBeatKind, emptyBeatNode, findBeatById, zoneContentEnd } from "./zoneutil.js";
+import { cueText, prevBeatKind, emptyBeatNode, findBeatById, findByModelId, zoneContentEnd } from "./zoneutil.js";
 import { landOnBeat } from "./lines.js";
 
 /**
@@ -116,6 +116,21 @@ export function setSnippetJump(state: EditorState, snippetPos: number, target: s
     tr.delete(snippetPos + 1, snippetPos + 1 + snip.content.size);
   }
   return tr.scrollIntoView();
+}
+
+/**
+ * Commit the `/` menu's Jump. Normally that is `insertJump`, which consumes the empty line the menu was
+ * raised on and turns the bubble into a divert. But the line is a WHOLLY EMPTY one, and the picker takes
+ * the editor's focus while it is open, so anything that tidies blank lines on blur can take it away
+ * first - and then `insertJump` has no triggering line, declines, and the author's pick does nothing at
+ * all (#63, reported again against 0.16.6 with a screen capture: the line is visibly gone before the
+ * pick lands). The bubble is what they were routing, so route it by id.
+ */
+export function commitSlashJump(state: EditorState, target: string, snippetId: string): Transaction | null {
+  const consumed = insertJump(state, target);
+  if (consumed) return consumed;
+  const at = findByModelId(state.doc, snippetId, (n) => n.type.name === "snippet");
+  return at ? setSnippetJump(state, at.pos, target) : null;
 }
 
 /** Insert a game event at the current empty line; a fresh line follows in the same bubble. */

@@ -11,7 +11,7 @@ import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { EditorView as PMEditorView } from "prosemirror-view";
 import type { Scene } from "@patterkit/model";
 import { sceneToDoc } from "../src/bridge.js";
-import { setSnippetJump, canInsertSpecial, insertJump } from "../src/special.js";
+import { setSnippetJump, canInsertSpecial, insertJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker } from "./targetpicker.js";
 import { createSlashMenu } from "./slashmenu.js";
 import { keepBeatlessBubbleSelected, sweepEmptyBeats } from "./surface.js";
@@ -253,5 +253,52 @@ describe("landing the selection when the bubble changes shape underneath it", ()
     doc.descendants((n, pos) => { if (promptBeat < 0 && n.type.name === "prose" && n.textContent === "") promptBeat = pos; return promptBeat < 0; });
     const s0 = EditorState.create({ doc, selection: TextSelection.near(doc.resolve(promptBeat + 2)) });
     expect(() => { const tr = sweepEmptyBeats(s0); if (tr) s0.apply(tr); }).not.toThrow();
+  });
+});
+
+describe("the / menu's Jump survives the line it was raised on being tidied away (#63, 0.16.6)", () => {
+  const posOfSnippet = (state: EditorState, id: string): number => {
+    let at = -1;
+    state.doc.descendants((n, pos) => { if (at < 0 && n.type.name === "snippet" && JSON.parse(n.attrs.raw as string).id === id) at = pos; return at < 0; });
+    return at;
+  };
+
+  const oneBlankLine: Scene = { id: "s", type: "scene", name: "S", blocks: [
+    { id: "b1", type: "block", name: "section1", children: [{ id: "sn1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "HECTOR" }] }] },
+    { id: "b2", type: "block", name: "section2", children: [{ id: "sn2", type: "snippet", beats: [{ id: "L2", kind: "line" }] }] },
+  ] };
+
+  /** The caret in sn2's blank line, which is where "/" was typed. */
+  const stateAtBlank = (): EditorState => {
+    const doc = sceneToDoc(oneBlankLine, { L1: "hi", L2: "" });
+    let blank = -1;
+    doc.descendants((n, pos) => { if (n.type.name === "line" && n.textContent === "") blank = pos; return true; });
+    return EditorState.create({ doc, selection: TextSelection.near(doc.resolve(blank + 2)) });
+  };
+
+  it("consumes the triggering line when it is still there (the ordinary path)", () => {
+    const s0 = stateAtBlank();
+    const s = s0.apply(commitSlashJump(s0, "b1", "sn2")!);
+    const sn2 = s.doc.nodeAt(posOfSnippet(s, "sn2"))!;
+    expect(sn2.childCount).toBe(0);                                   // the blank line went with it
+    expect(JSON.parse(sn2.attrs.jump as string).to).toBe("b1");
+  });
+
+  it("still routes the bubble when the line has ALREADY been swept (what the capture shows)", () => {
+    // Their 0.16.6 capture: the blank line is gone before the pick lands, so insertJump has nothing to
+    // consume and used to decline - the author picked a target and nothing happened.
+    const s0 = stateAtBlank();
+    const swept = s0.apply(sweepEmptyBeats(s0)!);
+    expect(insertJump(swept, "b1")).toBeNull();                       // the old path gives up here
+    const s = swept.apply(commitSlashJump(swept, "b1", "sn2")!);      // ...this one does not
+    const sn2 = s.doc.nodeAt(posOfSnippet(s, "sn2"))!;
+    expect(JSON.parse(sn2.attrs.jump as string).to).toBe("b1");
+    expect(sn2.childCount).toBe(0);
+  });
+
+  it("declines when there is neither a triggering line nor that bubble, rather than routing something else", () => {
+    const s0 = stateAtBlank();
+    const swept = s0.apply(sweepEmptyBeats(s0)!);
+    expect(commitSlashJump(swept, "b1", "sn_not_here")).toBeNull();
   });
 });
