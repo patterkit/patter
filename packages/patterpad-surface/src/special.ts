@@ -25,10 +25,24 @@ import { context } from "./context.js";
 import { cueText, prevBeatKind, emptyBeatNode, findBeatById, zoneContentEnd } from "./zoneutil.js";
 import { landOnBeat } from "./lines.js";
 
-/** Is the cursor on an empty line where the slash menu is allowed (content-start, or in the cue)? */
+/**
+ * Is the cursor on an empty line where the slash menu is allowed (content-start, or in the cue)?
+ *
+ * Two exclusions, both found by exercising the corners after #63 and both places the menu used to
+ * open with nothing useful behind it:
+ *   - a performance DIRECTION. `atStart` is true at the start of a paren zone too, so "/" opened the
+ *     menu while the author was writing a direction - and the hint bar, which offers only ")" there,
+ *     had been telling the truth all along.
+ *   - an option PROMPT, which is a beat with no snippet around it. Jump and Follow-with both declined
+ *     (they need a snippet), but "Insert game event" did not: it built a fresh snippet in the option
+ *     and the prompt - the choice's own text - was GONE. A menu with one live item that destroys
+ *     content has no business opening.
+ */
 export function canInsertSpecial(state: EditorState): boolean {
   const c = context(state);
   if (!c.beat || (c.beat.kind !== "line" && c.beat.kind !== "prose") || !c.zone) return false;
+  if (!c.snippet) return false;                      // an option prompt: nothing here can act
+  if (c.zone.role === "paren") return false;         // a direction is prose the author is writing
   let sayLen = 1;
   c.beat.node.forEach((z) => { if (z.type.name === "say") sayLen = z.content.size; });
   return sayLen === 0 && (c.zone.role === "cue" || c.zone.atStart);

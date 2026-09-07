@@ -6,7 +6,7 @@
 // it survives editor / inspector re-renders.
 
 import type { EditorView } from "prosemirror-view";
-import { anchorBelowCaret } from "./anchor.js";
+import { anchorBelowCaret, followOnScroll } from "./anchor.js";
 import { closeWithExit } from "./exit.js";
 
 export interface JumpSceneGroup { scene: { id: string; label: string }; blocks: Array<{ id: string; label: string }>; }
@@ -21,13 +21,14 @@ type Row =
   | { kind: "block"; id: string; label: string; scene: string }
   | { kind: "clear" };
 
-let active: { panel: HTMLElement; onDown: (e: PointerEvent) => void; anchor: HTMLElement | null } | null = null;
+let active: { panel: HTMLElement; onDown: (e: PointerEvent) => void; anchor: HTMLElement | null; unfollow: () => void } | null = null;
 
 export function closeTargetPicker(): void {
   if (!active) return;
-  const { panel, onDown } = active;
+  const { panel, onDown, unfollow } = active;
   active = null;
   document.removeEventListener("pointerdown", onDown, true);
+  unfollow();
   closeWithExit(panel, () => panel.remove());
 }
 
@@ -84,8 +85,15 @@ export function openTargetPicker(opts: {
   };
 
   const idOf = (r: Row): string | null => (r.kind === "scene" || r.kind === "block" ? r.id : r.kind === "end" ? "END" : null);
+  // One pick per opening. The panel outlives its own close by the length of the exit fade, and the
+  // rows keep their listeners while it plays; only `.closing { pointer-events: none }` in the CSS was
+  // stopping a second click from committing a second jump. A guard here does not depend on a
+  // stylesheet rule two files away.
+  let picked = false;
   const pick = (i: number): void => {
+    if (picked) return;
     const r = rows[i]; if (!r) return;
+    picked = true;
     opts.onPick(idOf(r)); // a "clear" row yields null
     close();
   };
@@ -143,15 +151,26 @@ export function openTargetPicker(opts: {
 
   // position: below the caret (the `/jump` case, via the empty-zone-safe helper), or below+left of
   // the anchor element (inspector / fix button), clamped to the viewport.
-  const w = 240, h = panel.offsetHeight || 280;
+  const w = 240;
   panel.style.width = `${w}px`;
-  if (opts.anchor instanceof HTMLElement) {
-    const r = opts.anchor.getBoundingClientRect();
-    panel.style.left = `${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - w - 8)))}px`;
-    panel.style.top = `${Math.round(Math.min(r.bottom + 6, window.innerHeight - h - 8))}px`;
-  } else {
-    anchorBelowCaret(opts.anchor.caretOf, panel); // sets left/top, robust to an empty zone's 0,0 coords
-  }
+  const place = (): void => {
+    const h = panel.offsetHeight || 280;
+    if (opts.anchor instanceof HTMLElement) {
+      // An anchor the inspector has since re-rendered away is no longer measurable (a detached node
+      // reads 0,0); leave the panel where the author last saw it rather than throwing it to the corner.
+      if (!opts.anchor.isConnected) return;
+      const r = opts.anchor.getBoundingClientRect();
+      panel.style.left = `${Math.round(Math.max(8, Math.min(r.left, window.innerWidth - w - 8)))}px`;
+      panel.style.top = `${Math.round(Math.min(r.bottom + 6, window.innerHeight - h - 8))}px`;
+    } else {
+      anchorBelowCaret(opts.anchor.caretOf, panel); // sets left/top, robust to an empty zone's 0,0 coords
+    }
+  };
+  place();
+  // Stay glued to the anchor while the page moves. The "/" menu has followed its caret since it was
+  // built on the floating helper; this panel positioned once and then sat there, so scrolling the
+  // inspector (its own scroller) or the editor slid the Jump row out from under its own picker.
+  const unfollow = followOnScroll(place);
   field.focus();
 
   const onDown = (e: PointerEvent): void => {
@@ -160,5 +179,5 @@ export function openTargetPicker(opts: {
     close();
   };
   setTimeout(() => document.addEventListener("pointerdown", onDown, true), 0);
-  active = { panel, onDown, anchor: anchorEl };
+  active = { panel, onDown, anchor: anchorEl, unfollow };
 }

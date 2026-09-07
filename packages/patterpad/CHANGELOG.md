@@ -32,7 +32,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   of its items unreachable and no way to scroll. It now flips above the line when there is no room
   below, and scrolls when there is room for neither.
 
-  Reported by jlafos in #63.
+- **`/` no longer opens over a performance direction.** A direction begins like an empty line as far as
+  the old check was concerned, so typing a slash into one raised the insert menu instead. The hint bar
+  there has always offered only ")", and it was right.
+- **`/` no longer opens on a choice's own text, where one of its items destroyed that text.** An option
+  prompt has no bubble around it, so Jump and Follow-with both did nothing; "Insert game event" did
+  something worse, replacing the option's prompt with a new bubble and losing what you had written.
+- **Choosing a target twice in a row cannot set two jumps.** The list only stopped a second click
+  because the fade-out ignores the mouse; now the pick itself is once per opening.
+- **The jump list follows its row when the panel behind it scrolls**, as the `/` menu already did.
+
+  Reported by jlafos in #63; the last four came out of exercising the same area afterwards.
 
 ## [0.16.5] - 2026-09-06
 

@@ -52,7 +52,9 @@ function zoneHints(s: ZoneState): Hint[] {
   // cue and at an empty content-start - never on a line that already has words.
   let sayLen = 1;
   s.beat.node.forEach((z) => { if (z.type.name === "say") sayLen = z.content.size; });
-  const sayEmpty = sayLen === 0;
+  // An option PROMPT has no snippet around it, and every item on that menu needs one (special.ts).
+  // Offering the key here promised something that could not happen.
+  const sayEmpty = sayLen === 0 && !!s.snippet;
   switch (s.zone.role) {
     case "cue":
       // The name is a token: type to FILTER / add (never edit), pick to accept. "/" inserts a
@@ -74,7 +76,7 @@ function zoneHints(s: ZoneState): Hint[] {
           return [
             { key: "Tab", label: "→ dialogue" },
             { key: "Enter", label: "next line" },
-            { key: "/", label: "insert" },
+            ...(sayEmpty ? [{ key: "/", label: "insert" }] : []),
           ];
         }
         return s.zone.atStart
@@ -87,7 +89,7 @@ function zoneHints(s: ZoneState): Hint[] {
           { key: "Enter", label: "next line" },
           { key: "Shift-Enter", label: "end snippet" },
           { key: "(", label: "direction" },
-          { key: "/", label: "insert" },
+          ...(sayEmpty ? [{ key: "/", label: "insert" }] : []),
         ];
       }
       if (s.zone.atStart) {
