@@ -8,12 +8,14 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import type { EditorView } from "prosemirror-view";
-import { EditorState, TextSelection } from "prosemirror-state";
+import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import { EditorView as PMEditorView } from "prosemirror-view";
 import type { Scene } from "@patterkit/model";
 import { sceneToDoc } from "../src/bridge.js";
 import { openTargetPicker, closeTargetPicker } from "./targetpicker.js";
 import { createSlashMenu } from "./slashmenu.js";
+import { keepBeatlessBubbleSelected } from "./surface.js";
+import { setSnippetJump } from "../src/special.js";
 import { anchorBelowCaret } from "./anchor.js";
 
 const DATA = { scenes: [{ scene: { id: "sc", label: "A scene" }, blocks: [{ id: "b1", label: "One" }, { id: "b2", label: "Two" }] }] };
@@ -52,6 +54,24 @@ describe("the target picker picks on the click, not the mousedown", () => {
     openTargetPicker({ anchor, data: DATA, current: "", allowClear: false, onPick: (t) => picked.push(t) });
 
     clickSeq(rowNamed("Two"));
+    expect(picked).toEqual(["b2"]);
+  });
+
+  it("hovering a row does not replace it, so the press and the release land on the same button", () => {
+    // Moving the mouse over a row moves the highlight. That used to rebuild every row, which swapped
+    // the button out from under the pointer - and a click only fires when mousedown and mouseup share
+    // a target, so the pick was silently swallowed. Found by re-testing the fix above against the
+    // reporter's own steps, where "not empty + click" stopped working.
+    const anchor = document.createElement("button");
+    document.body.append(anchor);
+    const picked: Array<string | null> = [];
+    openTargetPicker({ anchor, data: DATA, current: "", allowClear: false, onPick: (t) => picked.push(t) });
+
+    const row = rowNamed("Two");
+    row.dispatchEvent(new MouseEvent("mousemove", { bubbles: true }));   // the highlight moves here
+    expect(rowNamed("Two")).toBe(row);                                   // ...and this is the SAME button
+    expect(row.classList.contains("active")).toBe(true);
+    clickSeq(row);
     expect(picked).toEqual(["b2"]);
   });
 
@@ -180,5 +200,41 @@ describe('the "/" menu never types a slash into the line', () => {
     expect(menu.handleTextInput(view, "/")).toBe(false);
     expect(menu.isOpen()).toBe(false);
     view.destroy();
+  });
+});
+
+describe("routing a bubble keeps the inspector on that bubble", () => {
+  const twoBubbles: Scene = { id: "s", type: "scene", name: "S", blocks: [
+    { id: "b", type: "block", name: "M", children: [
+      { id: "sn1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }] },
+      { id: "sn2", type: "snippet", beats: [] },   // the jump-only bubble the author is working on
+    ] },
+  ] };
+
+  const posOf = (state: EditorState, id: string): number => {
+    let at = -1;
+    state.doc.descendants((n, pos) => { if (at < 0 && n.type.name === "snippet" && JSON.parse(n.attrs.raw as string).id === id) at = pos; return at < 0; });
+    return at;
+  };
+
+  it("a beat-less bubble stays selected after its jump is set", () => {
+    const s0 = EditorState.create({ doc: sceneToDoc(twoBubbles, { L1: "hello" }) });
+    const at = posOf(s0, "sn2");
+    const tr = setSnippetJump(s0, at, "b");
+    expect(tr).not.toBeNull();
+    // Without this the selection maps into sn1's line and the inspector shows the WRONG bubble.
+    const s = s0.apply(keepBeatlessBubbleSelected(tr!, at));
+    expect(s.selection).toBeInstanceOf(NodeSelection);
+    expect((s.selection as NodeSelection).node.type.name).toBe("snippet");
+    expect((s.selection as NodeSelection).node.childCount).toBe(0);
+    expect((s.selection as NodeSelection).from).toBe(at);
+  });
+
+  it("a bubble with beats is left alone (the caret stays in the text)", () => {
+    const s0 = EditorState.create({ doc: sceneToDoc(twoBubbles, { L1: "hello" }) });
+    const at = posOf(s0, "sn1");
+    const tr = setSnippetJump(s0, at, "b");
+    const before = tr!.selection;
+    expect(keepBeatlessBubbleSelected(tr!, at).selection).toBe(before);
   });
 });

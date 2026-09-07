@@ -91,24 +91,46 @@ export function openTargetPicker(opts: {
   };
   const close = (): void => { closeTargetPicker(); opts.afterClose?.(); };
 
+  let buttons: HTMLButtonElement[] = []; // 1:1 with `rows`
+
+  /** Move the highlight WITHOUT rebuilding the rows. Rebuilding on hover replaced the very button the
+   *  mouse was pressing, and a click only fires when the press and the release land on the SAME
+   *  element - so a rebuild between them swallowed the pick entirely. (Found by re-testing #63: the
+   *  click-instead-of-mousedown fix is only safe if the row survives the press.) */
+  const setHighlight = (i: number): void => {
+    if (i === highlight || i < 0 || i >= buttons.length) return;
+    buttons[highlight]?.classList.remove("active");
+    highlight = i;
+    buttons[highlight]?.classList.add("active");
+  };
+
   const render = (): void => {
     list.replaceChildren();
+    buttons = [];
     rows.forEach((r, i) => {
       const sel = idOf(r) !== null && idOf(r) === opts.current;
       const cls = r.kind === "scene" ? "tp-row tp-scene" : r.kind === "block" ? "tp-row tp-block" : r.kind === "clear" ? "tp-row tp-clear" : "tp-row tp-end";
       const b = mk("button", `${cls}${i === highlight ? " active" : ""}${sel ? " sel" : ""}`);
       b.type = "button";
       b.textContent = r.kind === "end" ? "END" : r.kind === "clear" ? "Clear jump" : r.label;
-      b.addEventListener("mousedown", (e) => { e.preventDefault(); pick(i); });
-      b.addEventListener("mousemove", () => { if (highlight !== i) { highlight = i; render(); } });
+      // Act on the CLICK, not the mousedown. Picking on mousedown closed the panel while the button
+      // was still down, so the browser delivered the click that followed to whatever the panel had
+      // been covering - the inspector's own Jump row, when the picker was anchored under it, which
+      // re-opened a picker on whatever snippet the inspector was showing by then and made the next
+      // pick land on the wrong snippet (#63). mousedown still preventDefaults, which is what stops
+      // the editor losing its selection; the click is the action.
+      b.addEventListener("mousedown", (e) => { e.preventDefault(); });
+      b.addEventListener("click", () => pick(i));
+      b.addEventListener("mousemove", () => setHighlight(i));
       list.append(b);
+      buttons.push(b);
     });
   };
 
   field.addEventListener("input", () => { query = field.value; highlight = 0; computeRows(); render(); });
   field.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); if (rows.length) { highlight = (highlight + 1) % rows.length; render(); } }
-    else if (e.key === "ArrowUp") { e.preventDefault(); if (rows.length) { highlight = (highlight - 1 + rows.length) % rows.length; render(); } }
+    if (e.key === "ArrowDown") { e.preventDefault(); if (rows.length) setHighlight((highlight + 1) % rows.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); if (rows.length) setHighlight((highlight - 1 + rows.length) % rows.length); }
     else if (e.key === "Enter") { e.preventDefault(); pick(highlight); }
     else if (e.key === "Escape") { e.preventDefault(); close(); }
   });

@@ -22,6 +22,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   that line for good.
 - **`/` works on a line with no character set.** The menu opened underneath the cast list, which kept
   the keyboard, so it looked as though nothing had happened.
+- **Choosing a jump target with the mouse works on a bubble you have just started.** Found by
+  re-testing the fixes above against the reporter's own steps: moving the mouse over the list rebuilt
+  its rows, which swapped the row out from under the button as it went down, and a click needs the
+  press and the release on the same row. The highlight now moves without rebuilding.
+- **After you set a jump, the inspector stays on the bubble you set it on.** A bubble with no lines
+  holds no cursor, so the jump landed correctly while the inspector moved to the bubble next door.
 - **The `/` menu stays on screen.** Opened near the bottom of the window it ran off the edge, with most
   of its items unreachable and no way to scroll. It now flips above the line when there is no room
   below, and scrolls when there is room for neither.

@@ -354,6 +354,20 @@ export function sweepEmptyBeats(state: EditorState): Transaction | null {
   return tr;
 }
 
+/**
+ * Keep the inspector on the bubble that was just routed. A beat-less bubble holds no caret, so after
+ * a change the selection maps into a NEIGHBOURING bubble's text and the inspector follows it there -
+ * which reads as "the jump went on the snippet before this one" (#63) even when the write landed
+ * exactly where it should. Re-assert the bubble itself, which is what clicking it would give you.
+ * `pos` is the bubble's position BEFORE the transaction; it is mapped through.
+ */
+export function keepBeatlessBubbleSelected(tr: Transaction, pos: number): Transaction {
+  const at = tr.mapping.map(pos);
+  const node = tr.doc.nodeAt(at);
+  if (node?.type.name === "snippet" && node.childCount === 0) tr.setSelection(NodeSelection.create(tr.doc, at));
+  return tr;
+}
+
 /** Position of the snippet enclosing the beat at `pos`, or null when it sits in an optionprompt / group. */
 function snippetHolding(state: EditorState, pos: number): number | null {
   const $at = state.doc.resolve(pos);
@@ -973,7 +987,13 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       const cur = node.attrs.jump ? ((JSON.parse(node.attrs.jump as string) as { to?: string }).to ?? "") : "";
       openTargetPicker({
         anchor, data: buildJumpData(), current: cur, allowClear: cur !== "",
-        onPick: (target) => { const p = findNodePos(id); if (p == null) return; const tr = setSnippetJump(view.state, p, target); if (tr) view.dispatch(tr); afterPick?.(); },
+        onPick: (target) => {
+        const p = findNodePos(id); if (p == null) return;
+        const tr = setSnippetJump(view.state, p, target);
+        if (!tr) return;
+        view.dispatch(keepBeatlessBubbleSelected(tr, p));
+        afterPick?.();
+      },
       });
     },
     jumpTargets: () => flatTargets(),
