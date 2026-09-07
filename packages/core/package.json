@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/core",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Patter core: stable id generation, readable-handle computation, canonical (de)serialisation, and the structural validator.",
   "type": "module",
   "license": "MIT",
