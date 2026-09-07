@@ -1,5 +1,12 @@
 # @patterkit/compiler
 
+## 0.2.8
+
+### Patch Changes
+
+- Updated dependencies [df4cd3a]
+  - @patterkit/core@0.2.4
+
 ## 0.2.7
 
 ### Patch Changes
