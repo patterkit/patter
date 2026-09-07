@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Block, GameEventBeat, Group, Scene, Snippet } from "@patterkit/model";
+import { humanizeNodeRefs } from "@patterkit/core";
 import { sourceStrings, mergeAuthoring } from "./loaded-helpers.js";
 import type { LoadedProject } from "./load.js";
 
@@ -48,12 +49,6 @@ export function characterColour(name: string): string {
   return CHAR_PALETTE[colourIndex(name)]!;
 }
 
-// `visits("blk_x")` / `seen("scn_y")` in a written condition carries an opaque node id - meaningless in a
-// reading script. Swap the id for the scene / block TITLE (the same courtesy the editor's condition tags do).
-const VISIT_FN_RE = /\b(patter_visits|patter_seen|visits|seen)\s*\(\s*(['"])(.*?)\2\s*\)/g;
-function humanizeCondition(cond: string, label: (id: string) => string): string {
-  return cond.replace(VISIT_FN_RE, (_m, fn: string, _q: string, id: string) => `${fn}(${label(id)})`);
-}
 
 /** A formatting run of body text. `code` marks an inline `{@property}` interpolation (rendered as accent
  *  mono); `bold`/`italic` carry Patter's closed `<b>/<i>/<bi>` markup. Renderers turn these into Word runs
@@ -177,7 +172,7 @@ export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
     for (const block of scene.blocks as Block[]) { blockTrail.set(block.id, `${scene.name} › ${block.name}`); blockName.set(block.id, block.name); }
   }
   // visits()/seen() in a condition reads better with the bare scene / block NAME than the full trail.
-  const humanize = (cond: string): string => humanizeCondition(cond, (id) => blockName.get(id) ?? sceneOf.get(id) ?? id);
+  const humanize = (cond: string): string => humanizeNodeRefs(cond, (id) => blockName.get(id) ?? sceneOf.get(id) ?? id);
 
   const els: ScriptElement[] = [];
   const textOf = (id: string): string => source[id] ?? "";

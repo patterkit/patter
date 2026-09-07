@@ -32,6 +32,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   of its items unreachable and no way to scroll. It now flips above the line when there is no room
   below, and scrolls when there is room for neither.
 
+- **The readable script names the blocks a condition refers to.** Publish ▸ Readable Script printed
+  `‹ if not seen(blk_lcd858q2) ›` where the editor shows `‹ if not seen(Intro) ›`, because the export
+  read only the quoted spelling of a node reference and Patterpad writes the bare one. Both spellings
+  are the same thing, and one rule now serves the editor and the script. Reported by jlafos in #64.
 - **`/` no longer opens over a performance direction.** A direction begins like an empty line as far as
   the old check was concerned, so typing a slash into one raised the insert menu instead. The hint bar
   there has always offered only ")", and it was right.

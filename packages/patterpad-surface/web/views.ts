@@ -8,6 +8,7 @@ import type { NodeViewConstructor, EditorView } from "prosemirror-view";
 import { NodeSelection } from "prosemirror-state";
 import { selectChunkAt } from "./chunkselect.js";
 import type { Node as PMNode } from "prosemirror-model";
+import { humanizeNodeRefs } from "@patterkit/core";
 import { colourFor } from "../src/colour.js";
 import { deleteAtomAt } from "../src/special.js";
 import { setBlockName, insertBlock, insertOptionAfter, seedSnippet, seedBeatInSnippet } from "../src/groups.js";
@@ -37,17 +38,12 @@ export function setJumpNavHandler(fn: ((targetId: string) => void) | null): void
 const jumpRefreshers = new Set<() => void>();
 export function refreshJumpLabels(): void { for (const fn of jumpRefreshers) fn(); }
 
-// The visit-counting functions (`visits` / `seen`, and their world-wide `patter_` variants) take a
-// node id - the same opaque id a jump targets. The author never wants to read `visits("blk_x7q2")`;
-// the read-only condition tag swaps that id for the scene / block TITLE via the same resolver the jump
-// chips use, so it reads `if visits(The Tavern) > 0`. The id is accepted BOTH quoted (`visits("blk_x")`)
-// AND as a bareword (`visits(blk_x)`): the dialect parses a bareword arg as the same string literal, so
-// both forms are valid and equivalent - humanize either.
-const VISIT_FN_RE = /\b(patter_visits|patter_seen|visits|seen)\s*\(\s*(?:(['"])(.*?)\2|([A-Za-z_]\w*))\s*\)/g;
-export function humanizeCondition(c: string): string {
-  return c.replace(VISIT_FN_RE, (_m, fn: string, _q: string | undefined, quotedId: string | undefined, bareId: string | undefined) =>
-    `${fn}(${resolveJumpLabel(quotedId ?? bareId ?? "")})`);
-}
+export const humanizeCondition = (c: string): string => humanizeNodeRefs(c, resolveJumpLabel);
+
+// The read-only condition tag reads `if visits(The Tavern) > 0`, not `if visits("blk_x7q2")`: the id is
+// swapped for the scene / block TITLE through the same resolver the jump chips use. The rule itself is
+// shared with the readable-script export (@patterkit/core), because keeping two copies is how the PDF
+// came to print raw ids while the editor showed names (#64).
 
 // One shared structural action menu (⋯ / right-click), created lazily on first use.
 let actionMenu: ReturnType<typeof createActionMenu> | null = null;

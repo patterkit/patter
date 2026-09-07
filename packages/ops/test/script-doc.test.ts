@@ -161,6 +161,26 @@ describe("readable-script text handling: conditions, markup, interpolation", () 
     expect(doc.elements.some((e) => JSON.stringify(e).includes("'vault'") || JSON.stringify(e).includes("'intro'"))).toBe(false); // no raw id leaks
   });
 
+  it("humanizes a BAREWORD id too, which is the form Patterpad writes (#64)", () => {
+    // The export's own copy of the rule insisted on quotes, so a script written in Patterpad printed
+    // `‹ if not seen(blk_lcd858q2) ›` while the editor showed the block's name for the same condition.
+    // Both spellings are valid: the dialect reads a bareword argument as the same string literal.
+    const dir = mkdtempSync(join(tmpdir(), "patter-script-bare-"));
+    for (const d of ["scenes", "loc/en"]) mkdirSync(join(dir, d), { recursive: true });
+    const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
+    w("game.patterproj", { schema: "patter/project@0", project: { id: "h", name: "H" }, locales: { default: "en", all: ["en"] } });
+    w("scenes/one.patterflow", { schema: "patter/flow@0", scene: { id: "s1", type: "scene", name: "Scene One", blocks: [
+      { id: "blk_lcd858q2", type: "block", name: "Intro", children: [{ id: "n0", type: "snippet", beats: [{ id: "T0", kind: "text" }] }] },
+      { id: "b2", type: "block", name: "The Vault", children: [
+        { id: "n1", type: "snippet", condition: "not seen(blk_lcd858q2)", beats: [{ id: "T1", kind: "text" }] }] },
+    ] } });
+    w("loc/en/one.patterloc", { schema: "patter/strings@0", scene: "s1", locale: "en", default: true, strings: { T0: "x", T1: "y" } });
+    const doc = runScriptDoc(loadProject(dir));
+    const conds = doc.elements.filter((e) => e.kind === "condition").map((e) => (e as { text: string }).text);
+    expect(conds).toContain("if not seen(Intro)");
+    expect(JSON.stringify(doc.elements)).not.toContain("blk_lcd858q2");
+  });
+
   it("textRuns splits the closed <b>/<i>/<bi> markup into formatting runs, literals verbatim", () => {
     expect(textRuns("Gold & <b>glory</b> await")).toEqual([
       { text: "Gold & ", bold: false, italic: false, code: false },
