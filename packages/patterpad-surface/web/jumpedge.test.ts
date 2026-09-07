@@ -14,6 +14,7 @@ import { sceneToDoc } from "../src/bridge.js";
 import { setSnippetJump, canInsertSpecial, insertJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker } from "./targetpicker.js";
 import { createSlashMenu } from "./slashmenu.js";
+import { createActionMenu } from "./actionmenu.js";
 import { keepBeatlessBubbleSelected, sweepEmptyBeats } from "./surface.js";
 
 const DATA = { scenes: [
@@ -300,5 +301,44 @@ describe("the / menu's Jump survives the line it was raised on being tidied away
     const s0 = stateAtBlank();
     const swept = s0.apply(sweepEmptyBeats(s0)!);
     expect(commitSlashJump(swept, "b1", "sn_not_here")).toBeNull();
+  });
+});
+
+describe("the structural action menu acts on the click too (#63, the last of that pattern)", () => {
+  const scene: Scene = { id: "s", type: "scene", name: "S", blocks: [
+    { id: "b", type: "block", name: "M", children: [
+      { id: "sn1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }] },
+    ] },
+  ] };
+
+  const openOnSnippet = (): { view: PMEditorView; menu: ReturnType<typeof createActionMenu>; snippetPos: number } => {
+    const doc = sceneToDoc(scene, { L1: "hi" });
+    let at = -1;
+    doc.descendants((n, pos) => { if (at < 0 && n.type.name === "snippet") at = pos; return at < 0; });
+    const mount = document.createElement("div");
+    document.body.append(mount);
+    const view = new PMEditorView(mount, { state: EditorState.create({ doc }) });
+    const menu = createActionMenu();
+    menu.open(view, () => at, { x: 10, y: 10 });
+    return { view, menu, snippetPos: at };
+  };
+
+  const item = (label: string): HTMLElement => {
+    const el = Array.from(document.querySelectorAll<HTMLElement>(".action-mi")).find((b) => b.textContent === label);
+    if (!el) throw new Error(`no menu item "${label}"`);
+    return el;
+  };
+
+  it("a mousedown alone changes nothing; the click is what runs it", () => {
+    const { view } = openOnSnippet();
+    const before = view.state.doc.childCount === 1 ? view.state.doc.child(0).childCount : -1;
+
+    item("Duplicate").dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    expect(view.state.doc.child(0).childCount).toBe(before);          // nothing committed on the press
+    expect(document.querySelector(".action-mi")).not.toBeNull();      // ...and the menu is still up
+
+    item("Duplicate").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(view.state.doc.child(0).childCount).toBe(before + 1);      // the copy landed
+    view.destroy();
   });
 });

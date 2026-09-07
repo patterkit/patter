@@ -15,6 +15,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   open, and the pick routes the bubble it was raised in even if something else clears the line first.
   The inspector also stays on that bubble afterwards, rather than following the caret to its neighbour.
   Reported by jlafos in #63, against 0.16.6, with a screen capture that showed the line vanishing.
+- **A structural menu (the bubble's ⋯, or right-click) no longer passes your click through to what it
+  was covering.** Its items ran as the button went down and the menu closed under your finger, so the
+  click that followed landed on the editor or the inspector behind it. Same fault as the jump list,
+  same fix; this was the last place it lived.
 
 
 ## [0.16.6] - 2026-09-07

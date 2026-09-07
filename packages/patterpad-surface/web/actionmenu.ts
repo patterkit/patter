@@ -62,6 +62,18 @@ function enclosingBlockId(state: EditorView["state"], pos: number): string | nul
 }
 
 /** One shared structural menu, created lazily on first use. */
+/**
+ * Bind a menu item's action to the CLICK, with mousedown only stopping the editor from losing its
+ * selection. Running on mousedown closes the menu while the button is still down, and the browser then
+ * delivers the click to whatever the menu had been covering - which in the jump picker opened a second
+ * picker on a bubble the author never chose (#63). This menu's items act on the node captured when it
+ * opened, so the damage here was milder, but it is the same fault and this is the last place it lived.
+ */
+const onPick = (el: HTMLElement, run: () => void): void => {
+  el.addEventListener("mousedown", (e) => { e.preventDefault(); });
+  el.addEventListener("click", run);
+};
+
 export function createActionMenu(): ActionMenu {
   const floating = createFloating("action-menu");
   const el = floating.el;
@@ -107,7 +119,7 @@ export function createActionMenu(): ActionMenu {
   const leaf = (label: string, cls: string, cmd: Cmd): HTMLElement => {
     const mi = document.createElement("button"); mi.className = `action-mi ${cls}`; mi.textContent = label;
     mi.addEventListener("mouseenter", closeSub);              // leaving a submenu parent closes the flyout
-    mi.addEventListener("mousedown", (e) => { e.preventDefault(); act(cmd); });
+    onPick(mi, () => { act(cmd); });
     return mi;
   };
 
@@ -116,8 +128,7 @@ export function createActionMenu(): ActionMenu {
   const noteItem = (): HTMLElement => {
     const mi = document.createElement("button"); mi.className = "action-mi"; mi.textContent = "Note…";
     mi.addEventListener("mouseenter", closeSub);
-    mi.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    onPick(mi, () => {
       if (!ctx) return; const view = ctx.view;
       // An explicit note target (a beat right-click) wins; otherwise note the node at the menu position.
       const note = ctx.note;
@@ -142,8 +153,7 @@ export function createActionMenu(): ActionMenu {
   const commentItem = (): HTMLElement => {
     const mi = document.createElement("button"); mi.className = "action-mi"; mi.textContent = "Add comment…";
     mi.addEventListener("mouseenter", closeSub);
-    mi.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    onPick(mi, () => {
       if (!ctx) return; const view = ctx.view; const beatId = commentBeat()?.id ?? null;
       close();
       startComment(view, beatId, view.dom);
@@ -159,8 +169,7 @@ export function createActionMenu(): ActionMenu {
   const suggestItem = (): HTMLElement => {
     const mi = document.createElement("button"); mi.className = "action-mi"; mi.textContent = "Suggest rewrite…";
     mi.addEventListener("mouseenter", closeSub);
-    mi.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    onPick(mi, () => {
       if (!ctx) return; const view = ctx.view; const beatId = commentBeat()?.id; if (!beatId) return;
       close();
       startSuggestion(view, beatId, view.dom);
@@ -174,7 +183,7 @@ export function createActionMenu(): ActionMenu {
     const caret = document.createElement("span"); caret.className = "action-caret"; caret.textContent = "›"; mi.appendChild(caret);
     const openThis = (): void => openSub(mi, kinds);
     mi.addEventListener("mouseenter", openThis);
-    mi.addEventListener("mousedown", (e) => { e.preventDefault(); openThis(); });
+    onPick(mi, () => { openThis(); });
     return mi;
   };
 
@@ -185,7 +194,7 @@ export function createActionMenu(): ActionMenu {
     sub.replaceChildren();
     for (const k of kinds) {
       const mi = document.createElement("button"); mi.className = "action-mi"; mi.textContent = k.label;
-      mi.addEventListener("mousedown", (e) => { e.preventDefault(); act(k.cmd); });
+      onPick(mi, () => { act(k.cmd); });
       sub.appendChild(mi);
     }
     sub.style.display = "block";
@@ -207,7 +216,7 @@ export function createActionMenu(): ActionMenu {
     const caret = document.createElement("span"); caret.className = "action-caret"; caret.textContent = "›"; mi.appendChild(caret);
     const openThis = (): void => openSubRun(mi, items);
     mi.addEventListener("mouseenter", openThis);
-    mi.addEventListener("mousedown", (e) => { e.preventDefault(); openThis(); });
+    onPick(mi, () => { openThis(); });
     return mi;
   };
 
@@ -222,7 +231,7 @@ export function createActionMenu(): ActionMenu {
       if (it.slot != null) { const dot = document.createElement("span"); dot.className = "status-swatch"; dot.style.background = `var(--char-${it.slot})`; mi.appendChild(dot); }
       mi.appendChild(document.createTextNode(it.label));
       // Run BEFORE close (the target ids resolve against the live ctx), then refocus + dismiss.
-      mi.addEventListener("mousedown", (e) => { e.preventDefault(); it.run(); ctx?.view.focus(); close(); });
+      onPick(mi, () => { it.run(); ctx?.view.focus(); close(); });
       sub.appendChild(mi);
     }
     sub.style.display = "block";
@@ -286,8 +295,7 @@ export function createActionMenu(): ActionMenu {
       if (bNode?.type.name === "block" && ctx.view.state.doc.childCount > 1) {
         const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete block";
         del.addEventListener("mouseenter", closeSub);
-        del.addEventListener("mousedown", (e) => {
-          e.preventDefault();
+        onPick(del, () => {
           if (!ctx) return; const view = ctx.view; const at = ctx.getPos(); close();
           if (at == null) return;
           let name = "this block";
@@ -317,8 +325,7 @@ export function createActionMenu(): ActionMenu {
       el.appendChild(sepEl());
       const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete";
       del.addEventListener("mouseenter", closeSub);
-      del.addEventListener("mousedown", (e) => {
-        e.preventDefault();
+      onPick(del, () => {
         if (!ctx) return; const view = ctx.view; close();
         confirmDialog({ title: `Delete these ${n} items?`, body: `${n} items and everything inside them will be removed. You can undo it.`, confirmLabel: "Delete" })
           .then((ok) => { if (ok) { const tr = deleteChunksAt(view.state, multiSelectPositions(view.state)); if (tr) view.dispatch(tr); view.focus(); } });
@@ -366,7 +373,7 @@ export function createActionMenu(): ActionMenu {
       el.appendChild(sepEl());
       const pb = document.createElement("button"); pb.className = "action-mi"; pb.textContent = "▶ Play block";
       pb.addEventListener("mouseenter", closeSub);
-      pb.addEventListener("mousedown", (e) => { e.preventDefault(); const id = blockId; close(); playBlockHandler?.(id); });
+      onPick(pb, () => { const id = blockId; close(); playBlockHandler?.(id); });
       el.appendChild(pb);
     }
 
@@ -384,8 +391,7 @@ export function createActionMenu(): ActionMenu {
     const noun = isOption ? "option" : isGroup ? "group" : "snippet";
     const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete";
     del.addEventListener("mouseenter", closeSub);
-    del.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    onPick(del, () => {
       if (!ctx) return; const view = ctx.view, getPos = ctx.getPos; close();
       const remove = (): void => { const p = getPos(); if (p == null) return; const tr = deleteChunk(view.state, p); if (tr) view.dispatch(tr); view.focus(); };
       // No confirmation when nothing is lost - an empty bubble, or a group of only empty bubbles.
