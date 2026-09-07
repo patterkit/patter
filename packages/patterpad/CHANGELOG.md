@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.6] - 2026-09-07
+
 ### Fixed
 
 - **Setting a jump on a bubble you have just started no longer wanders off to the bubble next door.**
