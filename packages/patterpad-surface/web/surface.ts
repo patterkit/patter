@@ -316,15 +316,28 @@ function normalizeCueSelection(state: EditorState): EditorState {
  * author exits the editor): an abandoned blank line otherwise has no way to be removed and would render at
  * runtime as an empty line emitting its raw id. A bubble left beat-less is kept as the "add a line" ghost
  * (a valid empty state - only the stray beat is removed). Null when there is nothing to sweep.
+ *
+ * The sweep also KEEPS THE AUTHOR WHERE THEY WERE. Deleting the beat the caret sat in leaves the
+ * selection homeless, and ProseMirror maps a homeless selection to the nearest valid position - which,
+ * when the swept beat was the bubble's only one, is a beat in a NEIGHBOURING bubble. The inspector
+ * follows the selection, so clicking "+ set jump" on a bubble you had just started re-pointed the whole
+ * inspector at the bubble before or after it, and the author was then editing a snippet they had not
+ * chosen (#63). The bubble is still on screen as the ghost, so the honest landing place is the bubble
+ * itself: a NodeSelection on it, which is what a click on a ghost bubble produces anyway.
  */
 export function sweepEmptyBeats(state: EditorState): Transaction | null {
   const spans: Array<{ from: number; to: number }> = [];
+  const head = state.selection.head;
+  let keepSnippet: number | null = null; // the snippet holding the swept beat the caret was in
   state.doc.descendants((node, pos) => {
     const k = node.type.name;
     if (k === "line" || k === "prose") {
       let hasData = false;
       try { const raw = JSON.parse((node.attrs.raw as string) || "{}"); hasData = !!(raw.gameData && Object.keys(raw.gameData).length) || !!(raw.tags && raw.tags.length); } catch { /* no raw data */ }
-      if (node.textContent.trim() === "" && !hasData) spans.push({ from: pos, to: pos + node.nodeSize });
+      if (node.textContent.trim() === "" && !hasData) {
+        spans.push({ from: pos, to: pos + node.nodeSize });
+        if (head > pos && head < pos + node.nodeSize) keepSnippet = snippetHolding(state, pos);
+      }
       return false; // a beat's zones (cue / paren / say) are not themselves beats
     }
     return k !== "gameEvent"; // descend into containers; never into atoms
@@ -332,7 +345,20 @@ export function sweepEmptyBeats(state: EditorState): Transaction | null {
   if (!spans.length) return null;
   let tr = state.tr;
   for (const s of spans.reverse()) tr = tr.delete(s.from, s.to); // high-to-low so earlier offsets stay valid
-  return tr.docChanged ? tr : null;
+  if (!tr.docChanged) return null;
+  if (keepSnippet != null) {
+    const at = tr.mapping.map(keepSnippet);
+    const node = tr.doc.nodeAt(at);
+    if (node?.type.name === "snippet") tr = tr.setSelection(NodeSelection.create(tr.doc, at));
+  }
+  return tr;
+}
+
+/** Position of the snippet enclosing the beat at `pos`, or null when it sits in an optionprompt / group. */
+function snippetHolding(state: EditorState, pos: number): number | null {
+  const $at = state.doc.resolve(pos);
+  for (let d = $at.depth; d >= 0; d--) if ($at.node(d).type.name === "snippet") return $at.before(d);
+  return null;
 }
 
 /**
@@ -636,7 +662,13 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       // A vertical (Up/Down) move only passes THROUGH a cue, so it must not raise the cast popup; a
       // sideways move or a click into the cue may (#20). A click off the cue is already a stray-click close.
       const mayOpenCue = lastInputWasPointer ? lastPointerOnCue : !lastKeyWasVertical;
-      if (tr.getMeta(STRUCTURAL_MOVE) || fromStrayClick) popup.close(); else popup.update(view, ctx, mayOpenCue);
+      // The cast popup and the slash menu are MUTUALLY EXCLUSIVE (slashmenu.ts says so, and only one of
+      // them can own the keyboard). Opening the menu closes the popup, but `popup.update` here would
+      // raise it again on the very next transaction whenever the caret sits in an empty cue - which is
+      // exactly the "/" with no character set case, where the popup came back on top of the menu and
+      // swallowed the typing, so the menu looked like it had done nothing (#63).
+      if (slash.isOpen()) popup.close();
+      else if (tr.getMeta(STRUCTURAL_MOVE) || fromStrayClick) popup.close(); else popup.update(view, ctx, mayOpenCue);
       // Hints depend only on the selection context, which changes only when the selection or doc does
       // (multi-select dispatches also set the selection) - so skip the rebuild on metadata-only
       // transactions (problem-mark updates), matching the scheduleSelect gate above.

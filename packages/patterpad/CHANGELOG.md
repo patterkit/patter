@@ -6,6 +6,28 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Setting a jump on a bubble you have just started no longer wanders off to the bubble next door.**
+  An empty bubble holds no cursor, so abandoning the blank line it was started with left the caret
+  homeless and the editor moved it to the nearest line, which sits in a neighbouring bubble. The
+  inspector follows the caret, so clicking "+ set jump" quietly re-pointed the whole inspector at a
+  bubble you had not chosen. The caret now lands on the bubble itself, which is what you are looking at.
+- **Picking a jump target with the mouse no longer sets a second jump somewhere else.** The list acted
+  as the button went down and closed itself, so the click that followed fell through to whatever the
+  list had been covering. Where that was the inspector's own Jump row, it opened a second picker on a
+  different bubble. Choosing with the arrow keys was never affected. The `/` menu had the same fault.
+- **A second `/` no longer types a slash into your line.** It dismissed the menu and let the character
+  through, and since the menu only opens on an empty line, that one stray slash locked the menu out of
+  that line for good.
+- **`/` works on a line with no character set.** The menu opened underneath the cast list, which kept
+  the keyboard, so it looked as though nothing had happened.
+- **The `/` menu stays on screen.** Opened near the bottom of the window it ran off the edge, with most
+  of its items unreachable and no way to scroll. It now flips above the line when there is no room
+  below, and scrolls when there is room for neither.
+
+  Reported by jlafos in #63.
+
 ## [0.16.5] - 2026-09-06
 
 ### Fixed

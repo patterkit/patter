@@ -88,7 +88,10 @@ export function createSlashMenu(openJump: (view: EditorView) => void): SlashMenu
       const b = document.createElement("button");
       b.className = "slash-item" + (i === highlight ? " active" : "");
       paintLabel(b, entry.label, entry.key); // underline the access letter
-      b.addEventListener("mousedown", (e) => { e.preventDefault(); entry.run(); });
+      // Click, not mousedown: running on mousedown closes the menu mid-press and the click that
+      // follows lands on whatever was underneath it (#63, same shape as the target picker).
+      b.addEventListener("mousedown", (e) => { e.preventDefault(); });
+      b.addEventListener("click", () => entry.run());
       b.addEventListener("mousemove", () => setHighlight(i));
       el.appendChild(b);
       buttons.push(b);
@@ -128,8 +131,16 @@ export function createSlashMenu(openJump: (view: EditorView) => void): SlashMenu
 
   return {
     handleTextInput: (view, text) => {
-      if (open) { close(); return false; }              // typing dismisses the menu
-      if (text === "/" && canInsertSpecial(view.state)) { rootMenu(view); return true; }
+      // A SECOND "/" while the menu is open is swallowed, never typed. It used to fall through to the
+      // document, and since the menu only opens on an EMPTY line, that one stray character made the
+      // line non-empty and locked the menu out of it for good - the author was left with a literal
+      // slash in their prose and a key that had stopped working (#63).
+      if (text === "/") {
+        if (open) return true;
+        if (canInsertSpecial(view.state)) { rootMenu(view); return true; }
+        return false;
+      }
+      if (open) { close(); return false; }              // any other typing dismisses the menu
       return false;
     },
     handleKeyDown: (view, event) => {

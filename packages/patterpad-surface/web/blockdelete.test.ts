@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
-import { EditorState } from "prosemirror-state";
+import { EditorState, NodeSelection, TextSelection } from "prosemirror-state";
 import type { Scene } from "@patterkit/model";
 import { sceneToDoc, docToScene } from "../src/bridge.js";
 import { deleteBlock } from "../src/groups.js";
@@ -65,6 +65,29 @@ describe("sweepEmptyBeats", () => {
     expect(tr).not.toBeNull();
     const s = s0.apply(tr!);
     expect(beatsOf(s)).toEqual([["L1"], [], ["L3"]]); // sn2's empty line gone; bubble left as a ghost
+  });
+
+  it("leaves the caret ON the bubble it swept, not in a neighbouring one (#63)", () => {
+    // The caret sits in sn2's blank line, which is sn2's only beat. Deleting it leaves the selection
+    // homeless, and PM's own mapping lands it in the nearest text - a beat in sn1 or sn3 - which is how
+    // the inspector ended up pointing at a snippet the author had never chosen.
+    const scene: Scene = { id: "s", type: "scene", name: "S", blocks: [
+      { id: "b", type: "block", name: "M", children: [
+        { id: "sn1", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA" }] },
+        { id: "sn2", type: "snippet", beats: [{ id: "L2", kind: "line" }] },
+        { id: "sn3", type: "snippet", beats: [{ id: "L3", kind: "line", character: "BO" }] },
+      ] },
+    ] };
+    const doc = sceneToDoc(scene, { L1: "hello", L2: "", L3: "later" });
+    let blankPos = -1;
+    doc.descendants((n, pos) => { if (blankPos < 0 && n.type.name === "line" && n.textContent === "" && !n.textBetween(0, n.content.size)) blankPos = pos; return blankPos < 0; });
+    const s0 = EditorState.create({ doc, selection: TextSelection.near(doc.resolve(blankPos + 2)) });
+    const s = s0.apply(sweepEmptyBeats(s0)!);
+    expect(s.selection).toBeInstanceOf(NodeSelection);
+    expect((s.selection as NodeSelection).node.type.name).toBe("snippet");
+    // ...and it is sn2 (now beat-less), not the bubble before or after it.
+    expect(docToScene(s.doc).scene.blocks[0]!.children[1]!.id).toBe("sn2");
+    expect((s.selection as NodeSelection).node.childCount).toBe(0);
   });
 
   it("is a no-op when every line has content", () => {

@@ -788,15 +788,23 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
   box-shadow: var(--shadow-2); padding: 0.2rem; min-width: 8rem;
   display: flex; flex-direction: column;
+  /* Bounded + scrollable, like .target-picker: the menu is eleven rows tall, and on a short window
+     the ones past the fold were simply unreachable (#63). anchor.ts flips it above the caret when
+     that fits; this covers the case where neither side has room. */
+  max-height: min(60vh, 22rem); overflow: auto;
 }
 .slash-item {
   display: block; width: 100%;
   text-align: left; background: none; border: 0; cursor: pointer; color: var(--ink);
   padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 0.8rem var(--font-ui);
+  /* flex:none, for the same reason .tp-row carries it (#30): once max-height bites, this flex column
+     has a definite height and rows with no minimum size get crushed to their padding instead of the
+     list scrolling. */
+  flex: none;
 }
 .slash-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* hover SETS .active (one shared highlight) */
 .slash-item u { text-decoration-color: var(--muted); text-underline-offset: 2px; } /* the access-key letter (type-ahead) */
-.slash-head { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.3rem 0.6rem 0.2rem; }
+.slash-head { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.3rem 0.6rem 0.2rem; flex: none; }
 .slash-head:not(:first-child) { margin-top: 0.15rem; border-top: 1px solid var(--line); padding-top: 0.4rem; } /* a quiet rule between the two sections */
 
 /* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */
