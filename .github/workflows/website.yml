@@ -2,9 +2,15 @@ name: Website
 
 # Build the static Astro + Starlight site and deploy it to GitHub Pages. One-time setup:
 # repo Settings → Pages → Source = "GitHub Actions". The site serves at /patter (project page).
+# A PULL REQUEST builds the site but does not deploy it. Without this the site's own build ran only
+# after a merge, so a website dependency PR arrived with a green tick that had never touched website/ -
+# the monorepo's CI ignores this directory entirely. Seven dependabot PRs sat that way (2026-09-13),
+# five of them website-only, and the first thing to actually run the build would have been the deploy.
 on:
   push:
     branches: [main]
+    paths: ["website/**", ".github/workflows/website.yml"]
+  pull_request:
     paths: ["website/**", ".github/workflows/website.yml"]
   workflow_dispatch:
 
@@ -13,10 +19,11 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deploy; let an in-progress run finish.
+# Allow one concurrent deploy; let an in-progress run finish. A PR check is not a deploy, so it gets its
+# own group per branch (and supersedes its own older runs) rather than queueing behind the live site.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('website-pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -34,11 +41,13 @@ jobs:
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'   # a PR proves the build; there is nothing to publish
         with:
           path: website/dist
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'   # main (or a manual run) publishes; a PR only proves the build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
