@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.8] - 2026-09-14
+
 ### Fixed
 
 - **Go to definition lands on the property, not just its page.** Right-clicking a property and choosing
