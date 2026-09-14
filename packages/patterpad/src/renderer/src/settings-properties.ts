@@ -116,7 +116,9 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
     purpose.addEventListener("input", () => { p.purpose = purpose.value.trim() || undefined; });
     details.push(labelled("Purpose", purpose));
 
-    return expandableRow({ line: [name, type, dflt, acts], details });
+    // Stamped with the declared name so "Go to definition" can land on this row, not only on the page it
+    // is on (from-storylets/go-to-definition-lands-on-the-row; the reveal is app-shell's revealRow).
+    return expandableRow({ line: [name, type, dflt, acts], details, name: p.name });
   };
 
   const render = (): void => {

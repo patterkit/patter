@@ -39,7 +39,7 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // asserts our copy still matches the shell's default.
 import { el } from "./dom.js";
 import { applyTheme } from "./apply-theme.js";
-import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
+import { revealRow, openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, type ShardVc } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
@@ -2692,6 +2692,21 @@ function signalReady(): void {
   window.patter.appReady();
 }
 
+/**
+ * "Go to definition" lands on the declaration's ROW, not only on the page it lives on
+ * (from-storylets/go-to-definition-lands-on-the-row): open its details, centre it, light it. The reveal is
+ * app-shell's revealRow; asking again is ours, because only we know what fills in on its own time, so a
+ * row not there yet is tried on the next frames and then given up on quietly.
+ *
+ * The search is scoped to the page the jump opened, never the whole document. The same name can be
+ * declared at @patter AND @scene, and the Properties page keeps its rows while it is hidden, so a
+ * document-wide search could light a row on a page nobody is looking at and report success.
+ */
+function landOn(within: HTMLElement, name: string, tries = 12): void {
+  if (revealRow(within, name) || tries <= 0) return;
+  requestAnimationFrame(() => landOn(within, name, tries - 1));
+}
+
 async function boot(): Promise<void> {
   // The family's tooltip controller (one delegated listener over the whole
   // document). The Writing View rule is ours and arrives as a predicate, because
@@ -2705,9 +2720,9 @@ async function boot(): Promise<void> {
   setPropertyActions(({ scope, name }) => {
     const ref = scope === "patter" ? `@${name}` : `@${scope}.${name}`;
     const go: PropertyAction | null =
-      scope === "patter" ? { label: "Go to definition", run: () => void showPropertiesDoc() }
-      : scope === "scene" ? { label: "Go to definition", run: () => openSceneProps() }
-      : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world") }
+      scope === "patter" ? { label: "Go to definition", run: () => void showPropertiesDoc().then(() => landOn(propsDocHostEl, name)) }
+      : scope === "scene" ? { label: "Go to definition", run: () => { openSceneProps(); landOn(spHost, name); } }
+      : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world").then(() => landOn(setWorldHost, name)) }
       : null;
     return [...(go ? [go] : []), { label: "Find usages", run: () => openPropertyUsage(ref) }];
   });

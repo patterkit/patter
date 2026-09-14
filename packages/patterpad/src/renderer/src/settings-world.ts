@@ -143,7 +143,10 @@ export function mountWorld(
     if (p.type === "enum" || p.type === "flags") details.push(labelled("Values", tagChips(p, refreshDefault)));
     // A quality's ladder, IN ORDER: the chips carry movers because position is the meaning here.
     if (p.type === "quality") details.push(labelled("Stages (in order)", stageChips(p, refreshDefault)));
-    return expandableRow({ line: [ref, type, dflt, acts], details });
+    // A declaration row, so it carries its name for "Go to definition" to land on. The coverage-driver rows
+    // below also use expandableRow and are deliberately NOT stamped: a driver names a property, it does
+    // not declare one, and a jump that landed on a driver would be landing on the wrong thing.
+    return expandableRow({ line: [ref, type, dflt, acts], details, name: p.name });
   };
 
   const renderScopes = (): void => {

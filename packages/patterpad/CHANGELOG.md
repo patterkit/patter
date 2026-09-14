@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Go to definition lands on the property, not just its page.** Right-clicking a property and choosing
+  Go to definition opened the page it is declared on and stopped there: on a long list the declaration
+  was off screen with nothing marking it, and an enum's values stayed shut behind its row. It now brings
+  that row to the middle of the page, opens its details and lights it for a moment, on the Properties
+  page, the scene properties dialog and the World tab alike. Reported first in Storyletter.
+
 ## [0.16.7] - 2026-09-07
 
 ### Fixed
