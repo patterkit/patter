@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.16.9] - 2026-09-15
+
 ### Fixed
 
 - **Renaming a scene updates the Scenes list straight away.** The new name showed in the scene's title
