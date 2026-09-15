@@ -6,6 +6,18 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Renaming a scene updates the Scenes list straight away.** The new name showed in the scene's title
+  and its jump list, but the Scenes list kept the old one until Patterpad was restarted, and so did the
+  project overview, the Start scene pickers, the Delete scene dialog, and jumps to that scene seen from
+  other scenes. They all follow a rename now. Reported by jlafos in #73.
+- **Select All while renaming a scene selects the title, not the whole window.** With the cursor in a
+  scene's title, Edit ▸ Select All (Cmd/Ctrl-A) selected everything on screen instead of the title's text.
+- **The scene name beside the project name follows a rename.** Once the title scrolls out of view, the
+  topbar shows the scene's name; after a rename it went on showing the old one, and clearing the title
+  brought the old name back too.
+
 ## [0.16.8] - 2026-09-14
 
 ### Fixed

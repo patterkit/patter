@@ -22,6 +22,8 @@ import "@fontsource/ibm-plex-mono/400.css";
 
 import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";
+import { adoptSceneName, relabelNavScene } from "./scene-name.js";
+import { selectAllOutsideEditor } from "./edit-commands.js";
 import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
@@ -446,6 +448,17 @@ function highlightNavBlock(blockId: string | null): void {
  *  immediately). Signature-guarded: onChange fires per keystroke, the DOM only rebuilds on a real
  *  block-list change. Clicking a row drops the caret on that block (centred), like the search jumps. */
 let navBlocksSig = "";
+/** Keep the open scene's name in step with its title (#73). A rename edits the document, but the Scenes
+ *  list, the overview index, the Start scene pickers, the Delete dialog and every other scene's jump
+ *  targets all read `project` - the copy taken when the project opened - so the name is written back
+ *  into it here, and the row already on screen is relabelled. Runs on every edit; changes nothing (and
+ *  repaints nothing) unless the name actually moved. */
+function syncSceneName(): void {
+  const name = surface?.sceneName();
+  if (!name || !currentSceneId) return;
+  if (adoptSceneName(project, currentSceneId, name)) relabelNavScene(navListEl, currentSceneId, name);
+}
+
 function refreshNavBlocks(force = false): void {
   const holder = navListEl.querySelector<HTMLElement>(`.nav-scene[data-id="${CSS.escape(currentSceneId ?? "")}"] .nav-blocks-inner`);
   if (!holder) return;
@@ -1019,9 +1032,10 @@ function paintProblems(): void {
  *  input - it means what it always did, which is why this does not just call the surface. */
 function selectAllCommand(): void {
   if (surface?.view.hasFocus() && surface.selectAllInBeat()) return;
-  const el = document.activeElement;
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.select();
-  else document.execCommand("selectAll");
+  // An input, a text area, or an editable element outside the script (the scene title) selects its own
+  // text. The native fallback is left for the rest; in the scene title it selected the whole window.
+  if (selectAllOutsideEditor(document.activeElement, surface?.view.dom ?? null)) return;
+  document.execCommand("selectAll");
 }
 
 /** Take the author to a problem's node: switch to its scene first when it lives elsewhere (the surface
@@ -1812,7 +1826,7 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
     jumpTargets: project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })),
     showTitle: true,
-    onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); } scheduleValidate(); refreshNavBlocks(); },
+    onChange: () => { if (!mountingScene) { saver.touch(); sceneEdited = true; refreshStaleBadge(); } scheduleValidate(); refreshNavBlocks(); syncSceneName(); },
     onSelect: showInspector, // drive the detail inspector off the caret's container stack
     onPlayBlock: (blockId) => { if (currentSceneId) void window.patter.openPlay(currentSceneId, blockId); },
     onOpenTarget: (targetId) => void openTarget(targetId), // double-click a jump chip -> follow the divert
@@ -2143,6 +2157,7 @@ async function hydrateProject(): Promise<void> {
   project = full;
   renderNav();
   if (currentSceneId) highlightNav(currentSceneId);
+  syncSceneName(); // a rename still inside the save debounce is newer than main's copy
   // Refresh the surface's cross-scene jump targets so the divert picker now offers every scene + block.
   surface?.setJumpTargets(project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })));
 }

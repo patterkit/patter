@@ -1142,7 +1142,13 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     anchorFor: (nodeId: string) => { const b = findByModelId(view.state.doc, nodeId); if (!b) return null; const dom = view.nodeDOM(b.pos); return dom instanceof HTMLElement ? dom : null; },
     undo: () => { undo(view.state, view.dispatch); view.focus(); },
     redo: () => { redo(view.state, view.dispatch); view.focus(); },
-    sceneName: () => opened.flow.scene.name,
+    // The LIVE name. This used to return the name the scene was opened with, so after a rename it went on
+    // answering the old one: the Scenes list's sync (#73) copied it back, the topbar suffix showed it, and
+    // blanking the title restored it. A rename writes the doc's raw attr (setSceneName), so read that.
+    sceneName: () => {
+      try { const n = (JSON.parse(view.state.doc.attrs.raw as string) as { name?: unknown }).name; if (typeof n === "string" && n) return n; } catch { /* fall back */ }
+      return opened.flow.scene.name;
+    },
     focus: () => view.focus(),
     // The hint bar is the HOST's element, filled by us: emptying it belongs here, or its last hints
     // outlive the editor they describe. Patterpad's welcome screen showed "Tab -> dialogue" with
