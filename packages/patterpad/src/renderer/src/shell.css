@@ -363,7 +363,7 @@ body.resizing main.panes { transition: none; }
   background: color-mix(in oklab, var(--ink) 28%, transparent); backdrop-filter: blur(3px); }
 .scratch-card { display: flex; flex-direction: column; align-items: center; gap: 1.4rem; padding: 2.4rem 3rem; min-width: 26rem; max-width: 40rem;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-3); text-align: center; }
-.scratch-line { font: 1.1rem/1.5 var(--font-reading, var(--font-ui)); color: var(--ink); }
+.scratch-line { font: 1.1rem/1.5 var(--font-read); color: var(--ink); }
 .scratch-stage { font: 700 3.2rem var(--font-ui); line-height: 1; min-height: 3.4rem; display: flex; align-items: center; }
 .scratch-stage.scratch-count { color: var(--accent); }
 .scratch-stage.scratch-rec { color: var(--danger); font-size: 2rem; animation: scratch-pulse var(--dur-slow) var(--ease-standard) infinite; }
@@ -390,13 +390,13 @@ body.resizing main.panes { transition: none; }
 .scratch-next-label { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .scratch-next-cue { font: 700 0.82rem var(--font-ui); letter-spacing: 0.05em; color: var(--accent); }
 .scratch-next-cue:empty { display: none; }
-.scratch-next-text { font: 1rem/1.4 var(--font-reading, var(--font-ui)); color: var(--ink); }
+.scratch-next-text { font: 1rem/1.4 var(--font-read); color: var(--ink); }
 /* Saved-state action buttons: replay / re-record / record next / finish (mouse-driven). */
 .scratch-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
 .scratch-btn { font: 600 0.82rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 0.4rem 0.75rem; cursor: pointer; }
 .scratch-btn:hover { border-color: var(--accent); color: var(--accent); }
-.scratch-btn-primary { color: #fff; background: var(--accent); border-color: var(--accent); }
-.scratch-btn-primary:hover { color: #fff; background: color-mix(in oklab, var(--accent) 85%, black); }
+.scratch-btn-primary { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+.scratch-btn-primary:hover { color: var(--on-accent); background: color-mix(in oklab, var(--accent) 85%, black); }
 .scratch-cue[hidden], .scratch-bar[hidden], .scratch-next[hidden], .scratch-actions[hidden] { display: none; }
 @keyframes scratch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 /* editable gameData field value (text / number input) */

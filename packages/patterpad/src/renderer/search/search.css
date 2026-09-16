@@ -87,7 +87,7 @@ body.swin {
 .swin-replace-row { display: flex; gap: 0.4rem; align-items: center; padding: 0 0.5rem 0.35rem; }
 .swin-replace-row[hidden] { display: none; } /* the `hidden` attr alone loses to the class's display:flex */
 .swin-replace { flex: 1; margin: 0; }
-.swin-replace-all { flex: none; padding: 0.32rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--accent); color: var(--on-accent, #fff); font: 0.8rem var(--font-ui); cursor: pointer; }
+.swin-replace-all { flex: none; padding: 0.32rem 0.7rem; border: 1px solid var(--line); border-radius: 6px; background: var(--accent); color: var(--on-accent); font: 0.8rem var(--font-ui); cursor: pointer; }
 .swin-replace-all:disabled { opacity: 0.45; cursor: default; background: var(--surface-2, var(--line)); color: var(--muted); }
 /* A Replace row is a two-column GRID, not the flex line the other rows use, because its diff has to
    wrap. On one nowrap line at the window's 460px default, a line of dialogue of ordinary length was cut

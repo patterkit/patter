@@ -19,8 +19,8 @@ body.coverage-win {
 .cov-bar-spacer { flex: 1 1 auto; }
 .cov-bar .btn { font: 600 0.78rem var(--font-ui); border: 1px solid var(--line); border-radius: 6px; padding: 0.35rem 0.7rem; background: none; color: var(--ink); cursor: pointer; }
 .cov-bar .btn:hover { color: var(--accent); border-color: var(--accent); }
-.cov-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--paper, #fff); }
-.cov-bar .btn.primary:hover { color: var(--paper, #fff); filter: brightness(1.05); }
+.cov-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.cov-bar .btn.primary:hover { color: var(--on-accent); filter: brightness(1.05); }
 .cov-bar .btn:disabled { opacity: 0.5; cursor: default; }
 
 .cov-drivers { flex: 0 0 auto; margin: 0; padding: 0.4rem 0.9rem 0; font: 0.74rem var(--font-ui); color: var(--ink-soft); }
@@ -33,7 +33,7 @@ body.coverage-win {
 .cov-results { flex: 1 1 auto; overflow: auto; padding: 0.6rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 /* A sweep is running: the PREVIOUS results stay readable but dimmed, so nobody reads a stale number as
    the live one. Kept non-interactive for the same reason. */
-.cov-results.stale { opacity: 0.5; pointer-events: none; transition: opacity var(--dur-fast, 120ms) ease; }
+.cov-results.stale { opacity: 0.5; pointer-events: none; transition: opacity var(--dur-quick) ease; }
 .cov-stats { display: flex; gap: 1.6rem; }
 .cov-stat-big { font: 700 1.6rem var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
 .cov-stat-label { font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
