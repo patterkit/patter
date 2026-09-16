@@ -6,6 +6,35 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Every icon is drawn.** The editor, the Play window, Search, Coverage, and the settings dialog draw
+  their icons from one set (Lucide, MIT licence) at one stroke weight, in place of the typed symbols
+  that used to vary with the platform's font. Game events carry a drawn gear in the script and the
+  Play transcript.
+- **The chrome has its own scale.** The navigator, inspector, top bar, and dialogs are sized on a
+  fixed 14px base, so they no longer grow with the reading size. On the default reading size they
+  come out about nine percent smaller than before, matching Storyletter; the script itself is
+  unchanged.
+- **Section captions are words.** The tracked uppercase labels in the inspector, the script's group
+  rails, the report cards, Search, and Coverage read as sentence-case labels now: Inspector, Game
+  data, Choice, Option, + Block. Screenplay character cues and table column heads keep their
+  uppercase.
+- **Buttons have edges.** Every button reads as a button at rest, with a border or a fill, and one
+  focus ring serves the whole window.
+- **Dialogs share one frame.** Settings, the first-run name question, confirmations, the update
+  prompt, and About sit on the same panel with the same scrim and exit. The About dialog's version
+  line no longer clips under the frame.
+- **Keyboard hints read true to the platform.** Tooltips and hint bars say Ctrl on Windows and Linux
+  and ⌘ on macOS, and key hints are drawn as keycaps rather than typed.
+- **Tooltips are all the editor's own.** The last native tooltips now use the themed one the rest of
+  the app uses, and an unset value in the inspector reads "None" rather than a dash.
+- **Copy tidied throughout.** Settings notes, field hints, tooltips, and problem messages are plain
+  sentences in UK English; the six settings tabs are in sentence case; the problems bar names the
+  scene beside each problem.
+- **Escape in Find closes the window from the query box**, and the job strip shows a moving band
+  while a job's size is still unknown.
+
 ## [0.16.9] - 2026-09-15
 
 ### Fixed

@@ -45,7 +45,7 @@
 //    words, not overlines": a tracked ALL-CAPS caption survives only where
 //    uppercase is the domain's own convention, which on this site is the
 //    screenplay character cue in the hero's sample script. And the three
-//    decorations the family review named as generated-page tells: a rotated
+//    decorations the family's sites do not use: a rotated
 //    element, a radial gradient, a backdrop blur.
 //
 // Runs as `postbuild`, so `npm run build` is the whole gate and there is
@@ -219,7 +219,7 @@ for (const { file, css, offset } of styleSources) {
       [/radial-gradient\(/, "a radial gradient"],
       [/backdrop-filter\s*:/, "a backdrop blur"],
     ]) {
-      if (re.test(line)) problems.push(`${rel(file)}:${offset + i + 1}  ${why} (a generated-page tell; design/ui-review-2026-09)`);
+      if (re.test(line)) problems.push(`${rel(file)}:${offset + i + 1}  ${why} (not in the family's site style)`);
     }
   });
 }

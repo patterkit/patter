@@ -4,7 +4,7 @@
 // (`describeProblem`, @wildwinter/app-shell/problems). The audience is writers,
 // not engineers: a hand-written sentence and a next step per structural code,
 // the two file-level categories mapped onto the family's own keys, and a
-// fallback that softens the technical tells (spec citations dropped, `@prop`
+// fallback that softens the technical residue (spec citations dropped, `@prop`
 // shown as “prop”). The CLI keeps the precise technical codes.
 //
 // Keying: a Patterpad Problem carries `category` + `detail`, not a `code`.
@@ -63,7 +63,7 @@ export function problemCode(p: Pick<Problem, "category" | "detail">): string | u
   }
 }
 
-/** Soften a validator message's technical tells, keeping the gist: the fallback for a condition /
+/** Soften a validator message's technical residue, keeping the gist: the fallback for a condition /
  *  interpolation problem (and any unmapped structural code). */
 export function softenProblemMessage(message: string): string {
   return message
