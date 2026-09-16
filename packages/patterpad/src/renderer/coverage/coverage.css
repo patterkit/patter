@@ -15,13 +15,9 @@ body.coverage-win {
 .cov-bar { flex: 0 0 auto; border-bottom: 1px solid var(--line); background: var(--surface); padding: 0.6rem 0.9rem; }
 .cov-opts { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.7rem; }
 .cov-opt { display: flex; flex-direction: column; gap: 0.2rem; font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.cov-opt input, .cov-opt select { width: 6.5rem; font: 0.8rem var(--font-ui); padding: 0.3rem 0.4rem; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); }
+.cov-opt input, .cov-opt select { width: 6.5rem; font: 0.8rem var(--font-ui); padding: 0.3rem 0.4rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
 .cov-bar-spacer { flex: 1 1 auto; }
-.cov-bar .btn { font: 600 0.78rem var(--font-ui); border: 1px solid var(--line); border-radius: 6px; padding: 0.35rem 0.7rem; background: none; color: var(--ink); cursor: pointer; }
-.cov-bar .btn:hover { color: var(--accent); border-color: var(--accent); }
-.cov-bar .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.cov-bar .btn.primary:hover { color: var(--on-accent); filter: brightness(1.05); }
-.cov-bar .btn:disabled { opacity: 0.5; cursor: default; }
+/* The bar's buttons are the shell's `.btn` / `.btn.primary` (controls.css). */
 
 .cov-drivers { flex: 0 0 auto; margin: 0; padding: 0.4rem 0.9rem 0; font: 0.74rem var(--font-ui); color: var(--ink-soft); }
 .cov-status { flex: 0 0 auto; margin: 0; padding: 0.5rem 0.9rem; color: var(--muted); font: 0.82rem var(--font-ui); }

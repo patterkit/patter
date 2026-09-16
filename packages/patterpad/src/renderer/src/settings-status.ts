@@ -7,8 +7,8 @@
 import type { WritingStatusDecl, RecordingStatusDecl, RecordingFolder } from "@patterkit/model";
 import { deriveRecordingFolders } from "@patterkit/model";
 import { PALETTE_SIZE } from "@patterkit/patterpad-surface/colour";
-import { el, iconBtn, moveItem } from "./dom.js";
-import { focusNewRow } from "@wildwinter/app-shell";
+import { el } from "./dom.js";
+import { iconBtn, moveItem, focusNewRow } from "@wildwinter/app-shell";
 
 export interface WritingStatusHandle { value(): WritingStatusDecl[]; }
 export interface AudioHandle { value(): { trackAudioStatus: boolean; recordingStatuses: RecordingStatusDecl[]; audioFolders: boolean; audioRoot: string | null; scratchStatus: string | null }; }

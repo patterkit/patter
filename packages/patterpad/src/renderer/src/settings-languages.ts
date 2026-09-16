@@ -2,7 +2,8 @@
 // remove languages and pick the default. The default is the source language - every string is authored
 // in it, and the others are localisation targets. value() returns a clean { localeDefault, locales }.
 
-import { el, iconBtn } from "./dom.js";
+import { el } from "./dom.js";
+import { iconBtn } from "@wildwinter/app-shell";
 
 export interface LanguagesValue { localeDefault: string; locales: string[]; }
 export interface LanguagesHandle { value(): LanguagesValue; }

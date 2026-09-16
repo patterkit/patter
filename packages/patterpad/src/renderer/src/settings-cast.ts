@@ -5,8 +5,8 @@
 
 import type { CastMember } from "@patterkit/model";
 import { COMMON_GENDERS } from "@patterkit/model";
-import { el, iconBtn, labelled, moveItem } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { el } from "./dom.js";
+import { iconBtn, labelled, moveItem, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 export interface CastHandle { value(): CastMember[]; firstDuplicate(): HTMLInputElement | null; }
 
@@ -93,7 +93,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
     guard.reset();
     host.replaceChildren();
     const list = el("div", "gd-fieldlist");
-    if (!state.length) list.append(el("p", "gd-empty", "No cast members yet."));
+    if (!state.length) list.append(el("p", "empty", "No cast members yet."));
     else state.forEach((m, i) => list.append(memberRow(m, i)));
     host.append(list);
     guard.check();

@@ -6,6 +6,7 @@
 //   - "status":  pick a writing-status rung and browse every line at it (unset = lowest); the box filters.
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
+import "@wildwinter/app-shell/controls.css"; // the segmented mode control is the family's `.seg`
 import "./search.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
@@ -226,7 +227,7 @@ const applyChipFilter = (): void => {
 async function setMode(next: SearchMode): Promise<void> {
   mode = next;
   for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeTagBtn, "tag"]] as const) {
-    btn.classList.toggle("active", mode === m);
+    btn.classList.toggle("on", mode === m);
     btn.setAttribute("aria-selected", String(mode === m));
   }
   chipsEl.hidden = !chipMode(mode);

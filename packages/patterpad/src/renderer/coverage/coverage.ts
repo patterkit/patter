@@ -5,6 +5,7 @@
 // Properties (declare @world properties + edit the input drivers the sweep feeds them).
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
+import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are the family's `.btn`
 import "./coverage.css";
 import "@wildwinter/app-shell/job.css";
 import "@fontsource/newsreader/400.css";

@@ -417,9 +417,9 @@ function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHand
   // target finishes (jump-and-return). Storage default is one-way, so a missing mode reads as "go".
   if (id && jump) {
     const mode: "jump" | "call" = jump.mode === "call" ? "call" : "jump";
-    const seg = el("span", "insp-seg");
+    const seg = el("span", "seg");
     const opt = (m: "jump" | "call", label: string, tip: string): HTMLElement => {
-      const b = el("button", `insp-seg-opt${mode === m ? " on" : ""}`, label);
+      const b = el("button", `seg-opt${mode === m ? " on" : ""}`, label);
       b.type = "button";
       b.dataset.tip = tip; b.setAttribute("aria-label", tip); b.setAttribute("aria-pressed", String(mode === m));
       if (mode !== m) b.addEventListener("click", () => h.setJumpMode(id, m));
@@ -703,7 +703,7 @@ export function inspectorAddress(ctx: InspectorContext): string {
 export function renderInspector(host: HTMLElement, ctx: InspectorContext, h: InspectorHandlers): void {
   host.replaceChildren();
   if (!ctx.levels.length) {
-    host.append(el("p", "insp-empty", "Click in the script to inspect what's there."));
+    host.append(el("p", "empty", "Click in the script to inspect what's there."));
     return;
   }
   for (const lv of ctx.levels) host.append(levelView(lv, h));

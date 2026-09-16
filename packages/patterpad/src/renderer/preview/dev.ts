@@ -293,6 +293,7 @@ const stub = {
   }),
   applyFix: async (fix: { kind: string }) => { if (fix.kind === "add-to-cast") castAdded = true; if (fix.kind === "declare-property") propDeclared = true; return { ok: true }; },
   getIdentity: async () => identity,
+  suggestIdentity: async () => null, // no VCS in the browser preview to ask for a name
   // Mirror main's blank-name default (the OS user name; "You" stands in for the preview) so the edit
   // dialog round-trips and the first-run skip yields a stored identity.
   setIdentity: async (id: { name?: string; email?: string }) => { identity = { name: id?.name?.trim() || "You", ...(id?.email?.trim() ? { email: id.email.trim() } : {}) }; },

@@ -9,9 +9,9 @@
 // value() returns a clean { scopeRegistry, coverageDrivers } for the save round-trip (blank rows pruned).
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
-import { el, iconBtn, labelled, moveItem, tagChips, stageChips } from "./dom.js";
-import { bindPropertyName, bindPropertyRef, dupGuard, expandableRow, firstIllegalPropertyName,
-  focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
+import { el } from "./dom.js";
+import { iconBtn, labelled, moveItem, tagChips, stageChips, bindPropertyName, bindPropertyRef, dupGuard, expandableRow,
+  firstIllegalPropertyName, focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
   ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Quality"],
@@ -136,7 +136,7 @@ export function mountWorld(
     const ro = el("input", "insp-check") as HTMLInputElement;
     ro.type = "checkbox"; ro.checked = p.writable === false;
     ro.addEventListener("change", () => { if (ro.checked) p.writable = false; else delete p.writable; });
-    const roLabel = el("label", "gd-labelled gd-shared"); roLabel.dataset.tip = "The story can read this value but not set it. A write is reported as a problem.";
+    const roLabel = el("label", "shell-labelled gd-shared"); roLabel.dataset.tip = "The story can read this value but not set it. A write is reported as a problem.";
     roLabel.append(ro, el("span", undefined, "Read-only"));
 
     const details: HTMLElement[] = [roLabel];
@@ -153,7 +153,7 @@ export function mountWorld(
     guard.reset();
     scopesHost.replaceChildren();
     const list = el("div", "gd-fieldlist");
-    if (!scopeRows.length) list.append(el("p", "gd-empty", "No world properties yet. Declare an @world property for the game to set and your story to read."));
+    if (!scopeRows.length) list.append(el("p", "empty", "No world properties yet. Declare an @world property for the game to set and your story to read."));
     else scopeRows.forEach((p, i) => list.append(scopeRow(p, i)));
     scopesHost.append(list);
     guard.check();
@@ -217,7 +217,7 @@ export function mountWorld(
   const renderDrivers = (): void => {
     driversHost.replaceChildren();
     const list = el("div", "gd-fieldlist");
-    if (!drivers.length) list.append(el("p", "gd-empty", "No drivers. Coverage will flag any @world-gated branch as needing an input."));
+    if (!drivers.length) list.append(el("p", "empty", "No drivers. Coverage will flag any @world-gated branch as needing an input."));
     else drivers.forEach((d, i) => list.append(driverRow(d, i)));
     driversHost.append(list);
     const actions = el("div", "world-driver-actions");

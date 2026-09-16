@@ -3,61 +3,42 @@
    file (the two-pane `main` grid). A clean split of surface-component CSS from app-shell CSS is a
    follow-up; for now this is additive and token-driven. */
 
-/* Top bar (the surface's `header` rule gives it padding / border / ui font; add the controls). */
-.topbar .spacer { flex: 1; }
-.btn {
-  background: none; cursor: pointer;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.3rem 0.7rem;
-  color: var(--ink); font: 600 0.78rem var(--font-ui); letter-spacing: 0.02em;
-  transition: color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), filter var(--dur-quick) var(--ease-standard);
-}
-.btn:hover { color: var(--accent); border-color: var(--accent); }
+/* The top bar is the shell's (pane-shell.css); the rules below are for what this app seats in it. */
+/* Buttons are the shell's `.btn` family (controls.css): bordered at rest, `.primary` filled, `.danger`
+   for the named destructive action, `.ghost` for icon-only toolbar buttons only. */
 /* The save indicator is the shell's (save.css): three states, always shown. */
 /* "<project>: <scene>" - the scene name fades in beside the project name only when the scene's title has
    scrolled out of the edit pane (so you always know where you are). Recessive (secondary to the name). */
 .scene-suffix {
   color: var(--muted); font: 600 0.8rem var(--font-ui); white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis; max-width: 22rem; opacity: 0;
-  margin-left: -1rem; /* cancel the topbar's flex gap so ": <scene>" sits flush against the project name */
+  margin-left: -0.5rem; /* cancel the lead slot's flex gap so ": <scene>" sits flush against the project name */
   transition: opacity var(--dur-base) var(--ease-standard);
 }
 .scene-suffix.shown { opacity: 1; }
 
-/* Side-pane (slide/pin) toggles - quiet by default, accent-tinted when the pane is up. */
-.pane-toggle {
-  background: none; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
-  color: var(--muted); font: 600 0.95rem var(--font-ui); line-height: 1; padding: 0.15rem 0.45rem; /* icon-only chevron */
-  transition: color var(--dur-quick) var(--ease-standard), background var(--dur-quick) var(--ease-standard);
-}
-.pane-toggle:hover { color: var(--accent); }
-.pane-toggle[hidden] { display: none; }
 /* the topbar Play affordance: quiet chrome, the accent on hover */
-.topbtn { font: 600 0.75rem var(--font-ui); color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; cursor: pointer; white-space: nowrap; }
+.topbtn { font: 600 0.75rem var(--font-ui); color: var(--muted); background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 10px; cursor: pointer; white-space: nowrap; }
 .topbtn:hover { color: var(--accent); border-color: var(--accent); }
 .topbtn[hidden] { display: none; }
 
-/* Three panes: navigator | editor | inspector (Patterpad.md §4). The two side columns SLIDE to 0 so
-   the editor goes full-bleed; the panes hold a FIXED-width inner so they clip (a clean wipe) instead
-   of reflowing as the column narrows. State is remembered per user (the "pin"). */
-main.panes {
-  /* `--*-open-w` is the author's chosen (draggable) width; the grid column `--*-w` follows it when
-     open and goes to 0 when the pane is toggled shut. The .pane-inner keeps the open width so its
-     content doesn't reflow as the column animates closed. */
-  --nav-open-w: 14rem; --insp-open-w: 22rem;
-  --nav-w: var(--nav-open-w); --insp-w: var(--insp-open-w);
-  position: relative;
-  display: grid; grid-template-columns: var(--nav-w) minmax(0, 1fr) var(--insp-w);
-  transition: grid-template-columns var(--dur-panel) var(--ease-standard);
-}
-main.panes.no-nav { --nav-w: 0px; }
-main.panes.no-inspector, main.panes.props-doc-open { --insp-w: 0px; }
-/* The pane content fades in lockstep with the column collapse, so a rail glides + fades away
-   (and back) rather than snapping - the same enter vocabulary, expressed as a reversible slide. */
-.nav, .inspector { transition: opacity var(--dur-panel) var(--ease-standard); }
-main.panes.no-nav > .nav, main.panes.no-inspector > .inspector, main.panes.props-doc-open > .inspector { opacity: 0; }
-.pane-inner { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; }
-.nav .pane-inner { width: var(--nav-open-w); overflow-y: auto; padding: 0.5rem; gap: 0.1rem; }
-/* Every nav row keeps its natural height. The pane is a flex column, so once the list outgrows it,
+/* The three-pane frame (navigator | editor | inspector, Patterpad.md §4) is the shell's `mountPaneShell`
+   + pane-shell.css now (ui-review-2026-09, finding 2): the grid, the slide-to-zero collapse, the fixed-width
+   inners, the drag seams, the toggles and the remembered state. It used to be this app's and was lifted;
+   the copy that stayed behind is gone. What is here is only how THIS app fills the panes. */
+/* The host the frame is built into: `display: contents` so the frame is body's flex item in its place.
+   `hidden` until the renderer has seated the furniture, so nothing shows unframed. */
+.frame { display: contents; }
+.frame[hidden] { display: none; }
+/* Screens that REPLACE the workspace (welcome / overview) sit beside the frame in the column. While the
+   panes are hidden the frame is just the title bar, and must not keep the workspace's share of the height. */
+.pane-shell:has(> .panes[hidden]) { flex: none; }
+.pane-nav { border-right: 1px solid var(--line); background: var(--bg); }
+.panes.no-nav > .pane-nav { border-right-color: transparent; }
+.panes.no-inspector > .pane-inspector { border-left-color: transparent; }
+/* The navigator's body: the list, inside the shell's scrolling inner. */
+.nav-list { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.5rem; }
+/* Every nav row keeps its natural height. The list is a flex column, so once it outgrows the pane,
    flex SHRINKS the rows instead of scrolling: <button> flex items get no automatic content-based
    minimum size (unlike divs, which refuse to shrink below their content), and the open scene's block
    sub-list sets min-height:0 for its accordion - so rows crush to clipped, unreadable slivers before
@@ -65,22 +46,10 @@ main.panes.no-nav > .nav, main.panes.no-inspector > .inspector, main.panes.props
    is what the pane's own scrollbar is for. Same hazard + same fix on every capped flex column of
    buttons: see .jump-list and .settings-tabs. (#30) */
 .nav-list > * { flex: none; }
-.inspector .pane-inner { width: var(--insp-open-w); }
-main.panes.no-nav > .nav { border-right-color: transparent; }
-main.panes.no-inspector > .inspector { border-left-color: transparent; }
+/* The editor's column holds the script scroller, or the Properties document in its place. */
+.pane-centre { display: flex; flex-direction: column; }
+#editor { flex: 1; min-height: 0; }
 
-/* draggable seams: thin bars over each pane's inner edge, tracking the grid columns. Hidden when the
-   pane is collapsed; the grid transition is suspended mid-drag (see body.resizing) for a 1:1 feel. */
-.pane-resizer { position: absolute; top: 0; bottom: 0; width: 7px; z-index: 6; cursor: col-resize; touch-action: none; }
-.pane-resizer::after { content: ""; position: absolute; inset: 0 3px; background: transparent; transition: background var(--dur-quick) var(--ease-standard); }
-.pane-resizer:hover::after, body.resizing .pane-resizer::after { background: color-mix(in oklab, var(--accent) 45%, transparent); }
-.pane-resizer-nav { left: calc(var(--nav-w) - 3px); }
-.pane-resizer-insp { right: calc(var(--insp-w) - 3px); }
-main.panes.no-nav .pane-resizer-nav, main.panes.no-inspector .pane-resizer-insp { display: none; }
-body.resizing { cursor: col-resize; user-select: none; }
-body.resizing main.panes { transition: none; }
-
-.nav { border-right: 1px solid var(--line); overflow: hidden; background: var(--bg); }
 .nav-item {
   display: flex; align-items: center; gap: 0.4rem; width: 100%; text-align: left; cursor: pointer;
   background: none; border: 0; border-radius: var(--radius-sm); padding: 0.4rem 0.6rem;
@@ -116,25 +85,13 @@ body.resizing main.panes { transition: none; }
 .nav-scene.drop-before { box-shadow: 0 -2px 0 0 var(--accent); }
 .nav-scene.drop-after { box-shadow: 0 2px 0 0 var(--accent); }
 
-/* Destructive confirm (Delete Scene): a danger-toned primary + the referring-scene evidence list. */
-.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--bg); }
-.btn.danger:hover { filter: brightness(1.08); }
+/* Destructive confirm (Delete Scene): the shell's frame + `.btn.danger`; ours is the referring-scene evidence list. */
 .del-refs { margin: 0.2rem 0 0.4rem; padding: 0.4rem 0.6rem; border-left: 2px solid var(--danger); }
 .del-refs-head { margin: 0 0 0.25rem; font: 600 0.8rem var(--font-ui); color: var(--ink); }
 .del-refs-row { margin: 0.1rem 0; font: 0.8rem var(--font-ui); color: var(--muted); }
 .del-warn { color: var(--warn); }
 
-/* The nav's minimal context menu (Delete Scene…; room for Rename later). */
-.nav-ctx {
-  position: fixed; z-index: 60; min-width: 10rem; padding: 0.25rem;
-  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px color-mix(in oklab, var(--ink) 18%, transparent);
-}
-.nav-ctx button {
-  display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); color: var(--ink); font: 0.82rem var(--font-ui);
-}
-.nav-ctx button:hover { background: color-mix(in oklab, var(--accent) 10%, transparent); }
+/* The nav's context menu is the shell's (openContextMenu + context-menu.css). */
 
 /* The quiet "+ New Scene" foot of the list: muted until hovered, then reads as the action it is. */
 .nav-add-scene {
@@ -193,28 +150,6 @@ body.resizing main.panes { transition: none; }
 .nav-search-icon svg { display: block; }
 .nav-search-kbd { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); font: 0.64rem var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 0.25rem; color: var(--muted); }
 
-/* --- borrowed from app-shell's pane-shell.css -------------------------------
-   Patterpad does not import pane-shell.css: it hand-rolls its own .topbar / .panes / .pane-* rules,
-   and taking the shell's file wholesale would give every one of them a second definition. So the
-   handful of rules these two shell features need are mirrored here, and ONLY those. Kept verbatim,
-   and `scripts/check-shell-css-mirror.mjs` (CI) fails if they stop matching the installed shell -
-   which they did within a day of being written, when the arrows-not-chevrons ruling changed a
-   font-size. A copy is only honest while something checks it. */
-/* The bar IS the window's drag surface (fused-title-bar); anything clickable opts out. */
-.topbar.titlebar { -webkit-app-region: drag; }
-.topbar.titlebar :is(button, input, select, a, .no-drag) { -webkit-app-region: no-drag; }
-/* Traffic-light room. macOS only - the class is not added elsewhere. */
-.topbar.titlebar-inset { padding-left: 84px; }
-/* The back/forward pair (nav-history): quiet chevrons, greyed when there is nowhere to go. */
-.shell-histnav { display: inline-flex; gap: 2px; margin-right: 6px; }
-.shell-histnav-btn {
-  display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
-  padding: 0; border: none; border-radius: var(--radius-sm); background: none; color: var(--muted);
-  font-size: 0.95rem; line-height: 1; cursor: pointer;
-}
-.shell-histnav-btn:hover:not(:disabled) { color: var(--ink); background: var(--accent-soft); }
-.shell-histnav-btn:disabled { opacity: 0.35; cursor: default; }
-
 /* The Properties document's row: a PAGE in the navigator, not a container - same weight as a scene
    row, with its count where a scene's chevron would be, and a hairline under it so the scene list
    below still reads as the list. */
@@ -237,13 +172,14 @@ body.resizing main.panes { transition: none; }
 /* Inspector: the detail panel for the current selection (Patterpad.md §4) - a context stack,
    innermost-first (leaf -> snippet -> group(s) -> block), most-specific at the top. The surface's
    `aside` rule supplies border-left + bg. */
-.inspector { display: flex; flex-direction: column; overflow: hidden; }
+.pane-inspector .pane-inner { display: flex; flex-direction: column; }
 .inspector-label { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.6rem 1rem; color: var(--muted); font: 600 0.7rem var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase; border-bottom: 1px solid var(--line); }
 /* The <scene>.<block> Game ID breadcrumb - right-aligned, monospace, quiet (a reference, not a control). */
 .inspector-stack { flex: 1; min-height: 0; overflow-y: auto; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
 /* Levels keep their natural height so a tall inspector SCROLLS rather than squashing its content. */
 .inspector-stack > * { flex: 0 0 auto; }
-.insp-empty { margin: 0; padding: 0.8rem 0.5rem; color: var(--muted); font: italic 0.82rem var(--font-ui); }
+/* The empty line is the shell's `.empty` (controls.css); the inspector pads it a little. */
+.inspector-stack > .empty { padding: 0.8rem 0.5rem; }
 
 /* One level = a card; the top card (most specific) reads strongest, deeper containers recede. */
 .insp-level { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg); overflow: hidden; }
@@ -290,11 +226,7 @@ body.resizing main.panes { transition: none; }
 .insp-if { color: var(--muted); font-family: var(--font-mono); }
 /* Jump row: the target chip and its go/call mode toggle stack in the value column. */
 .insp-jumpval { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; min-width: 0; }
-.insp-seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-pill); overflow: hidden; }
-.insp-seg-opt { background: none; border: 0; cursor: pointer; color: var(--muted); font: 0.68rem var(--font-ui); padding: 0.08rem 0.5rem; white-space: nowrap; }
-.insp-seg-opt + .insp-seg-opt { border-left: 1px solid var(--line); }
-.insp-seg-opt:hover { color: var(--accent); }
-.insp-seg-opt.on { color: var(--ink); background: color-mix(in oklab, var(--accent) 16%, var(--surface)); cursor: default; }
+/* The go/call mode toggle is the shell's `.seg` (controls.css). */
 
 /* The panel CHROME (position, border, shadow, header, body, enter/exit motion) is
    the shell's `.shell-anchored` now: see panel.ts. What stays here is only what is
@@ -311,7 +243,7 @@ body.resizing main.panes { transition: none; }
    app's btn classes; the shell's are the family's, which is the point. */
 /* inspector inline editors: native select + checkbox + jump list */
 .insp-select { font: 0.76rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.1rem 0.3rem; max-width: 11rem; }
-.insp-select:focus { outline: none; border-color: var(--accent); }
+.insp-select:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* A soft, advisory note under a control (e.g. the Best-match degeneracy nudge). Never an error colour. */
 .insp-note { color: var(--muted); font: italic 0.74rem var(--font-ui); line-height: 1.3; padding: 0.05rem 0 0.1rem; }
 /* Status rows (Writing #196 / Audio #206): the ladder dropdown reads as a tinted chip - its background is
@@ -322,7 +254,7 @@ body.resizing main.panes { transition: none; }
 /* Text is full --ink and the fill is a soft tint (mixed toward --bg inline via statusTint), so the rung name
    stays readable on every palette; a saturated --char-N fill would swallow the text. */
 .insp-status-select { font: 0.72rem var(--font-ui); color: var(--ink); background: var(--muted); border: none; border-radius: var(--radius-sm); padding: 0.08rem 0.42rem; max-width: 11rem; cursor: pointer; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
-.insp-status-select:focus { outline: none; box-shadow: 0 0 0 1px var(--accent); }
+.insp-status-select:focus-visible { box-shadow: 0 0 0 1px var(--accent); outline-offset: 0; }
 /* Audio Folders mode (#206): read-only recording status chip (the status is derived from files on disk). */
 .insp-rec-chip { font: 0.72rem var(--font-ui); color: var(--ink); background: var(--muted); border-radius: var(--radius-sm); padding: 0.08rem 0.42rem; box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 16%, transparent); }
 .insp-rec-play { flex: none; font-size: 0.6rem; line-height: 1; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0.15rem 0.2rem; border-radius: var(--radius-sm); }
@@ -375,7 +307,7 @@ body.resizing main.panes { transition: none; }
 /* Take-state badge (#224): whether the shown line's existing take is missing, out of date, or up to date.
    Sits under the line on the main card and beside the next-line preview in the saved state. */
 .scratch-badge { font: 600 0.68rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em;
-  padding: 0.14rem 0.55rem; border-radius: 999px; margin-top: -0.9rem; }
+  padding: 0.14rem 0.55rem; border-radius: var(--radius-pill); margin-top: -0.9rem; }
 .scratch-badge-missing { color: var(--muted); background: color-mix(in oklab, var(--ink) 8%, transparent); }
 .scratch-badge-stale { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
 .scratch-badge-current { color: var(--ok); background: color-mix(in oklab, var(--ok) 14%, transparent); }
@@ -401,7 +333,7 @@ body.resizing main.panes { transition: none; }
 @keyframes scratch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 /* editable gameData field value (text / number input) */
 .insp-gd-input { font: 0.78rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.12rem 0.35rem; min-width: 0; width: 100%; max-width: 11rem; }
-.insp-gd-input:focus { outline: none; border-color: var(--accent); }
+.insp-gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 
 /* Author tags chip editor (#215): hash-coloured chips (the `--char-N` cue palette) + an inline input. */
 .insp-row-tags { align-items: start; }
@@ -416,7 +348,6 @@ body.resizing main.panes { transition: none; }
   background: transparent; color: inherit; opacity: 0.6; font-size: 0.85rem; line-height: 1; cursor: pointer; }
 .insp-tag-x:hover { opacity: 1; background: color-mix(in oklab, var(--tag-c) 28%, transparent); }
 .insp-tag-input { flex: 1 1 4rem; min-width: 4rem; font: 0.78rem var(--font-ui); color: var(--ink); background: transparent; border: 0; padding: 0.1rem 0.15rem; }
-.insp-tag-input:focus { outline: none; }
 /* the host's custom fields, grouped in the lower part of the level under a subtle divider */
 .insp-gd-section { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent); }
 .insp-gd-cap { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.1rem; }
@@ -466,21 +397,16 @@ body.resizing main.panes { transition: none; }
    entered reads as distinct from the ambient bar above it. */
 .stepbar.reviewbar { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
 
-.btn.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
-.btn.primary:hover { filter: brightness(1.06); color: var(--surface); border-color: var(--accent); }
-.btn.ghost { border-color: transparent; color: var(--muted); }
-.btn.ghost:hover { color: var(--accent); border-color: transparent; }
-.btn:disabled { opacity: 0.4; cursor: default; }
-.btn:disabled:hover { color: var(--ink); border-color: var(--line); }
-
-/* Welcome screen (shown when no project is open; takes the space the panes would). */
-.welcome { flex: 1; min-height: 0; display: grid; place-items: center; padding: 2rem; overflow: auto; }
+/* Welcome screen (shown when no project is open; takes the space the panes would). The whole screen
+   drags the window, as Storyletter's does (parity row 32); anything clickable opts out. */
+.welcome { flex: 1; min-height: 0; display: grid; place-items: center; padding: 2rem; overflow: auto; -webkit-app-region: drag; }
+.welcome :is(button, input, select, a, .no-drag) { -webkit-app-region: no-drag; }
 .welcome[hidden] { display: none; }
 .panes[hidden] { display: none; }
 /* Soft cross-fade when the shell swaps top-level screens (welcome / project overview / workspace): the
    incoming screen eases up rather than hard-cutting. Fires only on the display:none -> shown transition
    (so it doesn't replay on unrelated reflows); neutralised under prefers-reduced-motion via the token. */
-.welcome:not([hidden]), .overview:not([hidden]), main.panes:not([hidden]) { animation: var(--anim-screen-in); }
+.welcome:not([hidden]), .overview:not([hidden]), .panes:not([hidden]) { animation: var(--anim-screen-in); }
 .welcome-card { width: min(34rem, 100%); }
 .welcome-title { margin: 0 0 0.2rem; font: 700 2.4rem/1.1 var(--font-read); color: var(--ink); text-align: center; }
 .welcome-sub { margin: 0 0 1.8rem; color: var(--muted); font-style: italic; text-align: center; }
@@ -488,6 +414,9 @@ body.resizing main.panes { transition: none; }
 /* The teaching line: quieter than the two actions above it, and a LINK rather than a third button,
    because it leaves the app rather than doing something in it. */
 .welcome-learn { margin: 0 0 1.8rem; text-align: center; color: var(--muted); font: 0.82rem var(--font-ui); }
+/* A text action that is not a button is a LINK: underlined and coloured, never bare muted text
+   ("Controls have edges"). The one rule for every in-window link (the tour line, the Properties page's
+   foot); the shell's control grammar has no link class, so it stays here. */
 .linklike { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .linklike:hover { color: var(--ink); }
 .welcome-recents-label { color: var(--muted); font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
@@ -503,15 +432,14 @@ body.resizing main.panes { transition: none; }
 /* Project overview (#3a): a calm landing - title, headline stats, drafted bar, and a clickable scene
    index. Shares the welcome screen's centred-card geometry; eases in with the shared panel motion. */
 /* The Properties document: a centre page like the overview, on the same reading measure. */
-/* It takes the EDITOR's cell in the panes grid, so the navigator and the layout stay exactly as
+/* It takes the EDITOR's place in the centre column, so the navigator and the layout stay exactly as
    they were - this is a page you open beside your scenes, not a screen that replaces the app. */
-.propsdoc { grid-column: 2; grid-row: 1; min-height: 0; display: grid; place-items: start center; padding: 3rem 2rem; overflow: auto; }
+.propsdoc { flex: 1; min-height: 0; display: grid; place-items: start center; padding: 3rem 2rem; overflow: auto; }
 .propsdoc[hidden] { display: none; }
 .propsdoc-card { width: min(42rem, 100%); }
 .propsdoc-title { margin: 0 0 0.3rem; font: 700 2.2rem/1.1 var(--font-read); color: var(--ink); }
 .propsdoc-sub { color: var(--muted); font: 0.9rem/1.5 var(--font-ui); margin: 0 0 1.2rem; }
 .propsdoc-foot { color: var(--muted); font: 0.8rem/1.5 var(--font-ui); margin: 1.2rem 0 0; border-top: 1px solid var(--line); padding-top: 0.7rem; }
-.propsdoc-link { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 .overview { flex: 1; min-height: 0; display: grid; place-items: start center; padding: 3rem 2rem; overflow: auto; }
 .overview[hidden] { display: none; }
@@ -563,7 +491,7 @@ body.resizing main.panes { transition: none; }
 .identity-sub { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .identity-field { display: flex; flex-direction: column; gap: 0.25rem; font: 600 0.76rem var(--font-ui); color: var(--muted); }
 .identity-field input { font: 1rem var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.4rem 0.55rem; }
-.identity-field input:focus { outline: none; border-color: var(--accent); }
+.identity-field input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 /* The sentence under a field. It had no rule of its own, so it inherited the field LABEL's 600 weight
    and shrank again as a `small`, reading as a squashed label rather than as prose. Sized and weighted
    here to match the shell's own `.shell-ident-hint`. */
@@ -574,29 +502,19 @@ body.resizing main.panes { transition: none; }
 .create-preview { margin: -0.3rem 0 0; color: var(--muted); font-size: 0.8rem; }
 .create-preview code { font: 0.78rem var(--font-mono); color: var(--ink-soft); }
 
-/* Project Settings dialog (reuses the identity chrome): a left CATEGORY tab rail + a panel area. */
-.settings-dialog { max-width: 64rem; width: 94vw; max-height: 90vh; }
-.scene-props-dialog { max-width: 40rem; }
-.scene-props-dialog .identity-form { gap: 0.6rem; }
-/* Bigger body now that the rail is grouped + tall: the two columns scroll independently so a long panel
-   (Game Data, Cast) never blows out the dialog (#214 settings revise). */
-.settings-body { display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 1.1rem; min-height: 30rem; max-height: 74vh; }
-.settings-tabs { display: flex; flex-direction: column; gap: 0.1rem; border-right: 1px solid var(--line); padding-right: 0.6rem; overflow-y: auto; }
+/* Project Settings is the shell's `mountSettingsDialog` + settings.css (ui-review-2026-09, finding 4); the
+   rail, the panels, the Save gate and their classes are its. Two things are this app's: the dialog is WIDE,
+   because the Game Data and World lists put several fields on a line, and the body keeps a floor so the
+   dialog does not change height as the tabs change. */
+.settings-dialog { width: min(64rem, 94vw); }
+.settings-body { min-height: 30rem; }
 .settings-tabs > * { flex: none; } /* tab BUTTONS would crush on a short window instead of scrolling (#30) */
-/* Section heading in the tab rail (Project / Story data / ...): a quiet label, not a tab. */
-.settings-group { margin: 0.75rem 0 0.15rem; padding: 0 0.6rem; font: 700 0.66rem var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
-.settings-group:first-child { margin-top: 0; }
-.settings-tab { text-align: left; background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer; padding: 0.4rem 0.6rem; color: var(--ink-soft); font: 600 0.85rem var(--font-ui); }
-.settings-tab:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
-.settings-tab.active { background: color-mix(in oklab, var(--accent) 16%, transparent); color: var(--accent); }
-.settings-tab.is-disabled { opacity: 0.4; cursor: default; } /* Audio tab when the project isn't voiced (#206) */
-.settings-tab.is-disabled:hover { background: none; }
+/* Scene properties (the inspector's Scene section) keeps the identity chrome at a list's width. */
+.scene-props-dialog { width: 94vw; max-width: 40rem; }
+.scene-props-dialog .identity-form { gap: 0.6rem; }
 /* Audio Status tab: the ladder / folders / scratch below the "Track Audio Status?" switch, dimmed + inert
    (the `inert` attribute blocks interaction) while tracking is off (#206). */
 .sp-audio-body.is-disabled { opacity: 0.45; }
-.settings-panels { min-width: 0; overflow-y: auto; padding-right: 0.5rem; }
-.settings-panel { display: flex; flex-direction: column; gap: 0.7rem; }
-.settings-panel[hidden] { display: none; }
 /* Closed Captions: the open/close delimiter pair side by side, centred single-glyph inputs. */
 .caption-delims { display: flex; gap: 0.8rem; align-items: flex-end; flex-wrap: wrap; }
 .caption-delims .identity-field { flex: 0 0 auto; }
@@ -607,7 +525,6 @@ body.resizing main.panes { transition: none; }
 /* A checkbox option that hangs off the control above it (e.g. the IDs-only source-debug toggle under the
    Localisation select): indented with a hairline so it reads as a sub-option, not a peer field. */
 .settings-suboption { margin-left: 0.9rem; padding-left: 0.8rem; border-left: 2px solid var(--line); }
-.settings-error { color: var(--danger); font: 0.8rem var(--font-ui); margin: 0 auto 0 0; align-self: center; }
 .settings-toggle { display: flex; align-items: flex-start; gap: 0.55rem; cursor: pointer; }
 .settings-toggle input { margin-top: 0.15rem; }
 .settings-toggle span { display: flex; flex-direction: column; gap: 0.1rem; font: 600 0.85rem var(--font-ui); color: var(--ink); }
@@ -631,7 +548,7 @@ input::placeholder, textarea::placeholder {
 .doc-class { display: flex; flex-direction: column; gap: 0.2rem; }
 .doc-class-label { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .doc-text { font: 0.9rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.4rem 0.5rem; resize: vertical; min-height: 3.4rem; }
-.doc-text:focus { outline: none; border-color: var(--accent); }
+.doc-text:focus-visible { border-color: var(--accent); outline-offset: 0; }
 .doc-add { align-self: flex-start; font: 0.82rem var(--font-ui); }
 
 /* Localisation modal: format + language pickers side by side. */
@@ -701,22 +618,16 @@ input::placeholder, textarea::placeholder {
 .gd-kindtab.active { background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); }
 .gd-kindcount { font: 600 0.6rem var(--font-mono); color: var(--surface); background: var(--accent); border-radius: var(--radius-sm); padding: 0 0.32rem; }
 .gd-fieldlist { display: flex; flex-direction: column; gap: 0.5rem; max-height: 24rem; overflow: auto; }
-.gd-empty { margin: 0.4rem 0; color: var(--muted); font: italic 0.82rem var(--font-ui); }
 .gd-field { display: flex; flex-direction: column; gap: 0.4rem; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 0.5rem 0.6rem; background: var(--bg); }
 .gd-field-top { display: flex; gap: 0.4rem; align-items: center; }
 .gd-field-mid { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 .gd-input { font: 0.85rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.32rem 0.45rem; }
-.gd-input:focus, .gd-default:focus { outline: none; border-color: var(--accent); }
+.gd-input:focus-visible, .gd-default:focus-visible { border-color: var(--accent); outline-offset: 0; }
 .gd-name { flex: 1; min-width: 0; }
 .gd-type { flex: 0 0 auto; }
 .gd-acts { display: flex; gap: 0.1rem; margin-left: auto; }
-.gd-icon { background: none; border: 0; cursor: pointer; color: var(--muted); font: 0.78rem var(--font-ui); padding: 0.1rem 0.3rem; border-radius: var(--radius-sm); }
-.gd-icon:hover:not(:disabled) { color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
-.gd-icon:disabled { opacity: 0.35; cursor: default; }
-.gd-icon.danger:hover:not(:disabled) { color: var(--danger); }
-.gd-labelled { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 8rem; }
-.gd-shared { flex-direction: row; align-items: center; gap: 0.4rem; flex: 0 0 auto; cursor: pointer; font: 600 0.78rem var(--font-ui); color: var(--ink-soft); }
-.gd-fieldcap { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+/* A checkbox caption on the shell's `.shell-labelled` row (Shared / Temporary / Read-only): its own look only. */
+.gd-shared { gap: 0.4rem; flex: 0 0 auto; cursor: pointer; font: 600 0.78rem var(--font-ui); color: var(--ink-soft); }
 .gd-default { font: 0.85rem var(--font-ui); }
 .gd-add { align-self: flex-start; margin-top: 0.2rem; background: none; border: 1px dashed var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 600 0.78rem var(--font-ui); padding: 0.25rem 0.6rem; }
 .gd-add:hover { color: var(--accent); border-color: var(--accent); }
@@ -805,13 +716,6 @@ input::placeholder, textarea::placeholder {
 .lang-add { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.2rem; }
 .lang-add .gd-input { flex: 1; }
 .gd-input.invalid { border-color: var(--danger); }
-/* tag-style enum values (chips + an add input) */
-.gd-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; }
-.gd-tag { display: inline-flex; align-items: center; gap: 0.25rem; background: color-mix(in oklab, var(--accent) 12%, transparent); color: var(--ink); border-radius: var(--radius-sm); padding: 0.1rem 0.1rem 0.1rem 0.4rem; font: 0.78rem var(--font-ui); }
-.gd-tag-x { background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 0.72rem; padding: 0 0.2rem; border-radius: var(--radius-sm); }
-.gd-tag-x:hover { color: var(--accent); }
-.gd-tag-input { font: 0.82rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.18rem 0.4rem; flex: 1 1 6rem; min-width: 6rem; }
-.gd-tag-input:focus { outline: none; border-color: var(--accent); }
 
 /* ============================================================================
    Writing View (full-bleed; Patterpad.md §4). A body class, NOT persisted state: entering hides ALL
@@ -846,9 +750,9 @@ body.writing-view .topbar:hover { opacity: 1; }
 
 /* Editor goes full-bleed: both side columns collapse (eases via the panes grid transition) and the
    pane contents fade in lockstep; the drag seams hide. State (panes.nav / .inspector) is untouched. */
-body.writing-view main.panes { --nav-w: 0px; --insp-w: 0px; }
-body.writing-view main.panes > .nav,
-body.writing-view main.panes > .inspector { opacity: 0; }
+body.writing-view .panes { --nav-w: 0px; --insp-w: 0px; }
+body.writing-view .panes > .pane-nav,
+body.writing-view .panes > .pane-inspector { opacity: 0; }
 body.writing-view .pane-resizer { display: none; }
 
 /* Surface review chrome fades + goes inert (so an invisible marker can't be clicked). The beat-level

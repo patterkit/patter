@@ -4,8 +4,8 @@
 // names pruned) for the save round-trip.
 
 import type { PropertyDecl, PropertyType, ScalarValue } from "@patterkit/model";
-import { el, iconBtn, labelled, moveItem, tagChips, stageChips } from "./dom.js";
-import { bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, focusNewRow,
+import { el } from "./dom.js";
+import { iconBtn, labelled, moveItem, tagChips, stageChips, bindPropertyName, dupGuard, expandableRow, firstIllegalPropertyName, focusNewRow,
   PROPERTY_NAME_HINT } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
@@ -97,7 +97,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
     const shared = el("input", "insp-check") as HTMLInputElement;
     shared.type = "checkbox"; shared.checked = p.shared ?? sharedDefault;
     shared.addEventListener("change", () => { if (shared.checked === sharedDefault) delete p.shared; else p.shared = shared.checked; });
-    const sharedLabel = el("label", "gd-labelled gd-shared"); sharedLabel.dataset.tip = "One value across all flows. Off gives each flow its own value.";
+    const sharedLabel = el("label", "shell-labelled gd-shared"); sharedLabel.dataset.tip = "One value across all flows. Off gives each flow its own value.";
     sharedLabel.append(shared, el("span", undefined, "Shared"));
 
     const details: HTMLElement[] = [sharedLabel];
@@ -105,7 +105,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
       const temp = el("input", "insp-check") as HTMLInputElement;
       temp.type = "checkbox"; temp.checked = p.temporary ?? false;
       temp.addEventListener("change", () => { if (temp.checked) p.temporary = true; else delete p.temporary; });
-      const tl = el("label", "gd-labelled gd-shared"); tl.dataset.tip = "Resets to its default every time the scene is entered.";
+      const tl = el("label", "shell-labelled gd-shared"); tl.dataset.tip = "Resets to its default every time the scene is entered.";
       tl.append(temp, el("span", undefined, "Temporary")); details.push(tl);
     }
     if (p.type === "enum" || p.type === "flags") details.push(labelled("Values", tagChips(p, refreshDefault)));
@@ -125,7 +125,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
     guard.reset();
     host.replaceChildren();
     const list = el("div", "gd-fieldlist");
-    if (!state.length) list.append(el("p", "gd-empty", scope === "scene" ? "No scene properties yet." : "No global properties yet."));
+    if (!state.length) list.append(el("p", "empty", scope === "scene" ? "No scene properties yet." : "No global properties yet."));
     else state.forEach((p, i) => list.append(propRow(p, i)));
     host.append(list);
     guard.check();

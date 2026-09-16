@@ -638,45 +638,16 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .group-ctl:hover { color: var(--ink); }
 
-/* themed confirmation modal (design-language §4) - never an OS dialog */
-.confirm-overlay {
-  position: fixed; inset: 0; z-index: 50;
-  display: flex; align-items: center; justify-content: center;
-  background: color-mix(in oklab, var(--ink) 28%, transparent);
-  backdrop-filter: blur(3px); /* the shared modal-scrim treatment (design-language §4): ink scrim + soft blur */
-  animation: var(--anim-backdrop-in);
-}
-.confirm-dialog {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-3); padding: 1.1rem 1.2rem; max-width: 22rem;
-  display: flex; flex-direction: column; gap: 0.5rem;
-  font-family: var(--font-ui);
-  animation: var(--anim-panel-in);
-}
-.confirm-title { font: 700 0.95rem var(--font-ui); color: var(--ink); }
-.confirm-body { font: 0.82rem/1.45 var(--font-ui); color: var(--muted); }
-.confirm-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
-.confirm-btn {
-  border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; padding: 0.35rem 0.8rem;
-  font: 600 0.78rem var(--font-ui); background: var(--bg); color: var(--ink);
-  transition: background var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), filter var(--dur-quick) var(--ease-standard);
-}
-.confirm-btn.cancel:hover { background: color-mix(in oklab, var(--line) 30%, transparent); }
-.confirm-btn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
-/* Solid-accent primary: the one shared hover idiom (matches .btn.primary) - an eased brightness lift, not a
-   bespoke darken-mix (design-language §4 "one default"). */
-.confirm-btn.danger:hover { filter: brightness(1.06); }
+/* The confirm is the shell's (`confirmDialog` on the family's dialog frame); its panel, scrim, buttons and
+   exit motion come from app-shell's dialog.css + controls.css + confirm.css, imported by the hosting window. */
 .group-rail-body > .bubble:last-child, .group-rail-body > .group-rail:last-child { margin-bottom: 0; }
 
 /* cue autocomplete (stub) */
 /* Exit motion: closeWithExit() (web/exit.ts) adds `.closing` just before teardown; this swaps the
    enter keyframe for its reverse. Higher specificity than the base rule, so it wins. */
-.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing,
-.confirm-dialog.closing { animation: var(--anim-panel-out); }
-.confirm-overlay.closing { animation: var(--anim-backdrop-out); }
+.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing { animation: var(--anim-panel-out); }
 /* a dismissing popup must not catch a stray click during its fade */
-.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing,
-.confirm-overlay.closing { pointer-events: none; }
+.cue-ac.closing, .target-picker.closing, .action-menu.closing, .slash-menu.closing { pointer-events: none; }
 
 .cue-ac {
   position: fixed; z-index: 10; animation: var(--anim-panel-in);

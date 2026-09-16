@@ -21,6 +21,11 @@ import "@fontsource/courier-prime/400.css";
 import "@fontsource/courier-prime/400-italic.css";
 import "@fontsource/courier-prime/700.css";
 import "@fontsource-variable/inter";
+// The confirm the surface raises is the shell's; its frame, buttons and copy draw from these (the app
+// window imports the same three once, so this is the harness doing what a host does).
+import "@wildwinter/app-shell/dialog.css";
+import "@wildwinter/app-shell/controls.css";
+import "@wildwinter/app-shell/confirm.css";
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-sans/700.css";

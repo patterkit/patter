@@ -4,8 +4,8 @@
 // default. `value()` returns the config for the save round-trip. See design/proposals/estimating.md.
 
 import type { EstimatingConfig, WritingStatusDecl } from "@patterkit/model";
-import { el, iconBtn, labelled } from "./dom.js";
-import { focusNewRow } from "@wildwinter/app-shell";
+import { el } from "./dom.js";
+import { iconBtn, labelled, focusNewRow } from "@wildwinter/app-shell";
 
 export interface EstimatingHandle { value(): EstimatingConfig; }
 
@@ -47,7 +47,7 @@ export function mountEstimating(host: HTMLElement, initial: EstimatingConfig, la
   const renderTags = (): void => {
     tagList.replaceChildren();
     const tags = state.tagEstimates ?? (state.tagEstimates = []);
-    if (!tags.length) tagList.append(el("p", "gd-empty", "Every scene uses the default estimate until you add a tag estimate."));
+    if (!tags.length) tagList.append(el("p", "empty", "Every scene uses the default estimate until you add a tag estimate."));
     else tags.forEach((t, i) => {
       const row = el("div", "est-tag-row");
       const tag = el("input", "gd-input est-tag") as HTMLInputElement;

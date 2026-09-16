@@ -6,8 +6,8 @@
 // fields / empty kinds are pruned).
 
 import type { GameDataField, GameDataFields, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
-import { el, iconBtn, labelled, moveItem, tagChips } from "./dom.js";
-import { dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { el } from "./dom.js";
+import { iconBtn, labelled, moveItem, tagChips, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
   { kind: "scene", label: "Scene" }, { kind: "block", label: "Block" }, { kind: "snippet", label: "Snippet" },
@@ -124,7 +124,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
 
     const fields = fieldsOf(activeKind);
     const list = el("div", "gd-fieldlist");
-    if (!fields.length) list.append(el("p", "gd-empty", "No game-data fields on this node type yet."));
+    if (!fields.length) list.append(el("p", "empty", "No game-data fields on this node type yet."));
     else fields.forEach((f, i) => list.append(fieldRow(f, i, fields)));
     host.append(list);
     guard.check();

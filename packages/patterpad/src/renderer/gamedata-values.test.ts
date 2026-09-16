@@ -3,11 +3,12 @@
 //
 // The cause is not a wrong index. `labelled()` wrapped the values editor in a `<label>` with no `for`,
 // and a label forwards clicks to its first labelable descendant - which, for a chips editor, is the
-// FIRST chip's remove button. So every click on the row that was not on some other control pressed it.
+// FIRST chip's remove button. The helpers are the shell's now (ui-review-2026-09, finding 3); the
+// guard travelled with them, and this test holds it on the shell's class names. So every click on the row that was not on some other control pressed it.
 // The click never reached the chip that was clicked at all.
 
 import { describe, it, expect } from "vitest";
-import { labelled, tagChips } from "./src/dom.js";
+import { labelled, tagChips } from "@wildwinter/app-shell";
 import { mountGameDataFields } from "./src/gamedata-fields.js";
 
 const clickOn = (node: Element): void => {
@@ -20,10 +21,10 @@ describe("game data list values (#44)", () => {
     const row = labelled("Values", tagChips(holder));
     document.body.append(row);
 
-    clickOn(row.querySelector(".gd-tag")!);          // the first chip's body
+    clickOn(row.querySelector(".shell-tag")!);          // the first chip's body
     expect(holder.values).toEqual(["alpha", "beta", "gamma"]);
 
-    clickOn(row.querySelector(".gd-fieldcap")!);     // the caption itself
+    clickOn(row.querySelector(".shell-fieldcap")!);     // the caption itself
     expect(holder.values).toEqual(["alpha", "beta", "gamma"]);
     row.remove();
   });
@@ -33,8 +34,8 @@ describe("game data list values (#44)", () => {
     const row = labelled("Values", tagChips(holder));
     document.body.append(row);
 
-    const chips = [...row.querySelectorAll<HTMLElement>(".gd-tag")];
-    clickOn(chips[1]!.querySelector(".gd-tag-x")!);
+    const chips = [...row.querySelectorAll<HTMLElement>(".shell-tag")];
+    clickOn(chips[1]!.querySelector(".shell-tag-x")!);
 
     expect(holder.values).toEqual(["alpha", "gamma"]);
     row.remove();
@@ -50,14 +51,14 @@ describe("game data list values (#44)", () => {
     [...host.querySelectorAll<HTMLButtonElement>(".gd-kindtab")]
       .find((t) => (t.textContent ?? "").startsWith("Dialogue"))!.click();
 
-    const chips = [...host.querySelectorAll<HTMLElement>(".gd-tag")];
+    const chips = [...host.querySelectorAll<HTMLElement>(".shell-tag")];
     expect(chips.map((c) => c.textContent?.replace("✕", ""))).toEqual(["warm", "cold"]);
 
     clickOn(chips[0]!);
     expect(handle.value().line?.[0]?.values).toEqual(["warm", "cold"]);
 
     // And the ✕ still does its job, on the value it belongs to.
-    clickOn(chips[0]!.querySelector(".gd-tag-x")!);
+    clickOn(chips[0]!.querySelector(".shell-tag-x")!);
     expect(handle.value().line?.[0]?.values).toEqual(["cold"]);
     host.remove();
   });

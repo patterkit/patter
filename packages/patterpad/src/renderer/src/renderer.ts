@@ -12,6 +12,12 @@ import "@wildwinter/app-shell/tooltip.css"; // ...and the themed tooltip's bubbl
 // Imported BEFORE shell.css so this app's own field rules, which sit on those
 // classes, come after and win.
 import "@wildwinter/app-shell/settings.css";
+import "@wildwinter/app-shell/pane-shell.css"; // the frame: top bar, the three panes, their toggles and seams
+import "@wildwinter/app-shell/controls.css"; // the family's button / field / segmented-control grammar
+import "@wildwinter/app-shell/dialog.css"; // the one modal frame (the confirm and the identity ask sit on it)
+import "@wildwinter/app-shell/confirm.css"; // what is the confirm's own: its width and its body copy
+import "@wildwinter/app-shell/identity.css"; // the identity ask's fields
+import "@wildwinter/app-shell/context-menu.css"; // the navigator's right-click menu
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";
@@ -41,8 +47,9 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // asserts our copy still matches the shell's default.
 import { el } from "./dom.js";
 import { applyTheme } from "./apply-theme.js";
-import { revealRow, openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
-  paintVcBadges, lockControls, createNavHistory, historyNav, type ShardVc } from "@wildwinter/app-shell";
+import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
+  paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
+  askIdentity, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
@@ -76,29 +83,73 @@ import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
-const panesEl = $("panes");
-const playTopEl = $<HTMLButtonElement>("play-topbtn");
-const welcomeEl = $("welcome");
-const editorEl = $("editor");
-const histNavHostEl = $("histnav"); // the back/forward pair, left of the project name
 
-// The topbar is the window's drag surface now (app-shell 0.34.0's `.topbar.titlebar`). The inset is
+// Boot state FIRST (a top-level await): the frame below restores the remembered pane widths through
+// its `initial`, and the shell has no way to set a width once mounted, so the state has to be in hand
+// before the frame exists. It is the one round trip boot() used to make, made earlier; boot() reads it.
+const bootState = await window.patter.boot();
+// The remembered slide/pin state plus every display pref that rides with it (docHidden, the review
+// toggles, the line-status set). The frame owns nav / inspector / the widths and reports them through
+// onChange; the rest is this module's and is merged in below before each setPanes.
+let panes: PaneState = bootState.panes;
+
+// The frame is the shell's (ui-review-2026-09, finding 2): the fused title bar, the navigator | editor |
+// inspector grid, the collapse, the drag seams and the toggles. It used to be Patterpad's, lifted into
+// app-shell and then kept here as a second copy; the copy is gone. The host in the markup (`#frame`)
+// holds the furniture this app seats into it just below.
+const frameHost = $("frame");
+const shell = mountPaneShell(frameHost, {
+  nav: { defaultWidth: "14rem", label: "scenes" },
+  inspector: { defaultWidth: "22rem", label: "inspector" },
+  initial: {
+    open: { nav: panes.nav, inspector: panes.inspector },
+    width: { ...(panes.navW ? { nav: panes.navW } : {}), ...(panes.inspW ? { inspector: panes.inspW } : {}) },
+  },
+  // The label / shortcut live on the themed tooltip + aria-label (no text word competing in the bar).
+  tipFor: (side, open) => `${open ? "Hide" : "Show"} ${side === "nav" ? "scenes" : "inspector"} (${side === "nav" ? "⌘1" : "⌘2"})`,
+  onChange: (state) => {
+    const next: PaneState = { ...panes, nav: state.open.nav, inspector: state.open.inspector };
+    delete next.navW; delete next.inspW;
+    if (state.width.nav !== undefined) next.navW = state.width.nav;
+    if (state.width.inspector !== undefined) next.inspW = state.width.inspector;
+    panes = next;
+    void window.patter.setPanes(panes); // remember it (also refreshes the View-menu checks)
+  },
+});
+// The grid the frame collapses, and its two toggles. The shell hands out the pane bodies and the bar's
+// slots but not these; they are reached by the class names its stylesheet documents. `hidden` on a
+// toggle is how the welcome / overview / Properties screens take it out of the bar.
+const panesEl = shell.root.querySelector<HTMLElement>(".panes")!;
+panesEl.hidden = true; // the workspace shows once a project opens; the welcome screen has the room until then
+const [toggleNavEl, toggleInspectorEl] = [...shell.topbar.querySelectorAll<HTMLButtonElement>(".pane-toggle")] as [HTMLButtonElement, HTMLButtonElement];
+
+// The topbar is the window's drag surface (app-shell 0.34.0's `.topbar.titlebar`). The inset is
 // macOS-only: it reserves the traffic lights' 84px, and adding it anywhere else would indent a bar
 // that still sits under a native frame.
-const topbarEl = document.querySelector<HTMLElement>(".topbar")!;
-topbarEl.classList.add("titlebar");
-if (navigator.platform.toUpperCase().includes("MAC")) topbarEl.classList.add("titlebar-inset");
-// A drag surface swallows clicks on anything that is not a button / input / select / a, so the two
-// spans in the bar that DO respond opt out by hand.
-for (const id of ["vcs-scene", "save-indicator"]) document.getElementById(id)?.classList.add("no-drag");
-
-const navEl = $("nav");
-const inspectorEl = $("inspector");
+shell.topbar.classList.add("titlebar");
+if (navigator.platform.toUpperCase().includes("MAC")) shell.topbar.classList.add("titlebar-inset");
+// Seat the furniture: the bar's cargo into its two slots, one body per pane. (A drag surface swallows
+// clicks on anything that is not a button / input / select / a, so the two spans in the bar that DO
+// respond carry `no-drag`: the VC chip in the markup, the save indicator once it is built below.)
+const histNavHostEl = $("histnav"); // the back/forward pair, left of the project name
+const projectNameEl = $("project-name");
+const sceneSuffixEl = $("scene-suffix");
+shell.topbarLead.append(histNavHostEl, projectNameEl, sceneSuffixEl);
+const playTopEl = $<HTMLButtonElement>("play-topbtn");
+const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
+const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
+shell.topbarTrail.append(playTopEl, vcsSceneEl, saveIndicatorHost);
 const navListEl = $("nav-list");
-const toggleNavEl = $<HTMLButtonElement>("toggle-nav");
-const toggleInspectorEl = $<HTMLButtonElement>("toggle-inspector");
-const hintbarEl = $("hintbar");
+shell.nav.append(navListEl);
+const editorEl = $("editor");
+const propsDocEl = $("props-doc");            // the Properties document (@patter's own page)
+shell.centre.append(editorEl, propsDocEl);
 const inspectorStackEl = $("inspector-stack");
+shell.inspector.append($("inspector-label"), inspectorStackEl);
+frameHost.hidden = false;
+
+const welcomeEl = $("welcome");
+const hintbarEl = $("hintbar");
 // Conditions / effects always render as pills in the inspector. (The old View > "Expressions as Text"
 // toggle, which swapped them for name-form code, has been removed.)
 const preferText = false;
@@ -118,10 +169,6 @@ function toggleDocClass(cls: string): void {
 // everything inside is rebuilt per paint, so nothing below holds a reference into either bar.
 const problembarEl = $("problembar");
 const reviewbarEl = $("reviewbar");
-const projectNameEl = $("project-name");
-const sceneSuffixEl = $("scene-suffix");
-const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
-const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
 const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bottom-left exit pill
 const recentsEl = $("recents");
 const recentsLabel = $("recents-label");
@@ -135,52 +182,16 @@ const overviewProgressEl = $("overview-progress");
 const overviewBarFillEl = $("overview-bar-fill");
 const overviewProgressLabelEl = $("overview-progress-label");
 const overviewScenesEl = $("overview-scenes");
-const propsDocEl = $("props-doc");            // the Properties document (@patter's own page)
 const propsDocHostEl = $("props-doc-host");
 const propsDocWorldEl = $<HTMLButtonElement>("props-doc-world");
 propsDocWorldEl.addEventListener("click", () => void openProjectSettings("world"));
-const identityDialog = $<HTMLDialogElement>("identity");
-const nameInput = $<HTMLInputElement>("identity-name");
-const emailInput = $<HTMLInputElement>("identity-email");
 const createDialogEl = $<HTMLDialogElement>("create-project");
 const createNameInput = $<HTMLInputElement>("create-name");
 const createVcsSel = $<HTMLSelectElement>("create-vcs");
 const createBuildInput = $<HTMLInputElement>("create-build");
 const createPreviewEl = $("create-preview-name");
 $<HTMLButtonElement>("create-cancel").addEventListener("click", () => createDialogEl.close("cancel"));
-const settingsDialogEl = $<HTMLDialogElement>("project-settings");
-const setNameInput = $<HTMLInputElement>("set-name");
-const setStartSel = $<HTMLSelectElement>("set-start");
-const setVcsSel = $<HTMLSelectElement>("set-vcs");
-const setVoicedInput = $<HTMLInputElement>("set-voiced");
-const setFormattingInput = $<HTMLInputElement>("set-formatting");
-const setAutosaveInput = $<HTMLInputElement>("set-autosave");
-const setAutoRebuildInput = $<HTMLInputElement>("set-autorebuild");
-const setCcOpenInput = $<HTMLInputElement>("set-cc-open");
-const setCcCloseInput = $<HTMLInputElement>("set-cc-close");
-const setCcCharacterInput = $<HTMLInputElement>("set-cc-character");
-const ccDelimWarn = $<HTMLElement>("cc-delim-warn");
-// Guardrail (#214): "(" at a line start opens a performance direction in the surface, so it can't also be
-// a caption start. Warn when the author picks it (round brackets stay allowed, e.g. for mid-line cues).
-const syncCcDelimWarn = (): void => { ccDelimWarn.hidden = setCcOpenInput.value.trim() !== "("; };
-setCcOpenInput.addEventListener("input", syncCcDelimWarn);
-const setBuildInput = $<HTMLInputElement>("set-build");
-const setBuildLocalesSel = $<HTMLSelectElement>("set-build-locales");
-const setBuildSourceDebug = $<HTMLInputElement>("set-build-sourcedebug");
-const setBuildSourceDebugRow = $("set-build-sourcedebug-row");
-// The source-debug toggle only applies to an IDs-only build; show it only then.
-const syncBuildLocaleRows = (): void => { setBuildSourceDebugRow.hidden = setBuildLocalesSel.value !== "ids"; };
-setBuildLocalesSel.addEventListener("change", syncBuildLocaleRows);
-const setLanguagesHost = $("set-languages");
-const setGameDataHost = $("set-gamedata");
-const setWorldHost = $("set-world");
-const setCastHost = $("set-cast");
-const setWritingStatusHost = $("set-writing-status");
-const setEstimatingHost = $("set-estimating");
-const setRecordingStatusHost = $("set-recording-status");
 const debugLink = mountDebugLink(); // live debug link control (#181): the bottom-right connect icon
-const setDictionaryHost = $("set-dictionary");
-$<HTMLButtonElement>("set-cancel").addEventListener("click", () => settingsDialogEl.close("cancel"));
 const scenePropsDialogEl = $<HTMLDialogElement>("scene-props");
 const spHost = $("sp-host");
 $<HTMLButtonElement>("sp-cancel").addEventListener("click", () => scenePropsDialogEl.close("cancel"));
@@ -242,31 +253,6 @@ $<HTMLButtonElement>("vo-export-btn").addEventListener("click", () => void voice
 const docDialogEl = $<HTMLDialogElement>("doc-notes");
 const docHost = $("doc-host");
 $<HTMLButtonElement>("doc-close").addEventListener("click", () => docDialogEl.close("done"));
-// Left category tab rail: clicking a tab shows its panel (General / Game Data / …).
-$("settings-tabs").addEventListener("click", (e) => {
-  const tab = (e.target as HTMLElement).closest<HTMLElement>(".settings-tab");
-  if (!tab || tab.classList.contains("is-disabled")) return; // a disabled tab (e.g. Audio when un-voiced) is inert
-  const name = tab.dataset["tab"];
-  for (const t of settingsDialogEl.querySelectorAll<HTMLElement>(".settings-tab")) t.classList.toggle("active", t === tab);
-  for (const p of settingsDialogEl.querySelectorAll<HTMLElement>(".settings-panel")) p.hidden = p.dataset["panel"] !== name;
-});
-
-// Audio is meaningful only for a VOICED project (#206): when Voiced is off the Audio settings tab is
-// disabled (dimmed, inert) - there is no recording status to track, and Audio Folders / scratch make no
-// sense. Reactive to the in-dialog Voiced toggle so flipping it updates the tab without reopening.
-function syncAudioSettingsTab(): void {
-  const tab = settingsDialogEl.querySelector<HTMLElement>('.settings-tab[data-tab="recording-status"]');
-  if (!tab) return;
-  const on = setVoicedInput.checked;
-  tab.classList.toggle("is-disabled", !on);
-  tab.dataset.tip = on ? "" : "Enable Voiced (General tab) to track recording status and audio.";
-  if (!on && tab.classList.contains("active")) { // showing the Audio panel as we disable it -> fall back to General
-    for (const t of settingsDialogEl.querySelectorAll<HTMLElement>(".settings-tab")) t.classList.toggle("active", t.dataset["tab"] === "general");
-    for (const p of settingsDialogEl.querySelectorAll<HTMLElement>(".settings-panel")) p.hidden = p.dataset["panel"] !== "general";
-  }
-}
-setVoicedInput.addEventListener("change", syncAudioSettingsTab);
-
 let project: OpenedProject | null = null;
 let currentSceneId: string | null = null;
 let surface: SurfaceHandle | null = null;
@@ -333,6 +319,7 @@ let sceneEdited = false;
 // span said nothing at all while clean, which left "did that get written?"
 // unanswered at the moment it is asked.
 const saveInd = saveIndicator();
+saveInd.el.classList.add("no-drag"); // it answers clicks, so it opts out of the title bar's drag surface
 saveIndicatorHost.replaceWith(saveInd.el);
 // `write` returns false on refusal, which keeps the controller "unsaved" so the
 // next touch or flush tries again rather than reporting a success that did not
@@ -561,13 +548,29 @@ function newScenePrompt(): void {
 // Severity scales with the evidence (design/proposals/delete-scene.md): an untouched scaffold
 // deletes silently; content asks; inbound references list the referring scenes BY NAME.
 
-const deleteSceneDialogEl = $<HTMLDialogElement>("delete-scene");
-const delSceneTitleEl = $("del-scene-title");
-const delSceneMsgEl = $("del-scene-msg");
-const delSceneRefsEl = $("del-scene-refs");
-const delSceneWarnEl = $("del-scene-warn");
-const delSceneConfirmEl = $<HTMLButtonElement>("del-scene-confirm");
-$<HTMLButtonElement>("del-scene-cancel").addEventListener("click", () => deleteSceneDialogEl.close("cancel"));
+/** The shell's confirm, with a body made of NODES: the referring-scene list is evidence, not a sentence, so
+ *  it is built as elements where `confirmDialog` takes a string. Same frame, same classes, same answers
+ *  (true on the destructive button; false on Cancel, Esc or the backdrop); with `confirmLabel` unset there
+ *  is nothing to confirm and only Cancel is offered. */
+function confirmWith(opts: { title: string; sub: string; body?: Node[]; confirmLabel?: string }): Promise<boolean> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok: boolean): void => { if (done) return; done = true; resolve(ok); frame.close(); };
+    const frame = dialogFrame({ title: opts.title, sub: opts.sub, className: "confirm-dialog", onClose: () => finish(false) });
+    if (opts.body?.length) frame.body.append(...opts.body);
+    const cancel = el("button", "btn confirm-btn cancel", "Cancel"); cancel.type = "button";
+    cancel.addEventListener("click", () => finish(false));
+    frame.actions.append(cancel);
+    if (opts.confirmLabel) {
+      const go = el("button", "btn danger confirm-btn", opts.confirmLabel); go.type = "button";
+      go.addEventListener("click", () => finish(true));
+      frame.actions.append(go);
+    }
+    frame.dialog.addEventListener("mousedown", (e) => { if (e.target === frame.dialog) finish(false); });
+    frame.open();
+    cancel.focus(); // a destructive default must be chosen, not stumbled into by a stray Enter
+  });
+}
 
 async function deleteScenePrompt(sceneId?: string): Promise<void> {
   const id = sceneId ?? currentSceneId;
@@ -576,11 +579,7 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   const info = await window.patter.sceneDeleteInfo(id);
   if (!scene || !info) return;
   if (info.lastScene) {
-    delSceneTitleEl.textContent = "Can't delete this scene";
-    delSceneMsgEl.textContent = "A project needs at least one scene.";
-    delSceneRefsEl.hidden = true; delSceneWarnEl.hidden = true; delSceneConfirmEl.hidden = true;
-    deleteSceneDialogEl.addEventListener("close", () => { delSceneConfirmEl.hidden = false; }, { once: true });
-    deleteSceneDialogEl.showModal();
+    await confirmWith({ title: "Can't delete this scene", sub: "A project needs at least one scene." });
     return;
   }
 
@@ -590,35 +589,33 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   // Frictionless undo of an accidental create: nothing at stake, nothing to confirm.
   if (info.untouched && !unsaved && !info.startsHere && info.referrers.length === 0) { await doDeleteScene(id); return; }
 
-  delSceneTitleEl.textContent = `Delete “${scene.name}”?`;
   const contents = info.untouched
     ? "This removes its files from the project."
     : `It contains ${info.lines} line${info.lines === 1 ? "" : "s"} across ${info.blocks} block${info.blocks === 1 ? "" : "s"}. This removes its files from the project.`;
-  delSceneMsgEl.textContent = unsaved ? `It has unsaved changes. ${contents}` : contents;
-  delSceneRefsEl.replaceChildren();
-  delSceneRefsEl.hidden = info.referrers.length === 0;
+  const body: Node[] = [];
   if (info.referrers.length) {
-    delSceneRefsEl.append(Object.assign(document.createElement("p"), { className: "del-refs-head", textContent: "These scenes refer to it:" }));
+    const refs = el("div", "del-refs");
+    refs.append(el("p", "del-refs-head", "These scenes refer to it:"));
     for (const r of info.referrers) {
       const bits = [r.jumps ? `${r.jumps} jump${r.jumps === 1 ? "" : "s"}` : "", r.conditions ? `${r.conditions} condition${r.conditions === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
-      delSceneRefsEl.append(Object.assign(document.createElement("p"), { className: "del-refs-row", textContent: `${r.name} · ${bits}` }));
+      refs.append(el("p", "del-refs-row", `${r.name}: ${bits}`));
     }
+    body.push(refs);
   }
   const warnBits = [
     info.referrers.length ? "Those references will dangle and show as problems until you repoint them." : "",
     info.startsHere ? "The project's start point will be cleared." : "",
     info.vcs ? "" : "This cannot be undone.",
   ].filter(Boolean);
-  delSceneWarnEl.textContent = warnBits.join(" ");
-  delSceneWarnEl.hidden = warnBits.length === 0;
-  delSceneConfirmEl.textContent = info.referrers.length ? "Delete scene anyway" : "Delete scene";
+  if (warnBits.length) body.push(el("p", "confirm-body del-warn", warnBits.join(" ")));
 
-  const onClose = (): void => {
-    deleteSceneDialogEl.removeEventListener("close", onClose);
-    if (deleteSceneDialogEl.returnValue === "delete") void doDeleteScene(id);
-  };
-  deleteSceneDialogEl.addEventListener("close", onClose);
-  deleteSceneDialogEl.showModal();
+  const ok = await confirmWith({
+    title: `Delete “${scene.name}”?`,
+    sub: unsaved ? `It has unsaved changes. ${contents}` : contents,
+    body,
+    confirmLabel: info.referrers.length ? "Delete scene anyway" : "Delete scene",
+  });
+  if (ok) await doDeleteScene(id);
 }
 
 async function doDeleteScene(id: string): Promise<void> {
@@ -639,20 +636,9 @@ async function doDeleteScene(id: string): Promise<void> {
   } else if (currentSceneId) highlightNav(currentSceneId);
 }
 
-/** The nav's minimal context menu (one action today; room for Rename later). */
+/** The nav's context menu: the shell's (one action today; room for Rename later). */
 function sceneContextMenu(sceneId: string, x: number, y: number): void {
-  document.querySelector(".nav-ctx")?.remove();
-  const menu = document.createElement("div");
-  menu.className = "nav-ctx";
-  menu.style.left = `${x}px`; menu.style.top = `${y}px`;
-  const del = document.createElement("button");
-  del.type = "button"; del.textContent = "Delete Scene…";
-  del.addEventListener("click", () => { menu.remove(); void deleteScenePrompt(sceneId); });
-  menu.appendChild(del);
-  const dismiss = (): void => { menu.remove(); window.removeEventListener("pointerdown", onAway, true); };
-  const onAway = (e: PointerEvent): void => { if (!menu.contains(e.target as Node)) dismiss(); };
-  window.addEventListener("pointerdown", onAway, true);
-  document.body.appendChild(menu);
+  openContextMenu(x, y, [{ label: "Delete scene…", danger: true, onClick: () => void deleteScenePrompt(sceneId) }]);
 }
 
 // --- scene reorder (drag a nav row; the order persists to the project) -------
@@ -783,78 +769,9 @@ async function refreshVcStatus(): Promise<void> {
 // --- side panes (slide / collapse) -------------------------------------------
 // The two side panes slide to full-bleed; the open/closed state is remembered per user. Closed means
 // closed - the inspector only opens when the user explicitly expands it (no auto-peek on selection).
-let panes: PaneState = { nav: false, inspector: false };
-
-function applyPanes(): void {
-  panesEl.classList.toggle("no-nav", !panes.nav);
-  panesEl.classList.toggle("no-inspector", !panes.inspector);
-  // Restore the author's dragged widths (px); absent -> the CSS default (rem).
-  if (panes.navW) panesEl.style.setProperty("--nav-open-w", `${panes.navW}px`); else panesEl.style.removeProperty("--nav-open-w");
-  if (panes.inspW) panesEl.style.setProperty("--insp-open-w", `${panes.inspW}px`); else panesEl.style.removeProperty("--insp-open-w");
-  // Icon-only chevrons (quiet chrome, Patterpad.md §4 "the window holds the script, not a button bar"):
-  // a bare chevron pointing toward where the pane sits - inward (‹ / ›) to collapse it, outward to expand.
-  // The label / shortcut live on the tooltip + aria-label (no text word competing in the bar).
-  toggleNavEl.textContent = panes.nav ? "‹" : "›";
-  toggleNavEl.setAttribute("aria-pressed", String(panes.nav));
-  toggleNavEl.setAttribute("aria-label", panes.nav ? "Hide scenes" : "Show scenes");
-  toggleNavEl.dataset.tip = panes.nav ? "Hide scenes (⌘1)" : "Show scenes (⌘1)";
-  toggleInspectorEl.textContent = panes.inspector ? "›" : "‹";
-  toggleInspectorEl.setAttribute("aria-pressed", String(panes.inspector));
-  toggleInspectorEl.setAttribute("aria-label", panes.inspector ? "Hide inspector" : "Show inspector");
-  toggleInspectorEl.dataset.tip = panes.inspector ? "Hide inspector (⌘2)" : "Show inspector (⌘2)";
-}
-
-function togglePane(which: "nav" | "inspector"): void {
-  panes = { ...panes, [which]: !panes[which] };
-  applyPanes();
-  void window.patter.setPanes(panes); // remember it (also refreshes the View-menu checks)
-}
-
-// --- draggable pane widths ---------------------------------------------------
-// Each seam handle drags its pane wider / narrower; the width is clamped to a minimum and a viewport-
-// relative maximum (so the centre script always keeps room), then remembered per user on release.
-const navResizerEl = $("nav-resizer");
-const inspResizerEl = $("insp-resizer");
-const MIN_PANE = 160;
-const maxPaneW = (): number => Math.max(MIN_PANE, Math.min(640, Math.round(window.innerWidth - 420)));
-
-function beginResize(e: PointerEvent, side: "nav" | "inspector"): void {
-  e.preventDefault();
-  const pane = side === "nav" ? navEl : inspectorEl;
-  const startX = e.clientX;
-  const startW = pane.getBoundingClientRect().width;
-  const cssVar = side === "nav" ? "--nav-open-w" : "--insp-open-w";
-  document.body.classList.add("resizing");
-  let latest = startW;
-  // Listen on window (not the 7px handle) so the drag tracks even when the cursor outruns the bar.
-  const onMove = (ev: PointerEvent): void => {
-    const delta = ev.clientX - startX;
-    latest = Math.max(MIN_PANE, Math.min(maxPaneW(), Math.round(side === "nav" ? startW + delta : startW - delta)));
-    panesEl.style.setProperty(cssVar, `${latest}px`);
-  };
-  const onUp = (): void => {
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-    document.body.classList.remove("resizing");
-    panes = { ...panes, [side === "nav" ? "navW" : "inspW"]: latest };
-    void window.patter.setPanes(panes); // remember the new width
-  };
-  window.addEventListener("pointermove", onMove);
-  window.addEventListener("pointerup", onUp);
-}
-
-navResizerEl.addEventListener("pointerdown", (e) => beginResize(e, "nav"));
-inspResizerEl.addEventListener("pointerdown", (e) => beginResize(e, "inspector"));
-
-/** Double-click a seam to drop that pane back to its default width. */
-function resetPaneWidth(side: "nav" | "inspector"): void {
-  panes = { ...panes };
-  if (side === "nav") delete panes.navW; else delete panes.inspW;
-  applyPanes(); // applyPanes removes the inline var when the width is unset -> CSS default
-  void window.patter.setPanes(panes);
-}
-navResizerEl.addEventListener("dblclick", () => resetPaneWidth("nav"));
-inspResizerEl.addEventListener("dblclick", () => resetPaneWidth("inspector"));
+// The collapse, the drag-resize and the dblclick reset are the frame's (mountPaneShell, above); every
+// change comes back through its onChange and is remembered there.
+function togglePane(which: "nav" | "inspector"): void { shell.togglePane(which); }
 
 /** View > Reset View: side panes back to their default widths and open/closed state. */
 /** View > Reset View: put EVERYTHING display-related back to defaults - the panes, every remembered
@@ -872,8 +789,8 @@ function resetView(): void {
   // Layout + the whole remembered pane/display set back to defaults, persisted once (this also refreshes
   // every View / Review menu check off the clean state).
   panes = { nav: false, inspector: false }; // full-bleed, both sides closed; widths + display prefs cleared
-  applyPanes();
-  void window.patter.setPanes(panes);
+  shell.setPaneOpen("nav", false); shell.setPaneOpen("inspector", false); shell.resetWidths(); // each reports back through onChange
+  void window.patter.setPanes(panes); // and once regardless, for the display prefs when nothing above moved
   void window.patter.resetWindows(); // rescue every window to a sensible on-screen place
 }
 
@@ -1984,7 +1901,6 @@ function enterWorkspace(): void {
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
   toggleNavEl.hidden = false; toggleInspectorEl.hidden = false; // pane toggles only matter in the workspace
   playTopEl.hidden = false;   // the primary loop's visible door: play what you wrote
-  applyPanes();
 }
 
 // --- project overview (#3a) --------------------------------------------------
@@ -2070,8 +1986,7 @@ async function showPropertiesDoc(): Promise<void> {
   // got here and how you leave), the editor's column carries the document, and the inspector folds
   // away, since it speaks about a selected node and there is none here.
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
-  applyPanes();
-  panesEl.classList.add("props-doc-open");
+  shell.holdClosed("inspector", true); // folded for the page, without touching what the author chose
   editorEl.hidden = true; propsDocEl.hidden = false;
   toggleNavEl.hidden = false; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true;
@@ -2102,7 +2017,7 @@ async function leavePropertiesDoc(): Promise<void> {
   propsHandle = null;
   propsDocEl.hidden = true;
   editorEl.hidden = false;
-  panesEl.classList.remove("props-doc-open");
+  shell.holdClosed("inspector", false); // back to whatever was remembered
   navListEl.querySelector(".nav-doc")?.classList.remove("active");
 }
 
@@ -2248,8 +2163,6 @@ async function saveAs(): Promise<void> {
   if (r) await showProject(r);
 }
 
-/** File > Project Settings: read the project-level settings, populate the modal (General + Game Data
- *  tabs), save on confirm. */
 /** File > Production Information: a read-only render of the production report (spec §13). Flushes any
  *  pending scene edits (tags, text) first so the figures are current, recomputes off the loaded project,
  *  then shows it in a themed modal. */
@@ -2444,117 +2357,212 @@ async function exportPlayableHtml(): Promise<void> {
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
+// --- Project Settings (File > Project Settings…) -------------------------------
+// The dialog is the shell's `mountSettingsDialog` (ui-review-2026-09, finding 4): the modal, the grouped
+// tab rail, the Enter guard and the Save gate are its. The sections below own their content and their
+// state, mount fresh on every open from `settingsRead` (read just before open(), because mount() is
+// synchronous), and hand what they hold to `saveSettingsFromDialog` through `live`.
+
+type SettingsRead = { s: ProjectSettingsDto; dictionaries: Awaited<ReturnType<typeof window.patter.listDictionaries>> };
+let settingsRead: SettingsRead | null = null;
+/** The controls and editors of the OPEN dialog, filled by each section's mount() and read by Save. */
+interface LiveSettings {
+  name: HTMLInputElement; start: HTMLSelectElement;
+  voiced: HTMLInputElement; formatting: HTMLInputElement; autosave: HTMLInputElement; autoRebuild: HTMLInputElement;
+  build: HTMLInputElement; buildLocales: HTMLSelectElement; buildSourceDebug: HTMLInputElement;
+  vcs: HTMLSelectElement;
+  ccOpen: HTMLInputElement; ccClose: HTMLInputElement; ccCharacter: HTMLInputElement;
+  langs: ReturnType<typeof mountLanguages>; gd: ReturnType<typeof mountGameDataFields>;
+  world: ReturnType<typeof mountWorld>; worldHost: HTMLElement; cast: ReturnType<typeof mountCast>;
+  writingStatus: ReturnType<typeof mountWritingStatus>; estimating: ReturnType<typeof mountEstimating>;
+  audio: ReturnType<typeof mountAudio>; dictionary: ReturnType<typeof mountDictionary>;
+}
+let live: Partial<LiveSettings> = {};
+
+// The small field kit the static markup used to spell out: a captioned field, a checkbox row with its
+// sub-line, and the two kinds of note.
+const sField = (caption: string, control: HTMLElement, ...notes: HTMLElement[]): HTMLLabelElement => {
+  const l = el("label", "identity-field"); l.append(caption, control, ...notes); return l;
+};
+const sToggle = (label: string, sub: string, checked: boolean, cls = "settings-toggle"): { row: HTMLLabelElement; input: HTMLInputElement } => {
+  const row = el("label", cls);
+  const input = el("input"); input.type = "checkbox"; input.checked = checked;
+  const cap = el("span"); cap.append(label, el("small", undefined, sub));
+  row.append(input, cap);
+  return { row, input };
+};
+const sNote = (cls: string, ...parts: Array<string | Node>): HTMLElement => { const n = el(cls === "settings-note" ? "p" : "small", cls); n.append(...parts); return n; };
+const code = (text: string): HTMLElement => el("code", undefined, text);
+const bold = (text: string): HTMLElement => el("b", undefined, text);
+const sSelect = (options: Array<[string, string]>, value: string, cls?: string): HTMLSelectElement => {
+  const sel = el("select", cls);
+  for (const [v, label] of options) sel.append(new Option(label, v));
+  sel.value = value;
+  return sel;
+};
+const VCS_OPTIONS: Array<[string, string]> = [["git", "Git"], ["perforce", "Perforce"], ["plastic", "Plastic SCM"], ["svn", "Subversion (SVN)"], ["none", "None"]];
+const DUP_MESSAGE = "Two entries share a name. Names must be unique.";
+
+const settingsDlg = mountSettingsDialog({
+  title: "Project settings",
+  sections: [
+    { id: "general", label: "General", group: "Project", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      const name = el("input"); name.type = "text"; name.required = true; name.value = s.name;
+      // Start scene picker: "(unset)" plus every scene; select the project's current start.
+      const start = sSelect([["", "(unset)"], ...(project?.scenes ?? []).map((sc): [string, string] => [sc.id, sc.name])], s.start?.scene ?? "");
+      const voiced = sToggle("Voiced", "Tracks recording status and exports voice scripts.", s.voiced);
+      // Audio is meaningful only for a VOICED project (#206): the Audio tab reads this box (its `disabled`
+      // below), and flipping it here updates the tab without reopening.
+      voiced.input.addEventListener("change", () => settingsDlg.refreshTabs());
+      const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and narration.", s.formatting);
+      const autosave = sToggle("Autosave", "Saves the open scene every 30 seconds.", s.autosave);
+      const autoRebuild = sToggle("Auto Rebuild", "Recompiles the .patterc bundle as your edits settle.", s.autoRebuild);
+      host.append(sField("Project name", name), sField("Start", start, sNote("settings-fieldnote", "The scene Play from Start opens.")),
+        voiced.row, formatting.row, autosave.row, autoRebuild.row);
+      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input, autosave: autosave.input, autoRebuild: autoRebuild.input });
+      // A blank name used to close the dialog and drop every other edit with it (parity row 7); now it
+      // is the fault the gate names.
+      return { firstInvalid: () => name.value.trim() ? null : { el: name, message: "Give the project a name." } };
+    } },
+    { id: "build", label: "Publish", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      const build = el("input"); build.type = "text"; build.spellcheck = false; build.placeholder = "../patter-dist/your-project.patterc"; build.value = s.buildBundle;
+      const buildLocales = sSelect([["embedded", "Embedded"], ["ids", "IDs only"]], s.buildLocalisation, "insp-select");
+      const sourceDebug = sToggle("Embed source language for debug", "Adds the source strings so an IDs-only build can be played. The runtime marks it as not shippable.", s.buildSourceDebug, "settings-toggle settings-suboption");
+      // The source-debug toggle only applies to an IDs-only build; show it only then.
+      const syncRows = (): void => { sourceDebug.row.hidden = buildLocales.value !== "ids"; };
+      buildLocales.addEventListener("change", syncRows); syncRows();
+      host.append(
+        sField("Build output", build, sNote("identity-hint", "Where Publish ▸ Publish Bundle writes the ", code(".patterc"), ", relative to the project root. The default is a sibling ", code("patter-dist/"), " folder.")),
+        sField("Localisation", buildLocales, sNote("identity-hint", bold("Embedded"), " ships every language in the bundle and the runtime returns the right string. ", bold("IDs only"), " ships no text, so the runtime returns the line ID and your game looks it up.")),
+        sourceDebug.row);
+      Object.assign(live, { build, buildLocales, buildSourceDebug: sourceDebug.input });
+      return {};
+    } },
+    { id: "vcs", label: "Version control", mount: (host): SettingsSectionHandle => {
+      const vcs = sSelect(VCS_OPTIONS, settingsRead!.s.vcs, "insp-select");
+      host.append(sField("Version control system", vcs),
+        sNote("settings-note", "Patterpad checks a file out before writing where the system locks files, and writes straight away where it merges. Switching systems regenerates the project's ", code("vcs-setup.md"), " and ignore rules."));
+      live.vcs = vcs;
+      return {};
+    } },
+    { id: "world", label: "World properties", group: "Story data", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      const worldHost = el("div"); host.append(worldHost);
+      const world = mountWorld(worldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers() });
+      Object.assign(live, { world, worldHost });
+      // Two gates. A duplicate name is a data hazard. An illegal one is a declared property no
+      // expression can reach (a hyphen reads as subtraction, a leading digit or a keyword will not parse,
+      // a capital is folded away); the field's own rollover says which fault, so the line repeats it.
+      return { firstInvalid: () => {
+        const dup = world.firstDuplicate(); if (dup) return { el: dup, message: DUP_MESSAGE };
+        const bad = world.firstIllegalName(); return bad ? { el: bad, message: bad.title || "That property name cannot be used in an expression." } : null;
+      } };
+    } },
+    { id: "gamedata", label: "Game data", mount: (host): SettingsSectionHandle => {
+      host.append(sNote("settings-note", "Fields your game reads from a scene, block, snippet, or line. Define them here and fill them in from the inspector."));
+      const gdHost = el("div"); host.append(gdHost);
+      const gd = mountGameDataFields(gdHost, settingsRead!.s.gameDataFields);
+      live.gd = gd;
+      return { firstInvalid: () => { const dup = gd.firstDuplicate(); return dup ? { el: dup, message: DUP_MESSAGE } : null; } };
+    } },
+    { id: "cast", label: "Cast", mount: (host): SettingsSectionHandle => {
+      host.append(sNote("settings-note", "A line's speaker must be one of these names."));
+      const castHost = el("div"); host.append(castHost);
+      const cast = mountCast(castHost, settingsRead!.s.cast);
+      live.cast = cast;
+      return { firstInvalid: () => { const dup = cast.firstDuplicate(); return dup ? { el: dup, message: DUP_MESSAGE } : null; } };
+    } },
+    { id: "writing-status", label: "Writing status", group: "Writing & audio", mount: (host): SettingsSectionHandle => {
+      const wsHost = el("div"); host.append(wsHost);
+      live.writingStatus = mountWritingStatus(wsHost, settingsRead!.s.writingStatuses);
+      return {};
+    } },
+    { id: "estimating", label: "Estimating", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      const estHost = el("div"); host.append(estHost);
+      live.estimating = mountEstimating(estHost, s.estimating, s.writingStatuses);
+      return {};
+    } },
+    { id: "recording-status", label: "Audio status", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      const audioHost = el("div"); host.append(audioHost);
+      live.audio = mountAudio(audioHost, { trackAudioStatus: s.trackAudioStatus, statuses: s.recordingStatuses, audioFolders: s.audioFolders, audioRoot: s.audioRoot, scratchStatus: s.scratchStatus });
+      return {};
+    }, disabled: () => live.voiced?.checked ? null : "Enable Voiced (General tab) to track recording status and audio." },
+    { id: "captions", label: "Closed captions", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      host.append(sNote("settings-note", "Closed captions describe sounds inside dialogue. A game can turn them off at runtime, and every cue between these delimiters is then removed from the line. Lines spoken by the caption character are removed entirely."));
+      const delim = (value: string): HTMLInputElement => { const i = el("input"); i.type = "text"; i.spellcheck = false; i.maxLength = 4; i.value = value; return i; };
+      const ccOpen = delim(s.closedCaptions.open);
+      const ccClose = delim(s.closedCaptions.close);
+      const warn = sNote("settings-fieldnote caption-delims-warn", "A ", code("("), " at the start of a line opens a performance direction, so a caption there won't work. Use ", code("["), " or another token.");
+      // Guardrail (#214): "(" at a line start opens a performance direction in the surface, so it can't also
+      // be a caption start. Warn when the author picks it (round brackets stay allowed, e.g. for mid-line cues).
+      const syncWarn = (): void => { warn.hidden = ccOpen.value.trim() !== "("; };
+      ccOpen.addEventListener("input", syncWarn); syncWarn();
+      const delims = el("div", "caption-delims");
+      delims.append(sField("Caption start", ccOpen), sField("Caption end", ccClose),
+        sNote("settings-fieldnote caption-delims-note", "The default pair is ", code("["), " and ", code("]"), "."), warn);
+      const ccCharacter = el("input"); ccCharacter.type = "text"; ccCharacter.spellcheck = false; ccCharacter.value = s.closedCaptions.character;
+      host.append(delims, sField("Caption character", ccCharacter, sNote("settings-fieldnote", "A cast member whose whole lines are captions. The default is ", code("SFX"), ".")));
+      Object.assign(live, { ccOpen, ccClose, ccCharacter });
+      return {};
+    } },
+    { id: "dictionary", label: "Dictionary", mount: (host): SettingsSectionHandle => {
+      const { s, dictionaries } = settingsRead!;
+      const dictHost = el("div"); host.append(dictHost);
+      // Dictionary tab (#177): the available dictionaries (built-ins + imports) drive the picker; Import / Remove
+      // route through the main process.
+      live.dictionary = mountDictionary(dictHost, {
+        language: s.dictionaryLanguage, words: s.dictionaryWords, ignore: s.dictionaryIgnore, enabled: s.dictionaryEnabled,
+        dictionaries,
+        onImport: () => window.patter.importDictionary(),
+        onRemove: (id) => window.patter.removeDictionary(id),
+      });
+      return {};
+    } },
+    { id: "language", label: "Language", group: "Localisation", mount: (host): SettingsSectionHandle => {
+      const { s } = settingsRead!;
+      host.append(sNote("settings-note", "The default language is the one you write in. The others are translation targets."));
+      const langHost = el("div"); host.append(langHost);
+      live.langs = mountLanguages(langHost, { localeDefault: s.localeDefault, locales: s.locales });
+      return {};
+    } },
+  ],
+  onSave: () => saveSettingsFromDialog(),
+});
+
+/** File > Project Settings: read the project-level settings, open the dialog on a tab (General by default;
+ *  the coverage window's "World Properties…" and a `@world` pill's "Go to definition" open "world"). */
 async function openProjectSettings(initialTab = "general"): Promise<void> {
   if (!project) return; // nothing open
   const s = await window.patter.readSettings();
   if (!s) return;
-  setNameInput.value = s.name;
-  // Start scene picker: "(unset)" plus every scene; select the project's current start.
-  setStartSel.replaceChildren(new Option("(unset)", ""));
-  for (const sc of project.scenes) setStartSel.append(new Option(sc.name, sc.id));
-  setStartSel.value = s.start?.scene ?? "";
-  setVcsSel.value = s.vcs;
-  setVoicedInput.checked = s.voiced;
-  syncAudioSettingsTab(); // gate the Audio tab on the project's Voiced state (#206)
-  setFormattingInput.checked = s.formatting;
-  setAutosaveInput.checked = s.autosave;
-  setAutoRebuildInput.checked = s.autoRebuild;
-  setCcOpenInput.value = s.closedCaptions.open;
-  setCcCloseInput.value = s.closedCaptions.close;
-  setCcCharacterInput.value = s.closedCaptions.character;
-  syncCcDelimWarn();
-  setBuildInput.value = s.buildBundle;
-  setBuildLocalesSel.value = s.buildLocalisation;
-  setBuildSourceDebug.checked = s.buildSourceDebug;
-  syncBuildLocaleRows();
-  // Language / Game Data / Properties / Cast tabs: mount each editor with the project's current data.
-  const langs = mountLanguages(setLanguagesHost, { localeDefault: s.localeDefault, locales: s.locales });
-  const gd = mountGameDataFields(setGameDataHost, s.gameDataFields);
-  const world = mountWorld(setWorldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers() });
-  const cast = mountCast(setCastHost, s.cast);
-  const writingStatus = mountWritingStatus(setWritingStatusHost, s.writingStatuses);
-  const estimating = mountEstimating(setEstimatingHost, s.estimating, s.writingStatuses);
-  const audio = mountAudio(setRecordingStatusHost, { trackAudioStatus: s.trackAudioStatus, statuses: s.recordingStatuses, audioFolders: s.audioFolders, audioRoot: s.audioRoot, scratchStatus: s.scratchStatus });
-  // Dictionary tab (#177): the available dictionaries (built-ins + imports) drive the picker; Import / Remove
-  // route through the main process.
-  const dictionary = mountDictionary(setDictionaryHost, {
-    language: s.dictionaryLanguage, words: s.dictionaryWords, ignore: s.dictionaryIgnore, enabled: s.dictionaryEnabled,
-    dictionaries: await window.patter.listDictionaries(),
-    onImport: () => window.patter.importDictionary(),
-    onRemove: (id) => window.patter.removeDictionary(id),
+  settingsRead = { s, dictionaries: await window.patter.listDictionaries() };
+  live = {};
+  settingsDlg.open(initialTab);
+  if (initialTab === "general") setTimeout(() => live.name?.focus(), 0);
+}
+
+/** Save is clicked and every section's gate passed: read the sections back and persist. */
+async function saveSettingsFromDialog(): Promise<void> {
+  const read = settingsRead;
+  const l = live as LiveSettings; // every section mounted on open(), so every handle is set
+  if (!read || !l.name) return;
+  await saveProjectSettings({
+    name: l.name.value.trim(), vcs: l.vcs.value as VcsKind, ...(l.start.value ? { start: { scene: l.start.value } } : {}),
+    voiced: l.voiced.checked, formatting: l.formatting.checked, autosave: l.autosave.checked,
+    autoRebuild: l.autoRebuild.checked,
+    closedCaptions: { open: l.ccOpen.value, close: l.ccClose.value, character: l.ccCharacter.value.trim() },
+    buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
+    ...l.langs.value(), gameDataFields: l.gd.value(),
+    properties: read.s.properties, // @patter lives in the Properties document now; pass the current set through untouched
+    ...l.world.value(), cast: l.cast.value(),
+    writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
+    ...l.dictionary.value(),
   });
-  const showTab = (tab: string): void => {
-    for (const t of settingsDialogEl.querySelectorAll<HTMLElement>(".settings-tab")) t.classList.toggle("active", t.dataset["tab"] === tab);
-    for (const p of settingsDialogEl.querySelectorAll<HTMLElement>(".settings-panel")) p.hidden = p.dataset["panel"] !== tab;
-  };
-  // Open on the requested tab (General by default; the coverage window's "World Properties…" opens "world").
-  showTab(initialTab);
-  // Duplicate-name gate: two entries sharing a name in Properties / Game Data / Cast / World Properties is a data
-  // hazard, so block the Save submit, jump to the offending tab, and focus the clashing (red) field.
-  const settingsForm = settingsDialogEl.querySelector("form")!;
-  const setErrorEl = $("set-error"); setErrorEl.hidden = true;
-  const dupTabs: Array<[string, { firstDuplicate(): HTMLInputElement | null }]> = [["gamedata", gd], ["cast", cast], ["world", world]];
-  // Only the two editors that declare PROPERTIES carry the name rule: game-data fields and cast
-  // members are not referenced by expressions, so they are not held to the expression grammar.
-  const nameTabs: Array<[string, { firstIllegalName(): HTMLInputElement | null }]> = [["world", world]];
-  const onSubmit = (e: Event): void => {
-    for (const [tab, h] of dupTabs) {
-      const bad = h.firstDuplicate();
-      if (!bad) continue;
-      e.preventDefault(); // keep the dialog open
-      showTab(tab);
-      setErrorEl.textContent = "Two entries share a name. Names must be unique."; setErrorEl.hidden = false;
-      setTimeout(() => { bad.scrollIntoView({ block: "nearest" }); bad.focus(); }, 0);
-      return;
-    }
-    // Illegal-name gate: a declared property whose name no expression can reach (a hyphen reads as
-    // subtraction, a leading digit or a keyword will not parse, a capital is folded away). Saving one
-    // writes a declaration nothing can refer to, so it is blocked the same way a duplicate is - and the
-    // field's own rollover says which fault it is, so the bar repeats it rather than inventing a summary.
-    for (const [tab, h] of nameTabs) {
-      const bad = h.firstIllegalName();
-      if (!bad) continue;
-      e.preventDefault();
-      showTab(tab);
-      setErrorEl.textContent = bad.title || "That property name cannot be used in an expression.";
-      setErrorEl.hidden = false;
-      setTimeout(() => { bad.scrollIntoView({ block: "nearest" }); bad.focus(); }, 0);
-      return;
-    }
-  };
-  settingsForm.addEventListener("submit", onSubmit);
-  // Enter in any field must NOT implicitly submit (and close) the settings dialog - it should just accept the
-  // value and stay. Only the explicit Save button submits; a textarea keeps its newline.
-  const onKeydown = (e: KeyboardEvent): void => {
-    if (e.key !== "Enter" || e.isComposing) return;
-    const tag = (e.target as HTMLElement).tagName;
-    if (tag === "TEXTAREA" || tag === "BUTTON") return;
-    e.preventDefault();
-  };
-  settingsForm.addEventListener("keydown", onKeydown);
-  const onClose = (): void => {
-    settingsDialogEl.removeEventListener("close", onClose);
-    settingsForm.removeEventListener("submit", onSubmit);
-    settingsForm.removeEventListener("keydown", onKeydown);
-    if (settingsDialogEl.returnValue !== "save") return;
-    const name = setNameInput.value.trim();
-    if (!name) return; // name is required; a blank submit is treated as a cancel
-    void saveProjectSettings({
-      name, vcs: setVcsSel.value as VcsKind, ...(setStartSel.value ? { start: { scene: setStartSel.value } } : {}),
-      voiced: setVoicedInput.checked, formatting: setFormattingInput.checked, autosave: setAutosaveInput.checked,
-      autoRebuild: setAutoRebuildInput.checked,
-      closedCaptions: { open: setCcOpenInput.value, close: setCcCloseInput.value, character: setCcCharacterInput.value.trim() },
-      buildBundle: setBuildInput.value.trim(), buildLocalisation: setBuildLocalesSel.value as "embedded" | "ids", buildSourceDebug: setBuildSourceDebug.checked,
-      ...langs.value(), gameDataFields: gd.value(),
-      properties: s.properties, // @patter lives in the Properties document now; pass the current set through untouched
-      ...world.value(), cast: cast.value(),
-      writingStatuses: writingStatus.value(), estimating: estimating.value(), ...audio.value(),
-      ...dictionary.value(),
-    });
-  };
-  settingsDialogEl.addEventListener("close", onClose);
-  settingsDialogEl.showModal();
-  setTimeout(() => setNameInput.focus(), 0);
 }
 
 async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
@@ -2657,40 +2665,23 @@ function ensureIdentity(current: Identity | null): Promise<void> {
   return current ? Promise.resolve() : showIdentityDialog(null, "welcome");
 }
 
-// The identity dialog in one of two modes: "welcome" (first run) or "edit" (File / app menu ▸ User
-// Information, prefilled). Name is optional; on close we refresh the local author name used to stamp new
-// comments. A blank name is defaulted by main (the OS user name); cancelling in edit mode changes nothing.
+// The identity ask is the shell's `askIdentity` (ui-review-2026-09, finding 7), in one of two modes:
+// "welcome" (first run) or "edit" (File / app menu ▸ User Information, prefilled). On close we refresh the
+// local author name used to stamp new comments. A skip on first run stores a blank name so the app does
+// not ask again (main defaults it to the OS user name); a skip in edit mode changes nothing.
 async function showIdentityDialog(current: Identity | null, mode: "welcome" | "edit"): Promise<void> {
   // Offer the VCS's name when we have nothing of our own. The badge in the corner of this same window
   // already says "Locked by bob@bob-ws", so the app has had a name in reach the whole time it was asking
   // for one, and an empty box is a poor first impression. Filled in as a VALUE rather than a placeholder
-  // so that pressing Continue accepts it; it is still the person's to type over, and skipping still works.
+  // so that pressing Enter accepts it; it is still the person's to type over, and skipping still works.
   const suggested = current?.name ? null : await window.patter.suggestIdentity();
-  (identityDialog.querySelector(".identity-title") as HTMLElement).textContent = mode === "welcome" ? "Welcome to Patterpad" : "User information";
-  (identityDialog.querySelector(".identity-sub") as HTMLElement).textContent =
-    "Your name tags your edits and signs your review comments. Leave it blank to use your computer's user name. You can change it any time from the menu.";
-  $<HTMLButtonElement>("identity-save").textContent = mode === "welcome" ? "Continue" : "Save";
-  nameInput.value = current?.name ?? suggested ?? "";
-  emailInput.value = current?.email ?? "";
-  identityDialog.returnValue = "";
-  return new Promise((resolve) => {
-    const onClose = (): void => {
-      identityDialog.removeEventListener("close", onClose);
-      void (async () => {
-        if (identityDialog.returnValue === "save") {
-          const name = nameInput.value.trim();
-          const email = emailInput.value.trim();
-          await window.patter.setIdentity({ name, ...(email ? { email } : {}) });
-        } else if (mode === "welcome") {
-          await window.patter.setIdentity({ name: "" }); // skipped: store the default so we don't re-prompt
-        }
-        authorName = (await window.patter.getIdentity())?.name ?? authorName;
-        resolve();
-      })();
-    };
-    identityDialog.addEventListener("close", onClose);
-    identityDialog.showModal();
+  const answer = await askIdentity({
+    ...(current ? { current } : {}),
+    ...(suggested ? { suggested: { name: suggested } } : {}),
   });
+  if (answer) await window.patter.setIdentity(answer);
+  else if (mode === "welcome") await window.patter.setIdentity({ name: "" }); // skipped: store the default so we don't re-prompt
+  authorName = (await window.patter.getIdentity())?.name ?? authorName;
 }
 
 // --- boot --------------------------------------------------------------------
@@ -2707,20 +2698,11 @@ function signalReady(): void {
   window.patter.appReady();
 }
 
-/**
- * "Go to definition" lands on the declaration's ROW, not only on the page it lives on
- * (from-storylets/go-to-definition-lands-on-the-row): open its details, centre it, light it. The reveal is
- * app-shell's revealRow; asking again is ours, because only we know what fills in on its own time, so a
- * row not there yet is tried on the next frames and then given up on quietly.
- *
- * The search is scoped to the page the jump opened, never the whole document. The same name can be
- * declared at @patter AND @scene, and the Properties page keeps its rows while it is hidden, so a
- * document-wide search could light a row on a page nobody is looking at and report success.
- */
-function landOn(within: HTMLElement, name: string, tries = 12): void {
-  if (revealRow(within, name) || tries <= 0) return;
-  requestAnimationFrame(() => landOn(within, name, tries - 1));
-}
+// "Go to definition" lands on the declaration's ROW, not only on the page it lives on
+// (from-storylets/go-to-definition-lands-on-the-row): the shell's `revealRowWhenReady` opens its details,
+// centres it and lights it, asking again over the next frames for a page that fills in on its own time.
+// The search is scoped to the page the jump opened, never the whole document: the same name can be
+// declared at @patter AND @scene, and the Properties page keeps its rows while it is hidden.
 
 async function boot(): Promise<void> {
   // The family's tooltip controller (one delegated listener over the whole
@@ -2735,16 +2717,15 @@ async function boot(): Promise<void> {
   setPropertyActions(({ scope, name }) => {
     const ref = scope === "patter" ? `@${name}` : `@${scope}.${name}`;
     const go: PropertyAction | null =
-      scope === "patter" ? { label: "Go to definition", run: () => void showPropertiesDoc().then(() => landOn(propsDocHostEl, name)) }
-      : scope === "scene" ? { label: "Go to definition", run: () => { openSceneProps(); landOn(spHost, name); } }
-      : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world").then(() => landOn(setWorldHost, name)) }
+      scope === "patter" ? { label: "Go to definition", run: () => void showPropertiesDoc().then(() => revealRowWhenReady(propsDocHostEl, name)) }
+      : scope === "scene" ? { label: "Go to definition", run: () => { openSceneProps(); void revealRowWhenReady(spHost, name); } }
+      : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world").then(() => { if (live.worldHost) void revealRowWhenReady(live.worldHost, name); }) }
       : null;
     return [...(go ? [go] : []), { label: "Find usages", run: () => openPropertyUsage(ref) }];
   });
   // No autosave timer: the controller runs its own clock off the edits themselves.
   window.addEventListener("beforeunload", flushRemember); // closing mid-debounce still records caret + scene
-  const state = await window.patter.boot();
-  panes = state.panes; // restore the remembered slide/pin state
+  const state = bootState; // read at the top of the module, before the frame was built
   docHidden = new Set(panes.docHidden ?? []); // restore the remembered documentation-class visibility
   lineStatusShown = panes.lineStatusShown ?? []; // restore the remembered Line-Status shown set (default none)
   // Review-session toggles ALWAYS start off - they are not remembered (main also resets them on disk at
@@ -2765,8 +2746,6 @@ $<HTMLButtonElement>("welcome-new").addEventListener("click", () => void createD
 // The tour is a download rather than something the app carries, so this opens the page that
 // offers it - the same allow-listed external route the About box uses.
 $<HTMLButtonElement>("welcome-tour").addEventListener("click", () => window.patter.openExternal("https://patterkit.dev/download/#something-to-open"));
-toggleNavEl.addEventListener("click", () => togglePane("nav"));
-toggleInspectorEl.addEventListener("click", () => togglePane("inspector"));
 // The project name is the way back to the project overview (#3a) - a no-op on the welcome screen.
 projectNameEl.addEventListener("click", () => { if (project && overviewEl.hidden) void showOverview(); });
 projectNameEl.style.cursor = "pointer";
