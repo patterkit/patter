@@ -10,7 +10,7 @@
 //    renders half a picture followed by a paragraph of loose label text.
 //
 // 2. THE HOUSE STYLE (design/copy-house-style.md in patterkit, mirrored as
-//    website/STYLE.md here). The rules that are cheap to hold mechanically and
+//    design/copy-house-style.md in the private patterkit repo). The rules that are cheap to hold mechanically and
 //    that creep back silently:
 //      - rule 3: no em-dash, no en-dash, and no spaced hyphen " - " standing in
 //        for either, in prose;
