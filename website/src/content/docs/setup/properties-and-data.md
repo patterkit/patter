@@ -5,12 +5,13 @@ sidebar:
   label: Properties and game data
 ---
 
-Two kinds of data flow through a Patter story, and as the project lead you define both:
+Two kinds of data flow through a Patter story, and as the project lead you define both.
 
-- **Properties**: variables the *story* reads and writes (gold, reputation, whether the player
-  knows a secret). Writers test and set these in conditions and effects.
-- **Game Data**: values the *game* reads back off each beat (an emotion, a camera angle,
-  a sound-effect id) to drive how it's presented.
+Properties are the variables the *story* reads and writes (gold, reputation, whether the player
+knows a secret). Writers test and set these in conditions and effects.
+
+Game Data is the values the *game* reads back off each beat (an emotion, a camera angle, a
+sound-effect id) to drive how it's presented.
 
 This page is the setup side. Writers see the same features from their side in
 [Conditions, effects & data](/patterpad/conditions-and-data/); the format-level model is

@@ -17,15 +17,16 @@ cues, but it never parses or rewrites these tags, it hands them to you verbatim.
 job**, because every engine's rich-text system differs (Unity TextMeshPro `<b>`, Godot BBCode `[b]`,
 Unreal decorators, HTML `<b>`…). Map Patter's three tags to whatever your renderer wants.
 
-Two deliberate rules make this safe and predictable:
+Two deliberate rules make this safe and predictable.
 
-- **No entity encoding.** Patter never emits `&amp;`, `&lt;`, or `&gt;`: a literal `&`, `<`, or `>` in
-  the writer's text reaches you as exactly that character. If your renderer needs those escaped (an HTML
-  view, for instance), **escape them yourself** at render time, the same way you would any user-facing
-  string.
-- **The vocabulary is fixed and flat** (no nesting, no attributes), so a small replace or a three-pattern
-  regex is enough; a `<` only ever means a tag when it forms a complete `<b>…</b>` / `<i>…</i>` /
-  `<bi>…</bi>` pair.
+There's no entity encoding. Patter never emits `&amp;`, `&lt;`, or `&gt;`, so a literal `&`, `<`, or
+`>` in the writer's text reaches you as exactly that character. If your renderer needs those escaped
+(an HTML view, for instance), escape them yourself at render time, the same way you would any
+user-facing string.
+
+The vocabulary is fixed and flat, with no nesting and no attributes, so a small replace or a
+three-pattern regex is enough. A `<` only ever means a tag when it forms a complete `<b>…</b>` /
+`<i>…</i>` / `<bi>…</bi>` pair.
 
 If formatting is **off** for the project, lines are plain text with no tags at all. See
 [the writing surface](/patterpad/writing-surface/) for how a writer applies bold and italic.

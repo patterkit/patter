@@ -17,11 +17,10 @@ clobbered. [The format](/format/overview/) describes every file.
 ## Scenes, blocks, and beats
 
 The story is a shallow tree. A **scene** holds **blocks**, a block holds **snippets** (and
-**groups** that wrap them), and a snippet is a run of **beats**. A beat is one of three kinds:
-
-- **line**: a character speaks (a cue + the line).
-- **text**: narration the player reads.
-- **game event**: a host-facing cue with no spoken text (play a sound, move the camera).
+**groups** that wrap them), and a snippet is a run of **beats**. A beat is one of three kinds.
+In a `line` a character speaks, with a cue and the line. A `text` beat is narration the player
+reads. A game event is a host-facing cue with no spoken text, such as playing a sound or
+moving the camera.
 
 Flow moves by **jumps** (a one-way `jump`, or a `call` that detours and returns) and by
 **choices**. [Scenes, blocks & beats](/format/structure/) has the detail.

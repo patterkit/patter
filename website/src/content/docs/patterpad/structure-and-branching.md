@@ -15,38 +15,42 @@ without ever asking you to wire up a flow chart. You change the structure throug
 Every snippet and group has a quiet **⋯** button at its top-right, and
 **right-clicking** anywhere on it opens the same menu. It holds the structural moves:
 
-- **Follow with ▸**: add something after this piece, a Snippet, a Branch, a Choice, or
-  a Sequence in one of its ready-made shapes (**Once each**, **Cycle**, **Shuffle**, or
+- Use **Follow with ▸** to add something after this piece, a Snippet, a Branch, a Choice,
+  or a Sequence in one of its ready-made shapes (**Once each**, **Cycle**, **Shuffle**, or
   **Best match**).
-- **Wrap in ▸**: wrap this piece (or several you've selected) in a Branch, a Choice, or
-  a Sequence (**Once each**, **Cycle**, **Shuffle**, or **Best match**).
-- **Add option**: on a choice (the same as the inline **"+ option"** control).
-- **Ungroup**: undo a group, so its contents move up a level.
-- **Split here / Join with previous / Join with next**: for snippets, shown only when
-  they make sense.
-- **Duplicate**: copy this piece *and everything inside it* in just after itself. Also on
-  **Edit ▸ Duplicate** (`⌘D`), which copies whatever you have selected, or the piece the
-  cursor is in. See below.
-- **Delete**: remove the piece (with a quick confirm unless it's already empty).
+- Use **Wrap in ▸** to wrap this piece (or several you've selected) in a Branch, a Choice,
+  or a Sequence (**Once each**, **Cycle**, **Shuffle**, or **Best match**).
+- On a choice, **Add option** does the same job as the inline **"+ option"** control.
+- Choose **Ungroup** to undo a group, so its contents move up a level.
+- For snippets, **Split here**, **Join with previous**, and **Join with next** appear only
+  when they make sense.
+- Reach for **Duplicate** to copy this piece *and everything inside it* in just after
+  itself, as described below.
+- Finish with **Delete**, which removes the piece (with a quick confirm unless it's already
+  empty).
 
 All of it is undoable.
 
 ### Duplicating a piece
 
 **Duplicate** copies a whole snippet, group, option, or **block** along with its contents,
-dropping the copy in right after the original. It is the quick way to make a variant: build
-one option the way you want it, duplicate it, and reword the copy.
+dropping the copy in right after the original. It is the quick way to make a variant. Build
+one option the way you want it, duplicate it, and reword the copy. It's also on
+**Edit ▸ Duplicate** (`⌘D`), which copies whatever you have selected, or the piece the
+cursor is in.
 
-The copy is a genuinely separate piece, never a shadow of the original:
+The copy is a genuinely separate piece, never a shadow of the original.
 
-- Every line in it gets its **own identity**, so editing the copy never changes the original
-  (identities are what the text, the recordings and the translations hang off).
-- The **text comes with it**, so you start from what you had rather than a blank.
-- **Writing status** and any **notes** come across too, since the copy is at the same stage
-  of drafting. **Review comments** don't: a comment is a conversation about the original
-  line. **Recording status** doesn't either, because the copy has no recording yet.
-- Duplicating a **block** also names the copy `<name> copy` (then `copy 2`, and so on) and
-  lets it take a fresh address, since two blocks in a scene can't share one.
+Every line in it gets its **own identity**, so editing the copy never changes the original
+(identities are what the text, the recordings and the translations hang off). The text comes
+with it, so you start from what you had rather than a blank.
+
+**Writing status** and any **notes** come across too, since the copy is at the same stage of
+drafting. **Review comments** don't, because a comment is a conversation about the original
+line. **Recording status** doesn't either, because the copy has no recording yet.
+
+Duplicating a **block** also names the copy `<name> copy` (then `copy 2`, and so on) and
+lets it take a fresh address, since two blocks in a scene can't share one.
 
 ## Choices and options
 
@@ -134,16 +138,15 @@ Give such a choice a fallback option, or one unconditional option, to guarantee 
 ## Selectors: how a group picks
 
 Any group has a **selector** (set in the inspector) that decides which of the things
-inside it play:
+inside it play.
 
-- **Run** (the default). Play everything eligible, in order.
-- **Branch**: play only the first eligible item. This is your if / else-if / else,
-  just conditions on an ordered list.
-- **Sequence**: a picker with a memory and two dials:
-  - **Order**: *In order* or *Shuffle* (shuffle never repeats a line right after
-    itself, and works through them all before reshuffling);
-  - **Exhaust**: *Play once*, *Repeat*, or *Stick on last*.
-- **Choice**: offer everything inside as options and wait for the player.
+**Run** is the default, and plays everything eligible, in order. **Branch** plays only the
+first eligible item, which is your if / else-if / else, just conditions on an ordered list.
+**Choice** offers everything inside as options and waits for the player.
+
+**Sequence** is a picker with a memory and two dials. Its **Order** is *In order* or
+*Shuffle*, and shuffle never repeats a line right after itself, and works through them all
+before reshuffling. Its **Exhaust** is *Play once*, *Repeat*, or *Stick on last*.
 
 Those two Sequence dials cover the everyday patterns: "say each line once", "cycle
 forever", "random with no instant repeat", "stop on the last line". You can also
@@ -166,12 +169,12 @@ any combination you like. The preset is just a starting point.
 
 A snippet can end with a **jump** to a scene, a block, or `END`. Open the jump row in
 the inspector and type to find any scene or block in the project (plus END). Once it's
-set, a small **jump / call** toggle sits beside it, so you choose how it behaves:
+set, a small **jump / call** toggle sits beside it, so you choose how it behaves.
 
-- **↪ jump**: head there and don't come back (the default).
-- **⤳ call**: head there, and when it finishes, come back and carry on where you left
-  off. Handy for a bit of story you want to reuse from several places (a shared aside, a
-  recurring bit of business), without copying it.
+A **↪ jump** heads there and doesn't come back, and that's the default. A **⤳ call** heads
+there, and when it finishes, comes back and carries on where you left off. That's handy for
+a bit of story you want to reuse from several places (a shared aside, a recurring bit of
+business), without copying it.
 
 The chip on the page shows the mode too, so you can tell a one-way `↪` from a returning
 `⤳` as you read. Renaming a scene or block never breaks a jump that points at it. A

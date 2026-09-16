@@ -80,13 +80,14 @@ Passing `"END"` as the scene ends the flow.
 - the **call stack is replaced**, so if the story had been "called" and owed a return, that return is
   dropped, just as an authored jump would drop it.
 
-Two things follow from it being a *game* action rather than a written one:
+Two things follow from it being a *game* action rather than a written one.
 
-- **It happens immediately.** If a snippet was part-way through being delivered, its remaining lines
-  are not played, and a choice waiting for the player is dropped. Interrupting is usually what you
-  want; if it is not, finish reading the current content before you move.
-- **It moves, it does not reset.** Variation, visit counts and properties all carry on. A flow that
-  had run out of content resumes at the new address.
+It happens immediately. If a snippet was part-way through being delivered, its remaining lines are
+not played, and a choice waiting for the player is dropped. Interrupting is usually what you want;
+if it is not, finish reading the current content before you move.
+
+It moves, it does not reset. Variation, visit counts, and properties all carry on. A flow that had
+run out of content resumes at the new address.
 
 ## Per engine
 

@@ -27,13 +27,14 @@ stays clean.
 | **`.patterx`** | all volatile **authoring metadata**: comments, documentation notes, writing/recording status, the edit trail, cut markers, estimates, suggestions | Stripped at export. Merges by union of ids. |
 | **`.patterproj`** | project **settings**: cast, properties, Game Data schema, status ladders, locales, VCS kind | The thing the editor "opens." Found by walking up the directory tree. |
 
-Two things follow from this that are worth knowing:
+Two things follow from this that are worth knowing.
 
-- **Strings are keyed by a stable beat id**, not by position or content, so
-  moving or renaming a line never orphans a translation.
-- **The committed source carries nothing compiled**: no parse trees, no indexes, no
-  caches. Anything derived is computed when the project loads, or written to a
-  git-ignored build file. That's what keeps diffs readable and merges safe.
+Strings are keyed by a stable beat id, not by position or content, so moving or renaming a
+line never orphans a translation.
+
+The committed source carries nothing compiled, so there are no parse trees, no indexes, and
+no caches. Anything derived is computed when the project loads, or written to a git-ignored
+build file. That's what keeps diffs readable and merges safe.
 
 Files are UTF-8 with LF line endings; the source form is JSON with comments and
 trailing commas allowed (`patter validate` enforces the encoding, `patter format`
@@ -66,14 +67,16 @@ point: it says "this is a delivery, not the canonical files." `patter unpack
 
 ## Why it's shaped this way
 
-- **Nothing proprietary.** Your narrative is text files you can read, diff, and search with
-  anything; you author them in Patterpad or through the CLI.
-- **VCS-native**: per-scene shards and a stable, line-oriented file form mean a
-  normal 3-way text merge works in any VCS, with
-  [`patter merge`](/setup/version-control/#how-merges-work) as an id-aware
-  upgrade when you want it.
-- **Survivable**: because nothing derived is committed, even a messy merge can't
-  corrupt a hidden cache; the source on disk is always the whole truth.
+Nothing here is proprietary. Your narrative is text files you can read, diff, and search
+with anything, and you author them in Patterpad or through the CLI.
+
+The shape is VCS-native. Per-scene shards and a stable, line-oriented file form mean a
+normal 3-way text merge works in any VCS, with
+[`patter merge`](/setup/version-control/#how-merges-work) as an id-aware upgrade when you
+want it.
+
+It is also survivable. Because nothing derived is committed, even a messy merge can't
+corrupt a hidden cache, and the source on disk is always the whole truth.
 
 ### A note on audio
 

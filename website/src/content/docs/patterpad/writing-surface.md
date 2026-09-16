@@ -82,7 +82,7 @@ Beyond the usual arrows and clicks, two things are worth knowing:
 
 - The **left and right arrows** walk through a line a piece at a time, name, direction,
   words, and carry on to the next line at the end.
-- **Undo and redo** (`⌘Z` / `⇧⌘Z`) cover everything, including structural changes like
+- Undo and redo (`⌘Z` / `⇧⌘Z`) cover everything, including structural changes like
   splitting or reordering a snippet, so you can always step back cleanly.
 
 ## Building structure as you type
@@ -102,12 +102,12 @@ The full set of structural tools, choices, selectors, jumps, and the ⋯ menu, l
 
 You can grab whole snippets and groups, one or many:
 
-- **Shift-click** to select a range.
-- **⌘ / Ctrl-click** to add or remove one at a time (so you can pick, say, the first,
-  second, and fourth).
+- Hold **Shift** and click to select a range.
+- Hold **⌘ / Ctrl** and click to add or remove one at a time (so you can pick, say, the
+  first, second, and fourth).
 - Click the **empty background** to clear the selection.
-- With something selected, **⌫** deletes it (with a quick confirm), and
-  **right-click ▸ Wrap in** groups it.
+- With something selected, press **⌫** to delete it (with a quick confirm), or use
+  **right-click ▸ Wrap in** to group it.
 
 To **reorder**, grab the **⠿** grip on the left and drag a snippet, group, or block; the
 page opens a gap to show where it will land, and **Esc** cancels mid-drag. Dragging an

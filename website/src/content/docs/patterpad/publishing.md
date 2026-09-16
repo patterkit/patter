@@ -37,13 +37,16 @@ server. Anyone you give it to double-clicks it and plays, on a laptop or a phone
 memory, and branching working exactly as they did in your Play window. Players get a Restart,
 and their place is saved in that browser.
 
-Ways to get it to people:
+There are a few ways to get it to people.
 
-- **Send it.** Email it, drop it in a shared folder, attach it to a message. It's one file.
-- **Put it on itch.io.** Name the file `index.html`, zip it, and upload the zip as an HTML
-  game. That's the whole process, and itch is the natural home for exactly this kind of work.
-- **Host it anywhere that serves files.** Neocities, GitHub Pages, or any web space you
-  already have. Upload the file and share the link.
+Send it. Email it, drop it in a shared folder, attach it to a message. It's one file.
+
+Put it on itch.io. Name the file `index.html`, zip it, and upload the zip as an HTML
+game. That's the whole process, and itch is the natural home for exactly this kind of
+work.
+
+Host it anywhere that serves files, on Neocities, GitHub Pages, or any web space you
+already have. Upload the file and share the link.
 
 Two details worth knowing. It plays in your **source language**, and it's a text-first page (your
 game's audio pipeline isn't part of it). The full reference is in

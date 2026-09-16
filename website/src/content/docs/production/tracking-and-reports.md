@@ -39,36 +39,39 @@ its own page: [Coverage testing](/production/coverage-testing/).
 
 ## Production reports and exports
 
-The **Production** menu turns the project into the artifacts other people need:
+The **Production** menu turns the project into the artifacts other people need.
 
-- **Production Information…** A report you can read but not edit, with word and line counts,
-  writing status by beat and by scene, branching, recording coverage (when
-  [audio tracking](/production/audio/#recording-status) is on), and a lines-to-write
-  burndown. Turn on [Estimating](#estimating) to size unwritten scenes by a guess instead of
-  their placeholder lines.
-- **Export Production Info…** That same report as an `.xlsx` spreadsheet.
-- **Export Voice Script…** A recording script for voice actors, either every voiced line or
-  only those marked ready to record. Once takes come back, drop them into folders by status
-  and Patterpad reads each line's recording status from the files, as
-  [Audio & recording](/production/audio/#recording-status) describes.
-- **Export / Import Localisation…** Hand your text out for translation and fold it back in.
-  It's covered under [Projects & settings](/patterpad/projects-and-settings/) and
-  [Localisation](/production/localisation/).
+Open **Production Information…** for a report you can read but not edit, with word and line counts,
+writing status by beat and by scene, branching, recording coverage (when
+[audio tracking](/production/audio/#recording-status) is on), and a lines-to-write burndown. Turn on
+[Estimating](#estimating) to size unwritten scenes by a guess instead of their placeholder lines.
+
+Choose **Export Production Info…** to write that same report as an `.xlsx` spreadsheet.
+
+Use **Export Voice Script…** for a recording script for voice actors, either every voiced line or
+only those marked ready to record. Once takes come back, drop them into folders by status and
+Patterpad reads each line's recording status from the files, as
+[Audio & recording](/production/audio/#recording-status) describes.
+
+Hand your text out for translation and fold it back in with **Export / Import Localisation…**. It's
+covered under [Projects & settings](/patterpad/projects-and-settings/) and
+[Localisation](/production/localisation/).
 
 <figure class="doc-shot">
   <img src="/doc-images/ProductionInfo.png" alt="The Production information report: headline cards for written lines, voiced lines, choices, ready to record and ready to ship, above coloured bar breakdowns of writing status, scene status and recording status, with an Export to spreadsheet button." />
   <figcaption>The Production Information report. Headline cards summarise written and voiced lines, choices, and how much has crossed the record / ship thresholds; the bars below break the project down by writing, scene, and recording status. <strong>Export to spreadsheet</strong> writes the same figures as <code>.xlsx</code>.</figcaption>
 </figure>
 
-The "share with anyone" outputs live in the **Publish** menu instead:
+The "share with anyone" outputs live in the **Publish** menu instead.
 
-- **Publish ▸ Publish Readable Script…** A screenplay of the whole story (dialogue, narration,
-  choices, jumps) as a **PDF** or **Word (.docx)**, the document to hand someone who just
-  wants to *read* it.
-  [Building & shipping](/setup/building-and-shipping/#a-readable-script-pdf--word) has the detail.
-- **Publish ▸ Publish Playable HTML…** A single `.html` file that *plays* the whole story in any
-  browser, offline, with nothing to install. Hand one file to a stakeholder, as
-  [Building & shipping](/setup/building-and-shipping/#a-playable-html-to-send-anyone) describes.
+Run **Publish ▸ Publish Readable Script…** for a screenplay of the whole story (dialogue,
+narration, choices, jumps) as a **PDF** or **Word (.docx)**, the document to hand someone who just
+wants to *read* it.
+[Building & shipping](/setup/building-and-shipping/#a-readable-script-pdf--word) has the detail.
+
+Run **Publish ▸ Publish Playable HTML…** for a single `.html` file that *plays* the whole story in
+any browser, offline, with nothing to install. Hand one file to a stakeholder, as
+[Building & shipping](/setup/building-and-shipping/#a-playable-html-to-send-anyone) describes.
 
 ## Estimating
 

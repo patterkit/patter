@@ -69,13 +69,13 @@ Every one of the four runtimes (JS, Unity, Unreal, Godot) has to pass the same s
 shared tests: a single, language-neutral `corpus.json` of hand-written cases that pin down the
 exact behaviour a conforming engine must reproduce. It covers:
 
-- **Expressions**: the evaluator, the Patter dialect (`random`, `flags`, `seen`, `visits`, …),
+- Expressions cover the evaluator, the Patter dialect (`random`, `flags`, `seen`, `visits`, …),
   and the seeded random-number generator, giving identical results on every engine.
-- **Playthroughs**: scenes, blocks, groups, selectors, sticky/fallback options, call/return,
-  conditions and effects, visit counts, `{@ref}` interpolation, and locale + character-name
+- Playthroughs cover scenes, blocks, groups, selectors, sticky/fallback options, call/return,
+  conditions and effects, visit counts, `{@ref}` interpolation, and locale and character-name
   resolution (including the `<Untranslated: {id}>` fallback).
-- **Scripted operations**: save/load round-trips, multiple flows, reset.
-- **Game Data**: filling in defaults as values are read.
+- Scripted operations cover save/load round-trips, multiple flows, and reset.
+- Game Data covers filling in defaults as values are read.
 
 Each port ships a small **test host** that replays the same `corpus.json` in its own language and
 checks it gets identical results. **Every port passes the full set of tests**: the JavaScript
@@ -84,13 +84,14 @@ reference, the C# (Unity) port on .NET, the C++ (Unreal) port under clang, and t
 
 ## Why this matters
 
-- **For you:** you ship on one engine, and this is what makes **your** engine trustworthy. It
-  plays the story exactly as Patterpad's preview and the reference runtime do, the same choices,
-  conditions, saves, right down to the random draws. What your writers saw in the editor is what
-  your players get: no "works in the editor, behaves differently on my engine" gap to chase.
-- **For a new engine:** adding a runtime is "build the engine, run the tests." If they pass,
-  it's conformant. The test suite is published as a versioned release asset, so a port author has
-  an exact target to hit.
+You ship on one engine, and this is what makes **your** engine trustworthy. It plays the story
+exactly as Patterpad's preview and the reference runtime do, the same choices, conditions, saves,
+right down to the random draws. What your writers saw in the editor is what your players get, with
+no "works in the editor, behaves differently on my engine" gap to chase.
+
+For a new engine, adding a runtime is "build the engine, run the tests." If they pass, it's
+conformant. The test suite is published as a versioned release asset, so a port author has an
+exact target to hit.
 
 It's not "should match." It's checked, case by case, and re-run on every release.
 

@@ -22,15 +22,16 @@ and the **pin** button keeps it on top. Close it with **✕** or **Escape**.
   <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Tags; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
 </figure>
 
-Type in the box and matches appear instantly. Search looks at:
+Type in the box and matches appear instantly. Search covers **dialogue and narration**, the words your
+characters say and the prose the player reads. It covers **scene and block titles**, and their
+**Game IDs** (the addresses your game uses).
 
-- **Dialogue and narration** the words your characters say and the prose the player reads.
-- **Scene and block titles**, and their **Game IDs** (the addresses your game uses).
-- The internal **id** of any line. Paste an id like `L_0n7vdq42` and search finds the line it names,
-  shown with its text and location. Handy when a [localisation](/production/localisation/) string, an
-  [audio](/production/audio/#recording-status) filename, a coverage report, or a runtime log
-  hands you an id and you need to see *which line* it is.
-  (See [the two IDs](/format/gamedata-and-addressing/#the-two-ids).)
+It covers the internal **id** of any line too. Paste an id like `L_0n7vdq42` and search finds the line
+it names, shown with its text and location. That's handy when a
+[localisation](/production/localisation/) string, an
+[audio](/production/audio/#recording-status) filename, a coverage report, or a runtime log
+hands you an id and you need to see *which line* it is.
+(See [the two IDs](/format/gamedata-and-addressing/#the-two-ids).)
 
 Results are **ranked around your cursor**: hits in the scene you're editing come first, starting from
 where your cursor sits, then the rest of that scene, then everywhere else, so the nearest matches are at
@@ -47,10 +48,8 @@ straight down a list of hits, checking each one in turn.
 
 Switch to the **Replace** tab (or press **⌘⌥F** / **Ctrl-H**) to find-and-replace across **every scene**,
 not just the open one. Type what to find, type the replacement, and the list previews each line as
-**before → after**. Then:
-
-- **Replace all** rewrites every match at once (it asks you to confirm the count first).
-- The **Replace** button on any row applies just that one.
+**before → after**. **Replace all** then rewrites every match at once, asking you to confirm the
+count first. The **Replace** button on any row applies just that one.
 
 Replace only ever touches **dialogue, narration, and choice text** in your source language. It never
 touches ids or Game IDs, conditions or effects, or your translations. Every change is written through

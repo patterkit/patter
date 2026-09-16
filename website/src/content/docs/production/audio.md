@@ -25,19 +25,22 @@ at the top of the **Audio Status** tab. The project also has to be
 Audio row shows in the inspector, and recording figures stay out of the production report and
 its spreadsheet.
 
-There are two ways to track it, chosen per project on the **Audio Status** tab:
+There are two ways to track it, chosen per project on the **Audio Status** tab.
 
-- **Manually** (the default). Select a line and pick its stage from the **Audio** dropdown in
-  the inspector, exactly like the Writing dropdown.
-- **Audio Folders**: turn on **Use Audio Folders** and set one **audio root** folder. Each stage
-  then gets its own subfolder under that root, named automatically from the stage (so `../audio`
-  gives `../audio/scratch/`, `../audio/recorded/`, `../audio/final/`) with the lowest "not recorded"
-  stage having none. Patterpad reads every line's recording status straight from the files. Drop a
-  line's `.wav` (or `.mp3`) into a stage's folder and the line takes that stage. If a line's audio
-  sits in more than one stage, the **most finished** one wins (a `recorded/` take beats a `scratch/`
-  one), and a line with no file anywhere reads as **missing**. The folders are watched live, so adding
-  or removing a file updates the status on its own. Here the inspector shows the status as a **chip**
-  you can't edit (it comes from the files) with a **▶ play button** next to any line that has a clip.
+Tracking it **manually** is the default. Select a line and pick its stage from the **Audio** dropdown
+in the inspector, exactly like the Writing dropdown.
+
+The other way is **Audio Folders**. Turn on **Use Audio Folders** and set one **audio root** folder.
+Each stage then gets its own subfolder under that root, named automatically from the stage (so
+`../audio` gives `../audio/scratch/`, `../audio/recorded/`, `../audio/final/`) with the lowest "not
+recorded" stage having none.
+
+Patterpad reads every line's recording status straight from the files. Drop a line's `.wav` (or
+`.mp3`) into a stage's folder and the line takes that stage. If a line's audio sits in more than one
+stage, the **most finished** one wins (a `recorded/` take beats a `scratch/` one), and a line with no
+file anywhere reads as **missing**. The folders are watched live, so adding or removing a file
+updates the status on its own. Here the inspector shows the status as a **chip** you can't edit (it
+comes from the files) with a **▶ play button** next to any line that has a clip.
 
 > Each audio file is named after the line's **id**, not its wording or where it sits, so
 > editing a line, moving it, or reordering it never loses track of its recording. To find a

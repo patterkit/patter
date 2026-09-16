@@ -19,20 +19,20 @@ the project, so "how much is drafted vs done, and what's left" is a number, not 
 
 - Writers set the ladder up on the [Writing status](/writing-status/) page; here it becomes the
   [rollup](/production/tracking-and-reports/#the-writing-status-rollup) and the reports.
-- **Burndown and estimating**: stub scenes with a couple of placeholder lines would read as almost
-  finished. Turn on Estimating to size them by a guess, so the "lines to write" burndown reflects the
-  real work ahead and the schedule is honest. See
+- Stub scenes with a couple of placeholder lines would read as almost finished, so turn on
+  Estimating to size them by a guess. The "lines to write" burndown then reflects the real work
+  ahead and the schedule is honest. See
   [Estimating](/production/tracking-and-reports/#estimating).
 
 ## Manage voice recording
 
 The whole VO pipeline lives in the app:
 
-- **Assign actors** to characters in the [Cast](/setup/cast/).
-- **Export a recording script** for the studio, either every voiced line or only those marked ready to
-  record: [Production reports and exports](/production/tracking-and-reports/#production-reports-and-exports)
+- Assign actors to characters in the [Cast](/setup/cast/).
+- Export a recording script for the studio, either every voiced line or only those marked ready to
+  record, from [Production reports and exports](/production/tracking-and-reports/#production-reports-and-exports)
   (or `patter voice-export` from the [CLI](/cli/)).
-- **Track takes** by dropping audio into per-status folders; Patter derives each line's recording
+- Track takes by dropping audio into per-status folders. Patter derives each line's recording
   status from the files, and flags a take as **out of date** when the line is edited after it was
   recorded, so you know exactly what needs a re-take. See
   [Recording status and audio](/production/audio/#recording-status).
@@ -56,7 +56,7 @@ to exercise world-gated branches. It is narrative QA you can gate a build on.
 
 ## Review and sign off
 
-- **Threaded comments** and **suggested rewrites** live on the nodes themselves, Word/Docs style, and a
+- Nodes carry **threaded comments** and **suggested rewrites**, Word/Docs style, and a
   **review walk** steps you through the open ones.
   See [Reviewing & feedback](/patterpad/reviewing/#threaded-comments).
 - The **Production Information** report (word and line counts, status bars, recording coverage,

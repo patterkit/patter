@@ -17,10 +17,10 @@ animation tracks.
 
 Both hang off the engine (build one from your bundle, then call these, no flow needed):
 
-- **`getOutline()`** returns the **nested tree**: scenes → blocks → children (groups *and* snippets,
-  groups preserved) → a snippet's beats. Use it to browse or mirror the authored structure, branches
-  and all.
-- **`getBeatSequence()`** returns the **flat, document-ordered** list of every beat, each with the
+- `getOutline()` returns the nested tree, running scenes → blocks → children (groups *and* snippets,
+  with groups preserved) → a snippet's beats. Use it to browse or mirror the authored structure,
+  branches and all.
+- `getBeatSequence()` returns the flat, document-ordered list of every beat, each with the
   `{ scene, block, snippet }` it belongs to. Use it to lay one thing per beat.
 
 Each beat carries the same data a played step would: `id`, `kind` (line / text / gameEvent),
@@ -81,9 +81,9 @@ for flat in engine.get_beat_sequence():
 Three more static reads answer "which characters are in this?", which is what a scene-loader, a VO
 pipeline, or a character-portrait pre-loader actually wants:
 
-- **`getCast()`** returns every cast member the **project declares**, in authored order.
-- **`castForScene(sceneRef)`** returns the speakers with a line anywhere in that scene.
-- **`castForBlock(sceneRef, blockRef)`** returns the same, scoped to one block.
+- `getCast()` returns every cast member the project declares, in authored order.
+- `castForScene(sceneRef)` returns the speakers with a line anywhere in that scene.
+- `castForBlock(sceneRef, blockRef)` returns the same, scoped to one block.
 
 All three return the **character token** (the `character` a line beat carries), not a display name.
 Scene and block refs may be an internal id **or** a [gameId address](/format/gamedata-and-addressing/),
@@ -122,10 +122,14 @@ through the active locale and follows [`setLocale`](/play/localisation/), which 
 
 ## Notes
 
-- **Read-only + static.** These reflect the compiled bundle, not a running flow. `gameData` is the
-  author's raw overrides (the same the step carries); merge with your defaults if you want the full set.
-- **Source locale.** `text` and `characterName` come from the source language; an IDs-only bundle has
-  no embedded text, so `text` is empty.
-- **Order.** Within a scene, blocks / nodes / beats are in authored order. Across scenes the order is
-  the bundle's scene order on most engines; the C++ (Unreal) engine iterates scenes by id. A branching
-  multi-scene story has no single linear order anyway, so key off the scene id when it matters.
+These reads are read-only and static, so they reflect the compiled bundle, not a running flow.
+`gameData` is the author's raw overrides (the same the step carries); merge with your defaults if
+you want the full set.
+
+Text comes from the source locale. `text` and `characterName` come from the source language, and an
+IDs-only bundle has no embedded text, so `text` is empty.
+
+Order is authored order. Within a scene, blocks / nodes / beats are in the order they were written.
+Across scenes the order is the bundle's scene order on most engines; the C++ (Unreal) engine iterates
+scenes by id. A branching multi-scene story has no single linear order anyway, so key off the scene
+id when it matters.

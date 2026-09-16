@@ -5,14 +5,15 @@ sidebar:
   label: Live Link
 ---
 
-One small localhost link between Patterpad and your running game buys you two things:
+One small localhost link between Patterpad and your running game buys you two things.
 
-- **Live refresh**: save in the editor and the running game **picks up the edit without
-  restarting**. Reword a line and the game speaks the new words the next time it comes up; even
-  restructured scenes carry the run across.
-- **Live debug**: the game streams its story cursor back, and Patterpad **follows it like a
-  debugger**. The current beat highlights, scenes switch as play crosses them, and you can see
-  which flow is where.
+Live refresh means you save in the editor and the running game picks up the edit without
+restarting. Reword a line and the game speaks the new words the next time it comes up; even
+restructured scenes carry the run across.
+
+Live debug means the game streams its story cursor back, and Patterpad follows it like a debugger.
+The current beat highlights, scenes switch as play crosses them, and you can see which flow is
+where.
 
 The debug half is **observe-only**, so the game stays in control and the editor is a passive mirror.
 The link is a **loopback-only** WebSocket (`127.0.0.1`), so only processes on your own machine
@@ -40,13 +41,15 @@ by the **Play ▸ Live Link** menu item, which is ticked while the link is on).
 
 The icon's **colour** is the state, and hovering it spells the status out:
 
-- **Grey**: off.
-- **Amber**: listening, waiting for a game.
-- **Green**: connected and **in sync** (the game is running this exact build, so beats highlight precisely).
-- **Red**: connected, but a **different build**. You've rebuilt or edited since the game launched, so
-  beat ids may not line up. The editor still follows scenes, but **rebuild and relaunch to re-sync** for
-  exact-beat highlighting. (A game wired for [live bundle refresh](#live-bundle-refresh)
-  re-syncs itself: saving in Patterpad pushes the new bundle straight into the running game.)
+- Grey is off.
+- Amber is listening, waiting for a game.
+- Green is connected and in sync, so the game is running this exact build and beats highlight precisely.
+- Red is connected, but running a different build.
+
+Red means you've rebuilt or edited since the game launched, so beat ids may not line up. The editor
+still follows scenes, but rebuild and relaunch to re-sync for exact-beat highlighting. A game wired
+for [live bundle refresh](#live-bundle-refresh) re-syncs itself, since saving in Patterpad pushes
+the new bundle straight into the running game.
 
 If more than one flow is live, a small **flow picker** appears next to the address to choose which one
 the playhead tracks.
@@ -61,8 +64,8 @@ fix on the next pass, with no rebuild, no restart, and no losing your place.
 
 Two tiers, picked automatically:
 
-- **Text-only edits** swap the string tables in place. Nothing restarts and no state is touched.
-- **Structural edits** carry the whole run across (a save and load behind the scenes). Position is re-found
+- Text-only edits swap the string tables in place. Nothing restarts and no state is touched.
+- Structural edits carry the whole run across (a save and load behind the scenes). Position is re-found
   by id, so lines inserted or reordered before the cursor neither replay nor shift where you are; an
   option you deleted drops out of an open choice; content deleted under the cursor is skipped and
   play continues from the nearest survivor.
@@ -87,19 +90,20 @@ const link = createDebugLink({
 });
 ```
 
-**Every engine receives the push.** The native wiring mirrors the JavaScript shape, adapted to
-each engine's threading:
+Every engine receives the push. The native wiring mirrors the JavaScript shape, adapted to each
+engine's threading.
 
-- **Unity**: drain the link from your `Update()` (the socket runs on a worker thread), then apply:
-  `if (_link.TryReceive(out var raw) && PatterLiveBundle.TryParsePush(raw, out var build, out var data))
-  { var r = PatterLiveBundle.Apply(_engine, _bundle, data); … _link.SetBuild(build); }`
-- **Unreal**: set `Link->OnBundle` (fires on the game thread); load with
-  `UPatterBundle::LoadFromString(Data)`, apply with `Engine->ApplyLiveBundle(NewBundle)` (the
-  engine object and every `UPatterFlow` handle swap **in place** and stay valid), then
-  `Link->SetBuild(Build)`.
-- **Godot**: connect the link's `bundle_pushed(build, data)` signal; apply with
-  `engine.apply_live_bundle(data)` (re-bind flow handles on a `"structure"` result), then
-  `link.set_build(build)`.
+In Unity, drain the link from your `Update()` (the socket runs on a worker thread), then apply
+`if (_link.TryReceive(out var raw) && PatterLiveBundle.TryParsePush(raw, out var build, out var data))
+{ var r = PatterLiveBundle.Apply(_engine, _bundle, data); … _link.SetBuild(build); }`.
+
+In Unreal, set `Link->OnBundle`, which fires on the game thread. Load with
+`UPatterBundle::LoadFromString(Data)`, apply with `Engine->ApplyLiveBundle(NewBundle)` (the engine
+object and every `UPatterFlow` handle swap in place and stay valid), then `Link->SetBuild(Build)`.
+
+In Godot, connect the link's `bundle_pushed(build, data)` signal. Apply with
+`engine.apply_live_bundle(data)` (re-bind flow handles on a `"structure"` result), then
+`link.set_build(build)`.
 
 The same swap powers Patterpad's own **Play window**. Edit mid-run and it applies live (a quiet
 "Edits applied live" note), only falling back to the restart prompt when the in-flight edit doesn't

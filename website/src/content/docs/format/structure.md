@@ -12,10 +12,9 @@ a condition; the things you **address** (scenes, blocks) cannot.
 
 There's a second idea worth holding onto, which is that the tree works at **two levels**.
 
-- **Selection** is the walk down the tree that decides the next beat.
-- **Delivery** is what your game sees, a flat stream of beats, pulled one at a time
-  until a choice or the end. The host never sees a snippet or a block; it just pulls
-  beats.
+Selection is the walk down the tree that decides the next beat. Delivery is what your game
+sees, a flat stream of beats, pulled one at a time until a choice or the end. The host never
+sees a snippet or a block; it just pulls beats.
 
 <svg viewBox="0 0 760 244" role="img" aria-labelledby="pk-struct-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-struct-title">Two altitudes: the selection tree (Scene, Block, Group, Snippet, Beat, where groups and snippets can carry conditions) flattens into a delivery stream of individual beats that the host pulls one at a time.</title>
@@ -44,33 +43,38 @@ There's a second idea worth holding onto, which is that the tree works at **two 
 
 ## The containers
 
-- **Scene**: the unit of context. It owns the cast, scene-local properties, and a
-  list of effects that run on entry. It holds one or more blocks, and the **first
-  block is where you enter** (there's no explicit pointer). The sharpest line between
-  a scene and a block: scenes run effects when you enter them, blocks don't.
-- **Block**: a named, addressable section. A block always **runs** its children in
-  order; it's never a "pick one" and never conditional. It must have an author
-  **name**, which doubles as its jump-target label. To pick one of several things
-  inside a block, nest a group.
-- **Group**: a container with a condition and an optional **selector** (see
-  [Choices & logic](/format/choices-and-logic/)). Groups nest as deep as you
-  like, so one group's condition can turn a whole subtree on or off.
-- **Snippet**: the only leaf, and the smallest playable unit: zero or more beats
-  played as one, optionally followed by a jump. Nothing is re-evaluated *inside* a
-  snippet; the seam *between* snippets is the only place interaction can happen.
+A scene is the unit of context. It owns the cast, scene-local properties, and a list of
+effects that run on entry. It holds one or more blocks, and the **first block is where you
+enter** (there's no explicit pointer). The sharpest line between a scene and a block is that
+scenes run effects when you enter them and blocks don't.
+
+A block is a named, addressable section. A block always **runs** its children in order, so
+it's never a "pick one" and never conditional. It must have an author **name**, which
+doubles as its jump-target label. To pick one of several things inside a block, nest a
+group.
+
+A group is a container with a condition and an optional **selector** (see
+[Choices & logic](/format/choices-and-logic/)). Groups nest as deep as you like, so one
+group's condition can turn a whole subtree on or off.
+
+A snippet is the only leaf, and the smallest playable unit, zero or more beats played as
+one, optionally followed by a jump. Nothing is re-evaluated *inside* a snippet. The seam
+*between* snippets is the only place interaction can happen.
 
 ## Beats
 
-A snippet holds **beats**, and there are three kinds:
+A snippet holds **beats**, and there are three kinds.
 
-- **line**: spoken dialogue. It has a `character` (checked against the cast), an
-  optional `direction` for the performer (language-neutral, never localised), and
-  localised text. A voiced line is a fixed string, with no interpolation.
-- **text**: narration or the author's voice. No speaker, never voiced, and free to
-  interpolate property values.
-- **game event**: an instruction to the engine with **no visible words**. It carries
-  only Game Data the host reads when the beat plays: play a sound, move a camera. Game
-  event beats never appear in the locale tables.
+A `line` beat is spoken dialogue. It has a `character` (checked against the cast), an
+optional `direction` for the performer (language-neutral, never localised), and localised
+text. A voiced line is a fixed string, with no interpolation.
+
+A `text` beat is narration or the author's voice. It has no speaker, is never voiced, and is
+free to interpolate property values.
+
+A game event is an instruction to the engine with **no visible words**. It carries only Game
+Data the host reads when the beat plays, so it can play a sound or move a camera. Game event
+beats never appear in the locale tables.
 
 Every beat gets a stable **id** the moment it's created, never based on its content or
 position. Translations, jumps, cursors, and visit counts all key off that id, so
@@ -83,13 +87,14 @@ its beats. A snippet that is *only* a jump (no beats) is a pure routing node. Ju
 target a **scene**, a **block**, or the reserved **`END`**, never a snippet (a snippet
 plays as a whole, so you can't land partway into one).
 
-There are two kinds:
+There are two kinds.
 
-- **jump** (the default). One-way. It heads where it says and **drops any pending
-  returns**.
-- **call**: head there and *come back*. It remembers where it was, runs the target, and
-  returns to the next child in the calling block when the target finishes (Ink calls
-  this a "tunnel"). Calls nest and recurse safely.
+A `jump` is the default, and it's one-way. It heads where it says and **drops any pending
+returns**.
+
+A `call` heads there and *comes back*. It remembers where it was, runs the target, and
+returns to the next child in the calling block when the target finishes (Ink calls this a
+"tunnel"). Calls nest and recurse safely.
 
 A jump can carry a **condition**: "jump if X, otherwise carry on." When a snippet just
 falls off the end of its block, the dialogue is finished: the same signal as an

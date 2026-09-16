@@ -21,13 +21,14 @@ bottom-left.
 
 ## Colour themes and fonts
 
-The **View** menu carries two reading controls, both remembered:
+The **View** menu carries two reading controls, both remembered.
 
-- **Colour Theme**: Follow System, Paper, Mist, Slate, or Night. Each is a
-  hand-tuned set where the background, accents, and character colours all sit well
-  together, not a plain light/dark flip.
-- **Font Theme**: Newsreader, Literata, Source Serif, or Courier (for a typewriter,
-  "script" feel).
+Under **Colour Theme** you get Follow System, Paper, Mist, Slate, or Night. Each is a
+hand-tuned set where the background, accents, and character colours all sit well
+together, not a plain light/dark flip.
+
+Under **Font Theme** you get Newsreader, Literata, Source Serif, or Courier (for a
+typewriter, "script" feel).
 
 You can zoom in and out from the View menu too, alongside full-screen.
 

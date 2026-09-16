@@ -61,10 +61,10 @@ Run the loop as often as you like, since it's incremental rather than a one-shot
 Writers keep writing while translation happens, so the export tracks **staleness** per line.
 The Excel export shows it as a **Status** column:
 
-- *(blank)* means not translated yet.
-- **translated** means it has a translation, and the source line hasn't changed since.
-- **stale** means it has a translation, but the **source line was edited after it was translated**,
-  so it needs re-checking against the new wording.
+- *(blank)*: not translated yet.
+- **translated**: it has a translation, and the source line hasn't changed since.
+- **stale**: it has a translation, but the **source line was edited after it was translated**, so it
+  needs re-checking against the new wording.
 
 Import writes back **every filled-in translation**, whatever its Status (an empty Translation
 cell is left alone). The Status doesn't decide *whether* a row imports, only what happens to its
@@ -78,12 +78,13 @@ as the standard `#, fuzzy` flag.)
 
 All three carry the same IDs and the same staleness signal; pick by who's receiving the file:
 
-- **Excel (.xlsx)** is for human translators working by hand, with one sheet per scene and columns
-  ID / Source / Translation / Comments / Status / Gender. The friendliest to non-technical folk.
-- **PO / POT** is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …).
-  Exporting with no language gives a blank **POT** template; staleness is `#, fuzzy`.
-- **JSON** is for pipelines and engines, plain ID → string tables, easy to transform or feed
-  into your game's own localisation system.
+- Excel (.xlsx) is for human translators working by hand, with one sheet per scene and columns
+  ID / Source / Translation / Comments / Status / Gender, which makes it the friendliest to
+  non-technical folk.
+- PO / POT is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …), where
+  exporting with no language gives a blank POT template and staleness is `#, fuzzy`.
+- JSON is for pipelines and engines, plain ID → string tables, easy to transform or feed into
+  your game's own localisation system.
 
 Translator-facing **comments** come from your documentation notes routed to the `loc`
 channel, as [Reviewing & feedback](/patterpad/reviewing/) describes.
@@ -117,17 +118,19 @@ for translation purposes; it is not shipped to, or read by, your game.
 ## How the strings ship: two approaches
 
 At publish time (**Project Settings ▸ Publish ▸ Localisation**) you pick how the built
-bundle carries text:
+bundle carries text.
 
-- **Embedded** (default). Every translated language ships **inside** the bundle. The runtime
-  resolves the right text and can switch language live, mid-game, with no rebuild. Right for
-  self-contained games, with nothing else to set up.
-- **IDs-only**: the bundle ships **no text at all**; the runtime hands your game each line's
-  ID and your game's own localisation system supplies the string. Right when the game
-  already has a loc pipeline (Unity Localization, i18n, a CMS…).
-  - **Embed source language for debug** (sub-option). Adds the source text to an IDs-only
-    build *just* so it's playable before your loc system is wired up. It warns it's not for
-    release; leave it off for a real build.
+Embedded is the default. Every translated language ships **inside** the bundle, and the runtime
+resolves the right text and can switch language live, mid-game, with no rebuild. It's right for
+self-contained games, with nothing else to set up.
+
+In **IDs-only** mode the bundle ships **no text at all**. The runtime hands your game each line's ID
+and your game's own localisation system supplies the string. That's right when the game already has
+a loc pipeline (Unity Localization, i18n, a CMS…).
+
+A sub-option, **Embed source language for debug**, adds the source text to an IDs-only build *just*
+so it's playable before your loc system is wired up. It warns it's not for release, so leave it off
+for a real build.
 
 Crucially, the choice **doesn't change the translation loop above**: either mode exports and
 imports the same files. Going IDs-only never cuts you off from Patter's round-trip, and you

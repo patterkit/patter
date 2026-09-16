@@ -92,11 +92,15 @@ if path != "": my_player.stream = load(path)
 
 ## Notes
 
-- **Resolve, not play.** Every engine returns a path/URL; you load and play it your way. That boundary
-  is deliberate, audio playback isn't portable, but resolution is.
-- **No search shipped.** The winner is chosen at build time, so the runtime just does a map lookup.
-- **No recording?** `resolve` returns null / empty for a beat with no take, so you can fall back to
-  on-screen text or silence.
-- **Single language** for now (VO isn't localised per-locale yet).
-- **Keep it fresh.** Re-run **Update Audio Manifest** (or Build) after adding takes so `patteraudio.json`
-  reflects the latest winners.
+Every engine resolves rather than plays. It returns a path/URL and you load and play it your way.
+That boundary is deliberate, audio playback isn't portable, but resolution is.
+
+No search is shipped. The winner is chosen at build time, so the runtime just does a map lookup.
+
+A line with no recording is fine. `resolve` returns null / empty for a beat with no take, so you can
+fall back to on-screen text or silence.
+
+It's single language for now, since VO isn't localised per-locale yet.
+
+Keep it fresh. Re-run **Update Audio Manifest** (or Build) after adding takes so `patteraudio.json`
+reflects the latest winners.

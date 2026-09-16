@@ -7,45 +7,56 @@ sidebar:
 
 ## Project Settings
 
-**File ▸ Project Settings…** (`⌘,`) opens a tabbed dialog:
+**File ▸ Project Settings…** (`⌘,`) opens a tabbed dialog.
 
 <figure class="doc-shot">
   <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Audio Status tab open, showing a Track Audio Status switch, an audio root folder, a ladder of recording-status folders, and Use Audio Folders and scratch-recording options." />
   <figcaption>Project settings, with tabs grouped down the left (Project / Story data / Writing &amp; audio / Localisation). The <strong>Audio Status</strong> tab is shown here, mapping each recording stage to a folder on disk.</figcaption>
 </figure>
 
-- **General**: project name, the **Start** scene (where the story begins, used by
-  **Play ▸ Play from Start** and the coverage test), your version-control system, the
-  **voiced** flag, the **formatting** (bold/italic) toggle, **autosave**, **Auto Rebuild**
-  (recompile the bundle as you edit, see [below](#building-a-bundle)), the **Build
-  output** path, and how strings are handled (the **localisation mode**, Embedded or
-  IDs-only, with a source-debug option).
-- **Language**: the languages your project supports and which one is the source.
-- **Game Data**: the fields each kind of beat can carry (see
-  [Conditions, effects & data](/patterpad/conditions-and-data/)).
-- **World Properties**: the `@world` values your game owns and your story reads
-  (declaring them is covered in
-  [Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)),
-  plus the **coverage drivers** that stand in for them during a
-  [coverage test](/production/coverage-testing/#input-drivers).
-- **Cast**: your characters, each with a script name, an optional display name for translation,
-  and an actor. Expand a row (▸) for **Grammatical gender**, free text (blank means not specified)
-  with auto-suggest for the everyday values (male / female / neuter) and any others already used in
-  the cast, sent to translators so a gendered language can inflect that character's lines (see
-  [Localisation](/production/localisation/#who-is-speaking-grammatical-gender)), and for free-text
-  **Notes** on casting, voice, or intent. Each character's colour is shown but chosen for you.
-- **Writing Status** and **Audio Status.** The status ladders, each stage with its own
-  colour. Audio Status is opt-in (a **Track Audio Status?** switch) and needs the project
-  to be **Voiced**; see [Recording status &
-  audio](/production/audio/#recording-status).
-- **Estimating**: size still-unwritten scenes by a guess instead of their placeholder
-  lines, so the report shows the work ahead. See
-  [Estimating](/production/tracking-and-reports/#estimating).
-- **Closed Captions**: the brackets (default `[` / `]`) and the caption character
-  (default `SFX`) your game uses to strip non-spoken cues from dialogue when a player
-  turns captions off. Avoid `(` as the opener, since parentheses open a performer direction
-  at the start of a line. See [Closed captions](/play/closed-captions/).
-- **Dictionary**: spell-check setup (below).
+The **General** tab holds the project name, the **Start** scene (where the story begins,
+used by **Play ▸ Play from Start** and the coverage test), your version-control system,
+the **voiced** flag, the **formatting** (bold/italic) toggle, **autosave**, **Auto
+Rebuild** (recompile the bundle as you edit, see [below](#building-a-bundle)), the
+**Build output** path, and how strings are handled (the **localisation mode**, Embedded
+or IDs-only, with a source-debug option).
+
+The **Language** tab lists the languages your project supports and which one is the
+source.
+
+The **Game Data** tab sets out the fields each kind of beat can carry (see
+[Conditions, effects & data](/patterpad/conditions-and-data/)).
+
+The **World Properties** tab holds the `@world` values your game owns and your story
+reads (declaring them is covered in
+[Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)), plus
+the **coverage drivers** that stand in for them during a
+[coverage test](/production/coverage-testing/#input-drivers).
+
+The **Cast** tab lists your characters, each with a script name, an optional display name
+for translation, and an actor. Expand a row (▸) for **Grammatical gender**, free text
+(blank means not specified) with auto-suggest for the everyday values (male / female /
+neuter) and any others already used in the cast, sent to translators so a gendered
+language can inflect that character's lines (see
+[Localisation](/production/localisation/#who-is-speaking-grammatical-gender)), and for
+free-text **Notes** on casting, voice, or intent. Each character's colour is shown but
+chosen for you.
+
+The **Writing Status** and **Audio Status** tabs hold the status ladders, each stage with
+its own colour. Audio Status is opt-in (a **Track Audio Status?** switch) and needs the
+project to be **Voiced**; see [Recording status &
+audio](/production/audio/#recording-status).
+
+The **Estimating** tab sizes still-unwritten scenes by a guess instead of their
+placeholder lines, so the report shows the work ahead. See
+[Estimating](/production/tracking-and-reports/#estimating).
+
+The **Closed Captions** tab sets the brackets (default `[` / `]`) and the caption
+character (default `SFX`) your game uses to strip non-spoken cues from dialogue when a
+player turns captions off. Avoid `(` as the opener, since parentheses open a performer
+direction at the start of a line. See [Closed captions](/play/closed-captions/).
+
+The **Dictionary** tab is spell-check setup (below).
 
 The `@patter` properties your story remembers aren't here. They're the story's working
 vocabulary rather than configuration, so they have their own
@@ -69,10 +80,10 @@ its own page: [Version control](/setup/version-control/).
 **Production ▸ Export / Import Localisation…** hands your text out for translation and
 folds it back in (also reachable from the Language settings tab):
 
-- **Export** the text for a language, or a blank template for the source, as **JSON**,
+- Export the text for a language, or a blank template for the source, as **JSON**,
   **Excel (.xlsx)**, or **PO/POT**.
-- **Import** a translated file back; the language comes from the file (or you set it),
-  and Patterpad tells you how many lines it updated.
+- Import a translated file back. The language comes from the file (or you set it), and
+  Patterpad tells you how many lines it updated.
 
 Patterpad only ever shows and edits the **source** language; the translations live off
 to the side and round-trip through this dialog. The full story is under

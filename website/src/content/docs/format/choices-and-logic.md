@@ -10,23 +10,26 @@ the player picks from, and the conditions, effects, and properties behind it all
 
 ## Selectors
 
-A group's **selector** decides what happens with the children whose conditions pass:
+A group's **selector** decides what happens with the children whose conditions pass.
 
-- **`run`** (the default). Play every eligible child in order.
-- **`branch`**: play the first eligible child, and stop. This is your if / else-if /
-  else, and your switch: ordered children with conditions, most specific first, and an
-  unconditional last child as the "else".
-- **`sequence`**: a picker that remembers where it is, with two independent settings:
-  - **order**: `sequential` (the default), `shuffle`, or `specificity` (**Best match**, below).
-  - **exhaust**: `once` (the default), `repeat`, or `stick` (hold on the last child).
+`run` is the default. It plays every eligible child in order.
 
-  Shuffle deals from the pack without repeats, and never plays the same line twice in
-  a row: that's built in, not an option. The `sequential` and `shuffle` combinations cover
-  the usual "each line once", "cycle", "random with no repeats", and "stop on the last"
-  patterns; `specificity` is the state-aware one, and gets [its own section](#best-match-lines-that-fit-the-moment).
-- **`choice`**: offer all children as options and wait for the player. This is the one
-  selector that does **not** filter on conditions; it hands ineligible options to your
-  game marked **unavailable** instead (see below).
+`branch` plays the first eligible child and stops. This is your if / else-if / else, and
+your switch. Order the children with conditions, most specific first, and leave an
+unconditional last child as the "else".
+
+`sequence` is a picker that remembers where it is, with two independent settings. Its
+**order** is `sequential` (the default), `shuffle`, or `specificity` (**Best match**,
+below). Its **exhaust** is `once` (the default), `repeat`, or `stick`, which holds on the
+last child. Shuffle deals from the pack without repeats, and never plays the same line
+twice in a row, and that's built in rather than an option. The `sequential` and `shuffle`
+combinations cover the usual "each line once", "cycle", "random with no repeats", and
+"stop on the last" patterns. `specificity` is the state-aware one, and gets
+[its own section](#best-match-lines-that-fit-the-moment).
+
+`choice` offers all children as options and waits for the player. It's the one selector
+that does **not** filter on conditions; it hands ineligible options to your game marked
+**unavailable** instead (see below).
 
 A sequence's memory can be **shared** across [flows](/concepts/#flows) rather than kept per-flow, so two
 characters never draw the same shuffled line, or a `once` is spent for everyone the
@@ -45,14 +48,15 @@ filler only when nothing more specific is eligible.**
 Reactive one-liners (barks, ambient chatter, greetings) that feel canned if they ignore the
 state, and are laborious to hand-branch if you write an `if` for every combination:
 
-- **Companion banter** that reacts to what just happened. "You're bleeding, here, take this" when
-  the player is hurt *and* the companion has a potion; "Careful, it's slippery" when it's raining;
-  a plain "Keep moving" when nothing special is going on.
-- **A guard** who notices what you carry. A line for the stolen crown, a line for *any* drawn
-  weapon, a generic "Move along" for everyone else.
-- **A shopkeeper** whose greeting tracks your reputation or quest stage. The further along you are,
-  the more specific the line they have for you.
-- **Tiered filler**: three lines for the exact circumstance, two for the broad one, one catch-all.
+- Companion banter reacts to what just happened, with "You're bleeding, here, take this"
+  when the player is hurt *and* the companion has a potion, "Careful, it's slippery" when
+  it's raining, and a plain "Keep moving" when nothing special is going on.
+- A guard notices what you carry, with a line for the stolen crown, a line for *any* drawn
+  weapon, and a generic "Move along" for everyone else.
+- A shopkeeper's greeting tracks your reputation or quest stage, and the further along you
+  are, the more specific the line they have for you.
+- Tiered filler gives three lines for the exact circumstance, two for the broad one, and
+  one catch-all.
 
 You write the specific lines and the filler, each with its condition, in one group; Best match picks
 the right tier every time, with no hand-built decision tree.
@@ -87,14 +91,15 @@ empty-handed; and the filler otherwise.
 
 ### Repeating vs using lines up
 
-Best match composes with the sequence **exhaust** setting:
+Best match composes with the sequence **exhaust** setting.
 
-- **`repeat`** (Patterpad's default for Best match). Re-score and re-pick every time the group is
-  reached, so the character keeps preferring the most on-topic line as the state changes. This is
-  what you want for barks and ambient chatter.
-- **`once`**: each line is used up as it plays, so the group **slides down** the tiers, the most
-  specific first, then the next, and finally the filler. Good graceful degradation for a set of
-  first-time lines that shouldn't repeat.
+`repeat` is Patterpad's default for Best match. It re-scores and re-picks every time the
+group is reached, so the character keeps preferring the most on-topic line as the state
+changes. This is what you want for barks and ambient chatter.
+
+With `once`, each line is used up as it plays, so the group **slides down** the tiers, the
+most specific first, then the next, and finally the filler. That's graceful degradation for
+a set of first-time lines that shouldn't repeat.
 
 ### Writing one
 
@@ -148,31 +153,34 @@ and no fallback gets a `choice-can-empty` warning from the validator.
 
 ## Conditions and effects
 
-- **Conditions** decide whether a snippet or group (or a conditional jump) is eligible.
-  Leave one off and it's always eligible.
-- **Effects** are ordered lists that run at a snippet's seam: `onEnter` / `onExit` on a
-  snippet, `onEntry` on a scene. An effect does **one thing and one thing only**: it
-  sets a property to the result of an expression. There's no way to fire an event from
-  an effect; host events ride on
-  [Game Data](/format/gamedata-and-addressing/) instead.
+Conditions decide whether a snippet or group (or a conditional jump) is eligible. Leave one
+off and it's always eligible.
+
+Effects are ordered lists that run at a snippet's seam, `onEnter` / `onExit` on a snippet
+and `onEntry` on a scene. An effect does **one thing and one thing only**, which is to set
+a property to the result of an expression. There's no way to fire an event from an effect,
+so host events ride on [Game Data](/format/gamedata-and-addressing/) instead.
 
 ## Properties
 
 Properties are the game state your logic reads and writes, and the state a runtime
 hands to the host.
 
-- **Scope**: `@patter` (global; created at the start, lives forever, visible
-  everywhere) and `@scene` (local to one scene, but still kept for the life of the
-  piece). A bare `@name` means `@patter.name`. There's no block- or group-local scope.
-- **Types**: `boolean`, `number`, `string`, `enum`, `flags` (enum and flags behave like
-  Ink LISTs), and `quality`, a story stage as an ordered ladder. Which to reach for, and
-  how to tell the confusable pairs apart, is [Property types](/format/property-types/).
-- **Sharing**: a per-property `shared` flag controls *where the value lives*: one value
-  for the whole world, or one per concurrent flow. `@patter` is shared by default;
-  `@scene` is per-flow by default. The two are independent, so you can have a
-  flow-private global or a shared scene property.
-- **`temporary`**: a per-flow `@scene` property can be reset to its default every time
-  the scene is entered ("fresh each visit", Ink's `temp`).
+There are two scopes. `@patter` is global, created at the start, alive forever, and visible
+everywhere. `@scene` is local to one scene, but still kept for the life of the piece. A bare
+`@name` means `@patter.name`, and there's no block- or group-local scope.
+
+The types are `boolean`, `number`, `string`, `enum`, `flags` (enum and flags behave like Ink
+LISTs), and `quality`, a story stage as an ordered ladder. Which to reach for, and how to
+tell the confusable pairs apart, is [Property types](/format/property-types/).
+
+A per-property `shared` flag controls *where the value lives*, either one value for the
+whole world or one per concurrent flow. `@patter` is shared by default and `@scene` is
+per-flow by default. The two are independent, so you can have a flow-private global or a
+shared scene property.
+
+A per-flow `@scene` property marked `temporary` is reset to its default every time the scene
+is entered ("fresh each visit", Ink's `temp`).
 
 **Visit counts** are derived and read-only. `visits(node)` / `seen(node)` give this
 flow's entered-count for a node id; `patter_visits()` / `patter_seen()` give the count
@@ -186,16 +194,17 @@ expression language. A writer in Patterpad **never types this by hand**: the
 [visual expression editor](/patterpad/conditions-and-data/#conditions) builds it
 from pills (a property, a comparison, a value) and stores the result. The language below is
 what that editor produces and what the format keeps on disk, useful to know if you're reading
-files or building tooling, not something an author has to learn:
+files or building tooling, not something an author has to learn.
 
-- **Property references**: `@name`, `@patter.name`, `@scene.name`.
-- **Operators**: comparisons, boolean logic (`&&`, `||`, `!`), and arithmetic, over
-  numbers, booleans, strings, and string arrays (flags).
-- **Built-in functions**: `seen()` / `visits()` (and their world-wide `patter_` forms),
-  `random(a, b)` (a whole number from `a` to `b` inclusive, drawn from a seeded
-  generator so every engine gets the same result), the flag helpers
-  `check_flags(@prop, +x, -y)` / `set_flags(...)`, and `advance(@quality)`, which steps a
-  [quality](/format/property-types/#quality-the-stage-of-a-story) to its next stage.
+A property reference is written `@name`, `@patter.name`, or `@scene.name`. The operators are
+comparisons, boolean logic (`&&`, `||`, `!`), and arithmetic, over numbers, booleans,
+strings, and string arrays (flags).
+
+The built-in functions are `seen()` and `visits()` (and their world-wide `patter_` forms),
+`random(a, b)` for a whole number from `a` to `b` inclusive, drawn from a seeded generator so
+every engine gets the same result, the flag helpers `check_flags(@prop, +x, -y)` and
+`set_flags(...)`, and `advance(@quality)`, which steps a
+[quality](/format/property-types/#quality-the-stage-of-a-story) to its next stage.
 
 ## Embedding property values in text
 

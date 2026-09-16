@@ -26,22 +26,24 @@ Click any row to jump the editor straight to that beat. The window can **pin** i
 
 ## What it flags
 
-Beats that never come up are flagged two ways:
+Beats that never come up are flagged two ways.
 
-- **‼ (dead)**: nothing ever reaches it. Usually a branch that can't be taken, or a condition
-  that's never true.
-- **? (needs input)**: it turns on a value your game owns (`@world.*`) that nothing in the
-  story sets, so the test can't reach it on its own. The row reads *gated on @x*; click that
-  name to see everywhere `@x` is used. Add a [driver](#input-drivers) and the test can reach it.
-- **? (dead at one remove)**: the value it's gated on *is* set by your story, but only by a beat
-  that never played either. The row names the gate and the beat that would have to happen first,
-  so two mysteries become one: open that beat and ask why *it* never came up. A gate on a single
-  flag is named as the flag (`@world.mood:armed`), not the whole property, because a property
-  half the story writes always looks well fed.
+A beat marked **‼ (dead)** is one nothing ever reaches. Usually that's a branch that can't be
+taken, or a condition that's never true.
 
-  This is deliberately cautious. Where the test can't be sure a writer never ran (the effect sits
-  on a beat-less snippet, or the property is assigned wholesale rather than a flag at a time), it
-  says nothing at all rather than guess. A wrong *"this can never happen"* is worse than silence.
+A beat marked **? (needs input)** turns on a value your game owns (`@world.*`) that nothing in the
+story sets, so the test can't reach it on its own. The row reads *gated on @x*; click that name to
+see everywhere `@x` is used. Add a [driver](#input-drivers) and the test can reach it.
+
+A beat marked **? (dead at one remove)** is gated on a value your story *does* set, but only on a
+beat that never played either. The row names the gate and the beat that would have to happen first,
+so two mysteries become one. Open that beat and ask why *it* never came up. A gate on a single flag
+is named as the flag (`@world.mood:armed`), not the whole property, because a property half the
+story writes always looks well fed.
+
+That last one is deliberately cautious. Where the test can't be sure a writer never ran (the effect
+sits on a beat-less snippet, or the property is assigned wholesale rather than a flag at a time), it
+says nothing at all rather than guess. A wrong *"this can never happen"* is worse than silence.
 
 ### Choices that ran dry
 

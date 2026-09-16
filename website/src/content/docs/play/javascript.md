@@ -120,16 +120,18 @@ the last.
 
 ## Helpers, state, and localisation
 
-- **`@patterkit/play-helpers`** wraps the common chores: `serializeState` / `deserializeState`
-  (exactly what `saveGame()` does), typed property setters, a state logger, a live state inspector
-  (below), and the [live refresh & debug](/play/live-debug/) link, including
-  `applyLiveBundle` so editor saves land in the running game. Optional, but it saves boilerplate.
-  The drop-in carries all of it on `window.Patterplay`; the npm package is the module form.
-  [Save/load & Game Data](/play/integration/) has the detail.
-- **Read your Game Data and tags** off each step to drive audio and visuals, supply your `@world`
-  values, and emit host events, as [Save/load & Game Data](/play/integration/) describes.
-- **Localisation**: read resolved text in Embedded mode, or get ids in IDs-only mode and
-  resolve them yourself, and switch language live. [Localisation](/play/localisation/) covers both modes.
+`@patterkit/play-helpers` wraps the common chores. It gives you `serializeState` /
+`deserializeState` (exactly what `saveGame()` does), typed property setters, a state logger, a live
+state inspector (below), and the [live refresh & debug](/play/live-debug/) link, including
+`applyLiveBundle` so editor saves land in the running game. It's optional, but it saves boilerplate.
+The drop-in carries all of it on `window.Patterplay`; the npm package is the module form.
+[Save/load & Game Data](/play/integration/) has the detail.
+
+Read your Game Data and tags off each step to drive audio and visuals, supply your `@world` values,
+and emit host events, as [Save/load & Game Data](/play/integration/) describes.
+
+For localisation, read resolved text in Embedded mode, or get ids in IDs-only mode and resolve them
+yourself, and switch language live. [Localisation](/play/localisation/) covers both modes.
 
 ## Live state inspector
 

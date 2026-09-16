@@ -77,22 +77,22 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 
 ## Walking a flow
 
-- **`flow.advance()`** → the next step (line, text, game event, choice, or end).
-- **`flow.advanceToStop()`** → `{ played, stop }`: collects beats until the next choice
+- `flow.advance()`: the next step (line, text, game event, choice, or end).
+- `flow.advanceToStop()`: `{ played, stop }`, collecting beats until the next choice
   or the end (handy when you render a whole exchange at once).
-- **`flow.getChoices()`** → the options of a pending choice.
-- **`flow.choose(id)`**: pick an eligible option by id; the next `advance()` runs it.
-  (Throws if there's no pending choice, or the id is unknown or ineligible.)
-- **`flow.isEnded()`**, **`flow.currentScene`**: state for tooling that follows the
+- `flow.getChoices()`: the options of a pending choice.
+- `flow.choose(id)`: pick an eligible option by id, and the next `advance()` runs it.
+  It throws if there's no pending choice, or the id is unknown or ineligible.
+- `flow.isEnded()`, `flow.currentScene`: state for tooling that follows the
   story across scenes.
-- **`flow.reset(scene?, block?)`**: forget this flow's position, keep shared state.
-- **`flow.goto(scene, block?)`** → `boolean`: move the cursor to an address, exactly as an
+- `flow.reset(scene?, block?)`: forget this flow's position, keep shared state.
+- `flow.goto(scene, block?)`: returns a `boolean` and moves the cursor to an address, exactly as an
   authored jump would (on-entry effects run, arriving counts as a visit, the call stack is
   replaced). It moves rather than resets, so variation and visit counts carry on; it lands
-  immediately, abandoning any part-delivered snippet or pending choice. Returns `false` and
+  immediately, abandoning any part-delivered snippet or pending choice. It returns `false` and
   leaves the cursor alone if the address does not resolve; the block is scene-scoped. See
   [Host navigation](/play/navigation/).
-- **`flow.isClosed`**: whether this flow has been finished (see above).
+- `flow.isClosed`: whether this flow has been finished (see above).
 
 ### Step shapes
 

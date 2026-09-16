@@ -49,13 +49,15 @@ Square brackets are the default because they match the closed-captioning convent
 and because parentheses are already spoken for: a `(` at the **start** of a line opens a performance
 [direction](/patterpad/writing-surface/) in the editor, so it can't also start a caption there.
 
-Configure it in **Project Settings ▸ Closed Captions**:
+Configure it in **Project Settings ▸ Closed Captions**.
 
-- **Open / Close**: the delimiter pair that wraps a cue. Default `[` and `]`; you can use any pair, even
-  the same token both sides (e.g. `*…*`). Avoid `(`: it opens a direction at the start of a line.
-- **Caption character**: a cast member (default **`SFX`**) whose **whole lines** are treated as pure
-  captions. A line spoken by this character is removed *entirely* when captions are off: delimiters or not
- , so you can write sound-only lines like `SFX: Thunder rumbles in the distance.`
+Open and Close are the delimiter pair that wraps a cue. The default is `[` and `]`, and you can use
+any pair, even the same token both sides (e.g. `*…*`). Avoid `(`, since it opens a direction at the
+start of a line.
+
+Caption character is a cast member (default **`SFX`**) whose **whole lines** are treated as pure
+captions. A line spoken by this character is removed *entirely* when captions are off, delimiters or
+not, so you can write sound-only lines like `SFX: Thunder rumbles in the distance.`
 
 Defaults apply even if you never open the tab: `[` / `]` and an `SFX` character.
 

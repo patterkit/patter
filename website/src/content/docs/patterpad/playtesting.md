@@ -11,9 +11,9 @@ branches, and hear how a scene lands before anyone else sees it.
 
 ## Starting a playthrough
 
-- **Play ▸ Play Scene** (`⌘P`) opens the play window and starts from the scene you're
-  editing.
-- **Play ▸ Play from Start** (`⇧⌘P`) runs from the project's [start
+- Use **Play ▸ Play Scene** (`⌘P`) to open the play window and start from the scene
+  you're editing.
+- Use **Play ▸ Play from Start** (`⇧⌘P`) to run from the project's [start
   point](/patterpad/projects-and-settings/) instead (you'll be asked to set one
   the first time).
 - To start partway in, right-click a block and choose **▶ Play block**.
@@ -28,21 +28,27 @@ not above everything else on your screen. Unpin it from its own pin control.
 
 ## The controls
 
-- **▸ Step** plays one beat, a line, a piece of narration, or a game event.
-- **Auto-continue** (the **▸▸ Continue** toggle in the header, on by default) turns Step
-  into **Continue to next stop**: it plays on to the next choice or the end, revealing one
-  line at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. Turn
-  it off to step one beat at a time.
-- **Speed** (Slow / Normal / Fast / Instant) sets how long each line is held before the
-  next appears; **Instant** drops the wait entirely. It paces the reveal only, a voiced
-  line always plays its full clip.
-- Options you can take are buttons; ones whose condition isn't met are shown faded and
-  can't be clicked. Pick one and the story moves on.
-- **↺ Rewind** (top-left) starts the run again from the top at any time; **↺ Restart**
-  shows up at the end.
-- **CC** shows or hides the non-spoken [caption cues](/play/closed-captions/) (on
-  by default). In an [Audio Folders](/production/audio/) project an **Audio** toggle
-  also appears, turning Continue into a table-read that plays each line's recording.
+Step (**▸**) plays one beat, a line, a piece of narration, or a game event.
+
+Auto-continue (the **▸▸ Continue** toggle in the header, on by default) turns Step into
+**Continue to next stop**. It plays on to the next choice or the end, revealing one line
+at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. Turn it off
+to step one beat at a time.
+
+Speed (Slow / Normal / Fast / Instant) sets how long each line is held before the next
+appears, and **Instant** drops the wait entirely. It paces the reveal only. A voiced line
+always plays its full clip.
+
+Options you can take are buttons; ones whose condition isn't met are shown faded and
+can't be clicked. Pick one and the story moves on.
+
+Rewind (**↺**, top-left) starts the run again from the top at any time, and **↺ Restart**
+shows up at the end.
+
+The **CC** control shows or hides the non-spoken
+[caption cues](/play/closed-captions/) (on by default). In an
+[Audio Folders](/production/audio/) project an **Audio** toggle also appears, turning
+Continue into a table-read that plays each line's recording.
 
 ## The editor follows along
 

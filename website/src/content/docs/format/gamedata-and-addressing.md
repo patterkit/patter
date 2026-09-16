@@ -57,24 +57,22 @@ authoring-only notes, tags are compiled into the bundle, so they ship to the run
 
 ## The two IDs
 
-Patter gives content two different identifiers, each with its own job:
+Patter gives content two different identifiers, each with its own job.
 
-- **The line `id`**: each line and beat has a short, stable **id** like `L_0n7vdq42`. You
-  never write it, it's assigned for you (the inspector shows it as a small, copyable
-  `#id`), and it's **fixed**, never based on the wording or where the line sits, so it
-  **survives editing, moving, renaming, and re-ordering**. Change a line's words, drag it
-  to another block, its `id` doesn't change. It's the key that a line's
-  **[localisation](/production/localisation/) string, its
-  [audio](/production/audio/#recording-status) file, and its place in a save** all
-  join on, which is *why* it can't encode location. If it changed when you moved a line,
-  the translation and the recorded take would be orphaned. A game that needs to react to
-  one *specific* line watches for its `id`.
+Each line and beat has a short, stable **id** like `L_0n7vdq42`. You never write it, it's
+assigned for you (the inspector shows it as a small, copyable `#id`), and it's **fixed**,
+never based on the wording or where the line sits, so it **survives editing, moving,
+renaming, and re-ordering**. Change a line's words, drag it to another block, its `id`
+doesn't change. It's the key that a line's **[localisation](/production/localisation/)
+string, its [audio](/production/audio/#recording-status) file, and its place in a save** all
+join on, which is *why* it can't encode location. If it changed when you moved a line, the
+translation and the recorded take would be orphaned. A game that needs to react to one
+*specific* line watches for its `id`.
 
-- **The `gameId` (address)**: an author-editable, host-facing address on a **scene or
-  block** ("play this scene", "jump to this block"). It's a readable slug, taken from the
-  name until you set a fixed value. Scene addresses are unique across the project; block
-  addresses are unique within their scene. Renaming an address never breaks a jump that
-  points at it.
+The `gameId` is an author-editable, host-facing address on a **scene or block** ("play this
+scene", "jump to this block"). It's a readable slug, taken from the name until you set a
+fixed value. Scene addresses are unique across the project, and block addresses are unique
+within their scene. Renaming an address never breaks a jump that points at it.
 
 In short, a line's **`id` is its stable identity** (what localisation, audio, and saves key
 off), and a **`gameId` is an address** your game code aims at to start or jump to a scene or
@@ -85,10 +83,11 @@ block. The runtime can also hand a `gameId` back for display and logging, as
 
 Because the `id` gives nothing away on its own, you'll sometimes have one in hand,
 from a locale table, an audio filename, a coverage report, or a runtime log, and need
-to know *which line it is*. Both tools resolve it instantly:
+to know *which line it is*. Both tools resolve it instantly.
 
-- **In Patterpad**, open search (**⌘F** / **Ctrl-F**) and paste the `id`. The matching line
-  is listed with its text and its scene › block location; press **Enter** to jump straight
-  to it. See [Search and navigation](/search/).
-- **From the command line**, `patter resolve <id>` prints the kind, location, and the line's
-  text, and it accepts a `gameId` or a scene/block name too. See [the CLI](/cli/).
+In Patterpad, open search (**⌘F** / **Ctrl-F**) and paste the `id`. The matching line is
+listed with its text and its scene › block location, and pressing **Enter** jumps straight to
+it. See [Search and navigation](/search/).
+
+From the command line, `patter resolve <id>` prints the kind, location, and the line's text,
+and it accepts a `gameId` or a scene/block name too. See [the CLI](/cli/).

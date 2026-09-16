@@ -13,14 +13,15 @@ compiled **bundle**. This page covers turning one into the other and getting it 
 **Publish ▸ Publish Bundle** (`⇧⌘B`) compiles the whole project to a `.patterc`: a single JSON file,
 with nothing else attached, and the only file a runtime needs. A toast confirms where it wrote.
 
-- **Output path.** Set it in **Project Settings ▸ Publish**. The default is a
-  `patter-dist/` folder next to the project; point it at your game's assets folder so a build
-  drops straight in.
-- **What's inside.** The scenes, the compiled conditions and effects, the cast, the Game Data
-  fields, the addresses your game uses to start scenes, the text (or none, in IDs-only mode), and
-  a content hash. You don't commit the bundle to your repo: you rebuild it, you don't merge it.
-- **From the terminal.** `patter export` runs the same compile for CI; `patter validate` re-checks
-  the bundle's hash to catch a stale build, as [the CLI](/cli/) page describes.
+Set the output path in **Project Settings ▸ Publish**. The default is a `patter-dist/` folder
+next to the project; point it at your game's assets folder so a build drops straight in.
+
+Inside are the scenes, the compiled conditions and effects, the cast, the Game Data fields, the
+addresses your game uses to start scenes, the text (or none, in IDs-only mode), and a content hash.
+You don't commit the bundle to your repo. You rebuild it, you don't merge it.
+
+From the terminal, `patter export` runs the same compile for CI, and `patter validate` re-checks the
+bundle's hash to catch a stale build, as [the CLI](/cli/) page describes.
 
 ## How localised strings travel
 
@@ -45,13 +46,16 @@ line), prose narration, and the branching laid out plainly, with choices as a la
 their conditions and once-only / repeatable flags) and jumps as “go to …”. Pick **PDF** or **Word
 (.docx)** in the Save dialog.
 
-- **It reads top-to-bottom.** Branches sit indented under each choice; it doesn't try to trace
-  every path, because it's the document of record rather than a playthrough (that's the playable HTML).
-- **Source language only.** Cut lines and engine-only beats are omitted.
-- **PDF vs Word.** PDF uses standard built-in fonts (great for Latin / Western-European text); for a
-  non-Latin script (Cyrillic, CJK, …) choose **Word**, which embeds full Unicode fonts.
-- **From the terminal.** `patter export-script [path] -o script.pdf` (or `.docx`); the format follows
-  the extension, as [the CLI](/cli/) page describes.
+It reads top to bottom. Branches sit indented under each choice; it doesn't try to trace every
+path, because it's the document of record rather than a playthrough (that's the playable HTML).
+
+You get the source language only. Cut lines and engine-only beats are omitted.
+
+PDF uses standard built-in fonts, which are great for Latin and Western-European text. For a
+non-Latin script (Cyrillic, CJK, …) choose **Word**, which embeds full Unicode fonts.
+
+From the terminal, `patter export-script [path] -o script.pdf` (or `.docx`) writes the same
+document, and the format follows the extension, as [the CLI](/cli/) page describes.
 
 ## A playable HTML to send anyone
 
@@ -61,13 +65,15 @@ self-contained **`.html`** file, with the Patterplay runtime, the whole compiled
 reader UI all inlined. There's no server, no network, and no build step. Double-click it and it
 plays in any browser, online or off. Email it, drop it in a shared folder, open it on a phone.
 
-- **It's the real runtime.** Choices, conditions, sequences, and jumps behave exactly as they do in
-  your game, because it's the same engine the bundle ships with rather than an approximation. There's a Restart,
-  and Save/Load (kept in that browser).
-- **Your source language.** The page reads in the project's source language, which is the version a
-  stakeholder is reviewing. (For translated text, send a localised build or the loc files instead.)
-- **From the terminal.** `patter export-html [path] -o story.html` produces the same file for a
-  pipeline (use `-o -` to write it to stdout), as [the CLI](/cli/) page describes.
+It's the real runtime. Choices, conditions, sequences, and jumps behave exactly as they do in your
+game, because it's the same engine the bundle ships with rather than an approximation. There's a
+Restart, and Save/Load (kept in that browser).
+
+The page reads in the project's source language, which is the version a stakeholder is reviewing.
+(For translated text, send a localised build or the loc files instead.)
+
+From the terminal, `patter export-html [path] -o story.html` produces the same file for a pipeline
+(use `-o -` to write it to stdout), as [the CLI](/cli/) page describes.
 
 This is for *reading and playing*, not editing, and there's no way back into the project from it. To
 let someone **edit** and return changes, hand them a `.patterpack` instead (below).

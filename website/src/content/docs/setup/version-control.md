@@ -14,12 +14,12 @@ overwrite each other and a CI pipeline sees exactly what the editor does.
 Pick the VCS when you **create the project**, or change it later in **Project Settings ▸
 General**. Patter supports the four common in games:
 
-- **git** and **SVN** are merge-based: everyone edits, and changes merge together. Because Patter
-  splits the story into one file per scene, and those files are clean and line-by-line, an
-  ordinary text merge is enough.
-- **Perforce** and **Plastic SCM** are lock-based: a file is checked out (and often locked to one
+- git and SVN are merge-based, so everyone edits and changes merge together. Because Patter splits
+  the story into one file per scene, and those files are clean and line-by-line, an ordinary text
+  merge is enough.
+- Perforce and Plastic SCM are lock-based, so a file is checked out (and often locked to one
   person) before editing. Patterpad understands this and checks files out when you save.
-- **none**: a plain project on disk with no version-control features at all.
+- The none option is a plain project on disk with no version-control features at all.
 
 Patter drives these through their **own command-line tools** (`git`, `p4`, `cm` for Plastic,
 `svn`), rather than reimplementing each one. So the CLI for the system you pick needs to be
@@ -32,15 +32,17 @@ ones.
 ## What Patterpad does for you
 
 Every save goes through your version-control system, so the editor reflects and respects the
-state of the repo:
+state of the repo.
 
-- **Locked scenes are read-only.** If another author holds a scene (on a lock-based VCS), its
-  surface and inspector dim, and a chip in the top bar names who has it, so you don't waste
-  effort on a file you can't save.
-- **Editable scenes check out when you save.** You write freely; the checkout happens on save,
-  not on every keystroke.
-- **Per-scene badges** in the navigator show the state in one glyph: locked (⊘), out of date (↓),
-  checked out by you (✎), modified (●), or new (+). They keep themselves up to date.
+Locked scenes are read-only. If another author holds a scene (on a lock-based VCS), its surface and
+inspector dim, and a chip in the top bar names who has it, so you don't waste effort on a file you
+can't save.
+
+Editable scenes check out when you save. You write freely, and the checkout happens on save rather
+than on every keystroke.
+
+Per-scene badges in the navigator show the state in one glyph, whether that's locked (⊘), out of
+date (↓), checked out by you (✎), modified (●), or new (+). They keep themselves up to date.
 
 If you chose **none**, everything is editable and none of these markers appear.
 

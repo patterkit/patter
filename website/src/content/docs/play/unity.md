@@ -17,12 +17,12 @@ Patterplay ships as a UPM package and must be installed **as a package** (its Ne
 Json dependency only resolves then). Get it from the `play-unity-v*` Release (see the
 [downloads page](/download/)), any of:
 
-- **From disk**: unzip the release, then *Package Manager ▸ Install package from disk…* and
-  pick the `Patterplay/` folder's `package.json`.
-- **Git URL**: in *Package Manager ▸ Add package from git URL…*, paste the package's git URL
-  (the Release lists it).
-- **Embedded**: copy the zip's `Patterplay/` folder into your project's `Packages/`
-  directory using your file browser.
+- Unzip the release, then open *Package Manager ▸ Install package from disk…* and pick the
+  `Patterplay/` folder's `package.json`.
+- In *Package Manager ▸ Add package from git URL…*, paste the package's git URL (the Release
+  lists it).
+- Copy the zip's `Patterplay/` folder into your project's `Packages/` directory using your file
+  browser, which embeds the package in the project.
 
 Don't drag the folder into the Unity **Project window**: even dropped onto its *Packages*
 section, Unity imports it into `Assets/` as loose scripts, where the package manifest is

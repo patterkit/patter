@@ -40,14 +40,14 @@ with no status set reads as the first stage (`stub`) in the report.
 Patterpad keeps the writing surface calm: the status controls only show when you want them.
 You set a status in one of three ways:
 
-- **Right-click a line or text beat ▸ Status ▸ …** sets that one beat. Each option shows its
-  colour, so the ladder reads at a skim.
-- **Right-click a snippet, group, block, or scene ▸ Status ▸ …** **flows** the status down to
-  every line and text beat inside (game event beats are skipped). It also works on a
+- Right-click a line or text beat and choose **Status ▸ …** to set that one beat. Each option
+  shows its colour, so the ladder reads at a skim.
+- Right-click a snippet, group, block, or scene and choose **Status ▸ …** to **flow** the status
+  down to every line and text beat inside (game event beats are skipped). It also works on a
   **selection** of several snippets, so you can mark a whole run at once.
-- **The inspector**: select a line or text beat and a **Writing** dropdown appears at the top,
-  tinted to its current stage. Pick a stage; picking the lowest one clears the status (a line
-  with none set reads as the lowest stage).
+- Select a line or text beat, and a **Writing** dropdown appears at the top of the inspector,
+  tinted to its current stage. Pick a stage; picking the lowest one clears the status (a line with
+  none set reads as the lowest stage).
 
 ## Seeing status in the script
 
