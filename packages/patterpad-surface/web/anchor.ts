@@ -3,7 +3,7 @@
 // the top-left; so we validate it and fall back to the bounding rect of the DOM node at the caret.
 //
 // The clamping is not a nicety. Below the caret is where a popup wants to be, but the `/` menu is
-// ~350px of items and the jump picker up to 22rem, so a caret in the lower half of the window put
+// ~350px of items and the jump picker up to 352px, so a caret in the lower half of the window put
 // most of the list off the bottom edge with no way to scroll or reach it: on a 560px-tall window the
 // menu opened at y=484 and one of its ten items was reachable (#63). So: flip ABOVE the caret when
 // that fits better, and clamp to the viewport either way. The element-anchored path in targetpicker

@@ -4,7 +4,7 @@
 body.swin {
   margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
   background: var(--bg); color: var(--ink);
-  font: 0.9rem/1.4 var(--font-ui);
+  font: 14.5px/1.4 var(--font-ui);
   -webkit-user-select: none; user-select: none;
   /* A transform-FREE fade entrance (not screen-in): translating a full-height body briefly pushes its
      bottom past the viewport and flashes a scrollbar until the animation settles. The results list owns
@@ -27,6 +27,9 @@ body.swin {
    is OUR container, so its opt-out stays here. Without it the segmented control's
    own frame, the border and the gaps between its buttons, would drag the window. */
 .swin-modes { -webkit-app-region: no-drag; }
+/* Chrome base (design-language §4 "Chrome has its own scale"): the head's unstyled text is 14px whatever
+   the root is; the literal stands in for the shell's `--chrome-size` until it exists. */
+.swin-head { font-size: 14px; }
 
 /* The pin and close buttons, their hover, the pinned state and their motion are
    all the shell's (tool-window.css), which carries the same "motion is
@@ -35,50 +38,50 @@ body.swin {
 /* the query box: styled like every other text field in the app (the .gd-input vocabulary) - UI font on the
    raised --surface, so it reads clearly as a "type here" field against the window's --bg body, not as text. */
 .swin-input {
-  margin: 0.4rem 0.5rem 0.3rem; padding: 0.35rem 0.5rem;
+  margin: 6.5px 8px 5px; padding: 5.5px 8px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  color: var(--ink); font: 0.9rem var(--font-ui);
+  color: var(--ink); font: 14.5px var(--font-ui);
 }
 .swin-input::placeholder { color: var(--muted); }
 /* The ring is the family's (tokens.css); the edge colours with it. */
 .swin-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 
 /* status chips */
-.swin-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; padding: 0 0.5rem 0.3rem; }
+.swin-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px 5px; }
 .swin-chips[hidden] { display: none; }
 .swin-chip {
-  display: inline-flex; align-items: center; gap: 0.32rem;
+  display: inline-flex; align-items: center; gap: 5px;
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-pill); cursor: pointer;
-  color: var(--ink-soft); font: 600 0.72rem var(--font-ui); padding: 0.14rem 0.5rem;
+  color: var(--ink-soft); font: 600 11.5px var(--font-ui); padding: 2px 8px;
 }
 .swin-chip:hover { border-color: var(--accent); }
 .swin-chip.active { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
-.swin-chip-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: none; }
+.swin-chip-dot { width: 9.5px; height: 9.5px; border-radius: 50%; flex: none; }
 /* Tag chips carry a node count instead of a colour dot. */
 .swin-chip-count { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
 .swin-chip.active .swin-chip-count { color: inherit; }
 
 /* the result list fills the rest of the window and scrolls */
-.swin-results { flex: 1; min-height: 0; overflow: auto; padding: 0 0.35rem 0.35rem; }
+.swin-results { flex: 1; min-height: 0; overflow: auto; padding: 0 5.5px 5.5px; }
 .swin-row {
-  display: flex; align-items: baseline; gap: 0.45rem; width: 100%; text-align: left;
+  display: flex; align-items: baseline; gap: 7px; width: 100%; text-align: left;
   background: none; border: none; border-radius: var(--radius-sm); cursor: pointer;
-  padding: 0.24rem 0.45rem; color: var(--ink); font: inherit;
+  padding: 4px 7px; color: var(--ink); font: inherit;
 }
 .swin-row:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .swin-row.sel { background: color-mix(in oklab, var(--accent) 16%, transparent); }
-.swin-kind { flex: none; color: var(--muted); font: 600 0.64rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; min-width: 2.7rem; }
+.swin-kind { flex: none; color: var(--muted); font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; min-width: 43px; }
 .swin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.swin-loc { flex: none; color: var(--muted); font: 0.74rem var(--font-ui); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.swin-gid { flex: none; color: var(--ink-soft); font: 0.72rem var(--font-mono); }
+.swin-loc { flex: none; color: var(--muted); font: 12px var(--font-ui); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swin-gid { flex: none; color: var(--ink-soft); font: 11.5px var(--font-mono); }
 /* The opaque id, shown on every row so an id → line lookup is unambiguous. Quieter than the Game ID. */
-.swin-id { flex: none; color: var(--muted); font: 0.68rem var(--font-mono); opacity: 0.8; }
+.swin-id { flex: none; color: var(--muted); font: 11px var(--font-mono); opacity: 0.8; }
 
 /* Replace mode: the replacement field + the bulk apply button, and the before → after preview rows. */
-.swin-replace-row { display: flex; gap: 0.4rem; align-items: center; padding: 0 0.5rem 0.35rem; }
+.swin-replace-row { display: flex; gap: 6.5px; align-items: center; padding: 0 8px 5.5px; }
 .swin-replace-row[hidden] { display: none; } /* the `hidden` attr alone loses to the class's display:flex */
 .swin-replace { flex: 1; margin: 0; }
-.swin-replace-all { flex: none; padding: 0.32rem 0.7rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 0.8rem var(--font-ui); cursor: pointer; }
+.swin-replace-all { flex: none; padding: 5px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--accent); color: var(--on-accent); font: 13px var(--font-ui); cursor: pointer; }
 .swin-replace-all:disabled { opacity: 0.45; cursor: default; background: var(--surface-2, var(--line)); color: var(--muted); }
 /* A Replace row is a two-column GRID, not the flex line the other rows use, because its diff has to
    wrap. On one nowrap line at the window's 460px default, a line of dialogue of ordinary length was cut
@@ -89,8 +92,8 @@ body.swin {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: start;
-  column-gap: 0.45rem;
-  row-gap: 0.1rem;
+  column-gap: 7px;
+  row-gap: 1.5px;
 }
 .swin-rrow .swin-name {
   grid-column: 1; grid-row: 1;
@@ -99,10 +102,10 @@ body.swin {
 .swin-rrow .swin-loc { grid-column: 1; grid-row: 2; max-width: 100%; }
 .swin-rrow .swin-rone { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .swin-before { color: var(--muted); } /* muted (not struck) - the → after + ink colour shows the change */
-.swin-arrow { display: inline-flex; vertical-align: middle; margin: 0 0.35rem; color: var(--muted); }
+.swin-arrow { display: inline-flex; vertical-align: middle; margin: 0 5.5px; color: var(--muted); }
 .swin-after { color: var(--ink); }
-.swin-rone { flex: none; padding: 0.15rem 0.5rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); font: 0.72rem var(--font-ui); cursor: pointer; }
+.swin-rone { flex: none; padding: 2.5px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); font: 11.5px var(--font-ui); cursor: pointer; }
 .swin-rone:hover { border-color: var(--accent); color: var(--accent); }
-.swin-empty { color: var(--muted); font: 0.85rem var(--font-ui); padding: 0.6rem 0.5rem; }
+.swin-empty { color: var(--muted); font: 13.5px var(--font-ui); padding: 9.5px 8px; }
 
-.swin-hint { border-top: 1px solid var(--line); padding: 0.26rem 0.55rem; color: var(--muted); font: 0.72rem var(--font-ui); background: var(--surface); }
+.swin-hint { border-top: 1px solid var(--line); padding: 4px 9px; color: var(--muted); font: 11.5px var(--font-ui); background: var(--surface); }

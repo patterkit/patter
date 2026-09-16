@@ -8,50 +8,55 @@ body.coverage-win {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
+  /* Chrome base (design-language §4 "Chrome has its own scale"): this window is all chrome, so its
+     unstyled text is 14px whatever the root is (it used to inherit the 110% reading root). The literal
+     stands in for the shell's `--chrome-size` until it exists. */
+  font-size: 14px;
   overflow: hidden;
 }
+.swin-head { font-size: 14px; }
 
 /* Options row */
-.cov-opts { flex: 0 0 auto; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.7rem; border-bottom: 1px solid var(--line); background: var(--surface); padding: 0.6rem 0.9rem; }
-.cov-opt { display: flex; flex-direction: column; gap: 0.2rem; font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.cov-opt input, .cov-opt select { width: 6.5rem; font: 0.8rem var(--font-ui); padding: 0.3rem 0.4rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
+.cov-opts { flex: 0 0 auto; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 11px; border-bottom: 1px solid var(--line); background: var(--surface); padding: 9.5px 14.5px; }
+.cov-opt { display: flex; flex-direction: column; gap: 3px; font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-opt input, .cov-opt select { width: 104px; font: 13px var(--font-ui); padding: 5px 6.5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
 .cov-bar-spacer { flex: 1 1 auto; }
 /* The bar's buttons are the shell's `.btn` / `.btn.primary` (controls.css). */
 
-.cov-drivers { flex: 0 0 auto; margin: 0; padding: 0.4rem 0.9rem 0; font: 0.74rem var(--font-ui); color: var(--ink-soft); }
-.cov-status { flex: 0 0 auto; margin: 0; padding: 0.5rem 0.9rem; color: var(--muted); font: 0.82rem var(--font-ui); }
+.cov-drivers { flex: 0 0 auto; margin: 0; padding: 6.5px 14.5px 0; font: 12px var(--font-ui); color: var(--ink-soft); }
+.cov-status { flex: 0 0 auto; margin: 0; padding: 8px 14.5px; color: var(--muted); font: 13px var(--font-ui); }
 
 /* The long-job strip sits between the drivers note and the results (app-shell's job.css draws it). */
-#cov-job { flex: 0 0 auto; padding: 0 0.9rem; }
+#cov-job { flex: 0 0 auto; padding: 0 14.5px; }
 
 /* Results area (the renderCoverage output) */
-.cov-results { flex: 1 1 auto; overflow: auto; padding: 0.6rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.cov-results { flex: 1 1 auto; overflow: auto; padding: 9.5px 14.5px 16px; display: flex; flex-direction: column; gap: 8px; }
 /* A sweep is running: the PREVIOUS results stay readable but dimmed, so nobody reads a stale number as
    the live one. Kept non-interactive for the same reason. */
 .cov-results.stale { opacity: 0.5; pointer-events: none; transition: opacity var(--dur-quick) ease; }
-.cov-stats { display: flex; gap: 1.6rem; }
-.cov-stat-big { font: 700 1.6rem var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
-.cov-stat-label { font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.cov-meta { display: flex; flex-direction: column; gap: 0.1rem; font: 0.76rem var(--font-ui); color: var(--ink-soft); }
+.cov-stats { display: flex; gap: 25.5px; }
+.cov-stat-big { font: 700 25.5px var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cov-stat-label { font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-meta { display: flex; flex-direction: column; gap: 1.5px; font: 12px var(--font-ui); color: var(--ink-soft); }
 .cov-meta-sep { color: var(--muted); }
 /* A cancelled sweep: the numbers are real, the sample is short. Said as a pill so it is not read as
    part of the run parameters underneath it. */
 .cov-stopped {
-  align-self: flex-start; margin-bottom: 0.15rem; padding: 0.05rem 0.4rem;
+  align-self: flex-start; margin-bottom: 2.5px; padding: 1px 6.5px;
   border: 1px solid var(--warn, var(--accent)); border-radius: var(--radius-sm, 4px);
-  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em;
+  font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--warn, var(--accent));
 }
-.cov-note { margin: 0; font: 0.78rem var(--font-ui); color: var(--ink-soft); }
+.cov-note { margin: 0; font: 12.5px var(--font-ui); color: var(--ink-soft); }
 .cov-note-input { color: var(--warn, var(--accent)); }
 .cov-note-dry { color: var(--danger); }
 
 /* Dry-choice list: clickable rows that reveal the offending choice in the editor. */
-.cov-dry-list { display: flex; flex-direction: column; gap: 0.15rem; margin: 0.15rem 0 0; }
+.cov-dry-list { display: flex; flex-direction: column; gap: 2.5px; margin: 2.5px 0 0; }
 .cov-dry-item {
-  display: flex; align-items: baseline; gap: 0.6rem; width: 100%;
-  padding: 0.28rem 0.5rem; border: 0; border-radius: var(--radius-sm, 4px); cursor: pointer;
-  font: 0.8rem var(--font-ui); text-align: left; color: var(--ink);
+  display: flex; align-items: baseline; gap: 9.5px; width: 100%;
+  padding: 4.5px 8px; border: 0; border-radius: var(--radius-sm, 4px); cursor: pointer;
+  font: 13px var(--font-ui); text-align: left; color: var(--ink);
   background: color-mix(in oklab, var(--danger) 9%, transparent);
 }
 .cov-dry-item:hover { background: color-mix(in oklab, var(--danger) 15%, transparent); }
@@ -59,22 +64,22 @@ body.coverage-win {
 .cov-dry-scene { font-weight: 600; color: var(--danger); }
 .cov-dry-id { color: var(--ink-soft); font-family: var(--font-mono, monospace); }
 .cov-dry-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
-.cov-empty { color: var(--muted); font: 0.85rem var(--font-ui); }
-.cov-scene-cap { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.5rem 0 0; font: 600 0.78rem var(--font-ui); color: var(--accent); }
-.cov-scene-dead { font: 600 0.64rem var(--font-ui); color: var(--danger); text-transform: uppercase; letter-spacing: 0.03em; }
-.cov-table { width: 100%; border-collapse: collapse; font: 0.8rem var(--font-ui); }
-.cov-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); color: var(--ink); vertical-align: baseline; }
+.cov-empty { color: var(--muted); font: 13.5px var(--font-ui); }
+.cov-scene-cap { display: flex; align-items: baseline; gap: 9.5px; margin: 8px 0 0; font: 600 12.5px var(--font-ui); color: var(--accent); }
+.cov-scene-dead { font: 600 10px var(--font-ui); color: var(--danger); text-transform: uppercase; letter-spacing: 0.03em; }
+.cov-table { width: 100%; border-collapse: collapse; font: 13px var(--font-ui); }
+.cov-table td { padding: 5px 8px; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); color: var(--ink); vertical-align: baseline; }
 .cov-table tr { cursor: pointer; }
 .cov-table tr:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .cov-table tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .cov-row-dead { background: color-mix(in oklab, var(--danger) 9%, transparent); }
 .cov-row-input { background: color-mix(in oklab, var(--warn, var(--accent)) 9%, transparent); }
-.cov-mark { width: 1.2rem; text-align: center; font-weight: 700; color: var(--danger); }
+.cov-mark { width: 19px; text-align: center; font-weight: 700; color: var(--danger); }
 .cov-mark [data-icon] { margin: 0 auto; } /* the drawn warning centres like the "?" text does */
 .cov-row-input .cov-mark { color: var(--warn, var(--accent)); }
-.cov-kind { display: inline-block; min-width: 3.2rem; font: 600 0.58rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
-.cov-gate { display: block; margin-top: 0.1rem; font: italic 0.72rem var(--font-ui); color: var(--ink-soft); }
-.cov-gate-ref { font: 0.72rem var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.cov-kind { display: inline-block; min-width: 51px; font: 600 9.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-gate { display: block; margin-top: 1.5px; font: italic 11.5px var(--font-ui); color: var(--ink-soft); }
+.cov-gate-ref { font: 11.5px var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .cov-gate-ref:hover { filter: brightness(1.15); }
 .cov-gate-blocked { color: var(--warn, var(--accent)); }
 .cov-n { text-align: right; font-variant-numeric: tabular-nums; }

@@ -20,7 +20,7 @@
 
 :root {
   /* --- reading size (Medium default; a future S/M/L control swaps this one value) --- */
-  font-size: 110%; /* ~17.6px root; reading text + chrome scale together off rem */
+  font-size: 110%; /* ~17.6px root: the READING size. Only the script surface scales off rem; the chrome is px off a 14px base (design-language §4) */
   color-scheme: light dark;
 
   /* --- surface palette (LIGHT): warm, cosy, booklike - parchment + paper, a chocolate-caramel

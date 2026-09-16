@@ -8,7 +8,7 @@
    eyebrows). One rule replaces the ~18 bespoke declarations that had drifted to six sizes / two weights
    / five tracking values (design-language §4 typography). Sites either carry the class or fold these
    three properties in; per-site colour / padding / margin stay. Deviate only on purpose, with a note. */
-.overline { font: 600 0.66rem/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.overline { font: 600 10.5px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 
 /* Themed scrollbars now live in theme.css (the shared layer), so the editor, play, and search windows
    all get them - see the ::-webkit-scrollbar rules there. */
@@ -24,27 +24,27 @@ body {
   font: 1rem/1.6 var(--font-read); /* 1rem = the scaled root above (was a fixed 16px) */
 }
 header {
-  display: flex; align-items: baseline; gap: 1rem;
-  padding: 0.7rem 1.2rem; border-bottom: 1px solid var(--line);
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 11px 19px; border-bottom: 1px solid var(--line);
   font-family: var(--font-ui);
 }
-header .hint { color: var(--muted); font-size: 0.78rem; }
+header .hint { color: var(--muted); font-size: 12.5px; }
 /* TEMP in-session header toggle (theme preview) - far right, not persisted; see main.ts */
-.hdr-tools { margin-left: auto; display: flex; gap: 0.5rem; }
+.hdr-tools { margin-left: auto; display: flex; gap: 8px; }
 .hdr-toggle {
   background: none; cursor: pointer;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.2rem 0.55rem;
-  color: var(--muted); font: 600 0.7rem var(--font-ui); letter-spacing: 0.03em;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 3px 9px;
+  color: var(--muted); font: 600 11px var(--font-ui); letter-spacing: 0.03em;
   transition: color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
 }
 .hdr-toggle:hover { color: var(--accent); border-color: var(--accent); }
-main { display: grid; grid-template-columns: 1fr 26rem; gap: 0; flex: 1; min-height: 0; }
+main { display: grid; grid-template-columns: 1fr 416px; gap: 0; flex: 1; min-height: 0; }
 /* tall bottom padding gives the last lines room to rise to the middle (typewriter
    scrolling in main.ts), so we are never forced to edit at the very page bottom. */
 #editor { overflow: auto; padding: 2.5rem clamp(1rem, 8vw, 5rem) 55vh; position: relative; } /* relative: the note-gutter overlay positions against it */
 aside { border-left: 1px solid var(--line); overflow: auto; background: var(--surface); }
-.aside-label { padding: 0.6rem 1rem; color: var(--muted); font: 0.72rem var(--font-ui); border-bottom: 1px solid var(--line); }
-#source { margin: 0; padding: 1rem; font: 12px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }
+.aside-label { padding: 9.5px 16px; color: var(--muted); font: 11.5px var(--font-ui); border-bottom: 1px solid var(--line); }
+#source { margin: 0; padding: 16px; font: 12px/1.5 var(--font-mono); color: var(--muted); white-space: pre-wrap; }
 
 /* the script surface. pre-wrap is load-bearing: prosemirror-view expects it on the editable element
    (cursor placement around spaces goes wrong under normal collapsing, and it warns in the console). */
@@ -409,7 +409,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .comment-bubble {
   position: absolute; pointer-events: auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 1.4rem; height: 1.4rem; padding: 0; line-height: 0; cursor: pointer;
+  width: 22.5px; height: 22.5px; padding: 0; line-height: 0; cursor: pointer;
   background: none; border: 0; color: var(--accent); opacity: 0.8;
   transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
 }
@@ -424,7 +424,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .suggestion-marker {
   position: absolute; pointer-events: auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 1.4rem; height: 1.4rem; padding: 0; line-height: 0; cursor: pointer;
+  width: 22.5px; height: 22.5px; padding: 0; line-height: 0; cursor: pointer;
   border: 0; background: none; color: var(--accent); opacity: 0.85;
   transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
 }
@@ -432,9 +432,9 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .suggestion-marker.stale { color: var(--muted); opacity: 0.6; }
 .suggestion-marker svg { display: block; }
 .suggestion-count {
-  position: absolute; top: -0.2rem; right: -0.3rem; min-width: 0.85rem; height: 0.85rem;
-  display: inline-flex; align-items: center; justify-content: center; padding: 0 0.15rem;
-  font: 600 0.55rem var(--font-ui); line-height: 1; border-radius: 0.5rem;
+  position: absolute; top: -3px; right: -5px; min-width: 13.5px; height: 13.5px;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0 2.5px;
+  font: 600 9px var(--font-ui); line-height: 1; border-radius: 0.5rem;
   background: var(--accent); color: var(--surface);
 }
 .beat.has-suggestion .zone.say { background: color-mix(in oklab, var(--accent) 7%, transparent); border-radius: 3px; }
@@ -457,21 +457,21 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    colour together so adjacent rungs are unmistakable where bare dots blurred. */
 .status-pill {
   position: absolute; pointer-events: auto; transform: translateX(-100%);
-  white-space: nowrap; max-width: 7rem; overflow: hidden; text-overflow: ellipsis;
-  padding: 0.04rem 0.4rem; border-radius: var(--radius-pill); border: 1px solid var(--line);
+  white-space: nowrap; max-width: 112px; overflow: hidden; text-overflow: ellipsis;
+  padding: 0.5px 6.5px; border-radius: var(--radius-pill); border: 1px solid var(--line);
   background: var(--surface); color: var(--muted);
-  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em;
+  font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em;
 }
 /* The colour swatch shown beside a rung's name in the "Status" submenu + the inspector dropdown. */
 .status-swatch {
-  display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; margin-right: 0.5rem;
+  display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 8px;
   vertical-align: -1px; background: var(--muted);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 18%, transparent);
 }
 .note-icon {
   position: absolute; pointer-events: auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 1.4rem; height: 1.4rem; padding: 0; line-height: 0; cursor: pointer;
+  width: 22.5px; height: 22.5px; padding: 0; line-height: 0; cursor: pointer;
   border: 0; background: none;
   color: var(--accent); opacity: 0.9; /* the filled glyph reads clearly on its own - no chip frame needed */
   transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
@@ -655,29 +655,29 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .cue-ac {
   position: fixed; z-index: 10; animation: var(--anim-panel-in);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 0.2rem; min-width: 7rem;
+  box-shadow: var(--shadow-2); padding: 3px; min-width: 112px;
   display: flex; flex-direction: column;
 }
 .cue-ac-item {
   display: block; width: 100%; /* stack vertically even when the container is display:block */
   text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); color: var(--ink);
-  font: 600 0.72rem var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 5px 9.5px; border-radius: var(--radius-sm); color: var(--ink);
+  font: 600 11.5px var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase;
 }
 /* Only the ACTIVE row is highlighted - hovering SETS the active row (one highlight, keyboard + mouse
    share it), so there's never a separate :hover highlight competing with the keyboard selection. */
 .cue-ac-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 /* the search "field" at the top of the dropdown (shows what's being typed) */
 .cue-ac-field {
-  padding: 0.3rem 0.6rem; margin-bottom: 0.15rem; border-bottom: 1px solid var(--line);
-  font: 600 0.72rem var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
+  padding: 5px 9.5px; margin-bottom: 2.5px; border-bottom: 1px solid var(--line);
+  font: 600 11.5px var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink);
 }
 .cue-ac-field.placeholder { font-weight: 400; font-style: italic; letter-spacing: normal; text-transform: none; color: var(--muted); }
 /* the "Add new character" row - the one place a name is authored */
 .cue-ac-add {
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); color: var(--accent);
-  font: 600 0.72rem var(--font-ui);
+  padding: 5px 9.5px; border-radius: var(--radius-sm); color: var(--accent);
+  font: 600 11.5px var(--font-ui);
 }
 .cue-ac-add.active { background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
@@ -688,18 +688,18 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
      and above the editor chrome when opened from `/jump`. Matches the expr popover convention. */
   position: fixed; z-index: 1000; animation: var(--anim-panel-in);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 0.25rem;
-  display: flex; flex-direction: column; max-height: min(60vh, 22rem);
+  box-shadow: var(--shadow-2); padding: 4px;
+  display: flex; flex-direction: column; max-height: min(60vh, 352px);
 }
 .tp-field {
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); outline: none;
-  padding: 0.32rem 0.5rem; margin-bottom: 0.2rem; color: var(--ink); font: 0.8rem var(--font-ui);
+  padding: 5px 8px; margin-bottom: 3px; color: var(--ink); font: 13px var(--font-ui);
 }
 .tp-field:focus { border-color: color-mix(in oklab, var(--accent) 55%, var(--line)); }
 .tp-list { overflow: auto; display: flex; flex-direction: column; min-height: 0; }
 .tp-row {
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 0.28rem 0.55rem; border-radius: var(--radius-sm); color: var(--ink); font: 0.8rem var(--font-ui);
+  padding: 4.5px 9px; border-radius: var(--radius-sm); color: var(--ink); font: 13px var(--font-ui);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   /* flex:none is LOAD-BEARING (#30). .tp-list is a flex column with a definite height once the panel
      hits its cap, and these rows have no minimum flex size (they are buttons, AND overflow:hidden for
@@ -707,72 +707,72 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
      to its ~10px padding shell, clipping the text to a sliver, instead of letting the list scroll. */
   flex: none;
 }
-.tp-end { font: 600 0.7rem var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
+.tp-end { font: 600 11px var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
 .tp-scene { font-weight: 600; color: var(--accent); }
-.tp-scene [data-icon] { display: inline-block; vertical-align: -2px; margin-right: 0.25rem; color: var(--muted); } /* the drawn chevron before a scene row */
-.tp-block { padding-left: 1.5rem; color: var(--ink-soft); }      /* blocks indented under their scene */
-.tp-clear { color: var(--muted); border-top: 1px solid var(--line); margin-top: 0.15rem; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.tp-scene [data-icon] { display: inline-block; vertical-align: -2px; margin-right: 4px; color: var(--muted); } /* the drawn chevron before a scene row */
+.tp-block { padding-left: 24px; color: var(--ink-soft); }      /* blocks indented under their scene */
+.tp-clear { color: var(--muted); border-top: 1px solid var(--line); margin-top: 2.5px; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 .tp-row.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* one highlight, keyboard + mouse */
 .tp-row.sel { box-shadow: inset 2px 0 0 var(--accent); }         /* the current target, marked */
 
 /* contextual hint bar */
 #hintbar {
-  display: flex; gap: 1.1rem; align-items: center;
-  padding: 0.45rem 1.2rem; border-top: 1px solid var(--line);
-  background: var(--surface); min-height: 1.9rem;
-  font: 0.74rem var(--font-ui); color: var(--muted);
+  display: flex; gap: 17.5px; align-items: center;
+  padding: 7px 19px; border-top: 1px solid var(--line);
+  background: var(--surface); min-height: 30.5px;
+  font: 12px var(--font-ui); color: var(--muted);
 }
-.hint { display: inline-flex; gap: 0.35rem; align-items: baseline; }
+.hint { display: inline-flex; gap: 5.5px; align-items: baseline; }
 .hint kbd {
-  display: inline-flex; align-items: center; justify-content: center; min-height: 1.1rem;
-  font: 600 0.68rem var(--font-mono); color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center; min-height: 17.5px;
+  font: 600 11px var(--font-mono); color: var(--ink);
   background: color-mix(in oklab, var(--line) 40%, transparent);
-  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.05rem 0.3rem;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1px 5px;
 }
 .hint-label { color: var(--muted); }
 
 /* the structural action menu (⋯ / right-click): a familiar vertical MENU - structural
    actions only (data lives in the inspector). "Follow with" / "Wrap in" open submenu flyouts. */
 .action-menu {
-  position: fixed; z-index: 50; min-width: 11rem; animation: var(--anim-panel-in);
+  position: fixed; z-index: 50; min-width: 176px; animation: var(--anim-panel-in);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 0.3rem;
-  display: flex; flex-direction: column; gap: 0.02rem;
-  font: 0.8rem var(--font-ui);
+  box-shadow: var(--shadow-2); padding: 5px;
+  display: flex; flex-direction: column; gap: 0.5px;
+  font: 13px var(--font-ui);
 }
-.action-submenu { min-width: 8rem; z-index: 51; }
-.action-head { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.25rem 0.5rem 0.3rem; }
+.action-submenu { min-width: 128px; z-index: 51; }
+.action-head { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 4px 8px 5px; }
 .action-mi {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 9.5px;
   width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 0.34rem 0.5rem; border-radius: var(--radius-sm); color: var(--ink);
-  font: 0.8rem var(--font-ui);
+  padding: 5.5px 8px; border-radius: var(--radius-sm); color: var(--ink);
+  font: 13px var(--font-ui);
 }
 .action-mi:hover, .action-mi.open { background: color-mix(in oklab, var(--accent) 10%, transparent); }
-.action-mi.has-icon { justify-content: flex-start; gap: 0.4rem; } /* a leading drawn icon sits beside its label, not across from it */
+.action-mi.has-icon { justify-content: flex-start; gap: 6.5px; } /* a leading drawn icon sits beside its label, not across from it */
 .action-caret { display: inline-flex; align-items: center; color: var(--muted); line-height: 1; margin-left: auto; }
 /* Status submenu rows: left-align [tick][swatch][label] instead of spreading them apart. */
-.action-mi.action-run { justify-content: flex-start; gap: 0.4rem; }
+.action-mi.action-run { justify-content: flex-start; gap: 6.5px; }
 .action-check { flex: 0 0 0.8em; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); line-height: 1; }
 .action-mi.del { color: var(--accent); }
 .action-mi.del:hover { background: color-mix(in oklab, var(--accent) 14%, transparent); }
-.action-sep { height: 1px; background: var(--line); margin: 0.2rem 0.3rem; }
+.action-sep { height: 1px; background: var(--line); margin: 3px 5px; }
 
 /* special-insert ("/") menu */
 .slash-menu {
   position: fixed; z-index: 10; animation: var(--anim-panel-in);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2); padding: 0.2rem; min-width: 8rem;
+  box-shadow: var(--shadow-2); padding: 3px; min-width: 128px;
   display: flex; flex-direction: column;
   /* Bounded + scrollable, like .target-picker: the menu is eleven rows tall, and on a short window
      the ones past the fold were simply unreachable (#63). anchor.ts flips it above the caret when
      that fits; this covers the case where neither side has room. */
-  max-height: min(60vh, 22rem); overflow: auto;
+  max-height: min(60vh, 352px); overflow: auto;
 }
 .slash-item {
   display: block; width: 100%;
   text-align: left; background: none; border: 0; cursor: pointer; color: var(--ink);
-  padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); font: 0.8rem var(--font-ui);
+  padding: 5.5px 9.5px; border-radius: var(--radius-sm); font: 13px var(--font-ui);
   /* flex:none, for the same reason .tp-row carries it (#30): once max-height bites, this flex column
      has a definite height and rows with no minimum size get crushed to their padding instead of the
      list scrolling. */
@@ -780,8 +780,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .slash-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* hover SETS .active (one shared highlight) */
 .slash-item u { text-decoration-color: var(--muted); text-underline-offset: 2px; } /* the access-key letter (type-ahead) */
-.slash-head { font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 0.3rem 0.6rem 0.2rem; flex: none; }
-.slash-head:not(:first-child) { margin-top: 0.15rem; border-top: 1px solid var(--line); padding-top: 0.4rem; } /* a quiet rule between the two sections */
+.slash-head { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 5px 9.5px 3px; flex: none; }
+.slash-head:not(:first-child) { margin-top: 2.5px; border-top: 1px solid var(--line); padding-top: 6.5px; } /* a quiet rule between the two sections */
 
 /* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */
 .atom-del {

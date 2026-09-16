@@ -105,9 +105,12 @@ let panes: PaneState = bootState.panes;
 // app-shell and then kept here as a second copy; the copy is gone. The host in the markup (`#frame`)
 // holds the furniture this app seats into it just below.
 const frameHost = $("frame");
+// Pane widths are px (design-language §4 "Chrome has its own scale"): the chrome does not move with the
+// reading root, so the defaults are the family's 14rem / 22rem AT 16px, not at this app's 110% root.
+// The remembered widths (navW / inspW) were always CSS px.
 const shell = mountPaneShell(frameHost, {
-  nav: { defaultWidth: "14rem", label: "scenes" },
-  inspector: { defaultWidth: "22rem", label: "inspector" },
+  nav: { defaultWidth: "224px", label: "scenes" },
+  inspector: { defaultWidth: "384px", label: "inspector" },
   initial: {
     open: { nav: panes.nav, inspector: panes.inspector },
     width: { ...(panes.navW ? { nav: panes.navW } : {}), ...(panes.inspW ? { inspector: panes.inspW } : {}) },
