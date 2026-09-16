@@ -22,7 +22,7 @@ The window is pinned by default, so it stays above the editor while you work. Th
 not above everything else on your screen. Unpin it from its own pin control.
 
 <figure class="doc-shot">
-  <img src="/doc-images/PlayWindow.png" alt="The Play window mid-run: a header reading PLAYING FROM the-patter-tour with speed, closed-caption, audio and pin controls, a transcript of played lines, and a tray of choice buttons at the foot." />
+  <img src="/doc-images/PlayWindow.png" alt="The Play window mid-run: a header reading Playing from the-patter-tour with speed, closed-caption, audio and pin controls, a transcript of played lines, and a tray of choice buttons at the foot." />
   <figcaption>The Play window walks the real runtime. The header shows where the run started, plus speed, closed-caption, audio, and pin controls; played beats build up as a transcript, and eligible choices appear as buttons in the tray at the foot.</figcaption>
 </figure>
 

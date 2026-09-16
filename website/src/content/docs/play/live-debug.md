@@ -29,7 +29,7 @@ The link is controlled by a small **connect icon** in the **bottom-right corner*
 by the **Play ▸ Live Link** menu item, which is ticked while the link is on).
 
 <figure class="doc-shot is-inset">
-  <img src="/doc-images/LiveDebugLink.png" alt="The live-link chip in the editor's bottom-right corner: the loopback address ws://127.0.0.1:4471 beside an amber connect icon, with a tooltip reading Live link: listening, waiting for a game. Click to stop." />
+  <img src="/doc-images/LiveDebugLink.png" alt="The live-link chip in the editor's bottom-right corner: the loopback address ws://127.0.0.1:4471 beside an amber connect icon, with a tooltip reading Live link is listening for a game. Click to stop." />
   <figcaption>The connect icon, amber and listening. The loopback address <code>ws://127.0.0.1:4471</code> sits beside it (click to copy); hovering spells out the state.</figcaption>
 </figure>
 

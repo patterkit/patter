@@ -18,7 +18,7 @@ and the **pin** button keeps it on top. Close it with **✕** or **Escape**.
 ## Finding a line
 
 <figure class="doc-shot">
-  <img src="/doc-images/SearchWindow.png" alt="The floating search window over a dimmed editor: tabs for Text, Replace, Writing, Recording, Property and Tags, a query box holding choice, and a ranked list of BEAT and BLOCK results each showing its scene path and internal id." />
+  <img src="/doc-images/SearchWindow.png" alt="The floating search window over a dimmed editor: tabs for Text, Replace, Writing, Recording, Property and Tags, a query box holding choice, and a ranked list of Beat and Block results each showing its scene path and internal id." />
   <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Tags; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
 </figure>
 
