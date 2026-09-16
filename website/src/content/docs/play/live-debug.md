@@ -41,10 +41,10 @@ by the **Play ▸ Live Link** menu item, which is ticked while the link is on).
 
 The icon's **colour** is the state, and hovering it spells the status out:
 
-- Grey is off.
-- Amber is listening, waiting for a game.
-- Green is connected and in sync, so the game is running this exact build and beats highlight precisely.
-- Red is connected, but running a different build.
+- **Grey** is off.
+- **Amber** is listening, waiting for a game.
+- **Green** is connected and in sync, so the game is running this exact build and beats highlight precisely.
+- **Red** is connected, but running a different build.
 
 Red means you've rebuilt or edited since the game launched, so beat ids may not line up. The editor
 still follows scenes, but rebuild and relaunch to re-sync for exact-beat highlighting. A game wired
@@ -64,8 +64,8 @@ fix on the next pass, with no rebuild, no restart, and no losing your place.
 
 Two tiers, picked automatically:
 
-- Text-only edits swap the string tables in place. Nothing restarts and no state is touched.
-- Structural edits carry the whole run across (a save and load behind the scenes). Position is re-found
+- **Text-only edits** swap the string tables in place. Nothing restarts and no state is touched.
+- **Structural edits** carry the whole run across (a save and load behind the scenes). Position is re-found
   by id, so lines inserted or reordered before the cursor neither replay nor shift where you are; an
   option you deleted drops out of an open choice; content deleted under the cursor is skipped and
   play continues from the nearest survivor.

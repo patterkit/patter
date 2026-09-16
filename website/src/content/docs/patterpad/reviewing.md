@@ -19,8 +19,8 @@ file, never in what ships to your game.
 
 - Select **text within a line** first and the comment highlights just that span; otherwise it
   attaches to the **whole beat** with a marker in the gutter.
-- Click a commented span to open its thread.
-- Mark a thread complete to tuck it away. Bring archived threads back with **Review ▸ Show
+- **Click a commented span** to open its thread.
+- **Mark a thread complete** to tuck it away. Bring archived threads back with **Review ▸ Show
   Resolved Comments** (it starts off each time you launch).
 
 ## Suggested rewrites

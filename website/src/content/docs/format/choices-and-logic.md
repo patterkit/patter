@@ -48,14 +48,14 @@ filler only when nothing more specific is eligible.**
 Reactive one-liners (barks, ambient chatter, greetings) that feel canned if they ignore the
 state, and are laborious to hand-branch if you write an `if` for every combination:
 
-- Companion banter reacts to what just happened, with "You're bleeding, here, take this"
+- **Companion banter** reacts to what just happened, with "You're bleeding, here, take this"
   when the player is hurt *and* the companion has a potion, "Careful, it's slippery" when
   it's raining, and a plain "Keep moving" when nothing special is going on.
-- A guard notices what you carry, with a line for the stolen crown, a line for *any* drawn
+- **A guard** notices what you carry, with a line for the stolen crown, a line for *any* drawn
   weapon, and a generic "Move along" for everyone else.
-- A shopkeeper's greeting tracks your reputation or quest stage, and the further along you
+- **A shopkeeper's** greeting tracks your reputation or quest stage, and the further along you
   are, the more specific the line they have for you.
-- Tiered filler gives three lines for the exact circumstance, two for the broad one, and
+- **Tiered filler** gives three lines for the exact circumstance, two for the broad one, and
   one catch-all.
 
 You write the specific lines and the filler, each with its condition, in one group; Best match picks

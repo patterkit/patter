@@ -78,12 +78,12 @@ as the standard `#, fuzzy` flag.)
 
 All three carry the same IDs and the same staleness signal; pick by who's receiving the file:
 
-- Excel (.xlsx) is for human translators working by hand, with one sheet per scene and columns
+- **Excel (.xlsx)** is for human translators working by hand, with one sheet per scene and columns
   ID / Source / Translation / Comments / Status / Gender, which makes it the friendliest to
   non-technical folk.
-- PO / POT is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …), where
+- **PO / POT** is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …), where
   exporting with no language gives a blank POT template and staleness is `#, fuzzy`.
-- JSON is for pipelines and engines, plain ID → string tables, easy to transform or feed into
+- **JSON** is for pipelines and engines, plain ID → string tables, easy to transform or feed into
   your game's own localisation system.
 
 Translator-facing **comments** come from your documentation notes routed to the `loc`

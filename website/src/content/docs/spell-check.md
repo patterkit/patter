@@ -37,9 +37,9 @@ flagged word in the editor.
 Right-click a wavy-underlined word for the usual menu:
 
 - Picking one of the suggested spellings replaces the word in place.
-- "Add to dictionary" marks the word as right for this project and adds it to the project dictionary,
+- **"Add to dictionary"** marks the word as right for this project and adds it to the project dictionary,
   so it's never flagged again, for anyone on the project.
-- "Ignore" leaves the word as-is for this session, without adding it anywhere.
+- **"Ignore"** leaves the word as-is for this session, without adding it anywhere.
 
 Misspellings also show up in the **problems panel** for the open scene, as "Spelling" notes you can step
 through like any other problem. They're advisory: they never block a build or export.

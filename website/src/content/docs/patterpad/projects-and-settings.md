@@ -80,9 +80,9 @@ its own page: [Version control](/setup/version-control/).
 **Production ▸ Export / Import Localisation…** hands your text out for translation and
 folds it back in (also reachable from the Language settings tab):
 
-- Export the text for a language, or a blank template for the source, as **JSON**,
+- **Export** the text for a language, or a blank template for the source, as **JSON**,
   **Excel (.xlsx)**, or **PO/POT**.
-- Import a translated file back. The language comes from the file (or you set it), and
+- **Import** a translated file back. The language comes from the file (or you set it), and
   Patterpad tells you how many lines it updated.
 
 Patterpad only ever shows and edits the **source** language; the translations live off

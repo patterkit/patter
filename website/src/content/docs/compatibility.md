@@ -69,13 +69,13 @@ Every one of the four runtimes (JS, Unity, Unreal, Godot) has to pass the same s
 shared tests: a single, language-neutral `corpus.json` of hand-written cases that pin down the
 exact behaviour a conforming engine must reproduce. It covers:
 
-- Expressions cover the evaluator, the Patter dialect (`random`, `flags`, `seen`, `visits`, …),
+- **Expressions** cover the evaluator, the Patter dialect (`random`, `flags`, `seen`, `visits`, …),
   and the seeded random-number generator, giving identical results on every engine.
-- Playthroughs cover scenes, blocks, groups, selectors, sticky/fallback options, call/return,
+- **Playthroughs** cover scenes, blocks, groups, selectors, sticky/fallback options, call/return,
   conditions and effects, visit counts, `{@ref}` interpolation, and locale and character-name
   resolution (including the `<Untranslated: {id}>` fallback).
-- Scripted operations cover save/load round-trips, multiple flows, and reset.
-- Game Data covers filling in defaults as values are read.
+- **Scripted operations** cover save/load round-trips, multiple flows, and reset.
+- **Game Data** covers filling in defaults as values are read.
 
 Each port ships a small **test host** that replays the same `corpus.json` in its own language and
 checks it gets identical results. **Every port passes the full set of tests**: the JavaScript

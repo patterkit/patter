@@ -17,10 +17,10 @@ animation tracks.
 
 Both hang off the engine (build one from your bundle, then call these, no flow needed):
 
-- `getOutline()` returns the nested tree, running scenes → blocks → children (groups *and* snippets,
+- **`getOutline()`** returns the nested tree, running scenes → blocks → children (groups *and* snippets,
   with groups preserved) → a snippet's beats. Use it to browse or mirror the authored structure,
   branches and all.
-- `getBeatSequence()` returns the flat, document-ordered list of every beat, each with the
+- **`getBeatSequence()`** returns the flat, document-ordered list of every beat, each with the
   `{ scene, block, snippet }` it belongs to. Use it to lay one thing per beat.
 
 Each beat carries the same data a played step would: `id`, `kind` (line / text / gameEvent),
@@ -81,9 +81,9 @@ for flat in engine.get_beat_sequence():
 Three more static reads answer "which characters are in this?", which is what a scene-loader, a VO
 pipeline, or a character-portrait pre-loader actually wants:
 
-- `getCast()` returns every cast member the project declares, in authored order.
-- `castForScene(sceneRef)` returns the speakers with a line anywhere in that scene.
-- `castForBlock(sceneRef, blockRef)` returns the same, scoped to one block.
+- **`getCast()`** returns every cast member the project declares, in authored order.
+- **`castForScene(sceneRef)`** returns the speakers with a line anywhere in that scene.
+- **`castForBlock(sceneRef, blockRef)`** returns the same, scoped to one block.
 
 All three return the **character token** (the `character` a line beat carries), not a display name.
 Scene and block refs may be an internal id **or** a [gameId address](/format/gamedata-and-addressing/),

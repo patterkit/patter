@@ -82,7 +82,7 @@ Beyond the usual arrows and clicks, two things are worth knowing:
 
 - The **left and right arrows** walk through a line a piece at a time, name, direction,
   words, and carry on to the next line at the end.
-- Undo and redo (`⌘Z` / `⇧⌘Z`) cover everything, including structural changes like
+- **Undo and redo** (`⌘Z` / `⇧⌘Z`) cover everything, including structural changes like
   splitting or reordering a snippet, so you can always step back cleanly.
 
 ## Building structure as you type

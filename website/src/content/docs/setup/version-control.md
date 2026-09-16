@@ -14,10 +14,10 @@ overwrite each other and a CI pipeline sees exactly what the editor does.
 Pick the VCS when you **create the project**, or change it later in **Project Settings ▸
 General**. Patter supports the four common in games:
 
-- git and SVN are merge-based, so everyone edits and changes merge together. Because Patter splits
+- **git** and SVN are merge-based, so everyone edits and changes merge together. Because Patter splits
   the story into one file per scene, and those files are clean and line-by-line, an ordinary text
   merge is enough.
-- Perforce and Plastic SCM are lock-based, so a file is checked out (and often locked to one
+- **Perforce** and Plastic SCM are lock-based, so a file is checked out (and often locked to one
   person) before editing. Patterpad understands this and checks files out when you save.
 - The none option is a plain project on disk with no version-control features at all.
 

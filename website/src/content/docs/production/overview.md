@@ -28,11 +28,11 @@ the project, so "how much is drafted vs done, and what's left" is a number, not 
 
 The whole VO pipeline lives in the app:
 
-- Assign actors to characters in the [Cast](/setup/cast/).
-- Export a recording script for the studio, either every voiced line or only those marked ready to
+- **Assign actors** to characters in the [Cast](/setup/cast/).
+- **Export a recording script** for the studio, either every voiced line or only those marked ready to
   record, from [Production reports and exports](/production/tracking-and-reports/#production-reports-and-exports)
   (or `patter voice-export` from the [CLI](/cli/)).
-- Track takes by dropping audio into per-status folders. Patter derives each line's recording
+- **Track takes** by dropping audio into per-status folders. Patter derives each line's recording
   status from the files, and flags a take as **out of date** when the line is edited after it was
   recorded, so you know exactly what needs a re-take. See
   [Recording status and audio](/production/audio/#recording-status).

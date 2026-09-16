@@ -76,9 +76,9 @@ already do.
 Every runtime takes a live host resolver, in its own idiom, and self-backs `@world` when you give it
 none:
 
-- Unity takes `EngineOptions.HostScopes`, an `IHostScope` per token, and the [Unity](/play/unity/#your-games-state) page has the detail.
-- Unreal binds a `UPatterWorld` at `UPatterEngine::Create(Bundle, World)`, covered on the [Unreal](/play/unreal/#your-games-state) page.
-- Godot uses the `host_scopes` option, a `get` / `set` pair per token, covered on the [Godot](/play/godot/#your-games-state) page.
+- **Unity** takes `EngineOptions.HostScopes`, an `IHostScope` per token, and the [Unity](/play/unity/#your-games-state) page has the detail.
+- **Unreal** binds a `UPatterWorld` at `UPatterEngine::Create(Bundle, World)`, covered on the [Unreal](/play/unreal/#your-games-state) page.
+- **Godot** uses the `host_scopes` option, a `get` / `set` pair per token, covered on the [Godot](/play/godot/#your-games-state) page.
 
 The rules are the same everywhere: `@world` is never in a Patter save; a `writable: false`
 declaration refuses the STORY's write with the same sentence (`'@world.x' is read-only`), bound or
