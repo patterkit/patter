@@ -116,7 +116,7 @@ Every engine's client has the same shape: open it with the build id, tell it whe
 report the position after each `advance()` / `choose()`, and tell it when a flow closes. It never
 throws into your game loop, and if Patterpad isn't listening every call is a no-op.
 
-**JavaScript** - `@patterkit/play-helpers` ships `createDebugLink`:
+**JavaScript**: `@patterkit/play-helpers` ships `createDebugLink`:
 
 ```js
 import { createDebugLink } from "@patterkit/play-helpers";

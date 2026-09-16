@@ -165,7 +165,7 @@ hands to the host.
   everywhere) and `@scene` (local to one scene, but still kept for the life of the
   piece). A bare `@name` means `@patter.name`. There's no block- or group-local scope.
 - **Types**: `boolean`, `number`, `string`, `enum`, `flags` (enum and flags behave like
-  Ink LISTs), and `quality` - a story stage as an ordered ladder. Which to reach for, and
+  Ink LISTs), and `quality`, a story stage as an ordered ladder. Which to reach for, and
   how to tell the confusable pairs apart, is [Property types](/format/property-types/).
 - **Sharing**: a per-property `shared` flag controls *where the value lives*: one value
   for the whole world, or one per concurrent flow. `@patter` is shared by default;

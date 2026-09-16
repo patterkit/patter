@@ -63,7 +63,7 @@ patterplay.js   the engine - refreshed every publish
 ```
 
 The first two are the **harness**: published once, then *left alone*. Change the colours and
-fonts in `style.css`, add a title image or an author credit to `index.html` - then keep
+fonts in `style.css`, add a title image or an author credit to `index.html`, then keep
 writing, and every later **Publish for Web…** to the same folder updates only your story,
 leaving your customisations exactly as you made them. (Deleted one? It's re-created fresh on
 the next publish.) The folder plays straight from disk with a double-click on `index.html`,
