@@ -79,6 +79,7 @@ const stub = {
   openWorld: () => console.log("openWorld"),
   findUsage: (ref: string) => console.log("findUsage", ref),
   setPin: (on: boolean) => console.log("setPin", on),
+  close: () => console.log("close"),
   onProject: () => undefined,
   onPin: () => undefined,
   onTheme: () => undefined,

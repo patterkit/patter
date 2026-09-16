@@ -6,10 +6,9 @@
 
 import type { CoverageReport, CoverageBeat } from "../../shared/api.js";
 import { el } from "./dom.js";
-import { iconNode } from "@wildwinter/app-shell"; // the drawn warning mark on a dead beat
+import { iconNode, formatCount as num } from "@wildwinter/app-shell"; // the drawn warning mark on a dead beat; the grouped count
 
 const pct = (n: number): string => `${n.toFixed(0)}%`;
-const num = (n: number): string => n.toLocaleString();
 const clip = (s: string, n = 60): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** A headline stat: big number + label. */

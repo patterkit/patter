@@ -10,7 +10,7 @@
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
 import { el } from "./dom.js";
-import { iconBtn, labelled, moveItem, tagChips, stageChips, bindPropertyName, bindPropertyRef, dupGuard, expandableRow,
+import { iconBtn, labelled, moveItem, tagChips, stageChips, bindPropertyName, bindPropertyRef, defaultControl, dupGuard, expandableRow,
   firstIllegalPropertyName, focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
 const TYPES: Array<[PropertyType, string]> = [
@@ -61,43 +61,9 @@ export function mountWorld(
   const driversHost = el("div", "world-drivers");
 
   // ---- host-scope property rows ------------------------------------------------------------------
-  const defaultControl = (p: ScopeRow): HTMLElement => {
-    if (p.type === "boolean") {
-      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
-      for (const [v, l] of [["", "(unset)"], ["true", "True"], ["false", "False"]] as const) {
-        const o = el("option", undefined, l) as HTMLOptionElement; o.value = v;
-        if ((v === "true" && p.default === true) || (v === "false" && p.default === false)) o.selected = true; sel.append(o);
-      }
-      sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value === "true"; });
-      return sel;
-    }
-    if (p.type === "enum") {
-      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
-      const o0 = el("option", undefined, "(unset)") as HTMLOptionElement; o0.value = ""; sel.append(o0);
-      for (const v of p.values ?? []) { const o = el("option", undefined, v) as HTMLOptionElement; o.value = v; if (p.default === v) o.selected = true; sel.append(o); }
-      sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value; });
-      return sel;
-    }
-    if (p.type === "quality") {
-      // Default = where the ladder starts; unset means the FIRST stage, so say so rather than "(unset)".
-      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
-      const o0 = el("option", undefined, "(first stage)") as HTMLOptionElement; o0.value = ""; sel.append(o0);
-      for (const v of p.stages ?? []) { const o = el("option", undefined, v) as HTMLOptionElement; o.value = v; if (p.default === v) o.selected = true; sel.append(o); }
-      sel.addEventListener("change", () => { if (sel.value === "") delete p.default; else p.default = sel.value; });
-      return sel;
-    }
-    if (p.type === "flags") {
-      const s = el("span", "gd-flagnote", "starts empty");
-      s.dataset.tip = "A flags property starts with none set. Effects turn them on with set_flags().";
-      return s;
-    }
-    const input = el("input", "gd-input gd-default") as HTMLInputElement;
-    input.type = p.type === "number" ? "number" : "text"; input.placeholder = "Default";
-    input.value = p.default == null ? "" : String(p.default);
-    input.addEventListener("input", () => { const raw = input.value; if (raw === "") delete p.default; else p.default = (p.type === "number" ? Number(raw) : raw) as ScalarValue; });
-    return input;
-  };
-
+  // The default control is the shell's (`defaultControl`, typed: the model holds a real boolean / number).
+  // The row itself stays hand-built: a fixed `@world.` prefix, a Read-only axis, a guard keyed on the
+  // full address and the driver rows re-checked on every rename are not the shell list's shape.
   const scopeRow = (p: ScopeRow, i: number): HTMLElement => {
     // Every world property is @world: the game owns these values and the story reads them. The scope
     // isn't a user choice, so the row shows a fixed `@world.` and edits only the property name.
@@ -123,8 +89,8 @@ export function mountWorld(
     });
 
     // Default on the line (matching Properties); rebuilt in place when enum/flags values change.
-    let dflt = defaultControl(p);
-    const refreshDefault = (): void => { const fresh = defaultControl(p); dflt.replaceWith(fresh); dflt = fresh; };
+    let dflt = defaultControl(p, undefined, { typed: true });
+    const refreshDefault = (): void => { const fresh = defaultControl(p, undefined, { typed: true }); dflt.replaceWith(fresh); dflt = fresh; };
 
     const acts = el("div", "gd-acts");
     acts.append(

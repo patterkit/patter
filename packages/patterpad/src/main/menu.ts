@@ -5,12 +5,13 @@
 // File > Open Recent stays current.
 
 import { app, shell, Menu, BrowserWindow, type MenuItemConstructorOptions } from "electron";
-import { resolve, sep } from "node:path";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
-// The suite-standard Edit items. Their LABELS and ACCELERATORS are family grammar and come from
-// the shell so both apps spell them the same; the click handlers stay Patterpad's, because the
-// undo MECHANISM is per app (ProseMirror history here, file-byte replay in Storyletter).
-import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, namedMenuItems } from "@wildwinter/app-shell/menu";
+// The suite's menu spine. Every LABEL and ACCELERATOR the family shares comes from the shell so both
+// apps spell them the same; the click handlers stay Patterpad's, because the mechanism behind each is
+// per app (ProseMirror history for Undo here, file-byte replay in Storyletter). What is hand-typed
+// below is only what is this app's alone (Patterpack, scenes, spelling, notes, fonts).
+import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, FILE_MENU, PLAY_MENU, PANE_MENU, REVIEW_MENU, PUBLISH_MENU, VIEW_MENU, namedMenuItems, recentsSubmenu } from "@wildwinter/app-shell/menu";
+import type { NamedMenuItem } from "@wildwinter/app-shell/menu";
 
 // The family-standard named items (About / Documentation), so this app spells them the way
 // every app in the suite does. The URLs are Patterpad's; the labels are not.
@@ -28,6 +29,13 @@ const COLOURS: Array<[ThemePrefs["colour"], string]> = [["system", "Follow Syste
 const FONTS: Array<[ThemePrefs["font"], string]> = [["newsreader", "Newsreader"], ["literata", "Literata"], ["source", "Source Serif"], ["script", "Courier (script)"]];
 const DOC_CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers" };
 
+/** A named documentation item, rendered disabled rather than dead when the app supplied no URL: the
+ *  shell's `ready` flag carries that, so no non-null assertion on `url` is needed here. */
+const linkItem = (item: NamedMenuItem): MenuItemConstructorOptions => ({
+  label: item.label, enabled: item.ready,
+  click: () => { if (item.url) void shell.openExternal(item.url); },
+});
+
 /** Spelling submenu data: on/off, the active dictionary, and every installed dictionary (Review ▸ Spelling
  *  mirrors the Dictionary settings tab). */
 export interface SpellingMenu { hasProject: boolean; enabled: boolean; language: string; dictionaries: Array<{ id: string; label: string }> }
@@ -36,25 +44,14 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
 
-  // Show WHERE each recent lives on disk. macOS renders `sublabel` as a dimmed second line and `toolTip`
-  // on hover; native menus elsewhere render neither, so on those platforms we fold the path into the label
-  // itself. Paths are abbreviated to `~` for the home dir to keep them short.
-  const home = app.getPath("home");
-  const tildePath = (p: string): string => {
-    const abs = resolve(p);
-    return abs === home || abs.startsWith(home + sep) ? `~${abs.slice(home.length)}` : abs;
-  };
-  const recentItems: MenuItemConstructorOptions[] = recents.length
-    ? recents.map((r) => {
-        const shown = tildePath(r.path);
-        return {
-          label: isMac ? r.name : `${r.name}  ·  ${shown}`,
-          sublabel: shown,        // macOS: a dimmed second line under the name
-          toolTip: r.path,        // macOS: the full (un-abbreviated) path on hover
-          click: () => send(`open-recent:${r.path}`),
-        };
-      })
-    : [{ label: "No Recent Projects", enabled: false }];
+  // The Open Recent submenu is the shell's: it shows WHERE each recent lives (a dimmed second line on
+  // macOS, folded into the label elsewhere), says "No Recent Projects" when empty, and offers Clear
+  // Recents after a separator. The renderer forgets them through the store and refreshes its welcome.
+  const recentItems: MenuItemConstructorOptions[] = recentsSubmenu(recents, {
+    onOpen: (path) => send(`open-recent:${path}`),
+    onClear: () => send("clear-recents"),
+    home: app.getPath("home"),
+  });
 
   // On macOS, replace the stock `role: "appMenu"` with an explicit one so "About Patterpad" opens our
   // THEMED about surface instead of the grey OS panel (design-language "coherent to the edges"); the rest
@@ -79,19 +76,19 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
     {
       label: "File",
       submenu: [
-        { label: "New Project…", accelerator: "CmdOrCtrl+N", click: () => send("new") },
-        { label: "Open Project…", accelerator: "CmdOrCtrl+O", click: () => send("open") },
+        { ...FILE_MENU.newProject, click: () => send("new") },
+        { ...FILE_MENU.openProject, click: () => send("open") },
         // A `.patterpack` is a single FILE (not a `.patter` folder), so it needs its own file picker: on
         // Windows / Linux the Open Project dialog is a directory selector that would grey the file out.
         { label: "Open Patterpack…", click: () => send("open-patterpack") },
-        { label: "Open Recent", submenu: recentItems },
+        { ...FILE_MENU.openRecent, submenu: recentItems },
         // The way back to the welcome screen: without it, opening a project is a one-way door and the
         // recents list is unreachable. No accelerator - it is not a key you tap. Close PROJECT, not
         // Close Window: the window stays, showing the welcome.
-        { label: "Close Project", enabled: spelling?.hasProject ?? false, click: () => send("close-project") },
+        { ...FILE_MENU.closeProject, enabled: spelling?.hasProject ?? false, click: () => send("close-project") },
         { type: "separator" },
-        { label: "Save", accelerator: "CmdOrCtrl+S", click: () => send("save") },
-        { label: "Save As…", accelerator: "Shift+CmdOrCtrl+S", click: () => send("save-as") }, // duplicate the project folder
+        { ...FILE_MENU.save, click: () => send("save") },
+        { ...FILE_MENU.saveAs, click: () => send("save-as") }, // duplicate the project folder
         { label: "Export as Patterpack…", click: () => send("export-patterpack") }, // bundle the project into one sendable file
         // The return leg of the line above, and a THIRD act rather than a mode of Open: export writes a
         // file, Open Patterpack replaces the project with a new one, this edits the open project in place.
@@ -101,9 +98,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", click: () => send("new-scene") },
         { label: "Delete Scene…", click: () => send("delete-scene") },
         { type: "separator" },
-        { label: "Project Settings…", accelerator: "CmdOrCtrl+,", click: () => send("project-settings") },
+        { ...FILE_MENU.projectSettings, click: () => send("project-settings") },
         // User identity (name + optional email) lives in the macOS app menu; on other platforms it sits here.
-        ...(isMac ? [] : [{ label: "User Information…", click: () => send("user-info") } as const]),
+        ...(isMac ? [] : [{ ...APP_MENU.userInfo, click: () => send("user-info") }]),
         // macOS: no File ▸ Close Window - the App menu's Quit (and the window's close button) already cover
         // it. Other platforms have no app menu, so the quit item lives here at the foot of File: labelled
         // "Exit" on Windows (its convention) and "Quit" on Linux.
@@ -145,7 +142,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Open the detached search window (#205) in the right mode. The accelerators ARE the shortcuts:
         // Find = Cmd/Ctrl+F; Replace = Cmd+Alt+F on macOS, Ctrl+H elsewhere (the platform conventions).
         { ...EDIT_MENU.find, click: () => send("find") },
-        { label: "Replace…", accelerator: isMac ? "Cmd+Alt+F" : "Ctrl+H", click: () => send("replace") },
+        { label: EDIT_MENU.replace.label, accelerator: isMac ? EDIT_MENU.replace.acceleratorMac : EDIT_MENU.replace.acceleratorOther, click: () => send("replace") },
       ],
     },
     {
@@ -157,7 +154,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Checked while the link is active (listening / connected); toggles it (the bottom-right connect icon
         // mirrors the same state). Follows a running game's cursor (#181).
         // "Live Link" = live bundle refresh INTO the game + the debugger-style cursor follow OUT of it.
-        { label: "Live Link", type: "checkbox", checked: debugActive, click: () => send("debug-link") },
+        { ...PLAY_MENU.liveLink, type: "checkbox", checked: debugActive, click: () => send("debug-link") },
       ],
     },
     {
@@ -165,12 +162,12 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // suggestion across the script, looping) plus the resolved-visibility toggles.
       label: "Review",
       submenu: [
-        { label: "Review Feedback", type: "checkbox", checked: panes.reviewFeedback ?? false, accelerator: "CmdOrCtrl+Shift+R", click: () => send("toggle-review-feedback") },
-        { label: "Next Feedback", accelerator: "F8", click: () => send("review-next") },
-        { label: "Previous Feedback", accelerator: "Shift+F8", click: () => send("review-prev") },
+        { ...REVIEW_MENU.reviewFeedback, type: "checkbox", checked: panes.reviewFeedback ?? false, click: () => send("toggle-review-feedback") },
+        { ...REVIEW_MENU.nextFeedback, click: () => send("review-next") },
+        { ...REVIEW_MENU.previousFeedback, click: () => send("review-prev") },
         { type: "separator" },
         // Narrative coverage (#159): random playthroughs find never-reached / needs-input content.
-        { label: "Coverage Test…", click: () => send("coverage-test") },
+        { ...REVIEW_MENU.coverageTest, click: () => send("coverage-test") },
         { type: "separator" },
         // Browse every line at a writing status (#205) - the search palette in status mode.
         { label: "Find Lines by Writing Status…", accelerator: "CmdOrCtrl+Shift+L", click: () => send("find-by-status") },
@@ -178,7 +175,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Audio status tracking is voiced-only + opt-outable, so this is disabled when it's off (matches the inspector).
         { label: "Find Lines by Recording Status…", enabled: audioTracked, click: () => send("find-by-recording") },
         // Find where a property is used in conditions / effects / text - the search palette in property mode.
-        { label: "Find Property Usage…", click: () => send("find-property") },
+        { ...REVIEW_MENU.findPropertyUsage, click: () => send("find-property") },
         // Browse every node carrying an author tag (#215) - the search palette in tag mode.
         { label: "Find by Tag…", click: () => send("find-by-tag") },
         {
@@ -213,7 +210,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         },
         { type: "separator" },
         // Reveal archived (resolved) comment threads in the editor (#148); remembered in panes.commentsResolved.
-        { label: "Show Resolved Comments", type: "checkbox", checked: panes.commentsResolved ?? false, click: () => send("toggle-comments-resolved") },
+        { ...REVIEW_MENU.showResolvedComments, type: "checkbox", checked: panes.commentsResolved ?? false, click: () => send("toggle-comments-resolved") },
         // Reveal archived (accepted/rejected) rewrite proposals; remembered in panes.suggestionsResolved.
         { label: "Show Resolved Suggestions", type: "checkbox", checked: panes.suggestionsResolved ?? false, click: () => send("toggle-suggestions-resolved") },
       ],
@@ -240,14 +237,14 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // game-facing compiled bundle.
       label: "Publish",
       submenu: [
-        { label: "Publish Playable HTML…", click: () => send("playable-html") },
+        { ...PUBLISH_MENU.playableHtml, click: () => send("playable-html") },
         { label: "Publish for Web…", click: () => send("publish-web") },
         { label: "Publish Readable Script…", click: () => send("export-script") },
         { type: "separator" },
-        { label: "Publish Bundle", accelerator: "Shift+CmdOrCtrl+B", click: () => send("build-bundle") },
+        { ...PUBLISH_MENU.bundle, click: () => send("build-bundle") },
         // Auto Rebuild: recompile the bundle after edits (debounced + deduped). Mirrors the same project
         // setting as the Project Settings ▸ General toggle.
-        { label: "Auto Rebuild", type: "checkbox", checked: autoRebuild, click: () => send("toggle-auto-rebuild") },
+        { ...PUBLISH_MENU.autoRebuild, type: "checkbox", checked: autoRebuild, click: () => send("toggle-auto-rebuild") },
       ],
     },
     {
@@ -255,7 +252,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // remembered state - then the standard view roles. Replaces role:viewMenu so both live in one place.
       label: "View",
       submenu: [
-        { label: "Project Overview", click: () => send("project-overview") }, // the #3a landing (scene index + stats)
+        { ...VIEW_MENU.projectOverview, click: () => send("project-overview") }, // the #3a landing (scene index + stats)
+        // Up a Level: the family's hierarchy step (Cmd+[), which here is a scene (or the Properties page)
+        // up to the project overview. History (Back / Forward) is the other axis, below.
+        { ...VIEW_MENU.upALevel, click: () => send("up-a-level") },
         { type: "separator" },
         // Navigation HISTORY, the other axis from the navigator's hierarchy (from-storylets/nav-history).
         // Always enabled: the arrows in the topbar carry the greyed state, and a step with nowhere to go
@@ -264,9 +264,11 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: GO_MENU.back.label, accelerator: process.platform === "darwin" ? GO_MENU.back.acceleratorMac : GO_MENU.back.acceleratorOther, click: () => send("nav-back") },
         { label: GO_MENU.forward.label, accelerator: process.platform === "darwin" ? GO_MENU.forward.acceleratorMac : GO_MENU.forward.acceleratorOther, click: () => send("nav-forward") },
         { type: "separator" },
-        { label: "Show Scenes", type: "checkbox", checked: panes.nav, accelerator: "CmdOrCtrl+1", click: () => send("toggle-nav") },
-        { label: "Show Inspector", type: "checkbox", checked: panes.inspector, accelerator: "CmdOrCtrl+2", click: () => send("toggle-inspector") },
-        { label: "Reset View", click: () => send("reset-view") }, // reset side-pane widths + visibility to defaults
+        // The spine's pane items. The navigator's LABEL is this app's on purpose: its left pane lists scenes
+        // and the bar's toggle says "Show scenes" too, so the menu keeps that word over the spine's "Navigator".
+        { ...PANE_MENU.showNav, label: "Show Scenes", type: "checkbox", checked: panes.nav, click: () => send("toggle-nav") },
+        { ...PANE_MENU.showInspector, type: "checkbox", checked: panes.inspector, click: () => send("toggle-inspector") },
+        { ...PANE_MENU.resetView, click: () => send("reset-view") }, // reset side-pane widths + visibility to defaults
         // Full-bleed: hide ALL chrome (panes, bars, topbar, review gutters/tints). A REAL accelerator
         // (handled natively, before the web content) so it toggles reliably even with the ProseMirror
         // editor focused - unlike a renderer keydown, which the editor can swallow. Shift+Cmd/Ctrl+M
@@ -288,7 +290,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         },
         { type: "separator" },
         {
-          label: "Colour Theme",
+          ...VIEW_MENU.colourTheme,
           submenu: COLOURS.map(([v, label]) => ({
             label, type: "radio" as const, checked: theme.colour === v, click: () => send(`theme:colour:${v}`),
           })),
@@ -314,8 +316,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       role: "help",
       submenu: [
         // The documentation site: the writers' guide first (the audience in this app), then the site home.
-        { label: NAMED.docs.label, enabled: NAMED.docs.ready, click: () => void shell.openExternal(NAMED.docs.url!) },
-        { label: NAMED.suiteDocs.label, enabled: NAMED.suiteDocs.ready, click: () => void shell.openExternal(NAMED.suiteDocs.url!) },
+        linkItem(NAMED.docs),
+        linkItem(NAMED.suiteDocs),
         { type: "separator" },
         { ...HELP_MENU.checkForUpdates, click: () => void manualCheckForUpdates(win) },
         // macOS keeps About in the app menu (above); Windows/Linux get it here, the conventional home.

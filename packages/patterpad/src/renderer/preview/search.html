@@ -3,21 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Patterpad · Search (UI preview)</title>
+    <title>Find (UI preview)</title>
   </head>
   <body class="swin">
-    <header id="swin-head" class="swin-head">
-      <div class="swin-modes" role="tablist">
-        <button id="mode-content" class="swin-mode" type="button" role="tab">Text</button>
-        <button id="mode-replace" class="swin-mode" type="button" role="tab">Replace</button>
-        <button id="mode-status" class="swin-mode" type="button" role="tab">Writing</button>
-        <button id="mode-recording" class="swin-mode" type="button" role="tab">Recording</button>
-        <button id="mode-property" class="swin-mode" type="button" role="tab">Property</button>
-        <button id="mode-tag" class="swin-mode" type="button" role="tab">Tags</button>
-      </div>
-      <span class="swin-spacer"></span>
-      <button id="swin-close" class="swin-close" type="button" data-tip="Close (Esc)" aria-label="Close (Esc)"></button>
-    </header>
+    <!-- The window is frameless: the shell's toolWindowHead (drag bar, pin, close) is built in search.ts,
+         and these mode tabs stand in its title slot. -->
+    <div id="swin-modes" class="seg swin-modes" role="tablist">
+      <button id="mode-content" class="seg-opt" type="button" role="tab">Text</button>
+      <button id="mode-replace" class="seg-opt" type="button" role="tab">Replace</button>
+      <button id="mode-status" class="seg-opt" type="button" role="tab">Writing</button>
+      <button id="mode-recording" class="seg-opt" type="button" role="tab">Recording</button>
+      <button id="mode-property" class="seg-opt" type="button" role="tab">Property</button>
+      <button id="mode-tag" class="seg-opt" type="button" role="tab">Tags</button>
+    </div>
     <input id="swin-input" class="swin-input" type="text" spellcheck="false" />
     <div id="swin-replace-row" class="swin-replace-row" hidden>
       <input id="swin-replace" class="swin-input swin-replace" type="text" spellcheck="false" placeholder="Replace with…" />

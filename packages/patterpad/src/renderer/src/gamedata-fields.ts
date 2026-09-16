@@ -7,7 +7,7 @@
 
 import type { GameDataField, GameDataFields, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
 import { el } from "./dom.js";
-import { iconBtn, labelled, moveItem, tagChips, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { iconBtn, labelled, moveItem, tagChips, defaultControl, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
   { kind: "scene", label: "Scene" }, { kind: "block", label: "Block" }, { kind: "snippet", label: "Snippet" },
@@ -40,38 +40,9 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     return null;
   };
 
-  /** A type-aware editor for the field's default value (empty/"unset" leaves it absent). */
-  const defaultControl = (f: GameDataField): HTMLElement => {
-    if (f.type === "boolean") {
-      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
-      for (const [v, l] of [["", "(unset)"], ["true", "True"], ["false", "False"]] as const) {
-        const o = el("option", undefined, l) as HTMLOptionElement; o.value = v;
-        if ((v === "true" && f.default === true) || (v === "false" && f.default === false)) o.selected = true;
-        sel.append(o);
-      }
-      sel.addEventListener("change", () => { if (sel.value === "") delete f.default; else f.default = sel.value === "true"; });
-      return sel;
-    }
-    if (f.type === "enum") {
-      const sel = el("select", "insp-select gd-default") as HTMLSelectElement;
-      const o0 = el("option", undefined, "(unset)") as HTMLOptionElement; o0.value = ""; sel.append(o0);
-      for (const v of f.values ?? []) { const o = el("option", undefined, v) as HTMLOptionElement; o.value = v; if (f.default === v) o.selected = true; sel.append(o); }
-      sel.addEventListener("change", () => { if (sel.value === "") delete f.default; else f.default = sel.value; });
-      return sel;
-    }
-    const input = el("input", "gd-input gd-default") as HTMLInputElement;
-    input.type = f.type === "number" ? "number" : "text";
-    input.placeholder = "Default";
-    input.value = f.default == null ? "" : String(f.default);
-    input.addEventListener("input", () => {
-      const raw = input.value;
-      if (raw === "") { delete f.default; }
-      else f.default = f.type === "number" ? Number(raw) : raw;
-     
-    });
-    return input;
-  };
-
+  // The default control is the shell's (`defaultControl`, typed: a real boolean / number in the model). A
+  // multiline field's default is a one-line text field, as it always was. The row itself stays hand-built:
+  // a game-data field name is the host's word and takes none of the property-name rules the shell list binds.
   const fieldRow = (f: GameDataField, i: number, fields: GameDataField[]): HTMLElement => {
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
     name.type = "text"; name.placeholder = "Field name"; name.value = f.name; name.spellcheck = false;
@@ -88,8 +59,8 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     });
 
     // Default on the line; rebuilt in place when enum values change so the new options become selectable.
-    let dflt = defaultControl(f);
-    const refreshDefault = (): void => { const fresh = defaultControl(f); dflt.replaceWith(fresh); dflt = fresh; };
+    let dflt = defaultControl(f, undefined, { typed: true });
+    const refreshDefault = (): void => { const fresh = defaultControl(f, undefined, { typed: true }); dflt.replaceWith(fresh); dflt = fresh; };
 
     const acts = el("div", "gd-acts");
     acts.append(

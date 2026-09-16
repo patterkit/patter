@@ -11,32 +11,30 @@ import { userInfo } from "node:os";
 import { currentUserAsync, writeBinaryFile, writeTextFile } from "@wildwinter/simple-vc-lib";
 import * as project from "./project.js";
 import * as dictionaries from "./dictionaries.js";
-import { createStore } from "./store.js";
+import { createStore, type ToolWindowName } from "./store.js";
 import { applyMenu } from "./menu.js";
 import { createDebugServer, type DebugServer } from "./debug-link.js";
-import { savedWindowRect, rememberBounds, centeredOnPrimary, pinToolWindow } from "@wildwinter/app-shell/tool-window";
+import { centeredOnPrimary, defineToolWindows, pinToolWindow } from "@wildwinter/app-shell/tool-window";
+import { plural } from "@wildwinter/app-shell/util";
 // The updater is the shell's. It IS this app's, generalised: the stall watchdog,
 // the retry budget, the surfaced background error and the live progress that
 // 0.6.6 grew after #33 all went into it, so this is a swap and not a downgrade.
 // Its IPC channel names are byte-identical to the ones this app already used, so
 // the preload and the renderer dialog are untouched.
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
-import { createJobHost, JOB_PROGRESS } from "@wildwinter/app-shell/job";
+import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
-import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, ThemePrefs, VcsKind } from "../shared/api.js";
+import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let win: BrowserWindow | null = null;
-let playWin: BrowserWindow | null = null;
 let playSceneId: string | null = null;
 let playBlockId: string | null = null; // Play Block: the block the run enters (null = scene start)
-let searchWin: BrowserWindow | null = null;
 let searchMode: SearchMode = "content"; // the mode the search window (re)opens in
 let searchSeed: string | undefined; // an initial query to seed the search window with (property-usage deep-link)
 let searchFocus: SearchFocus | undefined; // the editor's last scene + caret, for content-search ranking
-let coverageWin: BrowserWindow | null = null;
 let lastCoverageResult: import("../shared/api.js").CoverageResult | null = null; // session cache (the window shows it on reopen)
 
 // Live debug link (#181): created on first use. Frames for the followed flow ride the existing play:mark
@@ -57,15 +55,30 @@ function ensureDebugServer(): DebugServer {
 // `patterpad-session.json` sitting beside it on the first run after the change.
 const store = createStore(app.getPath("userData"));
 
-// Long jobs (the coverage sweep, today). COOPERATIVE, not parallel: the work still runs here, it just
-// hands the event loop back every few milliseconds, so IPC keeps flowing and Cancel is heard. Progress
-// goes to every live window rather than a remembered one, because the window that started the job is
-// not necessarily the only one that should see it, and a closed-and-reopened window still catches up.
+// Long jobs: the coverage sweep, and every export / publish / pack / merge (parity row 20). COOPERATIVE,
+// not parallel: the work still runs here, it just hands the event loop back every few milliseconds, so
+// IPC keeps flowing and Cancel is heard. Progress goes to every live window rather than a remembered
+// one, because the window that started the job is not necessarily the only one that should see it, and
+// a closed-and-reopened window still catches up.
 const jobs = createJobHost({
   send: (channel, payload) => {
     for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload);
   },
 });
+
+/** A refused or stopped job, in the shape every export path already returns. */
+type JobRefused = { ok: false; error: string };
+
+/** Run one of the publish-shaped paths as the kit's "publish" job: one at a time (a second click while
+ *  a pack is still being written is refused rather than raced), cancellable from the renderer's strip,
+ *  and on the same progress channel as coverage should the ops layer ever report through it. None of
+ *  these paths reports progress today, so the renderer draws them indeterminate. */
+async function publishJob<T>(work: () => Promise<T>): Promise<T | JobRefused> {
+  const out = await jobs.start("publish", work);
+  if ("error" in out) return { ok: false, error: out.error };
+  if (out.value === undefined) return { ok: false, error: "Stopped before it finished." };
+  return out.value;
+}
 
 // Live bundle refresh over the debug link (live-bundle-refresh, phases 2-3): after a save (or a
 // build), recompile the game-facing bundle and push it to a connected game, debounced. Free when
@@ -189,12 +202,35 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     return { session: proj, root: proj.root, name: proj.name, reply: { project: proj, lastScene: land, lastCaret } };
   },
   refreshMenu: () => refreshMenu(),
-  satellites: [
-    // `searchFocus` is re-anchored by `open` above when there is somewhere to anchor to; this clears it
-    // for the failure path and for an invalidation that is not an open.
-    { window: () => searchWin, channel: "searchWin:project", clear: () => { searchFocus = undefined; } },
-    { window: () => coverageWin, channel: "covWin:project", clear: () => { lastCoverageResult = null; } },
-  ],
+  // The tool windows register themselves as satellites: see `windows` below.
+});
+
+// --- the tool windows, as data ------------------------------------------------
+// One row per helper window (the shell's `defineToolWindows`): where it is remembered (the store slice),
+// its default and minimum size, and the project-changed nudge its renderer listens on. Every row is a
+// satellite of the session, so a new project cannot open underneath a window still showing the old one,
+// and Reset View walks the rows rather than a hand-kept list. The three windows are frameless; each
+// renderer draws the shell's `toolWindowHead` in place of the OS title bar.
+const MAIN_DEFAULT = { width: 1200, height: 820 };
+const windows = defineToolWindows<ToolWindowName>([
+  // Play was never a satellite before: a different project opened under it left it running the old
+  // scene. Its renderer closes on the nudge (a Play window over another project is a view of nothing).
+  { name: "play", title: "Play", page: "play/index.html", def: { width: 460, height: 740 }, min: { width: 340, height: 420 },
+    ...store.window("play"), channel: "play:project", clear: () => { playSceneId = null; playBlockId = null; } },
+  // `searchFocus` is re-anchored by `open` above when there is somewhere to anchor to; the clear covers
+  // the failure path and an invalidation that is not an open.
+  { name: "search", title: "Find", page: "search/index.html", def: { width: 460, height: 520 }, min: { width: 360, height: 280 },
+    ...store.window("search"), channel: "searchWin:project", clear: () => { searchFocus = undefined; } },
+  { name: "coverage", title: "Coverage", page: "coverage/index.html", def: { width: 720, height: 620 }, min: { width: 480, height: 360 },
+    ...store.window("coverage"), channel: "covWin:project", clear: () => { lastCoverageResult = null; } },
+], {
+  rendererDir: join(here, "../renderer"),
+  preload: join(here, "../preload/index.cjs"),
+  pinTo: () => win ?? undefined,
+  session: { addSatellite: session.addSatellite, channel: "state:project" },
+  resetStore: () => store.resetWindows(),
+  // Closing the play window clears the editor's playhead + visited trail.
+  onOpened: (w, name) => { if (name === "play") w.on("closed", () => { win?.webContents.send("play:reset"); }); },
 });
 
 /** Paths the renderer is allowed to ask us to open: ones the app already knows about (the last project,
@@ -571,9 +607,9 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
     await dialog.showMessageBox(win, { type: "info", message: "Nothing to merge.", detail: "That pack has no project files in it." });
     return null;
   }
-  const what = `Merge ${merged} file${merged === 1 ? "" : "s"}${added ? ` and add ${added}` : ""} into this project?`;
+  const what = `Merge ${plural(merged, "file")}${added ? ` and add ${added}` : ""} into this project?`;
   const conflictLine = summary.conflicts > 0
-    ? `${summary.conflicts} conflict${summary.conflicts === 1 ? "" : "s"} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.`
+    ? `${plural(summary.conflicts, "conflict")} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.`
     : "";
   const cannotUndo = "This edits the open project and cannot be undone from the Edit menu.";
 
@@ -676,160 +712,58 @@ async function createDialog(name: string, vcs: VcsKind, buildBundle?: string): P
   return { project: proj };
 }
 
-// --- the interactive play window ---------------------------------------------
-
-const MAIN_DEFAULT = { width: 1200, height: 820 };
-const PLAY_DEFAULT = { width: 460, height: 740 };
-const PLAY_MIN = { width: 340, height: 420 };
-
-/** A remembered helper-window rect, but only if it still lands on a connected display (so a window saved
- *  on a now-disconnected monitor doesn't open offscreen). Falls back to the default size. Shared by the
- *  play + search windows. */
-// `savedWindowRect`, `rememberBounds` and `centeredOnPrimary` are the shell's
-// (@wildwinter/app-shell/tool-window). They were this app's, lifted: the first two
-// came across byte-identical, including the 40px / 20px margins that decide a
-// remembered position is still on a screen somebody has. `rememberBounds` came
-// back with a better signature, taking just the bounds instead of threading a
-// whole store slice through a read and a write, so the store shape stays here
-// where it belongs.
-
-function createPlayWindow(): void {
-  const w = new BrowserWindow({
-    ...savedWindowRect(store.read().play.bounds, PLAY_DEFAULT, PLAY_MIN),
-    minWidth: PLAY_MIN.width,
-    minHeight: PLAY_MIN.height,
-    show: false,
-    title: "Patterpad · Play",
-    webPreferences: { preload: join(here, "../preload/index.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
-  });
-  playWin = w;
-  // The pin means "above the EDITOR", which is a child window - not alwaysOnTop, which floats over
-  // every other application on macOS and Windows (app-shell 0.33.0; a Storyletter user found it).
-  pinToolWindow(w, win, store.read().play.pinned);
-  w.once("ready-to-show", () => w.show());
-  rememberBounds(w, (bounds) => store.setPlay({ ...store.read().play, bounds }));
-  w.on("closed", () => { if (playWin === w) { playWin = null; win?.webContents.send("play:reset"); } }); // clear the editor's playhead + visited trail
-
-  if (process.env["ELECTRON_RENDERER_URL"]) void w.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/play/index.html`);
-  else void w.loadFile(join(here, "../renderer/play/index.html"));
-}
+// --- the tool windows: open / focus ------------------------------------------
 
 /** Open (or focus + restart) the play window for a scene (optionally entering a block - Play Block). */
 function openPlay(sceneId: string, blockId?: string): void {
   playSceneId = sceneId;
   playBlockId = blockId ?? null;
-  if (playWin && !playWin.isDestroyed()) { playWin.focus(); playWin.webContents.send("play:restart"); }
-  else createPlayWindow();
+  const running = windows.get("play");
+  const w = windows.open("play"); // focuses an open window; a fresh one reads `play:info` on boot
+  if (running === w) w.webContents.send("play:restart");
 }
 
 /** Reset View: rescue EVERY window to a sane, on-screen place - un-minimise, default size, centred on the
  *  primary display - so a window lost on a now-disconnected monitor or minimised out of reach comes back.
- *  Clears remembered helper-window bounds too, so they reopen sensibly next time. */
+ *  The editor window is this app's; the three tool windows are the table's (store reset, restore,
+ *  re-pin, and the renderer told so on `state:pinned`). */
 function rescueWindows(): void {
-  // The main editor window: restore, centre at its default size, focus.
   if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore();
     win.setBounds({ ...MAIN_DEFAULT, ...centeredOnPrimary(MAIN_DEFAULT) });
     win.show(); win.focus();
   }
-  // The play window: back to floating (re-pinned), default size, centred; remembered bounds cleared.
-  store.setPlay({ pinned: true });
-  if (playWin && !playWin.isDestroyed()) {
-    if (playWin.isMinimized()) playWin.restore();
-    pinToolWindow(playWin, win, true);
-    playWin.webContents.send("play:pin", true); // ...and its BUTTON, which chose the old state
-    playWin.setBounds({ ...PLAY_DEFAULT, ...centeredOnPrimary(PLAY_DEFAULT) });
-    playWin.show();
-  }
-  // The helper tool windows (search / coverage): clear remembered bounds; if open, restore + recentre.
-  store.setSearch({ pinned: true });
-  if (searchWin && !searchWin.isDestroyed()) {
-    if (searchWin.isMinimized()) searchWin.restore();
-    pinToolWindow(searchWin, win, true); // the store says pinned; the live window must agree
-    searchWin.webContents.send("searchWin:pin", true); // ...and so must its BUTTON, which chose the old state
-    searchWin.setBounds({ ...SEARCH_DEFAULT, ...centeredOnPrimary(SEARCH_DEFAULT) });
-    searchWin.show();
-  }
-  store.setCoverage({ pinned: true });
-  if (coverageWin && !coverageWin.isDestroyed()) {
-    if (coverageWin.isMinimized()) coverageWin.restore();
-    pinToolWindow(coverageWin, win, true); // as above
-    coverageWin.webContents.send("covWin:pin", true);
-    coverageWin.setBounds({ ...COVERAGE_DEFAULT, ...centeredOnPrimary(COVERAGE_DEFAULT) });
-    coverageWin.show();
-  }
+  windows.rescue();
 }
 
-/** Centre a rect on the primary display's work area. */
-
-// ---- the detached search tool window (#205) --------------------------------
-// A small, FRAMELESS, always-on-top helper (its own renderer): the editor stays live underneath while
-// you step through hits. It queries the project index in this process and drives the editor over IPC.
-const SEARCH_DEFAULT = { width: 460, height: 520 };
-const SEARCH_MIN = { width: 360, height: 280 };
-
-function createSearchWindow(): void {
-  const w = new BrowserWindow({
-    ...savedWindowRect(store.read().search.bounds, SEARCH_DEFAULT, SEARCH_MIN),
-    minWidth: SEARCH_MIN.width,
-    minHeight: SEARCH_MIN.height,
-    show: false,
-    title: "Patterpad · Search",
-    frame: false, // a light, chrome-free tool window: no OS title bar; the renderer draws its own slim drag bar + ✕
-    webPreferences: { preload: join(here, "../preload/index.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
-  });
-  searchWin = w;
-  pinToolWindow(w, win, store.read().search.pinned); // above the editor, not above the machine
-  w.once("ready-to-show", () => w.show());
-  rememberBounds(w, (bounds) => store.setSearch({ ...store.read().search, bounds }));
-  w.on("closed", () => { if (searchWin === w) searchWin = null; });
-
-  if (process.env["ELECTRON_RENDERER_URL"]) void w.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/search/index.html`);
-  else void w.loadFile(join(here, "../renderer/search/index.html"));
-}
-
-/** Open (or focus + switch the mode of) the detached search window, anchored at the editor's caret.
+/** Open (or focus + switch the mode of) the detached Find window, anchored at the editor's caret.
  *  `query` (optional) seeds the input: used by the coverage "gated on @x" → property-usage deep-link. */
 function openSearchWindow(mode: SearchMode, focus?: SearchFocus, query?: string): void {
   searchMode = mode;
   searchSeed = query; // a fresh window reads it via searchWin:info; a re-focus gets searchWin:seed below
   if (focus) searchFocus = focus;
-  if (searchWin && !searchWin.isDestroyed()) {
-    searchWin.focus();
-    searchWin.webContents.send("searchWin:mode", mode);
-    if (query) searchWin.webContents.send("searchWin:seed", query);
+  const open = windows.get("search");
+  const w = windows.open("search"); // a fresh window reads `searchMode` + `searchSeed` via searchWin:info on boot
+  if (open === w) {
+    w.webContents.send("searchWin:mode", mode);
+    if (query) w.webContents.send("searchWin:seed", query);
   }
-  else createSearchWindow(); // a fresh window reads `searchMode` + `searchSeed` via searchWin:info on boot
-}
-
-// --- coverage results window (#159) ---------------------------------------------------------------
-const COVERAGE_DEFAULT = { width: 720, height: 620 };
-const COVERAGE_MIN = { width: 480, height: 360 };
-
-function createCoverageWindow(): void {
-  const w = new BrowserWindow({
-    ...savedWindowRect(store.read().coverage.bounds, COVERAGE_DEFAULT, COVERAGE_MIN),
-    minWidth: COVERAGE_MIN.width,
-    minHeight: COVERAGE_MIN.height,
-    show: false,
-    title: "Patterpad · Coverage",
-    webPreferences: { preload: join(here, "../preload/index.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true },
-  });
-  coverageWin = w;
-  pinToolWindow(w, win, store.read().coverage.pinned); // as above
-  w.once("ready-to-show", () => w.show());
-  rememberBounds(w, (bounds) => store.setCoverage({ ...store.read().coverage, bounds }));
-  w.on("closed", () => { if (coverageWin === w) coverageWin = null; });
-
-  if (process.env["ELECTRON_RENDERER_URL"]) void w.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/coverage/index.html`);
-  else void w.loadFile(join(here, "../renderer/coverage/index.html"));
 }
 
 /** Open (or focus) the detached coverage results window. It reads its state via covWin:info on boot, so a
  *  reopen shows the last cached result. */
 function openCoverageWindow(): void {
-  if (coverageWin && !coverageWin.isDestroyed()) coverageWin.focus();
-  else createCoverageWindow();
+  windows.open("coverage");
+}
+
+/** File ▸ Open Recent ▸ Clear Recents. The OPEN project stays listed: forgetting it would also forget
+ *  which project is open, and the next launch would land on the welcome screen instead of in it. */
+function clearRecents(): RecentProject[] {
+  for (const r of store.read().recents) store.forget(r.path);
+  const root = project.currentRoot();
+  if (root) store.recordOpen(root, session.current()?.name ?? basename(root));
+  refreshMenu();
+  return store.read().recents;
 }
 
 function registerIpc(): void {
@@ -843,7 +777,7 @@ function registerIpc(): void {
   // out-of-date view, it is a view of nothing.
   ipcMain.handle("project:close", () => {
     session.closeCurrent();
-    for (const w of [playWin, searchWin, coverageWin]) if (w && !w.isDestroyed()) w.close();
+    for (const w of windows.all()) w.close();
   });
   ipcMain.handle("project:openPath", (_e, path: string): OpenResult => {
     if (!isKnownProjectPath(path)) throw new Error("refused to open an unrecognised path"); // renderer can only reopen known projects
@@ -851,20 +785,22 @@ function registerIpc(): void {
   });
   ipcMain.handle("project:createDialog", (_e, name: string, vcs: VcsKind, buildBundle?: string): Promise<OpenResult | null> => createDialog(name, vcs, buildBundle));
   ipcMain.handle("project:forget", (_e, path: string): BootState => { store.forget(path); if (samePath(path, currentRoot)) currentRoot = null; refreshMenu(); return bootState(null); });
+  ipcMain.handle("project:clearRecents", (): RecentProject[] => clearRecents());
   ipcMain.handle("project:report", () => project.report());
   ipcMain.handle("project:proposeCoverageDrivers", () => project.proposeCoverageDrivers());
   // Coverage window (#159): open it, feed its boot state, run + cache, drive the editor's jump + External Properties tab.
   ipcMain.handle("coverage:open", () => openCoverageWindow());
   ipcMain.handle("covWin:info", (): import("../shared/api.js").CoverageWinInfo => {
-    const pinned = store.read().coverage.pinned;
+    const pinned = store.window("coverage").pinned();
     const info = project.coverageInfo();
     const theme = store.read().theme; // this window paints in the author's palette too
     return info ? { hasProject: true, pinned, theme, ...info, last: lastCoverageResult } : { hasProject: false, pinned, theme, scenes: [], driverCount: 0, last: null };
   });
   ipcMain.handle("covWin:setPin", (_e, on: boolean) => {
-    store.setCoverage({ ...store.read().coverage, pinned: on });
-    pinToolWindow(coverageWin, win, on);
+    store.window("coverage").setPinned(on);
+    pinToolWindow(windows.get("coverage"), win, on);
   });
+  ipcMain.handle("covWin:close", () => { windows.get("coverage")?.close(); });
   ipcMain.handle("covWin:run", async (_e, options: import("../shared/api.js").CoverageRunOptions) => {
     const outcome = await jobs.start("coverage", async (ctx) => project.coverageAsync(options, {
       // The job's cancel flag, in the shape ops asks for. Read through a getter: ops checks it at the
@@ -880,6 +816,8 @@ function registerIpc(): void {
     return result;
   });
   ipcMain.handle("covWin:cancel", () => { jobs.cancel("coverage"); });
+  // The editor's progress strip: stop the running publish-shaped job at its next yield.
+  ipcMain.handle("job:cancel", (_e, kind: string) => { jobs.cancel(kind); });
   ipcMain.handle("covWin:reveal", (_e, sceneId: string, beatId: string) => {
     if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); win.webContents.send("coverage:navigate", sceneId, beatId); }
   });
@@ -888,22 +826,22 @@ function registerIpc(): void {
   });
   // Coverage "gated on @x" → open the Search window in property-usage mode, seeded with the ref.
   ipcMain.handle("covWin:findUsage", (_e, ref: string) => openSearchWindow("property", searchFocus, ref));
-  ipcMain.handle("project:exportReport", () => exportReport());
-  ipcMain.handle("project:build", async () => {
+  ipcMain.handle("project:exportReport", () => publishJob(exportReport));
+  ipcMain.handle("project:build", () => publishJob(async () => {
     const r = await project.buildBundle();
     if (r.ok) scheduleDebugPush(); // live bundle refresh: an explicit build also reaches a connected game
     return r;
-  });
+  }));
   ipcMain.handle("project:audioManifest", () => project.writeAudioManifest());
   ipcMain.handle("project:toggleAutoRebuild", async () => { const on = await project.toggleAutoRebuild(); refreshMenu(); return on; }); // keep the Build-menu checkbox in sync
-  ipcMain.handle("project:exportVoiceScript", (_e, everything: boolean) => exportVoiceScript(everything));
-  ipcMain.handle("project:exportPlayableHtml", () => exportPlayableHtml());
-  ipcMain.handle("project:exportWeb", () => exportWeb());
-  ipcMain.handle("project:exportScript", () => exportScript());
-  ipcMain.handle("patterpack:export", (): Promise<ExportResult> => exportPatterpack());
+  ipcMain.handle("project:exportVoiceScript", (_e, everything: boolean) => publishJob(() => exportVoiceScript(everything)));
+  ipcMain.handle("project:exportPlayableHtml", () => publishJob(exportPlayableHtml));
+  ipcMain.handle("project:exportWeb", () => publishJob(exportWeb));
+  ipcMain.handle("project:exportScript", () => publishJob(exportScript));
+  ipcMain.handle("patterpack:export", (): Promise<ExportResult> => publishJob(exportPatterpack));
   ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
-  ipcMain.handle("patterpack:merge", () => mergePatterpack());
-  ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => exportLoc(request));
+  ipcMain.handle("patterpack:merge", () => publishJob(mergePatterpack));
+  ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
   ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
@@ -914,7 +852,8 @@ function registerIpc(): void {
       // ...and a running PLAY WINDOW: properties / defaults / locales / captions all shape the compiled
       // bundle, so live-refresh the run in place (same path as an editor scene edit) rather than leaving
       // it stale until restart.
-      if (playWin && !playWin.isDestroyed()) {
+      const playWin = windows.get("play");
+      if (playWin) {
         const pr = project.refreshPlay();
         if (pr.kind === "stale") { playWin.webContents.send("play:stale"); win?.webContents.send("play:reset"); }
         else if (pr.kind !== "none") playWin.webContents.send("play:refreshed", pr.kind, pr.options ?? []);
@@ -985,7 +924,7 @@ function registerIpc(): void {
   ipcMain.handle("play:start", () => { if (playSceneId) project.startPlay(playSceneId, playBlockId ?? undefined); });
   ipcMain.handle("play:info", () => ({
     address: playSceneId ? project.playAddress(playSceneId, playBlockId ?? undefined) : "",
-    pinned: store.read().play.pinned,
+    pinned: store.window("play").pinned(),
     theme: store.read().theme, // this window paints in the author's palette too
     follow: store.read().playFollow,
 
@@ -996,9 +935,10 @@ function registerIpc(): void {
   ipcMain.handle("play:setLocale", (_e, locale: string) => project.setPlayLocale(locale));
   ipcMain.handle("play:setCaptions", (_e, on: boolean) => project.setPlayCaptions(on));
   ipcMain.handle("play:setPin", (_e, on: boolean) => {
-    store.setPlay({ ...store.read().play, pinned: on });
-    pinToolWindow(playWin, win, on);
+    store.window("play").setPinned(on);
+    pinToolWindow(windows.get("play"), win, on);
   });
+  ipcMain.handle("play:close", () => { windows.get("play")?.close(); });
   ipcMain.handle("view:resetWindows", () => rescueWindows());
   // The editor's scene changed: stash the live source (so the next (re)start plays it), then LIVE
   // REFRESH any running session (live-bundle-refresh, phase 1): a text-only edit swaps the string
@@ -1008,7 +948,8 @@ function registerIpc(): void {
   // positions (a deleted beat's mark simply has nothing to decorate).
   ipcMain.handle("play:edited", (_e, sceneId: string, flow: string, loc: string) => {
     project.setPlaySource({ sceneId, flow, loc });
-    if (!playWin || playWin.isDestroyed()) return;
+    const playWin = windows.get("play");
+    if (!playWin) return;
     const r = project.refreshPlay();
     if (r.kind === "none") return;
     if (r.kind === "stale") {
@@ -1054,7 +995,7 @@ function registerIpc(): void {
   ipcMain.handle("search:open", (_e, mode: SearchMode, focus?: SearchFocus, query?: string) => openSearchWindow(mode, focus, query));
   // `voiced` here gates ONLY the search window's Recording tab, so it reflects audio-status TRACKING (voiced +
   // not-opted-out), matching the inspector / menu (#206).
-  ipcMain.handle("searchWin:info", () => ({ mode: searchMode, pinned: store.read().search.pinned, hasProject: project.hasProject(), voiced: project.isAudioTracked(), query: searchSeed, theme: store.read().theme }));
+  ipcMain.handle("searchWin:info", () => ({ mode: searchMode, pinned: store.window("search").pinned(), hasProject: project.hasProject(), voiced: project.isAudioTracked(), query: searchSeed, theme: store.read().theme }));
   ipcMain.handle("searchWin:byProperty", (_e, query: string) => project.propertyUsage(query, searchFocus));
   ipcMain.handle("searchWin:byTag", (_e, tag: string) => project.tagUsage(tag, searchFocus));
   ipcMain.handle("searchWin:tags", () => project.tagList());
@@ -1076,10 +1017,10 @@ function registerIpc(): void {
     return r;
   });
   ipcMain.handle("searchWin:setPin", (_e, on: boolean) => {
-    store.setSearch({ ...store.read().search, pinned: on });
-    pinToolWindow(searchWin, win, on);
+    store.window("search").setPinned(on);
+    pinToolWindow(windows.get("search"), win, on);
   });
-  ipcMain.handle("searchWin:close", () => { searchWin?.close(); });
+  ipcMain.handle("searchWin:close", () => { windows.get("search")?.close(); });
   ipcMain.handle("project:applyFix", (_e, fix: QuickFix) => project.applyFix(fix));
   ipcMain.handle("identity:get", (): Identity | null => store.read().identity ?? null);
   /**
@@ -1168,7 +1109,7 @@ function createWindow(): void {
   };
   ipcMain.on("app:ready", reveal);
   setTimeout(reveal, 4000);
-  win.on("closed", () => { win = null; playWin?.close(); searchWin?.close(); coverageWin?.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
+  win.on("closed", () => { win = null; for (const w of windows.all()) w.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
 
   if (process.env["ELECTRON_RENDERER_URL"]) void win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   else void win.loadFile(join(here, "../renderer/index.html"));

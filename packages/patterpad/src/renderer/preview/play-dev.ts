@@ -69,6 +69,8 @@ const stub = {
   // The stub is cast to `unknown` on assignment, so a missing method is NOT a type error here: it is a
   // TypeError the moment play.ts calls it. Keep this list in step with PatterPlayApi by hand.
   onPin: () => undefined,
+  close: () => console.log("close"),
+  onProject: () => undefined,
   setFollow: () => undefined,
   onTheme: () => undefined,
 };

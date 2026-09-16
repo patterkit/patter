@@ -20,7 +20,8 @@ const tab = (input: HTMLInputElement): void => {
   input.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
 };
 const nameField = (host: HTMLElement): HTMLInputElement => {
-  const f = host.querySelector<HTMLInputElement>("input.gd-name");
+  // The @patter list is the shell's (`.set-name`); the World tab's rows are still this app's (`.gd-name`).
+  const f = host.querySelector<HTMLInputElement>("input.set-name, input.gd-name");
   if (!f) throw new Error("no name field");
   return f;
 };

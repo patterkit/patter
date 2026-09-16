@@ -1,4 +1,4 @@
-// The detached SEARCH tool window (#205): a small, frameless, always-on-top helper over the project-wide
+// The detached FIND tool window (#205): a small, frameless, always-on-top helper over the project-wide
 // index. It STAYS OPEN while you step through hits - choosing a result jumps the editor (which stays live
 // underneath) but keeps this window up and focused, so you can navigate across matches and explore.
 // Two modes, switchable in-window:
@@ -7,6 +7,7 @@
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "@wildwinter/app-shell/controls.css"; // the segmented mode control is the family's `.seg`
+import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./search.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
@@ -17,7 +18,7 @@ import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
-import { pinButton, iconNode } from "@wildwinter/app-shell";
+import { pinButton, toolWindowHead, iconNode, toast, plural, debounce, isEditableTarget } from "@wildwinter/app-shell";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
 // nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
@@ -25,7 +26,7 @@ initTooltips();
 
 const search = window.patterSearch!;
 
-const headEl = document.getElementById("swin-head")!;
+const modesEl = document.getElementById("swin-modes")!;
 const modeContentBtn = document.getElementById("mode-content") as HTMLButtonElement;
 const modeReplaceBtn = document.getElementById("mode-replace") as HTMLButtonElement;
 const modeStatusBtn = document.getElementById("mode-status") as HTMLButtonElement;
@@ -42,14 +43,12 @@ const statusLike = (m: SearchMode): boolean => m === "status" || m === "recordin
 /** Modes that browse via CHIPS + a filter box (writing / recording status, or author tags) rather than a
  *  free-text query. They share the chip rail, the "filter these" input, and the pick-a-chip flow. */
 const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag";
-const closeBtn = document.getElementById("swin-close") as HTMLButtonElement;
-closeBtn.append(iconNode("close", 12)); // the HTML carries the label; the cross is drawn
-// The pin is the shell's and is BUILT, not marked up: it owns its own class,
-// aria-pressed and the tooltip that says what a click will do, so there is one
-// place that decides what a pinned window looks like. Inserted before the close
-// button, which is where the markup used to put it.
+// The head is the shell's `toolWindowHead`: the drag bar, the pin, one "Close (Esc)" and Escape
+// closing the window are decided there for every tool window in the family. The mode tabs stand in
+// its title slot. The pin is BUILT, not marked up: it owns its own class, aria-pressed and the
+// tooltip that says what a click will do.
 const pin = pinButton({ pinned: true, onToggle: (on) => search.setPin(on) });
-closeBtn.before(pin.el);
+document.body.prepend(toolWindowHead({ tabs: modesEl, pin, onClose: () => search.close() }));
 const input = document.getElementById("swin-input") as HTMLInputElement;
 const chipsEl = document.getElementById("swin-chips")!;
 const resultsEl = document.getElementById("swin-results")!;
@@ -61,6 +60,7 @@ const KIND_LABEL: Record<SearchEntry["kind"], string> = {
 
 let mode: SearchMode = "content";
 let voiced = false; // recording status (and its tab) is voiced-only (#206)
+let hasProject = false; // nothing to re-run against until one is open
 // The chip rail's items: writing / recording rungs (with a palette colour) OR author tags (with a node
 // count). `activeChip` is the picked one; `chipHits` its full result list (the input box then filters it).
 let chips: Array<{ name: string; colour?: number; count?: number }> = [];
@@ -207,14 +207,14 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
   if (!onlyId) {
     const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
     const ok = await confirmDialog({
-      title: `Replace ${n} occurrence${n === 1 ? "" : "s"} across ${scenes} scene${scenes === 1 ? "" : "s"}?`,
+      title: `Replace ${plural(n, "occurrence")} across ${plural(scenes, "scene")}?`,
       body: `Replace “${input.value}” with “${replaceInput.value}”.`,
       confirmLabel: "Replace",
     });
     if (!ok) return;
   }
   const res = await search.replaceApply({ ...replaceOpts(), onlyId });
-  if (!res.ok) { hintEl.textContent = `Replace failed: ${res.error ?? "unknown error"}`; return; }
+  if (!res.ok) { toast(`Replace failed: ${res.error ?? "unknown error"}`, "error"); return; }
   await runReplacePreview(); // refresh: the applied hits are gone
 };
 
@@ -270,23 +270,30 @@ async function setMode(next: SearchMode): Promise<void> {
 }
 
 // --- input + keys ------------------------------------------------------------
-let debounce: ReturnType<typeof setTimeout> | undefined;
-input.addEventListener("input", () => {
-  clearTimeout(debounce);
-  debounce = setTimeout(() => {
-    if (chipMode(mode)) applyChipFilter();
-    else if (mode === "property") void runProperty();
-    else if (mode === "replace") void runReplacePreview();
-    else void runContent();
-  }, chipMode(mode) ? 0 : 110);
-});
+/** Re-run the current mode's query against what the box holds now. */
+const rerun = (): void => {
+  if (chipMode(mode)) applyChipFilter();
+  else if (mode === "property") void runProperty();
+  else if (mode === "replace") void runReplacePreview();
+  else void runContent();
+};
+// A chip mode's box is a post-filter over a list already in hand, so it answers at once; the others
+// query the index and wait for the typing to settle.
+const rerunSettled = debounce(rerun, 110);
+input.addEventListener("input", () => { if (chipMode(mode)) rerun(); else rerunSettled(); });
 
 // The replacement field re-previews the "after" text as you type it.
-replaceInput.addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(() => void runReplacePreview(), 110); });
+replaceInput.addEventListener("input", () => rerunSettled());
 replaceAllBtn.addEventListener("click", () => void applyReplace());
 
+// The index moved on while this window was behind the editor (a save, a rename): re-run on the way
+// back rather than showing hits for a script that has since changed (parity row 35).
+window.addEventListener("focus", () => { if (hasProject) { if (chipMode(mode) && activeChip) void loadChip(activeChip); else rerun(); } });
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { e.preventDefault(); search.close(); }
+  // Escape outside a field is the shell head's (it closes the window); in the box it is ours, so the
+  // field's own Escape never swallows the way out.
+  if (e.key === "Escape") { if (isEditableTarget(e.target)) { e.preventDefault(); search.close(); } }
   else if (mode === "replace") { /* no list navigation in Replace mode (rows have their own buttons) */ }
   else if (e.key === "ArrowDown") { e.preventDefault(); setSel(sel + 1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); setSel(sel - 1); }
@@ -299,7 +306,6 @@ modeStatusBtn.addEventListener("click", () => void setMode("status"));
 modeRecordingBtn.addEventListener("click", () => void setMode("recording"));
 modePropertyBtn.addEventListener("click", () => void setMode("property"));
 modeTagBtn.addEventListener("click", () => void setMode("tag"));
-closeBtn.addEventListener("click", () => search.close());
 
 
 // The Recording tab is voiced-only (#206): hide it for a text-only project, and never leave the window
@@ -317,7 +323,8 @@ search.onPin((on) => pin.set(on));
 search.onTheme((t) => applyTheme(t));
 
 search.onProject(() => void (async () => {
-  voiced = (await search.info()).voiced; reflectVoiced();
+  const info = await search.info();
+  voiced = info.voiced; hasProject = info.hasProject; reflectVoiced();
   if (mode === "recording" && !voiced) { void setMode("status"); return; }
   if (chipMode(mode)) void setMode(mode); else if (mode === "property") void runProperty(); else void runContent();
 })());
@@ -327,7 +334,7 @@ void (async () => {
   const info = await search.info();
   pin.set(info.pinned); // main decided this one, so no toggle callback
   applyTheme(info.theme);  // the palette is the app's; importing theme.css alone leaves this on Paper
-  voiced = info.voiced; reflectVoiced();
+  voiced = info.voiced; hasProject = info.hasProject; reflectVoiced();
   if (!info.hasProject) {
     hintEl.textContent = "Open a project to search.";
     return;
@@ -335,6 +342,3 @@ void (async () => {
   if (info.query) input.value = info.query; // seeded deep-link (property usage)
   await setMode(info.mode === "recording" && !voiced ? "status" : info.mode);
 })();
-
-// Keep `headEl` referenced (it carries the -webkit-app-region drag in CSS; no JS handler needed).
-void headEl;

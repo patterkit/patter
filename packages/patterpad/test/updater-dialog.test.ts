@@ -2,9 +2,12 @@
 // The updater dialog's live download-progress row (#33): shown only when the prompt asks for it,
 // fed by feedUpdaterDownloadProgress while open, and detached the moment the dialog closes so a
 // still-running download can never write into a dialog that's gone.
+//
+// The view is the shell's now (`showUpdaterDialog`, ui-review-2026-09 finding 6); this pins the #33
+// contract from the side that ships it, through the same import renderer.ts uses.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { showUpdaterDialog, feedUpdaterDownloadProgress } from "../src/renderer/src/updater-dialog.js";
+import { showUpdaterDialog, feedUpdaterDownloadProgress } from "@wildwinter/app-shell";
 import type { UpdaterDownloadProgress } from "../src/shared/api.js";
 
 beforeAll(() => {
@@ -22,16 +25,19 @@ const tick = (over: Partial<UpdaterDownloadProgress> = {}): UpdaterDownloadProgr
 
 function openDialog(progress: boolean): { dlg: HTMLDialogElement; done: Promise<number> } {
   const done = showUpdaterDialog({ message: "Update available", detail: "Downloading.", buttons: ["OK"], progress });
-  const dlg = document.querySelector("dialog.um-dialog") as HTMLDialogElement;
+  const dlg = document.querySelector("dialog.updater-dialog") as HTMLDialogElement;
   expect(dlg).toBeTruthy();
   return { dlg, done };
 }
 
+/** The frame plays an exit before it removes itself; the test only needs it gone. */
+const settled = (): Promise<void> => new Promise((r) => setTimeout(r, 400));
+
 describe("updater dialog download progress (#33)", () => {
   it("renders the progress row only when asked, and feeds it live", async () => {
     const { dlg, done } = openDialog(true);
-    const bar = dlg.querySelector<HTMLElement>(".um-progress-bar")!;
-    const label = dlg.querySelector<HTMLElement>(".um-progress-label")!;
+    const bar = dlg.querySelector<HTMLElement>(".updater-progress-bar")!;
+    const label = dlg.querySelector<HTMLElement>(".updater-progress-label")!;
     expect(bar).toBeTruthy();
     expect(label.textContent).toMatch(/Starting download/);
 
@@ -44,11 +50,12 @@ describe("updater dialog download progress (#33)", () => {
 
     dlg.querySelector("button")!.click();
     expect(await done).toBe(0);
+    await settled();
   });
 
   it("stops feeding once the dialog closes (a late tick must not resurrect it)", async () => {
     const { dlg, done } = openDialog(true);
-    const bar = dlg.querySelector<HTMLElement>(".um-progress-bar")!;
+    const bar = dlg.querySelector<HTMLElement>(".updater-progress-bar")!;
     feedUpdaterDownloadProgress(tick({ percent: 10 }));
     expect(bar.style.width).toBe("10%");
 
@@ -56,14 +63,16 @@ describe("updater dialog download progress (#33)", () => {
     await done;
     feedUpdaterDownloadProgress(tick({ percent: 90 })); // download still running; dialog gone
     expect(bar.style.width).toBe("10%"); // the detached bar is left alone
-    expect(document.querySelector("dialog.um-dialog")).toBeNull();
+    await settled();
+    expect(document.querySelector("dialog.updater-dialog")).toBeNull();
   });
 
   it("a plain (non-progress) dialog has no row and ignores ticks", async () => {
     const { dlg, done } = openDialog(false);
-    expect(dlg.querySelector(".um-progress-bar")).toBeNull();
+    expect(dlg.querySelector(".updater-progress-bar")).toBeNull();
     feedUpdaterDownloadProgress(tick()); // must be a no-op, not a throw
     dlg.querySelector("button")!.click();
     await done;
+    await settled();
   });
 });

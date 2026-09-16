@@ -7,11 +7,13 @@
 // to the element: renaming a scene and pressing Cmd-A selected the whole window, the Scenes list, the
 // entire script and the inspector with it (found while reproducing #73).
 
-/** An editable host: contenteditable in any form but "false". The scene title uses "plaintext-only",
- *  and the attribute is read as well as `isContentEditable` because jsdom does not implement the latter. */
+import { isEditableTarget } from "@wildwinter/app-shell";
+
+/** An editable host: contenteditable in any form but "false" (the scene title uses "plaintext-only").
+ *  The shell's `isEditableTarget` is the one answer to "is the focus in a field"; a select is a field
+ *  there but has no contents to select, so it is left to the native fallback as it always was. */
 const isEditableHost = (el: Element): el is HTMLElement =>
-  el instanceof HTMLElement &&
-  (el.isContentEditable === true || (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false"));
+  el instanceof HTMLElement && !(el instanceof HTMLSelectElement) && isEditableTarget(el);
 
 /**
  * Select the whole of the focused field when that field is outside the script editor. Returns false

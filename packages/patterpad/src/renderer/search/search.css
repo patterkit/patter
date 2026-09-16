@@ -1,5 +1,5 @@
-/* The detached search tool window (#205): a light, frameless helper on the app theme. The OS title bar
-   is gone (frame:false) - the slim header below IS the drag handle (-webkit-app-region: drag). */
+/* The detached Find tool window (#205): a light, frameless helper on the app theme. The OS title bar
+   is gone (frame:false) - the shell's head bar (tool-window.css) IS the drag handle. */
 * { box-sizing: border-box; }
 body.swin {
   margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;

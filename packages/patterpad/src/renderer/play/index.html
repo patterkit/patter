@@ -3,15 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Patterpad · Play</title>
+    <title>Play</title>
   </head>
   <body class="play">
+    <!-- The window is frameless: the shell's toolWindowHead (title, the starting address, rewind, follow,
+         pin, close) is built in play.ts and prepended above this toolbar row. -->
     <header class="play-head">
-      <div class="play-top">
-        <button id="play-rewind" class="play-rewind" type="button" data-tip="Rewind to the start and play again" aria-label="Rewind to the start and play again"></button>
-        <span class="play-from">Playing from</span>
-        <span id="play-addr" class="play-addr"></span>
-      </div>
       <div class="play-bar">
         <select id="play-locale" class="play-locale" data-tip="Play language" aria-label="Play language" hidden></select>
         <select id="play-speed" class="play-speed" data-tip="How long each line is held before the next appears" aria-label="How long each line is held before the next appears">

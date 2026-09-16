@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Patterpad · Coverage (UI preview)</title>
+    <title>Coverage (UI preview)</title>
   </head>
   <body class="coverage-win">
-    <header class="cov-bar">
-      <div class="cov-opts">
-        <label class="cov-opt">Runs<input id="cov-runs" type="number" min="1" step="100" value="5000" /></label>
-        <label class="cov-opt">Max steps<input id="cov-maxsteps" type="number" min="1" step="50" value="200" /></label>
-        <label class="cov-opt">Seed<input id="cov-seed" type="number" min="0" value="0" /></label>
-        <label class="cov-opt">Start<select id="cov-scene"></select></label>
-        <span class="cov-bar-spacer"></span>
-        <button id="cov-world" class="btn" type="button">World properties…</button>
-        <button id="cov-run" class="btn primary" type="button">Run test</button>
-      </div>
-    </header>
+    <!-- The window is frameless: the shell's toolWindowHead (title, pin, close) is built in coverage.ts
+         and prepended above this options row. -->
+    <div class="cov-opts">
+      <label class="cov-opt">Runs<input id="cov-runs" type="number" min="1" step="100" value="5000" /></label>
+      <label class="cov-opt">Max steps<input id="cov-maxsteps" type="number" min="1" step="50" value="200" /></label>
+      <label class="cov-opt">Seed<input id="cov-seed" type="number" min="0" value="0" /></label>
+      <label class="cov-opt">Start<select id="cov-scene"></select></label>
+      <span class="cov-bar-spacer"></span>
+      <button id="cov-world" class="btn" type="button" data-tip="Declare @world world properties and edit the input drivers">World properties…</button>
+      <button id="cov-run" class="btn primary" type="button">Run test</button>
+    </div>
     <p id="cov-drivers" class="cov-drivers"></p>
     <div id="cov-job"></div>
     <p id="cov-status" class="cov-status" hidden></p>

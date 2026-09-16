@@ -6,6 +6,8 @@
 
 import "@patterkit/patterpad-surface/theme.css"; // app-wide design tokens (same look as the editor)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
+import "@wildwinter/app-shell/controls.css"; // the follow toggle is the family's `.btn`
+import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./play.css";
 import "@wildwinter/app-shell/stale.css";
 import "@fontsource/newsreader/400.css";
@@ -13,10 +15,10 @@ import "@fontsource/newsreader/400-italic.css";
 import "@fontsource/newsreader/600.css";
 import "@fontsource-variable/inter";
 
-import { staleBar } from "@wildwinter/app-shell";
+import { staleBar, el } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";
-import { initTooltips, pinButton, iconNode, type IconName } from "@wildwinter/app-shell";
-import "@wildwinter/app-shell/tool-window.css"; // the pin's chrome travels with it
+import { initTooltips, pinButton, followButton, toolWindowHead, iconNode, type IconName } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
 import { colourFor } from "@patterkit/patterpad-surface/colour";
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
 
@@ -27,14 +29,11 @@ initTooltips();
 const play = window.patterPlay!;
 const transcriptEl = document.getElementById("transcript")!;
 const controlsEl = document.getElementById("choices")!;
-const addrEl = document.getElementById("play-addr")!;
 const localeEl = document.getElementById("play-locale") as HTMLSelectElement;
-const rewindEl = document.getElementById("play-rewind") as HTMLButtonElement;
 const continueEl = document.getElementById("play-continue") as HTMLButtonElement;
 // The header's drawn icons (the HTML carries the labels alone): Continue is "play through", the one honest
-// go-there arrow; the rewind control is the vocabulary's restart.
+// go-there arrow.
 continueEl.prepend(iconNode("arrowRight", 12));
-(document.getElementById("play-rewind") as HTMLButtonElement).append(iconNode("restart"));
 const audioEl = document.getElementById("play-audio") as HTMLButtonElement;
 
 // "Play with audio" (#206 P3): in Audio Folders mode, Continue becomes a time-paced table-read - each line
@@ -93,7 +92,7 @@ function reflectCaptions(on: boolean): void {
   captionsOn = on;
   ccEl.setAttribute("aria-pressed", String(on));
   ccEl.classList.toggle("off", !on);
-  ccEl.title = on ? "Closed captions are on. Click to hide non-spoken cues." : "Closed captions are off. Click to show non-spoken cues.";
+  ccEl.dataset["tip"] = on ? "Closed captions are on. Click to hide non-spoken cues." : "Closed captions are off. Click to show non-spoken cues.";
 }
 ccEl.addEventListener("click", () => { reflectCaptions(!captionsOn); void play.setClosedCaptions(captionsOn); });
 
@@ -379,39 +378,28 @@ async function startRun(): Promise<void> {
   await advance(firstAdvance(), continueMode); // always take the first Advance automatically (start / restart / rewind)
 }
 
-// --- header (starting address) + always-on-top pin ---------------------------
-// The pin is the shell's `pinButton`, as the search window's already was: one place decides what a
-// pinned tool window looks like, and this app was drawing two of them. Its `set` handle is how main
-// re-pins on Reset View without the button choosing it. Inserted where the markup used to put it.
+// --- the head: title, starting address, rewind, follow, pin, close ------------
+// The window is frameless, so the shell's `toolWindowHead` stands in for the OS title bar: the drag
+// region, one "Close (Esc)", and Escape closing the window are decided there for every tool window in
+// the family. The pin and the follow toggle are the shell's too; their `set` handles are how main
+// re-pins on Reset View, and how the remembered follow state lands, without either button choosing it.
+//
+// "Follow in the editor" sits beside the pin because both are about how this window sits NEXT TO the
+// editor rather than about the thing being played. OFF by default and remembered: marking is the
+// default behaviour and following is the author asking for it.
+const addrEl = el("span", "play-addr");
+const rewindEl = el("button", { className: "play-rewind", tip: "Rewind to the start and play again", onClick: () => void startRun() }, iconNode("restart"));
+rewindEl.type = "button";
+rewindEl.setAttribute("aria-label", "Rewind to the start and play again");
 const pin = pinButton({ pinned: true, onToggle: (on) => play.setPin(on) });
-addrEl.after(pin.el);
-
-// "Follow in the editor" (play-follow): the editor reveals each played beat as the run goes.
-//
-// It sits beside the pin because both are about how this window sits NEXT TO the editor rather than
-// about the thing being played. OFF by default and remembered: marking is the default behaviour and
-// following is the author asking for it, which is not the same as us deciding they want it.
-//
-// The LABEL is the careful part, and the brief is right that it is a trap. "Follow" alone would match
-// the vocabulary of a window that follows the editor; this is the opposite direction, the editor
-// following the run. The same word with the arrow reversed is worse than a longer label.
-const followEl = document.createElement("button");
-followEl.type = "button";
-followEl.className = "play-follow";
-followEl.textContent = "Follow in the editor";
-let following = false;
-function reflectFollow(): void {
-  followEl.classList.toggle("on", following);
-  followEl.setAttribute("aria-pressed", String(following));
-  const label = following
-    ? "The editor reveals each line as it plays. Click to stop."
-    : "Reveal each line in the editor as it plays";
-  followEl.dataset["tip"] = label;
-}
-followEl.addEventListener("click", () => { following = !following; reflectFollow(); play.setFollow(following); });
-reflectFollow();
-pin.el.after(followEl);
-rewindEl.addEventListener("click", () => void startRun());
+const follow = followButton({ on: false, onToggle: (on) => play.setFollow(on) });
+document.body.prepend(toolWindowHead({
+  title: "Play",
+  lead: [el("span", "play-from", "Playing from"), addrEl],
+  trail: [rewindEl, follow.el],
+  pin,
+  onClose: () => play.close(),
+}));
 
 // --- play-language switcher (#195) -------------------------------------------
 // Populate from the project's declared locales; hidden for a monolingual project. Changing it sets the
@@ -438,12 +426,15 @@ function applyInfo(info: PlayInfo): void {
 }
 localeEl.addEventListener("change", () => { void play.setLocale(localeEl.value).then(() => startRun()); });
 
-void play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); following = info.follow; reflectFollow(); });
+void play.info().then((info) => { applyInfo(info); pin.set(info.pinned); applyTheme(info.theme); follow.set(info.follow); });
 // The palette is the app's, not this window's: apply what the editor last chose, and follow it when
 // the author changes it. Importing theme.css is not enough, because the curated palettes only exist
 // under the `data-theme` attribute this sets.
 play.onTheme((t) => applyTheme(t));
 play.onPin((on) => pin.set(on)); // Reset View re-pins in main; the button must be told
+// A different project opened underneath: a run belongs to the project it started in, so this window
+// closes rather than sit over the new one showing the old scene (it is a satellite of the session now).
+play.onProject(() => play.close());
 play.onRestart(() => { void play.info().then(applyInfo); void startRun(); });
 play.onStale(showStale); // editor edited the scene mid-run AND the swap failed: freeze until restart
 // Live bundle refresh (phase 1): the edit landed in the running session in place. Confirm quietly;

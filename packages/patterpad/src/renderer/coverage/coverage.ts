@@ -6,13 +6,14 @@
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are the family's `.btn`
+import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./coverage.css";
 import "@wildwinter/app-shell/job.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
-import { mountJobProgress, pinButton } from "@wildwinter/app-shell";
-import "@wildwinter/app-shell/tool-window.css"; // the pin's chrome travels with it
+import { mountJobProgress, pinButton, toolWindowHead, toast, plural } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips } from "@wildwinter/app-shell";
 import { renderCoverage } from "../src/coverage-view.js";
@@ -66,7 +67,7 @@ async function boot(): Promise<void> {
   driversNote.textContent = !info.hasProject
     ? "No project open."
     : info.driverCount
-      ? `${info.driverCount} input driver${info.driverCount === 1 ? "" : "s"} configured (World properties…).`
+      ? `${plural(info.driverCount, "input driver")} configured (World properties…).`
       : "No input drivers, so branches gated on @world will read as needing input (World properties…).";
   if (info.last) showResult(info.last);
   else { host.hidden = true; host.replaceChildren(); }
@@ -89,8 +90,7 @@ async function run(): Promise<void> {
     if (!result) { statusEl.hidden = false; statusEl.textContent = "No project open."; return; }
     showResult(result);
   } catch (e) {
-    statusEl.hidden = false;
-    statusEl.textContent = `Coverage failed: ${e instanceof Error ? e.message : String(e)}`;
+    toast(`Coverage failed: ${e instanceof Error ? e.message : String(e)}`, "error");
   } finally {
     jobView.end();
     host.classList.remove("stale");
@@ -98,11 +98,11 @@ async function run(): Promise<void> {
   }
 }
 
-// The pin is the shell's `pinButton`, like the play + search windows: one place decides what a pinned
-// tool window looks like. Its `set` handle is how main re-pins on Reset View without the button
-// choosing it, and it says what a CLICK will do rather than what the state is.
+// The head is the shell's `toolWindowHead` (the window is frameless): the drag bar, the pin, one
+// "Close (Esc)" and Escape closing the window are decided there for every tool window in the family.
+// The pin's `set` handle is how main re-pins on Reset View without the button choosing it.
 const pin = pinButton({ pinned: true, onToggle: (on) => cov.setPin(on) });
-worldBtn.before(pin.el);
+document.body.prepend(toolWindowHead({ title: "Coverage", pin, onClose: () => cov.close() }));
 cov.onPin((on) => pin.set(on));
 cov.onTheme((t) => applyTheme(t));
 

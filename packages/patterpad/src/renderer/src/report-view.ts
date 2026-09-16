@@ -8,8 +8,7 @@
 
 import type { ReportData } from "../../shared/api.js";
 import { el } from "./dom.js";
-
-const num = (n: number): string => n.toLocaleString();
+import { formatCount as num } from "@wildwinter/app-shell"; // the grouped count, the family's
 
 /** A horizontal distribution: one bar per ladder rung, widths proportional to the largest count. So a
  *  reader sees at a glance where the work sits (lots of "stub", little "locked"). Zero-count rungs show

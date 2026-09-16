@@ -180,6 +180,9 @@ const stub = {
     { ref: "@world.mood", kind: "recurring", cadence: "sometimes", values: ["calm", "tense", "hostile"] },
   ]),
   exportReport: async () => ({ ok: true, path: "The Tavern - production.xlsx" }),
+  cancelJob: () => undefined,            // the publish paths resolve at once here; nothing to stop
+  onJobProgress: () => undefined,        // and report no progress
+  clearRecents: async () => { recents.splice(1); return recents; }, // the open project stays, as main keeps it
   buildBundle: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/dist/the_tavern.patterc" }),
   toggleAutoRebuild: async () => true,
   buildAudioManifest: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/audio/patteraudio.json" }),

@@ -18,6 +18,10 @@ import "@wildwinter/app-shell/dialog.css"; // the one modal frame (the confirm a
 import "@wildwinter/app-shell/confirm.css"; // what is the confirm's own: its width and its body copy
 import "@wildwinter/app-shell/identity.css"; // the identity ask's fields
 import "@wildwinter/app-shell/context-menu.css"; // the navigator's right-click menu
+import "@wildwinter/app-shell/welcome.css"; // the welcome screen (mountWelcome)
+import "@wildwinter/app-shell/link-status.css"; // the live-link chip (mountLinkStatus, via debug-panel.ts)
+import "@wildwinter/app-shell/updater.css"; // the updater prompt (showUpdaterDialog)
+import "@wildwinter/app-shell/job.css"; // the long-job strip the publish paths run under
 import "./shell.css"; // app shell layout, over the surface's page styles
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";
@@ -30,7 +34,6 @@ import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type Inspector
 import { buildSpellEngine } from "./spellcheck.js";
 import { adoptSceneName, relabelNavScene } from "./scene-name.js";
 import { selectAllOutsideEditor } from "./edit-commands.js";
-import { showUpdaterDialog, feedUpdaterDownloadProgress } from "./updater-dialog.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector } from "./inspector.js";
@@ -56,6 +59,9 @@ import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are ma
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
 import { toast } from "@wildwinter/app-shell";
+// The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
+// (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
+import { mountWelcome, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
@@ -140,7 +146,11 @@ const playTopEl = $<HTMLButtonElement>("play-topbtn");
 const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
 const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
 playTopEl.prepend(iconNode("play")); // the label is in index.html; the icon is drawn, never typed
-shell.topbarTrail.append(playTopEl, vcsSceneEl, saveIndicatorHost);
+// The topbar's quiet health chip (parity row 33): a tick when clean, the problem count when not. A count
+// promises "show me them", so a click steps the problems bar to the first; the clean state answers
+// instead of doing nothing. Painted by paintHealth() beside the bar; shown only in the workspace.
+const healthEl = el("button", "healthchip ok"); healthEl.type = "button"; healthEl.hidden = true;
+shell.topbarTrail.append(playTopEl, vcsSceneEl, healthEl, saveIndicatorHost);
 const navListEl = $("nav-list");
 shell.nav.append(navListEl);
 const editorEl = $("editor");
@@ -152,6 +162,27 @@ frameHost.hidden = false;
 
 const welcomeEl = $("welcome");
 const hintbarEl = $("hintbar");
+// The welcome is the shell's `mountWelcome` (ui-review-2026-09, finding 10): title, one line, the two
+// actions, the teaching line and the recents. What is Patterpad's is the words and the tour door: the
+// tour is a download rather than something the app carries, so its line opens the page that offers it,
+// through the same allow-listed external route the About box uses.
+const tourBtn = el("button", "linklike", "Take the interactive tour"); tourBtn.type = "button";
+tourBtn.addEventListener("click", () => window.patter.openExternal("https://patterkit.dev/download/#something-to-open"));
+const tourLine = el("span"); tourLine.append("New to Patter? ", tourBtn);
+const welcome = mountWelcome(welcomeEl, {
+  title: "Patterpad",
+  sub: "Write the script. Play it in your game.",
+  actions: [
+    { label: "Open a project…", primary: true, onClick: () => void openDialog() },
+    { label: "New project…", onClick: () => void createDialog() },
+  ],
+  recents: [],
+  tourLine,
+  maxRecents: 8, // the store keeps eight; the welcome shows what the menu shows
+});
+function setWelcomeRecents(recents: RecentProject[]): void {
+  welcome.setRecents(recents.map((r) => ({ name: r.name, path: r.path, onOpen: () => void openPath(r.path) })));
+}
 // Conditions / effects always render as pills in the inspector. (The old View > "Expressions as Text"
 // toggle, which swapped them for name-form code, has been removed.)
 const preferText = false;
@@ -172,8 +203,17 @@ function toggleDocClass(cls: string): void {
 const problembarEl = $("problembar");
 const reviewbarEl = $("reviewbar");
 const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bottom-left exit pill
-const recentsEl = $("recents");
-const recentsLabel = $("recents-label");
+// The long-job strip (parity row 20): every publish / export / pack / merge path shows itself here while
+// main runs it as the kit's "publish" job. None of those paths reports progress through the ops layer
+// yet, so the strip runs indeterminate (the label and a sliding fill) until one does; Cancel asks main to
+// stop the job at its next yield.
+const jobView = mountJobProgress($("job"), { onCancel: () => window.patter.cancelJob("publish"), units: "files" });
+async function withJob<T>(label: string, work: () => Promise<T>): Promise<T> {
+  jobView.begin(label);
+  jobView.element.classList.add("indeterminate");
+  try { return await work(); }
+  finally { jobView.element.classList.remove("indeterminate"); jobView.end(); }
+}
 const overviewEl = $("overview"); // the project-overview landing (#3a)
 const overviewPathEl = $("overview-path"); // where the project lives on disk (click reveals it)
 overviewPathEl.dataset.tip = navigator.platform.toUpperCase().includes("MAC") ? "Show in Finder" : "Show in file manager";
@@ -333,15 +373,11 @@ const saver = createSaveController({ write: writeScene, onStatus: saveInd.set })
 // scene so a reopen can reveal it. Captured on every selection move; flushed on a short timer and before
 // the window closes (so closing mid-debounce still records it).
 let caretNodeId: string | null = null;
-let rememberTimer: number | null = null;
-function flushRemember(): void {
-  if (rememberTimer != null) { window.clearTimeout(rememberTimer); rememberTimer = null; }
+function recordPlace(): void {
   if (project && currentSceneId) void window.patter.rememberScene(project.root, currentSceneId, caretNodeId ?? undefined);
 }
-function scheduleRemember(): void {
-  if (rememberTimer != null) window.clearTimeout(rememberTimer);
-  rememberTimer = window.setTimeout(flushRemember, 1000);
-}
+const scheduleRemember = debounce(recordPlace, 1000);
+function flushRemember(): void { scheduleRemember.cancel(); recordPlace(); }
 
 
 
@@ -471,12 +507,12 @@ function renderNav(): void {
   navListEl.replaceChildren();
   navBlocksSig = ""; // fresh rows: force the next block refresh to fill them
   const search = document.createElement("button");
-  search.className = "nav-search"; search.type = "button"; search.dataset.tip = "Search by name, handle, or id"; search.setAttribute("aria-label", "Search by name, handle, or id");
+  search.className = "nav-search"; search.type = "button"; search.dataset.tip = "Find by name, handle, or id"; search.setAttribute("aria-label", "Find by name, handle, or id");
   // A magnifier icon + centred, bold label read as a BUTTON that opens the search window - not a text field.
   const searchIcon = document.createElement("span"); searchIcon.className = "nav-search-icon";
   searchIcon.append(iconNode("search", 13));
   search.append(searchIcon);
-  search.append(Object.assign(document.createElement("span"), { textContent: "Search…" }));
+  search.append(Object.assign(document.createElement("span"), { textContent: "Find…" }));
   search.append(Object.assign(document.createElement("kbd"), { className: "nav-search-kbd", textContent: "⌘F" }));
   search.addEventListener("click", () => openSearch());
   navListEl.appendChild(search);
@@ -592,13 +628,13 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
 
   const contents = info.untouched
     ? "This removes its files from the project."
-    : `It contains ${info.lines} line${info.lines === 1 ? "" : "s"} across ${info.blocks} block${info.blocks === 1 ? "" : "s"}. This removes its files from the project.`;
+    : `It contains ${plural(info.lines, "line")} across ${plural(info.blocks, "block")}. This removes its files from the project.`;
   const body: Node[] = [];
   if (info.referrers.length) {
     const refs = el("div", "del-refs");
     refs.append(el("p", "del-refs-head", "These scenes refer to it:"));
     for (const r of info.referrers) {
-      const bits = [r.jumps ? `${r.jumps} jump${r.jumps === 1 ? "" : "s"}` : "", r.conditions ? `${r.conditions} condition${r.conditions === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ");
+      const bits = [r.jumps ? plural(r.jumps, "jump") : "", r.conditions ? plural(r.conditions, "condition") : ""].filter(Boolean).join(", ");
       refs.append(el("p", "del-refs-row", `${r.name}: ${bits}`));
     }
     body.push(refs);
@@ -744,6 +780,10 @@ function applySceneVc(): void {
   // version killed that too: you could not expand a section or copy an address to go and ask them about
   // it. Storyletter's version won this one, and STAYS_LIVE is the part only this app can supply.
   lockControls(inspectorStackEl, ro, STAYS_LIVE);
+  // The shell's notice at the head of a locked document (parity row 34): the chip says who, the notice
+  // says why editing stopped, where the author is looking. Sits above the script in the centre column.
+  shell.centre.querySelector(":scope > .vc-lock")?.remove();
+  if (st?.lockedBy?.length) editorEl.before(lockNotice(st.lockedBy));
   const chip: [Parameters<typeof iconNode>[0], string] | null = st?.lockedBy?.length ? ["locked", `Locked by ${st.lockedBy.join(", ")}`]
     : st?.outOfDate ? ["down", "Out of date"] : null;
   vcsSceneEl.replaceChildren(...(chip ? [iconNode(chip[0], 12), chip[1]] : []));
@@ -915,7 +955,7 @@ function paintProblems(): void {
   const fix = cur?.fix;
   problemFixEl = null;
   if (fix) {
-    const chip = el("button", "problem-fix", fixLabel(fix));
+    const chip = el("button", "stepbar-action", fixLabel(fix));
     chip.type = "button";
     chip.addEventListener("click", () => void applyCurrentFix());
     problemFixEl = chip;
@@ -944,7 +984,28 @@ function paintProblems(): void {
     actions: [problemFixEl],
     // No `empty`: no problems, no problems bar. This one is ambient, not a mode.
   });
+  paintHealth();
 }
+
+/** The topbar's health chip: a tick when clean, the count when not (the tone follows the worst). The
+ *  problems list is project-wide, so the clean answer names where the author is standing. */
+function paintHealth(): void {
+  const n = problems.length;
+  const errs = problems.filter((p) => p.severity === "error").length;
+  healthEl.className = `healthchip ${n === 0 ? "ok" : errs > 0 ? "err" : "warn"}`;
+  healthEl.replaceChildren(n === 0 ? iconNode("tick", 12) : String(n));
+  const tip = n === 0 ? healthCleanLine() : `${plural(n, "problem")}. Click to step through them.`;
+  healthEl.dataset["tip"] = tip;
+  healthEl.setAttribute("aria-label", tip);
+}
+function healthCleanLine(): string {
+  const scene = currentSceneId ? project?.scenes.find((sc) => sc.id === currentSceneId)?.name : undefined;
+  return `No problems in ${scene ?? project?.name ?? "this project"}`;
+}
+healthEl.addEventListener("click", () => {
+  if (problems.length > 0) { problemAt = 0; paintProblems(); void goToProblem(problems[0]); return; }
+  toast(healthCleanLine(), "ok"); // the clean state answers rather than doing nothing
+});
 
 /** Edit > Select All. In the editor it means the field the caret is in, never the whole scene
  *  (patterpad-surface/src/selectall.ts); anywhere else - a settings field, the notes box, a text
@@ -1050,15 +1111,11 @@ async function refreshProblems(): Promise<void> {
 
 // Re-validate shortly after edits settle (debounced): the problems panel reflects unsaved changes, and
 // any open play session is told the scene changed (it freezes until restart, then plays the new source).
-let validateTimer: ReturnType<typeof setTimeout> | undefined;
-function scheduleValidate(): void {
-  clearTimeout(validateTimer);
-  validateTimer = setTimeout(() => {
-    void refreshProblems();
-    // Only a genuine user edit tells the play session the scene changed - never a programmatic load.
-    if (sceneEdited && surface && currentSceneId) { const s = surface.getSource(); window.patter.playEdited(currentSceneId, s.flow, s.loc); }
-  }, 350);
-}
+const scheduleValidate = debounce(() => {
+  void refreshProblems();
+  // Only a genuine user edit tells the play session the scene changed - never a programmatic load.
+  if (sceneEdited && surface && currentSceneId) { const s = surface.getSource(); window.patter.playEdited(currentSceneId, s.flow, s.loc); }
+}, 350);
 
 // --- the detail inspector (right pane) ---------------------------------------
 let sceneProps: ConditionProperty[] = []; // referenceable properties for the condition editor (per scene)
@@ -1903,6 +1960,7 @@ function enterWorkspace(): void {
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
   toggleNavEl.hidden = false; toggleInspectorEl.hidden = false; // pane toggles only matter in the workspace
   playTopEl.hidden = false;   // the primary loop's visible door: play what you wrote
+  healthEl.hidden = false;    // and the problems it has, at a glance
 }
 
 // --- project overview (#3a) --------------------------------------------------
@@ -1918,7 +1976,7 @@ async function showOverview(): Promise<void> {
   if (surface) await save(); // files are the truth - persist before leaving the editor
   await leavePropertiesDoc();
   welcomeEl.hidden = true; panesEl.hidden = true; overviewEl.hidden = false;
-  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
+  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true; healthEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true; // the overview is a calm screen, no bars
   projectNameEl.textContent = project.name;
   projectNameEl.dataset.tip = project.root;
@@ -1941,7 +1999,6 @@ async function showOverview(): Promise<void> {
  *  Refreshed whenever they are saved (here or, for a rename through the fix, by the main process). */
 let patterProps: PropertyDecl[] = [];
 let propsHandle: { value(): PropertyDecl[]; firstDuplicate(): HTMLInputElement | null; firstIllegalName(): HTMLInputElement | null } | null = null;
-let propsSaveTimer: number | null = null;
 let propsSavedSig = "";
 
 async function refreshPatterProps(): Promise<void> {
@@ -1972,10 +2029,7 @@ async function savePropsDoc(): Promise<void> {
   paintPropsCount();
 }
 
-function schedulePropsSave(): void {
-  if (propsSaveTimer != null) window.clearTimeout(propsSaveTimer);
-  propsSaveTimer = window.setTimeout(() => { propsSaveTimer = null; void savePropsDoc(); }, 400);
-}
+const schedulePropsSave = debounce(() => { void savePropsDoc(); }, 400);
 
 /** Open the Properties document (the navigator's fixed row, and every "go to definition" on a
  *  `@patter` property). */
@@ -1990,7 +2044,7 @@ async function showPropertiesDoc(): Promise<void> {
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
   shell.holdClosed("inspector", true); // folded for the page, without touching what the author chose
   editorEl.hidden = true; propsDocEl.hidden = false;
-  toggleNavEl.hidden = false; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
+  toggleNavEl.hidden = false; toggleInspectorEl.hidden = true; playTopEl.hidden = true; healthEl.hidden = true;
   problembarEl.hidden = true; reviewbarEl.hidden = true;
   titleObserver?.disconnect(); titleObserver = null;
   sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene is open
@@ -2015,7 +2069,7 @@ async function showPropertiesDoc(): Promise<void> {
 
 /** Leaving the document: flush anything mid-debounce, since the next thing may reload the project. */
 async function leavePropertiesDoc(): Promise<void> {
-  if (propsSaveTimer != null) { window.clearTimeout(propsSaveTimer); propsSaveTimer = null; await savePropsDoc(); }
+  schedulePropsSave.cancel(); await savePropsDoc(); // a save still settling lands now (a no-op when nothing changed)
   propsHandle = null;
   propsDocEl.hidden = true;
   editorEl.hidden = false;
@@ -2030,7 +2084,7 @@ function renderOverview(): void {
   overviewPathEl.textContent = project.root;
   overviewPathEl.hidden = false;
   const n = project.scenes.length;
-  overviewStatsEl.textContent = `${n} ${n === 1 ? "scene" : "scenes"}`;
+  overviewStatsEl.textContent = plural(n, "scene");
   overviewProgressEl.hidden = true;
   overviewScenesEl.replaceChildren();
   for (const s of project.scenes) {
@@ -2046,8 +2100,7 @@ function fillOverviewStats(data: ReportData): void {
   if (!project) return;
   const t = data.totals;
   const n = project.scenes.length;
-  const fmt = (x: number): string => x.toLocaleString();
-  overviewStatsEl.textContent = `${n} ${n === 1 ? "scene" : "scenes"} · ${fmt(t.written.words)} words · ${fmt(t.written.count)} ${t.written.count === 1 ? "line" : "lines"}`;
+  overviewStatsEl.textContent = `${plural(n, "scene")} · ${formatCount(t.written.words)} words · ${formatCount(t.written.count)} ${t.written.count === 1 ? "line" : "lines"}`;
   const pct = t.projectedWritten > 0 ? Math.round((100 * t.writtenDone) / t.projectedWritten) : 0;
   overviewBarFillEl.style.width = `${pct}%`;
   overviewProgressLabelEl.textContent = `${pct}% drafted`;
@@ -2080,20 +2133,7 @@ async function hydrateProject(): Promise<void> {
 }
 
 // --- welcome screen ----------------------------------------------------------
-
-function renderRecents(recents: RecentProject[]): void {
-  recentsEl.replaceChildren();
-  recentsLabel.hidden = recents.length === 0;
-  for (const r of recents) {
-    const li = document.createElement("li");
-    const b = document.createElement("button"); b.className = "recent-item"; b.type = "button";
-    const name = document.createElement("span"); name.className = "recent-name"; name.textContent = r.name;
-    const path = document.createElement("span"); path.className = "recent-path"; path.textContent = r.path;
-    b.append(name, path);
-    b.addEventListener("click", () => void openPath(r.path));
-    li.appendChild(b); recentsEl.appendChild(li);
-  }
-}
+// (Built once at the top of the module with the shell's mountWelcome; showWelcome refreshes its recents.)
 
 /** File ▸ Close Project: back to the welcome screen, which without this was reachable only at launch
  *  (from-storylets/close-project). The window stays: this is Close PROJECT, not the Close Window
@@ -2121,17 +2161,17 @@ function showWelcome(state: BootState): void {
   surface?.destroy(); surface = null; project = null; currentSceneId = null;
   debugLink.setVisible(false); // no project -> hide the live-debug-link control
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene -> no suffix
-  vcMap.clear(); vcsSceneEl.hidden = true; panesEl.classList.remove("vcs-readonly"); // no project -> no VC state
+  vcMap.clear(); vcsSceneEl.hidden = true; panesEl.classList.remove("vcs-readonly"); shell.centre.querySelector(":scope > .vc-lock")?.remove(); // no project -> no VC state
   comments = []; commentsDirty = false; // no project -> no comments
   suggestions = []; suggestionsDirty = false; // no project -> no suggestions
   reviewItems = []; reviewbarEl.hidden = true; // no project -> no feedback walk
   void leavePropertiesDoc();
   panesEl.hidden = true; overviewEl.hidden = true; welcomeEl.hidden = false;
   problembarEl.hidden = true; inspectorStackEl.replaceChildren(); lastInspectorCtx = null; lastInspectorSig = null; // no script -> nothing to inspect
-  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true;
+  toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true; healthEl.hidden = true;
   projectNameEl.textContent = "Patterpad";
   delete projectNameEl.dataset.tip; // no project, no path
-  renderRecents(state.recents);
+  setWelcomeRecents(state.recents);
   signalReady(); // the welcome screen is up - safe to reveal the window (no-op if already revealed)
 }
 
@@ -2197,7 +2237,7 @@ function openVoiceScript(): void {
 }
 async function voiceScriptExport(): Promise<void> {
   voStatus.textContent = "Exporting…";
-  const res = await window.patter.exportVoiceScript(voEverythingInput.checked);
+  const res = await withJob("Exporting the voice script…", () => window.patter.exportVoiceScript(voEverythingInput.checked));
   if (res.ok) { voDialogEl.close(); toast(`Voice script exported to ${res.path}`, "ok"); } // done -> close, confirm via toast
   else if (res.canceled) voStatus.textContent = "";
   else voStatus.textContent = `Export failed: ${res.error ?? "unknown error"}`;
@@ -2220,7 +2260,7 @@ async function localisationExport(): Promise<void> {
   const format = locFormatSel.value as "json" | "xlsx" | "po";
   const locale = locLocaleSel.value || undefined; // "" = template
   locStatus.textContent = "Exporting…";
-  const res = await window.patter.exportLoc({ format, locale });
+  const res = await withJob("Exporting localisation…", () => window.patter.exportLoc({ format, locale }));
   if (res.ok) locStatus.textContent = `Exported to ${res.path}`;
   else if (res.canceled) locStatus.textContent = "";
   else locStatus.textContent = `Export failed: ${res.error ?? "unknown error"}`;
@@ -2242,7 +2282,7 @@ async function localisationImport(): Promise<void> {
 async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
   if (!project) return; // nothing open
   if (surface) await save(); // flush pending edits so the exported figures are current
-  const res = await window.patter.exportReport();
+  const res = await withJob("Exporting production information…", () => window.patter.exportReport());
   if (res.ok) {
     if (btn) { const prev = btn.textContent; btn.replaceChildren("Exported", iconNode("tick", 12)); btn.disabled = true;
       setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1600); }
@@ -2252,7 +2292,7 @@ async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
 /** Publish Bundle (Publish menu): compile + write the runtime `.patterc` to the configured output path. */
 async function buildBundle(): Promise<void> {
   if (!project) return;
-  const res = await window.patter.buildBundle();
+  const res = await withJob("Publishing the bundle…", () => window.patter.buildBundle());
   if (res.ok) {
     // Show where it landed RELATIVE to the project root when it's inside (the common dist/ case), so the
     // toast reads cleanly; fall back to the absolute path for an output written elsewhere.
@@ -2275,7 +2315,7 @@ async function buildAudioManifest(): Promise<void> {
  *  chosen in the native Save dialog in main); toast the result. */
 async function exportScript(): Promise<void> {
   if (!project) return;
-  const res = await window.patter.exportScript();
+  const res = await withJob("Publishing the readable script…", () => window.patter.exportScript());
   if (res.ok) {
     const where = relToProject(res.path);
     toast(`Script published\n${where}`, "ok");
@@ -2289,7 +2329,7 @@ async function exportPatterpack(): Promise<void> {
   if (surface) await save(); // pending text edits
   await persistDocs();                // pending Notes
   await persistComments();            // pending comments
-  const res = await window.patter.exportPatterpack();
+  const res = await withJob("Exporting the Patterpack…", () => window.patter.exportPatterpack());
   if (res.ok) {
     const where = relToProject(res.path);
     toast(`Patterpack exported\n${where}`, "ok");
@@ -2319,7 +2359,7 @@ async function mergePatterpack(): Promise<void> {
   if (surface) await save(); // pending text edits
   await persistDocs();                // pending Notes
   await persistComments();            // pending comments
-  const r = await window.patter.mergePatterpack();
+  const r = await withJob("Merging the returned Patterpack…", () => window.patter.mergePatterpack());
   if (!r) return;                                        // cancelled at one of the three prompts
   if ("error" in r) { toast(`Merge failed: ${r.error}`, "error"); return; }
 
@@ -2334,7 +2374,7 @@ async function mergePatterpack(): Promise<void> {
   // A conflict is not a failure - the merge committed - but it is not a quiet success either. The error
   // voice is what stops an author walking away from unresolved conflicts thinking they were done.
   if (r.summary.conflicts > 0) {
-    toast(`${counts}. ${r.summary.conflicts} conflict${r.summary.conflicts === 1 ? "" : "s"} need a look.\nSee the .patterconflict files.`, "error");
+    toast(`${counts}. ${plural(r.summary.conflicts, "conflict")} need a look.\nSee the .patterconflict files.`, "error");
   } else toast(`Merged the returned pack\n${counts}`, "ok");
 }
 
@@ -2342,7 +2382,7 @@ async function mergePatterpack(): Promise<void> {
  *  style.css published once and then kept; story.js + patterplay.js refreshed every publish). */
 async function exportWeb(): Promise<void> {
   if (!project) return;
-  const res = await window.patter.exportWeb();
+  const res = await withJob("Publishing for the web…", () => window.patter.exportWeb());
   if (res.ok) {
     toast(res.kept?.length ? `Story updated\nKept your ${res.kept.join(" + ")}` : `Web page published\n${res.path ?? ""}`, "ok");
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
@@ -2352,7 +2392,7 @@ async function exportWeb(): Promise<void> {
  *  plays the whole project offline in any browser. Native Save dialog in main; toast the result. */
 async function exportPlayableHtml(): Promise<void> {
   if (!project) return;
-  const res = await window.patter.exportPlayableHtml();
+  const res = await withJob("Publishing playable HTML…", () => window.patter.exportPlayableHtml());
   if (res.ok) {
     const where = relToProject(res.path);
     toast(`Playable HTML published\n${where}`, "ok");
@@ -2744,12 +2784,7 @@ async function boot(): Promise<void> {
   else showWelcome(state);
 }
 
-// Welcome-screen CTAs (the in-window primary actions). All other commands come from the app menus.
-$<HTMLButtonElement>("welcome-open").addEventListener("click", () => void openDialog());
-$<HTMLButtonElement>("welcome-new").addEventListener("click", () => void createDialog());
-// The tour is a download rather than something the app carries, so this opens the page that
-// offers it - the same allow-listed external route the About box uses.
-$<HTMLButtonElement>("welcome-tour").addEventListener("click", () => window.patter.openExternal("https://patterkit.dev/download/#something-to-open"));
+// (The welcome screen's actions are wired where it is mounted, at the top of the module.)
 // The project name is the way back to the project overview (#3a) - a no-op on the welcome screen.
 projectNameEl.addEventListener("click", () => { if (project && overviewEl.hidden) void showOverview(); });
 projectNameEl.style.cursor = "pointer";
@@ -2784,6 +2819,11 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "reset-view") resetView();
   else if (cmd === "close-project") void closeProject();
   else if (cmd === "project-overview") { if (project) void showOverview(); }
+  // Up a Level (Cmd+[): the family's hierarchy step. Here the levels are a scene (or the Properties
+  // page) and the project overview above it; from the overview there is nowhere higher.
+  else if (cmd === "up-a-level") { if (project && overviewEl.hidden) void showOverview(); }
+  // File ▸ Open Recent ▸ Clear Recents: main forgets them; the welcome's list follows if it is showing.
+  else if (cmd === "clear-recents") void window.patter.clearRecents().then((recents) => { if (!welcomeEl.hidden) setWelcomeRecents(recents); });
   else if (cmd === "nav-back") stepHistory("back");
   else if (cmd === "nav-forward") stepHistory("forward");
   else if (cmd === "toggle-writing-view") toggleWritingView();
@@ -2877,8 +2917,10 @@ window.patter.onOpenWorldSettings(() => void openProjectSettings("world"));
 window.patter.onUpdaterCheckDirty(() => saver.pending);
 window.patter.onUpdaterSaveBeforeInstall(async () => { await save(); return { ok: !saver.pending }; });
 // Auto-update prompts wear the app's themed dialog chrome, never a stock OS box.
-window.patter.onUpdaterPrompt((opts) => showUpdaterDialog(opts));
+window.patter.onUpdaterPrompt((opts) => showUpdaterDialog({ ...opts, openExternal: (url) => window.patter.openExternal(url) }));
 window.patter.onUpdaterDownloadProgress(feedUpdaterDownloadProgress);
+// A publish path that reports through the ops layer turns the strip determinate; none does yet.
+window.patter.onJobProgress((p) => { if (p.kind === "publish" && p.total > 0) { jobView.element.classList.remove("indeterminate"); jobView.update(p.done, p.total, p.elapsedMs); } });
 
 // A `.patter` document package opened from Finder while the app is running: render the delivered project.
 window.patter.onOpenProject((result) => void showProject(result));

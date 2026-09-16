@@ -495,6 +495,11 @@ export interface PatterPlayApi {
   info(): Promise<{ address: string; pinned: boolean; theme: ThemePrefs; follow: boolean; audio: boolean; captions: boolean; locales: string[]; locale: string; defaultLocale: string }>;
   /** Main changed this window's pin behind its back (Reset View re-pins every helper). */
   onPin(handler: (on: boolean) => void): void;
+  /** Close this window (the head's close button; Esc routes here too). */
+  close(): void;
+  /** A different project opened under this window (the session's satellite nudge). A run belongs to
+   *  the project it was started in, so the window closes rather than showing a view of nothing. */
+  onProject(handler: () => void): void;
   /** "Follow in the editor": ask main to reveal each played beat in the editor as the run goes.
    *  Remembered per user; OFF by default, because marking is the default and following is opt-in. */
   setFollow(on: boolean): void;
@@ -625,6 +630,8 @@ export interface PatterCoverageApi {
   findUsage(ref: string): void;
   /** Toggle this window's always-on-top pin (remembered; default pinned). */
   setPin(on: boolean): void;
+  /** Close this window (the head's close button; Esc routes here too). */
+  close(): void;
   /** A different project was opened/closed under the window: re-fetch info + clear stale results. */
   onProject(handler: () => void): void;
   /** Main changed this window's pin behind the window's back (Reset View re-pins every helper). The
@@ -734,6 +741,15 @@ export interface PatterApi {
   /** Export the production report as a producer spreadsheet (xlsx): opens a native Save dialog, writes the
    *  chosen file. `canceled` when the author dismisses the picker. */
   exportReport(): Promise<ExportResult>;
+  /** Stop the running long job of a kind at its next yield (the editor's progress strip's Cancel). Every
+   *  export / publish / pack / merge runs as the "publish" job; coverage has its own window. */
+  cancelJob(kind: string): void;
+  /** Progress from a long job in main (the same channel the coverage window listens on), so the editor
+   *  can draw a determinate bar the moment a publish path starts reporting through the ops layer. */
+  onJobProgress(handler: (p: JobProgressDto) => void): void;
+  /** File ▸ Open Recent ▸ Clear Recents: forget every recent (the open project stays, as the one entry)
+   *  and return what is left, so the welcome screen's list can follow. */
+  clearRecents(): Promise<RecentProject[]>;
   /** Build Bundle (Build menu): compile the project to its runtime `.patterc` and write it to the output
    *  path configured in Project Settings ▸ Build (else the dist/ default). Returns where it landed. */
   buildBundle(): Promise<ExportResult>;

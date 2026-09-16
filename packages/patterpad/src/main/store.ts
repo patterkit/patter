@@ -1,8 +1,8 @@
 // The session store (last project, recents, open-where-you-left-off, identity, theme, helper-window
 // bounds) - now an ADAPTER over the shell's `createAppStore`.
 //
-// The shape below is Patterpad's own and is deliberately unchanged: 37 call sites in index.ts read
-// `lastScene` / `play.pinned` / `theme` and call `recordOpen` / `recordScene`, and none of them should
+// The shape below is Patterpad's own and is deliberately unchanged: the call sites in index.ts read
+// `lastScene` / `theme` and call `recordOpen` / `recordScene`, and none of them should
 // have to care that the bytes underneath are now the family's `app-settings.json`. Everything that is
 // genuinely shared (recents and their cap, panes, identity, per-window bounds + pin, the atomic write,
 // the tolerant read) is the shell's; everything below is the translation plus the three things that are
@@ -14,8 +14,8 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { createAppStore } from "@wildwinter/app-shell/app-store";
-import type { AppSettings, PaneState as ShellPaneState, WindowState } from "@wildwinter/app-shell/app-store";
+import { createAppStore, resetWindows, windowSlice } from "@wildwinter/app-shell/app-store";
+import type { AppSettings, PaneState as ShellPaneState, WindowSlice, WindowState } from "@wildwinter/app-shell/app-store";
 import type { Identity, PaneState, RecentProject, ThemePrefs } from "../shared/api.js";
 
 export interface SessionState {
@@ -33,18 +33,11 @@ export interface SessionState {
   theme: ThemePrefs;
   /** "Follow in the editor" on the play window (default off). */
   playFollow: boolean;
-  /** Remembered play-window bounds + always-on-top pin (default pinned). */
-  play: PlayWindowState;
-  /** Remembered search-tool-window bounds + always-on-top pin (default pinned). */
-  search: PlayWindowState;
-  /** Remembered coverage-window bounds (a normal framed window; pin unused). */
-  coverage: PlayWindowState;
 }
 
-export interface PlayWindowState {
-  bounds?: { x?: number; y?: number; width: number; height: number };
-  pinned: boolean;
-}
+/** The three helper windows, by the key each remembers its bounds and pin under. */
+export type ToolWindowName = "play" | "search" | "coverage";
+export const TOOL_WINDOW_NAMES: readonly ToolWindowName[] = ["play", "search", "coverage"];
 
 /** Where the author was in one project. The shell keeps `places` opaque and keyed by project path;
  *  this is what Patterpad puts in the slot, and `read()` fans it back out into the parallel
@@ -66,6 +59,8 @@ interface AppSlice {
 
 /** The old hand-rolled file, kept only for the one-time fold-in below. */
 const LEGACY_FILE = "patterpad-session.json";
+/** Its shape: today's session state plus the three window slots it kept as named fields. */
+type LegacySession = Partial<SessionState> & { play?: WindowState; search?: WindowState; coverage?: WindowState };
 const SETTINGS_FILE = "app-settings.json";
 
 // First-run default: BOTH sides closed so the editor opens full-bleed (Patterpad.md §4 - "both sides
@@ -86,15 +81,6 @@ function migrateTheme(t: ThemePrefs): ThemePrefs {
   return colour === t.colour ? t : { ...t, colour };
 }
 
-// The three helper windows float on top by default (the author reads them beside the script as they
-// edit). The shell's `pinned` is OPTIONAL and so absent until something writes it; applying the default
-// on READ is what stops every window silently unpinning on the first launch after this change.
-const PINNED_BY_DEFAULT = true;
-const windowState = (w: WindowState | undefined): PlayWindowState => ({
-  ...(w?.bounds ? { bounds: w.bounds } : {}),
-  pinned: w?.pinned ?? PINNED_BY_DEFAULT,
-});
-
 export interface Store {
   read(): SessionState;
   recordOpen(path: string, name: string): void;
@@ -103,9 +89,13 @@ export interface Store {
   setPanes(panes: PaneState): void;
   setTheme(theme: ThemePrefs): void;
   setPlayFollow(on: boolean): void;
-  setPlay(play: PlayWindowState): void;
-  setSearch(search: PlayWindowState): void;
-  setCoverage(coverage: PlayWindowState): void;
+  /** One helper window's remembered bounds + pin, read through the shell's `windowSlice`: the three
+   *  helper windows float on top by default (the slice's own default), and nothing here flattens the
+   *  shell's record back into named fields any more (ui-review-2026-09, finding 19). */
+  window(name: ToolWindowName): WindowSlice;
+  /** Reset View's store half: forget every remembered rectangle and re-pin all three, so a window
+   *  stranded off-screen comes back centred at its default size on the next open. */
+  resetWindows(): void;
   forget(path: string): void;
   /** Forget WHICH project was open, keeping it in recents (Close Project). A quit after closing then
    *  boots to the welcome screen instead of silently reopening what the author just closed. */
@@ -127,9 +117,9 @@ export interface Store {
 function foldInLegacySession(dir: string): void {
   const settingsFile = join(dir, SETTINGS_FILE);
   if (existsSync(settingsFile)) return; // the shell's file is authoritative once it exists
-  let old: Partial<SessionState>;
+  let old: LegacySession;
   try {
-    old = JSON.parse(readFileSync(join(dir, LEGACY_FILE), "utf8")) as Partial<SessionState>;
+    old = JSON.parse(readFileSync(join(dir, LEGACY_FILE), "utf8")) as LegacySession;
   } catch {
     return; // no old file, or an unreadable one: a genuine first run, defaults all the way down
   }
@@ -170,15 +160,6 @@ export function createStore(dir: string): Store {
     panes: { ...DEFAULT_PANES },
   });
 
-  // These three setters REPLACE, where the shell's `setWindow` merges, and the difference is load
-  // bearing: `rescueWindows()` calls `setPlay({ pinned: true })` precisely to CLEAR a remembered
-  // rectangle, which is the whole point of a rescue - a window stranded off-screen must not come back
-  // to the same bad coordinates on the next launch. Every other caller already spreads the current
-  // state in, so passing the rectangle through explicitly (undefined and all) is what they both want.
-  const setWindow = (key: string, w: PlayWindowState): void => {
-    app.setWindow(key, { bounds: w.bounds, pinned: w.pinned });
-  };
-
   const read = (): SessionState => {
     const s = app.get();
     // `places` is one record of {scene, caret}; the app has always spoken in two parallel records and
@@ -204,9 +185,6 @@ export function createStore(dir: string): Store {
       panes: { ...DEFAULT_PANES, ...(s.panes as PaneState) },
       theme: migrateTheme({ ...DEFAULT_THEME, ...s.app.theme }),
       playFollow: s.app.playFollow ?? false,
-      play: windowState(s.windows.play),
-      search: windowState(s.windows.search),
-      coverage: windowState(s.windows.coverage),
     };
   };
 
@@ -240,14 +218,11 @@ export function createStore(dir: string): Store {
     setPlayFollow(on) {
       app.patchApp({ playFollow: on });
     },
-    setPlay(play) {
-      setWindow("play", play);
+    window(name) {
+      return windowSlice(app, name);
     },
-    setSearch(search) {
-      setWindow("search", search);
-    },
-    setCoverage(coverage) {
-      setWindow("coverage", coverage);
+    resetWindows() {
+      resetWindows(app, [...TOOL_WINDOW_NAMES]);
     },
     clearLastProject() {
       app.clearLastProject();

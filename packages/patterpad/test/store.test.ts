@@ -18,7 +18,7 @@ const legacy = (dir: string, session: object): string => {
 
 describe("session store", () => {
   it("starts empty and tolerates a missing file", () => {
-    expect(createStore(tmpDir()).read()).toEqual({ lastScene: {}, lastCaret: {}, recents: [], panes: { nav: false, inspector: false }, theme: { colour: "system", font: "newsreader" }, playFollow: false, play: { pinned: true }, search: { pinned: true }, coverage: { pinned: true } });
+    expect(createStore(tmpDir()).read()).toEqual({ lastScene: {}, lastCaret: {}, recents: [], panes: { nav: false, inspector: false }, theme: { colour: "system", font: "newsreader" }, playFollow: false });
   });
 
   it("remembers the side-pane (slide/pin) state", () => {
@@ -157,26 +157,34 @@ describe("session store", () => {
   });
 
   it("defaults the three helper windows to pinned, and remembers bounds and unpinning", () => {
+    // Each window is a slice of the shell's record (`windowSlice`); nothing flattens it any more.
     const dir = tmpDir();
     const s = createStore(dir);
-    expect(s.read().play).toEqual({ pinned: true });
-    s.setPlay({ ...s.read().play, bounds: { x: 10, y: 20, width: 400, height: 300 } });
-    s.setSearch({ ...s.read().search, pinned: false });
-    const reloaded = createStore(dir).read();
-    expect(reloaded.play).toEqual({ pinned: true, bounds: { x: 10, y: 20, width: 400, height: 300 } });
-    expect(reloaded.search).toEqual({ pinned: false });
-    expect(reloaded.coverage).toEqual({ pinned: true }); // untouched, still pinned
+    expect(s.window("play").pinned()).toBe(true);
+    expect(s.window("play").bounds()).toBeUndefined();
+    s.window("play").remember({ x: 10, y: 20, width: 400, height: 300 });
+    s.window("search").setPinned(false);
+    const reloaded = createStore(dir);
+    expect(reloaded.window("play").bounds()).toEqual({ x: 10, y: 20, width: 400, height: 300 });
+    expect(reloaded.window("play").pinned()).toBe(true);   // a remembered rect does not unpin
+    expect(reloaded.window("search").pinned()).toBe(false);
+    expect(reloaded.window("coverage").pinned()).toBe(true); // untouched, still pinned
   });
 
-  it("a rescue clears remembered bounds rather than merging over them", () => {
-    // rescueWindows() calls setPlay({ pinned: true }) to strand-proof a window that is off-screen.
-    // Merging would keep the bad rectangle and put it straight back there on the next launch.
+  it("a rescue clears remembered bounds rather than merging over them, and re-pins every window", () => {
+    // Reset View calls resetWindows() to strand-proof a window that is off-screen. Merging would keep
+    // the bad rectangle and put it straight back there on the next launch.
     const dir = tmpDir();
     const s = createStore(dir);
-    s.setPlay({ pinned: false, bounds: { x: -9000, y: -9000, width: 400, height: 300 } });
-    s.setPlay({ pinned: true });
-    expect(s.read().play).toEqual({ pinned: true });
-    expect(createStore(dir).read().play).toEqual({ pinned: true });
+    s.window("play").remember({ x: -9000, y: -9000, width: 400, height: 300 });
+    s.window("play").setPinned(false);
+    s.resetWindows();
+    expect(s.window("play").bounds()).toBeUndefined();
+    expect(s.window("play").pinned()).toBe(true);
+    const reloaded = createStore(dir);
+    expect(reloaded.window("play").bounds()).toBeUndefined();
+    expect(reloaded.window("play").pinned()).toBe(true);
+    expect(reloaded.window("search").pinned()).toBe(true); // every window, not only the one that moved
   });
 
   describe("folding in the pre-shell patterpad-session.json", () => {
@@ -204,9 +212,11 @@ describe("session store", () => {
       expect(st.identity).toEqual({ name: "Ian", email: "ian@example.com" });
       expect(st.panes).toEqual({ nav: true, inspector: false, docHidden: ["vo"] });
       expect(st.theme).toEqual({ colour: "night", font: "literata" }); // remapped on the way through
-      expect(st.play).toEqual({ pinned: false, bounds: { x: 1, y: 2, width: 300, height: 400 } });
-      expect(st.search).toEqual({ pinned: true });
-      expect(st.coverage).toEqual({ pinned: false });
+      const store = createStore(dir);
+      expect(store.window("play").bounds()).toEqual({ x: 1, y: 2, width: 300, height: 400 });
+      expect(store.window("play").pinned()).toBe(false);
+      expect(store.window("search").pinned()).toBe(true);
+      expect(store.window("coverage").pinned()).toBe(false);
     });
 
     it("leaves the old file untouched, as a rollback", () => {

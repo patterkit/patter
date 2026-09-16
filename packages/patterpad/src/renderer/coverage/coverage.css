@@ -1,5 +1,5 @@
-/* The detached coverage results window (#159): an options bar pinned at the top, a scrolling results
- * area below. Uses the shared app design tokens (theme.css). */
+/* The detached coverage results window (#159): the shell's head bar (tool-window.css), an options row
+ * under it, a scrolling results area below. Uses the shared app design tokens (theme.css). */
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body.coverage-win {
@@ -11,9 +11,8 @@ body.coverage-win {
   overflow: hidden;
 }
 
-/* Options bar */
-.cov-bar { flex: 0 0 auto; border-bottom: 1px solid var(--line); background: var(--surface); padding: 0.6rem 0.9rem; }
-.cov-opts { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.7rem; }
+/* Options row */
+.cov-opts { flex: 0 0 auto; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.7rem; border-bottom: 1px solid var(--line); background: var(--surface); padding: 0.6rem 0.9rem; }
 .cov-opt { display: flex; flex-direction: column; gap: 0.2rem; font: 600 0.62rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .cov-opt input, .cov-opt select { width: 6.5rem; font: 0.8rem var(--font-ui); padding: 0.3rem 0.4rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
 .cov-bar-spacer { flex: 1 1 auto; }

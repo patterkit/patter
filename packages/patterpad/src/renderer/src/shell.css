@@ -109,6 +109,23 @@
    other way about. `vc-frozen` is new here: read-only on disk with nobody else holding it. */
 .nav-item .vc-badge { margin-left: auto; }
 
+/* The topbar health chip (parity row 33): a tick when clean, the problem count when not; the tone is the
+   worst problem's. A count is a control (it steps to the first); the tick answers on click, quietly. */
+.healthchip { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 1.4rem; height: 1.3rem; padding: 0 0.45rem; border: 0; border-radius: var(--radius-pill); background: none; color: var(--ok); font: 600 0.72rem var(--font-ui); font-variant-numeric: tabular-nums; cursor: pointer; transition: background var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
+.healthchip[hidden] { display: none; }
+.healthchip.ok { color: var(--ok); }
+.healthchip.err { color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, transparent); }
+.healthchip.warn { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
+.healthchip svg { display: block; }
+
+/* The long-job strip (the shell's job.css) sits between the bottom bars and the hint bar. A publish path
+   that reports nothing through the ops layer runs INDETERMINATE: the fill slides rather than sitting at
+   zero, which would read as stuck. (A shell option for this shape would let this rule go.) */
+.job-host { flex: 0 0 auto; }
+.job-strip.indeterminate .job-fill { width: 28%; animation: job-slide calc(var(--dur-slow) * 3) var(--ease-standard) infinite alternate; }
+@keyframes job-slide { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+@media (prefers-reduced-motion: reduce) { .job-strip.indeterminate .job-fill { animation: none; width: 100%; opacity: 0.4; } }
+
 /* Topbar chip: the CURRENT scene's VC state (sits beside the unsaved dot). */
 .vcs-scene { display: inline-flex; align-items: center; gap: 4px; font: 600 0.72rem var(--font-ui); color: var(--warn); white-space: nowrap; }
 .vcs-scene[hidden] { display: none; } /* an explicit display would otherwise defeat the `hidden` attribute */
@@ -273,21 +290,11 @@
 .insp-rerecord { display: inline-flex; align-items: center; gap: 0.3rem; font: 0.72rem var(--font-ui); color: var(--ink); cursor: pointer; }
 .insp-rerecord input { margin: 0; cursor: pointer; }
 
-/* Live debug link (#181): a compact status control fixed in the bottom-right corner (over the hint bar).
-   One coloured "connect" icon toggles the localhost link (off → start listening → stop); the colour is the
-   state - grey off, amber listening, green connected/in-sync, red different-build. When live the copiable
-   ws:// address sits beside it (click to copy), plus a flow picker when more than one flow is live. */
-.debuglink { position: fixed; right: 0.9rem; bottom: 0.32rem; z-index: 40; display: inline-flex; align-items: center; gap: 0.4rem; }
-.debuglink[hidden] { display: none; }
-.debuglink-url { font: 0.72rem var(--font-mono); color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.14rem 0.45rem; cursor: pointer; }
-.debuglink-url:hover { border-color: var(--accent); color: var(--accent); }
-.debuglink-url.copied { color: var(--accent); border-color: var(--accent); }
-.debuglink-flow { font: 0.7rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.1rem 0.3rem; cursor: pointer; }
-.debuglink-toggle { flex: none; width: 1.4rem; height: 1.4rem; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--muted); cursor: pointer; transition: filter var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard); }
-.debuglink-toggle:hover { filter: brightness(1.06); border-color: var(--accent); }
-.debuglink-toggle.listening { color: var(--warn); border-color: var(--warn); background: color-mix(in oklab, var(--warn) 12%, var(--surface)); }
-.debuglink-toggle.live { color: var(--ok); border-color: var(--ok); background: color-mix(in oklab, var(--ok) 14%, var(--surface)); }
-.debuglink-toggle.stale { color: var(--danger); border-color: var(--danger); background: color-mix(in oklab, var(--danger) 12%, var(--surface)); }
+/* Live debug link (#181): the chip (the plug, its four states, the copiable address) is the shell's
+   `mountLinkStatus` + link-status.css. Ours is the flow picker it carries in its lead slot, shown when a
+   game reports more than one live flow. */
+.linkstatus-flow { font: 0.7rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.1rem 0.3rem; cursor: pointer; }
+.linkstatus-flow[hidden] { display: none; }
 
 /* Scratch-recording blocking overlay (#224): covers the whole window during a take; nothing behind it is
    reachable. Driven entirely by keys (Space finish, Esc cancel). */
@@ -384,50 +391,28 @@
 /* A resolved thread in the review walk reads as done rather than as live feedback. */
 .stepbar-cat.done { color: var(--muted); }
 
-/* A tinted "fix" chip (not a solid primary button): its fill-to-solid hover is an intentional, quieter idiom
-   for the problem bar. Kept distinct from .btn.primary's brightness, but now eased so it doesn't snap
-   (design-language §4 "motion is interpolation") - brightness would be near-invisible on the tinted rest. */
-.problem-fix { flex: 0 0 auto; margin-left: auto; cursor: pointer; background: color-mix(in oklab, var(--accent) 14%, transparent); color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-sm); font: 600 0.7rem var(--font-ui); padding: 0.15rem 0.55rem; transition: background var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
-.problem-fix:hover { background: var(--accent); color: var(--surface); }
-/* Amber when the problem you are standing on is advisory, matching the surface's amber squiggle. */
-#problembar:has(.stepbar-count.warn) .problem-fix { color: var(--warn); border-color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
-#problembar:has(.stepbar-count.warn) .problem-fix:hover { background: var(--warn); color: var(--surface); }
+/* The quick-fix chip is the shell's `.stepbar-action` (stepper.css), amber under a warn count there too. */
 
 /* The review walk is the problems bar plus ONE modifier: a subtle accent-tinted ground, so the mode you
    entered reads as distinct from the ambient bar above it. */
 .stepbar.reviewbar { background: color-mix(in oklab, var(--accent) 6%, var(--surface)); }
 
-/* Welcome screen (shown when no project is open; takes the space the panes would). The whole screen
-   drags the window, as Storyletter's does (parity row 32); anything clickable opts out. */
-.welcome { flex: 1; min-height: 0; display: grid; place-items: center; padding: 2rem; overflow: auto; -webkit-app-region: drag; }
-.welcome :is(button, input, select, a, .no-drag) { -webkit-app-region: no-drag; }
-.welcome[hidden] { display: none; }
+/* Welcome screen: the shell's `mountWelcome` + welcome.css (title, sub, actions, the teaching line, the
+   recents, the whole-screen drag region and its screen-in motion). The host is `display: contents` so
+   the shell's `.welcome` is the column's flex item in its place, and `hidden` on the host takes it out. */
+.welcome-host { display: contents; }
+.welcome-host[hidden] { display: none; }
 .panes[hidden] { display: none; }
-/* Soft cross-fade when the shell swaps top-level screens (welcome / project overview / workspace): the
-   incoming screen eases up rather than hard-cutting. Fires only on the display:none -> shown transition
-   (so it doesn't replay on unrelated reflows); neutralised under prefers-reduced-motion via the token. */
-.welcome:not([hidden]), .overview:not([hidden]), .panes:not([hidden]) { animation: var(--anim-screen-in); }
-.welcome-card { width: min(34rem, 100%); }
-.welcome-title { margin: 0 0 0.2rem; font: 700 2.4rem/1.1 var(--font-read); color: var(--ink); text-align: center; }
-.welcome-sub { margin: 0 0 1.8rem; color: var(--muted); font-style: italic; text-align: center; }
-.welcome-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem; }
-/* The teaching line: quieter than the two actions above it, and a LINK rather than a third button,
-   because it leaves the app rather than doing something in it. */
-.welcome-learn { margin: 0 0 1.8rem; text-align: center; color: var(--muted); font: 0.82rem var(--font-ui); }
+/* Soft cross-fade when the shell swaps top-level screens (project overview / workspace): the incoming
+   screen eases up rather than hard-cutting. Fires only on the display:none -> shown transition (so it
+   doesn't replay on unrelated reflows); neutralised under prefers-reduced-motion via the token. The
+   welcome carries the same token itself (welcome.css). */
+.overview:not([hidden]), .panes:not([hidden]) { animation: var(--anim-screen-in); }
 /* A text action that is not a button is a LINK: underlined and coloured, never bare muted text
    ("Controls have edges"). The one rule for every in-window link (the tour line, the Properties page's
    foot); the shell's control grammar has no link class, so it stays here. */
 .linklike { background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .linklike:hover { color: var(--ink); }
-.welcome-recents-label { color: var(--muted); font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
-.recents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.2rem; }
-.recent-item {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 0.05rem; width: 100%; cursor: pointer;
-  background: none; border: 1px solid transparent; border-radius: var(--radius-md); padding: 0.45rem 0.6rem;
-}
-.recent-item:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); border-color: var(--line); }
-.recent-name { color: var(--ink); font: 600 0.9rem var(--font-ui); }
-.recent-path { color: var(--muted); font: 0.7rem var(--font-mono); }
 
 /* Project overview (#3a): a calm landing - title, headline stats, drafted bar, and a clickable scene
    index. Shares the welcome screen's centred-card geometry; eases in with the shared panel motion. */
@@ -473,20 +458,7 @@
 /* Dim derived from --ink (palette-aware), matching the surface's confirm-overlay scrim rather than a fixed black. */
 .identity::backdrop { background: color-mix(in oklab, var(--ink) 28%, transparent); backdrop-filter: blur(3px); animation: var(--anim-backdrop-in); }
 .identity-form { display: flex; flex-direction: column; gap: 0.8rem; padding: 1.4rem; }
-/* The auto-update prompts reuse the identity dialog chrome; keep their detail's \n line breaks. */
-.um-dialog .identity-sub { white-space: pre-line; }
-/* The About dialog's centred PatterKit wordmark (inline SVG; words follow the theme ink/accent). */
-.um-wordmark { display: flex; justify-content: center; margin: 0.2rem 0 0.4rem; }
-.um-wordmark svg { height: 2.6rem; width: auto; }
-/* The About dialog's web links (opened externally via the main-process allow-list). */
-/* Live download progress in the updater dialog (Check for Updates while a download runs, #33). */
-.um-progress-track { height: 0.4rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--ink) 12%, transparent); overflow: hidden; }
-.um-progress-bar { height: 100%; width: 0%; border-radius: inherit; background: var(--accent); transition: width var(--dur-quick) var(--ease-standard); }
-.um-progress-label { margin: 0.3rem 0 0; font: 0.78rem var(--font-mono); color: var(--muted); }
-
-.um-links { margin: 0; display: flex; gap: 1rem; font-size: 0.85rem; }
-.um-links a { color: var(--accent); text-decoration: none; }
-.um-links a:hover { text-decoration: underline; }
+/* The auto-update prompts are the shell's `showUpdaterDialog` (updater.css), on the dialog frame. */
 .identity-title { margin: 0; font: 700 1.2rem var(--font-read); }
 .identity-sub { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .identity-field { display: flex; flex-direction: column; gap: 0.25rem; font: 600 0.76rem var(--font-ui); color: var(--muted); }
@@ -622,13 +594,12 @@ input::placeholder, textarea::placeholder {
 .gd-field-top { display: flex; gap: 0.4rem; align-items: center; }
 .gd-field-mid { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 .gd-input { font: 0.85rem var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.32rem 0.45rem; }
-.gd-input:focus-visible, .gd-default:focus-visible { border-color: var(--accent); outline-offset: 0; }
+.gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
 .gd-name { flex: 1; min-width: 0; }
 .gd-type { flex: 0 0 auto; }
 .gd-acts { display: flex; gap: 0.1rem; margin-left: auto; }
 /* A checkbox caption on the shell's `.shell-labelled` row (Shared / Temporary / Read-only): its own look only. */
 .gd-shared { gap: 0.4rem; flex: 0 0 auto; cursor: pointer; font: 600 0.78rem var(--font-ui); color: var(--ink-soft); }
-.gd-default { font: 0.85rem var(--font-ui); }
 .gd-add { align-self: flex-start; margin-top: 0.2rem; background: none; border: 1px dashed var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 600 0.78rem var(--font-ui); padding: 0.25rem 0.6rem; }
 .gd-add:hover { color: var(--accent); border-color: var(--accent); }
 
@@ -650,11 +621,10 @@ input::placeholder, textarea::placeholder {
 .set-rowline .world-ref { flex: 1; min-width: 0; gap: 0.05rem; }
 .set-rowline .world-token { flex: 0 0 4.6rem; width: 4.6rem; font-family: var(--font-mono); padding-left: 0.35rem; padding-right: 0.2rem; }
 .set-rowline .world-ref .gd-name { min-width: 3rem; }
-.set-rowline .gd-default { flex: 0 0 auto; max-width: 9rem; }
+/* The default control is the shell's `.set-default` (property-list.ts + settings.css). */
 /* The details panel stacks its fields (Values and Purpose never share a line),
    which is the shell's `.set-details` doing it. Only our own field sits here. */
 .set-details .gd-shared { align-self: flex-start; }
-.gd-flagnote { font: italic 0.78rem var(--font-ui); color: var(--muted); }
 /* Status rows reuse the compact row; keep the readiness radios from wrapping and the colour swatch tidy. */
 .gd-status-line .gd-name { min-width: 5rem; }
 .gd-status-line .gd-markers { flex: 0 0 auto; flex-wrap: nowrap; padding-left: 0; gap: 0.6rem; }

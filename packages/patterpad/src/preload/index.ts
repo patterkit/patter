@@ -71,6 +71,9 @@ const api: PatterApi = {
   report: () => ipcRenderer.invoke("project:report"),
   proposeCoverageDrivers: () => ipcRenderer.invoke("project:proposeCoverageDrivers"),
   exportReport: () => ipcRenderer.invoke("project:exportReport"),
+  cancelJob: (kind) => { void ipcRenderer.invoke("job:cancel", kind); },
+  onJobProgress: (handler) => { ipcRenderer.on(JOB_PROGRESS, (_e, p: JobProgressDto) => handler(p)); },
+  clearRecents: () => ipcRenderer.invoke("project:clearRecents"),
   buildBundle: () => ipcRenderer.invoke("project:build"),
   toggleAutoRebuild: () => ipcRenderer.invoke("project:toggleAutoRebuild"),
   buildAudioManifest: () => ipcRenderer.invoke("project:audioManifest"),
@@ -140,7 +143,10 @@ const playApi: PatterPlayApi = {
   setClosedCaptions: (on) => ipcRenderer.invoke("play:setCaptions", on),
   onStale: (handler) => { ipcRenderer.on("play:stale", () => handler()); },
   onRefreshed: (handler) => { ipcRenderer.on("play:refreshed", (_e, kind: "text" | "structure", options: PlayChoiceOption[]) => handler(kind, options)); },
-  onPin: (handler) => { ipcRenderer.on("play:pin", (_e, on: boolean) => handler(on)); },
+  // The shell's tool-window table re-pins every helper on Reset View and says so on ONE channel.
+  onPin: (handler) => { ipcRenderer.on("state:pinned", (_e, on: boolean) => handler(on)); },
+  close: () => { void ipcRenderer.invoke("play:close"); },
+  onProject: (handler) => { ipcRenderer.on("play:project", () => handler()); },
   setFollow: (on) => { void ipcRenderer.invoke("play:setFollow", on); },
   onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
@@ -162,7 +168,7 @@ const searchApi: PatterSearchApi = {
   onMode: (handler) => { ipcRenderer.on("searchWin:mode", (_e, mode: SearchMode) => handler(mode)); },
   onSeed: (handler) => { ipcRenderer.on("searchWin:seed", (_e, query: string) => handler(query)); },
   onProject: (handler) => { ipcRenderer.on("searchWin:project", () => handler()); },
-  onPin: (handler) => { ipcRenderer.on("searchWin:pin", (_e, on: boolean) => handler(on)); },
+  onPin: (handler) => { ipcRenderer.on("state:pinned", (_e, on: boolean) => handler(on)); },
   onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
@@ -176,8 +182,9 @@ const coverageApi: PatterCoverageApi = {
   openWorld: () => { void ipcRenderer.invoke("covWin:openWorld"); },
   findUsage: (ref) => { void ipcRenderer.invoke("covWin:findUsage", ref); },
   setPin: (on) => { void ipcRenderer.invoke("covWin:setPin", on); },
+  close: () => { void ipcRenderer.invoke("covWin:close"); },
   onProject: (handler) => { ipcRenderer.on("covWin:project", () => handler()); },
-  onPin: (handler) => { ipcRenderer.on("covWin:pin", (_e, on: boolean) => handler(on)); },
+  onPin: (handler) => { ipcRenderer.on("state:pinned", (_e, on: boolean) => handler(on)); },
   onTheme: (handler) => { ipcRenderer.on("theme:changed", (_e, t: ThemePrefs) => handler(t)); },
 };
 
