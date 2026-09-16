@@ -2,7 +2,7 @@
 title: Use it, ship it, and if you like? Say so.
 description: Use Patter freely under the MIT licence, and find the optional credit lines, badges, name rules, and bundled third-party notices here.
 sidebar:
-  label: Licensing and credit
+  label: Licensing
 ---
 
 Patter and its tools are free and MIT-licensed. Ship a commercial game with it, fork it, modify
