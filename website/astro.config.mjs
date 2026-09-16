@@ -63,8 +63,10 @@ export default defineConfig({
         { tag: "meta", attrs: { name: "twitter:image", content: "https://patterkit.dev/social-card.png" } },
       ],
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/patterkit/patter" }],
-      // Role-routed IA: newcomers/evaluators start at the top; writers, the project lead who sets
-      // a project up, and the game developers who integrate a runtime each get their own track.
+      // Role-routed IA: newcomers start at the top; writers, the person who sets a project up, and
+      // the developers who integrate a runtime each get their own track. Group order and labels
+      // follow the list agreed for the family (the Storylets site uses the same eight), and the
+      // first page of every track is labelled "Overview" in its frontmatter.
       sidebar: [
         {
           label: "Start here",
@@ -139,7 +141,7 @@ export default defineConfig({
             "compatibility",
           ],
         },
-        { label: "Automation: the CLI", items: ["cli"] },
+        { label: "The CLI", items: ["cli"] },
         { label: "Reference", items: ["specification", "licensing"] },
       ],
     }),

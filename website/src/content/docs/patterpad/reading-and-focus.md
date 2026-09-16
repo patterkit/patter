@@ -1,8 +1,8 @@
 ---
-title: Reading & focus
+title: Reading and focus
 description: Read your script back with Writing View, colour themes, and fonts chosen for reading as well as writing.
 sidebar:
-  label: Reading & focus
+  label: Reading and focus
 ---
 
 A lot of writing is really *reading back*: scrolling through, catching up, finding the

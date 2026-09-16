@@ -1,8 +1,8 @@
 ---
-title: Structure & branching
+title: Structure and branching
 description: Shape a scene in Patterpad with choices, selectors, jumps, and the action menu.
 sidebar:
-  label: Structure & branching
+  label: Structure and branching
 ---
 
 Branching in Patter comes from a handful of building blocks, and Patterpad shapes them

@@ -1,8 +1,8 @@
 ---
-title: Tracking & reports
+title: Tracking and reports
 description: Roll up writing status, run the coverage test, and export the reports, voice scripts, and localisation files that keep a project on schedule.
 sidebar:
-  label: Tracking & reports
+  label: Tracking and reports
 ---
 
 Once the writers are drafting, this is where you see **how much is done and what's left**,

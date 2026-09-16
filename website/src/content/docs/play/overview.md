@@ -2,7 +2,7 @@
 title: Playing in your game
 description: Pick the Patterplay runtime for your engine and see what all four of them give your game, from the play loop to live debugging.
 sidebar:
-  label: The runtime family
+  label: Overview
 ---
 
 Your story reaches a player through a Patterplay runtime. You build the project to one

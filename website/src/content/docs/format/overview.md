@@ -2,7 +2,7 @@
 title: The Patter format
 description: See what a Patter project is on disk, from the shards to the compiled bundle and the send envelope.
 sidebar:
-  label: Project & files
+  label: Overview
 ---
 
 A Patter project is **plain files you own**. There's no database and no server: the

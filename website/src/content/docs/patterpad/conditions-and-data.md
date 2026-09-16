@@ -1,8 +1,8 @@
 ---
-title: Conditions, effects & data
+title: Conditions, effects and data
 description: Edit a story's logic and memory in the inspector, from conditions and effects to properties, Game Data, tags, and addresses.
 sidebar:
-  label: Conditions, effects & data
+  label: Conditions, effects and data
 ---
 
 The story's logic, its conditions, its memory, its data, lives in the **inspector**

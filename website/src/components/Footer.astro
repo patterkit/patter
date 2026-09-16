@@ -1,6 +1,6 @@
 ---
 // Starlight Footer override: the stock footer (edit link / pagination), the Storytools mailing-list
-// sign-up, then a one-line site-wide credit, licence, author, and the PatterKit home. Registered in
+// sign-up, then a one-line site-wide credit naming the licence and the author. Registered in
 // astro.config.mjs `components`.
 import Default from "@astrojs/starlight/components/Footer.astro";
 import Newsletter from "./Newsletter.astro";
@@ -14,7 +14,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a tr
 <div class="pk-signup" data-pagefind-ignore><Newsletter /></div>
 {/* One line, no internal newlines: Astro collapses a newline between text and an adjacent
     inline element to nothing, which ran "Made by" into the author link. */}
-<p class="pk-credit"><a href={`${base}licensing/`}>MIT-licensed</a> open source &middot; Made by <a href="https://ian.wildwinter.net" rel="author">Ian Thomas</a> &middot; <a href="https://patterkit.dev">patterkit.dev</a></p>
+<p class="pk-credit">Open source under the <a href={`${base}licensing/`}>MIT licence</a>, made by <a href="https://ian.wildwinter.net" rel="author">Ian Thomas</a>.</p>
 
 <style>
   .pk-signup {
@@ -36,10 +36,10 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a tr
   }
   .pk-credit a {
     color: var(--sl-color-gray-2);
-    text-decoration: none;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .pk-credit a:hover {
     color: var(--sl-color-white);
-    text-decoration: underline;
   }
 </style>

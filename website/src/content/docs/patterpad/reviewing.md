@@ -1,8 +1,8 @@
 ---
-title: Reviewing & feedback
+title: Reviewing and feedback
 description: Review a script inside Patterpad with threaded comments, suggested rewrites, routed notes, and a walk through every open note.
 sidebar:
-  label: Reviewing & feedback
+  label: Reviewing and feedback
 ---
 
 Patterpad is built for the back-and-forth of a real production, not just the first draft.

@@ -1,46 +1,48 @@
 ---
 // Curated download sections, read live from the public, CORS-enabled GitHub Releases
 // API in the BROWSER so they stay current without rebuilding the static site. Each
-// instance renders ONE section (`kind`): "patterpad" (per-platform installer cards),
-// "plugins" (the four Patterplay runtime zips, brand icons), or "cli" (the standalone
-// binaries). Only the curated tag families render at all - the conformance-corpus and
-// npm-package releases in the same repo are deliberately invisible here.
+// instance renders ONE section (`kind`): "patterpad" (one row per platform), "plugins"
+// (the four Patterplay runtime zips, one row per engine), "cli" (the standalone binaries,
+// one row per platform), or "tour" (the interactive tour). Only the curated tag families
+// render at all; the conformance-corpus and npm-package releases in the same repo are
+// deliberately invisible here.
+//
+// Every section is a plain list: a name, a short note, and a bordered button on each row,
+// with a hairline between rows. No cards.
 const { kind = "patterpad" } = Astro.props;
 const repo = "patterkit/patter";
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
 ---
 
-{/* not-content: Starlight's escape hatch - exempts this subtree from its markdown flow
-    styles (which otherwise stamp margin-top on every sibling and out-cascade our classes,
-    un-pinning the card buttons and making same-row cards ragged). */}
+{/* not-content: Starlight's escape hatch, which exempts this subtree from its markdown flow
+    styles (they would otherwise stamp margin-top on every sibling and out-cascade our classes). */}
 <div class="pt-dl not-content" data-pt-dl={kind} data-repo={repo} data-base={base}>
   <p class="pt-dl-status">Loading the latest release…</p>
 </div>
 
 <style is:global>
-  /* Global (not scoped): the markup below is injected with innerHTML. */
-  .pt-dl { margin: 1rem 0 1.5rem; }
-  .pt-dl-status, .pt-dl-empty { color: var(--sl-color-gray-3); }
-  .pt-dl-meta { color: var(--sl-color-gray-3); font-size: 0.82rem; margin: 0.55rem 0 0; }
-  .pt-dl-meta a { color: var(--sl-color-text-accent); }
-  .pt-dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 0.75rem; }
-  .pt-dl-card { display: flex; flex-direction: column; gap: 0.4rem; height: 100%; border: 1px solid var(--sl-color-gray-5);
-    border-top: 2px solid var(--pt-teal-ink, var(--sl-color-accent)); border-radius: 0.6rem;
-    padding: 0.9rem 1rem 1rem; background: var(--sl-color-bg-sidebar); }
-  /* With not-content on the mount (see the markup), spacing inside a card is ours alone:
-     the flex gap plus the button's auto margin. */
-  .pt-dl-card > * { margin: 0; }
-  .pt-dl-card-head { display: flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 1rem; }
-  .pt-dl-card-head img { border-radius: 7px; }
-  .pt-dl-sub { font-size: 0.8rem; color: var(--sl-color-gray-2); margin: 0; }
-  /* margin-top:auto pins the button to the card's bottom edge, so the four
-     runtime cards' buttons align even when the blurbs wrap differently. */
-  .pt-dl-btn { display: inline-block; margin-top: auto; padding: 0.38rem 0.8rem; border-radius: 0.45rem;
-    background: var(--sl-color-text-accent); color: var(--sl-color-black) !important; font-weight: 600;
-    font-size: 0.88rem; text-decoration: none; align-self: flex-start; }
-  .pt-dl-btn:hover { opacity: 0.88; }
-  .pt-dl-alt { font-size: 0.8rem; margin-top: 0.35rem; }
-  .pt-dl-alt a { color: var(--sl-color-text-accent); }
+  /* Global (not scoped): the markup below is injected with innerHTML. The list uses Starlight's
+     colour tokens, which patter.css also defines for the standalone landing page. */
+  .pt-dl { --pt-dl-hair: var(--sl-color-gray-5); margin: 1rem 0 1.5rem; }
+  .pt-dl-status, .pt-dl-empty, .pt-dl-meta { color: var(--sl-color-gray-3); font-size: 0.9rem; margin: 0; }
+  .pt-dl-meta { margin-top: 0.7rem; }
+  .pt-dl-meta a, .pt-dl-empty a, .pt-dl-note a { color: var(--sl-color-text-accent); }
+  .pt-dl-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--pt-dl-hair); }
+  .pt-dl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--pt-dl-hair); }
+  .pt-dl-row > * { margin: 0; }
+  .pt-dl-name { display: flex; align-items: center; gap: 0.55rem; flex: 0 0 11rem; font-weight: 600; color: var(--sl-color-white); }
+  .pt-dl-name img { display: block; width: 24px; height: 24px; border-radius: 5px; }
+  .pt-dl-sub { flex: 1 1 14rem; font-size: 0.9rem; color: var(--sl-color-gray-2); }
+  .pt-dl-soon { font-size: 0.9rem; color: var(--sl-color-gray-3); }
+  /* A bordered button, the site's secondary shape; hover changes colour only. */
+  .pt-dl-btn { display: inline-block; padding: 0.4rem 0.85rem; border-radius: 6px; border: 1.5px solid var(--sl-color-text-accent);
+    color: var(--sl-color-text-accent) !important; background: transparent; font-weight: 600; font-size: 0.88rem; line-height: 1.2;
+    text-decoration: none; white-space: nowrap; }
+  .pt-dl-btn:hover { background: var(--sl-color-accent-low); }
+  .pt-dl-note { font-size: 0.9rem; color: var(--sl-color-gray-2); margin: 0.7rem 0 0; }
+  @media (max-width: 30rem) {
+    .pt-dl-name { flex-basis: 100%; }
+  }
 </style>
 
 <script>
@@ -48,20 +50,22 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
   const mounts = Array.from(document.querySelectorAll<HTMLElement>("[data-pt-dl]"));
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 
-  type Release = { tag_name: string; html_url: string; published_at: string | null; draft: boolean; assets: { name: string; browser_download_url: string }[] };
+  type Asset = { name: string; browser_download_url: string };
+  type Release = { tag_name: string; html_url: string; published_at: string | null; draft: boolean; assets: Asset[] };
 
-  function card(icon: string, title: string, sub: string, btn: string, extra = ""): string {
-    return `<div class="pt-dl-card">
-      <div class="pt-dl-card-head">${icon}<span>${esc(title)}</span></div>
-      <p class="pt-dl-sub">${sub}</p>
-      ${btn}${extra}
-    </div>`;
+  function row(icon: string, name: string, sub: string, action: string): string {
+    return `<li class="pt-dl-row">
+      <span class="pt-dl-name">${icon}<span>${esc(name)}</span></span>
+      <span class="pt-dl-sub">${sub}</span>
+      ${action}
+    </li>`;
   }
-  const button = (a: { name: string; browser_download_url: string } | undefined, label: string): string =>
-    a ? `<a class="pt-dl-btn" href="${esc(a.browser_download_url)}">${esc(label)}</a>` : `<p class="pt-dl-sub">coming soon</p>`;
+  const list = (rows: string[]): string => `<ul class="pt-dl-list">${rows.join("")}</ul>`;
+  const button = (a: Asset | undefined, label: string): string =>
+    a ? `<a class="pt-dl-btn" href="${esc(a.browser_download_url)}">${esc(label)}</a>` : `<span class="pt-dl-soon">Coming soon</span>`;
   const meta = (r: Release, ver: string): string => {
-    const date = r.published_at ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
-    return `<p class="pt-dl-meta">Version ${esc(ver)}${date ? " · " + esc(date) : ""} · <a href="${esc(r.html_url)}">release notes</a></p>`;
+    const date = r.published_at ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
+    return `<p class="pt-dl-meta">Version ${esc(ver)}${date ? ", published " + esc(date) : ""}. <a href="${esc(r.html_url)}">Release notes</a></p>`;
   };
 
   function renderPatterpad(root: HTMLElement, releases: Release[]): void {
@@ -69,34 +73,32 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     if (!r) return empty(root, "The Patterpad installers");
     const ver = r.tag_name.replace(/^v/, "");
     const find = (re: RegExp) => r.assets.find((a) => re.test(a.name));
-    root.innerHTML = `<div class="pt-dl-grid">
-      ${card("", "macOS", "Signed &amp; notarised <code>.dmg</code> (Apple silicon)", button(find(/\.dmg$/i), "Download for macOS"))}
-      ${card("", "Windows", "One-click installer", button(find(/\.exe$/i), "Download for Windows"))}
-      ${card("", "Linux", "Self-contained AppImage", button(find(/\.AppImage$/i), "Download for Linux"))}
-    </div>${meta(r, ver)}`;
+    root.innerHTML = list([
+      row("", "macOS", "Signed and notarised <code>.dmg</code> for Apple silicon", button(find(/\.dmg$/i), "Download for macOS")),
+      row("", "Windows", "One-click installer", button(find(/\.exe$/i), "Download for Windows")),
+      row("", "Linux", "Self-contained AppImage", button(find(/\.AppImage$/i), "Download for Linux")),
+    ]) + meta(r, ver);
   }
 
   function renderPlugins(root: HTMLElement, releases: Release[], base: string): void {
     const engines = [
-      { key: "js", tag: /^play-js-v\d/, icon: "plugin-javascript.svg", name: "JavaScript", sub: "Web games &amp; apps (TS/JS)" },
-      { key: "unity", tag: /^play-unity-v\d/, icon: "plugin-unity.svg", name: "Unity", sub: "C# package, drop into <code>Packages/</code>" },
-      { key: "unreal", tag: /^play-unreal-v\d/, icon: "plugin-unreal.svg", name: "Unreal", sub: "C++ plugin + sample project" },
+      { key: "js", tag: /^play-js-v\d/, icon: "plugin-javascript.svg", name: "JavaScript", sub: "Web games and apps (TypeScript or JavaScript)" },
+      { key: "unity", tag: /^play-unity-v\d/, icon: "plugin-unity.svg", name: "Unity", sub: "C# package for <code>Packages/</code>" },
+      { key: "unreal", tag: /^play-unreal-v\d/, icon: "plugin-unreal.svg", name: "Unreal", sub: "C++ plugin with a sample project" },
       { key: "godot", tag: /^play-godot-v\d/, icon: "plugin-godot.svg", name: "Godot", sub: "GDScript addon for <code>addons/</code>" },
     ];
-    let loose: { name: string; browser_download_url: string } | undefined;
-    const cards = engines.map((e) => {
+    let loose: Asset | undefined;
+    const rows = engines.map((e) => {
       const r = releases.find((x) => e.tag.test(x.tag_name));
-      const icon = `<img src="${base}${e.icon}" alt="" width="28" height="28" />`;
-      if (!r) return card(icon, e.name, e.sub, `<p class="pt-dl-sub">coming soon</p>`);
+      const icon = `<img src="${base}${e.icon}" alt="" width="24" height="24" />`;
+      if (!r) return row(icon, e.name, e.sub, button(undefined, ""));
       const ver = r.tag_name.replace(/^play-[a-z]+-v/, "");
       const zip = r.assets.find((a) => /\.zip$/i.test(a.name));
       if (e.key === "js") loose = r.assets.find((a) => a.name === "patterplay.min.js");
-      return card(icon, `${e.name} ${ver}`, e.sub, button(zip, "Download zip"));
+      return row(icon, `${e.name} ${ver}`, e.sub, button(zip, "Download zip"));
     });
-    // The loose drop-in sits under the grid, not in the JS card - an extra line
-    // inside one card would break the four cards' shared height/button line.
-    const looseLine = loose ? `<p class="pt-dl-alt">Script-tag only? Grab <a href="${esc(loose.browser_download_url)}">patterplay.min.js</a> loose.</p>` : "";
-    root.innerHTML = `<div class="pt-dl-grid">${cards.join("")}</div>${looseLine}`;
+    const looseLine = loose ? `<p class="pt-dl-note">For a plain script tag, <a href="${esc(loose.browser_download_url)}">patterplay.min.js</a> is also published on its own.</p>` : "";
+    root.innerHTML = list(rows) + looseLine;
   }
 
   function renderCli(root: HTMLElement, releases: Release[]): void {
@@ -104,18 +106,17 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     if (!r) return empty(root, "The CLI binaries");
     const ver = r.tag_name.replace(/^cli-v/, "");
     const plats = [
-      { re: /macos-arm64/i, label: "macOS (Apple silicon)" },
-      { re: /macos-x64/i, label: "macOS (Intel)" },
-      { re: /windows.*\.exe$/i, label: "Windows" },
-      { re: /linux-x64/i, label: "Linux (x64)" },
-      { re: /linux-arm64/i, label: "Linux (arm64)" },
+      { re: /macos-arm64/i, label: "macOS", sub: "Apple silicon" },
+      { re: /macos-x64/i, label: "macOS", sub: "Intel" },
+      { re: /windows.*\.exe$/i, label: "Windows", sub: "x64" },
+      { re: /linux-x64/i, label: "Linux", sub: "x64" },
+      { re: /linux-arm64/i, label: "Linux", sub: "arm64" },
     ];
-    const btns = plats
+    const rows = plats
       .map((p) => ({ p, a: r.assets.find((a) => p.re.test(a.name)) }))
       .filter((x) => x.a)
-      .map((x) => `<a class="pt-dl-btn" href="${esc(x.a!.browser_download_url)}">${esc(x.p.label)}</a>`)
-      .join(" ");
-    root.innerHTML = `${btns}${meta(r, ver)}`;
+      .map((x) => row("", x.p.label, esc(x.p.sub), button(x.a, "Download")));
+    root.innerHTML = list(rows) + meta(r, ver);
   }
 
   function renderTour(root: HTMLElement, releases: Release[]): void {
@@ -124,11 +125,11 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     const ver = r.tag_name.replace(/^tour-v/, "");
     // Prefer the single-file .patterpack; fall back to a legacy .zip on older tour releases.
     const pack = r.assets.find((a) => /\.patterpack$/i.test(a.name)) ?? r.assets.find((a) => /\.zip$/i.test(a.name));
-    root.innerHTML = `${button(pack, "Download the Interactive Tour")}${meta(r, ver)}`;
+    root.innerHTML = list([row("", "Interactive Tour", "One <code>tour.patterpack</code> file to open in Patterpad", button(pack, "Download the tour"))]) + meta(r, ver);
   }
 
   function empty(root: HTMLElement, what: string): void {
-    root.innerHTML = `<p class="pt-dl-empty">${what} will appear here once the first release ships - see <a href="https://github.com/patterkit/patter/releases">GitHub Releases</a>.</p>`;
+    root.innerHTML = `<p class="pt-dl-empty">${what} will appear here once the first release ships. Until then, see <a href="https://github.com/patterkit/patter/releases">GitHub Releases</a>.</p>`;
   }
 
   async function load(): Promise<void> {

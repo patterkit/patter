@@ -1,8 +1,8 @@
 ---
-title: Scenes, blocks & beats
+title: Scenes, blocks and beats
 description: Learn the Patter narrative tree, from scenes down to beats, and how jumps route between them.
 sidebar:
-  label: Scenes, blocks & beats
+  label: Scenes, blocks and beats
 ---
 
 Patter's structure is a tree of **Scene → Block → Group → Snippet → Beat**. One rule

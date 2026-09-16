@@ -1,5 +1,7 @@
 ---
 title: Running the project
+sidebar:
+  label: Overview
 description: Track the writing, manage recording and localisation, catch dead branches, and hand the story off, as the producer or lead.
 ---
 

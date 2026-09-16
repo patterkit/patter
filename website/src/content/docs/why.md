@@ -2,7 +2,7 @@
 title: Why Patter
 description: See what Patter optimises for and how it compares with Ink, Yarn Spinner, and articy:draft before you bring it to a team.
 sidebar:
-  label: Why Patter (and how it compares)
+  label: Why Patter
 ---
 
 There are good tools for branching narrative already. This page is for the person deciding

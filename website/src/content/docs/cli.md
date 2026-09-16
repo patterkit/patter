@@ -1,5 +1,7 @@
 ---
 title: The patter CLI
+sidebar:
+  label: Overview
 description: Validate, format, compile, play, localise, and merge Patter projects from the terminal.
 ---
 

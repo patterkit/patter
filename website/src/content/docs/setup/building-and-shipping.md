@@ -1,8 +1,8 @@
 ---
-title: Building & shipping
+title: Building and shipping
 description: Compile a project to the .patterc bundle your game loads, choose how localised strings travel, and hand a project to someone without your VCS.
 sidebar:
-  label: Building & shipping
+  label: Building and shipping
 ---
 
 Writers work in a [project folder](/format/overview/); the thing you ship is a single

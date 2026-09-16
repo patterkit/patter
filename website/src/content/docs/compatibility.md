@@ -1,8 +1,8 @@
 ---
-title: Compatibility & conformance
+title: Compatibility and conformance
 description: See how one bundle schema and a shared test suite keep a Patter story playing identically on every engine.
 sidebar:
-  label: Compatibility & conformance
+  label: Compatibility and conformance
 ---
 
 "Write once, play everywhere" is only worth anything if it's actually *true*. Patter

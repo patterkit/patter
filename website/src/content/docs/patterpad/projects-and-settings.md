@@ -1,8 +1,8 @@
 ---
-title: Projects & settings
+title: Projects and settings
 description: Find every tab of Project Settings, from version control and localisation to building a bundle and spell-check.
 sidebar:
-  label: Projects & settings
+  label: Projects and settings
 ---
 
 ## Project Settings

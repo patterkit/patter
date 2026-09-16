@@ -1,8 +1,8 @@
 ---
-title: JavaScript & web
+title: JavaScript and web
 description: Play a Patter bundle on the web with the patterplay.min.js drop-in or the @patterkit/runtime npm package.
 sidebar:
-  label: JavaScript & web
+  label: JavaScript and web
 ---
 
 The JavaScript runtime plays a `.patterc` [bundle](/format/overview/) in any browser or

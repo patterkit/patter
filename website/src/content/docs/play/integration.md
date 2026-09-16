@@ -1,8 +1,8 @@
 ---
-title: Save/load & Game Data
+title: Save/load and Game Data
 description: Save and load a run, read Game Data off each step, and handle host events, the same way on every Patterplay runtime.
 sidebar:
-  label: Save/load & Game Data
+  label: Save/load and Game Data
 ---
 
 Once you can [advance a flow](/play/concepts/), this page covers **saving and loading** a run

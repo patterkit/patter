@@ -1,8 +1,8 @@
 ---
-title: Audio & recording
+title: Audio and recording
 description: Track each line's recording status from the audio on disk, play a scene back as a table-read, and record scratch takes at your desk.
 sidebar:
-  label: Audio & recording
+  label: Audio and recording
 ---
 
 Alongside [writing status](/writing-status/), Patterpad can track a separate

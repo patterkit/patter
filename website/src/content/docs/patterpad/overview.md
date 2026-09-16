@@ -2,7 +2,7 @@
 title: Patterpad, the editor
 description: Tour Patterpad, the reading-first desktop editor for branching, performed dialogue, down to the keystrokes that are easy to miss.
 sidebar:
-  label: Overview & workspace
+  label: Overview
 ---
 
 You write Patter projects in Patterpad, a desktop app built on one idea, that a

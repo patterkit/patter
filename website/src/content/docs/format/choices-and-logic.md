@@ -1,8 +1,8 @@
 ---
-title: Choices & logic
+title: Choices and logic
 description: Learn how selectors, choices, conditions, effects, and properties shape a Patter scene, and how a property value lands in text.
 sidebar:
-  label: Choices & logic
+  label: Choices and logic
 ---
 
 This page is about how a Patter scene *decides*: which children of a group play, what

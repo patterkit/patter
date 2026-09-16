@@ -1,8 +1,8 @@
 ---
-title: Properties & game data
+title: Properties and game data
 description: Declare the @patter, @scene, and @world properties the story reads and writes, and the Game Data your game reads back.
 sidebar:
-  label: Properties & game data
+  label: Properties and game data
 ---
 
 Two kinds of data flow through a Patter story, and as the project lead you define both:

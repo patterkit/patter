@@ -2,7 +2,7 @@
 title: Setting up a project
 description: Set up a Patter project once, from properties and cast to languages and version control, so writers never touch the plumbing.
 sidebar:
-  label: Configuring a project
+  label: Overview
 ---
 
 This track is for the person who sets a project up so writers can work in it, usually a

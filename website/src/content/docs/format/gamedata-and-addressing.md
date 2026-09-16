@@ -1,8 +1,8 @@
 ---
-title: Game Data & addressing
+title: Game Data and addressing
 description: Attach typed Game Data to any node and address content by the two ids Patter gives it.
 sidebar:
-  label: Game Data & addressing
+  label: Game Data and addressing
 ---
 
 ## Game Data

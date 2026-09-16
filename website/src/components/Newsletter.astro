@@ -1,5 +1,5 @@
 ---
-/* Storytools mailing-list sign-up: one quiet line of copy and an inline email field.
+/* Storytools mailing-list sign-up: one sentence and an inline email field.
  * Shared by the landing page footer and the Starlight docs footer (registered in
  * astro.config.mjs via Footer.astro), so every page on the site feeds the same
  * MailerLite group as storytools.co.uk.
@@ -29,10 +29,7 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
     never fires in practice, but if the script fails the post still works and the raw JSON reply
     lands in a new tab instead of replacing the page. */}
 <form class:list={["nl", `nl-${variant}`]} method="post" action={action} target="_blank">
-  <p class="nl-copy">
-    <strong>Tool updates by email.</strong> Emails when I add new features or new tools
-    across Storytools, including Patter.
-  </p>
+  <p class="nl-copy">I'll email you when Patter, or another Storytools tool, gets something new.</p>
   <div class="nl-controls">
     <label class="nl-hidden" for={`nl-email-${variant}`}>Email address</label>
     <input
@@ -78,11 +75,6 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
     flex: 1 1 20rem;
     line-height: 1.5;
   }
-  .nl-copy strong {
-    color: var(--nl-strong);
-    font-weight: 600;
-  }
-
   .nl-controls {
     display: flex;
     gap: 8px;
@@ -153,8 +145,8 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
     --nl-accent: #57a294;
   }
 
-  /* Visually hidden, but still reachable by screen readers (the label) — and the honeypot,
-     which additionally carries aria-hidden so it is skipped entirely. */
+  /* Visually hidden, but still reachable by screen readers (the label). The honeypot also
+     carries aria-hidden, so it is skipped entirely. */
   .nl-hidden {
     position: absolute;
     width: 1px;
