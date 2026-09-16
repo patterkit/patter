@@ -2,7 +2,7 @@
 title: Live refresh and debug
 description: Link Patterpad to your running game so saves push a fresh bundle in and the game streams its cursor back to the editor.
 sidebar:
-  label: Live refresh and debug
+  label: Live Link
 ---
 
 One small localhost link between Patterpad and your running game buys you two things:
