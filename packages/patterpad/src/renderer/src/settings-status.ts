@@ -1,3 +1,4 @@
+import { openPopover } from "@wildwinter/app-shell/context-menu";
 // The status-vocabulary editors, split across two Project Settings tabs (spec §13): WRITING statuses
 // (each WritingStatusDecl is a name, a palette colour, plus the two readiness THRESHOLD markers - "ready
 // to record" / "ready to ship" - each declared on exactly one status, enforced as radio groups) and
@@ -23,40 +24,24 @@ function renderLadder(host: HTMLElement, hint: string, rows: HTMLElement[], addL
 // The status badge colour (#196 / #206) is drawn from the theme's 12-slot character palette, so it adapts
 // to light / dark + the colour themes. To keep each status row to a single line, the palette lives in a
 // POPOVER opened by one swatch button on the row (showing the current colour); picking a slot re-renders.
-let popCleanup: (() => void) | null = null;
-function closeColourPop(): void {
-  popCleanup?.(); popCleanup = null;
-  document.querySelectorAll(".sp-colour-pop").forEach((p) => p.remove());
-}
 function openColourPop(anchor: HTMLElement, s: { colour?: number }, render: () => void): void {
-  closeColourPop();
-  // Anchor inside the (modal) settings dialog so the popover paints in its top layer; `position: fixed`
-  // (set in CSS) escapes the field list's overflow:auto clipping.
-  const host = anchor.closest("dialog") ?? document.body;
-  const pop = el("div", "sp-colour-pop");
-  const swatch = (label: string, colour: number | undefined, none: boolean): void => {
-    const sw = el("button", `sp-swatch${none ? " sp-swatch-none" : ""}`) as HTMLButtonElement;
-    sw.type = "button"; sw.dataset.tip = label; sw.setAttribute("aria-label", label);
-    if (!none) sw.style.background = `var(--char-${colour})`;
-    if (s.colour === colour) sw.classList.add("active");
-    sw.addEventListener("click", () => { if (colour == null) delete s.colour; else s.colour = colour; closeColourPop(); render(); });
-    pop.append(sw);
-  };
-  swatch("No colour", undefined, true);
-  for (let slot = 0; slot < PALETTE_SIZE; slot++) swatch(`Colour ${slot + 1}`, slot, false);
-  host.append(pop);
-  // Place under the button, clamped into the viewport (offsetWidth forces a synchronous layout).
-  const r = anchor.getBoundingClientRect();
-  const left = Math.max(8, Math.min(r.left, window.innerWidth - 8 - pop.offsetWidth));
-  pop.style.left = `${Math.round(left)}px`;
-  pop.style.top = `${Math.round(r.bottom + 4)}px`;
-  setTimeout(() => {
-    const onDown = (e: PointerEvent): void => { const t = e.target as Node; if (!pop.contains(t) && t !== anchor) closeColourPop(); };
-    const onKey = (e: KeyboardEvent): void => { if (e.key === "Escape") { e.stopPropagation(); closeColourPop(); } };
-    document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("keydown", onKey, true);
-    popCleanup = (): void => { document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("keydown", onKey, true); };
-  }, 0);
+  // The shell's popover, hosted INSIDE the modal settings dialog so it paints in the dialog's top layer
+  // rather than inert beneath the scrim (app-shell 0.39.0, PopoverOptions.host).
+  const host = (anchor.closest("dialog") as HTMLElement | null) ?? document.body;
+  openPopover(anchor, (close) => {
+    const pop = el("div", "sp-colour-pop");
+    const swatch = (label: string, colour: number | undefined, none: boolean): void => {
+      const sw = el("button", `sp-swatch${none ? " sp-swatch-none" : ""}`) as HTMLButtonElement;
+      sw.type = "button"; sw.dataset.tip = label; sw.setAttribute("aria-label", label);
+      if (!none) sw.style.background = `var(--char-${colour})`;
+      if (s.colour === colour) sw.classList.add("active");
+      sw.addEventListener("click", () => { if (colour == null) delete s.colour; else s.colour = colour; close(); render(); });
+      pop.append(sw);
+    };
+    swatch("No colour", undefined, true);
+    for (let slot = 0; slot < PALETTE_SIZE; slot++) swatch(`Colour ${slot + 1}`, slot, false);
+    return pop;
+  }, undefined, { host });
 }
 
 /** A single round swatch on the row showing the status's current colour; opens the palette popover. */
@@ -115,7 +100,7 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
 
   const render = (): void => {
     ensureMarkers();
-    closeColourPop();
+    
     host.replaceChildren();
     renderLadder(host,
       "The lowest status is the default for a beat with none set. Mark which one means ready to record and which means ready to ship.",
@@ -191,7 +176,7 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
   };
 
   const render = (): void => {
-    closeColourPop();
+    
     host.replaceChildren();
 
     // Master gate (#206): "Track Audio Status?" at the very top. The tab itself is already disabled unless the

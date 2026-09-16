@@ -705,7 +705,7 @@ input::placeholder, textarea::placeholder {
 .sp-colour-btn:hover { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px color-mix(in oklab, var(--accent) 55%, transparent); }
 /* The palette popover: fixed (escapes the field list's overflow), painted in the modal dialog's top layer.
    A small grid of swatches. */
-.sp-colour-pop { position: fixed; z-index: 50; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-3); }
+.sp-colour-pop { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.35rem; padding: 0.5rem; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-3); }
 .sp-colour-pop .sp-swatch { width: 1.15rem; height: 1.15rem; }
 /* Dictionary word list: thin scrollable rows (word + remove), not the full field card. */
 .wordlist { gap: 0.2rem; }

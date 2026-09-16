@@ -49,7 +49,7 @@ import { el } from "./dom.js";
 import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
-  askIdentity, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle } from "@wildwinter/app-shell";
+  askIdentity, confirmDialog, dialogFrame, openContextMenu, type ShardVc, type SettingsSectionHandle } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/vc.css"; // the badge + locked-document chrome
 import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
@@ -550,10 +550,9 @@ function newScenePrompt(): void {
 // Severity scales with the evidence (design/proposals/delete-scene.md): an untouched scaffold
 // deletes silently; content asks; inbound references list the referring scenes BY NAME.
 
-/** The shell's confirm, with a body made of NODES: the referring-scene list is evidence, not a sentence, so
- *  it is built as elements where `confirmDialog` takes a string. Same frame, same classes, same answers
- *  (true on the destructive button; false on Cancel, Esc or the backdrop); with `confirmLabel` unset there
- *  is nothing to confirm and only Cancel is offered. */
+/** A Cancel-only notice on the confirm frame ("Can't delete this scene"): the shell's `confirmDialog`
+ *  always offers a destructive button, so the one case with nothing to confirm keeps this small frame.
+ *  The real delete confirm goes through `confirmDialog` with its evidence as `bodyNode`. */
 function confirmWith(opts: { title: string; sub: string; body?: Node[]; confirmLabel?: string }): Promise<boolean> {
   return new Promise((resolve) => {
     let done = false;
@@ -611,10 +610,11 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   ].filter(Boolean);
   if (warnBits.length) body.push(el("p", "confirm-body del-warn", warnBits.join(" ")));
 
-  const ok = await confirmWith({
+  const evidence = el("div", "del-evidence"); evidence.append(...body);
+  const ok = await confirmDialog({
     title: `Delete “${scene.name}”?`,
-    sub: unsaved ? `It has unsaved changes. ${contents}` : contents,
-    body,
+    body: unsaved ? `It has unsaved changes. ${contents}` : contents,
+    bodyNode: evidence,
     confirmLabel: info.referrers.length ? "Delete scene anyway" : "Delete scene",
   });
   if (ok) await doDeleteScene(id);
@@ -2678,11 +2678,13 @@ async function showIdentityDialog(current: Identity | null, mode: "welcome" | "e
   // so that pressing Enter accepts it; it is still the person's to type over, and skipping still works.
   const suggested = current?.name ? null : await window.patter.suggestIdentity();
   const answer = await askIdentity({
+    mode,
+    appName: "Patterpad",
+    neverAskAgainOnSkip: mode === "welcome", // a skipped first run stores a blank name so the app does not re-prompt
     ...(current ? { current } : {}),
     ...(suggested ? { suggested: { name: suggested } } : {}),
   });
   if (answer) await window.patter.setIdentity(answer);
-  else if (mode === "welcome") await window.patter.setIdentity({ name: "" }); // skipped: store the default so we don't re-prompt
   authorName = (await window.patter.getIdentity())?.name ?? authorName;
 }
 
