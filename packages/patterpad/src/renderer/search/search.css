@@ -72,7 +72,9 @@ body.swin {
 .swin-row.sel { background: color-mix(in oklab, var(--accent) 16%, transparent); }
 .swin-kind { flex: none; color: var(--muted); font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; min-width: 43px; }
 .swin-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.swin-loc { flex: none; color: var(--muted); font: 12px var(--font-ui); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The location is the shell's breadcrumb (drawn chevrons); this span sizes and clips it. */
+.swin-loc { flex: none; display: inline-flex; min-width: 0; color: var(--muted); font: 12px var(--font-ui); max-width: 40%; overflow: hidden; white-space: nowrap; }
+.swin-loc .shell-crumbs { font-size: inherit; }
 .swin-gid { flex: none; color: var(--ink-soft); font: 11.5px var(--font-mono); }
 /* The opaque id, shown on every row so an id → line lookup is unambiguous. Quieter than the Game ID. */
 .swin-id { flex: none; color: var(--muted); font: 11px var(--font-mono); opacity: 0.8; }
@@ -108,4 +110,6 @@ body.swin {
 .swin-rone:hover { border-color: var(--accent); color: var(--accent); }
 .swin-empty { color: var(--muted); font: 13.5px var(--font-ui); padding: 9.5px 8px; }
 
-.swin-hint { border-top: 1px solid var(--line); padding: 4px 9px; color: var(--muted); font: 11.5px var(--font-ui); background: var(--surface); }
+/* The hint line: a lead phrase and the shell's hint bar (keys.css), side by side, nothing typed between. */
+.swin-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; border-top: 1px solid var(--line); padding: 4px 9px; color: var(--muted); font: 11.5px var(--font-ui); background: var(--surface); }
+.swin-hint:empty { display: none; }

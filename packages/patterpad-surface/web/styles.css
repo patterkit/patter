@@ -715,21 +715,14 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .tp-row.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* one highlight, keyboard + mouse */
 .tp-row.sel { box-shadow: inset 2px 0 0 var(--accent); }         /* the current target, marked */
 
-/* contextual hint bar */
+/* contextual hint bar: the host only. The chips are the shell's `hintBar` (keys.css), drawn from
+   each hint's portable combo, so the keycaps read the same as every other hint in the family. */
 #hintbar {
   display: flex; gap: 17.5px; align-items: center;
   padding: 7px 19px; border-top: 1px solid var(--line);
   background: var(--surface); min-height: 30.5px;
   font: 12px var(--font-ui); color: var(--muted);
 }
-.hint { display: inline-flex; gap: 5.5px; align-items: baseline; }
-.hint kbd {
-  display: inline-flex; align-items: center; justify-content: center; min-height: 17.5px;
-  font: 600 11px var(--font-mono); color: var(--ink);
-  background: color-mix(in oklab, var(--line) 40%, transparent);
-  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1px 5px;
-}
-.hint-label { color: var(--muted); }
 
 /* the structural action menu (⋯ / right-click): a familiar vertical MENU - structural
    actions only (data lives in the inspector). "Follow with" / "Wrap in" open submenu flyouts. */

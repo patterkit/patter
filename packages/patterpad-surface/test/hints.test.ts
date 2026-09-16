@@ -73,7 +73,7 @@ describe("hint content matches the state", () => {
     expect(keys(caret("L1", "paren"))).toEqual([")"]);
   });
   it("empty dialogue content offers next-line / end-snippet / direction / insert", () => {
-    expect(keys(caret("L2", "say"))).toEqual(["Enter", "Shift-Enter", "(", "/"]);
+    expect(keys(caret("L2", "say"))).toEqual(["Enter", "Shift+Enter", "(", "/"]);
   });
   it("a cue on an empty line offers insert (the / menu is reachable from the cue too)", () => {
     expect(keys(caret("L2", "cue"))).toEqual(["type", "Enter", "Space", "(", "/"]); // L2's say is empty
@@ -83,8 +83,8 @@ describe("hint content matches the state", () => {
     expect(keys(caret("P2", "say", 0))).toContain("/"); // P2 has no text -> the / menu is reachable
     expect(keys(caret("P1", "say", 0))).not.toContain("/"); // P1 has text -> no insert
   });
-  it("Enter never ends the snippet in content (Shift-Enter does)", () => {
-    expect(keys(caret("L1", "say", 2))).toContain("Shift-Enter"); // content present
+  it("Enter never ends the snippet in content (Shift+Enter does)", () => {
+    expect(keys(caret("L1", "say", 2))).toContain("Shift+Enter"); // content present
     expect(hintsFor(context(caret("L1", "say", 2))).find((h) => h.key === "Enter")?.label).toBe("next line");
   });
   it("a free-text start offers promotion to dialogue", () => {
@@ -113,5 +113,35 @@ describe("multiSelectHints (a multi-chunk run, §6)", () => {
 
   it("returns null for a single caret (so the normal beat hints show)", () => {
     expect(multiSelectHints(EditorState.create({ doc: runDoc, selection: TextSelection.create(runDoc, 1) }))).toBeNull();
+  });
+});
+
+describe("hint keys are portable combos, never typed glyphs", () => {
+  // The bar draws each key through the shell's `keyHint`, which writes "⌘" on a Mac and "Ctrl"
+  // elsewhere, so a hint's `key` is the menu spine's spelling ("Mod+T", "Shift+Enter", "Backspace")
+  // or a plain word for a non-key affordance; never a glyph, never a "-" joiner.
+  const all = [
+    caret("L1", "cue"), caret("L1", "paren"), caret("L1", "say", 2), caret("L2", "say"), caret("L2", "cue"),
+    caret("P1", "say", 0), caret("P1", "say", 2), caret("P2", "say", 0), onAtom("gameEvent"),
+  ].flatMap((s) => hintsFor(context(s)));
+  it("no key carries a Mac glyph or a dash joiner", () => {
+    for (const h of all) {
+      expect(h.key, h.label).not.toMatch(/[⌫⌘⇧⌥⌃↩↑↓←→·]/);
+      expect(h.key, h.label).not.toMatch(/\w-\w/);
+    }
+  });
+  it("the modifier hints use Mod / Shift with a plus", () => {
+    expect(all.map((h) => h.key)).toContain("Mod+T");
+    expect(all.map((h) => h.key)).toContain("Shift+Enter");
+  });
+  it("the group-edge and multi-select delete hints say Backspace", () => {
+    let st = EditorState.create({ doc: sceneToDoc({ id: "s", type: "scene", name: "S", blocks: [
+      { id: "b", type: "block", name: "B", children: [
+        { id: "s1", type: "snippet", beats: [{ id: "M1", kind: "line" }] },
+        { id: "s2", type: "snippet", beats: [{ id: "M2", kind: "line" }] },
+      ] },
+    ] }, { M1: "a", M2: "b" }), plugins: [multiSelectState()] });
+    st = st.apply(st.tr.setMeta(SET_MULTI, { ids: ["s1", "s2"], anchor: "s1" }));
+    expect(multiSelectHints(st)?.[0]).toEqual({ key: "Backspace", label: "delete" });
   });
 });

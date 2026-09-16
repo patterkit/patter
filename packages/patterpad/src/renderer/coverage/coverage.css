@@ -38,7 +38,7 @@ body.coverage-win {
 .cov-stat-big { font: 700 25.5px var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
 .cov-stat-label { font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .cov-meta { display: flex; flex-direction: column; gap: 1.5px; font: 12px var(--font-ui); color: var(--ink-soft); }
-.cov-meta-sep { color: var(--muted); }
+.cov-meta-ended { color: var(--muted); } /* how the runs ended, softer than the parameters above it */
 /* A cancelled sweep: the numbers are real, the sample is short. Said as a pill so it is not read as
    part of the run parameters underneath it. */
 .cov-stopped {

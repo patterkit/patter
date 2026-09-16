@@ -12,7 +12,7 @@
 
 import { encodeScratchWav, textHash } from "./wav.js";
 import { el } from "./dom.js";
-import { iconNode, type IconName } from "@wildwinter/app-shell"; // drawn record / play / tick, never typed
+import { iconNode, hintBar, type IconName } from "@wildwinter/app-shell"; // drawn record / play / tick, never typed; the keycap hint bar
 
 /** A line to record: its beat id, say text, and speaker (for the on-screen cue). */
 export interface ScratchLine { beatId: string; text: string; character?: string; }
@@ -105,6 +105,8 @@ function buildOverlay(): Overlay {
   card.append(cue, line, badge, stage, bar, next, actions, hint);
   root.append(card);
   const reset = (): void => { bar.hidden = true; next.hidden = true; actions.hidden = true; };
+  // The hint row is a lead phrase and the shell's hint bar (keycap + word per key); nothing typed between.
+  const lead = (text: string): HTMLElement => el("span", "scratch-hint-lead", text);
   // `icon` is a leading drawn icon (record / play); a text button never carries a trailing glyph.
   const btn = (label: string, cls: string, fn: () => void, icon?: IconName): HTMLButtonElement => {
     const b = el("button", `scratch-btn ${cls}`.trim()) as HTMLButtonElement; b.type = "button";
@@ -129,11 +131,11 @@ function buildOverlay(): Overlay {
       if (hasNext && a.onSkip) actions.append(btn("Skip", "", a.onSkip));
       if (hasNeeded && a.onNeeded) actions.append(btn("Next needed", "", a.onNeeded));
       actions.append(btn("Finish", "", a.onFinish));
-      hint.textContent = "Space / Enter: record  ·  Esc: finish";
+      hint.replaceChildren(hintBar([{ keys: "Space Enter", label: "Record" }, { keys: "Esc", label: "Finish" }]));
     },
-    count(n: string): void { reset(); stage.className = "scratch-stage scratch-count"; stage.textContent = n; hint.textContent = "Get ready…  ·  Esc to cancel"; },
-    recordingState(): void { reset(); stage.className = "scratch-stage scratch-rec"; stage.replaceChildren(iconNode("record", 24), "REC"); hint.textContent = "Speak the line  ·  Space to finish  ·  Esc to cancel"; },
-    processing(): void { reset(); bar.hidden = false; stage.className = "scratch-stage scratch-processing"; stage.textContent = "Saving…"; hint.textContent = ""; },
+    count(n: string): void { reset(); stage.className = "scratch-stage scratch-count"; stage.textContent = n; hint.replaceChildren(lead("Get ready…"), hintBar([{ keys: "Esc", label: "Cancel" }])); },
+    recordingState(): void { reset(); stage.className = "scratch-stage scratch-rec"; stage.replaceChildren(iconNode("record", 24), "REC"); hint.replaceChildren(lead("Speak the line"), hintBar([{ keys: "Space", label: "Finish" }, { keys: "Esc", label: "Cancel" }])); },
+    processing(): void { reset(); bar.hidden = false; stage.className = "scratch-stage scratch-processing"; stage.textContent = "Saving…"; hint.replaceChildren(); },
     saved(nextLine: ScratchLine | null, nextState: TakeState | null, hasNeeded: boolean, a: SavedActions): void {
       reset();
       stage.className = "scratch-stage scratch-saved"; stage.replaceChildren("Saved", iconNode("tick", 22));
@@ -149,9 +151,11 @@ function buildOverlay(): Overlay {
       if (a.onNext) actions.append(btn("Record next", "scratch-btn-primary", a.onNext));
       if (a.onNeeded) actions.append(btn("Next needed", "", a.onNeeded));
       actions.append(btn("Finish", "", a.onFinish));
-      hint.textContent = nextLine ? "Space / Enter: record next  ·  Esc: finish" : "Enter / Esc: finish";
+      hint.replaceChildren(nextLine
+        ? hintBar([{ keys: "Space Enter", label: "Record next" }, { keys: "Esc", label: "Finish" }])
+        : hintBar([{ keys: "Enter Esc", label: "Finish" }]));
     },
-    error(msg: string): void { reset(); stage.className = "scratch-stage scratch-error"; stage.textContent = msg; hint.textContent = ""; },
+    error(msg: string): void { reset(); stage.className = "scratch-stage scratch-error"; stage.textContent = msg; hint.replaceChildren(); },
   };
 }
 

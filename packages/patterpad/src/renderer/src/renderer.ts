@@ -63,6 +63,11 @@ import { toast } from "@wildwinter/app-shell";
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
 import { mountWelcome, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
+import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
+// Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
+// line, never joined with a typed dot (design-language §4): no "⌘" and no " · " in a string in this file.
+import { keyHint, tipWithKey, metaLine } from "@wildwinter/app-shell";
+import { problemLineFor } from "./problem-copy.js";
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
 import { PANEL_KEEP_CLEAR } from "./panel.js";
@@ -116,7 +121,7 @@ const shell = mountPaneShell(frameHost, {
     width: { ...(panes.navW ? { nav: panes.navW } : {}), ...(panes.inspW ? { inspector: panes.inspW } : {}) },
   },
   // The label / shortcut live on the themed tooltip + aria-label (no text word competing in the bar).
-  tipFor: (side, open) => `${open ? "Hide" : "Show"} ${side === "nav" ? "scenes" : "inspector"} (${side === "nav" ? "⌘1" : "⌘2"})`,
+  tipFor: (side, open) => tipWithKey(`${open ? "Hide" : "Show"} ${side === "nav" ? "scenes" : "inspector"}`, side === "nav" ? "Mod+1" : "Mod+2"),
   onChange: (state) => {
     const next: PaneState = { ...panes, nav: state.open.nav, inspector: state.open.inspector };
     delete next.navW; delete next.inspW;
@@ -149,6 +154,7 @@ const playTopEl = $<HTMLButtonElement>("play-topbtn");
 const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
 const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
 playTopEl.prepend(iconNode("play")); // the label is in index.html; the icon is drawn, never typed
+playTopEl.dataset.tip = tipWithKey("Play scene", "Mod+P"); // the markup cannot know the platform; the key is set here
 // The topbar's quiet health chip (parity row 33): a tick when clean, the problem count when not. A count
 // promises "show me them", so a click steps the problems bar to the first; the clean state answers
 // instead of doing nothing. Painted by paintHealth() beside the bar; shown only in the workspace.
@@ -516,7 +522,8 @@ function renderNav(): void {
   searchIcon.append(iconNode("search", 13));
   search.append(searchIcon);
   search.append(Object.assign(document.createElement("span"), { textContent: "Find…" }));
-  search.append(Object.assign(document.createElement("kbd"), { className: "nav-search-kbd", textContent: "⌘F" }));
+  const searchKey = document.createElement("span"); searchKey.className = "nav-search-kbd"; searchKey.append(keyHint("Mod+F"));
+  search.append(searchKey);
   search.addEventListener("click", () => openSearch());
   navListEl.appendChild(search);
   // The Properties document's row: fixed, above the scenes, with a count of what it holds. Depth 0
@@ -853,8 +860,9 @@ function setWritingView(on: boolean): void {
 }
 function toggleWritingView(): void { setWritingView(!writingView); }
 writingExitEl.addEventListener("click", () => setWritingView(false));
-// Label the exit affordance with the platform's toggle shortcut (matches the View-menu accelerator).
-writingExitEl.textContent = `Exit writing view · ${navigator.platform.toUpperCase().includes("MAC") ? "⇧⌘M" : "Ctrl+Shift+M"}`;
+// Label the exit affordance with the toggle shortcut (matches the View-menu accelerator), as a keycap the
+// shell draws platform-true.
+writingExitEl.replaceChildren("Exit writing view", keyHint("Mod+Shift+M"));
 
 // --- colour / font theme (View menu) -----------------------------------------
 let theme: ThemePrefs = { colour: "system", font: "newsreader" };
@@ -900,45 +908,8 @@ const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
   spelling: "Spelling",
 };
 
-/** Rewrite a validator problem into plain language for the editor's problems bar - the audience is
- *  writers, not engineers. Known structural cases get a hand-written sentence; everything else has its
- *  technical tells softened (spec citations dropped, `@prop` shown as “prop”). The CLI is unchanged. */
-function humanizeProblem(p: Problem): { tag: string; message: string } {
-  const tag = PROBLEM_CATEGORY[p.category] ?? "Problem";
-  // A problem about a FILE names it, relative to the project: "this file" with no file was the one
-  // thing a reader could not act on, since these have no node for "Go to issue" to reveal (2026-09-03).
-  const where = relToProject(p.file);
-  if (p.category === "stale-bundle") return { tag, message: `Your playable build${where ? ` (${where})` : ""} is out of date. It refreshes the next time you export.` };
-  if (p.category === "merge") return { tag, message: `${where ?? "This file"} still has an unresolved merge conflict in it.` };
-  if (p.category === "not-in-project") return { tag, message: p.message }; // already writer-facing, and names the file
-  if (p.category === "hygiene") return { tag, message: where ? `${where}: ${p.message}` : p.message };
-  if (p.category === "spelling") return { tag, message: p.message }; // already writer-facing (#177)
-  const speaker = /'([^']+)' is not in the project cast/.exec(p.message);
-  switch (p.detail) {
-    case "missing-prompt": return { tag, message: "This option needs a label. What does the player choose here?" };
-    case "invalid-prompt": return { tag, message: "An option's label should be a single line." };
-    case "unknown-character": return { tag, message: speaker ? `“${speaker[1]}” isn't in your cast yet.` : "This line's speaker isn't in your cast yet." };
-    case "empty-snippet": return { tag, message: "This snippet is empty. Add a line, or send it somewhere." };
-    case "empty-container": return { tag, message: "This is empty. Add something inside it." };
-    case "empty-scene": return { tag, message: "This scene has nothing in it yet." };
-    case "missing-name": return { tag, message: "This needs a name." };
-    case "choice-can-empty": return { tag, message: "This choice can run dry. Once each option is used up and there's no fallback, it has nothing left to show." };
-    case "multiple-fallbacks": return { tag, message: "A choice can have at most one fallback option." };
-    case "dangling-jump": case "jump-into-non-addressable": return { tag, message: "This doesn't point anywhere valid. Choose where it goes." };
-    case "invalid-gameid": return { tag, message: "This Game ID isn't valid. Use lowercase letters, digits and hyphens." };
-    case "duplicate-gameid": return { tag, message: "This Game ID is already used elsewhere. Each one must be unique." };
-    default: break;
-  }
-  // Condition / interpolation (and any unmapped case): soften the technical tells, keep the gist.
-  const message = p.message
-    .replace(/\s*\(spec §[^)]*\)/g, "")            // drop spec citations
-    .replace(/'?@([A-Za-z0-9_.]+)'?/g, "“$1”")      // '@gold' / @gold -> “gold” (eat any wrapping quotes)
-    .replace(/^unresolved property reference /i, "uses a property that isn't set up yet: ")
-    .replace(/^unknown property( in interpolation slot)?:? /i, "uses a property that isn't set up yet: ")
-    .replace(/ is not a declared property$/i, " isn't set up yet")
-    .replace(/voiced line beats cannot contain interpolation/i, "voiced lines can't contain inserts");
-  return { tag, message };
-}
+// The sentences themselves (one per validator code, plus the softened fallback) live in problem-copy.ts,
+// on the shell's `describeProblem`; `problemLineFor` is the bar's one line per problem.
 
 /** Rewrite a condition, swapping the invalid enum literal for a chosen valid one (quoted form first,
  *  then a bare-word fallback). Used by the pick-enum-value quick-fix. */
@@ -965,13 +936,14 @@ function paintProblems(): void {
   }
   renderStepperBar(problembarEl, {
     items: problems.map((p) => {
-      const { tag, message } = humanizeProblem(p);
+      const tag = PROBLEM_CATEGORY[p.category] ?? "Problem";
       // A problem in ANOTHER scene says which, up front: "This snippet is empty" about a bubble that is
       // not on screen gave nothing to look for (the Hamlet demo, 2026-09-03). One in the open scene
-      // stays as it was; the name would only be noise there.
+      // stays as it was; the name would only be noise there. The scene name rides the bar's own `where`
+      // segment, drawn beside the sentence, not joined into it.
       const elsewhere = p.sceneId && p.sceneId !== currentSceneId ? project?.scenes.find((s) => s.id === p.sceneId)?.name : undefined;
       // `kindClass` is how severity colour stays app-side: the bar paints nothing itself.
-      return { kind: tag, kindClass: `sev-${p.severity}`, text: elsewhere ? `${elsewhere} · ${message}` : message };
+      return { kind: tag, kindClass: `sev-${p.severity}`, ...(elsewhere ? { where: elsewhere } : {}), text: problemLineFor(p, relToProject(p.file)) };
     }),
     at: problemAt,
     // The tone follows the CURRENT problem, not the worst one, which is what the old `.warning` class on
@@ -1865,7 +1837,7 @@ async function play(): Promise<void> {
 
 playTopEl.addEventListener("click", () => { void play(); });
 
-/** Play from Start (⇧⌘P): run from the project's start point, prompting to set one if unset. */
+/** Play from Start (Mod+Shift+P): run from the project's start point, prompting to set one if unset. */
 async function playFromStart(): Promise<void> {
   if (!project) return;
   const start = await ensureProjectStart();
@@ -2103,7 +2075,7 @@ function fillOverviewStats(data: ReportData): void {
   if (!project) return;
   const t = data.totals;
   const n = project.scenes.length;
-  overviewStatsEl.textContent = `${plural(n, "scene")} · ${formatCount(t.written.words)} words · ${formatCount(t.written.count)} ${t.written.count === 1 ? "line" : "lines"}`;
+  overviewStatsEl.replaceChildren(metaLine([plural(n, "scene"), `${formatCount(t.written.words)} words`, `${formatCount(t.written.count)} ${t.written.count === 1 ? "line" : "lines"}`]));
   const pct = t.projectedWritten > 0 ? Math.round((100 * t.writtenDone) / t.projectedWritten) : 0;
   overviewBarFillEl.style.width = `${pct}%`;
   overviewProgressLabelEl.textContent = `${pct}% drafted`;

@@ -3,7 +3,7 @@
 // surface's `onSelect` context; a header click jumps to that node (revealNode). The snippet / group
 // CONDITION rows are editable - clicking opens the visual expression editor (M1, editCondition).
 
-import { iconNode, iconHtml, iconSvg } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite
+import { iconNode, iconHtml, iconSvg, metaLine } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch,
 } from "@patterkit/patterpad-surface/surface";
@@ -349,7 +349,7 @@ function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit",
   const btn = el("button", `insp-cond${mine.length ? "" : " muted"}`);
   btn.type = "button";
   if (!mine.length) btn.textContent = "+ add";
-  else if (h.textMode()) { const p = mine.slice(0, 2).map(effectText).join(" · "); btn.textContent = mine.length > 2 ? `${p} · +${mine.length - 2}` : p; }
+  else if (h.textMode()) btn.replaceChildren(metaLine([...mine.slice(0, 2).map(effectText), mine.length > 2 ? `+${mine.length - 2}` : undefined])); // drawn separators, never a typed dot
   else btn.append(h.effectsPreview(mine)); // pills (inert → click opens editor)
   if (id) { btn.dataset.tip = `Edit ${label.toLowerCase()} effects`; btn.setAttribute("aria-label", `Edit ${label.toLowerCase()} effects`); btn.addEventListener("click", () => h.editEffects(id, onEnter, onExit, btn, phase)); }
   else btn.disabled = true;

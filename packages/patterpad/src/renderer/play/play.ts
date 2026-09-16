@@ -415,7 +415,8 @@ function applyInfo(info: PlayInfo): void {
     localeEl.replaceChildren(...info.locales.map((code) => {
       const o = document.createElement("option");
       o.value = code;
-      o.textContent = code === info.defaultLocale ? `${code} · source` : code;
+      // An <option> is text only, so the source language is marked in words, not with a drawn separator.
+      o.textContent = code === info.defaultLocale ? `${code} (source)` : code;
       return o;
     }));
     localeEl.value = info.locale;

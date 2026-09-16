@@ -173,7 +173,8 @@
 .nav-search:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--surface)); }
 .nav-search-icon { display: inline-flex; align-items: center; }
 .nav-search-icon svg { display: block; }
-.nav-search-kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font: 10px var(--font-mono); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 4px; color: var(--muted); }
+/* The Find shortcut sits at the button's right edge; the keycap itself is the shell's `.shell-kbd` (keys.css). */
+.nav-search-kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: inline-flex; }
 
 /* The Properties document's row: a PAGE in the navigator, not a container - same weight as a scene
    row, with its count where a scene's chevron would be, and a hairline under it so the scene list
@@ -315,7 +316,9 @@
 .scratch-stage.scratch-rec { color: var(--danger); font-size: 32px; animation: scratch-pulse var(--dur-slow) var(--ease-standard) infinite; }
 .scratch-stage.scratch-processing, .scratch-stage.scratch-error { font-size: 22.5px; color: var(--muted); }
 .scratch-stage.scratch-ready { font-size: 22.5px; color: var(--muted); }
-.scratch-hint { font: 13px var(--font-ui); color: var(--muted); letter-spacing: 0.02em; }
+/* The hint row: a lead phrase, then the shell's hint bar (keycap + word per key, nothing typed between). */
+.scratch-hint { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; font: 13px var(--font-ui); color: var(--muted); letter-spacing: 0.02em; }
+.scratch-hint .shell-hintbar { font-size: 13px; }
 /* The speaker above the line being recorded. */
 .scratch-cue { font: 700 13.5px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: -14.5px; }
 /* Take-state badge (#224): whether the shown line's existing take is missing, out of date, or up to date.
@@ -762,7 +765,7 @@ body.writing-view .beat.problem-warning .zone.say { text-decoration: none; }
    Shown only in Writing View. Sits over the bar's right edge, clear of the left-aligned hint chips. */
 .writing-exit { display: none; }
 body.writing-view .writing-exit {
-  display: inline-flex; align-items: center;
+  display: inline-flex; align-items: center; gap: 6px;
   position: fixed; right: 9.5px; bottom: 5px; z-index: 50;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 8px;
   color: var(--muted); font: 600 11px var(--font-ui); letter-spacing: 0.02em; cursor: pointer;

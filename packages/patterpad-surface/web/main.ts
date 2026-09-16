@@ -26,6 +26,7 @@ import "@fontsource-variable/inter";
 import "@wildwinter/app-shell/dialog.css";
 import "@wildwinter/app-shell/controls.css";
 import "@wildwinter/app-shell/confirm.css";
+import "@wildwinter/app-shell/keys.css"; // the hint bar's keycaps
 import "@fontsource/ibm-plex-sans/400.css";
 import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-sans/700.css";

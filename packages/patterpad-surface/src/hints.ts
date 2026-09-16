@@ -18,8 +18,10 @@ import type { ZoneState } from "./context.js";
 import { multiSelectPositions } from "./multiselect.js";
 import type { IconName } from "@wildwinter/app-shell";
 
-/** One hint chip: a keycap (`key`, or a drawn `icon` from the family's vocabulary when the
- *  affordance is a control rather than a key) and what it does. */
+/** One hint chip: a keycap and what it does. `key` is a combo in the shell's portable spelling
+ *  ("Enter", "Shift+Enter", "Mod+T", "Backspace"), which `keyHint` draws platform-true, or a plain
+ *  word for an affordance that is not a key ("type", "drag", "right-click"); `icon` is a drawn icon
+ *  from the family's vocabulary when the affordance is a control rather than a key. */
 export interface Hint { key: string; label: string; icon?: IconName }
 
 /** Hints for a multi-chunk selection (groups §6), or null when it isn't one - so the contextual hint
@@ -27,7 +29,7 @@ export interface Hint { key: string; label: string; icon?: IconName }
 export function multiSelectHints(state: EditorState): Hint[] | null {
   if (multiSelectPositions(state).length < 2) return null;
   return [
-    { key: "⌫", label: "delete" },
+    { key: "Backspace", label: "delete" },
     { key: "drag", label: "move" },
     { key: "right-click", label: "wrap…" },
   ];
@@ -45,7 +47,7 @@ export function hintsFor(s: ZoneState): Hint[] {
   // merges out across the group seam, §10) - a soft cue says why.
   const atLeftEdge = s.zone.atStart && (s.zone.role === "cue" || (s.beat.kind === "prose" && s.zone.role === "say"));
   return s.inGroup && s.firstSnippetInBlock && s.firstBeatInSnippet && atLeftEdge
-    ? [{ key: "⌫", label: "group edge" }, ...hints]
+    ? [{ key: "Backspace", label: "group edge" }, ...hints]
     : hints;
 }
 
@@ -84,13 +86,13 @@ function zoneHints(s: ZoneState): Hint[] {
         }
         return s.zone.atStart
           ? [{ key: "Tab", label: "dialogue" }, { key: "Enter", label: "next line" }]
-          : [{ key: "Enter", label: "next line" }, { key: "Cmd-T", label: "dialogue" }];
+          : [{ key: "Enter", label: "next line" }, { key: "Mod+T", label: "dialogue" }];
       }
       // dialogue content
       if (s.zone.textLen === 0) {
         return [
           { key: "Enter", label: "next line" },
-          { key: "Shift-Enter", label: "end snippet" },
+          { key: "Shift+Enter", label: "end snippet" },
           { key: "(", label: "direction" },
           ...(sayEmpty ? [{ key: "/", label: "insert" }] : []),
         ];
@@ -98,14 +100,14 @@ function zoneHints(s: ZoneState): Hint[] {
       if (s.zone.atStart) {
         return [
           { key: "Enter", label: "next line" },
-          { key: "Shift-Enter", label: "end snippet" },
+          { key: "Shift+Enter", label: "end snippet" },
           { key: "(", label: "direction" },
         ];
       }
       return [
         { key: "Enter", label: "next line" },
-        { key: "Cmd-T", label: "free text" },
-        { key: "Shift-Enter", label: "end snippet" },
+        { key: "Mod+T", label: "free text" },
+        { key: "Shift+Enter", label: "end snippet" },
       ];
     }
 

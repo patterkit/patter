@@ -18,6 +18,8 @@ import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
+import "@wildwinter/app-shell/keys.css"; // ...and the keycaps of the hint line
+import { modeHint, locationCrumbs } from "./pieces.js";
 import { pinButton, toolWindowHead, iconNode, toast, plural, debounce } from "@wildwinter/app-shell";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
@@ -93,9 +95,10 @@ const rowEl = (e: SearchEntry, i: number): HTMLElement => {
   const kind = document.createElement("span"); kind.className = "swin-kind"; kind.textContent = KIND_LABEL[e.kind];
   const name = document.createElement("span"); name.className = "swin-name";
   // What this row IS: a title / Game ID / the line's text - falling back to its location, then its id.
-  name.textContent = e.name ?? e.gameId ?? e.text ?? (e.location.length ? e.location.join(" › ") : e.id);
+  const what = e.name ?? e.gameId ?? e.text;
+  if (what !== undefined) name.textContent = what; else if (e.location.length) name.append(locationCrumbs(e.location)); else name.textContent = e.id;
   r.append(kind, name);
-  if (e.location.length) { const loc = document.createElement("span"); loc.className = "swin-loc"; loc.textContent = e.location.join(" › "); r.append(loc); }
+  if (e.location.length) { const loc = document.createElement("span"); loc.className = "swin-loc"; loc.append(locationCrumbs(e.location)); r.append(loc); }
   if (e.gameId && e.name) { const gid = document.createElement("span"); gid.className = "swin-gid"; gid.textContent = e.gameId; r.append(gid); }
   // The opaque id on every row, so an "id → line" lookup confirms the match (and is one click to copy/eye).
   const id = document.createElement("span"); id.className = "swin-id"; id.textContent = e.id; r.append(id);
@@ -136,7 +139,7 @@ const renderChips = (): void => {
   }
 };
 
-// Jump to the hit but KEEP this window up + focused, so ↑↓ / ↵ keep driving the list while the editor
+// Jump to the hit but KEEP this window up + focused, so the arrows / Enter keep driving the list while the editor
 // shows the centred result behind.
 const choose = (e: SearchEntry): void => { search.jump(e); setTimeout(() => input.focus(), 0); };
 
@@ -194,7 +197,7 @@ const renderReplace = (): void => {
     const arrow = document.createElement("span"); arrow.className = "swin-arrow"; arrow.append(iconNode("arrowRight", 12));
     const after = document.createElement("span"); after.className = "swin-after"; after.textContent = h.after;
     diff.append(before, arrow, after);
-    const loc = document.createElement("span"); loc.className = "swin-loc"; loc.textContent = h.location.join(" › ");
+    const loc = document.createElement("span"); loc.className = "swin-loc"; loc.append(locationCrumbs(h.location));
     const btn = document.createElement("button"); btn.type = "button"; btn.className = "swin-rone"; btn.textContent = "Replace";
     btn.addEventListener("click", () => void applyReplace(h.id));
     r.append(diff, loc, btn);
@@ -240,12 +243,7 @@ async function setMode(next: SearchMode): Promise<void> {
     : mode === "property" ? "Property usage… (@gold, world.threat, faction rebels)"
     : mode === "replace" ? "Find text to replace…"
     : "Search… (text, title, Game ID, or paste an id)";
-  hintEl.textContent = mode === "status" ? "Pick a writing status · type to filter · ↑↓ move · ↵ jump"
-    : mode === "recording" ? "Pick a recording status · type to filter · ↑↓ move · ↵ jump"
-    : mode === "tag" ? "Pick a tag · type to filter · ↑↓ move · ↵ jump"
-    : mode === "property" ? "Find where a property is used · ↑↓ move · ↵ jump"
-    : mode === "replace" ? "Replaces dialogue / narration / choice text across every scene · review, then Replace all"
-    : "↑↓ move · ↵ jump · drag the bar to move · Esc to close";
+  hintEl.replaceChildren(...modeHint(mode)); // the lead phrase + the shell's key bar (pieces.ts)
   results = []; replaceHits = []; sel = 0; renderResults();
   if (chipMode(mode)) {
     input.value = ""; // a chip mode's box is a post-filter; start empty so the full list for the picked chip shows

@@ -6,7 +6,7 @@
 
 import type { CoverageReport, CoverageBeat } from "../../shared/api.js";
 import { el } from "./dom.js";
-import { iconNode, formatCount as num } from "@wildwinter/app-shell"; // the drawn warning mark on a dead beat; the grouped count
+import { iconNode, formatCount as num, metaLine } from "@wildwinter/app-shell"; // the drawn warning mark on a dead beat; the grouped count; the drawn separator
 
 const pct = (n: number): string => `${n.toFixed(0)}%`;
 const clip = (s: string, n = 60): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
@@ -48,8 +48,12 @@ export function renderCoverage(
   // sample is smaller than the one that was asked for. Say so beside them, or a stopped sweep reads as
   // a finished one and a thin sample gets trusted like a thick one.
   if (report.cancelled) meta.append(el("span", "cov-stopped", "stopped early"));
-  meta.append(el("span", undefined, `${num(report.runs)} run${report.runs === 1 ? "" : "s"} · ${report.maxSteps} max steps · seed ${report.seed}`));
-  meta.append(el("span", "cov-meta-sep", `${num(term.ended)} ended · ${num(term.stalled)} stalled · ${num(term.capped)} capped${term.evalError ? ` · ${num(term.evalError)} errored` : ""}`));
+  // Two drawn metadata lines (the shell's metaLine, a disc between parts): the run parameters, then how the
+  // runs ended. The `errored` part is passed as undefined when there were none, and the line skips it.
+  meta.append(metaLine([`${num(report.runs)} run${report.runs === 1 ? "" : "s"}`, `${report.maxSteps} max steps`, `seed ${report.seed}`]));
+  const ended = metaLine([`${num(term.ended)} ended`, `${num(term.stalled)} stalled`, `${num(term.capped)} capped`, term.evalError ? `${num(term.evalError)} errored` : undefined]);
+  ended.classList.add("cov-meta-ended");
+  meta.append(ended);
   host.append(meta);
 
   if (report.drivers.length) {

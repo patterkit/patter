@@ -8,7 +8,7 @@
 
 import type { ReportData } from "../../shared/api.js";
 import { el } from "./dom.js";
-import { formatCount as num } from "@wildwinter/app-shell"; // the grouped count, the family's
+import { formatCount as num, metaLine } from "@wildwinter/app-shell"; // the grouped count, the family's; the drawn separator
 
 /** A horizontal distribution: one bar per ladder rung, widths proportional to the largest count. So a
  *  reader sees at a glance where the work sits (lots of "stub", little "locked"). Zero-count rungs show
@@ -31,10 +31,10 @@ function bars(ladder: string[], counts: Record<string, number>): HTMLElement {
 }
 
 /** A headline stat: big number + label + an optional sub-line. */
-function card(label: string, big: string, sub?: string): HTMLElement {
+function card(label: string, big: string, sub?: string | Node): HTMLElement {
   const c = el("div", "rpt-card");
   c.append(el("div", "rpt-card-label", label), el("div", "rpt-card-big", big));
-  if (sub) c.append(el("div", "rpt-card-sub", sub));
+  if (sub) { const s = el("div", "rpt-card-sub"); s.append(sub); c.append(s); }
   return c;
 }
 
@@ -79,9 +79,9 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
   // Headline cards: written + (when voiced) voiced line progress.
   const cards = el("div", "rpt-cards");
   cards.append(card("Written lines", `${num(t.writtenDone)} / ${num(t.projectedWritten)}`,
-    `${num(t.writtenRemaining)} to write · ${num(t.written.words)} words`));
+    metaLine([`${num(t.writtenRemaining)} to write`, `${num(t.written.words)} words`])));
   if (data.voiced) cards.append(card("Voiced lines", `${num(t.voicedDone)} / ${num(t.projectedVoiced)}`,
-    `${num(t.voicedRemaining)} to write · ${num(t.voiced.words)} words`));
+    metaLine([`${num(t.voicedRemaining)} to write`, `${num(t.voiced.words)} words`])));
   cards.append(card("Choices", num(t.choices)));
   if (data.voiced) {
     cards.append(card("Ready to record", num(t.voiced.readyToRecord), "voiced lines"));

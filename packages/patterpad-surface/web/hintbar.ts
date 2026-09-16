@@ -2,11 +2,17 @@
 // hintsFor(context(state)) - the same ZoneState the key-dispatch reads - so it
 // shows the 2-4 relevant transitions for wherever the cursor is. Grows as the
 // zone slices add states.
+//
+// The chips are the shell's (`hintBar`, keys.css): a keycap drawn platform-true
+// from the hint's portable combo ("Shift+Enter" is one "⇧↩" cap on a Mac and
+// "Shift" "Enter" side by side elsewhere), a label, and nothing typed between
+// items. A hint whose affordance is a control rather than a key carries a drawn
+// icon in place of the legend.
 
 import type { EditorView } from "prosemirror-view";
 import { context, type ZoneState } from "../src/context.js";
 import { hintsFor, multiSelectHints } from "../src/hints.js";
-import { iconNode } from "@wildwinter/app-shell";
+import { hintBar, iconNode } from "@wildwinter/app-shell";
 
 // `ctx` is optional so the dispatch loop can pass the ZoneState it already computed for the
 // transaction (it is otherwise re-derived here); falls back to computing it for standalone calls.
@@ -17,13 +23,11 @@ export function createHintBar(el: HTMLElement): (view: EditorView, ctx?: ZoneSta
     // live insertion point, so the bar would otherwise show hints for a caret the user can't see.
     if (!view.hasFocus()) return;
     // A multi-chunk run has no single caret context - show what the SELECTION can do instead (§6).
-    for (const hint of multiSelectHints(view.state) ?? hintsFor(ctx)) {
-      const chip = document.createElement("span"); chip.className = "hint";
-      const key = document.createElement("kbd");
-      if (hint.icon) key.append(iconNode(hint.icon, 10)); else key.textContent = hint.key;
-      const label = document.createElement("span"); label.className = "hint-label"; label.textContent = hint.label;
-      chip.append(key, label);
-      el.appendChild(chip);
-    }
+    const hints = multiSelectHints(view.state) ?? hintsFor(ctx);
+    if (!hints.length) return;
+    const bar = hintBar(hints.map((h) => ({ keys: h.icon ? "" : h.key, label: h.label })));
+    // An icon hint asked for an empty keycap above; draw the icon into it.
+    hints.forEach((h, i) => { if (h.icon) bar.children[i]?.querySelector("kbd")?.replaceChildren(iconNode(h.icon, 10)); });
+    el.append(bar);
   };
 }
