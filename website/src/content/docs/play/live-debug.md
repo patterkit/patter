@@ -1,6 +1,6 @@
 ---
 title: Live refresh & debug
-description: "A localhost link between Patterpad and your running game: saves push the new bundle straight into the run (live refresh), and the game streams its story cursor back for the editor to follow (live debug)."
+description: Link Patterpad to your running game so saves push a fresh bundle in and the game streams its cursor back to the editor.
 sidebar:
   label: Live refresh & debug
 ---
@@ -11,15 +11,15 @@ One small localhost link between Patterpad and your running game buys you two th
   restarting**. Reword a line and the game speaks the new words the next time it comes up; even
   restructured scenes carry the run across.
 - **Live debug**: the game streams its story cursor back, and Patterpad **follows it like a
-  debugger**: the current beat highlights, scenes switch as play crosses them, and you can see
+  debugger**. The current beat highlights, scenes switch as play crosses them, and you can see
   which flow is where.
 
-The debug half is **observe-only**: the game stays in control and the editor is a passive mirror.
-The link is a **loopback-only** WebSocket (`127.0.0.1`): only processes on your own machine can
-reach it; nothing leaves your machine.
+The debug half is **observe-only**, so the game stays in control and the editor is a passive mirror.
+The link is a **loopback-only** WebSocket (`127.0.0.1`), so only processes on your own machine
+can reach it, and nothing leaves your machine.
 
 > **Every engine ships a client** (JavaScript, Unity, Unreal, Godot), all speaking the same
-> `patterplay/debug@1` protocol below. Each is a **debug-only tool**: it is inert in a shipping build
+> `patterplay/debug@1` protocol below. Each is a **debug-only tool**, inert in a shipping build
 > and safe to leave wired in (see the per-engine notes).
 
 ## Turn it on in Patterpad
@@ -38,7 +38,7 @@ by the **Play ▸ Live Link** menu item, which is ticked while the link is on).
    **green** and the editor starts following the cursor.
 3. Click the icon again (or untick the menu item) to stop.
 
-The icon's **colour** is the state at a glance, and hovering it spells the status out:
+The icon's **colour** is the state, and hovering it spells the status out:
 
 - **Grey**: off.
 - **Amber**: listening, waiting for a game.
@@ -53,16 +53,16 @@ the playhead tracks.
 
 ## Live bundle refresh
 
-With the link connected, Patterpad doesn't just *watch* your game: **saving in the editor pushes the
+With the link connected, Patterpad doesn't just *watch* your game. **Saving in the editor pushes the
 freshly compiled bundle into the running game**, which picks it up without restarting. Reword a line,
 hit save, and the running game speaks the new words the next time that line comes up. For a writer,
-this closes the loop completely: play your actual game, feel a line land wrong, fix it, and hear the
-fix on the next pass, no rebuild, no restart, no losing your place.
+this closes the loop completely. Play your actual game, feel a line land wrong, fix it, and hear the
+fix on the next pass, with no rebuild, no restart, and no losing your place.
 
 Two tiers, picked automatically:
 
-- **Text-only edits** swap the string tables in place: nothing restarts, no state is touched.
-- **Structural edits** carry the whole run across (a save/load under the hood): position is re-found
+- **Text-only edits** swap the string tables in place. Nothing restarts and no state is touched.
+- **Structural edits** carry the whole run across (a save and load behind the scenes). Position is re-found
   by id, so lines inserted or reordered before the cursor neither replay nor shift where you are; an
   option you deleted drops out of an open choice; content deleted under the cursor is skipped and
   play continues from the nearest survivor.
@@ -101,12 +101,12 @@ each engine's threading:
   `engine.apply_live_bundle(data)` (re-bind flow handles on a `"structure"` result), then
   `link.set_build(build)`.
 
-The same swap powers Patterpad's own **Play window**: edit mid-run and it applies live (a quiet
+The same swap powers Patterpad's own **Play window**. Edit mid-run and it applies live (a quiet
 "Edits applied live" note), only falling back to the restart prompt when the in-flight edit doesn't
 compile. The cross-bundle behaviour is locked by the shared conformance corpus, so all four engines
 resolve an edit under the cursor identically.
 
-Honest limits: your game's own side-effects don't rewind (things already spawned stay spawned); text
+There are honest limits. Your game's own side-effects don't rewind (things already spawned stay spawned); text
 already in a transcript keeps the words the player saw; and an edit that changes how many random
 draws happen before the cursor naturally changes later draws.
 
@@ -142,7 +142,7 @@ follow list until it moves, not for the whole session. `flowOpened` is still wor
 that exists before it says anything, and `flowClosed` still matters, since nothing else tells the
 editor a flow has finished.
 
-**Unity** - `new PatterDebugLink(...)`. Wire it behind `#if UNITY_EDITOR || DEVELOPMENT_BUILD` so it
+**Unity.** `new PatterDebugLink(...)`. Wire it behind `#if UNITY_EDITOR || DEVELOPMENT_BUILD` so it
 is stripped from a release player build:
 
 ```csharp
@@ -154,7 +154,7 @@ _link.Observe("main", flow.CurrentScene, step.Id, PatterDebugLink.TypeName(step.
 #endif
 ```
 
-**Unreal** - `FPatterDebugLink::Create(...)`. It compiles to no-ops in a Shipping build (the
+**Unreal.** `FPatterDebugLink::Create(...)`. It compiles to no-ops in a Shipping build (the
 WebSockets dependency is dropped there), so it is safe to leave in:
 
 ```cpp
@@ -164,7 +164,7 @@ Link->FlowOpened(TEXT("main"));
 Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
 ```
 
-**Godot** - a `PatterDebugLink` node. It only opens the link in a debug build
+**Godot.** A `PatterDebugLink` node. It only opens the link in a debug build
 (`OS.is_debug_build()`), so it is inert in a release export:
 
 ```gdscript

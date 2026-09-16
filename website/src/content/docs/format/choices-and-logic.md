@@ -1,6 +1,6 @@
 ---
 title: Choices & logic
-description: Selectors, choices and options, conditions, effects, properties, the expression language, and embedding property values in text.
+description: Learn how selectors, choices, conditions, effects, and properties shape a Patter scene, and how a property value lands in text.
 sidebar:
   label: Choices & logic
 ---
@@ -12,12 +12,12 @@ the player picks from, and the conditions, effects, and properties behind it all
 
 A group's **selector** decides what happens with the children whose conditions pass:
 
-- **`run`** (the default): play every eligible child in order.
+- **`run`** (the default). Play every eligible child in order.
 - **`branch`**: play the first eligible child, and stop. This is your if / else-if /
   else, and your switch: ordered children with conditions, most specific first, and an
   unconditional last child as the "else".
 - **`sequence`**: a picker that remembers where it is, with two independent settings:
-  - **order**: `sequential` (the default), `shuffle`, or `specificity` (**Best match**, below);
+  - **order**: `sequential` (the default), `shuffle`, or `specificity` (**Best match**, below).
   - **exhaust**: `once` (the default), `repeat`, or `stick` (hold on the last child).
 
   Shuffle deals from the pack without repeats, and never plays the same line twice in
@@ -42,15 +42,15 @@ filler only when nothing more specific is eligible.**
 
 ### What it's for
 
-Reactive one-liners - barks, ambient chatter, greetings - that feel canned if they ignore the
+Reactive one-liners (barks, ambient chatter, greetings) that feel canned if they ignore the
 state, and are laborious to hand-branch if you write an `if` for every combination:
 
-- **Companion banter** that reacts to what just happened: "You're bleeding, here, take this" when
+- **Companion banter** that reacts to what just happened. "You're bleeding, here, take this" when
   the player is hurt *and* the companion has a potion; "Careful, it's slippery" when it's raining;
   a plain "Keep moving" when nothing special is going on.
-- **A guard** who notices what you carry: a line for the stolen crown, a line for *any* drawn
+- **A guard** who notices what you carry. A line for the stolen crown, a line for *any* drawn
   weapon, a generic "Move along" for everyone else.
-- **A shopkeeper** whose greeting tracks your reputation or quest stage: the further along you are,
+- **A shopkeeper** whose greeting tracks your reputation or quest stage. The further along you are,
   the more specific the line they have for you.
 - **Tiered filler**: three lines for the exact circumstance, two for the broad one, one catch-all.
 
@@ -71,7 +71,7 @@ Walking a condition to score it:
 - `or` takes the **stronger** side (only one side is carrying the truth).
 - `not` flips the sense and looks inside.
 - `check_flags(@q, +a, +b)` counts **each flag** it checks.
-- anything else - a comparison, a property, a `visits()` check - counts as **one**.
+- anything else (a comparison, a property, a `visits()` check) counts as **one**.
 
 | Condition (all currently true) | Score |
 |---|---|
@@ -89,7 +89,7 @@ empty-handed; and the filler otherwise.
 
 Best match composes with the sequence **exhaust** setting:
 
-- **`repeat`** (Patterpad's default for Best match): re-score and re-pick every time the group is
+- **`repeat`** (Patterpad's default for Best match). Re-score and re-pick every time the group is
   reached, so the character keeps preferring the most on-topic line as the state changes. This is
   what you want for barks and ambient chatter.
 - **`once`**: each line is used up as it plays, so the group **slides down** the tiers, the most
@@ -100,7 +100,7 @@ Best match composes with the sequence **exhaust** setting:
 
 Put the **specific lines first and the general ones last**, each with its condition, and leave
 **one child with no condition** as the filler at the end. You don't have to make the conditions
-mutually exclusive - that's the point: overlapping conditions are fine, the most specific eligible
+mutually exclusive, and that's the point. Overlapping conditions are fine, the most specific eligible
 one wins, and the filler catches the rest. (A Best-match group with *no* conditions at all just
 behaves like `shuffle`; Patterpad points that out.)
 
@@ -122,14 +122,14 @@ is allowed, so your game can draw the option from Game Data or an icon instead.
 
 ### The flags
 
-- **`secretUntilEligible`** (default false): while its condition fails, the option is
+- **`secretUntilEligible`** (default false). While its condition fails, the option is
   kept out of the data your game receives entirely, so it can't leak through a save.
   This is about *secrecy*, not rendering.
-- **`sticky`** (default false): off means **once-only**: after the player takes it, it
+- **`sticky`** (default false). Off means **once-only**: after the player takes it, it
   is gone from the choice for good. On means it stays available as long as its
   condition passes. (This rides the option's visit count, so it survives save and
   restore for free.)
-- **`fallback`** (default false, at most one per choice): never offered as a normal
+- **`fallback`** (default false, at most one per choice). Never offered as a normal
   option; taken automatically the moment it's the only eligible option left.
 
 ### Unavailable, not hidden
@@ -139,10 +139,10 @@ By default an ineligible option is still returned to your game, with its text an
 game's call: dim it, show a lock, spell out the requirement, or leave it out. For
 example, a persuade option gated on `@charisma >= 6` can be shown to a low-charisma
 player as "[Charisma 6] Talk them down", so they see the path they *could* have taken;
-the runtime simply won't let them pick it. Reach for `secretUntilEligible` only when an
+the runtime won't let them pick it. Reach for `secretUntilEligible` only when an
 option has to stay truly invisible, so it can't even leak through a save.
 
-If no normal option survives and there's no eligible fallback, the choice simply
+If no normal option survives and there's no eligible fallback, the choice
 **gathers**: the flow carries on past it. A re-enterable choice with no sticky option
 and no fallback gets a `choice-can-empty` warning from the validator.
 
@@ -205,7 +205,7 @@ replaced with the property's current value:
 
 > `You have {@gold} gold.`  →  `You have 42 gold.`
 
-- The body is a **bare property reference** - the same `@` reference you'd use in a
+- The body is a **bare property reference**, the same `@` reference you'd use in a
   [condition](#conditions-and-effects): a project property `{@gold}`, a scene property
   `{@scene.threat}`, a host value `{@world.faction}`. It's a reference, not a formula:
   you can't write `{@gold + 1}`.
@@ -227,10 +227,10 @@ Narration and choice options are always on-screen, so a value can always be subs
 
 Dialogue is the exception, and it comes down to whether the project is
 [**Voiced**](/patterpad/projects-and-settings/). A voiced line ships as **recorded audio**,
-and you can't splice a runtime value into a fixed recording - so **a voiced project rejects a
+and you can't splice a runtime value into a fixed recording, so **a voiced project rejects a
 `{…}` slot in a dialogue line, as a build error**. If the project is **not** voiced, its
 dialogue is just on-screen text like narration, so embedding works there too.
 
-Put simply: narration and choices always; spoken lines only when there is no voice audio to
+In short, narration and choices always; spoken lines only when there's no voice audio to
 contradict them. If you switch a project to Voiced later, any `{…}` already sitting in a
 dialogue line will surface as a build error to clean up.

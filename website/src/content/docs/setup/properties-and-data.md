@@ -1,6 +1,6 @@
 ---
 title: Properties & game data
-description: Set up the data model of your story, @patter, @scene, and @world properties the narrative reads and writes, and the typed Game Data your game reads back off each beat.
+description: Declare the @patter, @scene, and @world properties the story reads and writes, and the Game Data your game reads back.
 sidebar:
   label: Properties & game data
 ---
@@ -36,8 +36,8 @@ use, and there are fewer ways to write a logic bug.
 
 ## `@world`: values your game owns
 
-Some branches depend on things the *game* knows, not the story: the player's location, a
-difficulty setting, a live threat level. Declare those in **Project Settings ▸ World Properties**
+Some branches depend on things the *game* knows, not the story, such as the player's location,
+a difficulty setting, or a live threat level. Declare those in **Project Settings ▸ World Properties**
 as `@world` values (name, type, default, and whether the story is allowed to change them). Two
 payoffs:
 
@@ -46,11 +46,11 @@ payoffs:
 - While the game runs it **supplies** these values; if nothing sets them, the runtime falls back
   to the defaults you declared (see [Save/load & Game Data](/play/integration/)).
 
-One thing to know now: because the game sets `@world` values while it runs, the editor's
+One thing to know now is that because the game sets `@world` values while it runs, the editor's
 [coverage test](/production/coverage-testing/) can't know them, so a branch gated on
 `@world.threat` shows up as *needs input* until you give the test stand-in values. Those
 stand-ins, **coverage drivers**, live in the same World Properties tab and are covered with
-the test itself: see [Input drivers](/production/coverage-testing/#input-drivers).
+the test itself under [Input drivers](/production/coverage-testing/#input-drivers).
 
 ## Game Data: what your game reads back
 
@@ -76,4 +76,4 @@ For lighter, freeform labelling, writers can add **tags** to beats and structure
 `#tutorial`). A tag on a scene or group counts for everything inside it, and every tag reaches
 your game as the beat plays: no setup, nothing to declare. They're ideal for marks that cut
 across the story and don't warrant their own field.
-→ [Game Data & addressing](/format/gamedata-and-addressing/)
+[Game Data & addressing](/format/gamedata-and-addressing/) has the rules for tags.

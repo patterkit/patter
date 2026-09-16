@@ -1,6 +1,6 @@
 ---
 title: Version control
-description: How a Patter project collaborates through git, Perforce, Plastic, or SVN, lock-aware writes, per-scene status badges, and a CLI that behaves the same way for CI.
+description: Collaborate through git, Perforce, Plastic, or SVN with lock-aware writes, per-scene status badges, and a CLI that behaves the same in CI.
 sidebar:
   label: Version control
 ---
@@ -16,7 +16,7 @@ General**. Patter supports the four common in games:
 
 - **git** and **SVN** are merge-based: everyone edits, and changes merge together. Because Patter
   splits the story into one file per scene, and those files are clean and line-by-line, an
-  ordinary text merge just works.
+  ordinary text merge is enough.
 - **Perforce** and **Plastic SCM** are lock-based: a file is checked out (and often locked to one
   person) before editing. Patterpad understands this and checks files out when you save.
 - **none**: a plain project on disk with no version-control features at all.
@@ -39,16 +39,16 @@ state of the repo:
   effort on a file you can't save.
 - **Editable scenes check out when you save.** You write freely; the checkout happens on save,
   not on every keystroke.
-- **Per-scene badges** in the navigator show the state at a glance: locked (⊘), out of date (↓),
+- **Per-scene badges** in the navigator show the state in one glyph: locked (⊘), out of date (↓),
   checked out by you (✎), modified (●), or new (+). They keep themselves up to date.
 
 If you chose **none**, everything is editable and none of these markers appear.
 
 ## How merges work
 
-A project isn't one big file. It's split into small [pieces](/format/overview/): one
+A project isn't one big file. It's split into small [pieces](/format/overview/), one
 structure file per scene, a separate text file per language, and a companion file for the editor's
-own notes. That alone avoids most conflicts, two writers in different scenes touch different files,
+own notes. That alone avoids most conflicts, since two writers in different scenes touch different files,
 and the files are written to diff and merge cleanly (readable, line-by-line, with a stable id on
 every line so a moved or renamed line keeps its translation).
 
@@ -62,11 +62,11 @@ merging line by line, it merges by each node's **id**:
 - A **real** clash, the same line edited two different ways, or one node moved to two different
   places, is flagged rather than guessed at.
 
-Patter wires this into your VCS for you: on **git** it registers a merge driver, and on
+Patter wires this into your VCS for you. On **git** it registers a merge driver, and on
 **Perforce / Plastic / SVN** a merge tool (`patter init` writes the config and prints the one-time
 commands where a system needs them).
 
-When there *is* a real conflict, Patter never leaves raw `<<<<<<<` markers inside your files: the
+When there *is* a real conflict, Patter never leaves raw `<<<<<<<` markers inside your files. The
 merged file stays valid and provisionally keeps your side, and the clash is recorded in a
 **`.patterconflict`** file next to it. A leftover `.patterconflict` is an error that
 [`patter validate`](/cli/) reports, so an unresolved merge can't be built or shipped by

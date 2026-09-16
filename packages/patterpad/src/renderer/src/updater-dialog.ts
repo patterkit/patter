@@ -18,7 +18,7 @@ export function feedUpdaterDownloadProgress(p: UpdaterDownloadProgress): void {
   liveProgress.bar.style.width = `${pct}%`;
   const mb = (n: number): string => (n / (1024 * 1024)).toFixed(1);
   liveProgress.label.textContent =
-    `${pct.toFixed(0)}% - ${mb(p.transferred)} of ${mb(p.total)} MB (${mb(p.bytesPerSecond)} MB/s)`;
+    `${pct.toFixed(0)}%, ${mb(p.transferred)} of ${mb(p.total)} MB (${mb(p.bytesPerSecond)} MB/s)`;
 }
 
 /** Show the prompt as a modal themed dialog; resolve the index of the clicked button (Esc → cancelId). */

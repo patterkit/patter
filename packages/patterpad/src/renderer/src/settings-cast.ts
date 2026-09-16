@@ -40,7 +40,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
     // player- / actor-facing, so they keep their typed case.
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
     m.name = m.name.toUpperCase();
-    name.type = "text"; name.placeholder = "<name (speaker)>"; name.dataset.tip = "The canonical name. A line's speaker must match it."; name.value = m.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Name"; name.dataset.tip = "The canonical name. A line's speaker must match it."; name.value = m.name; name.spellcheck = false;
     name.addEventListener("input", () => {
       const s = name.selectionStart, e = name.selectionEnd;
       name.value = name.value.toUpperCase(); // length is preserved, so the caret restores cleanly
@@ -50,17 +50,17 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
     guard.track(name);
 
     const display = el("input", "gd-input cast-field") as HTMLInputElement;
-    display.type = "text"; display.placeholder = "<display name>"; display.dataset.tip = "Player-facing name (optional)."; display.value = m.displayName ?? "";
+    display.type = "text"; display.placeholder = "Display name"; display.dataset.tip = "Player-facing name (optional)."; display.value = m.displayName ?? "";
     display.addEventListener("input", () => { m.displayName = display.value.trim() || undefined; });
     const actor = el("input", "gd-input cast-field") as HTMLInputElement;
-    actor.type = "text"; actor.placeholder = "<actor>"; actor.dataset.tip = "Voice actor (optional)."; actor.value = m.actor ?? "";
+    actor.type = "text"; actor.placeholder = "Actor"; actor.dataset.tip = "Voice actor (optional)."; actor.value = m.actor ?? "";
     actor.addEventListener("input", () => { m.actor = actor.value.trim() || undefined; });
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "move up", () => { moveItem(state, i, -1); render(); }, i === 0),
-      iconBtn("↓", "move down", () => { moveItem(state, i, 1); render(); }, i === state.length - 1),
-      iconBtn("✕", "remove from cast", () => { state.splice(i, 1); render(); }, false, true),
+      iconBtn("↑", "Move up", () => { moveItem(state, i, -1); render(); }, i === 0),
+      iconBtn("↓", "Move down", () => { moveItem(state, i, 1); render(); }, i === state.length - 1),
+      iconBtn("✕", "Remove from cast", () => { state.splice(i, 1); render(); }, false, true),
     );
 
     // Grammatical gender: translator context, exported into the localisation formats. Free text with
@@ -68,8 +68,8 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
     // suggestion list offers the everyday genders plus any already used in this cast, keeping spellings
     // consistent without locking out languages that need other values.
     const gender = el("input", "gd-input") as HTMLInputElement;
-    gender.type = "text"; gender.placeholder = "<gender (optional)>"; gender.value = m.gender ?? ""; gender.spellcheck = false;
-    gender.dataset.tip = "Grammatical gender, sent to translators so gendered languages can inflect this character's lines. Free text; suggestions keep common values spelled consistently.";
+    gender.type = "text"; gender.placeholder = "Gender"; gender.value = m.gender ?? ""; gender.spellcheck = false;
+    gender.dataset.tip = "Sent to translators so gendered languages can inflect this character's lines.";
     const genderList = el("datalist") as HTMLDataListElement;
     genderList.id = `gender-list-${genderListSeq++}`;
     gender.setAttribute("list", genderList.id);
@@ -81,7 +81,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
     gender.addEventListener("input", () => { m.gender = gender.value.trim() || undefined; });
 
     const notes = el("input", "gd-input") as HTMLInputElement;
-    notes.type = "text"; notes.placeholder = "<casting / voice / intent notes>"; notes.value = m.notes ?? "";
+    notes.type = "text"; notes.placeholder = "Notes"; notes.value = m.notes ?? "";
     notes.addEventListener("input", () => { m.notes = notes.value.trim() || undefined; });
 
     const genderField = labelled("Grammatical gender", gender);

@@ -10,10 +10,10 @@ const UNTYPED = "__untyped"; // sentinel for the editor-only (no-class) bucket i
 const CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers" };
 const label = (key: string): string => CLASS_LABEL[key] ?? (key ? key[0]!.toUpperCase() + key.slice(1) : "Note (editor-only)");
 const placeholder = (key: string): string =>
-  key === "vo" ? "<direction for the voice actor / director>"
-  : key === "loc" ? "<context for translators>"
-  : key === "" ? "<an internal note - never exported>"
-  : "<intent / rationale - why this is here>";
+  key === "vo" ? "Direction for the voice actor or director"
+  : key === "loc" ? "Context for translators"
+  : key === "" ? "An internal note, never exported"
+  : "Why this is here";
 
 export interface DocEditorOptions {
   /** The node's current notes. */

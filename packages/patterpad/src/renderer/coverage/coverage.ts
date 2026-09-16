@@ -65,8 +65,8 @@ async function boot(): Promise<void> {
   driversNote.textContent = !info.hasProject
     ? "No project open."
     : info.driverCount
-      ? `${info.driverCount} input driver${info.driverCount === 1 ? "" : "s"} configured (World Properties…).`
-      : "No input drivers, branches gated on @world will read as needs-input (World Properties…).";
+      ? `${info.driverCount} input driver${info.driverCount === 1 ? "" : "s"} configured (World properties…).`
+      : "No input drivers, so branches gated on @world will read as needing input (World properties…).";
   if (info.last) showResult(info.last);
   else { host.hidden = true; host.replaceChildren(); }
 }

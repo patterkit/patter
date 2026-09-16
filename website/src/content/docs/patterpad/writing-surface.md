@@ -1,6 +1,6 @@
 ---
 title: The writing surface
-description: "How Patterpad's screenplay-style surface works: character cues, the three kinds of beat, and the keys and gestures that make writing fast."
+description: Write on Patterpad's screenplay-style surface, with character cues, the three kinds of beat, and the keys that keep you fast.
 sidebar:
   label: The writing surface
 ---
@@ -13,20 +13,18 @@ through the whole thing.
 ## Snippets, cues, and beats
 
 A run of dialogue and narration that plays together is a **snippet**, drawn as a soft
-rounded card. Quiet space sits between snippets, so the shape of a scene reads at a
-glance without the page turning into boxes and lines.
+rounded card. Quiet space sits between snippets, so the shape of a scene is clear at a
+skim without the page turning into boxes and lines.
 
 <figure class="doc-shot">
   <img src="/doc-images/Snippet.png" alt="A snippet showing the three beat kinds: dialogue lines with a coloured GUIDE cue, a speaker-less prose line, a line carrying a (warmly) direction, and a game-event chip, with a jump to The Crossroads at the foot." />
   <figcaption>One snippet holding all three beat kinds: <strong>lines</strong> (a coloured <code>GUIDE</code> cue beside the words), a <strong>text</strong> beat (prose with no speaker), a line carrying an inline <code>(warmly)</code> direction, and a silent <code>⚙ game event</code>. The <code>↪ The Crossroads</code> chip is a jump; the <code>⠿</code> grip reorders the snippet and <code>⋯</code> opens its action menu.</figcaption>
 </figure>
 
-Inside a snippet are **beats**, and there are only three kinds:
-
-- a **line**: someone speaks, with their name beside the words;
-- a **text** beat: narration or description, with no speaker;
-- a **game event**: a silent cue to your game (play a sound, move the camera) that the
-  player never sees.
+Inside a snippet are **beats**, and there are only three kinds. A **line** is someone
+speaking, with their name beside the words. A **text** beat is narration or description,
+with no speaker. A **game event** is a silent cue to your game (play a sound, move the
+camera) that the player never sees.
 
 A character's name is a coloured tag, not something you retype each time. Each
 character keeps their own colour, so you can see who's speaking as you skim. An empty
@@ -36,10 +34,10 @@ line shows a faint `<character>:` until you name a speaker.
 
 Click or arrow into a name and a small picker opens:
 
-- **type** to filter your cast;
-- **↑ / ↓** to move through the matches;
-- **Enter** or **Tab** to accept the highlighted name;
-- **`+ Add "<name>"`** adds someone new;
+- **Type** to filter your cast.
+- **↑ / ↓** move through the matches.
+- **Enter** or **Tab** accepts the highlighted name.
+- **`+ Add "<name>"`** adds someone new.
 - **Esc** (or a click away) closes it.
 
 Anyone you name is added to the cast for you, so there's no cast list to set up first.

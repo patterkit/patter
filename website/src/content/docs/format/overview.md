@@ -1,6 +1,6 @@
 ---
 title: The Patter format
-description: What a Patter project is on disk, the shards, the compiled bundle, and the send envelope.
+description: See what a Patter project is on disk, from the shards to the compiled bundle and the send envelope.
 sidebar:
   label: Project & files
 ---
@@ -66,7 +66,7 @@ point: it says "this is a delivery, not the canonical files." `patter unpack
 
 ## Why it's shaped this way
 
-- **No lock-in**: your narrative is text files you can read, diff, and search with
+- **Nothing proprietary.** Your narrative is text files you can read, diff, and search with
   anything; you author them in Patterpad or through the CLI.
 - **VCS-native**: per-scene shards and a stable, line-oriented file form mean a
   normal 3-way text merge works in any VCS, with

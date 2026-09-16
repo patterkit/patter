@@ -1,6 +1,6 @@
 ---
 title: Tracking & reports
-description: "Roll up writing status, run the coverage test, and export production reports, voice scripts, and localisation: the numbers and artifacts that keep a narrative project on schedule."
+description: Roll up writing status, run the coverage test, and export the reports, voice scripts, and localisation files that keep a project on schedule.
 sidebar:
   label: Tracking & reports
 ---
@@ -12,13 +12,13 @@ go; here it rolls up into numbers you can plan with.
 
 ## The writing-status rollup
 
-Writing status feeds **Production ▸ Production Information** (and the exported report): each
+Writing status feeds **Production ▸ Production Information** (and the exported report) with each
 scene's line counts broken down by stage, plus how many voiced lines have crossed the "ready
 to record" and "ready to ship" thresholds. Since game event beats aren't tracked, they never
-skew those totals: the numbers reflect only the lines actually written and (if you like)
+skew those totals. The numbers reflect only the lines actually written and (if you like)
 voiced.
 
-Where the report gives you the *counts*, **status search** gives you the *lines*: open
+Where the report gives you the *counts*, **status search** gives you the *lines*. Open
 **Review ▸ Find Lines by Status…** (or switch the
 [search window](/search/#browsing-by-writing-status) to its **Writing** mode) to list
 and jump straight to every line at a given stage. It's the quick way to pull up "everything
@@ -28,7 +28,7 @@ still at **stub**" and work through it.
 
 Every scene also has a **status**: the stage of its **lowest** beat, its weakest link (an
 unset beat counts as the lowest). The report shows each scene's status and counts how many
-scenes sit at each stage, so you can see at a glance which are furthest from done.
+scenes sit at each stage, so you can see which are furthest from done.
 
 ## Coverage testing
 
@@ -41,18 +41,18 @@ its own page: [Coverage testing](/production/coverage-testing/).
 
 The **Production** menu turns the project into the artifacts other people need:
 
-- **Production Information…**: a report you can read but not edit: word and line counts,
+- **Production Information…** A report you can read but not edit, with word and line counts,
   writing status by beat and by scene, branching, recording coverage (when
   [audio tracking](/production/audio/#recording-status) is on), and a lines-to-write
   burndown. Turn on [Estimating](#estimating) to size unwritten scenes by a guess instead of
   their placeholder lines.
-- **Export Production Info…**: that same report as an `.xlsx` spreadsheet.
-- **Export Voice Script…**: a recording script for voice actors, either every voiced line or
+- **Export Production Info…** That same report as an `.xlsx` spreadsheet.
+- **Export Voice Script…** A recording script for voice actors, either every voiced line or
   only those marked ready to record. Once takes come back, drop them into folders by status
-  and Patterpad reads each line's recording status from the files: see
-  [Audio & recording](/production/audio/#recording-status).
-- **Export / Import Localisation…**: hand your text out for translation and fold it back in;
-  covered under [Projects & settings](/patterpad/projects-and-settings/) and
+  and Patterpad reads each line's recording status from the files, as
+  [Audio & recording](/production/audio/#recording-status) describes.
+- **Export / Import Localisation…** Hand your text out for translation and fold it back in.
+  It's covered under [Projects & settings](/patterpad/projects-and-settings/) and
   [Localisation](/production/localisation/).
 
 <figure class="doc-shot">
@@ -62,13 +62,13 @@ The **Production** menu turns the project into the artifacts other people need:
 
 The "share with anyone" outputs live in the **Publish** menu instead:
 
-- **Publish ▸ Publish Readable Script…**: a screenplay of the whole story (dialogue, narration,
+- **Publish ▸ Publish Readable Script…** A screenplay of the whole story (dialogue, narration,
   choices, jumps) as a **PDF** or **Word (.docx)**, the document to hand someone who just
-  wants to *read* it. →
-  [Building & shipping](/setup/building-and-shipping/#a-readable-script-pdf--word).
-- **Publish ▸ Publish Playable HTML…**: a single `.html` file that *plays* the whole story in any
-  browser, offline, with nothing to install. Hand one file to a stakeholder. →
-  [Building & shipping](/setup/building-and-shipping/#a-playable-html-to-send-anyone).
+  wants to *read* it.
+  [Building & shipping](/setup/building-and-shipping/#a-readable-script-pdf--word) has the detail.
+- **Publish ▸ Publish Playable HTML…** A single `.html` file that *plays* the whole story in any
+  browser, offline, with nothing to install. Hand one file to a stakeholder, as
+  [Building & shipping](/setup/building-and-shipping/#a-playable-html-to-send-anyone) describes.
 
 ## Estimating
 

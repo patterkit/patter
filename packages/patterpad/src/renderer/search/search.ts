@@ -241,7 +241,7 @@ async function setMode(next: SearchMode): Promise<void> {
     : mode === "tag" ? "Pick a tag · type to filter · ↑↓ move · ↵ jump"
     : mode === "property" ? "Find where a property is used · ↑↓ move · ↵ jump"
     : mode === "replace" ? "Replaces dialogue / narration / choice text across every scene · review, then Replace all"
-    : "↑↓ move · ↵ jump · drag the bar to move · esc to close";
+    : "↑↓ move · ↵ jump · drag the bar to move · Esc to close";
   results = []; replaceHits = []; sel = 0; renderResults();
   if (chipMode(mode)) {
     input.value = ""; // a chip mode's box is a post-filter; start empty so the full list for the picked chip shows

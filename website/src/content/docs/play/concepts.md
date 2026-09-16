@@ -1,12 +1,12 @@
 ---
 title: The play loop
-description: The model every Patterplay runtime shares, build an engine from a bundle, open a flow, advance it one step at a time, render line/text/gameEvent/choice/end steps, and pass back the player's choice.
+description: Learn the play loop every Patterplay runtime shares, from building an engine to advancing a flow and passing back a choice.
 sidebar:
   label: The play loop
 ---
 
 Every Patterplay runtime (JavaScript, Unity, Unreal, Godot) works the same way. Learn the
-shape here once; each engine's [quickstart](/play/overview/) is then mostly install notes
+shape here once; each engine's [guide](/play/overview/) is then mostly install notes
 and local naming.
 
 ## Engine and flow
@@ -117,7 +117,7 @@ details (including reading typed **Game Data** and **tags** off each step) are i
 The whole run: every flow's position, the shared state, visit counts, even the seeded random
 generator's place in its sequence: serialises in one call and restores in one call.
 Every runtime handles save/load the same way, so a save made by one engine round-trips
-exactly. See your engine's quickstart for the local call and
+exactly. See your engine's guide for the local call and
 [Save/load & Game Data](/play/integration/) for the shape.
 
 ## Localisation
@@ -125,12 +125,12 @@ exactly. See your engine's quickstart for the local call and
 In **Embedded** mode the text on each step is already resolved to the current language, and you
 can switch language live. In **IDs-only** mode the step carries ids instead of text, and you
 resolve them through your own localisation system. The runtime API is the same either way; only
-where the words come from changes. → [Localisation](/play/localisation/)
+where the words come from changes, as [Localisation](/play/localisation/) shows.
 
 ## Next
 
-- Get it running on your engine: [JavaScript](/play/javascript/) ·
-  [Unity](/play/unity/) · [Unreal](/play/unreal/) · [Godot](/play/godot/).
-- The deep JavaScript API: [The Engine API](/play/engine/).
-- Moving a flow from the game: [Host navigation](/play/navigation/).
-- Save/load, Game Data, tags, host events: [Save/load & Game Data](/play/integration/).
+- Get it running on your engine with the [JavaScript](/play/javascript/),
+  [Unity](/play/unity/), [Unreal](/play/unreal/), or [Godot](/play/godot/) guide.
+- [The Engine API](/play/engine/) is the deep JavaScript reference.
+- [Host navigation](/play/navigation/) moves a flow from the game.
+- [Save/load & Game Data](/play/integration/) covers save/load, Game Data, tags, and host events.

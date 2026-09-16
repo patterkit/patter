@@ -1,6 +1,6 @@
 ---
 title: Specification
-description: Where to find the normative Patter language + format specification.
+description: Find the normative Patter language and format specification.
 ---
 
 The normative specification (the language, the flow model, the bundle format, and the
@@ -17,6 +17,6 @@ A native-port author works from the format docs, then proves the port by passing
 corpus (see [Compatibility](/compatibility/)).
 
 :::note
-Documentation here is unversioned for now - it tracks the latest release. Versioned docs
+Documentation here's unversioned for now, and it tracks the latest release. Versioned docs
 may follow once the schema and runtimes stabilise.
 :::

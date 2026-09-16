@@ -26,7 +26,7 @@ export function openSuggestionCompose(opts: {
 
   body.append(el("p", "sg-hint", "Edit the line, then Suggest. The author sees your version and accepts or rejects it."));
   const ta = el("textarea", "sg-input") as HTMLTextAreaElement;
-  ta.rows = 3; ta.value = opts.current; ta.placeholder = "<the rewritten line>";
+  ta.rows = 3; ta.value = opts.current; ta.placeholder = "The rewritten line";
   body.append(ta);
 
   const submit = (): void => { const v = ta.value.trim(); if (!v || v === opts.current.trim()) { close(); return; } opts.onSubmit(v); close(); };
@@ -71,7 +71,7 @@ export function openSuggestionReview(opts: {
     head.append(el("span", "sg-author", r.author || "Someone"), el("span", "sg-ts", fmtTs(r.ts)));
     if (r.resolved) head.append(el("span", "sg-outcome", r.outcome === "accepted" ? "accepted" : "rejected"));
     card.append(head);
-    if (r.stale && !r.resolved) card.append(el("div", "sg-stale", "The line changed since this was suggested - review against the current text."));
+    if (r.stale && !r.resolved) card.append(el("div", "sg-stale", "The line has changed since this was suggested. Review it against the current text."));
     card.append(el("div", "sg-diff-label", "Current"), el("blockquote", "sg-before", r.before || "(empty)"));
     card.append(el("div", "sg-diff-label", "Proposed"), el("blockquote", "sg-after", r.proposed));
 

@@ -300,7 +300,7 @@ export function createActionMenu(): ActionMenu {
           if (at == null) return;
           let name = "this block";
           try { name = (JSON.parse(view.state.doc.nodeAt(at)?.attrs.raw as string)?.name as string) || name; } catch { /* keep default */ }
-          confirmDialog({ title: `Delete "${name}"?`, body: "The block and everything inside it will be removed. You can undo it.", confirmLabel: "Delete" })
+          confirmDialog({ title: `Delete "${name}"?`, body: "The block and everything inside it will be removed. You can undo this.", confirmLabel: "Delete block" })
             .then((ok) => { if (ok) { const tr = deleteBlock(view.state, at); if (tr) view.dispatch(tr); view.focus(); } });
         });
         el.appendChild(del);
@@ -327,7 +327,7 @@ export function createActionMenu(): ActionMenu {
       del.addEventListener("mouseenter", closeSub);
       onPick(del, () => {
         if (!ctx) return; const view = ctx.view; close();
-        confirmDialog({ title: `Delete these ${n} items?`, body: `${n} items and everything inside them will be removed. You can undo it.`, confirmLabel: "Delete" })
+        confirmDialog({ title: `Delete these ${n} items?`, body: `${n} items and everything inside them will be removed. You can undo this.`, confirmLabel: `Delete ${n} items` })
           .then((ok) => { if (ok) { const tr = deleteChunksAt(view.state, multiSelectPositions(view.state)); if (tr) view.dispatch(tr); view.focus(); } });
       });
       el.appendChild(del);
@@ -396,7 +396,7 @@ export function createActionMenu(): ActionMenu {
       const remove = (): void => { const p = getPos(); if (p == null) return; const tr = deleteChunk(view.state, p); if (tr) view.dispatch(tr); view.focus(); };
       // No confirmation when nothing is lost - an empty bubble, or a group of only empty bubbles.
       if (chunkIsEmpty(node)) { remove(); return; }
-      confirmDialog({ title: `Delete this ${noun}?`, body: `The ${noun} and everything inside it will be removed. You can undo it.`, confirmLabel: "Delete" })
+      confirmDialog({ title: `Delete this ${noun}?`, body: `The ${noun} and everything inside it will be removed. You can undo this.`, confirmLabel: `Delete ${noun}` })
         .then((ok) => { if (ok) remove(); });
     });
     el.appendChild(del);

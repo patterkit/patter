@@ -1,6 +1,6 @@
 ---
 title: Localisation
-description: "Running a Patter project's translation loop: declare your languages, export for translators as JSON, Excel, or PO, import the results back, and let the Status column tell you what needs re-checking when the source changes."
+description: Run the translation loop, from declaring languages and exporting for translators to importing results and spotting stale rows.
 sidebar:
   label: Localisation
 ---
@@ -9,7 +9,7 @@ A Patter project is **ready to translate from the start**: every line, narration
 prompt, and character name has a stable **ID** that its translations hang off. Running the
 translation side of a project is one small loop, and one rule keeps it sane: **writers only
 ever see and edit the source language.** Translations live in their own files, never on the
-writing surface - which is also what makes staleness computable (below).
+writing surface, which is also what makes staleness computable (below).
 
 <svg viewBox="0 0 760 168" role="img" aria-labelledby="pk-loc-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-loc-title">The translation round-trip: export source strings as JSON, xlsx, or PO; a translator fills them in; import them back into the locale shards. You only ever edit the source language, and stable line ids mean a moved or edited line never orphans its translation.</title>
@@ -46,31 +46,31 @@ In **Project Settings ▸ Language**, list the languages you'll ship and mark th
 **Production ▸ Export / Import Localisation…** (also reachable from the Language tab) runs
 both halves:
 
-1. **Export** writes the source text - and, for a chosen language, its current translations -
+1. **Export** writes the source text (and, for a chosen language, its current translations)
    in the translator's preferred format (below). Hand the file over.
 2. The translator fills in the Translation column/fields and sends it back.
 3. **Import** reads the language from the file (or you set it) and reports how many
-   translations **changed** (re-importing an unedited file reports **0** - unchanged rows
+   translations **changed** (re-importing an unedited file reports **0**, since unchanged rows
    aren't counted). Translations go into that language's own file; the source is untouched,
    and the writing surface still shows only the source language.
 
-Run the loop as often as you like - it's incremental, not a one-shot. Which brings us to:
+Run the loop as often as you like, since it's incremental rather than a one-shot. Which brings us to:
 
 ### What changed since last time: the Status column
 
 Writers keep writing while translation happens, so the export tracks **staleness** per line.
 The Excel export shows it as a **Status** column:
 
-- *(blank)* - not translated yet.
-- **translated** - has a translation, and the source line hasn't changed since.
-- **stale** - has a translation, but the **source line was edited after it was translated**:
-  it needs re-checking against the new wording.
+- *(blank)* means not translated yet.
+- **translated** means it has a translation, and the source line hasn't changed since.
+- **stale** means it has a translation, but the **source line was edited after it was translated**,
+  so it needs re-checking against the new wording.
 
 Import writes back **every filled-in translation**, whatever its Status (an empty Translation
-cell is left alone). The Status doesn't decide *whether* a row imports - only what happens to its
-staleness: an unflagged row is accepted as fresh (its translation is now current for the source as
+cell is left alone). The Status doesn't decide *whether* a row imports, only what happens to its
+staleness. An unflagged row is accepted as fresh (its translation is now current for the source as
 it stands), while a row still marked **stale** has its text imported but **stays flagged**. The
-translator confirms a re-check by *clearing the "stale" cell*, not by re-sending the file - so an
+translator confirms a re-check by *clearing the "stale" cell*, not by re-sending the file, so an
 old spreadsheet can never silently bless an outdated translation. (PO files carry the same signal
 as the standard `#, fuzzy` flag.)
 
@@ -78,20 +78,20 @@ as the standard `#, fuzzy` flag.)
 
 All three carry the same IDs and the same staleness signal; pick by who's receiving the file:
 
-- **Excel (.xlsx)** - for human translators working by hand: one sheet per scene, columns
+- **Excel (.xlsx)** is for human translators working by hand, with one sheet per scene and columns
   ID / Source / Translation / Comments / Status / Gender. The friendliest to non-technical folk.
-- **PO / POT** - for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …).
+- **PO / POT** is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …).
   Exporting with no language gives a blank **POT** template; staleness is `#, fuzzy`.
-- **JSON** - for pipelines and engines: plain ID → string tables, easy to transform or feed
+- **JSON** is for pipelines and engines, plain ID → string tables, easy to transform or feed
   into your game's own localisation system.
 
 Translator-facing **comments** come from your documentation notes routed to the `loc`
-channel - see [Reviewing & feedback](/patterpad/reviewing/).
+channel, as [Reviewing & feedback](/patterpad/reviewing/) describes.
 
 ### Who is speaking: grammatical gender
 
-A gendered language often has to inflect the line itself to match its **speaker** - adjectives,
-participles, sometimes the verb. English source text rarely reveals which, so a translator working
+A gendered language often has to inflect the line itself to match its **speaker**, in adjectives,
+participles, and sometimes the verb. English source text rarely reveals which, so a translator working
 line by line is left guessing, and guessing wrong is a bug you only find in a late language pass.
 
 Set a character's **Grammatical gender** in **Project Settings ▸ Cast** and every export carries it
@@ -111,7 +111,7 @@ speaker (narration) and characters left blank carry nothing, so you only send wh
 
 Gender is **export-only context**: it is regenerated from the cast on every export, never read back
 on import, and never shipped in the compiled `.patterc` bundle. Change a character's gender and the
-next export simply tells translators the truth. It describes the character as a grammatical subject
+next export tells translators the truth. It describes the character as a grammatical subject
 for translation purposes; it is not shipped to, or read by, your game.
 
 ## How the strings ship: two approaches
@@ -119,18 +119,18 @@ for translation purposes; it is not shipped to, or read by, your game.
 At publish time (**Project Settings ▸ Publish ▸ Localisation**) you pick how the built
 bundle carries text:
 
-- **Embedded** (default): every translated language ships **inside** the bundle. The runtime
+- **Embedded** (default). Every translated language ships **inside** the bundle. The runtime
   resolves the right text and can switch language live, mid-game, with no rebuild. Right for
-  self-contained games - nothing else to set up.
+  self-contained games, with nothing else to set up.
 - **IDs-only**: the bundle ships **no text at all**; the runtime hands your game each line's
   ID and your game's own localisation system supplies the string. Right when the game
   already has a loc pipeline (Unity Localization, i18n, a CMS…).
-  - **Embed source language for debug** (sub-option): adds the source text to an IDs-only
+  - **Embed source language for debug** (sub-option). Adds the source text to an IDs-only
     build *just* so it's playable before your loc system is wired up. It warns it's not for
     release; leave it off for a real build.
 
 Crucially, the choice **doesn't change the translation loop above**: either mode exports and
-imports the same files. Going IDs-only never cuts you off from Patter's round-trip - you
+imports the same files. Going IDs-only never cuts you off from Patter's round-trip, and you
 still hand translators the same spreadsheets and feed the results into whichever pipeline
 ships them.
 
@@ -156,6 +156,6 @@ build mode is picked per export too: `patter export --ids` / `--source-debug`.
 
 ## For the game team
 
-How the two modes look **from inside the game** - `setLocale`, `interpolate`, the
-untranslated fallback, all four runtimes - lives with the rest of the integration docs:
+How the two modes look **from inside the game** (`setLocale`, `interpolate`, the
+untranslated fallback, all four runtimes) lives with the rest of the integration docs, on
 [Localisation at runtime](/play/localisation/).

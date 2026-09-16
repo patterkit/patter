@@ -1,6 +1,6 @@
 ---
 title: Save/load & Game Data
-description: The integration reference for saving and loading a run and reading Game Data off each step, plus host events. The same shape on every Patterplay runtime.
+description: Save and load a run, read Game Data off each step, and handle host events, the same way on every Patterplay runtime.
 sidebar:
   label: Save/load & Game Data
 ---
@@ -11,7 +11,7 @@ below are shown in JavaScript, but every engine exposes the same shape. Other ru
 own pages, [linked at the end](#more-runtime-topics).
 
 **The same calls in your engine.** You only ship on one engine, so here is the local naming for the
-operations you reach for most (see your engine's [quickstart](/play/overview/) for the rest):
+operations you reach for most (see your engine's [guide](/play/overview/) for the rest):
 
 | Operation | JavaScript | Unity (C#) | Unreal (C++) | Godot (GDScript) |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ operations you reach for most (see your engine's [quickstart](/play/overview/) f
 | Get / set a property | `flow.getProperty` / `setProperty` | `flow.GetProperty` / `SetProperty` | `Engine->GetPropertyNumber` / `SetPropertyNumber` | `flow.get_property` / `set_property` |
 | Switch language live | `engine.setLocale("fr")` | `engine.SetLocale("fr")` | `Engine->Raw().setLocale("fr")` | `engine.set_locale("fr")` |
 
-Save/load differs per engine (see each quickstart's *Save and load*).
+Save/load differs per engine (see each engine guide's *Save and load*).
 
 ## Save and load
 
@@ -32,7 +32,7 @@ const save = engine.saveGame();   // a plain serialisable object (version 2)
 engine.loadGame(save);
 ```
 
-The snapshot holds everything needed to resume: shared state, world and per-flow visit
+The snapshot holds everything needed to resume, meaning shared state, world and per-flow visit
 counts, selector cursors and shuffle bags, each flow's position and call/return stack,
 the PRNG position, and any pending choice (saved as its exact option set and replayed
 verbatim on load, so conditions aren't re-evaluated and the PRNG never double-draws).
@@ -40,15 +40,15 @@ verbatim on load, so conditions aren't re-evaluated and the PRNG never double-dr
 that points at content you've since deleted resumes best-effort rather than throwing.
 **`@world` is not in it either**: it's your game's state, reached through the resolver you
 bind, so your game saves it. That is also what makes running Patter beside
-[Storylet Studio](https://storylet.studio)'s engine safe: both exclude `@world` from their own
+[Storylet Studio](https://storylet.studio)'s engine safe. Both exclude `@world` from their own
 saves, your game saves its one world once, and nothing is written twice.
 
 **Every runtime writes and reads the same save format**, `patter/save@0`, so a save crosses
-engines: a game that saves from a web build loads in Godot, a Patterpad Play-window save loads in
-Unity. The shape is the JS runtime's, documented in `@patterkit/model`, and the conformance corpus
+engines. A game that saves from a web build loads in Godot, and a Patterpad Play-window save loads
+in Unity. The shape is the JS runtime's, documented in `@patterkit/model`, and the conformance corpus
 holds every engine to it by carrying a save the JS runtime wrote that each engine must load, write
-back in the same shape, and continue. Semantically equivalent is the promise, not byte-identical:
-key order and number formatting can differ between engines, and nothing should compare the text.
+back in the same shape, and continue. Semantically equivalent is the promise, not byte-identical.
+Key order and number formatting can differ between engines, and nothing should compare the text.
 
 The **`@patterkit/play-helpers`** package wraps this for storage:
 
@@ -100,5 +100,5 @@ The rest of wiring a runtime into your game lives on its own pages:
 - [Tags](/play/tags/): read the accumulated author tags off each step.
 - [Formatting markup](/play/formatting/): render the bold / italic the runtime hands you.
 - [Localisation](/play/localisation/): Embedded vs IDs-only, `setLocale`, and `interpolate` at
-  runtime.
+  `interpolate` at runtime.
 - [The play-helpers package](/play/play-helpers/): optional save/load and property conveniences.

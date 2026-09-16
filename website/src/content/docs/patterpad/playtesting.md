@@ -1,6 +1,6 @@
 ---
 title: Playtesting your story
-description: "The Play window: walk your story live in Patterpad, on the same engine your game will use, with step, continue, speed, captions, and audio."
+description: Walk your story live in Patterpad's Play window, on the same engine your game will use, with step, speed, captions, and audio.
 sidebar:
   label: Playtesting
 ---
@@ -18,8 +18,8 @@ branches, and hear how a scene lands before anyone else sees it.
   the first time).
 - To start partway in, right-click a block and choose **▶ Play block**.
 
-The window is pinned by default, so it stays above the editor while you work - above Patterpad,
-that is, not above everything else on your screen. Unpin it from its own pin control.
+The window is pinned by default, so it stays above the editor while you work. That is above Patterpad,
+not above everything else on your screen. Unpin it from its own pin control.
 
 <figure class="doc-shot">
   <img src="/doc-images/PlayWindow.png" alt="The Play window mid-run: a header reading PLAYING FROM the-patter-tour with speed, closed-caption, audio and pin controls, a transcript of played lines, and a tray of choice buttons at the foot." />
@@ -46,12 +46,12 @@ that is, not above everything else on your screen. Unpin it from its own pin con
 
 ## The editor follows along
 
-As it plays, the editor keeps pace: the current line gets a gliding marker and a soft
+As it plays, the editor keeps pace. The current line gets a gliding marker and a soft
 wash, everything it's already played picks up a faint "visited" dot, and the editor
 changes scenes when the story does. The speaker colours match the ones you see while
 writing.
 
-Edit the scene mid-run and the change **applies live**: a reworded line plays its new text the
+Edit the scene mid-run and the change **applies live**. A reworded line plays its new text the
 next time it comes up, and even structural edits carry the run across (the playthrough keeps its
 place; a quiet "Edits applied live" note confirms it). Only an edit that doesn't compile yet, say
 a half-finished line of logic, pauses the controls with a "Scene changed: restart" note until you

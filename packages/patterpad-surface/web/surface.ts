@@ -392,8 +392,8 @@ const deleteSelectedChunk: Command = (state, _dispatch, view) => {
     const removeSet = (): void => { const tr = deleteChunksAt(view.state, multiSelectPositions(view.state)); if (tr) view.dispatch(tr); view.focus(); };
     void confirmDialog({
       title: `Delete these ${n} items?`,
-      body: `${n} items and everything inside them will be removed. You can undo it.`,
-      confirmLabel: "Delete",
+      body: `${n} items and everything inside them will be removed. You can undo this.`,
+      confirmLabel: `Delete ${n} items`,
     }).then((ok) => { if (ok) removeSet(); });
     return true;
   }
@@ -407,8 +407,8 @@ const deleteSelectedChunk: Command = (state, _dispatch, view) => {
   if (chunkIsEmpty(node)) { remove(); return true; } // nothing lost -> no prompt (matches the action menu)
   void confirmDialog({
     title: `Delete this ${noun}?`,
-    body: `The ${noun} and everything inside it will be removed. You can undo it.`,
-    confirmLabel: "Delete",
+    body: `The ${noun} and everything inside it will be removed. You can undo this.`,
+    confirmLabel: `Delete ${noun}`,
   }).then((ok) => { if (ok) remove(); });
   return true;
 };

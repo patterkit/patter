@@ -437,7 +437,7 @@ async function importDictionaryDialog(): Promise<{ ok: boolean; error?: string; 
   if (!win) return { ok: false, error: "no window" };
   const r = await dialog.showOpenDialog(win, {
     title: "Import a Hunspell dictionary",
-    message: "Choose the .dic file - its matching .aff (same name, same folder) is imported with it.",
+    message: "Choose the .dic file. Its matching .aff (same name, same folder) is imported with it.",
     buttonLabel: "Import",
     properties: ["openFile"],
     filters: [{ name: "Hunspell dictionary", extensions: ["dic"] }],

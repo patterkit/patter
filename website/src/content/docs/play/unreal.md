@@ -1,6 +1,6 @@
 ---
 title: Unreal
-description: Play a Patter bundle in Unreal Engine with the native C++ Patterplay plugin, drop it into Plugins/, import a .patterc as an asset, drive the flow from C++ or Blueprint, and watch live state in an editor panel.
+description: Play a Patter bundle in Unreal with the native C++ plugin, drive the flow from C++ or Blueprint, and watch live state.
 sidebar:
   label: Unreal
 ---
@@ -18,7 +18,7 @@ directly: same bundle, same behaviour, held to the same
 The release zip (from the `play-unreal-v*` Release: see the
 [downloads page](/download/)) contains **two sibling folders**: the **`Patterplay/`**
 runtime plugin, and **`PatterplayDemo/`**, a ready-to-open **sample project**. To try
-Patterplay first, just open `PatterplayDemo.uproject` where it sits - it finds the plugin in
+Patterplay first, just open `PatterplayDemo.uproject` where it sits, and it finds the plugin in
 the sibling folder, nothing to install. To use it in your game, drop `Patterplay/` into your
 project's `Plugins/` folder, restart the editor, and enable it. Everything ships
 **source-only**. The runtime core is header-only standard C++, so it compiles inside your
@@ -50,7 +50,7 @@ dialogue widget without touching C++.
 
 The **PatterplayDemo** sample project (the second folder in the release zip) holds two working
 references. Press **Play** in it and **`ATourDemoActor`** runs the complete interactive Patter
-tour in a UI overlay - a scrolling transcript with clickable choices - loading its bundle from
+tour in a UI overlay (a scrolling transcript with clickable choices), loading its bundle from
 disk, so a fresh unzip plays with no setup. **`APatterplayDemoActor`** is the minimal shared
 demo flow (the smallest render-and-choose loop, logged) to read first. The tour actor also
 shows per-line audio resolution via `UPatterAudio`; audio files are not bundled (playback is
@@ -73,21 +73,21 @@ UPatterEngine* Engine = UPatterEngine::Create(Bundle, World);
 World->OnChanged.AddDynamic(this, &AMyActor::OnWorldChanged);   // (Name, Value, bFromStory)
 ```
 
-Everything on `UPatterWorld` is Blueprint-callable: typed `Set*` / `Get*`, `Has`, `Names`,
+Everything on `UPatterWorld` is Blueprint-callable, with typed `Set*` / `Get*`, `Has`, `Names`,
 `SetReadOnly`, and an `OnChanged` delegate that tells your own writes from the story's. Names match
 case-insensitively, as the story's references do. Leave `World` out of `Create` and the engine
 **self-backs** `@world` from the declared defaults, which is right for a run that never leaves the
 engine; `GetBoundWorld()` says which you have.
 
 Two read-only rules meet here and stay distinct. A property declared **`writable: false`** in the
-project is the *story's* promise, refused by the engine whether or not a world is bound - and only
-the story's: your own `SetProperty` writes it, because the value is the game's.
+project is the *story's* promise, refused by the engine whether or not a world is bound. Only
+the story's write is refused; your own `SetProperty` writes it, because the value is the game's.
 **`SetReadOnly`** is the *game's* policy, a name the story may read but this game will not let it
 write. Either refusal fails the step and logs why, never crashes, and neither binds your own `Set*`
-calls. The container is never in a Patter save: your game saves it once, however it already saves
+calls. The container is never in a Patter save, so your game saves it once, however it already saves
 things, and a load never writes through it. The binding survives `HotSwap` and `ApplyLiveBundle`.
 It is the same shape as the Storylet Engine's `UStoryletEngine::Create(Bundle, …, World)`, so a
-project running both reads one API. → [World Properties](/play/world-properties/)
+project running both reads one API. [World Properties](/play/world-properties/) has the full picture.
 
 ## Send the story somewhere
 
@@ -140,7 +140,7 @@ Link->FlowOpened(TEXT("main"));
 Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
 ```
 
-→ [Live refresh & debug](/play/live-debug/)
+The protocol and the editor side are on [Live refresh & debug](/play/live-debug/).
 
 ## Save and load
 
@@ -154,18 +154,17 @@ whether the file was accepted (a refusal is logged with its reason).
 Prefer it over reaching past the wrapper. Loading REBUILDS the engine's flows, so any `UPatterFlow`
 you are holding refers to a flow that no longer exists; `UPatterSave` re-binds your wrappers to the
 restored flows for you, and a flow the save did not carry comes back closed rather than dangling.
-Calling `loadGame()` on the core engine through `UPatterEngine::Raw()` skips that step.
-→ [Save/load & Game Data](/play/integration/)
+Calling `loadGame()` on the core engine through `UPatterEngine::Raw()` skips that step. [Save/load & Game Data](/play/integration/) covers the format.
 
 ## Build against the writer's structure
 
 `UPatterEngine::GetOutline()` and `GetBeatSequence()` expose the authored tree (scenes → blocks →
 snippets → beats) as Blueprint structs, without playing. Walk the flat beat list and read each beat's
-`GameData` to build, say, a **Sequencer of subsequences**, one per beat. → [Structure introspection](/play/structure/)
+`GameData` to build, say, a **Sequencer of subsequences**, one per beat. [Structure introspection](/play/structure/) describes both calls.
 
 ## Next
 
-- The shared model: [The play loop](/play/concepts/).
-- Driving the story from the game: [Host navigation](/play/navigation/).
-- Reading Game Data/tags, host events, localisation: [Save/load & Game Data](/play/integration/).
-- Why it matches the other engines exactly: [Compatibility & conformance](/compatibility/).
+- [The play loop](/play/concepts/) is the shared model.
+- [Host navigation](/play/navigation/) drives the story from the game.
+- [Save/load & Game Data](/play/integration/) covers Game Data, tags, host events, and localisation.
+- [Compatibility & conformance](/compatibility/) explains why it matches the other engines exactly.

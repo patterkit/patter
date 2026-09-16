@@ -1,6 +1,6 @@
 ---
 title: Conditions, effects & data
-description: "The inspector's visual editors for a story's logic and memory: conditions, effects, properties, Game Data, tags, and addresses."
+description: Edit a story's logic and memory in the inspector, from conditions and effects to properties, Game Data, tags, and addresses.
 sidebar:
   label: Conditions, effects & data
 ---
@@ -15,9 +15,9 @@ stepping on the other.
 A **condition** decides whether a piece of content shows. Click a snippet or group's
 **Condition** row (or **+ add condition**) to open the visual editor:
 
-- build each test from **pills**: a property, a comparison, a value;
-- join them with **and / or**;
-- pick properties and built-ins from a menu, no need to remember names
+- Build each test from **pills**, a property, a comparison, and a value.
+- Join them with **and / or**.
+- Pick properties and built-ins from a menu, with no need to remember names.
 
 It checks as you build, and the finished test shows on the snippet as a quiet `if …`
 tag. With no condition, the content always shows.
@@ -73,8 +73,8 @@ along a story is.** If asking "or past it" makes sense, use a Quality.
 
 ### What a property chip can tell you
 
-Wherever a property appears as a chip - in a condition, in an effect, in the read-only rows
-on the inspector - it will answer two questions about itself:
+Wherever a property appears as a chip (in a condition, in an effect, in the read-only rows
+on the inspector), it will answer two questions about itself:
 
 - **Hover it** for the note written on its declaration (the **Purpose** field), and, for a
   Quality, its ladder of stages. Worth filling in: it is what everyone else on the project

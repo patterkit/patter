@@ -1,6 +1,6 @@
 ---
 title: Reading & focus
-description: "Writing View, colour themes, and fonts: the tools that let you read your script back, not just write it."
+description: Read your script back with Writing View, colour themes, and fonts chosen for reading as well as writing.
 sidebar:
   label: Reading & focus
 ---
@@ -13,7 +13,7 @@ gives you ways to strip it back, re-theme it, and get out of your own way.
 
 **View ▸ Writing View** (`⇧⌘M`) clears everything away: both side panes and the bottom
 bars, leaving only the script and the hint bar. The top bar stays, faded almost out of
-sight, and firms up when you point at it - on macOS it is the window's title bar, so
+sight, and firms up when you point at it. On macOS it's the window's title bar, so
 taking it away would leave the window's own buttons floating over your prose. It hides
 the furniture, never the words. Nothing is lost; it puts your exact layout back the moment you leave,
 by the same shortcut, **Esc**, or the quiet "Exit Writing View" pill at the

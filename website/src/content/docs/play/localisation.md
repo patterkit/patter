@@ -1,17 +1,17 @@
 ---
 title: Localisation at runtime
-description: "How a Patter bundle carries translatable text into your game: Embedded (the runtime resolves and live-switches languages) vs IDs-only (your loc system supplies the strings), with the same API across all four runtimes."
+description: Carry translatable text into your game in Embedded or IDs-only mode, with the same API on all four runtimes.
 sidebar:
   label: Localisation
 ---
 
 How translated text reaches the player is a **build choice** with two modes. The mode is baked
-into the bundle, so your integration code constructs the engine the same way either way - what
-changes is what a step hands you. (The translation *workflow* - exporting for translators,
-importing back, staleness - is the project team's side:
-[Localisation](/production/localisation/).)
+into the bundle, so your integration code constructs the engine the same way either way. What
+changes is what a step hands you. (The translation *workflow*, exporting for translators,
+importing back, and staleness, is the project team's side, on the
+[Localisation](/production/localisation/) page.)
 
-## The two modes at a glance
+## The two modes side by side
 
 | | **Embedded** (default) | **IDs-only** |
 |---|---|---|
@@ -55,8 +55,8 @@ const speaker = myLocaliser.lookup("cast:" + step.character, currentLanguage); /
 ```
 
 The ID → source tables your loc system needs come from the same export the translators use
-(JSON is the natural format here) - see
-[the workflow page](/production/localisation/#the-formats).
+(JSON is the natural format here), as
+[the workflow page](/production/localisation/#the-formats) describes.
 
 If the build was made with `--source-debug`, the engine resolves the embedded **source**
 strings (so the build is playable before your loc system exists) and exposes
@@ -64,6 +64,6 @@ strings (so the build is playable before your loc system exists) and exposes
 
 ## Everywhere the same
 
-All four runtimes handle both modes identically - JavaScript (`@patterkit/runtime`), Unity
-(C#), Unreal (C++), and Godot (GDScript) - each held to the same
+All four runtimes handle both modes identically, with JavaScript (`@patterkit/runtime`), Unity
+(C#), Unreal (C++), and Godot (GDScript) each held to the same
 [shared test suite](/compatibility/). `setLocale` is live on every one of them.

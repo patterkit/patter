@@ -55,11 +55,11 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
       // Flags hold a SET of values (any number on at once), so there's no single default value: a flags
       // property starts empty. (Toggle flags in effects with set_flags().)
       const s = el("span", "gd-flagnote", "starts empty");
-      s.dataset.tip = "A flags property begins with no flags set; turn them on in effects with set_flags().";
+      s.dataset.tip = "A flags property starts with none set. Effects turn them on with set_flags().";
       return s;
     }
     const input = el("input", "gd-input gd-default") as HTMLInputElement;
-    input.type = p.type === "number" ? "number" : "text"; input.placeholder = "<default (optional)>";
+    input.type = p.type === "number" ? "number" : "text"; input.placeholder = "Default";
     input.value = p.default == null ? "" : String(p.default);
     input.addEventListener("input", () => { const raw = input.value; if (raw === "") delete p.default; else p.default = (p.type === "number" ? Number(raw) : raw) as ScalarValue; });
     return input;
@@ -67,7 +67,7 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
 
   const propRow = (p: PropertyDecl, i: number): HTMLElement => {
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
-    name.type = "text"; name.placeholder = "<property name>"; name.value = p.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Property name"; name.value = p.name; name.spellcheck = false;
     name.dataset.tip = PROPERTY_NAME_HINT;
     bindPropertyName(name, (v) => { p.name = v; }, { hint: PROPERTY_NAME_HINT });
     guard.track(name);
@@ -88,16 +88,16 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "move up", () => { moveItem(state, i, -1); render(); }, i === 0),
-      iconBtn("↓", "move down", () => { moveItem(state, i, 1); render(); }, i === state.length - 1),
-      iconBtn("✕", "delete property", () => { state.splice(i, 1); render(); }, false, true),
+      iconBtn("↑", "Move up", () => { moveItem(state, i, -1); render(); }, i === 0),
+      iconBtn("↓", "Move down", () => { moveItem(state, i, 1); render(); }, i === state.length - 1),
+      iconBtn("✕", "Delete property", () => { state.splice(i, 1); render(); }, false, true),
     );
 
     // Secondary fields behind the ▸ expander: Shared / (Temporary) / enum-or-flags Values / Purpose.
     const shared = el("input", "insp-check") as HTMLInputElement;
     shared.type = "checkbox"; shared.checked = p.shared ?? sharedDefault;
     shared.addEventListener("change", () => { if (shared.checked === sharedDefault) delete p.shared; else p.shared = shared.checked; });
-    const sharedLabel = el("label", "gd-labelled gd-shared"); sharedLabel.dataset.tip = "Shared: one value across all flows. Off = a separate value per flow.";
+    const sharedLabel = el("label", "gd-labelled gd-shared"); sharedLabel.dataset.tip = "One value across all flows. Off gives each flow its own value.";
     sharedLabel.append(shared, el("span", undefined, "Shared"));
 
     const details: HTMLElement[] = [sharedLabel];
@@ -105,14 +105,14 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
       const temp = el("input", "insp-check") as HTMLInputElement;
       temp.type = "checkbox"; temp.checked = p.temporary ?? false;
       temp.addEventListener("change", () => { if (temp.checked) p.temporary = true; else delete p.temporary; });
-      const tl = el("label", "gd-labelled gd-shared"); tl.dataset.tip = "Temporary: the value resets to its default every time the scene is entered (Ink's temp).";
+      const tl = el("label", "gd-labelled gd-shared"); tl.dataset.tip = "Resets to its default every time the scene is entered.";
       tl.append(temp, el("span", undefined, "Temporary")); details.push(tl);
     }
     if (p.type === "enum" || p.type === "flags") details.push(labelled("Values", tagChips(p, refreshDefault)));
     // A quality's ladder, IN ORDER: the chips carry movers because position is the meaning here.
     if (p.type === "quality") details.push(labelled("Stages (in order)", stageChips(p, refreshDefault)));
     const purpose = el("input", "gd-input") as HTMLInputElement;
-    purpose.type = "text"; purpose.placeholder = "<what this property is for (a note for your team)>"; purpose.value = p.purpose ?? "";
+    purpose.type = "text"; purpose.placeholder = "What this property is for"; purpose.value = p.purpose ?? "";
     purpose.addEventListener("input", () => { p.purpose = purpose.value.trim() || undefined; });
     details.push(labelled("Purpose", purpose));
 

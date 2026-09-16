@@ -29,10 +29,10 @@ export function mountDebugLink(): DebugLink {
   let status: DebugStatus = { state: "off" };
 
   const tipFor = (s: DebugStatus): string =>
-    s.state === "off" ? "Live link: off. Click to start listening."
-    : s.state === "error" ? `Live link error: ${s.message}. Click to retry.`
-    : s.state === "listening" ? "Live link: listening, waiting for a game. Click to stop."
-    : `Live link: connected${s.project ? ` to ${s.project}` : ""}${s.build === "stale" ? " (different build; save or rebuild to re-sync)" : s.build === "match" ? " (in sync)" : ""}. Click to stop.`;
+    s.state === "off" ? "Live Link is off. Click to start listening."
+    : s.state === "error" ? `Live Link failed (${s.message}). Click to retry.`
+    : s.state === "listening" ? "Live Link is listening for a game. Click to stop."
+    : `Live Link is connected${s.project ? ` to ${s.project}` : ""}${s.build === "stale" ? " on a different build, so save or rebuild to re-sync" : s.build === "match" ? " and in sync" : ""}. Click to stop.`;
 
   const render = (): void => {
     const stateClass = (status.state === "off" || status.state === "error") ? "off"

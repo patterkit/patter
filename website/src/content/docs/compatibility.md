@@ -1,6 +1,6 @@
 ---
 title: Compatibility & conformance
-description: How Patter guarantees the same story plays identically on every engine, one bundle schema as the contract, and a shared test suite every runtime must pass, case by case.
+description: See how one bundle schema and a shared test suite keep a Patter story playing identically on every engine.
 sidebar:
   label: Compatibility & conformance
 ---
@@ -94,4 +94,4 @@ reference, the C# (Unity) port on .NET, the C++ (Unreal) port under clang, and t
 
 It's not "should match." It's checked, case by case, and re-run on every release.
 
-→ Back to [Playing in your game](/play/overview/).
+Back to [Playing in your game](/play/overview/).

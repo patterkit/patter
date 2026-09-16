@@ -22,7 +22,7 @@ export function mountEstimating(host: HTMLElement, initial: EstimatingConfig, la
   const enable = el("input") as HTMLInputElement; enable.type = "checkbox"; enable.checked = state.enabled;
   const toggle = el("label", "settings-toggle");
   const label = el("span"); label.append(document.createTextNode("Enable estimating"));
-  const desc = el("small", undefined, "Replace a still-guesswork scene's line count with an estimate in the production report."); label.append(desc);
+  const desc = el("small", undefined, "Counts an estimate instead of the placeholder lines for a scene that is still a sketch."); label.append(desc);
   toggle.append(enable, label);
 
   const config = el("div", "est-config");
@@ -34,7 +34,7 @@ export function mountEstimating(host: HTMLElement, initial: EstimatingConfig, la
   threshold.value = state.thresholdStatus && rungs.includes(state.thresholdStatus) ? state.thresholdStatus : (rungs[0] ?? "");
   threshold.addEventListener("change", () => { state.thresholdStatus = threshold.value; });
   config.append(labelled("Estimate scenes up to status", threshold));
-  config.append(el("small", "settings-fieldnote", "A scene is estimated only when every one of its beats sits at or below this status (an unset beat counts as the lowest)."));
+  config.append(el("small", "settings-fieldnote", "A scene is estimated while every beat sits at or below this status."));
 
   // Default estimate (lines).
   const def = el("input", "gd-input est-num") as HTMLInputElement; def.type = "number"; def.min = "0"; def.value = String(state.defaultLines);
@@ -42,22 +42,22 @@ export function mountEstimating(host: HTMLElement, initial: EstimatingConfig, la
   config.append(labelled("Default estimate (lines)", def));
 
   // Tag estimates: a scene carrying a mapped tag uses that number instead of the default (largest wins).
-  config.append(el("p", "settings-note", "Tag estimates override the default for scenes carrying that tag (e.g. cutscene, conversation). If a scene has several mapped tags, the largest wins."));
+  config.append(el("p", "settings-note", "A scene carrying one of these tags uses that estimate instead of the default. The largest wins when several apply."));
   const tagList = el("div", "gd-fieldlist est-tags");
   const renderTags = (): void => {
     tagList.replaceChildren();
     const tags = state.tagEstimates ?? (state.tagEstimates = []);
-    if (!tags.length) tagList.append(el("p", "gd-empty", "No tag estimates."));
+    if (!tags.length) tagList.append(el("p", "gd-empty", "Every scene uses the default estimate until you add a tag estimate."));
     else tags.forEach((t, i) => {
       const row = el("div", "est-tag-row");
       const tag = el("input", "gd-input est-tag") as HTMLInputElement;
-      tag.type = "text"; tag.placeholder = "<tag>"; tag.spellcheck = false; tag.value = t.tag;
+      tag.type = "text"; tag.placeholder = "Tag"; tag.spellcheck = false; tag.value = t.tag;
       tag.addEventListener("input", () => { t.tag = tag.value; });
       const lines = el("input", "gd-input est-num") as HTMLInputElement;
       lines.type = "number"; lines.min = "0"; lines.value = String(t.lines);
       lines.addEventListener("input", () => { t.lines = Math.max(0, Math.round(Number(lines.value) || 0)); });
       const acts = el("div", "gd-acts");
-      acts.append(iconBtn("✕", "remove tag estimate", () => { tags.splice(i, 1); renderTags(); }, false, true));
+      acts.append(iconBtn("✕", "Remove tag estimate", () => { tags.splice(i, 1); renderTags(); }, false, true));
       row.append(tag, lines, acts);
       tagList.append(row);
     });

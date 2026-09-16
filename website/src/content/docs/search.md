@@ -1,6 +1,6 @@
 ---
 title: Search and navigation
-description: "Find any line in a Patterpad project and jump straight to it: search by text, title, or Game ID, browse lines by writing status, all from a small search window that floats above the editor."
+description: Find any line in a Patterpad project by text, title, or Game ID, browse by writing status, and jump straight to it.
 ---
 
 Patterpad searches the **whole project**, every scene, not just the one you have open, and jumps you

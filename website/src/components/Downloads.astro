@@ -70,7 +70,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     const ver = r.tag_name.replace(/^v/, "");
     const find = (re: RegExp) => r.assets.find((a) => re.test(a.name));
     root.innerHTML = `<div class="pt-dl-grid">
-      ${card("", "macOS", "Signed &amp; notarized <code>.dmg</code> (Apple silicon)", button(find(/\.dmg$/i), "Download for macOS"))}
+      ${card("", "macOS", "Signed &amp; notarised <code>.dmg</code> (Apple silicon)", button(find(/\.dmg$/i), "Download for macOS"))}
       ${card("", "Windows", "One-click installer", button(find(/\.exe$/i), "Download for Windows"))}
       ${card("", "Linux", "Self-contained AppImage", button(find(/\.AppImage$/i), "Download for Linux"))}
     </div>${meta(r, ver)}`;

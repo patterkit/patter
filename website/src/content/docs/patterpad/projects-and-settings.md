@@ -1,6 +1,6 @@
 ---
 title: Projects & settings
-description: Project Settings, version-control awareness, localisation export/import, building a bundle, and spell-check.
+description: Find every tab of Project Settings, from version control and localisation to building a bundle and spell-check.
 sidebar:
   label: Projects & settings
 ---
@@ -18,7 +18,7 @@ sidebar:
   **Play ▸ Play from Start** and the coverage test), your version-control system, the
   **voiced** flag, the **formatting** (bold/italic) toggle, **autosave**, **Auto Rebuild**
   (recompile the bundle as you edit, see [below](#building-a-bundle)), the **Build
-  output** path, and how strings are handled (**localisation mode**: Embedded or
+  output** path, and how strings are handled (the **localisation mode**, Embedded or
   IDs-only, with a source-debug option).
 - **Language**: the languages your project supports and which one is the source.
 - **Game Data**: the fields each kind of beat can carry (see
@@ -28,13 +28,13 @@ sidebar:
   [Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)),
   plus the **coverage drivers** that stand in for them during a
   [coverage test](/production/coverage-testing/#input-drivers).
-- **Cast**: your characters: script name, an optional display name for translation, and an
-  actor. Expand a row (▸) for **Grammatical gender** - free text (blank = not specified) with
-  auto-suggest for the everyday values (male / female / neuter) and any others already used in the
-  cast, sent to translators so a gendered language can inflect that character's lines (see
-  [Localisation](/production/localisation/#who-is-speaking-grammatical-gender)) - and free-text
+- **Cast**: your characters, each with a script name, an optional display name for translation,
+  and an actor. Expand a row (▸) for **Grammatical gender**, free text (blank means not specified)
+  with auto-suggest for the everyday values (male / female / neuter) and any others already used in
+  the cast, sent to translators so a gendered language can inflect that character's lines (see
+  [Localisation](/production/localisation/#who-is-speaking-grammatical-gender)), and for free-text
   **Notes** on casting, voice, or intent. Each character's colour is shown but chosen for you.
-- **Writing Status** / **Audio Status**: the status ladders, each stage with its own
+- **Writing Status** and **Audio Status.** The status ladders, each stage with its own
   colour. Audio Status is opt-in (a **Track Audio Status?** switch) and needs the project
   to be **Voiced**; see [Recording status &
   audio](/production/audio/#recording-status).
@@ -43,11 +43,11 @@ sidebar:
   [Estimating](/production/tracking-and-reports/#estimating).
 - **Closed Captions**: the brackets (default `[` / `]`) and the caption character
   (default `SFX`) your game uses to strip non-spoken cues from dialogue when a player
-  turns captions off. Avoid `(` as the opener: parentheses open a performer direction
+  turns captions off. Avoid `(` as the opener, since parentheses open a performer direction
   at the start of a line. See [Closed captions](/play/closed-captions/).
 - **Dictionary**: spell-check setup (below).
 
-The `@patter` properties your story remembers are NOT here: they are the story's working
+The `@patter` properties your story remembers aren't here. They're the story's working
 vocabulary rather than configuration, so they have their own
 [**Properties** page](/setup/properties-and-data/#properties-the-storys-variables) at the top of the
 navigator. What stays in this dialog is the contract with your game (**World Properties**) and the

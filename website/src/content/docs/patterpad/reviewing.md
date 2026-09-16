@@ -1,6 +1,6 @@
 ---
 title: Reviewing & feedback
-description: "Threaded comments, suggested rewrites, and delivery-routed documentation notes, plus the review walk that steps through every open note, all anchored to the script inside Patterpad."
+description: Review a script inside Patterpad with threaded comments, suggested rewrites, routed notes, and a walk through every open note.
 sidebar:
   label: Reviewing & feedback
 ---
@@ -38,8 +38,8 @@ Comments are for discussion; **documentation notes** explain the content itself:
 is for, the context around it, how to pronounce a name in the booth. Right-click ▸ **Note…**
 to add one. Each note has a **class**, and the class decides who receives it:
 
-- **Everyone**: always shown;
-- **Voice (VO)**: rides along into the recording script;
+- **Everyone**: always shown.
+- **Voice (VO)**: rides along into the recording script.
 - **Localisers**: rides along into the translation hand-off.
 
 So a pronunciation note reaches the voice actor and a context note reaches the translator,

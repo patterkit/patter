@@ -1,6 +1,6 @@
 ---
 title: The play-helpers package
-description: "@patterkit/play-helpers: optional host-wiring conveniences for save/load, property setters, and a state logger. None of it is required to play."
+description: Add optional host-wiring helpers for save/load, property setters, and a state logger with @patterkit/play-helpers.
 sidebar:
   label: Play-helpers package
 ---

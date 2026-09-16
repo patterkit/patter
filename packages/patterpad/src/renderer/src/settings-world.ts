@@ -88,11 +88,11 @@ export function mountWorld(
     }
     if (p.type === "flags") {
       const s = el("span", "gd-flagnote", "starts empty");
-      s.dataset.tip = "A flags property begins with no flags set; turn them on in effects with set_flags().";
+      s.dataset.tip = "A flags property starts with none set. Effects turn them on with set_flags().";
       return s;
     }
     const input = el("input", "gd-input gd-default") as HTMLInputElement;
-    input.type = p.type === "number" ? "number" : "text"; input.placeholder = "<default (optional)>";
+    input.type = p.type === "number" ? "number" : "text"; input.placeholder = "Default";
     input.value = p.default == null ? "" : String(p.default);
     input.addEventListener("input", () => { const raw = input.value; if (raw === "") delete p.default; else p.default = (p.type === "number" ? Number(raw) : raw) as ScalarValue; });
     return input;
@@ -103,7 +103,7 @@ export function mountWorld(
     // isn't a user choice, so the row shows a fixed `@world.` and edits only the property name.
     const ref = el("div", "world-ref");
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
-    name.type = "text"; name.placeholder = "<property name>"; name.value = p.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Property name"; name.value = p.name; name.spellcheck = false;
     name.dataset.tip = PROPERTY_NAME_HINT;
     // Same rule and same manners as @patter / @scene declarations; this is the scope
     // where the fault that produced the rule was found.
@@ -128,15 +128,15 @@ export function mountWorld(
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "move up", () => { moveItem(scopeRows, i, -1); renderScopes(); }, i === 0),
-      iconBtn("↓", "move down", () => { moveItem(scopeRows, i, 1); renderScopes(); }, i === scopeRows.length - 1),
-      iconBtn("✕", "delete property", () => { scopeRows.splice(i, 1); renderScopes(); }, false, true),
+      iconBtn("↑", "Move up", () => { moveItem(scopeRows, i, -1); renderScopes(); }, i === 0),
+      iconBtn("↓", "Move down", () => { moveItem(scopeRows, i, 1); renderScopes(); }, i === scopeRows.length - 1),
+      iconBtn("✕", "Delete property", () => { scopeRows.splice(i, 1); renderScopes(); }, false, true),
     );
 
     const ro = el("input", "insp-check") as HTMLInputElement;
     ro.type = "checkbox"; ro.checked = p.writable === false;
     ro.addEventListener("change", () => { if (ro.checked) p.writable = false; else delete p.writable; });
-    const roLabel = el("label", "gd-labelled gd-shared"); roLabel.dataset.tip = "Read-only: the story can read this value but not set it (the game owns it). Writing to it is then a validation error.";
+    const roLabel = el("label", "gd-labelled gd-shared"); roLabel.dataset.tip = "The story can read this value but not set it. A write is reported as a problem.";
     roLabel.append(ro, el("span", undefined, "Read-only"));
 
     const details: HTMLElement[] = [roLabel];
@@ -172,7 +172,7 @@ export function mountWorld(
     // name; stored back as the full `@world.name` ref.
     const refWrap = el("div", "world-ref");
     const ref = el("input", "gd-input gd-name") as HTMLInputElement;
-    ref.type = "text"; ref.placeholder = "<property name>"; ref.value = d.ref.replace(/^@\w+\./, "").replace(/^@/, ""); ref.spellcheck = false;
+    ref.type = "text"; ref.placeholder = "Property name"; ref.value = d.ref.replace(/^@\w+\./, "").replace(/^@/, ""); ref.spellcheck = false;
     refWrap.append(el("span", "world-at", "@"), el("span", "world-scope", "world"), el("span", "world-dot", "."), ref);
     // Bound AFTER the input is in the tree: the shell attaches its datalist as a SIBLING, which is a
     // no-op while the input has no parent, and the failure is invisible (no autocomplete, no error).
@@ -190,7 +190,7 @@ export function mountWorld(
     });
 
     const values = el("input", "gd-input world-driver-values") as HTMLInputElement;
-    values.type = "text"; values.placeholder = "<values, comma-separated: 49, 50, 51>"; values.value = valuesText(d.values);
+    values.type = "text"; values.placeholder = "49, 50, 51"; values.value = valuesText(d.values);
     values.addEventListener("input", () => { d.values = parseValues(values.value); });
 
     const kind = el("select", "insp-select gd-type") as HTMLSelectElement;
@@ -205,9 +205,9 @@ export function mountWorld(
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "move up", () => { moveItem(drivers, i, -1); renderDrivers(); }, i === 0),
-      iconBtn("↓", "move down", () => { moveItem(drivers, i, 1); renderDrivers(); }, i === drivers.length - 1),
-      iconBtn("✕", "delete driver", () => { drivers.splice(i, 1); renderDrivers(); }, false, true),
+      iconBtn("↑", "Move up", () => { moveItem(drivers, i, -1); renderDrivers(); }, i === 0),
+      iconBtn("↓", "Move down", () => { moveItem(drivers, i, 1); renderDrivers(); }, i === drivers.length - 1),
+      iconBtn("✕", "Delete driver", () => { drivers.splice(i, 1); renderDrivers(); }, false, true),
     );
 
     syncCadence();
@@ -236,10 +236,10 @@ export function mountWorld(
 
   host.replaceChildren();
   host.append(el("h3", "world-cap", "World properties"));
-  host.append(el("p", "settings-note", "Properties the game engine owns and your story reads: referenced as @world.name in conditions and effects. The runtime fills them from their defaults until your game sets them."));
+  host.append(el("p", "settings-note", "Values your game owns and your story reads as @world.name. Each starts at its default until the game sets it."));
   host.append(scopesHost);
   host.append(el("h3", "world-cap", "Coverage drivers"));
-  host.append(el("p", "settings-note", "Values the coverage test feeds the host scopes so world-gated branches get exercised. Propose them from your story, then tune."));
+  host.append(el("p", "settings-note", "Values the coverage test feeds @world so gated branches run. Propose them from the story, then adjust."));
   host.append(driversHost);
   renderScopes();
   renderDrivers();

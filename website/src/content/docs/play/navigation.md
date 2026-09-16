@@ -1,6 +1,6 @@
 ---
 title: Sending the story somewhere
-description: Move a running flow to a Game ID address from your game, on any Patterplay engine. goto behaves like an authored jump, runFlow plays an address in one call, and reusing a named flow is what keeps shuffles and once-each lists in their place.
+description: Move a running flow to any Game ID address from your game, with goto, runFlow, and named flows, on any Patterplay engine.
 sidebar:
   label: Host navigation
 ---
@@ -13,7 +13,7 @@ to drop you at chapter four.
 Every Patterplay engine can send a running flow to an **address** ([Game IDs](/format/gamedata-and-addressing/)) and carry
 on playing from there.
 
-## The short version: play an address
+## Play an address
 
 For the common case, one call does everything. It opens the flow if it does not exist yet, moves it
 if it does, plays until the content stops, and hands you what played:
@@ -26,7 +26,7 @@ const lines = engine.runFlow("guard-42", "npc-barks", "greet");
 for (const line of lines) speak(line.character, line.text);
 ```
 
-An **empty array** means that address had nothing left to give - an exhausted variation list, say -
+An **empty array** means that address had nothing left to give (an exhausted variation list, say),
 which is your cue to fall back to other content. An address that does not exist is an error, not an
 empty result, so the two never look alike.
 
@@ -50,7 +50,7 @@ through the same written list separately.
 :::caution
 **`openFlow` does the opposite.** Opening a flow with a name that already exists **replaces** it with
 a fresh one, which starts that variation state over and closes the old flow. That is the right thing
-when you genuinely mean "begin again" - but do not mix the two on one name by accident, or a speaker
+when you genuinely mean "begin again", but don't mix the two on one name by accident, or a speaker
 will keep repeating its first line.
 :::
 
@@ -67,7 +67,7 @@ if (!flow.goto("throne-room", "audience")) {
 ```
 
 Both parts of the address are **Game IDs** (an internal id works too). The block is **scene-scoped**,
-so it is looked up inside the scene you named - two scenes can both have a block called `intro`
+so it's looked up inside the scene you named, so two scenes can both have a block called `intro`
 without ambiguity. To move within the scene you are already in, pass that scene's address again.
 Passing `"END"` as the scene ends the flow.
 
@@ -78,7 +78,7 @@ Passing `"END"` as the scene ends the flow.
 - the destination scene's **on-entry** effects run,
 - arriving **counts as a visit**, so `visits()` conditions see it,
 - the **call stack is replaced**, so if the story had been "called" and owed a return, that return is
-  dropped - just as an authored jump would drop it.
+  dropped, just as an authored jump would drop it.
 
 Two things follow from it being a *game* action rather than a written one:
 
@@ -86,7 +86,7 @@ Two things follow from it being a *game* action rather than a written one:
   are not played, and a choice waiting for the player is dropped. Interrupting is usually what you
   want; if it is not, finish reading the current content before you move.
 - **It moves, it does not reset.** Variation, visit counts and properties all carry on. A flow that
-  had run out of content simply resumes at the new address.
+  had run out of content resumes at the new address.
 
 ## Per engine
 
@@ -128,7 +128,7 @@ The Blueprint-facing name is `Goto`, like everywhere else.
 
 ## Finished flows
 
-Closing a flow - with `closeFlow`, by resetting the engine, or by replacing its name - **finishes**
+Closing a flow (with `closeFlow`, by resetting the engine, or by replacing its name) **finishes**
 it. If you are still holding one, it is inert: advancing reports the end, and `goto` refuses to move
 it. This is deliberate, so a reference you forgot to drop cannot quietly keep running scene entry
 effects and moving shared state behind your back.

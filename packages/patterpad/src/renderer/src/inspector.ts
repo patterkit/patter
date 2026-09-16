@@ -102,7 +102,7 @@ function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown,
   } else {
     const input = el("input", "insp-gd-input") as HTMLInputElement;
     input.type = f.type === "number" ? "number" : "text";
-    input.placeholder = `<${defHint ? `default: ${defHint}` : f.type}>`;
+    input.placeholder = defHint ? `Default is ${defHint}` : f.type === "number" ? "Number" : "Text";
     input.value = current == null ? "" : String(current);
     if (!id) input.disabled = true;
     // Commit on change (blur / Enter), not per keystroke - so the inspector re-render doesn't steal focus.
@@ -204,18 +204,18 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
     const wrap = el("div", "insp-status");
     const chip = el("span", "insp-rec-chip", status);
     chip.style.background = statusTint(slotOf(status));
-    chip.dataset.tip = "derived from audio folders";
+    chip.dataset.tip = "Derived from audio folders";
     wrap.append(chip);
     // Stale scratch take (#224): the WAV's stamped text-hash no longer matches the line (it was edited).
     if (derived && h.scratchStale(id)) {
       const warn = el("span", "insp-rec-stale", "⚠ out of date");
-      warn.dataset.tip = "this scratch take was recorded against an earlier version of the line";
+      warn.dataset.tip = "This scratch take was recorded against an earlier version of the line.";
       wrap.append(warn);
     }
     // A play button only when a file actually resolved (not for an implicitly-missing line).
     if (derived) {
       const play = el("button", "insp-rec-play") as HTMLButtonElement;
-      play.type = "button"; play.textContent = "▶"; play.dataset.tip = "play audio";
+      play.type = "button"; play.textContent = "▶"; play.dataset.tip = "Play audio";
       play.setAttribute("aria-label", "play audio");
       play.addEventListener("click", () => h.playRecording(id, play));
       wrap.append(play);
@@ -229,7 +229,7 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
       const scrIdx = order.indexOf(scratch);
       if (curIdx >= 0 && scrIdx >= 0 && curIdx <= scrIdx) {
         const rec = el("button", "insp-rec-record") as HTMLButtonElement;
-        rec.type = "button"; rec.textContent = "● Record"; rec.dataset.tip = "record a scratch take";
+        rec.type = "button"; rec.textContent = "● Record"; rec.dataset.tip = "Record a scratch take";
         rec.addEventListener("click", () => h.recordScratch(id));
         wrap.append(rec);
       }
@@ -268,7 +268,7 @@ function rerecordRow(id: string | null, h: InspectorHandlers): HTMLElement | nul
   if (on) {
     const pill = el("span", "insp-rec-chip", "re-record");
     pill.style.background = statusTint(RERECORD_STATUS_DECL.colour);
-    pill.dataset.tip = "this line is flagged for a retake";
+    pill.dataset.tip = "This line is flagged for a retake.";
     wrap.append(pill);
   }
   r.append(wrap);
@@ -300,7 +300,7 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
       chip.style.setProperty("--tag-c", `var(--char-${colourIndex(t)})`);
       chip.append(el("span", "insp-tag-text", t));
       const x = el("button", "insp-tag-x", icon.close);
-      x.type = "button"; x.dataset.tip = "remove tag"; x.setAttribute("aria-label", `remove tag ${t}`);
+      x.type = "button"; x.dataset.tip = "Remove tag"; x.setAttribute("aria-label", `Remove tag ${t}`);
       x.addEventListener("click", () => { current.splice(i, 1); repaint(); commit(); input.focus(); });
       chip.append(x);
       box.insertBefore(chip, input);
@@ -351,7 +351,7 @@ function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit",
   if (!mine.length) btn.textContent = "+ add";
   else if (h.textMode()) { const p = mine.slice(0, 2).map(effectText).join(" · "); btn.textContent = mine.length > 2 ? `${p} · +${mine.length - 2}` : p; }
   else btn.append(h.effectsPreview(mine)); // pills (inert → click opens editor)
-  if (id) { btn.dataset.tip = `edit ${label.toLowerCase()} effects`; btn.setAttribute("aria-label", `edit ${label.toLowerCase()} effects`); btn.addEventListener("click", () => h.editEffects(id, onEnter, onExit, btn, phase)); }
+  if (id) { btn.dataset.tip = `Edit ${label.toLowerCase()} effects`; btn.setAttribute("aria-label", `Edit ${label.toLowerCase()} effects`); btn.addEventListener("click", () => h.editEffects(id, onEnter, onExit, btn, phase)); }
   else btn.disabled = true;
   r.append(btn);
   return r;
@@ -368,7 +368,7 @@ function condRow(id: string | null, src: string | undefined, h: InspectorHandler
   if (!src) btn.textContent = "+ add condition";
   else if (h.textMode()) btn.textContent = `if ${src}`;
   else { btn.append(el("span", "insp-if", "if "), h.condPreview(src)); } // pills (inert → click opens editor)
-  if (id) { btn.dataset.tip = "edit condition"; btn.setAttribute("aria-label", "edit condition"); btn.addEventListener("click", () => h.editCondition(id, src ?? "", btn)); }
+  if (id) { btn.dataset.tip = "Edit condition"; btn.setAttribute("aria-label", "Edit condition"); btn.addEventListener("click", () => h.editCondition(id, src ?? "", btn)); }
   else btn.disabled = true;
   r.append(btn);
   return r;
@@ -409,7 +409,7 @@ function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHand
   const btn = el("button", `insp-cond${jump ? "" : " muted"}`);
   btn.type = "button";
   btn.textContent = jump ? `${jump.mode === "call" ? "⤳" : "↪"} ${h.jumpLabel(jump.to)}` : "+ set jump";
-  if (id) { btn.dataset.tip = "set jump target"; btn.setAttribute("aria-label", "set jump target"); btn.addEventListener("click", () => h.editJump(id, jump?.to ?? "", btn)); }
+  if (id) { btn.dataset.tip = "Set jump target"; btn.setAttribute("aria-label", "Set jump target"); btn.addEventListener("click", () => h.editJump(id, jump?.to ?? "", btn)); }
   else btn.disabled = true;
   const val = el("div", "insp-jumpval");
   val.append(btn);
@@ -425,7 +425,7 @@ function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHand
       if (mode !== m) b.addEventListener("click", () => h.setJumpMode(id, m));
       return b;
     };
-    seg.append(opt("jump", "↪ jump", "one-way jump"), opt("call", "⤳ call", "jump and return here"));
+    seg.append(opt("jump", "↪ jump", "One-way jump"), opt("call", "⤳ call", "Jump and return here"));
     val.append(seg);
   }
   r.append(val);
@@ -535,7 +535,7 @@ function addressRow(id: string | null, gameId: string | undefined, address: stri
   btn.type = "button";
   btn.textContent = address || "—";
   if (id) {
-    btn.dataset.tip = gameId ? "edit the Game ID" : "auto from name; click to pin a fixed Game ID"; btn.setAttribute("aria-label", gameId ? "edit the Game ID" : "auto from name; click to pin a fixed Game ID");
+    btn.dataset.tip = gameId ? "Edit the Game ID" : "Derived from the name. Click to pin a fixed Game ID."; btn.setAttribute("aria-label", gameId ? "Edit the Game ID" : "Derived from the name. Click to pin a fixed Game ID.");
     btn.addEventListener("click", () => edit(id, gameId ?? "", address, btn));
   } else btn.disabled = true;
   r.append(btn);
@@ -549,7 +549,7 @@ function scenePropsRow(h: InspectorHandlers): HTMLElement {
   r.append(el("span", "insp-key", "Properties"));
   const n = h.sceneProps().length;
   const btn = el("button", `insp-cond${n ? "" : " muted"}`);
-  btn.type = "button"; btn.dataset.tip = "scene-local @scene properties"; btn.setAttribute("aria-label", "scene-local @scene properties");
+  btn.type = "button"; btn.dataset.tip = "Scene-local @scene properties"; btn.setAttribute("aria-label", "Scene-local @scene properties");
   btn.textContent = n ? `${n} scene ${n === 1 ? "property" : "properties"}, edit` : "+ add scene properties";
   btn.addEventListener("click", () => h.editSceneProps());
   r.append(btn);

@@ -23,7 +23,7 @@ export function mountLanguages(host: HTMLElement, initial: LanguagesValue): Lang
     radio.addEventListener("change", () => { if (radio.checked) { def = code; } });
     mark.append(radio, el("span", undefined, "Default"));
     const name = el("span", "gd-name lang-code", code);
-    const del = iconBtn("✕", "remove language", () => {
+    const del = iconBtn("✕", "Remove language", () => {
       const i = codes.indexOf(code); if (i < 0) return;
       codes.splice(i, 1);
       if (def === code) def = codes[0] ?? ""; // default went away -> first remaining becomes the source
@@ -42,7 +42,7 @@ export function mountLanguages(host: HTMLElement, initial: LanguagesValue): Lang
 
     const add = el("div", "lang-add");
     const input = el("input", "gd-input") as HTMLInputElement;
-    input.type = "text"; input.placeholder = "<add a language, e.g. fr or pt-BR>"; input.spellcheck = false;
+    input.type = "text"; input.placeholder = "Language code, e.g. pt-BR"; input.spellcheck = false;
     const commit = (): void => {
       const v = input.value.trim();
       input.value = "";

@@ -1,6 +1,6 @@
 ---
 title: Godot
-description: Play a Patter bundle in Godot with the native GDScript Patterplay addon, drop it into addons/, load a .patterc, build an engine, walk the flow, and watch live state with an in-game inspector panel.
+description: Play a Patter bundle in Godot with the native GDScript addon, and watch live state in an in-game inspector panel.
 sidebar:
   label: Godot
 ---
@@ -52,7 +52,7 @@ to hear it, or leave it unset to play silently.
 
 ## Your game's state
 
-Hand the engine your `@world` values through the **`host_scopes`** option: a `get` / `set` pair of
+Hand the engine your `@world` values through the **`host_scopes`** option, a `get` / `set` pair of
 Callables per token, keyed by property name, that the story reads before every condition and writes
 through on an effect. Bind the same store to anything else that shares those values:
 
@@ -65,11 +65,11 @@ var engine := PatterEngine.new(bundle, {"host_scopes": {"world": {
 ```
 
 Leave `host_scopes` out and the engine **self-backs** `@world` from the declared defaults. A property
-declared `writable: false` in the project is the *story's* promise: the engine refuses the story's
+declared `writable: false` in the project is the *story's* promise, so the engine refuses the story's
 write with a `push_error` (`'@world.x' is read-only`) and no write, bound or self-backed. Your own
-`set_property` is not refused: the value is the game's. A per-name policy of your own is yours to
-refuse from `set`. The store is never in a Patter save: your
-game saves it once. → [World Properties](/play/world-properties/)
+`set_property` isn't refused, because the value is the game's. A per-name policy of your own is yours to
+refuse from `set`. The store is never in a Patter save, so your
+game saves it once. [World Properties](/play/world-properties/) has the full picture.
 
 ## Send the story somewhere
 
@@ -119,7 +119,7 @@ link.flow_opened("main")
 link.observe("main", flow.current_scene(), step.get("id", ""), step["type"])
 ```
 
-→ [Live refresh & debug](/play/live-debug/)
+The protocol and the editor side are on [Live refresh & debug](/play/live-debug/).
 
 ## Save and load
 
@@ -128,13 +128,13 @@ run: every flow's position, the shared `@patter` / `@scene` state, visit counts,
 generator, as a tagged JSON envelope. It is the **same `patter/save@0` format every Patterplay runtime
 uses**, so a save written by a web build or by Patterpad loads here, and a save written here loads in
 Unity or Unreal. Saves written by this addon before 0.11.0 (its old snake_case shape) still load, and
-are written back in the shared shape on the next save.
-→ [Save/load & Game Data](/play/integration/)
+are written back in the shared shape on the next save. [Save/load & Game Data](/play/integration/)
+covers the format.
 
 ## Exporting your game
 
 **Nothing to configure.** From Patterplay 0.4.5 the plugin puts your `.patterc` into the export
-itself, so an exported build has its story on every platform - desktop, mobile and web. Export as
+itself, so an exported build has its story on every platform (desktop, mobile, and web). Export as
 you would any Godot project.
 
 That is worth stating plainly because it used to be a trap. Godot packs the files it recognises as
@@ -145,8 +145,8 @@ covers you if the plugin is ever disabled.
 
 **Other loose files are still yours to handle.** The plugin knows about bundles and nothing else,
 so if you use [Audio Folders](/play/audio/) add **`patteraudio.json`** under **Project ▸ Export...
-▸ your preset ▸ Resources ▸ "Filters to export non-resource files/folders"** - the audio files
-themselves are imported resources and export fine, the manifest is plain JSON and is not. The same
+▸ your preset ▸ Resources ▸ "Filters to export non-resource files/folders"**, since the audio files
+themselves are imported resources and export fine, while the manifest is plain JSON and isn't. The same
 goes for any other data file you read at runtime, like a `*.json` save template.
 
 To sanity-check a build before you ship it, in the EXPORTED game rather than the editor:
@@ -157,7 +157,7 @@ print(FileAccess.file_exists("res://story.patterc"))   # must print true
 
 ## Next
 
-- The shared model: [The play loop](/play/concepts/).
-- Driving the story from the game: [Host navigation](/play/navigation/).
-- Reading Game Data/tags, host events, localisation: [Save/load & Game Data](/play/integration/).
-- Why it matches the other engines exactly: [Compatibility & conformance](/compatibility/).
+- [The play loop](/play/concepts/) is the shared model.
+- [Host navigation](/play/navigation/) drives the story from the game.
+- [Save/load & Game Data](/play/integration/) covers Game Data, tags, host events, and localisation.
+- [Compatibility & conformance](/compatibility/) explains why it matches the other engines exactly.

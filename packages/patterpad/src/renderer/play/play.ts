@@ -89,7 +89,7 @@ function reflectCaptions(on: boolean): void {
   captionsOn = on;
   ccEl.setAttribute("aria-pressed", String(on));
   ccEl.classList.toggle("off", !on);
-  ccEl.title = on ? "Closed captions on: non-spoken cues shown. Click to hide them." : "Closed captions off: non-spoken cues hidden. Click to show them.";
+  ccEl.title = on ? "Closed captions are on. Click to hide non-spoken cues." : "Closed captions are off. Click to show non-spoken cues.";
 }
 ccEl.addEventListener("click", () => { reflectCaptions(!captionsOn); void play.setClosedCaptions(captionsOn); });
 
@@ -397,8 +397,8 @@ function reflectFollow(): void {
   followEl.classList.toggle("on", following);
   followEl.setAttribute("aria-pressed", String(following));
   const label = following
-    ? "Following: the editor reveals each line as it plays. Click to stop."
-    : "Follow in the editor: reveal each line in the editor as it plays";
+    ? "The editor reveals each line as it plays. Click to stop."
+    : "Reveal each line in the editor as it plays";
   followEl.dataset["tip"] = label;
 }
 followEl.addEventListener("click", () => { following = !following; reflectFollow(); play.setFollow(following); });

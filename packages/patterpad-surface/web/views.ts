@@ -57,7 +57,7 @@ export function openSceneMenu(view: View, at: { x: number; y: number }, sceneId:
 
 /** The quiet ⋯ control (Slack / Docs style) that opens the structural action menu. */
 function menuButton(view: View, getPos: GetPos): HTMLButtonElement {
-  const b = document.createElement("button"); b.className = "menu-dots"; b.textContent = "⋯"; b.dataset.tip = "actions"; b.setAttribute("aria-label", "actions"); b.contentEditable = "false";
+  const b = document.createElement("button"); b.className = "menu-dots"; b.textContent = "⋯"; b.dataset.tip = "Actions"; b.setAttribute("aria-label", "Actions"); b.contentEditable = "false";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, b); });
   return b;
 }
@@ -110,7 +110,7 @@ function wireBeatMenu(el: HTMLElement, view: View, getPos: GetPos): void {
 function ghostSnippet(
   view: View, getPos: GetPos,
   seed: (state: View["state"], pos: number) => import("prosemirror-state").Transaction | null = seedSnippet,
-  title = "add a snippet",
+  title = "Add a snippet",
 ): HTMLElement {
   const g = document.createElement("div"); g.className = "ghost-snippet"; g.contentEditable = "false"; g.dataset.tip = title;
   const plus = document.createElement("span"); plus.className = "ghost-plus"; plus.textContent = "+";
@@ -124,7 +124,7 @@ function ghostSnippet(
 function addAfterButton(view: View, getPos: GetPos): HTMLButtonElement {
   // No "+" text glyph: the cross is drawn with CSS pseudo-bars (.bubble-after::before/::after)
   // so it is GEOMETRICALLY centred, not subject to a font's math-axis offset.
-  const b = document.createElement("button"); b.className = "snippet-ctl add-after"; b.dataset.tip = "follow with"; b.setAttribute("aria-label", "follow with"); b.contentEditable = "false";
+  const b = document.createElement("button"); b.className = "snippet-ctl add-after"; b.dataset.tip = "Follow with"; b.setAttribute("aria-label", "Follow with"); b.contentEditable = "false";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, b, "add"); });
   return b;
 }
@@ -329,13 +329,13 @@ export const snippetView: NodeViewConstructor = (node, view, getPos) => {
   const jump = document.createElement("div"); jump.className = "bubble-jump"; jump.contentEditable = "false"; // read-only jump chip
   // An un-entered (beat-less) bubble - a branch's else leaf, or a jump-only bubble - shows a
   // generic click-to-add ghost; the click injects a type-following line above any jump (§9).
-  const ghost = ghostSnippet(view, getPos, seedBeatInSnippet, "add a line"); ghost.classList.add("bubble-ghost");
+  const ghost = ghostSnippet(view, getPos, seedBeatInSnippet, "Add a line"); ghost.classList.add("bubble-ghost");
   // A bubble that OPENS with a game event (an option body of "game event + jump", say) has no text to
   // click into above the atom, so a slim hover-revealed "+" strip sits on its top edge and injects a
   // type-following line there (insertLineBefore) - the mouse's way to what typing over the selected
   // atom does (2026-09-03). Shown only while the first beat is an atom (CSS, .atom-first).
   const above = document.createElement("div"); above.className = "bubble-above"; above.contentEditable = "false";
-  above.dataset.tip = "add a line above"; above.setAttribute("aria-label", "add a line above");
+  above.dataset.tip = "Add a line above"; above.setAttribute("aria-label", "Add a line above");
   const abovePlus = document.createElement("span"); abovePlus.className = "ghost-plus"; abovePlus.textContent = "+"; above.appendChild(abovePlus);
   above.addEventListener("mousedown", (e) => {
     e.preventDefault(); e.stopPropagation();
@@ -372,7 +372,7 @@ export const snippetView: NodeViewConstructor = (node, view, getPos) => {
       const d = JSON.parse(raw) as { to?: string; mode?: string };
       jumpTo = String(d.to ?? "");
       jump.textContent = `${d.mode === "call" ? "⤳" : "↪"} ${resolveJumpLabel(jumpTo)}`;
-      jump.dataset.tip = jumpTo && jumpTo !== "END" ? "double-click to go to target" : "";
+      jump.dataset.tip = jumpTo && jumpTo !== "END" ? "Double-click to go to the target" : "";
     } else { jumpTo = ""; jump.textContent = ""; jump.dataset.tip = ""; }
   };
   // Double-click the jump chip -> follow the divert to its target (the host switches scene if needed).
@@ -467,7 +467,7 @@ export const groupView: NodeViewConstructor = (node, view, getPos) => {
 
 /** Add an option AFTER this one (groups §8) - centred in the gap below each option (CSS). */
 function addOptionButton(view: View, getPos: GetPos): HTMLButtonElement {
-  const b = document.createElement("button"); b.className = "group-ctl add-option"; b.textContent = "+ option"; b.dataset.tip = "add a choice option";
+  const b = document.createElement("button"); b.className = "group-ctl add-option"; b.textContent = "+ option"; b.dataset.tip = "Add a choice option";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); const pos = getPos(); if (pos == null) return; const tr = insertOptionAfter(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return b;
 }
@@ -484,7 +484,7 @@ export const rawnodeView: NodeViewConstructor = (node) => {
 
 /** New block after this one (the outline-level create, groups §3). */
 function addBlockButton(view: View, getPos: GetPos): HTMLButtonElement {
-  const b = document.createElement("button"); b.className = "block-ctl add"; b.textContent = "+ block"; b.dataset.tip = "new block after this one";
+  const b = document.createElement("button"); b.className = "block-ctl add"; b.textContent = "+ block"; b.dataset.tip = "New block after this one";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); const pos = getPos(); if (pos == null) return; const tr = insertBlock(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return b;
 }
@@ -498,10 +498,10 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "block";
   const head = document.createElement("div"); head.className = "block-head"; head.contentEditable = "false";
   const drag = makeDragHandle(view, getPos); drag.classList.add("block-drag"); // to the LEFT of the title
-  const name = document.createElement("input"); name.className = "block-name"; name.spellcheck = false; name.placeholder = "<section name>";
+  const name = document.createElement("input"); name.className = "block-name"; name.spellcheck = false; name.placeholder = "Section name";
   // The quiet ⋯ control (matching snippets / groups) opens the block's note menu - Note…, status, and
   // Delete block - so the action is discoverable, not buried behind a right-click only.
-  const dots = document.createElement("button"); dots.className = "menu-dots block-dots"; dots.textContent = "⋯"; dots.dataset.tip = "actions"; dots.setAttribute("aria-label", "actions"); dots.contentEditable = "false";
+  const dots = document.createElement("button"); dots.className = "menu-dots block-dots"; dots.textContent = "⋯"; dots.dataset.tip = "Actions"; dots.setAttribute("aria-label", "Actions"); dots.contentEditable = "false";
   dots.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, dots, "note"); });
   head.append(drag, name, dots);
   wireNoteMenu(head, view, getPos); // right-click the block heading -> "Note…" (#148)

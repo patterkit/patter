@@ -1,6 +1,6 @@
 ---
 title: Tags at runtime
-description: "Read author tags off each step at runtime: accumulated down the structure, delivered on step.tags, with engine accessors for a beat, scene, or block."
+description: Read author tags off each step at runtime, accumulated down the structure, with accessors for a beat, scene, or block.
 sidebar:
   label: Tags
 ---

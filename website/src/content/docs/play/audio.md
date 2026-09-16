@@ -1,16 +1,16 @@
 ---
 title: Audio
-description: Patter doesn't play audio or dictate your pipeline - it gives every line a stable id you tie voice-over to, however your engine and audio tooling work. Patterpad also ships an optional Audio Folders + resolver convenience (a build-time patteraudio.json manifest that maps a beat id to its winning take) for teams who want batteries included.
+description: Tie voice-over to the stable id every line carries, and use the optional Audio Folders resolver if you want it.
 sidebar:
   label: Audio
 ---
 
-**Patter doesn't play audio, and it doesn't impose an audio pipeline** - your engine and your
+**Patter doesn't play audio, and it doesn't impose an audio pipeline.** Your engine and your
 audio tooling own that (Wwise, FMOD, engine-native, whatever you already use). What Patter gives
 you is the hook every pipeline needs: **a stable [id](/format/gamedata-and-addressing/#the-two-ids)
 on every line** (the same id that keys [translations](/production/localisation/)). Tie your
-voice-over to that id however suits your project - an addressable, a middleware event, a filename,
-a lookup table - and play it your way.
+voice-over to that id however suits your project (an addressable, a middleware event, a filename,
+a lookup table) and play it your way.
 
 That id is all most teams need; the runtime hands it to you on every step:
 
@@ -19,9 +19,9 @@ const step = flow.advance();
 if (step.type === "line") myAudioSystem.playFor(step.id);   // your pipeline, keyed on the id
 ```
 
-If you'd rather not wire up your own asset lookup, Patterpad ships an **optional** batteries-included
-path on top of the id, described below. It's a convenience for teams who want it, not a requirement -
-you can ignore everything past here and just key off the id.
+If you'd rather not wire up your own asset lookup, Patterpad ships an **optional** ready-made
+path on top of the id, described below. It's a convenience for teams who want it rather than a
+requirement, and you can ignore everything past here and just key off the id.
 
 ## The built-in resolver (optional)
 
@@ -74,7 +74,7 @@ var audio = new PatterAudioResolver(json, Path.Combine(Application.streamingAsse
 string path = audio.Resolve(step.Id);                      // full path, or null
 ```
 
-**Unreal** (C++ / Blueprint): `UPatterAudio` is BlueprintCallable, so this can be graph-only:
+**Unreal** (C++ / Blueprint). `UPatterAudio` is BlueprintCallable, so this can be graph-only:
 
 ```cpp
 UPatterAudio* Audio = UPatterAudio::Load(ManifestJson, TEXT("Audio"));

@@ -70,10 +70,10 @@ export function tagChips(holder: { values?: string[] }, onChange?: () => void): 
   // One PERSISTENT input (never rebuilt), so focus stays in the field after each commit - you can type a
   // run of values without clicking back in. Chips are inserted before the input as they're committed.
   const input = el("input", "gd-tag-input") as HTMLInputElement;
-  input.type = "text"; input.placeholder = "<add value>"; input.spellcheck = false;
+  input.type = "text"; input.placeholder = "Add value"; input.spellcheck = false;
   const makeChip = (v: string): HTMLElement => {
     const chip = el("span", "gd-tag", v);
-    const x = el("button", "gd-tag-x", "✕"); x.type = "button"; x.dataset.tip = `remove ${v}`; x.setAttribute("aria-label", `remove ${v}`);
+    const x = el("button", "gd-tag-x", "✕"); x.type = "button"; x.dataset.tip = `Remove ${v}`; x.setAttribute("aria-label", `Remove ${v}`);
     x.addEventListener("click", () => { holder.values = (holder.values ?? []).filter((o) => o !== v); chip.remove(); onChange?.(); });
     chip.append(x);
     return chip;
@@ -96,19 +96,19 @@ export function tagChips(holder: { values?: string[] }, onChange?: () => void): 
 export function stageChips(holder: { stages?: string[] }, onChange?: () => void): HTMLElement {
   const wrap = el("div", "gd-tags");
   const input = el("input", "gd-tag-input") as HTMLInputElement;
-  input.type = "text"; input.placeholder = "<add stage>"; input.spellcheck = false;
+  input.type = "text"; input.placeholder = "Add stage"; input.spellcheck = false;
   const rebuild = (): void => {
     for (const c of Array.from(wrap.children)) if (c !== input) c.remove();
     const stages = holder.stages ?? [];
     stages.forEach((v, i) => {
       const chip = el("span", "gd-tag", `${i + 1}. ${v}`);
-      const left = el("button", "gd-tag-x", "‹"); left.type = "button"; left.dataset.tip = "earlier"; left.setAttribute("aria-label", `move ${v} earlier`);
+      const left = el("button", "gd-tag-x", "‹"); left.type = "button"; left.dataset.tip = "Earlier"; left.setAttribute("aria-label", `Move ${v} earlier`);
       left.disabled = i === 0;
       left.addEventListener("click", () => { [stages[i - 1], stages[i]] = [stages[i]!, stages[i - 1]!]; rebuild(); onChange?.(); });
-      const right = el("button", "gd-tag-x", "›"); right.type = "button"; right.dataset.tip = "later"; right.setAttribute("aria-label", `move ${v} later`);
+      const right = el("button", "gd-tag-x", "›"); right.type = "button"; right.dataset.tip = "Later"; right.setAttribute("aria-label", `Move ${v} later`);
       right.disabled = i === stages.length - 1;
       right.addEventListener("click", () => { [stages[i], stages[i + 1]] = [stages[i + 1]!, stages[i]!]; rebuild(); onChange?.(); });
-      const x = el("button", "gd-tag-x", "✕"); x.type = "button"; x.dataset.tip = `remove ${v}`; x.setAttribute("aria-label", `remove ${v}`);
+      const x = el("button", "gd-tag-x", "✕"); x.type = "button"; x.dataset.tip = `Remove ${v}`; x.setAttribute("aria-label", `Remove ${v}`);
       x.addEventListener("click", () => { holder.stages = (holder.stages ?? []).filter((o) => o !== v); rebuild(); onChange?.(); });
       chip.append(left, right, x);
       wrap.insertBefore(chip, input);

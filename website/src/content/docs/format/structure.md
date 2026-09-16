@@ -1,19 +1,19 @@
 ---
 title: Scenes, blocks & beats
-description: The Patter narrative tree (scenes, blocks, groups, snippets, beats) and how jumps route between them.
+description: Learn the Patter narrative tree, from scenes down to beats, and how jumps route between them.
 sidebar:
   label: Scenes, blocks & beats
 ---
 
-Patter's structure is a tree: **Scene → Block → Group → Snippet → Beat**. One rule
+Patter's structure is a tree of **Scene → Block → Group → Snippet → Beat**. One rule
 runs through all of it: *a container picks among its children, and each child decides
 whether it's eligible.* So the things you can **select** (groups, snippets) can carry
 a condition; the things you **address** (scenes, blocks) cannot.
 
-There's a second idea worth holding onto: the tree works at **two levels**.
+There's a second idea worth holding onto, which is that the tree works at **two levels**.
 
 - **Selection** is the walk down the tree that decides the next beat.
-- **Delivery** is what your game sees: a flat stream of beats, pulled one at a time
+- **Delivery** is what your game sees, a flat stream of beats, pulled one at a time
   until a choice or the end. The host never sees a snippet or a block; it just pulls
   beats.
 
@@ -85,7 +85,7 @@ plays as a whole, so you can't land partway into one).
 
 There are two kinds:
 
-- **jump** (the default): one-way. It heads where it says and **drops any pending
+- **jump** (the default). One-way. It heads where it says and **drops any pending
   returns**.
 - **call**: head there and *come back*. It remembers where it was, runs the target, and
   returns to the next child in the calling block when the target finishes (Ink calls

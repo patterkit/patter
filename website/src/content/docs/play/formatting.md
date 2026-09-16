@@ -1,6 +1,6 @@
 ---
 title: Formatting markup
-description: "How a Patterplay runtime hands you bold/italic: a fixed, flat, closed tag vocabulary you map to your engine's rich text. No entity encoding; rendering is the host's job."
+description: Map the fixed, flat tag vocabulary a Patterplay runtime hands you for bold and italic onto your engine's rich text.
 sidebar:
   label: Formatting markup
 ---
@@ -31,5 +31,5 @@ If formatting is **off** for the project, lines are plain text with no tags at a
 [the writing surface](/patterpad/writing-surface/) for how a writer applies bold and italic.
 
 Each runtime's bundled tour demo shows its engine's mapping in working code: HTML tags on the
-web, IMGUI rich text in Unity, an `SRichTextBlock` style set in Unreal, BBCode in Godot - and
+web, IMGUI rich text in Unity, an `SRichTextBlock` style set in Unreal, BBCode in Godot, and
 all four strip the tags where a widget (a choice button) renders plain text.

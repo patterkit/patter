@@ -28,9 +28,9 @@
       <section id="props-doc" class="propsdoc" hidden>
         <div class="propsdoc-card">
           <h1 class="propsdoc-title">Properties</h1>
-          <p class="propsdoc-sub">The story's own memory: <code>@patter</code> properties your conditions and effects read and write. Edits save as they settle.</p>
+          <p class="propsdoc-sub">The <code>@patter</code> properties your conditions and effects read and write. Edits save as they settle.</p>
           <div id="props-doc-host"></div>
-          <p class="propsdoc-foot">Values your <em>game</em> owns and the story only reads live in <button id="props-doc-world" class="propsdoc-link" type="button">Project Settings ▸ World Properties</button>.</p>
+          <p class="propsdoc-foot">Values your <em>game</em> owns and the story only reads live in <button id="props-doc-world" class="propsdoc-link" type="button">Project Settings ▸ World properties</button>.</p>
         </div>
       </section>
       <aside id="inspector" class="inspector" aria-label="inspector">
@@ -45,7 +45,7 @@
 
     <!-- Writing View exit affordance (shown only in Writing View via CSS). Mirrored from index.html so the
          renderer's top-level binding doesn't throw and abort boot. -->
-    <button id="writing-exit" class="writing-exit" type="button">Exit Writing View</button>
+    <button id="writing-exit" class="writing-exit" type="button">Exit writing view</button>
 
     <!-- Hosts only: the shell's renderStepperBar fills them. Mirrors renderer/index.html. -->
     <div id="problembar" class="stepbar" aria-label="problems" hidden></div>
@@ -103,7 +103,7 @@
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">New project</h2>
         <p class="identity-sub">Name your story. Next, you'll choose where to keep it.</p>
-        <label class="identity-field">Project name<input id="create-name" type="text" placeholder="<e.g. The Tavern>" required /><small class="identity-hint">You'll get a scene called <code>Start</code> with one line of narration in it, so the project plays the moment it opens. Replace that line with your own writing.</small></label>
+        <label class="identity-field">Project name<input id="create-name" type="text" placeholder="The Tavern" required /><small class="identity-hint">The project opens with a scene called <code>Start</code> and one line of narration in it. Replace that line with your own writing.</small></label>
         <label class="identity-field">Version control<select id="create-vcs" class="insp-select">
           <option value="git">Git</option>
           <option value="perforce">Perforce</option>
@@ -111,7 +111,7 @@
           <option value="svn">Subversion (SVN)</option>
           <option value="none" selected>None</option>
         </select></label>
-        <label class="identity-field">Publish output<input id="create-build" type="text" spellcheck="false" placeholder="../patter-dist/your-project.patterc" /><small class="identity-hint">Where “Publish Bundle” writes the compiled <code>.patterc</code>: by default a sibling <code>patter-dist/</code> folder (the project is a package, so builds go beside it, not inside). Editable later in Project Settings.</small></label>
+        <label class="identity-field">Publish output<input id="create-build" type="text" spellcheck="false" placeholder="../patter-dist/your-project.patterc" /><small class="identity-hint">Where Publish ▸ Publish Bundle writes the <code>.patterc</code>. The default is a sibling <code>patter-dist/</code> folder.</small></label>
         <p class="create-preview">Saved as <code id="create-preview-name">your-project.patter</code></p>
         <div class="identity-actions">
           <button type="button" id="create-cancel" class="btn ghost" value="cancel">Cancel</button>
@@ -128,16 +128,16 @@
             <div class="settings-group">Project</div>
             <button type="button" class="settings-tab active" data-tab="general">General</button>
             <button type="button" class="settings-tab" data-tab="build">Publish</button>
-            <button type="button" class="settings-tab" data-tab="vcs">Version Control</button>
+            <button type="button" class="settings-tab" data-tab="vcs">Version control</button>
             <div class="settings-group">Story data</div>
-            <button type="button" class="settings-tab" data-tab="world">World Properties</button>
-            <button type="button" class="settings-tab" data-tab="gamedata">Game Data</button>
+            <button type="button" class="settings-tab" data-tab="world">World properties</button>
+            <button type="button" class="settings-tab" data-tab="gamedata">Game data</button>
             <button type="button" class="settings-tab" data-tab="cast">Cast</button>
             <div class="settings-group">Writing &amp; audio</div>
-            <button type="button" class="settings-tab" data-tab="writing-status">Writing Status</button>
+            <button type="button" class="settings-tab" data-tab="writing-status">Writing status</button>
             <button type="button" class="settings-tab" data-tab="estimating">Estimating</button>
-            <button type="button" class="settings-tab" data-tab="recording-status">Audio Status</button>
-            <button type="button" class="settings-tab" data-tab="captions">Closed Captions</button>
+            <button type="button" class="settings-tab" data-tab="recording-status">Audio status</button>
+            <button type="button" class="settings-tab" data-tab="captions">Closed captions</button>
             <button type="button" class="settings-tab" data-tab="dictionary">Dictionary</button>
             <div class="settings-group">Localisation</div>
             <button type="button" class="settings-tab" data-tab="language">Language</button>
@@ -145,14 +145,14 @@
           <div class="settings-panels">
             <section class="settings-panel" data-panel="general">
               <label class="identity-field">Project name<input id="set-name" type="text" required /></label>
-              <label class="identity-field">Start<select id="set-start"></select><small class="settings-fieldnote">Where the story begins: used by Play from Start and the Coverage test.</small></label>
-              <label class="settings-toggle"><input id="set-voiced" type="checkbox" /><span>Voiced<small>This story is voiced, so Patterpad tracks recording status and can export voice scripts.</small></span></label>
-              <label class="settings-toggle"><input id="set-formatting" type="checkbox" /><span>Inline formatting<small>Authors can bold / italicise dialogue and narration (stored as tags in the strings).</small></span></label>
-              <label class="settings-toggle"><input id="set-autosave" type="checkbox" /><span>Autosave<small>Save the open scene automatically every 30 seconds while you write.</small></span></label>
-              <label class="settings-toggle"><input id="set-autorebuild" type="checkbox" /><span>Auto Rebuild<small>Recompile the .patterc bundle as your edits settle, so the build on disk stays current.</small></span></label>
+              <label class="identity-field">Start<select id="set-start"></select><small class="settings-fieldnote">The scene Play from Start opens.</small></label>
+              <label class="settings-toggle"><input id="set-voiced" type="checkbox" /><span>Voiced<small>Tracks recording status and exports voice scripts.</small></span></label>
+              <label class="settings-toggle"><input id="set-formatting" type="checkbox" /><span>Inline formatting<small>Bold and italic in dialogue and narration.</small></span></label>
+              <label class="settings-toggle"><input id="set-autosave" type="checkbox" /><span>Autosave<small>Saves the open scene every 30 seconds.</small></span></label>
+              <label class="settings-toggle"><input id="set-autorebuild" type="checkbox" /><span>Auto Rebuild<small>Recompiles the .patterc bundle as your edits settle.</small></span></label>
             </section>
             <section class="settings-panel" data-panel="language" hidden>
-              <p class="settings-note">The project's languages. The <strong>default</strong> is the source language every string is authored in; the others are localisation targets.</p>
+              <p class="settings-note">The default language is the one you write in. The others are translation targets.</p>
               <div id="set-languages"></div>
             </section>
             <section class="settings-panel" data-panel="vcs" hidden>
@@ -163,18 +163,16 @@
                 <option value="svn">Subversion (SVN)</option>
                 <option value="none">None</option>
               </select></label>
-              <p class="settings-note">Drives the lock-aware vs merge-based write path and the project's VCS config files (<code>vcs-setup.md</code>, ignore rules). Switching regenerates those config files for the new system.</p>
+              <p class="settings-note">Patterpad checks a file out before writing where the system locks files, and writes straight away where it merges. Switching systems regenerates the project's <code>vcs-setup.md</code> and ignore rules.</p>
             </section>
             <section class="settings-panel" data-panel="world" hidden>
-              <p class="settings-note">World properties: the values your game engine owns and your story reads (referenced as <code>@world</code>), plus the inputs the coverage test feeds them.</p>
               <div id="set-world"></div>
             </section>
             <section class="settings-panel" data-panel="cast" hidden>
-              <p class="settings-note">The master cast. A line's speaker must match a cast member's name.</p>
+              <p class="settings-note">A line's speaker must be one of these names.</p>
               <div id="set-cast"></div>
             </section>
             <section class="settings-panel" data-panel="estimating" hidden>
-              <p class="settings-note">Estimating replaces a still-guesswork scene's line count with a guess in the production report, so a stub scene doesn't read as nearly finished. When off, reports show pure actuals.</p>
               <div id="set-estimating"></div>
             </section>
             <section class="settings-panel" data-panel="writing-status" hidden>
@@ -184,30 +182,29 @@
               <div id="set-recording-status"></div>
             </section>
             <section class="settings-panel" data-panel="captions" hidden>
-              <p class="settings-note">Closed captions describe non-spoken sounds inside dialogue. A game can turn captions <strong>off</strong> at runtime; Patterplay then removes every cue between these delimiters (and the surrounding space) from a line: <em>“Oh dear. [sigh] What now?”</em> → <em>“Oh dear. What now?”</em>. Lines spoken by the caption character are removed entirely. Captions don't affect audio playback.</p>
+              <p class="settings-note">Closed captions describe sounds inside dialogue. A game can turn them off at runtime, and every cue between these delimiters is then removed from the line. Lines spoken by the caption character are removed entirely.</p>
               <div class="caption-delims">
                 <label class="identity-field">Caption start<input id="set-cc-open" type="text" spellcheck="false" maxlength="4" /></label>
                 <label class="identity-field">Caption end<input id="set-cc-close" type="text" spellcheck="false" maxlength="4" /></label>
-                <small class="settings-fieldnote caption-delims-note">The pair that wraps a caption cue inside a line; the default is <code>[</code> … <code>]</code>. With captions off, everything between them (and the surrounding space) is removed.</small>
-                <small id="cc-delim-warn" class="settings-fieldnote caption-delims-warn" hidden>Avoid <code>(</code> as the start: a <code>(</code> at the start of a line opens a performance direction, so a caption there won't work. Use <code>[</code> or another token.</small>
+                <small class="settings-fieldnote caption-delims-note">The default pair is <code>[</code> and <code>]</code>.</small>
+                <small id="cc-delim-warn" class="settings-fieldnote caption-delims-warn" hidden>A <code>(</code> at the start of a line opens a performance direction, so a caption there won't work. Use <code>[</code> or another token.</small>
               </div>
-              <label class="identity-field">Caption character<input id="set-cc-character" type="text" spellcheck="false" /><small class="settings-fieldnote">A cast member (default <code>SFX</code>) whose whole lines are pure captions: omitted entirely when captions are off, delimiters or not. The dialogue event still fires so its audio plays.</small></label>
+              <label class="identity-field">Caption character<input id="set-cc-character" type="text" spellcheck="false" /><small class="settings-fieldnote">A cast member whose whole lines are captions. The default is <code>SFX</code>.</small></label>
             </section>
             <section class="settings-panel" data-panel="dictionary" hidden>
               <div id="set-dictionary"></div>
             </section>
             <section class="settings-panel" data-panel="gamedata" hidden>
-              <p class="settings-note">Custom fields the host game reads off each node type. Define them here; edit each node's values in the inspector.</p>
+              <p class="settings-note">Fields your game reads from a scene, block, snippet, or line. Define them here and fill them in from the inspector.</p>
               <div id="set-gamedata"></div>
             </section>
             <section class="settings-panel" data-panel="build" hidden>
-              <p class="settings-note">Where <strong>Publish ▸ Publish Bundle</strong> writes the compiled runtime <code>.patterc</code> bundle.</p>
-              <label class="identity-field">Build output<input id="set-build" type="text" spellcheck="false" placeholder="../patter-dist/&lt;project&gt;.patterc" /><small class="identity-hint">Relative to the project root, or an absolute path. Defaults to a sibling <code>patter-dist/</code> folder (beside the package, not inside it).</small></label>
+              <label class="identity-field">Build output<input id="set-build" type="text" spellcheck="false" placeholder="../patter-dist/your-project.patterc" /><small class="identity-hint">Where Publish ▸ Publish Bundle writes the <code>.patterc</code>, relative to the project root. The default is a sibling <code>patter-dist/</code> folder.</small></label>
               <label class="identity-field">Localisation<select id="set-build-locales" class="insp-select">
-                <option value="embedded">Embedded: strings inside the .patterc</option>
-                <option value="ids">IDs only: your game localises the line IDs</option>
-              </select><small class="identity-hint"><b>Embedded</b>: every language ships in the bundle; the runtime returns the right string (switch language live). <b>IDs only</b>: the bundle ships no text, the runtime returns the line ID and your game looks it up in its own system (use Export Localisation for the language files).</small></label>
-              <label class="settings-toggle settings-suboption" id="set-build-sourcedebug-row" hidden><input id="set-build-sourcedebug" type="checkbox" /><span>Embed source language for debug<small>Adds the source strings to an IDs-only build so it can be played for debugging. The runtime flags it as not shippable.</small></span></label>
+                <option value="embedded">Embedded</option>
+                <option value="ids">IDs only</option>
+              </select><small class="identity-hint"><b>Embedded</b> ships every language in the bundle and the runtime returns the right string. <b>IDs only</b> ships no text, so the runtime returns the line ID and your game looks it up.</small></label>
+              <label class="settings-toggle settings-suboption" id="set-build-sourcedebug-row" hidden><input id="set-build-sourcedebug" type="checkbox" /><span>Embed source language for debug<small>Adds the source strings so an IDs-only build can be played. The runtime marks it as not shippable.</small></span></label>
             </section>
           </div>
         </div>
@@ -223,7 +220,7 @@
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">New scene</h2>
         <p class="identity-sub">A fresh scene file, ready to write into.</p>
-        <label class="identity-field">Scene name<input id="new-scene-name" type="text" placeholder="<e.g. The Docks>" required /></label>
+        <label class="identity-field">Scene name<input id="new-scene-name" type="text" placeholder="The Docks" required /></label>
         <div class="identity-actions">
           <button type="button" id="new-scene-cancel" class="btn ghost" value="cancel">Cancel</button>
           <button id="new-scene-confirm" class="btn primary" value="create">Create</button>
@@ -239,7 +236,7 @@
         <p class="identity-sub del-warn" id="del-scene-warn" hidden></p>
         <div class="identity-actions">
           <button type="button" id="del-scene-cancel" class="btn ghost" value="cancel">Cancel</button>
-          <button id="del-scene-confirm" class="btn danger" value="delete">Delete</button>
+          <button id="del-scene-confirm" class="btn danger" value="delete">Delete scene</button>
         </div>
       </form>
     </dialog>
@@ -247,7 +244,7 @@
     <dialog id="scene-props" class="identity settings-dialog scene-props-dialog">
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">Scene properties</h2>
-        <p class="settings-note">Scene-local <code>@scene</code> state: exists only within this scene (per-flow by default; tick Temporary to reset on every entry).</p>
+        <p class="settings-note"><code>@scene</code> properties exist only within this scene. Tick Temporary to reset one on every entry.</p>
         <div id="sp-host"></div>
         <div class="identity-actions">
           <button type="button" id="sp-cancel" class="btn ghost" value="cancel">Cancel</button>
@@ -259,7 +256,7 @@
     <dialog id="doc-notes" class="identity doc-dialog">
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">Notes</h2>
-        <p class="settings-note">Notes for whoever works on this later. Choose who each note is for: a VO note travels with the voice script, a Localisation note with the localisation handoff. Leave it untyped to keep it here in the editor.</p>
+        <p class="settings-note">A VO note travels with the voice script and a Localisation note with the localisation handoff. An untyped note stays in the editor.</p>
         <div id="doc-host" class="doc-host"></div>
         <div class="identity-actions">
           <button type="button" id="doc-close" class="btn primary" value="done">Done</button>
@@ -270,8 +267,8 @@
     <dialog id="vo-export" class="identity vo-dialog">
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">Export voice script</h2>
-        <p class="settings-note">A recording spreadsheet: one row per spoken line, with its scope and VO notes.</p>
-        <label class="settings-toggle"><input id="vo-everything" type="checkbox" /><span>Export everything<small>Include every voiced line, not just those marked ready to record.</small></span></label>
+        <p class="settings-note">One row per spoken line, with its scope and VO notes.</p>
+        <label class="settings-toggle"><input id="vo-everything" type="checkbox" /><span>Export everything<small>Includes lines not yet marked ready to record.</small></span></label>
         <p class="settings-note" id="vo-status"></p>
         <div class="identity-actions">
           <button type="button" id="vo-cancel" class="btn ghost" value="cancel">Cancel</button>
@@ -283,7 +280,7 @@
     <dialog id="loc" class="identity loc-dialog">
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">Localisation</h2>
-        <p class="settings-note">Export strings for translation, then import the translated file back. Character display names ride along.</p>
+        <p class="settings-note">Export strings for translation, then import the translated file back. Character display names are included.</p>
         <div class="loc-row">
           <label class="identity-field">Format
             <select id="loc-format" class="insp-select">
@@ -324,7 +321,7 @@
     <dialog id="set-start-prompt" class="identity">
       <form method="dialog" class="identity-form">
         <h2 class="identity-title">Where does your story start?</h2>
-        <p class="settings-note">Pick the scene the story begins at. You can change this any time in Project Settings.</p>
+        <p class="settings-note">You can change this later in Project Settings.</p>
         <label class="identity-field">Start scene<select id="start-prompt-scene"></select></label>
         <div class="identity-actions">
           <button type="submit" value="cancel" class="btn">Cancel</button>

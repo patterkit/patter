@@ -1,6 +1,6 @@
 ---
 title: Unity
-description: Play a Patter bundle in Unity with the native C# Patterplay runtime, import the UPM package, drop a .patterc in (a ScriptedImporter converts it), build an engine, walk the flow, and inspect live state in an editor window.
+description: Play a Patter bundle in Unity with the native C# runtime, from the UPM package to a live state window in the editor.
 sidebar:
   label: Unity
 ---
@@ -80,7 +80,7 @@ Drop that on a GameObject, assign the imported bundle to the **Bundle** field, a
 Render each `step` into your own dialogue UI; on a `Choice`, show `step.Options` (each has a
 `Prompt` and an `Eligible` flag) and call `flow.Choose(id)` with the player's pick.
 
-Two ready-made samples ship with the package - import them from **Package Manager ▸ Patterplay ▸
+Two ready-made samples ship with the package. Import them from **Package Manager ▸ Patterplay ▸
 Samples**. Each carries a **ready-made scene**, so there is nothing to set up: import, open the
 scene, press Play. The **Tour demo** (`Tour.unity`) plays the full interactive Patter tour as an
 OnGUI transcript with clickable choices; the minimal **Play-through demo** (`PlayThrough.unity`)
@@ -91,7 +91,7 @@ play silently.
 
 ## Your game's state
 
-Hand the engine your `@world` values through **`EngineOptions.HostScopes`**: an `IHostScope` per
+Hand the engine your `@world` values through **`EngineOptions.HostScopes`**, an `IHostScope` per
 token (`Get` / `Set`, keyed by property name) that the story reads before every condition and writes
 through on an effect. Bind the same object to anything else that shares those values:
 
@@ -108,10 +108,10 @@ var engine = Bundle.CreateEngine(new EngineOptions { HostScopes = new() { ["worl
 ```
 
 Leave `HostScopes` null and the engine **self-backs** `@world` from the declared defaults. A property
-declared `writable: false` in the project is the *story's* promise: the engine refuses the story's
-write with `'@world.x' is read-only`, bound or self-backed. Your own `SetProperty` is not refused:
-the value is the game's. A per-name policy of your own is yours to refuse from `Set`. The scope is never in a Patter save: your game saves it once.
-→ [World Properties](/play/world-properties/)
+declared `writable: false` in the project is the *story's* promise, so the engine refuses the story's
+write with `'@world.x' is read-only`, bound or self-backed. Your own `SetProperty` isn't refused, because
+the value is the game's. A per-name policy of your own is yours to refuse from `Set`. The scope is never in a Patter save, so your game saves it once.
+[World Properties](/play/world-properties/) has the full picture.
 
 ## Send the story somewhere
 
@@ -154,7 +154,7 @@ _link.Observe("main", flow.CurrentScene, step.Id, PatterDebugLink.TypeName(step.
 #endif
 ```
 
-→ [Live refresh & debug](/play/live-debug/)
+The protocol and the editor side are on [Live refresh & debug](/play/live-debug/).
 
 ## Save and load
 
@@ -163,11 +163,11 @@ flow's position, the shared state, visit counts, and the PRNG, as a tagged JSON 
 **same `patter/save@0` format every Patterplay runtime uses**, so a save written by a web build or by
 Patterpad loads here, and a save written here loads in Godot or Unreal. Saves written by this package
 before 0.11.0 (its old PascalCase shape) still load, and are written back in the shared shape on the
-next save. Persist the string wherever you keep saves. → [Save/load & Game Data](/play/integration/)
+next save. Persist the string wherever you keep saves, and see [Save/load & Game Data](/play/integration/) for the format.
 
 ## Next
 
-- The shared model: [The play loop](/play/concepts/).
-- Driving the story from the game: [Host navigation](/play/navigation/).
-- Reading Game Data/tags, host events, localisation: [Save/load & Game Data](/play/integration/).
-- Why it matches the other engines exactly: [Compatibility & conformance](/compatibility/).
+- [The play loop](/play/concepts/) is the shared model.
+- [Host navigation](/play/navigation/) drives the story from the game.
+- [Save/load & Game Data](/play/integration/) covers Game Data, tags, host events, and localisation.
+- [Compatibility & conformance](/compatibility/) explains why it matches the other engines exactly.

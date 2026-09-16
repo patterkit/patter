@@ -1,12 +1,12 @@
 ---
 title: How it fits together
-description: The Patter ecosystem at a glance, the Patterpad editor and the CLI author a project, compile it to one portable bundle, and the Patterplay runtimes play it identically on every engine.
+description: Follow a story from the Patterpad editor through one compiled bundle to the Patterplay runtime in every engine.
 sidebar:
   label: How it fits together
 ---
 
-Patter is a small family of tools around one idea: **author a story as plain files, compile
-it to one portable bundle, and play that bundle identically on any engine.** This page shows
+Patter is a small family of tools around one idea. You author a story as plain files, compile
+it to one portable bundle, and play that bundle identically on any engine. This page shows
 how the pieces connect, so the rest of the docs make sense in context.
 
 ## The dataflow
@@ -66,9 +66,9 @@ how the pieces connect, so the rest of the docs make sense in context.
 1. **Writers author in [Patterpad](/patterpad/overview/).** The project is just a folder
    of plain-text [files](/format/overview/) (scenes, strings, and their notes) that live
    in your version control alongside the rest of the game.
-2. **A build compiles the project to one `.patterc` bundle**: a single file, the only thing you
-   ship. The [`patter` CLI](/cli/) does this from the terminal (handy for automation), and
-   Patterpad's own Build menu runs the exact same compile.
+2. **A build compiles the project to one `.patterc` bundle**: It's a single file and the
+   only thing you ship. The [`patter` CLI](/cli/) does this from the terminal (handy for
+   automation), and Patterpad's own Build menu runs the exact same compile.
 3. **A [Patterplay](/play/overview/) runtime loads the bundle and plays it.** There's one
    for each engine (JavaScript, Unity, Unreal, Godot), and they all play a story the same way, so
    what your writers saw in Patterpad is what your players get.
@@ -78,27 +78,26 @@ what finally runs in your game never drift apart.
 
 ## The components
 
-| Component | Who it's for | What it is |
+| Component | Who it's for | What it's |
 |---|---|---|
-| **Patterpad** | Writers + the project lead | The desktop editor: a screenplay-style writing surface, live validation, an in-app play window, review/comments, status tracking, localisation, and all project settings. [Tour it →](/patterpad/overview/) |
-| **The Patter format** | Tooling authors + the curious | The on-disk project (text shards in your VCS) and the compiled `.patterc` bundle you ship. [Read it →](/format/overview/) |
-| **Patterplay** | Game developers | The runtime family: one native player per engine (JS, Unity, Unreal, Godot), each verified against the shared corpus. [Integrate it →](/play/overview/) |
-| **The `patter` CLI** | Developers + CI | The same operations the editor runs, from the terminal: validate, format, compile, play, report, localisation export/import. [Automate it →](/cli/) |
+| **[Patterpad](/patterpad/overview/)** | Writers and the project lead | The desktop editor, with a screenplay-style writing surface, live validation, an in-app play window, review and comments, status tracking, localisation, and all project settings. |
+| **[The Patter format](/format/overview/)** | Tooling authors and the curious | The on-disk project (text shards in your VCS) and the compiled `.patterc` bundle you ship. |
+| **[Patterplay](/play/overview/)** | Game developers | The runtime family, one native player per engine (JS, Unity, Unreal, Godot), each verified against the shared corpus. |
+| **[The `patter` CLI](/cli/)** | Developers and CI | The same operations the editor runs, from the terminal. Validate, format, compile, play, report, and export or import localisation. |
 
-Under the hood, all of these sit on one shared core (the model, the compiler, and a single
-operations layer), which is *why* they can't drift, but you never have to think about those
-internals to use Patter.
+All of these sit on one shared core (the model, the compiler, and a single operations
+layer), which is *why* they can't drift, but you never have to think about those internals
+to use Patter.
 
 ## Find your track
 
-The docs are organised by what you're trying to do:
+The docs are organised by what you're trying to do. Writers live in
+[Writing in Patterpad](/patterpad/overview/). The person who sets the project up for them
+reads [Setting up a project](/setup/overview/), which covers properties, game data, cast,
+languages, version control, and building. Whoever runs the narrative effort has
+[Running the project](/production/overview/), on tracking progress, reviewing, and handing
+work to producers, translators, and voice actors. Game developers putting the story in a game
+start at [Playing in your game](/play/overview/), which has a guide for each engine plus the
+runtime API.
 
-- **You write the story.** Live in [Writing in Patterpad](/patterpad/overview/).
-- **You set the project up for the writers.** See [Setting up a project](/setup/overview/):
-  properties, game data, cast, languages, version control, and building.
-- **You run the narrative effort.** See [Running the project](/production/overview/):
-  tracking progress, reviewing, and handing work to producers, translators, and voice actors.
-- **You put the story in a game.** See [Playing in your game](/play/overview/): a
-  quickstart for each engine plus the runtime API.
-
-Everyone shares one vocabulary: the [Core concepts](/concepts/) primer.
+Everyone shares one vocabulary, the [Core concepts](/concepts/) primer.

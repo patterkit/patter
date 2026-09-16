@@ -1,6 +1,6 @@
 ---
 title: Property types
-description: The six kinds of state a Patter story can hold - boolean, number, string, enum, flags and quality - what each is for, and how to tell the confusable pairs apart.
+description: Choose the right one of the six property types (boolean, number, string, enum, flags, quality) and tell the confusable pairs apart.
 sidebar:
   label: Property types
 ---
@@ -92,7 +92,7 @@ time. A suspicion that deepens, a negotiation that progresses, a siege that tigh
 
 ### Why not just a number?
 
-This is the most common shape a quality replaces. Suspicion as a number, gated like this:
+A number is the most common shape a quality replaces. Take suspicion as a number, gated like this:
 
 ```
 @suspicion >= 2
@@ -114,13 +114,13 @@ does not exist is an error where a wrong number never could be, and `advance()` 
 
 ### Why not just an enum?
 
-An enum can hold the same four words. What it cannot do is compare them. With an enum,
+An enum holds the same four words happily. What it can't do is compare them. With an enum,
 "at the confrontation or past it" has to be written out as
 `@investigation == "certain" or @investigation == "confronted"`, and every time you add a
 stage you must find and extend every one of those lists. A quality asks `>= "certain"`
 and keeps working.
 
-So: **enum for a state, quality for a stage.** If asking "or past it" makes sense, it is
+The rule is **enum for a state, quality for a stage.** If asking "or past it" makes sense, it is
 a quality.
 
 ### Insertion safety, and why it matters more in a voiced project

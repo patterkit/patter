@@ -1,6 +1,6 @@
 ---
 title: Coverage testing
-description: "Play your story through many times, automatically, to catch content players can never reach, choices that run dry, and branches gated on values only your game sets."
+description: Play your story through many times automatically to catch content players can never reach and choices that run dry.
 sidebar:
   label: Coverage testing
 ---

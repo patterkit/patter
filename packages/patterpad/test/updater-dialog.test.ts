@@ -37,7 +37,7 @@ describe("updater dialog download progress (#33)", () => {
 
     feedUpdaterDownloadProgress(tick());
     expect(bar.style.width).toBe("42%");
-    expect(label.textContent).toBe("42% - 42.0 of 100.0 MB (2.0 MB/s)");
+    expect(label.textContent).toBe("42%, 42.0 of 100.0 MB (2.0 MB/s)");
 
     feedUpdaterDownloadProgress(tick({ percent: 137 })); // clamped
     expect(bar.style.width).toBe("100%");

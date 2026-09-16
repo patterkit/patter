@@ -14,8 +14,8 @@ patter validate ./my-project.patter
 
 Every command writes through your version control (checking a file out first, adding
 new files), so a locked or read-only file fails the write rather than being
-overwritten. **Exit codes** are consistent: **0** success · **1** the operation found
-problems or failed · **2** a usage error. `fmt` is an alias for `format`, and `stats`
+overwritten. **Exit codes** are consistent. Exit **0** means success, **1** means the operation found
+problems or failed, and **2** means a usage error. `fmt` is an alias for `format`, and `stats`
 for `report`.
 
 ### Which build am I running?
@@ -55,13 +55,13 @@ language for debug playback.
 Export a **readable screenplay** of the script + flow: dialogue, narration, choices (with their
 conditions / flags), and jumps, in reading order. Format follows the extension; default
 `dist/<name>.pdf`. PDF uses built-in fonts (Latin / Western-European); use `.docx` for full
-Unicode. → [Building & shipping](/setup/building-and-shipping/)
+Unicode. The document's layout is described on [Building & shipping](/setup/building-and-shipping/).
 
 ### `patter export-html [path] [-o file]`
 Export a single self-contained, **playable** `.html`: the runtime, the whole story, and
 a reader UI inlined, so it plays offline in any browser with no server. Hand one file to a
 stakeholder. Defaults to `dist/<name>.html`; `-o -` writes to stdout. Reads in the project's
-source language. → [Building & shipping](/setup/building-and-shipping/)
+source language, as [Building & shipping](/setup/building-and-shipping/) describes.
 
 ### `patter play [path]`
 Run the story through the reference runtime **non-interactively** and print a transcript, for
@@ -94,7 +94,7 @@ it as one argument (`"faction rebels"`). `--json` emits the hits for scripting.
 ### `patter report [path]` (alias `stats`)
 A production report: status, burndown, recording coverage. `--xlsx file` also writes
 a spreadsheet; `--json` emits JSON to stdout (for pipelines). In an **Audio Folders**
-project, recording status is derived from the takes on disk - the same numbers Patterpad
+project, recording status is derived from the takes on disk, the same numbers Patterpad
 shows.
 
 ### `patter loc-export [path] -o file`

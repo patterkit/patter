@@ -1,14 +1,14 @@
 ---
 title: Patterpad, the editor
-description: A tour of Patterpad, the reading-first desktop editor for branching, performed dialogue.
+description: Tour Patterpad, the reading-first desktop editor for branching, performed dialogue, down to the keystrokes that are easy to miss.
 sidebar:
   label: Overview & workspace
 ---
 
-**Patterpad** is the desktop app where you write Patter projects. It is built on one
-idea: a scriptwriter should be *pleased* to use it. The surface reads like a
-screenplay, the serious tooling waits until you reach for it, and the complexity
-stays hidden until you ask for it.
+You write Patter projects in Patterpad, a desktop app built on one idea, that a
+scriptwriter should be *pleased* to use it. The surface reads like a screenplay, the
+serious tooling waits until you reach for it, and the complexity stays hidden until you
+ask for it.
 
 This section is a full tour, right down to the many keystrokes, gestures, and menus
 that are easy to miss. If you only read one other page, make it
@@ -25,7 +25,7 @@ or the File menu on Windows and Linux).
 
 From there you land on the **welcome screen**, where you can open a project, create
 one, or pick from your recent projects. **File ▸ Close Project** brings you back to it
-at any time: the window stays open, and the project you closed is top of the recents
+at any time. The window stays open, and the project you closed is top of the recents
 list. It is also the way back to the shipped **tour** once you have a project open.
 
 ### Creating a project
@@ -50,14 +50,11 @@ You probably want to store it in whatever VCS you are using for your project, al
 
 ## Opening where you left off
 
-Patterpad gets you working in one click:
-
-- **Open** a project (`⌘O` / `Ctrl+O`), click a recent one, or use **File ▸ Open
-  Recent**.
-- It reopens the **last scene you were editing**, with your cursor back on the exact
-  line and scrolled into view.
-- Double-click a `.patter` folder to reopen your last session, double-click a single
-  scene file to open just that scene, or run `patterpad <path>` from a shell.
+Patterpad gets you working in one click. **Open** a project (`⌘O` / `Ctrl+O`), click a
+recent one, or use **File ▸ Open Recent**. It reopens the **last scene you were editing**,
+with your cursor back on the exact line and scrolled into view. Double-click a `.patter`
+folder to reopen your last session, double-click a single scene file to open just that
+scene, or run `patterpad <path>` from a shell.
 
 ### Opening at a particular line
 
@@ -90,15 +87,15 @@ A `.patter` project is a folder of files, which is perfect for version control b
 to email or drop in a chat. A **Patterpack** is that whole project squeezed into a single
 `.patterpack` file you can hand to someone.
 
-- **File ▸ Export as Patterpack…** writes a `<name>.patterpack`. Like **Save As**, it
-  carries the *source* only: your scenes, settings, notes, and translations travel;
-  recorded audio and the published `.patterc` bundle do not (they are large and rebuilt
-  anyway).
-- **File ▸ Open Patterpack…** takes a `.patterpack`, asks **where to create the project
-  folder** (defaulting to `<name>.patter` beside the pack), unpacks it there, and opens it.
-  Opening always makes a fresh folder: it never writes over an existing project.
-- **Double-click** a `.patterpack` (or drop it on the app) does the same: Patterpad asks
-  where to unpack it, then opens the result.
+**File ▸ Export as Patterpack…** writes a `<name>.patterpack`. Like **Save As**, it
+carries the *source* only. Your scenes, settings, notes, and translations travel; recorded
+audio and the published `.patterc` bundle don't (they're large and rebuilt anyway).
+
+**File ▸ Open Patterpack…** takes a `.patterpack`, asks **where to create the project
+folder** (defaulting to `<name>.patter` beside the pack), unpacks it there, and opens it.
+Opening always makes a fresh folder and never writes over an existing project.
+Double-clicking a `.patterpack` (or dropping it on the app) does the same. Patterpad asks
+where to unpack it, then opens the result.
 
 Because a Patterpack is a real copy, the person you send it to can open it, write, and send
 one back. It is the friendly way to pass a project to a collaborator who is not on your
@@ -111,22 +108,24 @@ version-control system.
   <figcaption>The three-column workspace: the navigator (left, with the Properties page above the scenes), the script surface (centre), and the Inspector (right). The script stays put; the side panes are guests you toggle with <code>⌘1</code> and <code>⌘2</code>.</figcaption>
 </figure>
 
-Three columns, with the script always in the centre:
+Three columns, with the script always in the centre.
 
-- **Scenes** (left): the **Properties** page sits at the top, above your scenes, showing how many
-  `@patter` properties the project declares (see
-  [Conditions, effects & data](/patterpad/conditions-and-data/#properties-the-storys-memory)).
-  Below it, your list of scenes. The open scene unfolds to list its **blocks** -
-  the block your cursor is in stays marked, and clicking one jumps straight to it. **Drag**
-  a scene to reorder the list; the order is saved with the project (it changes nothing
-  about how the story plays). Add a scene with the **+ New Scene** row at the foot of the
-  list (or **File ▸ New Scene…**, `⇧⌘N`); delete one from its right-click menu (or
-  **File ▸ Delete Scene…**) - if other scenes jump into it, the confirm names them, and the
-  dangling jumps show as problems until you repoint them. Toggle the pane with
-  **View ▸ Show Scenes** (`⌘1`).
-- **The script** (centre): where you write. This one stays put; the sides are guests.
-- **Inspector** (right): the detail for whatever your cursor is on. Toggle with
-  **View ▸ Show Inspector** (`⌘2`).
+On the left, the **Scenes** pane. The **Properties** page sits at the top, above your
+scenes, showing how many `@patter` properties the project declares (see
+[Conditions, effects & data](/patterpad/conditions-and-data/#properties-the-storys-memory)).
+Below it, your list of scenes. The open scene unfolds to list its **blocks**. The block your
+cursor is in stays marked, and clicking one jumps straight to it. **Drag** a scene to
+reorder the list; the order is saved with the project (it changes nothing about how the
+story plays). Add a scene with the **+ New Scene** row at the foot of the list (or
+**File ▸ New Scene…**, `⇧⌘N`). Delete one from its right-click menu (or
+**File ▸ Delete Scene…**), and if other scenes jump into it, the confirm names them, and the
+dangling jumps show as problems until you repoint them. Toggle the pane with
+**View ▸ Show Scenes** (`⌘1`).
+
+In the centre, **the script**, where you write. This one stays put; the sides are guests.
+
+On the right, the **Inspector**, the detail for whatever your cursor is on. Toggle it with
+**View ▸ Show Inspector** (`⌘2`).
 
 Drag the edge between a pane and the script to resize it, or **double-click that edge**
 to reset the pane to its usual width. **View ▸ Reset View** brings both panes back (and
@@ -134,13 +133,12 @@ rescues a play window that's drifted off-screen). Patterpad remembers your pane 
 between sessions.
 
 Above the script, the top bar carries a **`←` `→` pair** that retraces the pages you have
-visited - scenes, the Properties page, the Project Overview - greyed when there is nowhere
+visited (scenes, the Properties page, the Project Overview), greyed when there's nowhere
 to go, and also on **View ▸ Back / Forward** (`⌃⌘←` / `⌃⌘→`). It is the other axis from the
-navigator: the navigator shows you where things live, Back retraces where you have been.
+navigator. The navigator shows you where things live, and Back retraces where you have been.
 
-When you want nothing but the words, **Writing View** (`⇧⌘M`) clears everything else
-away: both panes and the bottom bars, leaving just the script and the
-hint bar. See [Reading & focus](/patterpad/reading-and-focus/).
+When you want nothing but the words, **Writing View** (`⇧⌘M`) clears both panes and the
+bottom bars away, leaving just the script and the hint bar. See [Reading & focus](/patterpad/reading-and-focus/).
 
 ## Saving
 
@@ -150,9 +148,9 @@ work. **Autosave** is on by default (about every 30 seconds; toggle it in Projec
 Settings), and Patterpad also saves before switching scenes, playing, or installing an
 update.
 
-## Where to go next
+## The rest of the tour
 
-- **Learn by playing**: open `examples/projects/tour.patter` and **Play from Start** for an interactive tour of
+- Open `examples/projects/tour.patter` and **Play from Start** for an interactive tour of
   choices, selectors, properties, conditions, and closed captions, written as a Patter story.
 - [The writing surface](/patterpad/writing-surface/): cues, beats, and every keystroke.
 - [Structure & branching](/patterpad/structure-and-branching/): choices, selectors, jumps.

@@ -1,6 +1,6 @@
 ---
 title: Audio & recording
-description: "Track each spoken line's recording status in Patterpad, derive it from audio files on disk, play a scene back as a table-read, and record quick scratch takes at your desk."
+description: Track each line's recording status from the audio on disk, play a scene back as a table-read, and record scratch takes at your desk.
 sidebar:
   label: Audio & recording
 ---
@@ -27,16 +27,16 @@ its spreadsheet.
 
 There are two ways to track it, chosen per project on the **Audio Status** tab:
 
-- **Manually** (the default): select a line and pick its stage from the **Audio** dropdown in
+- **Manually** (the default). Select a line and pick its stage from the **Audio** dropdown in
   the inspector, exactly like the Writing dropdown.
 - **Audio Folders**: turn on **Use Audio Folders** and set one **audio root** folder. Each stage
   then gets its own subfolder under that root, named automatically from the stage (so `../audio`
   gives `../audio/scratch/`, `../audio/recorded/`, `../audio/final/`) with the lowest "not recorded"
-  stage having none. Patterpad reads every line's recording status straight from the files: drop a
+  stage having none. Patterpad reads every line's recording status straight from the files. Drop a
   line's `.wav` (or `.mp3`) into a stage's folder and the line takes that stage. If a line's audio
   sits in more than one stage, the **most finished** one wins (a `recorded/` take beats a `scratch/`
-  one), and a line with no file anywhere reads as **missing**. The folders are watched live: add or
-  remove a file and the status updates on its own. Here the inspector shows the status as a **chip**
+  one), and a line with no file anywhere reads as **missing**. The folders are watched live, so adding
+  or removing a file updates the status on its own. Here the inspector shows the status as a **chip**
   you can't edit (it comes from the files) with a **▶ play button** next to any line that has a clip.
 
 > Each audio file is named after the line's **id**, not its wording or where it sits, so
@@ -47,7 +47,7 @@ There are two ways to track it, chosen per project on the **Audio Status** tab:
 > filename back to the line. The same id keys the line's [translations](/production/localisation/).
 > See [the IDs explained](/format/gamedata-and-addressing/#the-two-ids).
 
-Recording status feeds the same places as writing status: **filter by it** with **Review ▸
+Recording status feeds the same places as writing status. **Filter by it** with **Review ▸
 Find Lines by Recording…** (or the search window's **Recording** mode), and it's broken down
 per character in the [Production Information report](/production/tracking-and-reports/#the-writing-status-rollup).
 
@@ -72,14 +72,14 @@ in the shipped game.
 ## Getting the audio into your game
 
 Patter itself doesn't play audio: your engine and audio tooling do. The durable hook is the line
-**id** from the callout above - plenty of teams tie voice-over straight to that id through their own
+**id** from the callout above, and plenty of teams tie voice-over straight to that id through their own
 audio system or middleware and skip the rest of this section.
 
 If you'd rather have Patterpad do the file-picking for you, it's an **optional** convenience: on
 **Publish Bundle** (or **Production ▸ Update Audio Manifest**), Patterpad writes a small
 `patteraudio.json` next to your audio listing each line's winning file. Ship the audio folder, point a
-tiny resolver at it, and the runtime maps a beat to its clip (it finds the file; you still play it). →
-[Audio (runtime)](/play/audio/)
+tiny resolver at it, and the runtime maps a beat to its clip (it finds the file; you still play it). The
+runtime side is on [Audio (runtime)](/play/audio/).
 
 ## Playing with audio
 
@@ -93,27 +93,27 @@ playing each line's clip as you go. See [Playtesting](/patterpad/playtesting/).
 
 In Audio Folders mode you can also record quick **scratch takes** right inside Patterpad, a
 fast way to hear a scene before you book a session. It's the one bit of the audio pipeline a
-**writer** reaches for as much as a producer: rough a line in your own voice, at your desk,
+**writer** reaches for as much as a producer. Rough a line in your own voice, at your desk,
 and hear the scene read back. Turn on **Enable scratch recording** on the **Audio Status** tab
 and choose which stage's folder the takes land in (the **scratch** stage by default).
 
 Then, for any line **at or below** the scratch stage (one that hasn't already got a more
 finished take), the inspector shows a **● Record** button. Click it and a full-screen recorder
-takes over, opening on a **cue screen**: the line, its speaker, and a badge saying where its
-existing take stands - **no take yet**, **take out of date** (the line was edited after it was
-recorded), or **take up to date**. From there, press **Space** to record - a **3·2·1**
-countdown, then it records your microphone while everything else pauses, and **Space** again
+takes over, opening on a **cue screen** with the line, its speaker, and a badge saying where its
+existing take stands (**no take yet**, **take out of date** because the line was edited after it
+was recorded, or **take up to date**). From there, press **Space** to record. A **3, 2, 1**
+countdown runs, then it records your microphone while everything else pauses, and **Space** again
 finishes the take (or **Esc** cancels). Patterpad trims the silence off each end, saves the
 take into the scratch folder, and the line's status updates to match. No files to shuffle.
 
-After each take you can **replay** it, **re-record** it, or carry straight on: **Record
+After each take you can **replay** it, **re-record** it, or carry straight on. **Record
 next ▸** moves to the following line, and **Next needed ▸▸** jumps ahead to the next line
 whose take is missing or out of date, skipping everything already covered. The same skip
-buttons are on the cue screen, so a tidy-up pass works from anywhere: open the recorder on
+buttons are on the cue screen, so a tidy-up pass works from anywhere. Open the recorder on
 any line, hop from needed line to needed line, and stop when nothing's left. The next-line
 preview carries the same badge, so you always know whether the suggested line actually needs
 a take before committing to it.
 
 Each take remembers the exact line it was recorded against, so if you later edit that line,
-the inspector flags it **⚠ out of date** - and the recorder's badges pick out exactly which
+the inspector flags it **⚠ out of date**, and the recorder's badges pick out exactly which
 scratch needs redoing.

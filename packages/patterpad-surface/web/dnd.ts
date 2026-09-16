@@ -141,7 +141,7 @@ function captureSeams(view: View, positions: number[], draggingBlock: boolean): 
 
 /** A grip that drags this node (bubble / group / block) to a new seam (groups §6). */
 export function makeDragHandle(view: View, getPos: GetPos): HTMLElement {
-  const h = document.createElement("span"); h.className = "drag-handle"; h.textContent = "⠿"; h.dataset.tip = "drag to move"; h.contentEditable = "false";
+  const h = document.createElement("span"); h.className = "drag-handle"; h.textContent = "⠿"; h.dataset.tip = "Drag to move"; h.contentEditable = "false";
   h.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
@@ -293,7 +293,7 @@ export function makeDragHandle(view: View, getPos: GetPos): HTMLElement {
           const tr = moveChunksAt(view.state, run, target); if (tr) commitWithFlip(view, tr); // move the whole set (FLIP-animated)
         } else if (dropUnwrapsOption(view.state, from, target)) {
           // dragging an Option out of its choice dissolves it - confirm before committing (§7)
-          confirmDialog({ title: "Ungroup this option?", body: "Moving an option out of its choice ungroups it - its contents move into the target. You can undo it.", confirmLabel: "Ungroup" })
+          confirmDialog({ title: "Ungroup this option?", body: "Moving an option out of its choice ungroups it. Its contents move into the target. You can undo this.", confirmLabel: "Ungroup option" })
             .then((ok) => { if (ok) { const tr = moveNodeTo(view.state, from, target); if (tr) commitWithFlip(view, tr); } view.focus(); });
           return;
         } else {

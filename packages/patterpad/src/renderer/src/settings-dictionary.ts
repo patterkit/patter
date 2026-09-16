@@ -56,7 +56,7 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
 
     // Language picker + Import / Remove.
     host.append(el("div", "gd-statuscap", "Dictionary"));
-    host.append(el("p", "settings-note", "The language to check spelling against - your source language. Import your own Hunspell dictionary (.dic + .aff) to add another; imported dictionaries are kept on this computer."));
+    host.append(el("p", "settings-note", "The language spelling is checked against. Import a Hunspell dictionary (.dic and .aff) to add another."));
     const row = el("div", "dict-lang-row");
     const sel = el("select", "insp-select") as HTMLSelectElement;
     for (const d of dicts) {
@@ -64,7 +64,7 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
       o.value = d.id; if (d.id === language) o.selected = true; sel.append(o);
     }
     if (!selected()) { // a project picked a custom language this machine hasn't imported
-      const o = el("option", undefined, `${language} - not installed`) as HTMLOptionElement; o.value = language; o.selected = true; sel.append(o);
+      const o = el("option", undefined, `${language} (not installed)`) as HTMLOptionElement; o.value = language; o.selected = true; sel.append(o);
     }
     sel.addEventListener("change", () => { language = sel.value; render(); });
     row.append(sel);
@@ -89,7 +89,7 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
       for (const idx of alphaOrder(arr)) {
         const wordrow = el("div", "wordrow");
         const input = el("input", "gd-input gd-name") as HTMLInputElement;
-        input.type = "text"; input.value = arr[idx]!; input.spellcheck = false; input.placeholder = "<word>";
+        input.type = "text"; input.value = arr[idx]!; input.spellcheck = false; input.placeholder = "Word";
         input.addEventListener("input", () => { arr[idx] = input.value; });
         wordrow.append(input, iconBtn("✕", removeTip, () => { arr.splice(idx, 1); render(); }, false, true));
         list.append(wordrow);
@@ -99,8 +99,8 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
 
     // Project word list.
     host.append(el("div", "gd-statuscap", "Project dictionary"));
-    host.append(el("p", "settings-note", "Words to always accept in this project - character names, places, invented terms. Shared with everyone who opens the project."));
-    const list = wordList(words, "remove word");
+    host.append(el("p", "settings-note", "Words always accepted in this project, such as names and invented terms. Everyone who opens the project shares them."));
+    const list = wordList(words, "Remove word");
     host.append(list);
     const add = el("button", "gd-add", "+ Add word"); add.type = "button";
     add.addEventListener("click", () => { words.push(""); render(); focusNewRow(host.querySelector<HTMLElement>(".wordlist")); });
@@ -110,8 +110,8 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
     // vocabulary, just "stop flagging this"); shown here so a persisted ignore can be reviewed / removed.
     if (ignore.length) {
       host.append(el("div", "gd-statuscap", "Ignored words"));
-      host.append(el("p", "settings-note", "Words you chose to Ignore on a spelling flag. They stay ignored across sessions; remove one to start flagging it again."));
-      host.append(wordList(ignore, "stop ignoring"));
+      host.append(el("p", "settings-note", "Words you chose to ignore on a spelling flag. Remove one to start flagging it again."));
+      host.append(wordList(ignore, "Stop ignoring"));
     }
 
     async function doImport(): Promise<void> {

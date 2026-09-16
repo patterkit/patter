@@ -1,6 +1,6 @@
 ---
 title: Keyboard shortcuts
-description: Every keyboard shortcut and editor gesture in Patterpad.
+description: Look up every keyboard shortcut and editor gesture in Patterpad.
 sidebar:
   label: Keyboard shortcuts
 ---
@@ -18,7 +18,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⌘S` | Save |
 | `⌘,` | Project Settings |
 | `⌘Z` / `⇧⌘Z` | Undo / Redo |
-| `⌘D` | Duplicate the selected snippet, group, option or block (contents and all) |
+| `⌘D` | Duplicate the selected snippet, group, option, or block (contents and all) |
 | `⌘P` | Play |
 | `⌘F` | Search (go to anything) |
 | `⌘⌥F` / `Ctrl-H` | Replace text across the project |
@@ -38,7 +38,7 @@ These keys have no menu entry; they're how you write on the page:
 | --- | --- |
 | `Enter` | New line in the snippet |
 | `⇧Enter` / `⌘Enter` | New snippet |
-| `Tab` | Turn a plain line into dialogue · accept a name · close a `(direction)` |
+| `Tab` | Turn a plain line into dialogue, accept a name, or close a `(direction)` |
 | `⌘T` / `Alt-T` | Switch the line between dialogue and narration |
 | `Space` (empty name / start) | Turn the line into plain narration |
 | `(` … `)` | Open / close an inline `(direction)` |

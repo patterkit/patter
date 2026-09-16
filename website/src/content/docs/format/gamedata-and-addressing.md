@@ -1,6 +1,6 @@
 ---
 title: Game Data & addressing
-description: Author-defined typed data on every node, and the two IDs Patter uses to address content.
+description: Attach typed Game Data to any node and address content by the two ids Patter gives it.
 sidebar:
   label: Game Data & addressing
 ---
@@ -61,12 +61,12 @@ Patter gives content two different identifiers, each with its own job:
 
 - **The line `id`**: each line and beat has a short, stable **id** like `L_0n7vdq42`. You
   never write it, it's assigned for you (the inspector shows it as a small, copyable
-  `#id`), and it's **fixed**: never based on the wording or where the line sits, so it
+  `#id`), and it's **fixed**, never based on the wording or where the line sits, so it
   **survives editing, moving, renaming, and re-ordering**. Change a line's words, drag it
   to another block, its `id` doesn't change. It's the key that a line's
   **[localisation](/production/localisation/) string, its
   [audio](/production/audio/#recording-status) file, and its place in a save** all
-  join on, which is *why* it can't encode location: if it changed when you moved a line,
+  join on, which is *why* it can't encode location. If it changed when you moved a line,
   the translation and the recorded take would be orphaned. A game that needs to react to
   one *specific* line watches for its `id`.
 
@@ -76,10 +76,10 @@ Patter gives content two different identifiers, each with its own job:
   addresses are unique within their scene. Renaming an address never breaks a jump that
   points at it.
 
-So: a line's **`id` is its stable identity** (what localisation, audio, and saves key
-off); a **`gameId` is an address** your game code aims at to start or jump to a scene or
-block. The runtime can also hand a `gameId` back for display and logging: see
-[the Engine API](/play/engine/).
+In short, a line's **`id` is its stable identity** (what localisation, audio, and saves key
+off), and a **`gameId` is an address** your game code aims at to start or jump to a scene or
+block. The runtime can also hand a `gameId` back for display and logging, as
+[the Engine API](/play/engine/) describes.
 
 ### Finding the line an `id` refers to
 

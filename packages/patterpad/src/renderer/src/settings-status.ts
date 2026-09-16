@@ -42,8 +42,8 @@ function openColourPop(anchor: HTMLElement, s: { colour?: number }, render: () =
     sw.addEventListener("click", () => { if (colour == null) delete s.colour; else s.colour = colour; closeColourPop(); render(); });
     pop.append(sw);
   };
-  swatch("no colour", undefined, true);
-  for (let slot = 0; slot < PALETTE_SIZE; slot++) swatch(`colour ${slot + 1}`, slot, false);
+  swatch("No colour", undefined, true);
+  for (let slot = 0; slot < PALETTE_SIZE; slot++) swatch(`Colour ${slot + 1}`, slot, false);
   host.append(pop);
   // Place under the button, clamped into the viewport (offsetWidth forces a synchronous layout).
   const r = anchor.getBoundingClientRect();
@@ -95,18 +95,18 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
     const row = el("div", "set-row");
     const line = el("div", "set-rowline gd-status-line");
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
-    name.type = "text"; name.placeholder = "<status name>"; name.value = s.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Status name"; name.value = s.name; name.spellcheck = false;
     name.addEventListener("input", () => { s.name = name.value; });
     const markers = el("div", "gd-markers");
     markers.append(
-      marker("sp-rtr", !!s.readyToRecord, "Record", "This status means: ready to record (voice).", () => { for (const w of writing) delete w.readyToRecord; s.readyToRecord = true; }),
-      marker("sp-rts", !!s.readyToShip, "Ship", "This status means: ready to ship.", () => { for (const w of writing) delete w.readyToShip; s.readyToShip = true; }),
+      marker("sp-rtr", !!s.readyToRecord, "Record", "Lines at this status are ready to record.", () => { for (const w of writing) delete w.readyToRecord; s.readyToRecord = true; }),
+      marker("sp-rts", !!s.readyToShip, "Ship", "Lines at this status are ready to ship.", () => { for (const w of writing) delete w.readyToShip; s.readyToShip = true; }),
     );
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "move earlier", () => { moveItem(writing, i, -1); render(); }, i === 0),
-      iconBtn("↓", "move later", () => { moveItem(writing, i, 1); render(); }, i === writing.length - 1),
-      iconBtn("✕", "delete status", () => { writing.splice(i, 1); ensureMarkers(); render(); }, false, true),
+      iconBtn("↑", "Move earlier", () => { moveItem(writing, i, -1); render(); }, i === 0),
+      iconBtn("↓", "Move later", () => { moveItem(writing, i, 1); render(); }, i === writing.length - 1),
+      iconBtn("✕", "Delete status", () => { writing.splice(i, 1); ensureMarkers(); render(); }, false, true),
     );
     line.append(name, markers, colourButton(s, render), acts);
     row.append(line);
@@ -118,7 +118,7 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
     closeColourPop();
     host.replaceChildren();
     renderLadder(host,
-      "From not-started to done. The lowest rung is the default for any beat with no status set. Pick which status means ready to record, and which means ready to ship.",
+      "The lowest status is the default for a beat with none set. Mark which one means ready to record and which means ready to ship.",
       writing.map(writingRow), "+ Add writing status", () => { writing.push({ name: "" }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
   };
   render();
@@ -166,15 +166,15 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
     // The fixed "not recorded" fallback (folder mode, lowest rung): its name / delete are locked.
     const locked = audioFolders && i === 0;
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
-    name.type = "text"; name.placeholder = "<status name>"; name.value = s.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Status name"; name.value = s.name; name.spellcheck = false;
     if (locked) { name.readOnly = true; name.classList.add("sp-locked"); name.dataset.tip = "The fallback for any line with no audio file. Fixed while Audio Folders is on."; }
     else name.addEventListener("input", () => { s.name = name.value; });
     const acts = el("div", "gd-acts");
     acts.append(
       // The sentinel stays first: it can't move, and the rung above it can't move up into its slot.
-      iconBtn("↑", "move earlier", () => { moveItem(recording, i, -1); render(); }, i === 0 || (audioFolders && i === 1)),
-      iconBtn("↓", "move later", () => { moveItem(recording, i, 1); render(); }, i === recording.length - 1 || locked),
-      iconBtn("✕", "delete status", () => { recording.splice(i, 1); render(); }, locked, true),
+      iconBtn("↑", "Move earlier", () => { moveItem(recording, i, -1); render(); }, i === 0 || (audioFolders && i === 1)),
+      iconBtn("↓", "Move later", () => { moveItem(recording, i, 1); render(); }, i === recording.length - 1 || locked),
+      iconBtn("✕", "Delete status", () => { recording.splice(i, 1); render(); }, locked, true),
     );
     line.append(name);
     // Audio Folders mode: show the AUTO-DERIVED subfolder (read-only), not a manual folder field. The fallback
@@ -200,7 +200,7 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
     const trackRow = el("label", "settings-toggle");
     const tcb = el("input") as HTMLInputElement; tcb.type = "checkbox"; tcb.checked = trackAudioStatus;
     const tcap = el("span"); tcap.append(document.createTextNode("Track Audio Status?"));
-    tcap.append(el("small", undefined, "Track each voiced line's recording progress - shown in the inspector, production reports, and the .xlsx export."));
+    tcap.append(el("small", undefined, "Shows each voiced line's recording progress in the inspector, reports, and exports."));
     tcb.addEventListener("change", () => { trackAudioStatus = tcb.checked; render(); });
     trackRow.append(tcb, tcap);
     host.append(trackRow);
@@ -216,7 +216,7 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
       rootRow.append(el("span", "sp-folder-cap", "Audio root folder"));
       const inp = el("input", "gd-input sp-folder-input") as HTMLInputElement;
       inp.type = "text"; inp.placeholder = "../audio"; inp.spellcheck = false; inp.value = audioRoot;
-      inp.dataset.tip = "One folder; each rung gets an auto-named subfolder under it (from the status name).";
+      inp.dataset.tip = "Each status gets a subfolder under this folder, named from the status.";
       inp.addEventListener("input", () => { audioRoot = inp.value; });
       inp.addEventListener("change", () => render()); // refresh the derived subfolder hints once you finish typing
       rootRow.append(inp);
@@ -225,8 +225,8 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
 
     renderLadder(body,
       audioFolders
-        ? "A line's recording status is the HIGHEST rung whose derived folder holds its <beatId>.wav (preferred) or .mp3, else the fallback. Each rung's subfolder is named from its status."
-        : "From not-recorded to done. The lowest rung is the default for any line with no recording status.",
+        ? "A line takes the highest status whose folder holds its audio file, or the fallback. Each subfolder is named from its status."
+        : "The lowest status is the default for a line with none set.",
       recording.map(recordingRow), "+ Add recording status", () => { recording.push({ name: "" }); render(); focusNewRow(body.querySelector<HTMLElement>(".gd-fieldlist")); });
 
     // The Audio Folders toggle sits BELOW the ladder: off = manual recording status (set per line in the
@@ -255,8 +255,8 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
       const cb2 = el("input") as HTMLInputElement; cb2.type = "checkbox"; cb2.checked = scratchOn; cb2.disabled = rungs.length === 0;
       const cap2 = el("span"); cap2.append(document.createTextNode("Enable scratch recording"));
       const sub2 = el("small", undefined, rungs.length === 0
-        ? "Set an audio root first: scratch takes record into a rung's derived folder."
-        : "Record quick scratch takes in-app, straight into a status folder."); cap2.append(sub2);
+        ? "Set an audio root first. Scratch takes record into a status folder."
+        : "Record scratch takes in Patterpad, straight into a status folder."); cap2.append(sub2);
       cb2.addEventListener("change", () => { scratchStatus = cb2.checked ? (scratchStatus ?? rungs[0]?.name.trim() ?? null) : null; render(); });
       row.append(cb2, cap2);
       body.append(row);

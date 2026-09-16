@@ -86,7 +86,7 @@ interface Overlay {
 }
 
 /** Badge copy per take state (styled by the matching scratch-badge-* class). */
-const BADGE: Record<TakeState, string> = { missing: "no take yet", stale: "take out of date", current: "take up to date" };
+const BADGE: Record<TakeState, string> = { missing: "No take yet", stale: "Take out of date", current: "Take up to date" };
 
 /** Build the blocking overlay: the speaker + line being recorded, a big state area (countdown / REC /
  *  processing bar / saved), the saved-state action buttons, and the key hints. */
@@ -286,7 +286,7 @@ export async function recordScratch(start: ScratchLine, deps: ScratchDeps): Prom
   // on macOS a missing TCC grant does NOT fail getUserMedia, it hands over a silent stream.
   overlay.setLine(start, deps.takeState(start.beatId, start.text));
   if (!(await deps.micAccess())) {
-    overlay.error("Microphone access denied. Allow Patterpad in System Settings › Privacy & Security › Microphone.");
+    overlay.error("Microphone access denied. Allow Patterpad in System Settings ▸ Privacy & Security ▸ Microphone.");
     await wait(3200); cleanup(); return;
   }
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }

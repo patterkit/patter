@@ -1,6 +1,6 @@
 ---
 title: Closed captions
-description: Let players turn off the non-spoken caption cues inside dialogue, Patterplay strips them at runtime, on every engine, while the line still fires so audio plays.
+description: Let players turn off the non-spoken caption cues inside dialogue while the line still fires, on every engine.
 sidebar:
   label: Closed captions
 ---

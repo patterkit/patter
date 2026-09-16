@@ -1325,8 +1325,8 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
   } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
 
   const locale = catalog.locale ?? fallbackLocale;
-  if (!locale) return { ok: false, error: "could not tell which language this file is for - pick a target language first" };
-  if (locale === loaded.project.locales.default) return { ok: false, error: `'${locale}' is the source language - nothing to import` };
+  if (!locale) return { ok: false, error: "Couldn't tell which language this file is for. Pick a target language first." };
+  if (locale === loaded.project.locales.default) return { ok: false, error: `'${locale}' is the source language, so there's nothing to import.` };
 
   const { writes, stats } = applyLoc(loaded, { ...catalog, locale });
   if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0 };
@@ -1856,7 +1856,7 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { project?: O
     ensureHydrated(); // ordering is a whole-project fact - never validate against the landing-only list
     const known = new Set(loaded.scenes.map((s) => s.id));
     if (ids.length !== known.size || ids.some((id) => !known.has(id))) {
-      return { ok: false, error: "scene list changed - reorder ignored" };
+      return { ok: false, error: "The scene list changed, so the reorder was ignored." };
     }
     const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
     const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);

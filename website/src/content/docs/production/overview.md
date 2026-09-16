@@ -1,6 +1,6 @@
 ---
 title: Running the project
-description: For producers and narrative leads. Track the writing, manage recording and localisation, catch dead branches, review, and hand the story off, all from one place.
+description: Track the writing, manage recording and localisation, catch dead branches, and hand the story off, as the producer or lead.
 ---
 
 If you run the narrative effort, this is your map. Patter is not just a writing tool: it tracks how

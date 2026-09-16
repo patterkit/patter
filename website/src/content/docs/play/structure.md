@@ -1,15 +1,15 @@
 ---
 title: Structure introspection
-description: Walk a compiled Patter bundle's authored tree (scenes, blocks, snippets, beats) without playing it, for editor and dev tooling, on any Patterplay engine. Get the nested outline or the flat, document-ordered beat sequence with per-beat data.
+description: Walk a compiled bundle's authored tree without playing it, as a nested outline or a flat beat sequence, on any engine.
 sidebar:
   label: Structure introspection
 ---
 
-Sometimes a tool needs to see the **shape of the writing**, not play it: list the scenes, the blocks
-in each, the snippets, and the beats inside them, with their ids, types, and data. Every Patterplay
-engine exposes this as a **read-only, static** view of the compiled bundle: no flow, no play state.
+Sometimes a tool needs to see the **shape of the writing**, not play it, listing the scenes, the
+blocks in each, the snippets, and the beats inside them, with their ids, types, and data. Every Patterplay
+engine exposes this as a **read-only, static** view of the compiled bundle, with no flow and no play state.
 
-A concrete example: in Unreal you can build a **Sequencer of subsequences**, one per beat the writer
+As a concrete example, in Unreal you can build a **Sequencer of subsequences**, one per beat the writer
 authored, by walking the flat beat list and reading each beat's `gameData` to drive audio, camera, or
 animation tracks.
 
@@ -81,9 +81,9 @@ for flat in engine.get_beat_sequence():
 Three more static reads answer "which characters are in this?", which is what a scene-loader, a VO
 pipeline, or a character-portrait pre-loader actually wants:
 
-- **`getCast()`** - every cast member the **project declares**, in authored order.
-- **`castForScene(sceneRef)`** - the speakers with a line anywhere in that scene.
-- **`castForBlock(sceneRef, blockRef)`** - the same, scoped to one block.
+- **`getCast()`** returns every cast member the **project declares**, in authored order.
+- **`castForScene(sceneRef)`** returns the speakers with a line anywhere in that scene.
+- **`castForBlock(sceneRef, blockRef)`** returns the same, scoped to one block.
 
 All three return the **character token** (the `character` a line beat carries), not a display name.
 Scene and block refs may be an internal id **or** a [gameId address](/format/gamedata-and-addressing/),

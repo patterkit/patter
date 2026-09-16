@@ -56,19 +56,19 @@ export function renderCoverage(
     host.append(el("p", "cov-note", `Inputs driven: ${report.drivers.map((d) => d.ref).join(", ")}`));
   }
   if (report.unwrittenInputs.length) {
-    host.append(el("p", "cov-note cov-note-input", `Some dead branches are gated on inputs nothing writes or drives: ${report.unwrittenInputs.join(", ")}. Add a coverage driver in Project Settings ▸ World Properties.`));
+    host.append(el("p", "cov-note cov-note-input", `Some dead branches are gated on inputs nothing writes or drives: ${report.unwrittenInputs.join(", ")}. Add a coverage driver in Project Settings ▸ World properties.`));
   }
   // Choices that ran DRY (fell through with nothing takeable). The runtime hides this - here it is explicit.
   if (report.dryChoices.length) {
     const n = report.dryChoices.length;
     host.append(el("p", "cov-note cov-note-dry",
-      `${n} choice${n === 1 ? "" : "s"} ran dry (fell through with nothing the player could take and no fallback). This is a silent dead-end: give the choice a fallback option, or an unconditional one.`));
+      `${n} choice${n === 1 ? "" : "s"} ran dry (fell through with nothing the player could take and no fallback). This is a silent dead end. Give the choice a fallback option or an unconditional one.`));
     const list = el("div", "cov-dry-list");
     for (const d of report.dryChoices) {
       const row = el("button", "cov-dry-item");
       row.append(el("span", "cov-dry-scene", sceneName(d.scene)), el("span", "cov-dry-id", clip(d.id, 32)));
       row.append(el("span", "cov-dry-count", `${num(d.runs)} / ${num(report.runs)} runs`));
-      row.title = `Reveal this choice - ran dry in ${num(d.runs)} of ${num(report.runs)} run${report.runs === 1 ? "" : "s"}`;
+      row.title = `Reveal this choice. It ran dry in ${num(d.runs)} of ${num(report.runs)} run${report.runs === 1 ? "" : "s"}.`;
       row.addEventListener("click", () => onReveal(d.scene, d.id));
       list.append(row);
     }
@@ -135,7 +135,7 @@ export function renderCoverage(
           const target = report.beats.find((x) => x.id === w);
           if (!target) { line.append(document.createTextNode(w)); return; }
           const a = el("button", "cov-gate-ref", clip(target.preview || target.id, 28)); a.type = "button";
-          a.title = "This never played either - open it";
+          a.title = "Open this beat. It never played either.";
           a.addEventListener("click", (e) => { e.stopPropagation(); onReveal(target.scene, target.id); });
           line.append(a);
         });

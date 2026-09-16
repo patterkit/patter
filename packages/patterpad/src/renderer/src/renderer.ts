@@ -289,7 +289,7 @@ async function buildSpellcheck(): Promise<void> {
     if (bytes) spellChecker = buildSpellEngine(bytes.aff, bytes.dic, [...d.words, ...(d.ignore ?? []), ...(project?.cast ?? [])]);
     else if (!dictMissingNotified.has(d.language)) { // a chosen custom dictionary isn't installed here
       dictMissingNotified.add(d.language);
-      toast(`Spell-check is off: the “${d.language}” dictionary isn't installed on this computer.`, "info");
+      toast(`Spell-check is off. The “${d.language}” dictionary isn't installed on this computer.`, "info");
     }
   }
   surface?.setSpellChecker(spellChecker);
@@ -482,7 +482,7 @@ function renderNav(): void {
   navListEl.replaceChildren();
   navBlocksSig = ""; // fresh rows: force the next block refresh to fill them
   const search = document.createElement("button");
-  search.className = "nav-search"; search.type = "button"; search.dataset.tip = "search by name, handle, or id"; search.setAttribute("aria-label", "search by name, handle, or id");
+  search.className = "nav-search"; search.type = "button"; search.dataset.tip = "Search by name, handle, or id"; search.setAttribute("aria-label", "Search by name, handle, or id");
   // A magnifier icon + centred, bold label read as a BUTTON that opens the search window - not a text field.
   const searchIcon = document.createElement("span"); searchIcon.className = "nav-search-icon";
   searchIcon.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16 16"/></svg>';
@@ -496,7 +496,7 @@ function renderNav(): void {
   // scenes only, so the project shard has no status to paint here.)
   const propsRow = document.createElement("button");
   propsRow.className = "nav-doc"; propsRow.type = "button";
-  propsRow.dataset.tip = "the project's @patter properties";
+  propsRow.dataset.tip = "The project's @patter properties";
   propsRow.dataset["vc"] = PROJECT_SHARD_KEY; // the shard key `paintVcBadges` badges this row from
   propsRow.setAttribute("aria-label", "Properties");
   propsRow.append(Object.assign(document.createElement("span"), { className: "nav-doc-name", textContent: "Properties" }));
@@ -606,12 +606,12 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   }
   const warnBits = [
     info.referrers.length ? "Those references will dangle and show as problems until you repoint them." : "",
-    info.startsHere ? "This is the project's start point - it will be cleared." : "",
+    info.startsHere ? "The project's start point will be cleared." : "",
     info.vcs ? "" : "This cannot be undone.",
   ].filter(Boolean);
   delSceneWarnEl.textContent = warnBits.join(" ");
   delSceneWarnEl.hidden = warnBits.length === 0;
-  delSceneConfirmEl.textContent = info.referrers.length ? "Delete anyway" : "Delete";
+  delSceneConfirmEl.textContent = info.referrers.length ? "Delete scene anyway" : "Delete scene";
 
   const onClose = (): void => {
     deleteSceneDialogEl.removeEventListener("close", onClose);
@@ -892,7 +892,7 @@ function setWritingView(on: boolean): void {
 function toggleWritingView(): void { setWritingView(!writingView); }
 writingExitEl.addEventListener("click", () => setWritingView(false));
 // Label the exit affordance with the platform's toggle shortcut (matches the View-menu accelerator).
-writingExitEl.textContent = `Exit Writing View · ${navigator.platform.toUpperCase().includes("MAC") ? "⇧⌘M" : "Ctrl+Shift+M"}`;
+writingExitEl.textContent = `Exit writing view · ${navigator.platform.toUpperCase().includes("MAC") ? "⇧⌘M" : "Ctrl+Shift+M"}`;
 
 // --- colour / font theme (View menu) -----------------------------------------
 let theme: ThemePrefs = { colour: "system", font: "newsreader" };
@@ -1428,8 +1428,8 @@ async function playLineAudio(id: string, btn?: HTMLButtonElement): Promise<void>
   const audio = new Audio(url);
   inspectorAudio = audio; inspectorPlayBtn = btn ?? null;
   btn?.classList.add("playing");
-  if (btn) btn.dataset.tip = "stop audio";
-  const stop = (): void => { URL.revokeObjectURL(url); btn?.classList.remove("playing"); if (btn) btn.dataset.tip = "play audio"; };
+  if (btn) btn.dataset.tip = "Stop audio";
+  const stop = (): void => { URL.revokeObjectURL(url); btn?.classList.remove("playing"); if (btn) btn.dataset.tip = "Play audio"; };
   audio.addEventListener("ended", stop);
   audio.addEventListener("pause", stop); // a new click (or the abort above) pauses this one
   void audio.play().catch(stop);
@@ -2377,7 +2377,7 @@ async function exportPatterpack(): Promise<void> {
   const res = await window.patter.exportPatterpack();
   if (res.ok) {
     const where = relToProject(res.path);
-    toast(`Patterpack exported\n${where}`);
+    toast(`Patterpack exported\n${where}`, "ok");
   } else if (!res.canceled) toast(res.error ? `Export failed: ${res.error}` : "Export failed", "error");
 }
 
@@ -2419,8 +2419,8 @@ async function mergePatterpack(): Promise<void> {
   // A conflict is not a failure - the merge committed - but it is not a quiet success either. The error
   // voice is what stops an author walking away from unresolved conflicts thinking they were done.
   if (r.summary.conflicts > 0) {
-    toast(`${counts}; ${r.summary.conflicts} conflict${r.summary.conflicts === 1 ? "" : "s"} need a look\nsee the .patterconflict files`, "error");
-  } else toast(`Merged the returned pack\n${counts}`);
+    toast(`${counts}. ${r.summary.conflicts} conflict${r.summary.conflicts === 1 ? "" : "s"} need a look.\nSee the .patterconflict files.`, "error");
+  } else toast(`Merged the returned pack\n${counts}`, "ok");
 }
 
 /** Publish ▸ Publish for Web: write the story to a FOLDER as a customisable page (index.html +
@@ -2429,7 +2429,7 @@ async function exportWeb(): Promise<void> {
   if (!project) return;
   const res = await window.patter.exportWeb();
   if (res.ok) {
-    toast(res.kept?.length ? `Story updated\nkept your ${res.kept.join(" + ")}` : `Web page published\n${res.path ?? ""}`);
+    toast(res.kept?.length ? `Story updated\nKept your ${res.kept.join(" + ")}` : `Web page published\n${res.path ?? ""}`, "ok");
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
@@ -2440,7 +2440,7 @@ async function exportPlayableHtml(): Promise<void> {
   const res = await window.patter.exportPlayableHtml();
   if (res.ok) {
     const where = relToProject(res.path);
-    toast(`Playable HTML published\n${where}`);
+    toast(`Playable HTML published\n${where}`, "ok");
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
@@ -2879,7 +2879,7 @@ window.patter.onEditorFlush(() => void (async () => { await save(); window.patte
 window.patter.onReplaceApplied(() => void (async () => {
   if (currentSceneId) await loadScene(currentSceneId); // re-read the open scene with the replaced text
   await refreshProblems();
-  toast("Replaced across the project.", "info");
+  toast("Replaced across the project", "ok");
 })());
 // Coverage window (#159): a clicked result row jumps the editor; the "World Properties…" button opens settings.
 window.patter.onCoverageNavigate((sceneId, beatId) => void (async () => {

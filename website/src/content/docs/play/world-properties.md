@@ -1,6 +1,6 @@
 ---
 title: World Properties
-description: "Bind your game's live state into a Patter story as @world properties: the story reads them in conditions, effects can write them back, all through a single world resolver."
+description: Bind your game's live state into a story as @world properties that conditions read and effects can write back.
 sidebar:
   label: World Properties
 ---
@@ -50,7 +50,7 @@ both engines sees one rule:
    what you may do. (Before September 2026 the runtime refused every caller, so a game could not
    advance its own clock through the engine.)
 4. **A resolver with no `set` makes the whole of `@world` read-only to everyone**, whatever the
-   declarations say - there is nowhere for a write to land. That is the game's own doing rather
+   declarations say, because there's nowhere for a write to land. That is the game's own doing rather
    than the story's promise.
 
 There is no write-only: a declared property can always be read by the story. If the game holds a
@@ -76,9 +76,9 @@ already do.
 Every runtime takes a live host resolver, in its own idiom, and self-backs `@world` when you give it
 none:
 
-- **Unity**: `EngineOptions.HostScopes`, an `IHostScope` per token → [Unity](/play/unity/#your-games-state)
-- **Unreal**: a `UPatterWorld` bound at `UPatterEngine::Create(Bundle, World)` → [Unreal](/play/unreal/#your-games-state)
-- **Godot**: the `host_scopes` option, a `get` / `set` pair per token → [Godot](/play/godot/#your-games-state)
+- **Unity**: `EngineOptions.HostScopes`, an `IHostScope` per token, on the [Unity](/play/unity/#your-games-state) page.
+- **Unreal**: a `UPatterWorld` bound at `UPatterEngine::Create(Bundle, World)`, on the [Unreal](/play/unreal/#your-games-state) page.
+- **Godot**: the `host_scopes` option, a `get` / `set` pair per token, on the [Godot](/play/godot/#your-games-state) page.
 
 The rules are the same everywhere: `@world` is never in a Patter save; a `writable: false`
 declaration refuses the STORY's write with the same sentence (`'@world.x' is read-only`), bound or

@@ -1,6 +1,6 @@
 ---
 title: Use it, ship it, and if you like? Say so.
-description: "Patter is free and MIT-licensed, with no obligation to credit anyone. This page covers the part that is a favour - credit lines and made-with badges you can download - plus what you may do with the Patter name and mark, and the third-party components bundled with the tools."
+description: Use Patter freely under the MIT licence, and find the optional credit lines, badges, name rules, and bundled third-party notices here.
 sidebar:
   label: Licensing & credit
 ---
@@ -98,11 +98,11 @@ aren't covered by it, so here's the plain-English version.
 - Say your game's dialogue was made with Patter, in credits, marketing, a blog, or a talk.
 - Use these badges unmodified, at any size, in game, on your site, or in a press kit.
 - Name Patter in a list of tools and middleware alongside your engine.
-- Use the wordmark in an article, tutorial or video about Patter.
+- Use the wordmark in an article, tutorial, or video about Patter.
 
 ### Please don't
 
-- Recolour, redraw, stretch or rebuild the mark, or set the wordmark in another typeface.
+- Recolour, redraw, stretch, or rebuild the mark, or set the wordmark in another typeface.
 - Use the mark as your own product, studio, or app icon.
 - Imply that PatterKit endorses, sponsors, or has reviewed your project.
 - Put Patter or PatterKit in your product name, company name or domain.
@@ -132,5 +132,5 @@ wherever you got them. See [Spell-check](/spell-check/) for how these are used.
 
 ---
 
-MIT-licensed - made by Ian Thomas
+MIT-licensed, made by Ian Thomas
 [Read the MIT licence](https://github.com/patterkit/patter/blob/main/LICENSE)

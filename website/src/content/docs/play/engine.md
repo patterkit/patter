@@ -1,23 +1,23 @@
 ---
 title: The Engine API
-description: Play a compiled Patter bundle with the JavaScript runtime, the Engine and Flow API.
+description: Play a compiled Patter bundle with the JavaScript runtime's Engine and Flow API.
 sidebar:
   label: The Engine API
 ---
 
 This is the **deep API reference** for the JavaScript reference engine, `@patterkit/runtime`.
-If you just want it running, start with the [JavaScript & web quickstart](/play/javascript/);
+If you just want it running, start with the [JavaScript & web guide](/play/javascript/);
 for the cross-engine model, see [the play loop](/play/concepts/). The native
 [Unity](/play/unity/), [Unreal](/play/unreal/), and [Godot](/play/godot/)
 ports mirror this same shape.
 
 ## Engine and Flow
 
-The **`Engine`** owns the world: the bundle, shared global state, and every running
-flow. A **`Flow`** is one independent position through the story: its own cursor,
+The **`Engine`** owns the world, meaning the bundle, shared global state, and every running
+flow. A **`Flow`** is one independent position through the story, with its own cursor,
 PRNG, and per-flow state. Many flows can run at once over the same data, sharing the
 shared state; that's how you'd run two NPCs from one project. **One live instance, one
-shared state**: there's no whole-story copy per branch.
+shared state**, and no whole-story copy per branch.
 
 ```ts
 import { Engine } from "@patterkit/runtime";

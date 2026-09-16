@@ -61,7 +61,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     }
     const input = el("input", "gd-input gd-default") as HTMLInputElement;
     input.type = f.type === "number" ? "number" : "text";
-    input.placeholder = "<default (optional)>";
+    input.placeholder = "Default";
     input.value = f.default == null ? "" : String(f.default);
     input.addEventListener("input", () => {
       const raw = input.value;
@@ -74,7 +74,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
 
   const fieldRow = (f: GameDataField, i: number, fields: GameDataField[]): HTMLElement => {
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
-    name.type = "text"; name.placeholder = "<field name>"; name.value = f.name; name.spellcheck = false;
+    name.type = "text"; name.placeholder = "Field name"; name.value = f.name; name.spellcheck = false;
     name.addEventListener("input", () => { f.name = name.value; });
     guard.track(name);
 
@@ -93,13 +93,13 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "move up", () => { moveItem(fields, i, -1); render(); }, i === 0),
-      iconBtn("↓", "move down", () => { moveItem(fields, i, 1); render(); }, i === fields.length - 1),
-      iconBtn("✕", "delete field", () => { fields.splice(i, 1); render(); }, false, true),
+      iconBtn("↑", "Move up", () => { moveItem(fields, i, -1); render(); }, i === 0),
+      iconBtn("↓", "Move down", () => { moveItem(fields, i, 1); render(); }, i === fields.length - 1),
+      iconBtn("✕", "Delete field", () => { fields.splice(i, 1); render(); }, false, true),
     );
 
     const purpose = el("input", "gd-input") as HTMLInputElement;
-    purpose.type = "text"; purpose.placeholder = "<what this field is for (shown as a hint)>"; purpose.value = f.purpose ?? "";
+    purpose.type = "text"; purpose.placeholder = "What this field is for"; purpose.value = f.purpose ?? "";
     purpose.addEventListener("input", () => { f.purpose = purpose.value.trim() || undefined; });
     const details: HTMLElement[] = [];
     if (f.type === "enum") details.push(labelled("Values", tagChips(f, refreshDefault)));

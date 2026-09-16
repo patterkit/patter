@@ -1,6 +1,6 @@
 ---
 title: Structure & branching
-description: Choices, selectors, jumps, and the action menu that shapes a Patter scene in Patterpad.
+description: Shape a scene in Patterpad with choices, selectors, jumps, and the action menu.
 sidebar:
   label: Structure & branching
 ---
@@ -50,15 +50,13 @@ The copy is a genuinely separate piece, never a shadow of the original:
 
 ## Choices and options
 
-A **choice** offers the player options. Each option holds:
+A **choice** offers the player options. Each option holds a **prompt**, the line the player
+reads, handed to your game exactly as you wrote it. It can hold optional **content**, anything
+from a single line to a whole branch of its own, played when the option is taken. And it
+carries a few per-option **flags** (below).
 
-- a **prompt**: the line the player reads, handed to your game exactly as you wrote it;
-- optional **content**: anything from a single line to a whole branch of its own,
-  played when the option is taken;
-- a few per-option **flags** (below).
-
-Edit all of a choice's options together in one inspector panel: prompt, condition, and
-flags side by side, with reorder, delete, and add.
+Edit all of a choice's options together in one inspector panel. Prompt, condition, and flags
+sit side by side, with reorder, delete, and add.
 
 <svg viewBox="0 0 760 272" role="img" aria-labelledby="pk-branch-title" style="width:100%;height:auto;font-family:var(--sl-font,sans-serif)">
   <title id="pk-branch-title">A choice branches into options, each with its own content, then rejoins at a gather and carries on. Separately: a jump leaves for another scene or block and does not return; a call runs a shared piece of story and then returns to where it left off.</title>
@@ -138,7 +136,7 @@ Give such a choice a fallback option, or one unconditional option, to guarantee 
 Any group has a **selector** (set in the inspector) that decides which of the things
 inside it play:
 
-- **Run** (the default): play everything eligible, in order.
+- **Run** (the default). Play everything eligible, in order.
 - **Branch**: play only the first eligible item. This is your if / else-if / else,
   just conditions on an ordered list.
 - **Sequence**: a picker with a memory and two dials:
@@ -170,13 +168,13 @@ A snippet can end with a **jump** to a scene, a block, or `END`. Open the jump r
 the inspector and type to find any scene or block in the project (plus END). Once it's
 set, a small **jump / call** toggle sits beside it, so you choose how it behaves:
 
-- **↪ jump**: head there and don't come back (the default);
+- **↪ jump**: head there and don't come back (the default).
 - **⤳ call**: head there, and when it finishes, come back and carry on where you left
   off. Handy for a bit of story you want to reuse from several places (a shared aside, a
   recurring bit of business), without copying it.
 
 The chip on the page shows the mode too, so you can tell a one-way `↪` from a returning
-`⤳` at a glance. Renaming a scene or block never breaks a jump that points at it. A
+`⤳` as you read. Renaming a scene or block never breaks a jump that points at it. A
 snippet that's *just* a jump, with no lines of its own, is a neat way to route the story
 around. (`⌘/Ctrl-click` a jump chip to follow it to its target.)
 
@@ -206,7 +204,7 @@ something that plays fine is worse than saying nothing. It reasons only about
 The moment a value is written any other way (set back to `false`, cleared, assigned
 something computed, driven by your game through `@world`, reseeded by `temporary`, or
 already `true` by default) it drops out of the check entirely rather than being
-guessed at. Counters, text and qualities are never analysed at all.
+guessed at. Counters, text, and qualities are never analysed at all.
 
 ## The inspector, briefly
 
