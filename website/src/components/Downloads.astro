@@ -65,7 +65,7 @@ const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
     a ? `<a class="pt-dl-btn" href="${esc(a.browser_download_url)}">${esc(label)}</a>` : `<span class="pt-dl-soon">Coming soon</span>`;
   const meta = (r: Release, ver: string): string => {
     const date = r.published_at ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "";
-    return `<p class="pt-dl-meta">Version ${esc(ver)}${date ? ", published " + esc(date) : ""}. <a href="${esc(r.html_url)}">Release notes</a></p>`;
+    return `<p class="pt-dl-meta">Version ${esc(ver)}${date ? ", released " + esc(date) : ""}. <a href="${esc(r.html_url)}">Release notes</a></p>`;
   };
 
   function renderPatterpad(root: HTMLElement, releases: Release[]): void {

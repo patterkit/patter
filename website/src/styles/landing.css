@@ -137,3 +137,5 @@
   .pt-lines, .pt-cond-lines { grid-template-columns: 1fr; gap: 2px; }
   .pt-section { padding-top: 56px; }
 }
+/* The note under the hero actions; the selector outranks the landing-wide paragraph reset. */
+p.pt-note { font-size: 14.5px; color: var(--l-muted); margin: 32px 0 0; }
