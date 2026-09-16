@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-16
+
 ### Changed
 
 - **Every icon is drawn.** The editor, the Play window, Search, Coverage, and the settings dialog draw
