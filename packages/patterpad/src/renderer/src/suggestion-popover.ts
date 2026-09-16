@@ -69,7 +69,7 @@ export function openSuggestionReview(opts: {
     const card = el("div", `sg-card${r.resolved ? " resolved" : ""}`);
     const head = el("div", "sg-head");
     head.append(el("span", "sg-author", r.author || "Someone"), el("span", "sg-ts", fmtTs(r.ts)));
-    if (r.resolved) head.append(el("span", "sg-outcome", r.outcome === "accepted" ? "accepted" : "rejected"));
+    if (r.resolved) head.append(el("span", "sg-outcome", r.outcome === "accepted" ? "Accepted" : "Rejected"));
     card.append(head);
     if (r.stale && !r.resolved) card.append(el("div", "sg-stale", "The line has changed since this was suggested. Review it against the current text."));
     card.append(el("div", "sg-diff-label", "Current"), el("blockquote", "sg-before", r.before || "(empty)"));

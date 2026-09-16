@@ -72,7 +72,7 @@ export interface GroupLevel {
   kind: "group";
   id: string | null;
   role: GroupRole;
-  /** The same human label the rail header shows (e.g. "sequence · shuffle · once"). */
+  /** The same human label the rail header shows (e.g. "Sequence · shuffle · once"). */
   label: string;
   condition?: string;
   selector?: string;
@@ -182,7 +182,7 @@ function groupLevel(node: PMNode, parent: PMNode | null): GroupLevel {
   // An option is recognised by its CONTAINER being a choice group (the bridge strips `prompt` from raw).
   const option = isChoiceGroup(parent);
   const level: GroupLevel = option
-    ? { kind: "group", id: rawId(raw) ?? idAttr(node), role: "option", label: "◇ option" }
+    ? { kind: "group", id: rawId(raw) ?? idAttr(node), role: "option", label: "◇ Option" }
     : { kind: "group", id: rawId(raw) ?? idAttr(node), role: groupRole(raw), label: groupLabel(raw) };
   if (typeof raw.condition === "string" && raw.condition) level.condition = raw.condition;
   if (typeof raw.selector === "string") level.selector = raw.selector;

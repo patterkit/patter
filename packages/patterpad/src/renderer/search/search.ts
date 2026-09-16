@@ -59,7 +59,7 @@ const resultsEl = document.getElementById("swin-results")!;
 const hintEl = document.getElementById("swin-hint")!;
 
 const KIND_LABEL: Record<SearchEntry["kind"], string> = {
-  scene: "scene", block: "block", group: "group", snippet: "snippet", beat: "beat",
+  scene: "Scene", block: "Block", group: "Group", snippet: "Snippet", beat: "Beat",
 };
 
 let mode: SearchMode = "content";

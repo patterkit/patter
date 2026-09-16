@@ -119,13 +119,9 @@ describe("family style: icons are drawn", () => {
   it("types no icon glyph into a string the renderer shows", () => {
     const hits = lineHits(GLYPH).filter((h) => GLYPH.test(withoutMenuPaths(h.key)));
     hold("typed icon glyph", hits, [
-      { file: "patterpad-surface/src/grouplabel.ts", match: '"◇ option"', why: "the diamond option marker: the option's structural label on the rail, the one non-icon mark the surface keeps (the same diamond is drawn on the prompt cell by CSS)" },
-      { file: "patterpad-surface/src/inspect.ts", match: '"◇ option"', why: "the same label handed to the inspector through the surface's inspect contract (GroupLevel.label)" },
-    ], [
-      { file: "patterpad-surface/src/schema.ts", match: '"⚙"', why: "the game-event atom's typed gear on the reading surface; the family word for it is a drawn icon" },
-      { file: "patterpad-surface/web/views.ts", match: /glyph\.textContent = "⚙"/, why: "the same gear, set again by the game-event node view" },
-      { file: "patterpad/src/renderer/play/play.ts", match: /"⚙ game event"/, why: "the same gear on the Play window's rendered game-event line" },
-    ]);
+      { file: "patterpad-surface/src/grouplabel.ts", match: '"◇ Option"', why: "the diamond option marker: the option's structural label on the rail, the one non-icon mark the surface keeps (the same diamond is drawn on the prompt cell by CSS)" },
+      { file: "patterpad-surface/src/inspect.ts", match: '"◇ Option"', why: "the same label handed to the inspector through the surface's inspect contract (GroupLevel.label)" },
+    ], []);
   });
 
   it("draws nothing from a symbol font in CSS content either", () => {
@@ -151,16 +147,16 @@ describe("family style: separators and key hints are drawn", () => {
   it("types no separator or key notation into a string", () => {
     const hits = TYPED.flatMap(([re, why]) => lineHits(re).map((h) => ({ ...h, key: `${h.key}  [${why}]` })));
     // The reading-surface strings that flow through the surface's inspect contract: the group rail's
-    // structural label is prose the writer reads inside the script column ("sequence · shuffle ·
+    // structural label is prose the writer reads inside the script column ("Sequence · shuffle ·
     // once"), the same string the inspector receives as GroupLevel.label. They are the surface's
     // notation, not chrome, and they are listed here by file so that the day they move to a drawn
     // form the entries go with them.
     hold("typed separator", hits, [
-      { file: "patterpad-surface/src/grouplabel.ts", match: /"branch · first match"/, why: "the branch rail label on the reading surface, through the inspect contract" },
-      { file: "patterpad-surface/src/grouplabel.ts", match: /`sequence · /, why: "the sequence rail label (order · exhaust) on the reading surface, through the inspect contract" },
+      { file: "patterpad-surface/src/grouplabel.ts", match: /"Branch · first match"/, why: "the branch rail label on the reading surface, through the inspect contract" },
+      { file: "patterpad-surface/src/grouplabel.ts", match: /`Sequence · /, why: "the sequence rail label (order · exhaust) on the reading surface, through the inspect contract" },
       { file: "patterpad-surface/web/views.ts", match: /parts\.join\(" · "\)/, why: "a game event's field summary on the reading surface (key: value · key: value), the same text the inspect contract carries" },
       { file: "patterpad-surface/web/views.ts", match: /"  · secret"/, why: "the option rail's secret flag beside its marker, on the reading surface" },
-      { file: "patterpad/src/renderer/src/inspector.ts", match: /replace\(\/\^sequence · \/, ""\)/, why: "the inspector STRIPPING the surface's label prefix it received through the inspect contract; the literal is never shown" },
+      { file: "patterpad/src/renderer/src/inspector.ts", match: /replace\(\/\^Sequence · \/, ""\)/, why: "the inspector STRIPPING the surface's label prefix it received through the inspect contract; the literal is never shown" },
     ], []);
   });
 
@@ -177,18 +173,13 @@ describe("family style: tooltips go through the shell", () => {
   it("sets no native title tooltip", () => {
     hold("native title", lineHits(TITLE), [
       { file: "patterpad-surface/web/index.html", match: /class="hdr-toggle"/, count: 3, why: "the surface's standalone vite harness page (npm run dev in patterpad-surface), not shipped in Patterpad; its three header toggles explain themselves to a developer" },
-    ], [
-      { file: "patterpad/src/renderer/index.html", match: /id="report-more"/, why: "the report pane's scroll-for-more button carries title=\"More below\" beside its aria-label; the label alone is the family form" },
-      { file: "patterpad/src/renderer/src/coverage-view.ts", match: /\.title = /, count: 4, why: "the Coverage window's dry-choice rows, gate references and dead-beat links explain themselves through native titles; the shell tooltip is the family form" },
-    ]);
+    ], []);
   });
 });
 
 describe("family style: no dashes in strings", () => {
   it("types no em-dash or en-dash", () => {
-    hold("dash", lineHits(/[—–]/, ["ts", "html", "css"]), [], [
-      { file: "patterpad/src/renderer/src/inspector.ts", match: /"—"/, count: 2, why: "the em-dash standing for an empty value in the inspector's Character and Address rows; the family word is a muted \"None\" or the field left blank" },
-    ]);
+    hold("dash", lineHits(/[—–]/, ["ts", "html", "css"]), [], []);
   });
 });
 
@@ -207,9 +198,10 @@ describe("family style: focus is always visible", () => {
 
 describe("family style: captions are words, not overlines", () => {
   // A tracked ALL-CAPS caption survives in exactly two places: table column heads and screenplay
-  // character cues, where uppercase is the domain's own convention. Everything else in the pending
-  // list is the eyebrow the review counted (design/ui-review-2026-09/00-conclusions.md, "Overline
-  // retired as default") and is to become sentence-case text at label size, weight 600.
+  // character cues, where uppercase is the domain's own convention. The 28 eyebrows the review
+  // counted (design/ui-review-2026-09/00-conclusions.md, "Overline retired as default") are gone:
+  // each is sentence-case text at label size, weight 600, in the UI face, muted. PENDING is empty,
+  // so a caption that reaches for the tracked caps again fails this run.
   it("tracks no uppercase caption outside the cues and the table heads", () => {
     const hits = blockHits((body) => /text-transform:\s*uppercase/.test(body) && /letter-spacing/.test(body));
     hold("tracked uppercase caption", hits, [
@@ -219,36 +211,7 @@ describe("family style: captions are words, not overlines", () => {
       { file: SURFACE, match: /^\.cue-ac-item$/, why: "the cast popup's rows are the cues they will become, in the script's cue casing" },
       { file: SURFACE, match: /^\.cue-ac-field$/, why: "the cast popup's field, where the cue is typed, in the same casing as the rows" },
       { file: SHELL, match: /^\.rpt-table th$/, why: "a table column head, the other place the overline survives" },
-    ], [
-      { file: SHELL, match: /^\.suggestion-popover \.sg-outcome$/, why: "eyebrow over a suggestion's outcome" },
-      { file: SHELL, match: /^\.suggestion-popover \.sg-diff-label$/, why: "eyebrow over a suggestion's diff" },
-      { file: SHELL, match: /^\.inspector-label$/, why: "the inspector's section caption" },
-      { file: SHELL, match: /^\.effects-section-cap$/, why: "the effects editor's section caption" },
-      { file: SHELL, match: /^\.scratch-badge$/, why: "the scratch recorder's state badge" },
-      { file: SHELL, match: /^\.scratch-next-label$/, why: "the scratch recorder's next-line caption" },
-      { file: SHELL, match: /^\.insp-gd-cap$/, why: "the inspector's game data caption" },
-      { file: SHELL, match: /^\.overview-scenes-label$/, why: "the project overview's scenes caption" },
-      { file: SHELL, match: /^\.doc-class-label$/, why: "the documentation class label" },
-      { file: SHELL, match: /^\.rpt-badge$/, why: "the report's badge" },
-      { file: SHELL, match: /^\.rpt-card-label$/, why: "the report card's caption" },
-      { file: SHELL, match: /^\.rpt-section-cap$/, why: "the report's section caption" },
-      { file: SHELL, match: /^\.est-tags-label$/, why: "the estimating tab's tags caption" },
-      { file: SHELL, match: /^\.gd-statuscap$/, why: "the game data status caption" },
-      { file: SEARCH, match: /^\.swin-kind$/, why: "the Find window's result-kind tag" },
-      { file: COVERAGE, match: /^\.cov-opt$/, why: "the Coverage window's option captions" },
-      { file: COVERAGE, match: /^\.cov-stat-label$/, why: "the Coverage window's stat captions" },
-      { file: COVERAGE, match: /^\.cov-stopped$/, why: "the Coverage window's stopped badge" },
-      { file: COVERAGE, match: /^\.cov-scene-dead$/, why: "the Coverage window's dead-scene tag" },
-      { file: COVERAGE, match: /^\.cov-kind$/, why: "the Coverage window's beat-kind tag" },
-      { file: SURFACE, match: /^\.overline$/, why: "the surface's own copy of the retired .overline utility" },
-      { file: SURFACE, match: /^\.doc-underhead-cls$/, why: "the documentation class label under a block head" },
-      { file: SURFACE, match: /^\.block-ctl$/, why: "the block head's control captions" },
-      { file: SURFACE, match: /^\.status-pill$/, why: "the writing-status pill in the gutter" },
-      { file: SURFACE, match: /^\.group-rail-head$/, why: "the group rail's structural label" },
-      { file: SURFACE, match: /^\.group-ctl$/, why: "the group rail's control captions" },
-      { file: SURFACE, match: /^\.action-head$/, why: "the action menu's section heads" },
-      { file: SURFACE, match: /^\.slash-head$/, why: "the slash menu's section heads" },
-    ]);
+    ], []);
   });
 });
 

@@ -4,11 +4,10 @@
 
 * { box-sizing: border-box; }
 
-/* The one small-uppercase caption used across the app (section heads, card labels, table heads,
-   eyebrows). One rule replaces the ~18 bespoke declarations that had drifted to six sizes / two weights
-   / five tracking values (design-language §4 typography). Sites either carry the class or fold these
-   three properties in; per-site colour / padding / margin stay. Deviate only on purpose, with a note. */
-.overline { font: 600 10.5px/1 var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+/* The tracked-caps caption utility that used to sit here is retired ("Captions are words, not
+   overlines", design-language §4): a caption is sentence-case text at label size, weight 600, in the
+   UI face, muted. The uppercase form survives only on a table column head and a character cue, and
+   this sheet carries neither as a utility. */
 
 /* Themed scrollbars now live in theme.css (the shared layer), so the editor, play, and search windows
    all get them - see the ::-webkit-scrollbar rules there. */
@@ -83,7 +82,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .doc-underhead-indent { padding-left: 1rem; }
 .doc-underhead:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); }
 .doc-underhead-line { font: italic 0.78rem var(--font-ui); color: var(--muted); line-height: 1.45; }
-.doc-underhead-cls { font-style: normal; font-weight: 600; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-right: 0.35rem; }
+.doc-underhead-cls { font-style: normal; font-weight: 600; font-size: 0.78rem; color: var(--muted); margin-right: 0.35rem; }
 .block-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); } /* to the left of the title */
 .block:hover > .block-head > .block-drag, .block:focus-within > .block-head > .block-drag { opacity: 1; }
 .block-dots { margin-left: auto; } /* the quiet ⋯ sits at the right end of the heading */
@@ -102,7 +101,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .block-after { height: 1.4rem; display: flex; align-items: center; justify-content: flex-start; }
 .block-ctl {
   background: none; border: 0; cursor: pointer; color: var(--muted);
-  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; padding: 0;
+  font: 600 0.78rem var(--font-ui); padding: 0;
   opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
 }
 .block:hover > .block-after > .block-ctl, .block-after:hover > .block-ctl { opacity: 1; }
@@ -460,7 +459,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   white-space: nowrap; max-width: 112px; overflow: hidden; text-overflow: ellipsis;
   padding: 0.5px 6.5px; border-radius: var(--radius-pill); border: 1px solid var(--line);
   background: var(--surface); color: var(--muted);
-  font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em;
+  font: 600 12.5px/1.2 var(--font-ui);
 }
 /* The colour swatch shown beside a rung's name in the "Status" submenu + the inspector dropdown. */
 .status-swatch {
@@ -552,12 +551,16 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .bubble.problem-error, .group-rail.problem-error { box-shadow: inset 3px 0 0 var(--danger); }
 .bubble.problem-warning, .group-rail.problem-warning { box-shadow: inset 3px 0 0 var(--warn); }
 
-/* game event: the toDOM renders the gear glyph; push it to the right margin. The row is a flex
-   line (gear glyph + hover-revealed delete affordance, .atom-del below). */
+/* game event: the toDOM renders the drawn mark; push it to the right margin. The row is a flex
+   line (the mark + hover-revealed delete affordance, .atom-del below). */
 .beat.kind-gameEvent {
   display: flex; justify-content: flex-end; align-items: center; gap: 0.4rem; margin: 0.25rem 0;
   color: var(--accent); font-size: 0.9rem; user-select: none;
 }
+/* The event's mark: the vocabulary's drawn `settings`, sized off the row (1em) so it tracks the
+   reading scale the row is set in rather than the chrome's px. */
+.beat.kind-gameEvent .atom-glyph { display: inline-flex; align-items: center; }
+.beat.kind-gameEvent .atom-glyph svg { width: 1em; height: 1em; }
 /* The event's gameData, inline (#48): machine text, so the design-language mono; one line that yields
    real estate gracefully - it shrinks and ellipsizes before it ever wraps the row. */
 .beat.kind-gameEvent .atom-fields {
@@ -577,12 +580,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* the rails are a quiet structural cue, not a loud frame - they read like the neutral sequence/run
    rail (plain --line); the label, the option PROMPT cell, and condition tags carry the identity. */
 .group-rail.is-choice { border-left-color: var(--line); }
-/* Intentionally NOT the shared `.overline` (700/0.62/0.07): the persistent structural rail label reads a
-   touch heavier + tighter than a one-off caption, and its is-choice / is-option variants below re-tune it. */
+/* The persistent structural label on the rail: the caption form in the reading column, so it is sized
+   in rem with the script it labels rather than in the chrome's px. Its is-choice / is-option variants
+   below re-colour it. */
 .group-rail-head {
   display: flex; align-items: baseline; gap: 0.4rem;
-  font: 700 0.62rem var(--font-ui);
-  text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+  font: 600 0.78rem var(--font-ui); color: var(--muted);
   padding: 0.1rem 0 0.25rem; user-select: none;
 }
 /* drag handle: INSIDE the rail, just left of the type label (so it never overlaps the
@@ -590,7 +593,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .rail-drag { opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard); }
 .group-rail:hover > .group-rail-head > .rail-drag, .group-rail:focus-within > .group-rail-head > .rail-drag { opacity: 1; }
 .group-rail.is-choice > .group-rail-head { color: color-mix(in oklab, var(--accent) 32%, var(--muted)); }
-.group-rail.is-option > .group-rail-head { color: var(--ink); text-transform: none; letter-spacing: normal; font-weight: 600; }
+.group-rail.is-option > .group-rail-head { color: var(--ink); }
 /* an option's rail stays neutral too - its PROMPT cell (the accent-tinted box below) is the anchor */
 .group-rail.is-option { border-left-color: var(--line); }
 /* a choice option's PROMPT cell (groups §13.10): the tied choice-text line at the top of the option
@@ -637,7 +640,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* the "+ option" control (the only remaining inline group control) */
 .group-ctl {
   background: none; border: 0; cursor: pointer; color: var(--muted); padding: 0;
-  font: 600 0.66rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em;
+  font: 600 0.78rem var(--font-ui);
 }
 .group-ctl:hover { color: var(--ink); }
 
@@ -734,7 +737,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   font: 13px var(--font-ui);
 }
 .action-submenu { min-width: 128px; z-index: 51; }
-.action-head { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 4px 8px 5px; }
+.action-head { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); padding: 4px 8px 5px; }
 .action-mi {
   display: flex; align-items: center; justify-content: space-between; gap: 9.5px;
   width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
@@ -773,7 +776,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .slash-item.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* hover SETS .active (one shared highlight) */
 .slash-item u { text-decoration-color: var(--muted); text-underline-offset: 2px; } /* the access-key letter (type-ahead) */
-.slash-head { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 5px 9.5px 3px; flex: none; }
+.slash-head { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); padding: 5px 9.5px 3px; flex: none; }
 .slash-head:not(:first-child) { margin-top: 2.5px; border-top: 1px solid var(--line); padding-top: 6.5px; } /* a quiet rule between the two sections */
 
 /* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */

@@ -121,7 +121,7 @@ function ghostSnippet(
 }
 
 /** The discreet "+" that adds a following sibling chunk (the kinds menu), mirroring
- *  "+ block" / "+ option" - it lives centred in the gap after a snippet. */
+ *  "+ Block" / "+ Option" - it lives centred in the gap after a snippet. */
 function addAfterButton(view: View, getPos: GetPos): HTMLButtonElement {
   // No "+" text glyph: the cross is drawn with CSS pseudo-bars (.bubble-after::before/::after)
   // so it is GEOMETRICALLY centred, not subject to a font's math-axis offset.
@@ -263,7 +263,7 @@ function gameEventFields(node: PMNode): string {
 
 export const gameEventView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "beat kind-gameEvent"; dom.contentEditable = "false";
-  const glyph = document.createElement("span"); glyph.className = "atom-glyph"; glyph.textContent = "⚙";
+  const glyph = document.createElement("span"); glyph.className = "atom-glyph"; glyph.append(iconNode("settings", 15));
   const fields = document.createElement("span"); fields.className = "atom-fields";
   // The inline line ellipsizes rather than wrap, so the HOVER carries the whole list (the docnotes /
   // comment-chip idiom): a long event stays one quiet row and still answers in full on approach. No
@@ -408,7 +408,7 @@ function isChoiceOption(view: View, pos: number | undefined): boolean {
  * A group renders as a left-RAIL container (groups §3 / §13.2): the rail + a
  * header label are a persistent structural cue (always visible), the children
  * edit inline. A choice's children render as OPTION rows (◇ + the prompt cell), with
- * an "+ option" control on the choice; their condition / secret flag is edited from the
+ * an "+ Option" control on the choice; their condition / secret flag is edited from the
  * rail's "edit" popover (the choice text lives in the option's prompt cell, §14.8).
  */
 export const groupView: NodeViewConstructor = (node, view, getPos) => {
@@ -431,7 +431,7 @@ export const groupView: NodeViewConstructor = (node, view, getPos) => {
   });
   const body = document.createElement("div"); body.className = "group-rail-body";
   const ghost = ghostSnippet(view, getPos); // shown only when the group body is empty (CSS)
-  // "+ option" lives in the SPACE after each option (centred), mirroring "+ block";
+  // "+ Option" lives in the SPACE after each option (centred), mirroring "+ Block";
   // shown only when this group IS an option (CSS).
   const after = document.createElement("div"); after.className = "option-after"; after.contentEditable = "false";
   after.append(addOptionButton(view, getPos));
@@ -444,7 +444,7 @@ export const groupView: NodeViewConstructor = (node, view, getPos) => {
     // rail label is just the marker (+ a secret flag).
     // The ◇ marker now lives on the option's PROMPT cell (CSS .option-prompt::before), not the rail
     // label - so the diamond sits with the choice text it marks.
-    label.textContent = option ? `option${raw.secretUntilEligible ? "  · secret" : ""}` : groupLabel(raw);
+    label.textContent = option ? `Option${raw.secretUntilEligible ? "  · secret" : ""}` : groupLabel(raw);
     const c = typeof raw.condition === "string" ? raw.condition : "";
     cond.textContent = c ? `if ${humanizeCondition(c)}` : "";  // surface the condition (read-only, ids->titles); inspector edits it
     cond.style.display = c ? "" : "none";
@@ -469,7 +469,7 @@ export const groupView: NodeViewConstructor = (node, view, getPos) => {
 
 /** Add an option AFTER this one (groups §8) - centred in the gap below each option (CSS). */
 function addOptionButton(view: View, getPos: GetPos): HTMLButtonElement {
-  const b = document.createElement("button"); b.className = "group-ctl add-option"; b.textContent = "+ option"; b.dataset.tip = "Add a choice option";
+  const b = document.createElement("button"); b.className = "group-ctl add-option"; b.textContent = "+ Option"; b.dataset.tip = "Add a choice option";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); const pos = getPos(); if (pos == null) return; const tr = insertOptionAfter(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return b;
 }
@@ -486,7 +486,7 @@ export const rawnodeView: NodeViewConstructor = (node) => {
 
 /** New block after this one (the outline-level create, groups §3). */
 function addBlockButton(view: View, getPos: GetPos): HTMLButtonElement {
-  const b = document.createElement("button"); b.className = "block-ctl add"; b.textContent = "+ block"; b.dataset.tip = "New block after this one";
+  const b = document.createElement("button"); b.className = "block-ctl add"; b.textContent = "+ Block"; b.dataset.tip = "New block after this one";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); const pos = getPos(); if (pos == null) return; const tr = insertBlock(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return b;
 }
@@ -521,7 +521,7 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
   name.addEventListener("focus", selectBlock); // focusing the rename field also shows the block in the inspector
   const body = document.createElement("div"); body.className = "block-body";
   const ghost = ghostSnippet(view, getPos); // shown only when the block is empty (CSS)
-  // "+ block" lives in the SPACE after the block (the inter-block gap), not in the header.
+  // "+ Block" lives in the SPACE after the block (the inter-block gap), not in the header.
   const after = document.createElement("div"); after.className = "block-after"; after.contentEditable = "false";
   after.append(addBlockButton(view, getPos));
   dom.append(head, body, ghost, after);

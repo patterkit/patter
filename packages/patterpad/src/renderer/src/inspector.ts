@@ -35,6 +35,14 @@ export interface EffectLike { kind: "set"; target?: string; value?: string; }
 // inspector reads that preference via `h.textMode()` and the renderer also flips any open editor.
 
 /** A label : value row. Returns null for an empty value so callers can skip blanks cheaply. */
+/** The same row with nothing in it: a muted "None" in the value column. A typed dash for "nothing"
+ *  is a placeholder glyph, and the family writes the word (copy-house-style.md rule 32). */
+function emptyRow(label: string): HTMLElement {
+  const r = el("div", "insp-row");
+  r.append(el("span", "insp-key", label), el("span", "insp-val insp-none", "None"));
+  return r;
+}
+
 function row(label: string, value: string | null | undefined): HTMLElement | null {
   if (value == null || value === "") return null;
   const r = el("div", "insp-row");
@@ -72,7 +80,7 @@ function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData
   const rows = gameDataFieldRows(kind, id, gd, h);
   if (!rows.length) return null;
   const sec = el("div", "insp-gd-section");
-  sec.append(el("div", "insp-gd-cap", "Game Data"), ...rows);
+  sec.append(el("div", "insp-gd-cap", "Game data"), ...rows);
   return sec;
 }
 
@@ -127,7 +135,7 @@ function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
   if (lv.beat === "line") rows.push(recordingStatusRow(lv.id, h)); // recording status, dialogue lines only (#206)
   if (lv.beat === "line") rows.push(rerecordRow(lv.id, h));         // "needs re-record" override, dialogue lines only (#227)
   if (lv.beat === "line") {
-    rows.push(row("Character", lv.character ?? "—"));
+    rows.push(lv.character ? row("Character", lv.character) : emptyRow("Character"));
     rows.push(row("Direction", lv.direction));
   }
   rows.push(tagsRow(lv.id, lv.tags, h));
@@ -531,7 +539,7 @@ function addressRow(id: string | null, gameId: string | undefined, address: stri
   r.append(el("span", "insp-key", "Game ID"));
   const btn = el("button", `insp-cond${gameId ? "" : " muted"}`);
   btn.type = "button";
-  btn.textContent = address || "—";
+  btn.textContent = address || "None";
   if (id) {
     btn.dataset.tip = gameId ? "Edit the Game ID" : "Derived from the name. Click to pin a fixed Game ID."; btn.setAttribute("aria-label", gameId ? "Edit the Game ID" : "Derived from the name. Click to pin a fixed Game ID.");
     btn.addEventListener("click", () => edit(id, gameId ?? "", address, btn));
@@ -583,7 +591,7 @@ function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   switch (lv.kind) {
     case "leaf": head = LEAF_HEAD[lv.beat]; body = leafBody(lv, h); break;
     case "snippet": head = "Snippet"; body = snippetBody(lv, h); break; // always "Snippet" - a jump is a snippet property, not its identity (the body notes a jump-only snippet)
-    case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" ? lv.label.replace(/^sequence · /, "") : ""; body = groupBody(lv, h); break;
+    case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" ? lv.label.replace(/^Sequence · /, "") : ""; body = groupBody(lv, h); break;
     case "block": head = "Block"; sub = lv.name; body = addressBody(lv, h); break;
     case "scene": head = "Scene"; sub = lv.name; body = addressBody(lv, h); break;
   }

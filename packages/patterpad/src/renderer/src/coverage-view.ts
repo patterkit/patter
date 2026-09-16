@@ -9,6 +9,9 @@ import { el } from "./dom.js";
 import { iconNode, formatCount as num, metaLine } from "@wildwinter/app-shell"; // the drawn warning mark on a dead beat; the grouped count; the drawn separator
 
 const pct = (n: number): string => `${n.toFixed(0)}%`;
+/** The beat-kind tag beside a row, in the inspector's words: the report's `gameEvent` token is a
+ *  key, not a caption. */
+const KIND_LABEL: Record<CoverageBeat["kind"], string> = { line: "Line", text: "Text", gameEvent: "Game event" };
 const clip = (s: string, n = 60): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** A headline stat: big number + label. */
@@ -36,9 +39,9 @@ export function renderCoverage(
   // Summary: headline stats + the run parameters + termination breakdown.
   const stats = el("div", "cov-stats");
   stats.append(
-    stat(pct(t.coveragePct), "beats reached"),
-    stat(`${num(t.covered)} / ${num(t.beats)}`, "covered"),
-    stat(num(t.neverHit), t.neverHit === 1 ? "never reached" : "never reached"),
+    stat(pct(t.coveragePct), "Beats reached"),
+    stat(`${num(t.covered)} / ${num(t.beats)}`, "Covered"),
+    stat(num(t.neverHit), t.neverHit === 1 ? "Never reached" : "Never reached"),
   );
   host.append(stats);
 
@@ -47,7 +50,7 @@ export function renderCoverage(
   // A cancelled sweep reports the runs it ACTUALLY took, so the percentages above are real but the
   // sample is smaller than the one that was asked for. Say so beside them, or a stopped sweep reads as
   // a finished one and a thin sample gets trusted like a thick one.
-  if (report.cancelled) meta.append(el("span", "cov-stopped", "stopped early"));
+  if (report.cancelled) meta.append(el("span", "cov-stopped", "Stopped early"));
   // Two drawn metadata lines (the shell's metaLine, a disc between parts): the run parameters, then how the
   // runs ended. The `errored` part is passed as undefined when there were none, and the line skips it.
   meta.append(metaLine([`${num(report.runs)} run${report.runs === 1 ? "" : "s"}`, `${report.maxSteps} max steps`, `seed ${report.seed}`]));
@@ -72,7 +75,7 @@ export function renderCoverage(
       const row = el("button", "cov-dry-item");
       row.append(el("span", "cov-dry-scene", sceneName(d.scene)), el("span", "cov-dry-id", clip(d.id, 32)));
       row.append(el("span", "cov-dry-count", `${num(d.runs)} / ${num(report.runs)} runs`));
-      row.title = `Reveal this choice. It ran dry in ${num(d.runs)} of ${num(report.runs)} run${report.runs === 1 ? "" : "s"}.`;
+      row.dataset.tip = `Reveal this choice. It ran dry in ${num(d.runs)} of ${num(report.runs)} run${report.runs === 1 ? "" : "s"}.`;
       row.addEventListener("click", () => onReveal(d.scene, d.id));
       list.append(row);
     }
@@ -109,14 +112,14 @@ export function renderCoverage(
       if (b.reachedRuns === 0 && !(b.needsInput || b.blockedBy)) mark.append(iconNode("warning", 12));
       const label = b.character ? `${b.character}: ${clip(b.preview)}` : clip(b.preview || `(${b.kind})`);
       const beatCell = el("td", "cov-beat");
-      beatCell.append(el("span", "cov-kind", b.kind), el("span", "cov-text", label));
+      beatCell.append(el("span", "cov-kind", KIND_LABEL[b.kind]), el("span", "cov-text", label));
       if (b.needsInput) {
         const gate = el("span", "cov-gate", "gated on ");
         b.needsInput.forEach((ref, i) => {
           if (i) gate.append(document.createTextNode(", "));
           if (onFindUsage) {
             // Each gate ref is a "where else is @x used?" link → property-usage search.
-            const a = el("button", "cov-gate-ref", ref); a.type = "button"; a.title = `Find where ${ref} is used`;
+            const a = el("button", "cov-gate-ref", ref); a.type = "button"; a.dataset.tip = `Find where ${ref} is used`;
             a.addEventListener("click", (e) => { e.stopPropagation(); onFindUsage(ref); }); // don't also trigger the row reveal
             gate.append(a);
           } else gate.append(document.createTextNode(ref));
@@ -130,7 +133,7 @@ export function renderCoverage(
         const line = el("span", "cov-gate cov-gate-blocked");
         line.append(document.createTextNode("gated on "));
         if (onFindUsage) {
-          const a = el("button", "cov-gate-ref", bg.ref); a.type = "button"; a.title = `Find where ${bg.ref} is used`;
+          const a = el("button", "cov-gate-ref", bg.ref); a.type = "button"; a.dataset.tip = `Find where ${bg.ref} is used`;
           a.addEventListener("click", (e) => { e.stopPropagation(); onFindUsage(bg.ref); });
           line.append(a);
         } else line.append(document.createTextNode(bg.ref));
@@ -140,7 +143,7 @@ export function renderCoverage(
           const target = report.beats.find((x) => x.id === w);
           if (!target) { line.append(document.createTextNode(w)); return; }
           const a = el("button", "cov-gate-ref", clip(target.preview || target.id, 28)); a.type = "button";
-          a.title = "Open this beat. It never played either.";
+          a.dataset.tip = "Open this beat. It never played either.";
           a.addEventListener("click", (e) => { e.stopPropagation(); onReveal(target.scene, target.id); });
           line.append(a);
         });

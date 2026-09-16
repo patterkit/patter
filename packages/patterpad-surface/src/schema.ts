@@ -22,6 +22,7 @@
 // ---------------------------------------------------------------------------
 
 import { Schema } from "prosemirror-model";
+import { iconNode } from "@wildwinter/app-shell"; // the family's drawn set: the event's mark is a word, not a typed glyph
 
 export const patterSchema = new Schema({
   nodes: {
@@ -86,7 +87,8 @@ export const patterSchema = new Schema({
     // Game event: an opaque engine instruction (details via a separate UI). No cursor.
     gameEvent: {
       group: "beat", atom: true, attrs: { id: {}, raw: { default: "{}" } },
-      toDOM: () => ["div", { class: "beat kind-gameEvent", contenteditable: "false" }, "⚙"],
+      toDOM: () => ["div", { class: "beat kind-gameEvent", contenteditable: "false" },
+        ["span", { class: "atom-glyph" }, iconNode("settings", 15)]],
     },
 
     // --- zones (textblocks the cursor occupies) -----------------------------

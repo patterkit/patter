@@ -56,7 +56,9 @@ body.play {
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .pline { animation: none; } }
 .pline.text { color: var(--ink-soft); }
-.pline.gameEvent { color: var(--muted); font: 0.85rem var(--font-mono); }
+.pline.gameEvent { color: var(--muted); font: 0.85rem var(--font-mono); display: flex; align-items: center; gap: 0.3rem; }
+/* The event's mark is drawn, and sized off the line so it tracks the reading scale. */
+.pline.gameEvent svg { width: 1em; height: 1em; flex: none; }
 /* A line whose audio is currently sounding: a soft pulsing accent bar in the left margin, so it's clear
    which line you're hearing. Reduced-motion holds it steady. */
 .pline-playing { position: relative; }

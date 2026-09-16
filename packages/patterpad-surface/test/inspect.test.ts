@@ -93,7 +93,7 @@ describe("inspect: the detail-inspector context stack", () => {
     ] };
     const option = inspect(stateAtSay(scene, { P1: "Go", L1: "Hi" }, "L1")).levels[2] as GroupLevel;
     expect(option.role).toBe("option"); // recognised via the parent choice, not raw.prompt / secret
-    expect(option.label).toBe("◇ option");
+    expect(option.label).toBe("◇ Option");
   });
 
   it("a choice level carries its options (prompt + condition + secret) for the consolidated editor", () => {

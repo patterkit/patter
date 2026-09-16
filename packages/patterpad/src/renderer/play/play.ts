@@ -204,7 +204,7 @@ function appendStep(step: PlayStep): HTMLElement {
   } else if (step.kind === "text") {
     renderMarkup(div, step.text ?? "");
   } else {
-    div.textContent = "⚙ game event";
+    div.append(iconNode("settings", 15), "game event"); // the flex gap sets the space, not a typed one
   }
   transcriptEl.appendChild(div);
   return div;

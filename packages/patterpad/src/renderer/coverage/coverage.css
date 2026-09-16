@@ -18,7 +18,7 @@ body.coverage-win {
 
 /* Options row */
 .cov-opts { flex: 0 0 auto; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 11px; border-bottom: 1px solid var(--line); background: var(--surface); padding: 9.5px 14.5px; }
-.cov-opt { display: flex; flex-direction: column; gap: 3px; font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-opt { display: flex; flex-direction: column; gap: 3px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .cov-opt input, .cov-opt select { width: 104px; font: 13px var(--font-ui); padding: 5px 6.5px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--ink); }
 .cov-bar-spacer { flex: 1 1 auto; }
 /* The bar's buttons are the shell's `.btn` / `.btn.primary` (controls.css). */
@@ -36,7 +36,7 @@ body.coverage-win {
 .cov-results.stale { opacity: 0.5; pointer-events: none; transition: opacity var(--dur-quick) ease; }
 .cov-stats { display: flex; gap: 25.5px; }
 .cov-stat-big { font: 700 25.5px var(--font-ui); color: var(--ink); font-variant-numeric: tabular-nums; }
-.cov-stat-label { font: 600 10px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-stat-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .cov-meta { display: flex; flex-direction: column; gap: 1.5px; font: 12px var(--font-ui); color: var(--ink-soft); }
 .cov-meta-ended { color: var(--muted); } /* how the runs ended, softer than the parameters above it */
 /* A cancelled sweep: the numbers are real, the sample is short. Said as a pill so it is not read as
@@ -44,7 +44,7 @@ body.coverage-win {
 .cov-stopped {
   align-self: flex-start; margin-bottom: 2.5px; padding: 1px 6.5px;
   border: 1px solid var(--warn, var(--accent)); border-radius: var(--radius-sm, 4px);
-  font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em;
+  font: 600 12.5px/1.2 var(--font-ui);
   color: var(--warn, var(--accent));
 }
 .cov-note { margin: 0; font: 12.5px var(--font-ui); color: var(--ink-soft); }
@@ -66,7 +66,7 @@ body.coverage-win {
 .cov-dry-count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .cov-empty { color: var(--muted); font: 13.5px var(--font-ui); }
 .cov-scene-cap { display: flex; align-items: baseline; gap: 9.5px; margin: 8px 0 0; font: 600 12.5px var(--font-ui); color: var(--accent); }
-.cov-scene-dead { font: 600 10px var(--font-ui); color: var(--danger); text-transform: uppercase; letter-spacing: 0.03em; }
+.cov-scene-dead { font: 600 12.5px/1.2 var(--font-ui); color: var(--danger); }
 .cov-table { width: 100%; border-collapse: collapse; font: 13px var(--font-ui); }
 .cov-table td { padding: 5px 8px; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); color: var(--ink); vertical-align: baseline; }
 .cov-table tr { cursor: pointer; }
@@ -77,7 +77,7 @@ body.coverage-win {
 .cov-mark { width: 19px; text-align: center; font-weight: 700; color: var(--danger); }
 .cov-mark [data-icon] { margin: 0 auto; } /* the drawn warning centres like the "?" text does */
 .cov-row-input .cov-mark { color: var(--warn, var(--accent)); }
-.cov-kind { display: inline-block; min-width: 51px; font: 600 9.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.cov-kind { display: inline-block; min-width: 72px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .cov-gate { display: block; margin-top: 1.5px; font: italic 11.5px var(--font-ui); color: var(--ink-soft); }
 .cov-gate-ref { font: 11.5px var(--font-mono); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .cov-gate-ref:hover { filter: brightness(1.15); }

@@ -160,9 +160,9 @@
 .suggestion-popover .sg-head { display: flex; align-items: baseline; gap: 8px; }
 .suggestion-popover .sg-author { font: 600 12.5px var(--font-ui); color: var(--ink); }
 .suggestion-popover .sg-ts { font: 11px var(--font-ui); color: var(--muted); }
-.suggestion-popover .sg-outcome { margin-left: auto; font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.suggestion-popover .sg-outcome { margin-left: auto; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .suggestion-popover .sg-stale { margin: 5.5px 0; padding: 4px 7px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent) 10%, transparent); color: var(--ink-soft); font: italic 11.5px var(--font-ui); }
-.suggestion-popover .sg-diff-label { margin-top: 6.5px; font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+.suggestion-popover .sg-diff-label { margin-top: 6.5px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .suggestion-popover .sg-before { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--line); color: var(--muted); font: 13px var(--font-ui); white-space: pre-wrap; }
 .suggestion-popover .sg-after { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); color: var(--ink); font: 13px var(--font-ui); white-space: pre-wrap; }
 
@@ -199,7 +199,7 @@
    innermost-first (leaf -> snippet -> group(s) -> block), most-specific at the top. The surface's
    `aside` rule supplies border-left + bg. */
 .pane-inspector .pane-inner { display: flex; flex-direction: column; }
-.inspector-label { display: flex; align-items: baseline; gap: 8px; padding: 9.5px 16px; color: var(--muted); font: 600 11px var(--font-ui); letter-spacing: 0.07em; text-transform: uppercase; border-bottom: 1px solid var(--line); }
+.inspector-label { display: flex; align-items: baseline; gap: 8px; padding: 9.5px 16px; color: var(--muted); font: 600 12.5px/1.2 var(--font-ui); border-bottom: 1px solid var(--line); }
 /* The <scene>.<block> Game ID breadcrumb - right-aligned, monospace, quiet (a reference, not a control). */
 .inspector-stack { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 /* Levels keep their natural height so a tall inspector SCROLLS rather than squashing its content. */
@@ -245,6 +245,8 @@
 .insp-key.insp-gd { font-family: var(--font-mono); color: var(--ink-soft); }
 .insp-val { color: var(--ink); word-break: break-word; }
 .insp-val.insp-mono { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); }
+/* A row whose value is not set: the word, muted, never a typed dash. */
+.insp-val.insp-none { color: var(--muted); }
 /* the editable Condition / effect value: a clickable chip (showing pills) that opens the visual editor */
 .insp-cond { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2.5px; text-align: left; background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--ink); font: 12px var(--font-mono); padding: 1.5px 6.5px; }
 .insp-cond:hover { border-color: var(--accent); color: var(--accent); }
@@ -263,7 +265,7 @@
 .shell-anchored-body { display: block; padding: 9.5px; }
 /* effects editor: one section per phase (On enter / On exit) */
 .effects-section + .effects-section { margin-top: 11px; padding-top: 9.5px; border-top: 1px solid var(--line); }
-.effects-section-cap { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 5.5px; }
+.effects-section-cap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-bottom: 5.5px; }
 /* The gameId editor is the shell's (openGameIdEditor); its `.shell-id-*` styles
    come with it in anchored.css. Ours reused the expr-editor input look and the
    app's btn classes; the shell's are the family's, which is the point. */
@@ -323,7 +325,7 @@
 .scratch-cue { font: 700 13.5px var(--font-ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: -14.5px; }
 /* Take-state badge (#224): whether the shown line's existing take is missing, out of date, or up to date.
    Sits under the line on the main card and beside the next-line preview in the saved state. */
-.scratch-badge { font: 600 11px var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em;
+.scratch-badge { font: 600 12.5px/1.2 var(--font-ui);
   padding: 2px 9px; border-radius: var(--radius-pill); margin-top: -14.5px; }
 .scratch-badge-missing { color: var(--muted); background: color-mix(in oklab, var(--ink) 8%, transparent); }
 .scratch-badge-stale { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
@@ -336,7 +338,7 @@
 @keyframes scratch-slide { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
 /* The next-line preview shown in the saved state (record it, or finish). */
 .scratch-next { display: flex; flex-direction: column; gap: 4px; align-items: center; }
-.scratch-next-label { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.scratch-next-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .scratch-next-cue { font: 700 13px var(--font-ui); letter-spacing: 0.05em; color: var(--accent); }
 .scratch-next-cue:empty { display: none; }
 .scratch-next-text { font: 1rem/1.4 var(--font-read); color: var(--ink); }
@@ -367,7 +369,7 @@
 .insp-tag-input { flex: 1 1 64px; min-width: 64px; font: 12.5px var(--font-ui); color: var(--ink); background: transparent; border: 0; padding: 1.5px 2.5px; }
 /* the host's custom fields, grouped in the lower part of the level under a subtle divider */
 .insp-gd-section { display: flex; flex-direction: column; gap: 2.5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent); }
-.insp-gd-cap { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 1.5px; }
+.insp-gd-cap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-bottom: 1.5px; }
 .insp-check { accent-color: var(--accent); cursor: pointer; }
 .jump-list { display: flex; flex-direction: column; gap: 1.5px; max-height: 60vh; overflow: auto; }
 /* THE #30 fix. One row per scene/block, so a big project overflows the 60vh cap - and flex then
@@ -454,7 +456,7 @@
 .overview-bar { flex: 1; height: 6.5px; border-radius: var(--radius-pill); background: color-mix(in oklab, var(--ink) 10%, transparent); overflow: hidden; }
 .overview-bar-fill { display: block; height: 100%; background: var(--accent); border-radius: var(--radius-pill); transition: width var(--dur-settle) var(--ease-standard); }
 .overview-progress-label { color: var(--muted); font: 600 12.5px var(--font-ui); white-space: nowrap; }
-.overview-scenes-label { color: var(--muted); font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.overview-scenes-label { color: var(--muted); font: 600 12.5px/1.2 var(--font-ui); margin-bottom: 8px; }
 .overview-scenes { display: flex; flex-direction: column; gap: 2.5px; }
 .overview-scene {
   text-align: left; width: 100%; cursor: pointer; color: var(--ink); font: 500 16px/1.3 var(--font-read);
@@ -528,7 +530,7 @@ input::placeholder, textarea::placeholder {
 .doc-dialog { width: 92vw; max-width: 544px; }
 .doc-host { display: flex; flex-direction: column; gap: 11px; max-height: 60vh; overflow: auto; }
 .doc-class { display: flex; flex-direction: column; gap: 3px; }
-.doc-class-label { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.doc-class-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .doc-text { font: 14.5px var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 8px; resize: vertical; min-height: 54.5px; }
 .doc-text:focus-visible { border-color: var(--accent); outline-offset: 0; }
 .doc-add { align-self: flex-start; font: 13px var(--font-ui); }
@@ -567,15 +569,15 @@ input::placeholder, textarea::placeholder {
 .rpt-summary { display: flex; align-items: baseline; gap: 9.5px; flex-wrap: wrap; }
 .rpt-summary-name { font: 700 16px var(--font-read); color: var(--ink); }
 .rpt-summary-scenes { color: var(--muted); font: 13px var(--font-ui); }
-.rpt-badge { margin-left: auto; font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1.5px 9px; }
+.rpt-badge { margin-left: auto; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 1.5px 9px; }
 .rpt-badge.voiced { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 40%, var(--line)); }
 .rpt-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 9.5px; }
 .rpt-card { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 9px 11px; background: var(--bg); display: flex; flex-direction: column; gap: 2.5px; }
-.rpt-card-label { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.rpt-card-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .rpt-card-big { font: 700 20px var(--font-read); color: var(--ink); }
 .rpt-card-sub { font: 12px var(--font-ui); color: var(--muted); }
 .rpt-section { display: flex; flex-direction: column; gap: 8px; }
-.rpt-section-cap { margin: 0; font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); }
+.rpt-section-cap { margin: 0; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .rpt-bars { display: flex; flex-direction: column; gap: 5px; }
 .rpt-bar-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 48px; align-items: center; gap: 9.5px; }
 .rpt-bar-label { font: 12.5px var(--font-ui); color: var(--ink-soft); }
@@ -617,7 +619,7 @@ input::placeholder, textarea::placeholder {
 .est-config { display: flex; flex-direction: column; gap: 9px; margin-top: 11px; }
 .est-config.est-off { opacity: 0.5; }
 .est-num { width: 96px; }
-.est-tags-label { font: 600 11.5px var(--font-ui); color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+.est-tags-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-top: 3px; }
 .est-tag-row { display: flex; align-items: center; gap: 6.5px; }
 .est-tag-row .est-tag { flex: 1; }
 
@@ -649,7 +651,7 @@ input::placeholder, textarea::placeholder {
 .dict-error { color: var(--danger); }
 /* Status ladders (Project Settings > Status): a captioned section per ladder, each writing row
    carrying its two readiness-threshold radios. */
-.gd-statuscap { font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin-top: 9.5px; }
+.gd-statuscap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-top: 9.5px; }
 .gd-statuscap:first-child { margin-top: 0; }
 .gd-markers { display: flex; gap: 14.5px; flex-wrap: wrap; padding-left: 1.5px; }
 .gd-marker { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font: 12px var(--font-ui); color: var(--muted); }

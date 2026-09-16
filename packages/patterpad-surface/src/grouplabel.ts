@@ -18,18 +18,19 @@ export function groupRole(raw: Record<string, unknown>): GroupRole {
   return raw.condition ? "conditional" : "group"; // run-group: a conditional block, else a plain run
 }
 
-/** The always-visible structural label for a group's rail header (spec / groups §3). */
+/** The always-visible structural label for a group's rail header (spec / groups §3). Sentence case:
+ *  the rail reads as a caption in words, never a tracked all-caps eyebrow (design-language §4). */
 export function groupLabel(raw: Record<string, unknown>): string {
   switch (groupRole(raw)) {
-    case "option": return "◇ option";
-    case "choice": return "choice";
-    case "branch": return "branch · first match";
+    case "option": return "◇ Option";
+    case "choice": return "Choice";
+    case "branch": return "Branch · first match";
     case "sequence": {
       const o = (raw.options as { order?: string; exhaust?: string } | undefined) ?? {};
       const order = o.order === "specificity" ? "best match" : (o.order ?? "sequential");
-      return `sequence · ${order} · ${o.exhaust ?? "once"}`;
+      return `Sequence · ${order} · ${o.exhaust ?? "once"}`;
     }
-    case "conditional": return "conditional";
-    default: return "group";
+    case "conditional": return "Conditional";
+    default: return "Group";
   }
 }

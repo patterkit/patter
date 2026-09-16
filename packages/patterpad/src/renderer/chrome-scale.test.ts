@@ -60,7 +60,7 @@ describe("chrome scale: no rem in chrome rules", () => {
 
 describe("chrome scale: the surface's mixed sheet", () => {
   it("chrome rules are px", () => {
-    for (const sel of ["#hintbar", ".action-menu", ".action-mi", ".slash-menu", ".slash-item", ".target-picker", ".tp-row", ".cue-ac", ".overline", ".note-icon", ".comment-bubble", ".status-pill"]) {
+    for (const sel of ["#hintbar", ".action-menu", ".action-mi", ".slash-menu", ".slash-item", ".target-picker", ".tp-row", ".cue-ac", ".note-icon", ".comment-bubble", ".status-pill"]) {
       expect(rule(surface, sel), sel).not.toMatch(REM);
     }
     expect(rule(surface, "#hintbar")).toContain("font: 12px var(--font-ui)");

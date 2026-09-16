@@ -53,13 +53,13 @@ describe("Phase B: recursive groups", () => {
     const dom = view.dom as HTMLElement;
 
     // the sequence rail, labelled with its order x exhaust, containing a nested branch rail
-    const seq = [...dom.querySelectorAll(".group-rail")].find((r) => r.querySelector(".group-rail-label")?.textContent?.startsWith("sequence"))!;
-    expect(seq.querySelector(".group-rail-label")?.textContent).toBe("sequence · shuffle · repeat");
-    expect(seq.querySelector(".group-rail-body > .group-rail .group-rail-label")?.textContent).toBe("branch · first match");
+    const seq = [...dom.querySelectorAll(".group-rail")].find((r) => r.querySelector(".group-rail-label")?.textContent?.startsWith("Sequence"))!;
+    expect(seq.querySelector(".group-rail-label")?.textContent).toBe("Sequence · shuffle · repeat");
+    expect(seq.querySelector(".group-rail-body > .group-rail .group-rail-label")?.textContent).toBe("Branch · first match");
 
     // the choice rail holds its two Option groups (rails), not bare bubbles
     const choice = dom.querySelector(".group-rail.is-choice")!;
-    expect(choice.querySelector(".group-rail-label")?.textContent).toBe("choice");
+    expect(choice.querySelector(".group-rail-label")?.textContent).toBe("Choice");
     expect(choice.querySelectorAll(".group-rail-body > .group-rail.is-option").length).toBe(2);
     view.destroy();
   });
