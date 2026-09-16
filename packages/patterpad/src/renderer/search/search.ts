@@ -18,7 +18,7 @@ import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
-import { pinButton, toolWindowHead, iconNode, toast, plural, debounce, isEditableTarget } from "@wildwinter/app-shell";
+import { pinButton, toolWindowHead, iconNode, toast, plural, debounce } from "@wildwinter/app-shell";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
 // nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
@@ -48,7 +48,9 @@ const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag";
 // its title slot. The pin is BUILT, not marked up: it owns its own class, aria-pressed and the
 // tooltip that says what a click will do.
 const pin = pinButton({ pinned: true, onToggle: (on) => search.setPin(on) });
-document.body.prepend(toolWindowHead({ tabs: modesEl, pin, onClose: () => search.close() }));
+// Escape closes from the query box too (`esc: "always"`): this window's focus lives in a field, and
+// the field's own Escape must never swallow the way out.
+document.body.prepend(toolWindowHead({ tabs: modesEl, pin, onClose: () => search.close(), esc: "always" }));
 const input = document.getElementById("swin-input") as HTMLInputElement;
 const chipsEl = document.getElementById("swin-chips")!;
 const resultsEl = document.getElementById("swin-results")!;
@@ -291,10 +293,8 @@ replaceAllBtn.addEventListener("click", () => void applyReplace());
 window.addEventListener("focus", () => { if (hasProject) { if (chipMode(mode) && activeChip) void loadChip(activeChip); else rerun(); } });
 
 document.addEventListener("keydown", (e) => {
-  // Escape outside a field is the shell head's (it closes the window); in the box it is ours, so the
-  // field's own Escape never swallows the way out.
-  if (e.key === "Escape") { if (isEditableTarget(e.target)) { e.preventDefault(); search.close(); } }
-  else if (mode === "replace") { /* no list navigation in Replace mode (rows have their own buttons) */ }
+  // Escape is the shell head's, from the box as well as outside it.
+  if (mode === "replace") { /* no list navigation in Replace mode (rows have their own buttons) */ }
   else if (e.key === "ArrowDown") { e.preventDefault(); setSel(sel + 1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); setSel(sel - 1); }
   else if (e.key === "Enter") { e.preventDefault(); const e2 = results[sel]; if (e2) choose(e2); }

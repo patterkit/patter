@@ -118,13 +118,9 @@
 .healthchip.warn { color: var(--warn); background: color-mix(in oklab, var(--warn) 14%, transparent); }
 .healthchip svg { display: block; }
 
-/* The long-job strip (the shell's job.css) sits between the bottom bars and the hint bar. A publish path
-   that reports nothing through the ops layer runs INDETERMINATE: the fill slides rather than sitting at
-   zero, which would read as stuck. (A shell option for this shape would let this rule go.) */
+/* The long-job strip (the shell's job.css) sits between the bottom bars and the hint bar. The band a
+   publish path shows while it reports nothing is the shell's own indeterminate mode. */
 .job-host { flex: 0 0 auto; }
-.job-strip.indeterminate .job-fill { width: 28%; animation: job-slide calc(var(--dur-slow) * 3) var(--ease-standard) infinite alternate; }
-@keyframes job-slide { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
-@media (prefers-reduced-motion: reduce) { .job-strip.indeterminate .job-fill { animation: none; width: 100%; opacity: 0.4; } }
 
 /* Topbar chip: the CURRENT scene's VC state (sits beside the unsaved dot). */
 .vcs-scene { display: inline-flex; align-items: center; gap: 4px; font: 600 0.72rem var(--font-ui); color: var(--warn); white-space: nowrap; }

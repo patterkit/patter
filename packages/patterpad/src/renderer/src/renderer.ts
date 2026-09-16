@@ -205,14 +205,14 @@ const reviewbarEl = $("reviewbar");
 const writingExitEl = $<HTMLButtonElement>("writing-exit"); // Writing View's bottom-left exit pill
 // The long-job strip (parity row 20): every publish / export / pack / merge path shows itself here while
 // main runs it as the kit's "publish" job. None of those paths reports progress through the ops layer
-// yet, so the strip runs indeterminate (the label and a sliding fill) until one does; Cancel asks main to
-// stop the job at its next yield.
+// yet, so the strip runs on the shell's indeterminate band (the label, the band and the elapsed time)
+// until one does: the strip follows the data and flips to the bar on the first total. Cancel asks main
+// to stop the job at its next yield.
 const jobView = mountJobProgress($("job"), { onCancel: () => window.patter.cancelJob("publish"), units: "files" });
 async function withJob<T>(label: string, work: () => Promise<T>): Promise<T> {
   jobView.begin(label);
-  jobView.element.classList.add("indeterminate");
   try { return await work(); }
-  finally { jobView.element.classList.remove("indeterminate"); jobView.end(); }
+  finally { jobView.end(); }
 }
 const overviewEl = $("overview"); // the project-overview landing (#3a)
 const overviewPathEl = $("overview-path"); // where the project lives on disk (click reveals it)
@@ -2919,8 +2919,9 @@ window.patter.onUpdaterSaveBeforeInstall(async () => { await save(); return { ok
 // Auto-update prompts wear the app's themed dialog chrome, never a stock OS box.
 window.patter.onUpdaterPrompt((opts) => showUpdaterDialog({ ...opts, openExternal: (url) => window.patter.openExternal(url) }));
 window.patter.onUpdaterDownloadProgress(feedUpdaterDownloadProgress);
-// A publish path that reports through the ops layer turns the strip determinate; none does yet.
-window.patter.onJobProgress((p) => { if (p.kind === "publish" && p.total > 0) { jobView.element.classList.remove("indeterminate"); jobView.update(p.done, p.total, p.elapsedMs); } });
+// A publish path that reports through the ops layer turns the strip determinate (the shell flips the
+// band to the bar on the first positive total); none does yet.
+window.patter.onJobProgress((p) => { if (p.kind === "publish") jobView.update(p.done, p.total, p.elapsedMs); });
 
 // A `.patter` document package opened from Finder while the app is running: render the delivered project.
 window.patter.onOpenProject((result) => void showProject(result));
