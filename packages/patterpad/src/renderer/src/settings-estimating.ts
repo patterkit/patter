@@ -57,7 +57,7 @@ export function mountEstimating(host: HTMLElement, initial: EstimatingConfig, la
       lines.type = "number"; lines.min = "0"; lines.value = String(t.lines);
       lines.addEventListener("input", () => { t.lines = Math.max(0, Math.round(Number(lines.value) || 0)); });
       const acts = el("div", "gd-acts");
-      acts.append(iconBtn("✕", "Remove tag estimate", () => { tags.splice(i, 1); renderTags(); }, false, true));
+      acts.append(iconBtn("close", "Remove tag estimate", () => { tags.splice(i, 1); renderTags(); }, false, true));
       row.append(tag, lines, acts);
       tagList.append(row);
     });

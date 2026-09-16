@@ -7,6 +7,7 @@
 
 import type { DebugStatus } from "../../shared/api.js";
 import { el } from "./dom.js";
+import { iconNode } from "@wildwinter/app-shell"; // the vocabulary's "connect" (a plug), one source for the suite
 
 export interface DebugLink {
   /** Show / hide the control (shown when a project is open). Re-queries the current status when shown. */
@@ -15,14 +16,11 @@ export interface DebugLink {
   toggle(): void;
 }
 
-// A plug glyph: two prongs up, the body, a cord down - reads as "connect".
-const PLUG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8z"/><path d="M12 16v6"/></svg>`;
-
 export function mountDebugLink(): DebugLink {
   const wrap = el("div", "debuglink"); wrap.hidden = true;
   const flow = el("select", "debuglink-flow") as HTMLSelectElement; flow.hidden = true;
   const url = el("button", "debuglink-url") as HTMLButtonElement; url.type = "button"; url.hidden = true;
-  const toggle = el("button", "debuglink-toggle off") as HTMLButtonElement; toggle.type = "button"; toggle.innerHTML = PLUG;
+  const toggle = el("button", "debuglink-toggle off") as HTMLButtonElement; toggle.type = "button"; toggle.append(iconNode("connect"));
   wrap.append(flow, url, toggle);
   document.body.append(wrap);
 

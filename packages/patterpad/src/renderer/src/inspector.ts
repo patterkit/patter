@@ -3,7 +3,7 @@
 // surface's `onSelect` context; a header click jumps to that node (revealNode). The snippet / group
 // CONDITION rows are editable - clicking opens the visual expression editor (M1, editCondition).
 
-import { icon } from "@wildwinter/app-shell"; // one spelling of close across the suite
+import { iconNode, iconHtml, iconSvg } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch,
 } from "@patterkit/patterpad-surface/surface";
@@ -208,15 +208,15 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
     wrap.append(chip);
     // Stale scratch take (#224): the WAV's stamped text-hash no longer matches the line (it was edited).
     if (derived && h.scratchStale(id)) {
-      const warn = el("span", "insp-rec-stale", "⚠ out of date");
+      const warn = el("span", "insp-rec-stale"); warn.append(iconNode("warning", 12), "out of date");
       warn.dataset.tip = "This scratch take was recorded against an earlier version of the line.";
       wrap.append(warn);
     }
     // A play button only when a file actually resolved (not for an implicitly-missing line).
     if (derived) {
       const play = el("button", "insp-rec-play") as HTMLButtonElement;
-      play.type = "button"; play.textContent = "▶"; play.dataset.tip = "Play audio";
-      play.setAttribute("aria-label", "play audio");
+      play.type = "button"; play.append(iconNode("play", 12)); play.dataset.tip = "Play audio";
+      play.setAttribute("aria-label", "Play audio");
       play.addEventListener("click", () => h.playRecording(id, play));
       wrap.append(play);
     }
@@ -229,7 +229,7 @@ function recordingStatusRow(id: string | null, h: InspectorHandlers): HTMLElemen
       const scrIdx = order.indexOf(scratch);
       if (curIdx >= 0 && scrIdx >= 0 && curIdx <= scrIdx) {
         const rec = el("button", "insp-rec-record") as HTMLButtonElement;
-        rec.type = "button"; rec.textContent = "● Record"; rec.dataset.tip = "Record a scratch take";
+        rec.type = "button"; rec.append(iconNode("record", 12), "Record"); rec.dataset.tip = "Record a scratch take";
         rec.addEventListener("click", () => h.recordScratch(id));
         wrap.append(rec);
       }
@@ -299,7 +299,7 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
       const chip = el("span", "insp-tag");
       chip.style.setProperty("--tag-c", `var(--char-${colourIndex(t)})`);
       chip.append(el("span", "insp-tag-text", t));
-      const x = el("button", "insp-tag-x", icon.close);
+      const x = el("button", "insp-tag-x"); x.append(iconNode("close", 10));
       x.type = "button"; x.dataset.tip = "Remove tag"; x.setAttribute("aria-label", `Remove tag ${t}`);
       x.addEventListener("click", () => { current.splice(i, 1); repaint(); commit(); input.focus(); });
       chip.append(x);
@@ -455,7 +455,7 @@ const GROUP_HEAD: Record<GroupLevel["role"], string> = {
 // The "copy" glyph: a clean front sheet with only the back sheet's top-right corner peeking out behind it
 // (stroke-only, so no lines cross the front sheet's interior - theme-proof). A tick replaces it on copy.
 const COPY_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="3" y="9" width="12" height="12" rx="2"/><path d="M9 9V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4"/></svg>';
-const COPY_CHECK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4 10-11"/></svg>';
+const COPY_CHECK = iconHtml("tick", 13); // the vocabulary's tick, at the copy glyph's size
 
 /** A quiet "click to copy" button. `text` is the value copied (a string, or a getter read at click
  *  time); briefly flips to a tick. Stops propagation so it never triggers an enclosing header click. */
@@ -479,17 +479,15 @@ function addrCopyButton(value: string, what: string): HTMLButtonElement {
   return b;
 }
 
-// The note-page glyph for the inspector title bar: OUTLINE when the node has no notes, FILLED when it does
-// (the filled form mirrors the surface's gutter note glyph). currentColor, no colour emoji.
-const NOTE_FILLED = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M3.4 1.4h5.3L12.6 5.3v8.1a1.2 1.2 0 0 1-1.2 1.2H3.4a1.2 1.2 0 0 1-1.2-1.2V2.6A1.2 1.2 0 0 1 3.4 1.4ZM4.9 6.8h6.2v1.1H4.9Zm0 2.1h6.2v1.1H4.9Zm0 2.1h3.7v1.1H4.9Z"/></svg>';
-const NOTE_OUTLINE = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M3.4 2h4.9l3.9 3.9v7.5a1 1 0 0 1-1 1H3.4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M8.3 2.2v3.8h3.8"/><path d="M4.9 8h6.2M4.9 10h6.2M4.9 12h3.7" stroke-width="0.95"/></svg>';
+// The note-page pair (outline = no notes, filled = notes set) is the shell's `iconSvg.noteFilled` /
+// `noteOutline`: the same bytes this file used to carry, now with one owner.
 
 /** The title-bar note icon: outline when no notes, filled when notes are set; opens the notes modal. */
 function noteButton(id: string, kind: string | undefined, has: boolean, h: InspectorHandlers): HTMLButtonElement {
   const b = el("button", `insp-note${has ? " has" : ""}`) as HTMLButtonElement; b.type = "button";
   b.dataset.tip = has ? "Edit notes" : "Add a note";
   b.setAttribute("aria-label", has ? "Edit notes" : "Add a note");
-  b.innerHTML = has ? NOTE_FILLED : NOTE_OUTLINE;
+  b.innerHTML = has ? iconSvg.noteFilled : iconSvg.noteOutline;
   b.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); h.editNote(id, b, kind); });
   return b;
 }

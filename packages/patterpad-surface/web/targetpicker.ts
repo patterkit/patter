@@ -8,6 +8,7 @@
 import type { EditorView } from "prosemirror-view";
 import { anchorBelowCaret, followOnScroll } from "./anchor.js";
 import { closeWithExit } from "./exit.js";
+import { iconNode } from "@wildwinter/app-shell";
 
 export interface JumpSceneGroup { scene: { id: string; label: string }; blocks: Array<{ id: string; label: string }>; }
 export interface JumpData { scenes: JumpSceneGroup[]; }
@@ -125,6 +126,7 @@ export function openTargetPicker(opts: {
       const b = mk("button", `${cls}${i === highlight ? " active" : ""}${sel ? " sel" : ""}`);
       b.type = "button";
       b.textContent = r.kind === "end" ? "END" : r.kind === "clear" ? "Clear jump" : r.label;
+      if (r.kind === "scene") b.prepend(iconNode("forward", 12)); // a scene is a target (its start) + a heading
       // Act on the CLICK, not the mousedown. Picking on mousedown closed the panel while the button
       // was still down, so the browser delivered the click that followed to whatever the panel had
       // been covering - the inspector's own Jump row, when the picker was anchored under it, which

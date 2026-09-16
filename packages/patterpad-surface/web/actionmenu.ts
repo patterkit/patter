@@ -20,6 +20,7 @@ import { notesEnabled, openNoteFor } from "./docnotes.js";
 import { commentsEnabled, hasSaySelection, startComment } from "./comments.js";
 import { suggestionsEnabled, startSuggestion } from "./suggestions.js";
 import { writingStatusEnabled, writingStatusLadder, applyWritingStatus, collectBeatIds, writingStatusOf } from "./writingstatus.js";
+import { iconNode } from "@wildwinter/app-shell";
 
 type GetPos = () => number | undefined;
 type At = HTMLElement | { x: number; y: number };
@@ -180,7 +181,7 @@ export function createActionMenu(): ActionMenu {
   /** A submenu parent: hovering / clicking opens a right-hand flyout of `kinds`. */
   const parent = (label: string, kinds: Array<{ label: string; cmd: Cmd }>): HTMLElement => {
     const mi = document.createElement("button"); mi.className = "action-mi has-sub"; mi.textContent = label;
-    const caret = document.createElement("span"); caret.className = "action-caret"; caret.textContent = "›"; mi.appendChild(caret);
+    const caret = document.createElement("span"); caret.className = "action-caret"; caret.append(iconNode("forward", 12)); mi.appendChild(caret);
     const openThis = (): void => openSub(mi, kinds);
     mi.addEventListener("mouseenter", openThis);
     onPick(mi, () => { openThis(); });
@@ -213,7 +214,7 @@ export function createActionMenu(): ActionMenu {
 
   const parentRun = (label: string, items: RunItem[]): HTMLElement => {
     const mi = document.createElement("button"); mi.className = "action-mi has-sub"; mi.textContent = label;
-    const caret = document.createElement("span"); caret.className = "action-caret"; caret.textContent = "›"; mi.appendChild(caret);
+    const caret = document.createElement("span"); caret.className = "action-caret"; caret.append(iconNode("forward", 12)); mi.appendChild(caret);
     const openThis = (): void => openSubRun(mi, items);
     mi.addEventListener("mouseenter", openThis);
     onPick(mi, () => { openThis(); });
@@ -227,7 +228,7 @@ export function createActionMenu(): ActionMenu {
     for (const it of items) {
       const mi = document.createElement("button"); mi.className = "action-mi action-run";
       // A leading tick column (a ✓ on the current rung, empty otherwise) so the swatches stay aligned.
-      const check = document.createElement("span"); check.className = "action-check"; check.textContent = it.checked ? "✓" : ""; mi.appendChild(check);
+      const check = document.createElement("span"); check.className = "action-check"; if (it.checked) check.append(iconNode("tick", 12)); mi.appendChild(check);
       if (it.slot != null) { const dot = document.createElement("span"); dot.className = "status-swatch"; dot.style.background = `var(--char-${it.slot})`; mi.appendChild(dot); }
       mi.appendChild(document.createTextNode(it.label));
       // Run BEFORE close (the target ids resolve against the live ctx), then refocus + dismiss.
@@ -371,7 +372,7 @@ export function createActionMenu(): ActionMenu {
     const blockId = enclosingBlockId(ctx.view.state, pos);
     if (playBlockHandler && blockId) {
       el.appendChild(sepEl());
-      const pb = document.createElement("button"); pb.className = "action-mi"; pb.textContent = "▶ Play block";
+      const pb = document.createElement("button"); pb.className = "action-mi has-icon"; pb.append(iconNode("play", 12), "Play block");
       pb.addEventListener("mouseenter", closeSub);
       onPick(pb, () => { const id = blockId; close(); playBlockHandler?.(id); });
       el.appendChild(pb);

@@ -267,9 +267,12 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 
 /* the ⋯ action control (Slack / Docs style): quiet, hover-revealed; a set group/snippet
    keeps it discoverable. Shared by snippets (.bubble-menu) and group rails (.group-menu). */
+/* An unmodelled chunk's quiet card: the drawn mark, then its type name, on one line. */
+.rawnode { display: flex; align-items: center; gap: 0.35rem; }
 .menu-dots {
+  display: inline-flex; align-items: center; justify-content: center;
   background: none; border: 0; cursor: pointer; color: var(--muted); padding: 0 0.2rem;
-  font-size: 1rem; line-height: 1; border-radius: var(--radius-sm); user-select: none;
+  line-height: 1; border-radius: var(--radius-sm); user-select: none;
   opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard), background var(--dur-quick) var(--ease-standard);
 }
 .bubble:hover > .bubble-menu, .bubble:focus-within > .bubble-menu { opacity: 1; }
@@ -277,7 +280,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 .menu-dots:hover { color: var(--accent); background: color-mix(in oklab, var(--accent) 10%, transparent); }
 
 /* drag handle (groups §6) + the drop-seam targets */
-.drag-handle { cursor: grab; color: var(--muted); font-size: 0.78rem; line-height: 1; user-select: none; }
+.drag-handle { display: inline-flex; align-items: center; cursor: grab; color: var(--muted); line-height: 1; user-select: none; }
 .drag-handle:hover { color: var(--accent); }
 .is-dragging, .is-dragging * { cursor: grabbing !important; user-select: none; }
 .drag-source { opacity: 0.4; } /* the node being dragged, dimmed */
@@ -474,7 +477,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   transition: opacity var(--dur-quick) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
 }
 .note-icon:hover { opacity: 1; transform: scale(1.15); }
-.note-icon svg { display: block; }
+.note-icon svg { display: block; width: 16px; height: 16px; } /* the shell's 16-grid note page, at the gutter's size */
 
 /* A sub-text range a comment is pinned to: a soft highlight under the words (#148). */
 .comment-range { background: color-mix(in oklab, var(--accent) 16%, transparent); border-radius: 2px; box-shadow: 0 1px 0 color-mix(in oklab, var(--accent) 45%, transparent); }
@@ -706,7 +709,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .tp-end { font: 600 0.7rem var(--font-ui); letter-spacing: 0.05em; color: var(--muted); }
 .tp-scene { font-weight: 600; color: var(--accent); }
-.tp-scene::before { content: "▸ "; color: var(--muted); }       /* a scene is a target (its start) + a heading */
+.tp-scene [data-icon] { display: inline-block; vertical-align: -2px; margin-right: 0.25rem; color: var(--muted); } /* the drawn chevron before a scene row */
 .tp-block { padding-left: 1.5rem; color: var(--ink-soft); }      /* blocks indented under their scene */
 .tp-clear { color: var(--muted); border-top: 1px solid var(--line); margin-top: 0.15rem; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 .tp-row.active { background: color-mix(in oklab, var(--accent) 12%, transparent); } /* one highlight, keyboard + mouse */
@@ -721,6 +724,7 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 }
 .hint { display: inline-flex; gap: 0.35rem; align-items: baseline; }
 .hint kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 1.1rem;
   font: 600 0.68rem var(--font-mono); color: var(--ink);
   background: color-mix(in oklab, var(--line) 40%, transparent);
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0.05rem 0.3rem;
@@ -745,10 +749,11 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   font: 0.8rem var(--font-ui);
 }
 .action-mi:hover, .action-mi.open { background: color-mix(in oklab, var(--accent) 10%, transparent); }
-.action-caret { color: var(--muted); font-size: 1rem; line-height: 1; margin-left: auto; }
+.action-mi.has-icon { justify-content: flex-start; gap: 0.4rem; } /* a leading drawn icon sits beside its label, not across from it */
+.action-caret { display: inline-flex; align-items: center; color: var(--muted); line-height: 1; margin-left: auto; }
 /* Status submenu rows: left-align [tick][swatch][label] instead of spreading them apart. */
 .action-mi.action-run { justify-content: flex-start; gap: 0.4rem; }
-.action-check { flex: 0 0 0.8em; text-align: center; color: var(--accent); font-size: 0.72rem; line-height: 1; }
+.action-check { flex: 0 0 0.8em; display: inline-flex; align-items: center; justify-content: center; color: var(--accent); line-height: 1; }
 .action-mi.del { color: var(--accent); }
 .action-mi.del:hover { background: color-mix(in oklab, var(--accent) 14%, transparent); }
 .action-sep { height: 1px; background: var(--line); margin: 0.2rem 0.3rem; }
@@ -780,8 +785,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 
 /* per-beat delete affordance on the game-event atom (the .beat.kind-gameEvent row is styled above) */
 .atom-del {
-  background: none; border: 0; cursor: pointer; color: var(--muted);
-  font-size: 0.9rem; line-height: 1; padding: 0 0.2rem; opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard);
+  display: inline-flex; align-items: center; background: none; border: 0; cursor: pointer; color: var(--muted);
+  line-height: 1; padding: 0 0.2rem; opacity: 0; transition: opacity var(--dur-quick) var(--ease-standard);
 }
 .beat.kind-gameEvent:hover .atom-del { opacity: 1; }
 .atom-del:hover { color: var(--accent); }

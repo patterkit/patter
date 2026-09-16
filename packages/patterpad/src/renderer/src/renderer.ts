@@ -56,6 +56,7 @@ import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are ma
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
 import { toast } from "@wildwinter/app-shell";
+import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
 import { PANEL_KEEP_CLEAR } from "./panel.js";
@@ -138,6 +139,7 @@ shell.topbarLead.append(histNavHostEl, projectNameEl, sceneSuffixEl);
 const playTopEl = $<HTMLButtonElement>("play-topbtn");
 const vcsSceneEl = $("vcs-scene"); // topbar chip: the CURRENT scene's VC state (locked / out-of-date)
 const saveIndicatorHost = $("save-indicator"); // the shell's indicator mounts here
+playTopEl.prepend(iconNode("play")); // the label is in index.html; the icon is drawn, never typed
 shell.topbarTrail.append(playTopEl, vcsSceneEl, saveIndicatorHost);
 const navListEl = $("nav-list");
 shell.nav.append(navListEl);
@@ -472,7 +474,7 @@ function renderNav(): void {
   search.className = "nav-search"; search.type = "button"; search.dataset.tip = "Search by name, handle, or id"; search.setAttribute("aria-label", "Search by name, handle, or id");
   // A magnifier icon + centred, bold label read as a BUTTON that opens the search window - not a text field.
   const searchIcon = document.createElement("span"); searchIcon.className = "nav-search-icon";
-  searchIcon.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5 16 16"/></svg>';
+  searchIcon.append(iconNode("search", 13));
   search.append(searchIcon);
   search.append(Object.assign(document.createElement("span"), { textContent: "Search…" }));
   search.append(Object.assign(document.createElement("kbd"), { className: "nav-search-kbd", textContent: "⌘F" }));
@@ -742,9 +744,9 @@ function applySceneVc(): void {
   // version killed that too: you could not expand a section or copy an address to go and ask them about
   // it. Storyletter's version won this one, and STAYS_LIVE is the part only this app can supply.
   lockControls(inspectorStackEl, ro, STAYS_LIVE);
-  const chip = st?.lockedBy?.length ? `⊘ Locked by ${st.lockedBy.join(", ")}`
-    : st?.outOfDate ? "↓ Out of date" : "";
-  vcsSceneEl.textContent = chip;
+  const chip: [Parameters<typeof iconNode>[0], string] | null = st?.lockedBy?.length ? ["locked", `Locked by ${st.lockedBy.join(", ")}`]
+    : st?.outOfDate ? ["down", "Out of date"] : null;
+  vcsSceneEl.replaceChildren(...(chip ? [iconNode(chip[0], 12), chip[1]] : []));
   vcsSceneEl.hidden = !chip;
   vcsSceneEl.classList.toggle("locked", !!st?.lockedBy?.length);
 }
@@ -2242,7 +2244,7 @@ async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
   if (surface) await save(); // flush pending edits so the exported figures are current
   const res = await window.patter.exportReport();
   if (res.ok) {
-    if (btn) { const prev = btn.textContent; btn.textContent = "Exported ✓"; btn.disabled = true;
+    if (btn) { const prev = btn.textContent; btn.replaceChildren("Exported", iconNode("tick", 12)); btn.disabled = true;
       setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1600); }
   } else if (res.error) console.error("Export production info failed:", res.error);
 }
@@ -2410,14 +2412,14 @@ const settingsDlg = mountSettingsDialog({
       const { s } = settingsRead!;
       const name = el("input"); name.type = "text"; name.required = true; name.value = s.name;
       // Start scene picker: "(unset)" plus every scene; select the project's current start.
-      const start = sSelect([["", "(unset)"], ...(project?.scenes ?? []).map((sc): [string, string] => [sc.id, sc.name])], s.start?.scene ?? "");
+      const start = sSelect([["", "(unset)"], ...(project?.scenes ?? []).map((sc): [string, string] => [sc.id, sc.name])], s.start?.scene ?? "", "field");
       const voiced = sToggle("Voiced", "Tracks recording status and exports voice scripts.", s.voiced);
       // Audio is meaningful only for a VOICED project (#206): the Audio tab reads this box (its `disabled`
       // below), and flipping it here updates the tab without reopening.
       voiced.input.addEventListener("change", () => settingsDlg.refreshTabs());
       const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and narration.", s.formatting);
       const autosave = sToggle("Autosave", "Saves the open scene every 30 seconds.", s.autosave);
-      const autoRebuild = sToggle("Auto Rebuild", "Recompiles the .patterc bundle as your edits settle.", s.autoRebuild);
+      const autoRebuild = sToggle("Auto rebuild", "Recompiles the .patterc bundle as your edits settle.", s.autoRebuild);
       host.append(sField("Project name", name), sField("Start", start, sNote("settings-fieldnote", "The scene Play from Start opens.")),
         voiced.row, formatting.row, autosave.row, autoRebuild.row);
       Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input, autosave: autosave.input, autoRebuild: autoRebuild.input });

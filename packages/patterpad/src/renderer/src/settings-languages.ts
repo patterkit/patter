@@ -24,7 +24,7 @@ export function mountLanguages(host: HTMLElement, initial: LanguagesValue): Lang
     radio.addEventListener("change", () => { if (radio.checked) { def = code; } });
     mark.append(radio, el("span", undefined, "Default"));
     const name = el("span", "gd-name lang-code", code);
-    const del = iconBtn("✕", "Remove language", () => {
+    const del = iconBtn("close", "Remove language", () => {
       const i = codes.indexOf(code); if (i < 0) return;
       codes.splice(i, 1);
       if (def === code) def = codes[0] ?? ""; // default went away -> first remaining becomes the source

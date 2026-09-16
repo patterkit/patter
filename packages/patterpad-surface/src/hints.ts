@@ -16,8 +16,11 @@
 import type { EditorState } from "prosemirror-state";
 import type { ZoneState } from "./context.js";
 import { multiSelectPositions } from "./multiselect.js";
+import type { IconName } from "@wildwinter/app-shell";
 
-export interface Hint { key: string; label: string }
+/** One hint chip: a keycap (`key`, or a drawn `icon` from the family's vocabulary when the
+ *  affordance is a control rather than a key) and what it does. */
+export interface Hint { key: string; label: string; icon?: IconName }
 
 /** Hints for a multi-chunk selection (groups §6), or null when it isn't one - so the contextual hint
  *  bar shows what a multi-select can do (delete / move / wrap) rather than one beat's keys. */
@@ -35,7 +38,7 @@ export function hintsFor(s: ZoneState): Hint[] {
 
   // the game-event atom (no zone): typing puts a line above it, Enter one below; removed via the
   // affordance, not a key
-  if (!s.zone) return [{ key: "type", label: "line above" }, { key: "Enter", label: "line below" }, { key: "×", label: "delete game event" }];
+  if (!s.zone) return [{ key: "type", label: "line above" }, { key: "Enter", label: "line below" }, { key: "", icon: "close", label: "delete game event" }];
 
   const hints = zoneHints(s);
   // At the LEFT edge of a group's first bubble, Backspace is a no-op (it never
@@ -62,7 +65,7 @@ function zoneHints(s: ZoneState): Hint[] {
       return [
         { key: "type", label: "filter / add" },
         { key: "Enter", label: "accept" },
-        { key: "Space", label: "→ free text" },
+        { key: "Space", label: "free text" },
         { key: "(", label: "direction" },
         ...(sayEmpty ? [{ key: "/", label: "insert" }] : []),
       ];
@@ -74,14 +77,14 @@ function zoneHints(s: ZoneState): Hint[] {
       if (s.beat.kind === "prose") {
         if (s.zone.textLen === 0) {
           return [
-            { key: "Tab", label: "→ dialogue" },
+            { key: "Tab", label: "dialogue" },
             { key: "Enter", label: "next line" },
             ...(sayEmpty ? [{ key: "/", label: "insert" }] : []),
           ];
         }
         return s.zone.atStart
-          ? [{ key: "Tab", label: "→ dialogue" }, { key: "Enter", label: "next line" }]
-          : [{ key: "Enter", label: "next line" }, { key: "Cmd-T", label: "→ dialogue" }];
+          ? [{ key: "Tab", label: "dialogue" }, { key: "Enter", label: "next line" }]
+          : [{ key: "Enter", label: "next line" }, { key: "Cmd-T", label: "dialogue" }];
       }
       // dialogue content
       if (s.zone.textLen === 0) {
@@ -101,7 +104,7 @@ function zoneHints(s: ZoneState): Hint[] {
       }
       return [
         { key: "Enter", label: "next line" },
-        { key: "Cmd-T", label: "→ free text" },
+        { key: "Cmd-T", label: "free text" },
         { key: "Shift-Enter", label: "end snippet" },
       ];
     }

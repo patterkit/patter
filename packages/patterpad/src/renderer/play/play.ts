@@ -15,7 +15,7 @@ import "@fontsource-variable/inter";
 
 import { staleBar } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";
-import { initTooltips, pinButton } from "@wildwinter/app-shell";
+import { initTooltips, pinButton, iconNode, type IconName } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/tool-window.css"; // the pin's chrome travels with it
 import { colourFor } from "@patterkit/patterpad-surface/colour";
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
@@ -31,6 +31,10 @@ const addrEl = document.getElementById("play-addr")!;
 const localeEl = document.getElementById("play-locale") as HTMLSelectElement;
 const rewindEl = document.getElementById("play-rewind") as HTMLButtonElement;
 const continueEl = document.getElementById("play-continue") as HTMLButtonElement;
+// The header's drawn icons (the HTML carries the labels alone): Continue is "play through", the one honest
+// go-there arrow; the rewind control is the vocabulary's restart.
+continueEl.prepend(iconNode("arrowRight", 12));
+(document.getElementById("play-rewind") as HTMLButtonElement).append(iconNode("restart"));
 const audioEl = document.getElementById("play-audio") as HTMLButtonElement;
 
 // "Play with audio" (#206 P3): in Audio Folders mode, Continue becomes a time-paced table-read - each line
@@ -156,8 +160,11 @@ async function paceBeat(step: PlayStep, lineEl?: HTMLElement): Promise<void> {
   await raceDelay(step.kind === "gameEvent" ? 350 : fakeDuration(step.text));
 }
 
-function button(label: string, cls: string, onClick?: () => void): HTMLButtonElement {
-  const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = label;
+/** A control button. `icon` is a LEADING drawn icon from the family's vocabulary (a text button never
+ *  carries a typed glyph); Step is `forward` (one beat on), Continue is `arrowRight` (play through). */
+function button(label: string, cls: string, onClick?: () => void, icon?: IconName): HTMLButtonElement {
+  const b = document.createElement("button"); b.type = "button"; b.className = cls;
+  if (icon) b.append(iconNode(icon, 14)); b.append(label);
   if (onClick) b.addEventListener("click", onClick);
   return b;
 }
@@ -218,7 +225,7 @@ function scrollToEnd(): void {
  *  clip / delay). The un-played beats stay queued behind a resume control (showResume) - it does NOT rush
  *  ahead through the rest. */
 function showStop(): void {
-  controlsEl.replaceChildren(button("◼ Stop", "play-stop", () => { stopRequested = true; skipFire?.(); stopClip?.(); }));
+  controlsEl.replaceChildren(button("Stop", "play-stop", () => { stopRequested = true; skipFire?.(); stopClip?.(); }));
 }
 
 function showAdvance(): void {
@@ -226,8 +233,8 @@ function showAdvance(): void {
   const row = document.createElement("div"); row.className = "padv-row";
   // Step's behaviour follows the header Continue toggle: off = one beat; on = run to the next natural stop (a
   // choice or the end) as a paced reveal - each beat held for its audio or a reading-length delay.
-  const step = button(continueMode ? "▸▸ Continue to next stop" : "▸ Step", "padv", () =>
-    void advance(continueMode ? play.toStop() : play.step(), continueMode));
+  const step = button(continueMode ? "Continue to next stop" : "Step", "padv", () =>
+    void advance(continueMode ? play.toStop() : play.step(), continueMode), continueMode ? "arrowRight" : "forward");
   row.append(step);
   controlsEl.replaceChildren(row);
 }
@@ -250,7 +257,7 @@ function showEnd(error?: string): void {
   const note = document.createElement("div");
   note.className = `pnote${error ? " error" : ""}`;
   note.textContent = error ? `Error: ${error}` : "The End";
-  controlsEl.replaceChildren(note, button("↺ Restart", "pchoice restart", () => void startRun()));
+  controlsEl.replaceChildren(note, button("Restart", "pchoice restart", () => void startRun(), "restart"));
 }
 
 // The script changed under this run: freeze Step / Continue / choices and prompt a restart, which
@@ -334,8 +341,8 @@ function showResume(batch: PlayBatch, gen: number, nextIdx: number): void {
   if (nextIdx >= batch.steps.length) { showTerminal(batch); return; } // nothing left queued
   resumeState = { batch, gen, nextIdx };
   const row = document.createElement("div"); row.className = "padv-row presume";
-  const b = button(continueMode ? "▸▸ Continue" : "▸ Step", "padv", () =>
-    continueMode ? void revealFrom(batch, gen, nextIdx) : revealOne(batch, gen, nextIdx));
+  const b = button(continueMode ? "Continue" : "Step", "padv", () =>
+    continueMode ? void revealFrom(batch, gen, nextIdx) : revealOne(batch, gen, nextIdx), continueMode ? "arrowRight" : "forward");
   row.append(b);
   controlsEl.replaceChildren(row);
   scrollToEnd();

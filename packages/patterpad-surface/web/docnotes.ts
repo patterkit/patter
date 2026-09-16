@@ -14,7 +14,7 @@ import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import type { Node as PMNode } from "prosemirror-model";
 import { createGutterOverlay } from "./gutterlayer.js";
-import { tipBold } from "@wildwinter/app-shell";
+import { tipBold, iconSvg } from "@wildwinter/app-shell";
 import { modelIdOf } from "../src/zoneutil.js";
 
 /** One visible note: its class (for the label) + text. */
@@ -45,17 +45,15 @@ const tooltipOf = (notes: DocNote[]): string => notes.map((n) => { const l = lab
 // the under-heading text goes stale after an edit / filter toggle.
 const sigOf = (notes: DocNote[]): string => notes.map((n) => `${n.cls}=${n.text}`).join("|");
 
-// A monochrome, FILLED "note page" glyph - a document with its text lines punched out (fill-rule
-// evenodd, so the lines show the background through and stay theme-proof). Filled + solid colour reads
-// far more clearly in the gutter than a thin outline. Inherits currentColor (no colour emoji).
-const NOTE_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M3.4 1.4h5.3L12.6 5.3v8.1a1.2 1.2 0 0 1-1.2 1.2H3.4a1.2 1.2 0 0 1-1.2-1.2V2.6A1.2 1.2 0 0 1 3.4 1.4ZM4.9 6.8h6.2v1.1H4.9Zm0 2.1h6.2v1.1H4.9Zm0 2.1h3.7v1.1H4.9Z"/></svg>';
+// The FILLED note page (a document with its text lines punched out) is the shell's `iconSvg.noteFilled`:
+// the same bytes this file used to carry, now with one owner (sized to the gutter box by .note-icon svg).
 
 /** The clickable note icon for the right gutter: hover reads the note(s), click opens the editor. */
 function noteIcon(nodeId: string, kind: string | undefined, notes: DocNote[]): HTMLElement {
   const b = document.createElement("button");
   b.className = "note-icon"; b.type = "button"; b.contentEditable = "false";
   b.dataset.tip = tooltipOf(notes); b.setAttribute("aria-label", "Documentation notes");
-  b.innerHTML = NOTE_SVG;
+  b.innerHTML = iconSvg.noteFilled;
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); noteHandler?.(nodeId, b, kind); });
   return b;
 }

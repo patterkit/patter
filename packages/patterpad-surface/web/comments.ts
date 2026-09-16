@@ -19,6 +19,7 @@ import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import { createGutterOverlay } from "./gutterlayer.js";
 import { modelIdOf, sayStartOf, sayText, findBeatById, findBeatsByIds } from "../src/zoneutil.js";
+import { iconNode } from "@wildwinter/app-shell";
 
 /** One visible thread to surface: its id, the beat it anchors to, an optional span (plain-text offsets
  *  + quote), and the badge facts. No range => a whole-beat thread. */
@@ -75,7 +76,6 @@ export function startComment(view: EditorView, beatId: string | null, fallbackAn
 
 const key = new PluginKey<PluginState>("patterComments");
 
-const BUBBLE_SVG = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3 2.5h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H7.4l-3.1 2.5A.5.5 0 0 1 3.5 13.6v-1.6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/></svg>';
 const COMMENT_GAP = 8; // px from the column's right edge - the INNER gutter lane (the note chip sits just outside)
 
 /** A thread resolved against the live doc: its mark + current PM span (null = whole-beat or orphaned). */
@@ -111,7 +111,7 @@ function bubble(mark: CommentMark, orphaned: boolean): HTMLElement {
   b.className = `comment-bubble${mark.resolved ? " resolved" : ""}${orphaned ? " orphaned" : ""}`;
   b.type = "button"; b.contentEditable = "false";
   b.dataset.tip = tooltipOf(mark, orphaned); b.setAttribute("aria-label", "Comment");
-  b.innerHTML = BUBBLE_SVG;
+  b.append(iconNode("comment", 16)); // the vocabulary's comment (speech, not a document)
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); openHandler?.({ nodeId: mark.nodeId, threadId: mark.id, anchor: b }); });
   return b;
 }

@@ -88,9 +88,9 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "Move up", () => { moveItem(state, i, -1); render(); }, i === 0),
-      iconBtn("↓", "Move down", () => { moveItem(state, i, 1); render(); }, i === state.length - 1),
-      iconBtn("✕", "Delete property", () => { state.splice(i, 1); render(); }, false, true),
+      iconBtn("up", "Move up", () => { moveItem(state, i, -1); render(); }, i === 0),
+      iconBtn("down", "Move down", () => { moveItem(state, i, 1); render(); }, i === state.length - 1),
+      iconBtn("close", "Delete property", () => { state.splice(i, 1); render(); }, false, true),
     );
 
     // Secondary fields behind the ▸ expander: Shared / (Temporary) / enum-or-flags Values / Purpose.

@@ -91,7 +91,7 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
         const input = el("input", "gd-input gd-name") as HTMLInputElement;
         input.type = "text"; input.value = arr[idx]!; input.spellcheck = false; input.placeholder = "Word";
         input.addEventListener("input", () => { arr[idx] = input.value; });
-        wordrow.append(input, iconBtn("✕", removeTip, () => { arr.splice(idx, 1); render(); }, false, true));
+        wordrow.append(input, iconBtn("close", removeTip, () => { arr.splice(idx, 1); render(); }, false, true));
         list.append(wordrow);
       }
       return list;

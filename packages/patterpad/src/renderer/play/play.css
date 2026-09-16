@@ -47,11 +47,11 @@ body.play {
 /* Rewind-to-start: a compact icon in the header beside the pin (a persistent window action), so the bottom
    tray is just the contextual advance / choice controls - no separate footer bar. Sized to match the pin:
    line-height 1 so the glyph keeps its full height (line-height 0 collapses the box). */
-.play-rewind { flex: none; display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font-size: 0.95rem; line-height: 1; padding: 0.22rem 0.4rem; }
+.play-rewind { flex: none; display: inline-flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); line-height: 1; padding: 0.22rem 0.4rem; }
 .play-rewind:hover { border-color: var(--accent); color: var(--accent); }
 /* Auto-continue toggle: a playback preference that lives in the header (not beside Step) so it stays
    reachable even in Continue mode, where the per-beat Step row never appears. Quiet by default, accented on. */
-.play-continue { flex: none; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 0.72rem var(--font-ui); text-transform: none; letter-spacing: normal; padding: 0.18rem 0.4rem; }
+.play-continue { flex: none; display: inline-flex; align-items: center; gap: 0.3rem; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); font: 500 0.72rem var(--font-ui); text-transform: none; letter-spacing: normal; padding: 0.18rem 0.4rem; }
 .play-continue:hover { border-color: var(--accent); }
 .play-continue.on { color: var(--accent); border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
@@ -88,12 +88,12 @@ body.play {
 .pchoice:hover { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 8%, var(--bg)); }
 .pchoice.ineligible { opacity: 0.45; cursor: default; border-style: dashed; }
 .pchoice.ineligible:hover { border-color: color-mix(in oklab, var(--accent) 26%, var(--line)); background: var(--bg); }
-.pchoice.restart { border-color: var(--line); color: var(--muted); font: 600 0.85rem var(--font-ui); text-align: center; }
+.pchoice.restart { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; border-color: var(--line); color: var(--muted); font: 600 0.85rem var(--font-ui); text-align: center; }
 
 /* The advance control: a single full-width Step button (Continue mode is a header toggle now). */
 .padv-row { display: flex; gap: 0.45rem; }
 .padv {
-  flex: 1; cursor: pointer; text-align: center;
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; cursor: pointer; text-align: center;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md);
   padding: 0.5rem 0.6rem; color: var(--ink); font: 600 0.85rem var(--font-ui);
   transition: border-color var(--dur-quick, 120ms) var(--ease-standard, ease), color var(--dur-quick, 120ms) var(--ease-standard, ease);

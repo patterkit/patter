@@ -104,9 +104,9 @@ export function mountWritingStatus(host: HTMLElement, initial: WritingStatusDecl
     );
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "Move earlier", () => { moveItem(writing, i, -1); render(); }, i === 0),
-      iconBtn("↓", "Move later", () => { moveItem(writing, i, 1); render(); }, i === writing.length - 1),
-      iconBtn("✕", "Delete status", () => { writing.splice(i, 1); ensureMarkers(); render(); }, false, true),
+      iconBtn("up", "Move earlier", () => { moveItem(writing, i, -1); render(); }, i === 0),
+      iconBtn("down", "Move later", () => { moveItem(writing, i, 1); render(); }, i === writing.length - 1),
+      iconBtn("close", "Delete status", () => { writing.splice(i, 1); ensureMarkers(); render(); }, false, true),
     );
     line.append(name, markers, colourButton(s, render), acts);
     row.append(line);
@@ -172,9 +172,9 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
     const acts = el("div", "gd-acts");
     acts.append(
       // The sentinel stays first: it can't move, and the rung above it can't move up into its slot.
-      iconBtn("↑", "Move earlier", () => { moveItem(recording, i, -1); render(); }, i === 0 || (audioFolders && i === 1)),
-      iconBtn("↓", "Move later", () => { moveItem(recording, i, 1); render(); }, i === recording.length - 1 || locked),
-      iconBtn("✕", "Delete status", () => { recording.splice(i, 1); render(); }, locked, true),
+      iconBtn("up", "Move earlier", () => { moveItem(recording, i, -1); render(); }, i === 0 || (audioFolders && i === 1)),
+      iconBtn("down", "Move later", () => { moveItem(recording, i, 1); render(); }, i === recording.length - 1 || locked),
+      iconBtn("close", "Delete status", () => { recording.splice(i, 1); render(); }, locked, true),
     );
     line.append(name);
     // Audio Folders mode: show the AUTO-DERIVED subfolder (read-only), not a manual folder field. The fallback

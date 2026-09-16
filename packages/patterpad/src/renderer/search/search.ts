@@ -17,7 +17,7 @@ import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js
 import { confirmDialog } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
-import { pinButton } from "@wildwinter/app-shell";
+import { pinButton, iconNode } from "@wildwinter/app-shell";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
 // nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
@@ -43,6 +43,7 @@ const statusLike = (m: SearchMode): boolean => m === "status" || m === "recordin
  *  free-text query. They share the chip rail, the "filter these" input, and the pick-a-chip flow. */
 const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag";
 const closeBtn = document.getElementById("swin-close") as HTMLButtonElement;
+closeBtn.append(iconNode("close", 12)); // the HTML carries the label; the cross is drawn
 // The pin is the shell's and is BUILT, not marked up: it owns its own class,
 // aria-pressed and the tooltip that says what a click will do, so there is one
 // place that decides what a pinned window looks like. Inserted before the close
@@ -188,7 +189,7 @@ const renderReplace = (): void => {
     const r = document.createElement("div"); r.className = "swin-row swin-rrow";
     const diff = document.createElement("span"); diff.className = "swin-name";
     const before = document.createElement("span"); before.className = "swin-before"; before.textContent = h.before;
-    const arrow = document.createElement("span"); arrow.className = "swin-arrow"; arrow.textContent = " → ";
+    const arrow = document.createElement("span"); arrow.className = "swin-arrow"; arrow.append(iconNode("arrowRight", 12));
     const after = document.createElement("span"); after.className = "swin-after"; after.textContent = h.after;
     diff.append(before, arrow, after);
     const loc = document.createElement("span"); loc.className = "swin-loc"; loc.textContent = h.location.join(" › ");
@@ -207,7 +208,7 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
     const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
     const ok = await confirmDialog({
       title: `Replace ${n} occurrence${n === 1 ? "" : "s"} across ${scenes} scene${scenes === 1 ? "" : "s"}?`,
-      body: `“${input.value}” → “${replaceInput.value}”`,
+      body: `Replace “${input.value}” with “${replaceInput.value}”.`,
       confirmLabel: "Replace",
     });
     if (!ok) return;

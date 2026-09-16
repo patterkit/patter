@@ -6,6 +6,7 @@
 import type { EditorView } from "prosemirror-view";
 import { context, type ZoneState } from "../src/context.js";
 import { hintsFor, multiSelectHints } from "../src/hints.js";
+import { iconNode } from "@wildwinter/app-shell";
 
 // `ctx` is optional so the dispatch loop can pass the ZoneState it already computed for the
 // transaction (it is otherwise re-derived here); falls back to computing it for standalone calls.
@@ -18,7 +19,8 @@ export function createHintBar(el: HTMLElement): (view: EditorView, ctx?: ZoneSta
     // A multi-chunk run has no single caret context - show what the SELECTION can do instead (§6).
     for (const hint of multiSelectHints(view.state) ?? hintsFor(ctx)) {
       const chip = document.createElement("span"); chip.className = "hint";
-      const key = document.createElement("kbd"); key.textContent = hint.key;
+      const key = document.createElement("kbd");
+      if (hint.icon) key.append(iconNode(hint.icon, 10)); else key.textContent = hint.key;
       const label = document.createElement("span"); label.className = "hint-label"; label.textContent = hint.label;
       chip.append(key, label);
       el.appendChild(chip);

@@ -29,7 +29,7 @@ describe("game data list values (#44)", () => {
     row.remove();
   });
 
-  it("clicking a value's ✕ still removes THAT value", () => {
+  it("clicking a value's remove control still removes THAT value", () => {
     const holder = { values: ["alpha", "beta", "gamma"] };
     const row = labelled("Values", tagChips(holder));
     document.body.append(row);
@@ -52,12 +52,12 @@ describe("game data list values (#44)", () => {
       .find((t) => (t.textContent ?? "").startsWith("Dialogue"))!.click();
 
     const chips = [...host.querySelectorAll<HTMLElement>(".shell-tag")];
-    expect(chips.map((c) => c.textContent?.replace("✕", ""))).toEqual(["warm", "cold"]);
+    expect(chips.map((c) => c.textContent)).toEqual(["warm", "cold"]); // the remove control is a drawn icon, no text
 
     clickOn(chips[0]!);
     expect(handle.value().line?.[0]?.values).toEqual(["warm", "cold"]);
 
-    // And the ✕ still does its job, on the value it belongs to.
+    // And the remove control still does its job, on the value it belongs to.
     clickOn(chips[0]!.querySelector(".shell-tag-x")!);
     expect(handle.value().line?.[0]?.values).toEqual(["cold"]);
     host.remove();

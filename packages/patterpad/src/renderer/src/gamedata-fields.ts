@@ -93,9 +93,9 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "Move up", () => { moveItem(fields, i, -1); render(); }, i === 0),
-      iconBtn("↓", "Move down", () => { moveItem(fields, i, 1); render(); }, i === fields.length - 1),
-      iconBtn("✕", "Delete field", () => { fields.splice(i, 1); render(); }, false, true),
+      iconBtn("up", "Move up", () => { moveItem(fields, i, -1); render(); }, i === 0),
+      iconBtn("down", "Move down", () => { moveItem(fields, i, 1); render(); }, i === fields.length - 1),
+      iconBtn("close", "Delete field", () => { fields.splice(i, 1); render(); }, false, true),
     );
 
     const purpose = el("input", "gd-input") as HTMLInputElement;

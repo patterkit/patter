@@ -71,6 +71,7 @@ body.coverage-win {
 .cov-row-dead { background: color-mix(in oklab, var(--danger) 9%, transparent); }
 .cov-row-input { background: color-mix(in oklab, var(--warn, var(--accent)) 9%, transparent); }
 .cov-mark { width: 1.2rem; text-align: center; font-weight: 700; color: var(--danger); }
+.cov-mark [data-icon] { margin: 0 auto; } /* the drawn warning centres like the "?" text does */
 .cov-row-input .cov-mark { color: var(--warn, var(--accent)); }
 .cov-kind { display: inline-block; min-width: 3.2rem; font: 600 0.58rem var(--font-ui); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .cov-gate { display: block; margin-top: 0.1rem; font: italic 0.72rem var(--font-ui); color: var(--ink-soft); }

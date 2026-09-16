@@ -17,6 +17,7 @@ import { groupLabel } from "../src/grouplabel.js";
 import { createActionMenu } from "./actionmenu.js";
 import { makeDragHandle } from "./dnd.js";
 import { modelIdOf, isChoiceGroup, rawAttr } from "../src/zoneutil.js";
+import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in the script surface
 
 type View = import("prosemirror-view").EditorView;
 type GetPos = () => number | undefined;
@@ -57,7 +58,7 @@ export function openSceneMenu(view: View, at: { x: number; y: number }, sceneId:
 
 /** The quiet ⋯ control (Slack / Docs style) that opens the structural action menu. */
 function menuButton(view: View, getPos: GetPos): HTMLButtonElement {
-  const b = document.createElement("button"); b.className = "menu-dots"; b.textContent = "⋯"; b.dataset.tip = "Actions"; b.setAttribute("aria-label", "Actions"); b.contentEditable = "false";
+  const b = document.createElement("button"); b.className = "menu-dots"; b.append(iconNode("more")); b.dataset.tip = "Actions"; b.setAttribute("aria-label", "Actions"); b.contentEditable = "false";
   b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, b); });
   return b;
 }
@@ -236,7 +237,8 @@ export const optionpromptView: NodeViewConstructor = () => {
 // --- the action atom, with a delete affordance (spec §10) --------------------
 
 function atomDeleteButton(view: import("prosemirror-view").EditorView, getPos: () => number | undefined): HTMLButtonElement {
-  const del = document.createElement("button"); del.className = "atom-del"; del.textContent = "\u2715"; // app-shell icon.close; a literal until the surface takes the shell dep del.dataset.tip = "delete"; del.setAttribute("aria-label", "delete");
+  const del = document.createElement("button"); del.className = "atom-del"; del.append(iconNode("close", 12));
+  del.dataset.tip = "Delete game event"; del.setAttribute("aria-label", "Delete game event"); // was swallowed by a trailing comment before
   del.addEventListener("mousedown", (e) => {
     e.preventDefault();
     const pos = getPos();
@@ -476,7 +478,7 @@ function addOptionButton(view: View, getPos: GetPos): HTMLButtonElement {
 export const rawnodeView: NodeViewConstructor = (node) => {
   const dom = document.createElement("div"); dom.className = "rawnode"; dom.contentEditable = "false";
   const g = JSON.parse(node.attrs.json) as { type?: string };
-  dom.textContent = `⋯ ${String(g.type ?? "node")}`;
+  dom.append(iconNode("more", 12), String(g.type ?? "node"));
   return { dom };
 };
 
@@ -501,7 +503,7 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
   const name = document.createElement("input"); name.className = "block-name"; name.spellcheck = false; name.placeholder = "Section name";
   // The quiet ⋯ control (matching snippets / groups) opens the block's note menu - Note…, status, and
   // Delete block - so the action is discoverable, not buried behind a right-click only.
-  const dots = document.createElement("button"); dots.className = "menu-dots block-dots"; dots.textContent = "⋯"; dots.dataset.tip = "Actions"; dots.setAttribute("aria-label", "Actions"); dots.contentEditable = "false";
+  const dots = document.createElement("button"); dots.className = "menu-dots block-dots"; dots.append(iconNode("more")); dots.dataset.tip = "Actions"; dots.setAttribute("aria-label", "Actions"); dots.contentEditable = "false";
   dots.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, dots, "note"); });
   head.append(drag, name, dots);
   wireNoteMenu(head, view, getPos); // right-click the block heading -> "Note…" (#148)

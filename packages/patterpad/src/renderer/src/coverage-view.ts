@@ -6,6 +6,7 @@
 
 import type { CoverageReport, CoverageBeat } from "../../shared/api.js";
 import { el } from "./dom.js";
+import { iconNode } from "@wildwinter/app-shell"; // the drawn warning mark on a dead beat
 
 const pct = (n: number): string => `${n.toFixed(0)}%`;
 const num = (n: number): string => n.toLocaleString();
@@ -101,7 +102,8 @@ export function renderCoverage(
       tr.addEventListener("click", reveal);
       tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); reveal(); } });
 
-      const mark = el("td", "cov-mark", b.reachedRuns === 0 ? (b.needsInput || b.blockedBy ? "?" : "‼") : "");
+      const mark = el("td", "cov-mark", b.reachedRuns === 0 && (b.needsInput || b.blockedBy) ? "?" : "");
+      if (b.reachedRuns === 0 && !(b.needsInput || b.blockedBy)) mark.append(iconNode("warning", 12));
       const label = b.character ? `${b.character}: ${clip(b.preview)}` : clip(b.preview || `(${b.kind})`);
       const beatCell = el("td", "cov-beat");
       beatCell.append(el("span", "cov-kind", b.kind), el("span", "cov-text", label));

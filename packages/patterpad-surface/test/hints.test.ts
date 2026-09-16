@@ -91,7 +91,8 @@ describe("hint content matches the state", () => {
     expect(keys(caret("P1", "say", 0))).toContain("Tab");
   });
   it("a game-event atom says a keystroke puts a line above it, Enter one below, and offers its delete affordance", () => {
-    expect(keys(onAtom("gameEvent"))).toEqual(["type", "Enter", "×"]);
+    // The delete affordance is a control, not a key: its keycap carries the drawn close icon.
+    expect(hintsFor(context(onAtom("gameEvent"))).map((h) => h.icon ?? h.key)).toEqual(["type", "Enter", "close"]);
   });
 });
 

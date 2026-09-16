@@ -17,6 +17,7 @@ import { moveNodeTo, moveChunksAt, dropUnwrapsOption } from "../src/groups.js";
 import { multiSelectPositions } from "../src/multiselect.js";
 import { selectChunkAt } from "./chunkselect.js";
 import { confirmDialog } from "./confirm.js";
+import { iconNode } from "@wildwinter/app-shell";
 
 type View = EditorView;
 type GetPos = () => number | undefined;
@@ -141,7 +142,7 @@ function captureSeams(view: View, positions: number[], draggingBlock: boolean): 
 
 /** A grip that drags this node (bubble / group / block) to a new seam (groups §6). */
 export function makeDragHandle(view: View, getPos: GetPos): HTMLElement {
-  const h = document.createElement("span"); h.className = "drag-handle"; h.textContent = "⠿"; h.dataset.tip = "Drag to move"; h.contentEditable = "false";
+  const h = document.createElement("span"); h.className = "drag-handle"; h.append(iconNode("grip")); h.dataset.tip = "Drag to move"; h.contentEditable = "false";
   h.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();

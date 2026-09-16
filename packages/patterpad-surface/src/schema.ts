@@ -69,7 +69,7 @@ export const patterSchema = new Schema({
     // fallback so unknown content still round-trips.
     rawnode: {
       group: "chunk", atom: true, attrs: { json: { default: "{}" } },
-      toDOM: (node) => ["div", { class: "rawnode", contenteditable: "false" }, `⋯ ${String((JSON.parse(node.attrs.json) as { type?: string }).type ?? "node")}`],
+      toDOM: (node) => ["div", { class: "rawnode", contenteditable: "false" }, String((JSON.parse(node.attrs.json) as { type?: string }).type ?? "node")],
     },
 
     // --- beats (the line types) ---------------------------------------------

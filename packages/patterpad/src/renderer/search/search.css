@@ -99,7 +99,7 @@ body.swin {
 .swin-rrow .swin-loc { grid-column: 1; grid-row: 2; max-width: 100%; }
 .swin-rrow .swin-rone { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .swin-before { color: var(--muted); } /* muted (not struck) - the → after + ink colour shows the change */
-.swin-arrow { color: var(--muted); }
+.swin-arrow { display: inline-flex; vertical-align: middle; margin: 0 0.35rem; color: var(--muted); }
 .swin-after { color: var(--ink); }
 .swin-rone { flex: none; padding: 0.15rem 0.5rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); font: 0.72rem var(--font-ui); cursor: pointer; }
 .swin-rone:hover { border-color: var(--accent); color: var(--accent); }

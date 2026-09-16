@@ -128,9 +128,9 @@ export function mountWorld(
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "Move up", () => { moveItem(scopeRows, i, -1); renderScopes(); }, i === 0),
-      iconBtn("↓", "Move down", () => { moveItem(scopeRows, i, 1); renderScopes(); }, i === scopeRows.length - 1),
-      iconBtn("✕", "Delete property", () => { scopeRows.splice(i, 1); renderScopes(); }, false, true),
+      iconBtn("up", "Move up", () => { moveItem(scopeRows, i, -1); renderScopes(); }, i === 0),
+      iconBtn("down", "Move down", () => { moveItem(scopeRows, i, 1); renderScopes(); }, i === scopeRows.length - 1),
+      iconBtn("close", "Delete property", () => { scopeRows.splice(i, 1); renderScopes(); }, false, true),
     );
 
     const ro = el("input", "insp-check") as HTMLInputElement;
@@ -205,9 +205,9 @@ export function mountWorld(
 
     const acts = el("div", "gd-acts");
     acts.append(
-      iconBtn("↑", "Move up", () => { moveItem(drivers, i, -1); renderDrivers(); }, i === 0),
-      iconBtn("↓", "Move down", () => { moveItem(drivers, i, 1); renderDrivers(); }, i === drivers.length - 1),
-      iconBtn("✕", "Delete driver", () => { drivers.splice(i, 1); renderDrivers(); }, false, true),
+      iconBtn("up", "Move up", () => { moveItem(drivers, i, -1); renderDrivers(); }, i === 0),
+      iconBtn("down", "Move down", () => { moveItem(drivers, i, 1); renderDrivers(); }, i === drivers.length - 1),
+      iconBtn("close", "Delete driver", () => { drivers.splice(i, 1); renderDrivers(); }, false, true),
     );
 
     syncCadence();
