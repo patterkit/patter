@@ -3,17 +3,20 @@
 // deliberately outside the Starlight docs chrome. Brand tokens come from src/styles/patter.css;
 // the landing's own classes live in src/styles/landing.css.
 //
-// Shape, top to bottom: a plain header; one sentence, one paragraph, one button, and the
+// Shape, top to bottom: the shared header; one sentence, one paragraph, one button, and the
 // hand-drawn screenplay surface; a few paragraphs for writers with the real Patterpad screenshot;
 // the four runtimes as a sentence; five reasons as a plain list; the Patterpad downloads as a
-// plain list; the footer. The sibling Storylets site shares the footer and nothing else.
+// plain list; the shared footer. The header, the footer and the downloads list come from
+// src/chrome, which is generated from patterkit/site-chrome and is never edited here; the
+// sibling Storylets site draws the same three from the same source, and shares nothing else.
 import "../styles/patter.css";
+import "../chrome/chrome.css";
 import "../styles/landing.css";
-import Newsletter from "../components/Newsletter.astro";
-import Downloads from "../components/Downloads.astro";
+import LandingHeader from "../chrome/LandingHeader.astro";
+import LandingFooter from "../chrome/LandingFooter.astro";
+import Downloads from "../chrome/Downloads.astro";
 
 const base = import.meta.env.BASE_URL.replace(/\/?$/, "/"); // normalise to a trailing slash
-const repo = "https://github.com/patterkit/patter";
 const title = "PatterKit, an open dialogue toolkit for games";
 const description =
   "Write game dialogue as a screenplay in Patterpad, then play it in Unity, Unreal, Godot, or on the web from one small file. Open source and free.";
@@ -54,26 +57,7 @@ const engines = [
   </head>
   <body>
     <div class="pt-landing">
-      <!-- HEADER -->
-      <header class="pt-head">
-        <div class="pt-wrap pt-head-inner">
-          <a class="pt-brand" href={base} aria-label="PatterKit home">
-            <svg viewBox="8 25 124 112" width="33" height="30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#214f4b" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g>
-              <g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g>
-            </svg>
-            <span class="pt-wordmark">Patter<span>Kit</span></span>
-          </a>
-          <nav class="pt-navlinks" aria-label="Site">
-            <a class="pt-navlink" href={`${base}patterpad/overview/`}>Patterpad</a>
-            <a class="pt-navlink" href={`${base}play/overview/`}>Runtimes</a>
-            <a class="pt-navlink" href={`${base}why/`}>Why Patter</a>
-            <a class="pt-navlink" href={`${base}download/`}>Download</a>
-            <a class="pt-navlink" href={repo}>GitHub</a>
-            <a class="pt-btn" href={`${base}getting-started/`}>Get started</a>
-          </nav>
-        </div>
-      </header>
+      <LandingHeader />
 
       <main>
         <!-- HERO: one sentence, one paragraph, one button, then the script itself -->
@@ -82,7 +66,7 @@ const engines = [
             <h1 class="pt-h1">Write dialogue as a screenplay your game can play.</h1>
             <p class="pt-lead">Patter is an open toolkit for dialogue and branching narrative in games. Writers work in Patterpad, a desktop editor that reads like a script. Your game plays the result through one small file, in Unity, Unreal, Godot, or on the web.</p>
             <div class="pt-actions">
-              <a class="pt-btn pt-btn-primary" href={`${base}getting-started/`}>Get started</a>
+              <a class="chrome-btn pt-btn-primary" href={`${base}getting-started/`}>Get started</a>
               <a class="pt-link" href={`${base}download/`}>Download</a>
             </div>
             <p class="pt-note">It’s free and MIT-licensed, and there’s no server to run.</p>
@@ -163,24 +147,7 @@ const engines = [
         </section>
       </main>
 
-      <!-- FOOTER -->
-      <footer class="pt-foot">
-        <div class="pt-wrap pt-foot-signup"><Newsletter variant="landing" /></div>
-        <div class="pt-wrap pt-foot-inner">
-          <div class="pt-foot-brand">
-            <svg viewBox="8 25 124 112" width="27" height="24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g transform="translate(36.7,6) rotate(270 50 50)"><path fill="#57a294" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g><g transform="translate(3.3,56) rotate(90 50 50)"><path fill="#d2603e" d="M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z"></path></g></svg>
-            <span>PatterKit</span>
-          </div>
-          <div class="pt-foot-links">
-            <a href={`${base}why/`}>Why Patter</a>
-            <a href={`${base}patterpad/overview/`}>Patterpad</a>
-            <a href={`${base}play/overview/`}>Runtimes</a>
-            <a href={`${base}download/`}>Download</a>
-            <a href={repo}>GitHub</a>
-          </div>
-          <p class="pt-foot-credit">Open source under the <a href={`${base}licensing/`}>MIT licence</a>, made by <a href="https://ian.wildwinter.net" rel="author">Ian Thomas</a>.</p>
-        </div>
-      </footer>
+      <LandingFooter />
     </div>
   </body>
 </html>

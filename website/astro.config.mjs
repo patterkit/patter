@@ -20,10 +20,12 @@ export default defineConfig({
     starlight({
       title: "Patter",
       tagline: "Write playable dialogue.",
-      customCss: ["./src/styles/patter.css"],
-      // Every docs page ends with the license/author/home credit line (the landing page's footer
-      // carries the same credit separately - it doesn't use Starlight chrome).
-      components: { Footer: "./src/components/Footer.astro" },
+      customCss: ["./src/styles/patter.css", "./src/chrome/chrome.css"],
+      // Every docs page ends with the mailing-list sign-up and the credit line naming the
+      // licence and the author. Generated from patterkit/site-chrome, like the stylesheet
+      // above; the landing page carries the same credit through its own footer, because it is
+      // a standalone page outside Starlight's chrome.
+      components: { Footer: "./src/chrome/Footer.astro" },
       // Code blocks sit on the stage-black ground in BOTH site themes (a deliberate constant that reads
       // as "the runtime"). Force one dark syntax theme so the tokens always suit the dark background, and
       // pin the exact stage-black fill + hairline.

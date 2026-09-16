@@ -1,10 +1,16 @@
-/* PatterKit documentation, brand pass.
- * Anchors the site on the real brand palette: teal ink (the script: structural, the accent, and the
- * primary button), ember (kept for what it means, a danger aside and the Patterpad screenshots),
- * gold (caution), stage-black (the shared dark ground and code). Teal is the default; ember is
- * never promoted to a general link or button colour. Fonts are loaded via the Google Fonts <link>
- * in astro.config. Captions are words in the text face, never a tracked uppercase label; monospace
- * is for code, file names, and CLI output only.
+/* PatterKit documentation: the brand palette, and nothing else.
+ *
+ * This file is the site's tokens. It anchors the docs on the real brand palette (teal ink for
+ * the script, the accent and the primary button; ember kept for what it means, a danger aside
+ * and the Patterpad screenshots; gold for caution; stage-black for the shared dark ground and
+ * code), maps it onto Starlight's own tokens, and then declares the --chrome-* properties the
+ * shared chrome reads.
+ *
+ * The RULES that use these values are in src/chrome/chrome.css, which is generated from
+ * patterkit/site-chrome and identical on every site in the family. Nothing here is a rule, and
+ * nothing there is a colour. Fonts are loaded by the Google Fonts <link> in astro.config.mjs;
+ * captions are words in the text face, never a tracked uppercase label; monospace is for code,
+ * file names and CLI output only.
  */
 
 :root {
@@ -13,10 +19,9 @@
   --sl-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Widen the central reading column (Starlight default 45rem) so wide tables get room.
-   * Running prose is capped back to a comfortable measure below, so only tables, figures,
-   * code, and diagrams use the extra width. */
+   * Running prose is capped back to a comfortable measure by the chrome, so only tables,
+   * figures, code, and diagrams use the extra width. */
   --sl-content-width: 54rem;
-  --pt-prose-measure: 46rem;
 
   /* brand reference tokens (theme independent) */
   --pt-teal-ink: #214f4b;
@@ -25,6 +30,22 @@
   --pt-ember: #d2603e;
   --pt-gold: #cf9433;
   --pt-stage: #15201e;
+
+  /* The chrome, where this site's answer is the same in both themes. The sidebar marker is
+     the brand mark's drop, as a mask, so the pill carries the mark at 7px. */
+  --chrome-display: var(--pt-read);
+  --chrome-measure: 46rem;
+  --chrome-current-bg: var(--pt-teal-ink);
+  --chrome-current-ink: #f1ebe0;
+  --chrome-marker-width: 7px;
+  --chrome-marker-height: 9px;
+  --chrome-marker-gap: 8px;
+  --chrome-marker-shift: -1px;
+  --chrome-marker-ink: #8fc7bb;
+  --chrome-marker-shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E");
+  /* Code blocks sit on stage-black in BOTH themes, a deliberate constant that reads as "the
+     runtime". The syntax theme is forced dark in astro.config to suit it. */
+  --chrome-code-bg: #15201e;
 }
 
 /* ------------------------------------------------------------------ */
@@ -51,10 +72,20 @@
   --sl-color-bg-sidebar: #192724;
   --sl-color-bg-inline-code: #1f302d;
 
+  --chrome-aside-ink: var(--pt-teal-soft);
+  --chrome-aside-edge: var(--pt-teal-soft);
+  --chrome-caution-ink: #e0b257;
+  --chrome-caution-edge: var(--pt-gold);
+  --chrome-danger-ink: #e0734f;
+  --chrome-danger-edge: var(--pt-ember);
   /* Primary button: the accent fill with stage ink on it (5.6:1). */
-  --pt-cta: #57a294;
-  --pt-cta-hover: #6fb5a7;
-  --pt-on-accent: #15201e;
+  --chrome-cta: #57a294;
+  --chrome-cta-ink: #15201e;
+  --chrome-cta-hover: #6fb5a7;
+  --chrome-secondary-ink: var(--pt-teal-soft);
+  --chrome-code-ink: #9fd0c4;
+  --chrome-shot-edge: var(--sl-color-gray-4);
+  --chrome-shot-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,176 +114,18 @@
   --sl-color-bg-sidebar: #f6f0e6;
   --sl-color-bg-inline-code: #e7f0ed;
 
+  --chrome-aside-ink: var(--pt-teal-ink);
+  --chrome-aside-edge: var(--pt-teal-ink);
+  --chrome-caution-ink: #9a6e15;
+  --chrome-caution-edge: var(--pt-gold);
+  --chrome-danger-ink: #b04a28;
+  --chrome-danger-edge: var(--pt-ember);
   /* Primary button: teal ink with white on it (9.2:1). */
-  --pt-cta: #214f4b;
-  --pt-cta-hover: #18403c;
-  --pt-on-accent: #ffffff;
-}
-
-/* Keep running prose to a comfortable measure inside the wider column; tables, figures, code
- * blocks, and inline diagrams (top-level <svg>) are left to use the full --sl-content-width. */
-.sl-markdown-content > p,
-.sl-markdown-content > ul,
-.sl-markdown-content > ol,
-.sl-markdown-content > blockquote,
-.sl-markdown-content > h1,
-.sl-markdown-content > h2,
-.sl-markdown-content > h3,
-.sl-markdown-content > h4,
-.sl-markdown-content > h5,
-.sl-markdown-content > h6 { max-width: var(--pt-prose-measure); }
-
-/* ------------------------------------------------------------------ */
-/* Headings, wordmark, hero title: the warm reading face, one weight   */
-/* ------------------------------------------------------------------ */
-.sl-markdown-content h1,
-.sl-markdown-content h2,
-.sl-markdown-content h3,
-h1#_top,
-.hero h1,
-.hero .tagline,
-.site-title {
-  font-family: var(--pt-read);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.hero h1 { font-size: clamp(2.4rem, 6vw, 4rem); }
-
-/* ------------------------------------------------------------------ */
-/* Asides: off the default lilac, onto the brand                       */
-/* This Starlight version does NOT derive the aside fill from the      */
-/* border, so tint the fill explicitly from the (brand-mapped) border  */
-/* var; one rule covers every variant and both themes. The descendant  */
-/* selector out-specifies Starlight's own aside background rule.       */
-/* ------------------------------------------------------------------ */
-.sl-markdown-content .starlight-aside {
-  background-color: color-mix(in oklab, var(--sl-color-asides-border) 12%, var(--sl-color-bg));
-}
-.starlight-aside {
-  --sl-color-asides-text-accent: var(--pt-teal-ink);
-  --sl-color-asides-border: var(--pt-teal-ink);
-}
-:root[data-theme="dark"] .starlight-aside {
-  --sl-color-asides-text-accent: var(--pt-teal-soft);
-  --sl-color-asides-border: var(--pt-teal-soft);
-}
-.starlight-aside--caution {
-  --sl-color-asides-text-accent: #9a6e15;
-  --sl-color-asides-border: var(--pt-gold);
-}
-:root[data-theme="dark"] .starlight-aside--caution {
-  --sl-color-asides-text-accent: #e0b257;
-  --sl-color-asides-border: var(--pt-gold);
-}
-.starlight-aside--danger {
-  --sl-color-asides-text-accent: #b04a28;
-  --sl-color-asides-border: var(--pt-ember);
-}
-:root[data-theme="dark"] .starlight-aside--danger {
-  --sl-color-asides-text-accent: #e0734f;
-  --sl-color-asides-border: var(--pt-ember);
-}
-
-/* ------------------------------------------------------------------ */
-/* Sidebar: teal active page with a drop bullet, plain group labels    */
-/* ------------------------------------------------------------------ */
-#starlight__sidebar a[aria-current="page"] {
-  background: var(--pt-teal-ink);
-  color: #f1ebe0;
-  border-radius: 6px;
-  font-weight: 500;
-}
-#starlight__sidebar a[aria-current="page"]::before {
-  content: "";
-  display: inline-block;
-  width: 7px;
-  height: 9px;
-  margin-right: 8px;
-  vertical-align: -1px;
-  background: #8fc7bb;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E") no-repeat center / contain;
-          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 8 C64 30 78 48 78 64 A28 28 0 1 1 22 64 C22 48 36 30 50 8 Z'/%3E%3C/svg%3E") no-repeat center / contain;
-}
-/* Group headings in the sidebar: the text face at 600, sentence case, muted. */
-#starlight__sidebar .sidebar-content summary span,
-#starlight__sidebar .group-label > span {
-  font-family: var(--sl-font);
-  font-weight: 600;
-  font-size: 13px;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--sl-color-gray-3);
-}
-
-/* ------------------------------------------------------------------ */
-/* Buttons: teal primary, teal-outline secondary                       */
-/* ------------------------------------------------------------------ */
-.sl-link-button.primary,
-a.action.primary {
-  background: var(--pt-cta);
-  border-color: var(--pt-cta);
-  color: var(--pt-on-accent);
-}
-.sl-link-button.primary:hover,
-a.action.primary:hover {
-  background: var(--pt-cta-hover);
-  border-color: var(--pt-cta-hover);
-}
-.sl-link-button.secondary,
-a.action.secondary {
-  background: transparent;
-  color: var(--pt-teal-ink);
-  border: 1.5px solid var(--pt-teal-ink);
-}
-:root[data-theme="dark"] .sl-link-button.secondary,
-:root[data-theme="dark"] a.action.secondary {
-  color: var(--pt-teal-soft);
-  border-color: var(--pt-teal-soft);
-}
-.sl-link-button.minimal,
-a.action.minimal {
-  color: var(--sl-color-text-accent);
-}
-
-/* ------------------------------------------------------------------ */
-/* Inline code: pale-teal chip                                         */
-/* ------------------------------------------------------------------ */
-.sl-markdown-content :not(pre) > code {
-  background: var(--sl-color-bg-inline-code);
-  color: var(--pt-teal-ink);
-}
-:root[data-theme="dark"] .sl-markdown-content :not(pre) > code {
-  color: #9fd0c4;
-}
-
-/* Code blocks sit on stage-black in BOTH themes (a deliberate constant that reads as "the runtime").
-   The syntax theme is forced dark in astro.config (expressiveCode) so tokens suit this ground; this is a
-   belt-and-braces background pin. */
-.expressive-code .frame pre,
-.expressive-code .frame .copy + pre {
-  --ec-codeBg: #15201e;
-  background: #15201e;
-}
-
-/* Screenshots of the real Patterpad UI. Framed to read as a capture, not a diagram. */
-.doc-shot { margin: 1.5rem 0; }
-.doc-shot img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--sl-color-gray-5);
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(21, 32, 30, 0.08), 0 8px 24px rgba(21, 32, 30, 0.06);
-}
-:root[data-theme="dark"] .doc-shot img {
-  border-color: var(--sl-color-gray-4);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-/* Small chrome captures (icons, chips) should not stretch full width. */
-.doc-shot.is-inset img { max-width: 320px; }
-.doc-shot figcaption {
-  margin-top: 0.55rem;
-  font-size: 0.82rem;
-  line-height: 1.45;
-  color: var(--sl-color-gray-2);
+  --chrome-cta: #214f4b;
+  --chrome-cta-ink: #ffffff;
+  --chrome-cta-hover: #18403c;
+  --chrome-secondary-ink: var(--pt-teal-ink);
+  --chrome-code-ink: var(--pt-teal-ink);
+  --chrome-shot-edge: var(--sl-color-gray-5);
+  --chrome-shot-shadow: 0 1px 3px rgba(21, 32, 30, 0.08), 0 8px 24px rgba(21, 32, 30, 0.06);
 }

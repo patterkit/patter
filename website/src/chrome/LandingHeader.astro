@@ -1,0 +1,24 @@
+---
+// Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
+import site from "./site.mjs";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const { landing } = site;
+
+const url = (href: string) => (/^https?:/.test(href) ? href : `${base}${href}`);
+---
+
+<header class="chrome-head">
+  <div class:list={[site.wrapClass, "chrome-head-inner"]}>
+    <a class="chrome-brand" href={base} aria-label={`${site.brand} home`}>
+      <Fragment set:html={landing.mark} />
+      <span class="chrome-wordmark" set:html={landing.wordmark} />
+    </a>
+    <nav class="chrome-nav" aria-label="Site">
+      {landing.nav.map((link: { label: string; href: string }) => (
+        <a class="chrome-navlink" href={url(link.href)}>{link.label}</a>
+      ))}
+      <a class="chrome-btn" href={url(landing.cta.href)}>{landing.cta.label}</a>
+    </nav>
+  </div>
+</header>

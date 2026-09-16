@@ -1,0 +1,276 @@
+/* Generated from patterkit/site-chrome; do not edit here, edit the source and run sync */
+.sl-markdown-content > p,
+.sl-markdown-content > ul,
+.sl-markdown-content > ol,
+.sl-markdown-content > blockquote,
+.sl-markdown-content > h1,
+.sl-markdown-content > h2,
+.sl-markdown-content > h3,
+.sl-markdown-content > h4,
+.sl-markdown-content > h5,
+.sl-markdown-content > h6 { max-width: var(--chrome-measure); }
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+h1#_top,
+.hero h1,
+.hero .tagline,
+.site-title {
+  font-family: var(--chrome-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.hero h1 { font-size: clamp(2.4rem, 6vw, 4rem); }
+
+.sl-markdown-content .starlight-aside {
+  background-color: color-mix(in oklab, var(--sl-color-asides-border) 12%, var(--sl-color-bg));
+}
+.starlight-aside {
+  --sl-color-asides-text-accent: var(--chrome-aside-ink);
+  --sl-color-asides-border: var(--chrome-aside-edge);
+}
+.starlight-aside--caution {
+  --sl-color-asides-text-accent: var(--chrome-caution-ink);
+  --sl-color-asides-border: var(--chrome-caution-edge);
+}
+.starlight-aside--danger {
+  --sl-color-asides-text-accent: var(--chrome-danger-ink);
+  --sl-color-asides-border: var(--chrome-danger-edge);
+}
+
+#starlight__sidebar a[aria-current="page"] {
+  background: var(--chrome-current-bg);
+  color: var(--chrome-current-ink);
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+#starlight__sidebar a[aria-current="page"]::before {
+  content: "";
+  display: inline-block;
+  width: var(--chrome-marker-width);
+  height: var(--chrome-marker-height);
+  margin-right: var(--chrome-marker-gap);
+  vertical-align: var(--chrome-marker-shift);
+  background: var(--chrome-marker-ink);
+  -webkit-mask: var(--chrome-marker-shape) no-repeat center / contain;
+          mask: var(--chrome-marker-shape) no-repeat center / contain;
+}
+
+#starlight__sidebar .sidebar-content summary span,
+#starlight__sidebar .group-label > span {
+  font-family: var(--sl-font);
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--sl-color-gray-3);
+}
+
+.sl-link-button.primary,
+a.action.primary {
+  background: var(--chrome-cta);
+  border-color: var(--chrome-cta);
+  color: var(--chrome-cta-ink);
+}
+.sl-link-button.primary:hover,
+a.action.primary:hover {
+  background: var(--chrome-cta-hover);
+  border-color: var(--chrome-cta-hover);
+}
+.sl-link-button.secondary,
+a.action.secondary {
+  background: transparent;
+  color: var(--chrome-secondary-ink);
+  border: 1.5px solid var(--chrome-secondary-ink);
+}
+.sl-link-button.minimal,
+a.action.minimal { color: var(--sl-color-text-accent); }
+
+.sl-markdown-content :not(pre) > code {
+  background: var(--sl-color-bg-inline-code);
+  color: var(--chrome-code-ink);
+}
+.expressive-code .frame pre,
+.expressive-code .frame .copy + pre {
+  --ec-codeBg: var(--chrome-code-bg);
+  background: var(--chrome-code-bg);
+}
+
+.doc-shot { margin: 1.5rem 0; }
+.doc-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--chrome-shot-edge);
+  border-radius: 10px;
+  box-shadow: var(--chrome-shot-shadow);
+}
+
+.doc-shot.is-inset img { max-width: 320px; }
+.doc-shot figcaption {
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--sl-color-gray-2);
+}
+
+.chrome-signup {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sl-color-hairline);
+}
+
+.chrome-signup + .chrome-credit {
+  padding-top: 0;
+  border-top: 0;
+}
+.chrome-credit {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sl-color-hairline);
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+}
+.chrome-credit a {
+  color: var(--sl-color-gray-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chrome-credit a:hover { color: var(--sl-color-white); }
+
+.chrome-dl { --chrome-dl-hair: var(--sl-color-gray-5); margin: 1rem 0 1.5rem; }
+.chrome-dl-status,
+.chrome-dl-empty,
+.chrome-dl-meta { color: var(--sl-color-gray-3); font-size: 0.9rem; margin: 0; }
+.chrome-dl-meta { margin-top: 0.7rem; }
+.chrome-dl-meta a,
+.chrome-dl-empty a,
+.chrome-dl-note a { color: var(--sl-color-text-accent); }
+.chrome-dl-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--chrome-dl-hair); }
+.chrome-dl-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--chrome-dl-hair);
+}
+.chrome-dl-row > * { margin: 0; }
+.chrome-dl-name {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 0 0 11rem;
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+.chrome-dl-name img { display: block; width: 24px; height: 24px; border-radius: 5px; }
+.chrome-dl-sub { flex: 1 1 14rem; font-size: 0.9rem; color: var(--sl-color-gray-2); }
+.chrome-dl-soon { font-size: 0.9rem; color: var(--sl-color-gray-3); }
+
+.chrome-dl-btn {
+  display: inline-block;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  border: 1.5px solid var(--sl-color-text-accent);
+  color: var(--sl-color-text-accent) !important;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.88rem;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chrome-dl-btn:hover { background: var(--sl-color-accent-low); }
+.chrome-dl-note { font-size: 0.9rem; color: var(--sl-color-gray-2); margin: 0.7rem 0 0; }
+@media (max-width: 30rem) {
+  .chrome-dl-name { flex-basis: 100%; }
+}
+
+.chrome-head { border-bottom: 1px solid var(--chrome-land-rule); }
+.chrome-head-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+.chrome-brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
+.chrome-brand svg { display: block; }
+.chrome-wordmark {
+  font-family: var(--chrome-display);
+  font-weight: 600;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+  color: var(--chrome-land-wordmark-ink);
+}
+
+.chrome-wordmark span { color: var(--chrome-land-wordmark-accent, inherit); }
+.chrome-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; }
+.chrome-navlink {
+  color: var(--chrome-land-nav-ink);
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+}
+.chrome-navlink:hover {
+  color: var(--chrome-land-nav-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.chrome-btn {
+  display: inline-block;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--chrome-land-btn-ink);
+  color: var(--chrome-land-btn-ink);
+  background: transparent;
+}
+.chrome-btn:hover { background: var(--chrome-land-btn-hover); }
+.chrome-nav .chrome-btn { font-size: 14px; padding: 8px 14px; }
+
+.chrome-foot { margin-top: 88px; background: var(--chrome-foot-bg); color: var(--chrome-foot-ink); }
+.chrome-foot-signup { padding-top: 32px; padding-bottom: 24px; }
+.chrome-foot-signup + .chrome-foot-inner { border-top: 1px solid var(--chrome-foot-rule); }
+.chrome-foot-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 32px;
+  padding-bottom: 36px;
+}
+.chrome-foot-brand { display: flex; align-items: center; gap: 11px; }
+.chrome-foot-brand span {
+  font-family: var(--chrome-display);
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--chrome-foot-brand-ink);
+}
+.chrome-foot-links { display: flex; flex-wrap: wrap; gap: 12px 22px; font-size: 14px; }
+
+.chrome-foot .chrome-foot-links a { color: var(--chrome-foot-link); text-decoration: none; }
+.chrome-foot .chrome-foot-links a:hover {
+  color: var(--chrome-foot-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chrome-foot-credit { flex-basis: 100%; font-size: 13px; color: var(--chrome-foot-ink); margin: 0; }
+.chrome-foot .chrome-foot-credit a {
+  color: var(--chrome-foot-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.chrome-foot .chrome-foot-credit a:hover { color: var(--chrome-foot-link-hover); }

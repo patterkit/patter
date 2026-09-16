@@ -23,6 +23,33 @@
   --l-wash: #e7f0ed;          /* pale teal wash: code chip, outline-button hover */
   --l-accent-deep: #18403c;   /* primary button hover */
 
+  /* The header and the footer are the shared chrome (src/chrome/chrome.css, generated from
+     patterkit/site-chrome). These are the values it reads: the page's own hairline and ink for
+     the header, the stage ground and its four inks for the footer, and the seven the sign-up
+     field needs on that ground. */
+  --chrome-land-rule: var(--l-hair-2);
+  --chrome-land-wordmark-ink: #312b22;
+  --chrome-land-wordmark-accent: var(--pt-teal-ink);
+  --chrome-land-nav-ink: var(--pt-teal-ink);
+  --chrome-land-nav-hover: var(--pt-teal-ink);
+  --chrome-land-btn-ink: var(--pt-teal-ink);
+  --chrome-land-btn-hover: var(--l-wash);
+
+  --chrome-foot-bg: var(--pt-stage, #15201e);
+  --chrome-foot-ink: #a9bbb6;
+  --chrome-foot-rule: #22302d;
+  --chrome-foot-brand-ink: #e7ece9;
+  --chrome-foot-link: #c2cecb;
+  --chrome-foot-link-hover: #ffffff;
+
+  --chrome-nl-text: #8a9b97;
+  --chrome-nl-strong: #e7ece9;
+  --chrome-nl-field: #1b2624;
+  --chrome-nl-field-ink: #e7ece9;
+  --chrome-nl-hair: #2c3e3a;
+  --chrome-nl-hair-strong: #3c5551;
+  --chrome-nl-accent: #57a294;
+
   color: var(--l-ink-2);
   background: var(--l-page);
   font-family: var(--sl-font, "Inter", ui-sans-serif, system-ui, sans-serif);
@@ -35,30 +62,13 @@
 .pt-serif { font-family: var(--pt-read, "Newsreader", Georgia, serif); }
 
 /* ---- Links and buttons -------------------------------------------------------
- * A link is coloured and underlined; a button has an edge at rest. Hover changes colour only. */
+ * A link is coloured and underlined; a button has an edge at rest. Hover changes colour only.
+ * The bordered button itself is `.chrome-btn`, from the shared chrome; the primary is that
+ * shape with the accent filled in, which is this site's to say. */
 .pt-link { color: var(--pt-teal-ink); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .pt-link:hover { color: var(--l-accent-deep); }
-.pt-btn {
-  display: inline-block; text-decoration: none; cursor: pointer;
-  font-weight: 600; font-size: 15px; line-height: 1.2; padding: 10px 18px;
-  border-radius: 6px; border: 1.5px solid var(--pt-teal-ink);
-  color: var(--pt-teal-ink); background: transparent;
-}
-.pt-btn:hover { background: var(--l-wash); }
-.pt-btn-primary { background: var(--pt-teal-ink); color: var(--pt-on-accent, #fff); }
+.pt-btn-primary { background: var(--pt-teal-ink); color: var(--chrome-cta-ink, #fff); border-color: var(--pt-teal-ink); }
 .pt-btn-primary:hover { background: var(--l-accent-deep); border-color: var(--l-accent-deep); }
-
-/* ---- Header ------------------------------------------------------------------ */
-.pt-head { border-bottom: 1px solid var(--l-hair-2); }
-.pt-head-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; padding-top: 18px; padding-bottom: 18px; }
-.pt-brand { display: flex; align-items: center; gap: 11px; text-decoration: none; }
-.pt-brand svg { display: block; }
-.pt-wordmark { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 600; font-size: 21px; letter-spacing: -0.01em; color: #312b22; }
-.pt-wordmark span { color: var(--pt-teal-ink); }
-.pt-navlinks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; }
-.pt-navlink { color: var(--pt-teal-ink); text-decoration: none; font-size: 15px; font-weight: 500; }
-.pt-navlink:hover { text-decoration: underline; text-underline-offset: 3px; }
-.pt-navlinks .pt-btn { font-size: 14px; padding: 8px 14px; }
 
 /* ---- Hero: one sentence, one paragraph, one button, then the script ----------- */
 .pt-hero { padding-top: 64px; padding-bottom: 24px; }
@@ -113,21 +123,7 @@
 .pt-after { margin-top: 22px; font-size: 16px; }
 
 /* Downloads: the shared component renders a plain list; the landing only sets its ground. */
-.pt-downloads .pt-dl { --pt-dl-hair: var(--l-hair); }
-
-/* ---- Footer ------------------------------------------------------------------- */
-.pt-foot { margin-top: 88px; background: var(--pt-stage, #15201e); color: #a9bbb6; }
-.pt-foot-signup { padding-top: 32px; padding-bottom: 24px; }
-.pt-foot-signup + .pt-foot-inner { border-top: 1px solid #22302d; }
-.pt-foot-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; padding-top: 32px; padding-bottom: 36px; }
-.pt-foot-brand { display: flex; align-items: center; gap: 11px; }
-.pt-foot-brand span { font-family: var(--pt-read, "Newsreader", Georgia, serif); font-weight: 600; font-size: 17px; color: #e7ece9; }
-.pt-foot-links { display: flex; flex-wrap: wrap; gap: 12px 22px; font-size: 14px; }
-.pt-foot-links a { color: #c2cecb; text-decoration: none; }
-.pt-foot-links a:hover { color: #ffffff; text-decoration: underline; text-underline-offset: 3px; }
-.pt-foot-credit { flex-basis: 100%; font-size: 13px; color: #a9bbb6; margin: 0; }
-.pt-foot-credit a { color: #c2cecb; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.pt-foot-credit a:hover { color: #ffffff; }
+.pt-downloads .chrome-dl { --chrome-dl-hair: var(--l-hair); }
 
 /* ---- Responsive --------------------------------------------------------------- */
 @media (max-width: 560px) {

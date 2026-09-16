@@ -1,23 +1,12 @@
 ---
-/* Storytools mailing-list sign-up: one sentence and an inline email field.
- * Shared by the landing page footer and the Starlight docs footer (registered in
- * astro.config.mjs via Footer.astro), so every page on the site feeds the same
- * MailerLite group as storytools.co.uk.
- *
- * Deliberately NOT MailerLite's universal.js embed: this posts straight to their form
- * endpoint, so no third-party script loads on any page and the field inherits the site's
- * own type and colour.
- *
- * The two ids come from the MailerLite form's own embed code (Forms > Storytools Newsletter >
- * Embed > HTML tab): its action url reads .../jsonp/<ACCOUNT_ID>/forms/<FORM_ID>/subscribe.
- * The storytools.co.uk site posts to this same pair.
- */
+// Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
+import site from "./site.mjs";
+
 const ACCOUNT_ID = "2547332";
 const FORM_ID = "194494502057019185";
 
 interface Props {
-  /* "docs" sits on Starlight chrome and follows the light/dark theme;
-     "landing" sits on the landing page's dark stage-black footer. */
+
   variant?: "docs" | "landing";
 }
 const { variant = "docs" } = Astro.props;
@@ -25,11 +14,8 @@ const { variant = "docs" } = Astro.props;
 const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_ID}/subscribe`;
 ---
 
-{/* target="_blank" mirrors MailerLite's own embed: the script below intercepts the submit, so it
-    never fires in practice, but if the script fails the post still works and the raw JSON reply
-    lands in a new tab instead of replacing the page. */}
 <form class:list={["nl", `nl-${variant}`]} method="post" action={action} target="_blank">
-  <p class="nl-copy">I'll email you when Patter, or another Storytools tool, gets something new.</p>
+  <p class="nl-copy">I'll email you when {site.product}, or another Storytools tool, gets something new.</p>
   <div class="nl-controls">
     <label class="nl-hidden" for={`nl-email-${variant}`}>Email address</label>
     <input
@@ -45,7 +31,6 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
   </div>
   <p class="nl-status" role="status" aria-live="polite"></p>
 
-  {/* Bot trap: hidden from people and from assistive tech, so anything that fills it is a bot. */}
   <input class="nl-hidden" type="text" name="nl-company" tabindex="-1" autocomplete="off" aria-hidden="true" />
   <input type="hidden" name="ml-submit" value="1" />
   <input type="hidden" name="anticsrf" value="true" />
@@ -53,7 +38,7 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
 
 <style>
   .nl {
-    /* Palette hooks; each variant fills these in. */
+
     --nl-text: var(--sl-color-gray-3);
     --nl-strong: var(--sl-color-white);
     --nl-field-bg: var(--sl-color-bg);
@@ -133,20 +118,16 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
     display: none;
   }
 
-  /* The landing page footer is stage-black regardless of theme, so it pins its own values
-     rather than following the Starlight tokens. */
   .nl-landing {
-    --nl-text: #8a9b97;
-    --nl-strong: #e7ece9;
-    --nl-field-bg: #1b2624;
-    --nl-field-ink: #e7ece9;
-    --nl-hair: #2c3e3a;
-    --nl-hair-strong: #3c5551;
-    --nl-accent: #57a294;
+    --nl-text: var(--chrome-nl-text);
+    --nl-strong: var(--chrome-nl-strong);
+    --nl-field-bg: var(--chrome-nl-field);
+    --nl-field-ink: var(--chrome-nl-field-ink);
+    --nl-hair: var(--chrome-nl-hair);
+    --nl-hair-strong: var(--chrome-nl-hair-strong);
+    --nl-accent: var(--chrome-nl-accent);
   }
 
-  /* Visually hidden, but still reachable by screen readers (the label). The honeypot also
-     carries aria-hidden, so it is skipped entirely. */
   .nl-hidden {
     position: absolute;
     width: 1px;
@@ -171,15 +152,10 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
 </style>
 
 <script>
-  /* MailerLite's form endpoint answers with `access-control-allow-origin: *`, so this is an
-   * ordinary CORS fetch and the JSON reply is readable:
-   *   { "success": true }
-   *   { "success": false, "errors": { "fields": { "email": ["...message..."] } } }
-   * which means a rejected address gets MailerLite's own wording rather than a guess. */
+
   const DONE = "Thanks! Check your inbox for the confirmation link.";
   const FAILED = "That didn’t go through? Please try again.";
 
-  /** First field-level message MailerLite returned, if any. */
   function firstError(payload: any): string | null {
     const fields = payload?.errors?.fields;
     for (const key in fields) {
@@ -207,7 +183,6 @@ const action = `https://assets.mailerlite.com/jsonp/${ACCOUNT_ID}/forms/${FORM_I
       event.preventDefault();
       const data = new FormData(form);
 
-      // Silently accept the bot without troubling MailerLite with it.
       if (data.get("nl-company")) {
         succeed();
         return;

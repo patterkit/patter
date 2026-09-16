@@ -1,0 +1,13 @@
+{
+  "note": "Generated from patterkit/site-chrome; do not edit here, edit the source and run sync",
+  "source": "patterkit/site-chrome",
+  "files": {
+    "site.mjs": "990143d8065733cf28dafa175f7dfcb180a88e474b2f20498f12bac0a690d803",
+    "chrome.css": "dc6d554c18fe1f29a66f40a47ba69fc44b384b7d3a834405bddc94819224d53e",
+    "Footer.astro": "9baa2f68c856ca1bbcd86a63b28c57936ba10edff19029b7e34a91f89ee5396a",
+    "Newsletter.astro": "6919ee38971817b4852eeda30f2807192e7730c0ecf64264bab9fa000fbf1cae",
+    "Downloads.astro": "9196907b59d6962312764c0a4c0d06186232d7e291db96f2f929ac28428fa128",
+    "LandingHeader.astro": "60675c087c5be259b5c5e0e4ba9b4e416bad8b85097d2cb5fd7a51d5f6d9737c",
+    "LandingFooter.astro": "5ca206688f0c541a73a6b85a340339de6ca6abe99266726c19bf1282a6356c42"
+  }
+}

@@ -5,6 +5,10 @@
 // to this tree. Astro reports none of these, which is the reason the file
 // exists: a green build is what every one of them looks like.
 //
+// 0. AN EDITED COPY OF THE SHARED CHROME. src/chrome/ is generated from
+//    patterkit/site-chrome and hashed in its own manifest, so a change made
+//    here is a change that the next sync silently throws away.
+//
 // 1. A BLANK LINE INSIDE A RAW <svg>. Markdown ends an HTML block at the first
 //    blank line, so the rest of the diagram is re-parsed as prose and the page
 //    renders half a picture followed by a paragraph of loose label text.
@@ -49,6 +53,7 @@
 // opened straight from the terminal.
 // ---------------------------------------------------------------------------
 
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, relative, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,7 +78,32 @@ const blank = (m) => m.replace(/[^\n]/g, " ");
 
 const docsDir = join(root, "src/content/docs");
 const docs = walk(docsDir, [".md", ".mdx"]);
-const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/components"), [".astro"])];
+const astro = [join(root, "src/pages/index.astro"), ...walk(join(root, "src/chrome"), [".astro"])];
+
+// --- 0. the shared chrome is generated, not written here -----------------------
+// src/chrome/ is rendered into this repository by patterkit/site-chrome, which keeps one
+// source for the footer, the sign-up, the downloads list and the shared rules across the two
+// public sites and the server's set. Every file it writes is hashed in manifest.json, so an
+// edit made here, in the copy, fails this check in the commit that makes it. Staleness against
+// the SOURCE is the other half, and only patterkit can see it: `node sync.mjs --check` there.
+{
+  const dir = join(root, "src/chrome");
+  const EDITED = "src/chrome is generated from patterkit/site-chrome; do not edit it here";
+  const manifestFile = join(dir, "manifest.json");
+  if (!existsSync(manifestFile)) {
+    problems.push(`src/chrome/manifest.json  missing: ${EDITED}`);
+  } else {
+    const listed = JSON.parse(readFileSync(manifestFile, "utf8")).files;
+    for (const [name, digest] of Object.entries(listed)) {
+      const file = join(dir, name);
+      const found = existsSync(file) ? createHash("sha256").update(readFileSync(file)).digest("hex") : null;
+      if (found !== digest) problems.push(`src/chrome/${name}  ${found ? "edited" : "missing"}: ${EDITED}`);
+    }
+    for (const name of readdirSync(dir)) {
+      if (name !== "manifest.json" && !(name in listed)) problems.push(`src/chrome/${name}  not in the manifest: ${EDITED}`);
+    }
+  }
+}
 
 // --- 1. blank lines inside a raw <svg> -------------------------------------
 for (const file of docs) {
@@ -164,6 +194,7 @@ const OVERLINE_ALLOWED = new Set([
 ]);
 const styleSources = [
   ...walk(join(root, "src/styles"), [".css"]).map((file) => ({ file, css: readFileSync(file, "utf8"), offset: 0 })),
+  ...walk(join(root, "src/chrome"), [".css"]).map((file) => ({ file, css: readFileSync(file, "utf8"), offset: 0 })),
   // The <style> blocks inside the Astro components are the same class of rule.
   ...astro.flatMap((file) => {
     const text = readFileSync(file, "utf8");

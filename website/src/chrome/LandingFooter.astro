@@ -1,0 +1,26 @@
+---
+// Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
+import Newsletter from "./Newsletter.astro";
+import site from "./site.mjs";
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+const { landing } = site;
+const url = (href: string) => (/^https?:/.test(href) ? href : `${base}${href}`);
+const credit = site.credit.replaceAll("{base}", base);
+---
+
+<footer class="chrome-foot">
+  <div class:list={[site.wrapClass, "chrome-foot-signup"]}><Newsletter variant="landing" /></div>
+  <div class:list={[site.wrapClass, "chrome-foot-inner"]}>
+    <div class="chrome-foot-brand">
+      <Fragment set:html={landing.footMark} />
+      <span>{site.brand}</span>
+    </div>
+    <nav class="chrome-foot-links" aria-label="Footer">
+      {landing.footNav.map((link: { label: string; href: string }) => (
+        <a href={url(link.href)}>{link.label}</a>
+      ))}
+    </nav>
+    <p class="chrome-foot-credit" set:html={credit}></p>
+  </div>
+</footer>

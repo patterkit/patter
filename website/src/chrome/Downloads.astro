@@ -1,0 +1,129 @@
+---
+// Generated from patterkit/site-chrome; do not edit here, edit the source and run sync
+import site from "./site.mjs";
+
+const { kind = site.downloads.default } = Astro.props;
+---
+
+<div class="chrome-dl not-content" data-chrome-dl={kind}>
+  <p class="chrome-dl-status">Loading the latest release…</p>
+</div>
+
+<script>
+  import site from "./site.mjs";
+
+  const cfg = site.downloads;
+  const base = import.meta.env.BASE_URL.replace(/\/?$/, "/");
+  const mounts = Array.from(document.querySelectorAll<HTMLElement>("[data-chrome-dl]"));
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+
+  type Asset = { name: string; browser_download_url: string };
+  type Release = { tag_name: string; html_url: string; published_at: string | null; draft: boolean; assets: Asset[] };
+
+  const row = (icon: string, name: string, sub: string, action: string): string =>
+    `<li class="chrome-dl-row">
+      <span class="chrome-dl-name">${icon}<span>${esc(name)}</span></span>
+      <span class="chrome-dl-sub">${sub}</span>
+      ${action}
+    </li>`;
+  const list = (rows: string[]): string => `<ul class="chrome-dl-list">${rows.join("")}</ul>`;
+  const soon = `<span class="chrome-dl-soon">Coming soon</span>`;
+  const download = (a: Asset | undefined, label: string): string =>
+    a ? `<a class="chrome-dl-btn" href="${esc(a.browser_download_url)}">${esc(label)}</a>` : soon;
+  const go = (href: string, label: string): string =>
+    `<a class="chrome-dl-btn" href="${esc(href)}">${esc(label)}</a>`;
+  const icon = (file: string | undefined): string =>
+    file ? `<img src="${base}${esc(file)}" alt="" width="24" height="24" />` : "";
+  const meta = (r: Release, ver: string): string => {
+    const date = r.published_at
+      ? new Date(r.published_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+      : "";
+    return `<p class="chrome-dl-meta">Version ${esc(ver)}${date ? ", released " + esc(date) : ""}. <a href="${esc(r.html_url)}">Release notes</a>.</p>`;
+  };
+  const empty = (root: HTMLElement, what: string): void => {
+    root.innerHTML = `<p class="chrome-dl-empty">${esc(what)} will appear here once the first release ships. See <a href="${esc(cfg.releases)}">GitHub Releases</a>.</p>`;
+  };
+
+  const linkRow = (spec: any): string => row(icon(spec.icon), spec.name, spec.sub, go(`${base}${spec.link}`, spec.label));
+
+  const assetFor = (release: Release, pattern: string | string[]): Asset | undefined => {
+    for (const one of Array.isArray(pattern) ? pattern : [pattern]) {
+      const found = release.assets.find((a) => new RegExp(one, "i").test(a.name));
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  function renderRelease(root: HTMLElement, spec: any, releases: Release[]): void {
+    const release = releases.find((r) => new RegExp(spec.tag).test(r.tag_name));
+    const links = spec.rows.filter((x: any) => x.link);
+    if (!release) {
+      const missing = spec.whenMissing ?? {};
+
+      if (missing.keepLinks && links.length) {
+        root.innerHTML = list(links.map(linkRow)) + `<p class="chrome-dl-meta">${missing.note}</p>`;
+      } else if (missing.message) {
+        root.innerHTML = `<p class="chrome-dl-empty">${missing.message}</p>`;
+      } else {
+        empty(root, missing.what ?? "The downloads");
+      }
+      return;
+    }
+    const version = release.tag_name.replace(new RegExp(spec.strip), "");
+    const rows: string[] = [];
+    for (const r of spec.rows) {
+      if (r.link) {
+        rows.push(linkRow(r));
+        continue;
+      }
+      const asset = assetFor(release, r.asset);
+
+      if (!asset && r.drop) continue;
+      rows.push(row(icon(r.icon), r.name, r.sub, download(asset, r.label)));
+    }
+    root.innerHTML = list(rows) + (spec.meta === false ? "" : meta(release, version));
+  }
+
+  function renderEngines(root: HTMLElement, spec: any, releases: Release[]): void {
+    let loose: Asset | undefined;
+    const rows = spec.engines.map((e: any) => {
+      const release = releases.find((r) => new RegExp(e.tag).test(r.tag_name));
+      if (!release) return row(icon(e.icon), e.name, e.sub, soon);
+      const version = release.tag_name.replace(new RegExp(spec.strip), "");
+      if (spec.loose && spec.loose.engine === e.key) {
+        loose = release.assets.find((a) => a.name === spec.loose.asset);
+      }
+      const zip = assetFor(release, spec.asset);
+      return row(icon(e.icon), `${e.name} ${version}`, e.sub, download(zip, spec.label));
+    });
+    const line =
+      loose && spec.loose
+        ? `<p class="chrome-dl-note">${spec.loose.text.replace(
+            "{link}",
+            `<a href="${esc(loose.browser_download_url)}">${esc(spec.loose.label)}</a>`,
+          )}</p>`
+        : "";
+    root.innerHTML = list(rows) + line;
+  }
+
+  async function load(): Promise<void> {
+    if (!mounts.length) return;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${cfg.repo}/releases?per_page=50`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const releases: Release[] = (await res.json()).filter((r: Release) => !r.draft);
+      for (const mount of mounts) {
+        const spec = cfg.sections[mount.dataset.chromeDl!];
+        if (!spec) continue;
+        if (spec.kind === "engines") renderEngines(mount, spec, releases);
+        else renderRelease(mount, spec, releases);
+      }
+    } catch {
+      for (const mount of mounts) empty(mount, "The downloads");
+    }
+  }
+
+  load();
+</script>
