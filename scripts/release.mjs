@@ -65,7 +65,7 @@ for (const t of tags) {
 // ---- bump + commit (pad / play) --------------------------------------------
 if (target === "pad") {
   run(`node scripts/bump-patterpad-version.mjs ${version}`); // gates the changelog; exits non-zero on refusal
-  run("git add packages/patterpad/package.json packages/patterpad/CHANGELOG.md");
+  run("git add packages/patterpad/package.json packages/patterpad/CHANGELOG.md package-lock.json");
   run(`git commit -m "Patterpad ${version}"`);
 } else if (target === "play") {
   run(`node scripts/bump-play-version.mjs ${version}`); // writes every runtime manifest + changelog, all-or-nothing

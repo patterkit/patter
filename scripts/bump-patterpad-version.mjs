@@ -5,7 +5,7 @@
 // Patterpad has its own tag-driven release pipeline (bare v* tags -> .github/workflows/patterpad.yml;
 // bare v* is Patterpad's alone - electron-builder/updater can only target plain semver tags),
 // separate from Changesets and from the runtimes' lockstep `bump:play`. This script:
-//   1. writes the version into packages/patterpad/package.json (electron-builder takes the
+//   1. writes the version into packages/patterpad/package.json and package-lock.json (electron-builder takes the
 //      installer file names, the app's About version, and the updater feed version from it)
 //   2. stamps today's date into packages/patterpad/CHANGELOG.md: an existing
 //        "## [<version>] - Unreleased" heading is dated in place; otherwise the
@@ -45,6 +45,21 @@ edit("packages/patterpad/package.json", (s, rel) => {
   return s.replace(/^  "version": "[^"]+",$/m, `  "version": "${version}",`);
 });
 
+// --- 1b. the lockfile ------------------------------------------------------------
+
+// package-lock.json carries its own copy of every workspace package's version. npm only
+// rewrites it on install, so a bump that stops at package.json leaves the lock one release
+// behind until the next unrelated `npm install` drags the correction into somebody else's
+// commit. npm writes the lock as two-space JSON with a trailing newline, so a parse and
+// stringify round-trip changes nothing but the field we set.
+edit("package-lock.json", (s, rel) => {
+  const lock = JSON.parse(s);
+  const entry = lock.packages?.["packages/patterpad"];
+  if (!entry) throw new Error(`${rel}: no workspace entry for packages/patterpad`);
+  entry.version = version;
+  return JSON.stringify(lock, null, 2) + "\n";
+});
+
 // --- 2. the changelog ----------------------------------------------------------
 
 edit("packages/patterpad/CHANGELOG.md", (s, rel) => {
@@ -72,7 +87,7 @@ for (const { path, rel, after } of pending) {
 }
 console.log(`
 Next steps (review the diffs first):
-  git add packages/patterpad/package.json packages/patterpad/CHANGELOG.md
+  git add packages/patterpad/package.json packages/patterpad/CHANGELOG.md package-lock.json
   git commit -m "Patterpad ${version}"
   git push
   git tag v${version} && git push origin v${version}

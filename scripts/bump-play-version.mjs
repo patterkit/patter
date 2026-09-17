@@ -93,6 +93,26 @@ edit("ports/godot/addons/patterplay/plugin.cfg", (s, rel) => {
   return s.replace(/^version="[^"]*"$/m, `version="${version}"`);
 });
 
+// --- 1b. the lockfile ------------------------------------------------------------
+
+// package-lock.json carries its own copy of the runtime's version and of the exact pins
+// the in-repo dependents hold on it. npm only rewrites it on install, so a bump that stops
+// at the manifests leaves the lock one release behind until the next unrelated
+// `npm install` drags the correction into somebody else's commit. npm writes the lock as
+// two-space JSON with a trailing newline, so a parse and stringify round-trip changes
+// nothing but the fields we set.
+edit("package-lock.json", (s, rel) => {
+  const lock = JSON.parse(s);
+  const runtime = lock.packages?.["packages/runtime"];
+  if (!runtime) throw new Error(`${rel}: no workspace entry for packages/runtime`);
+  runtime.version = version;
+  for (const dir of ["packages/play-helpers", "packages/ops", "packages/patterpad"]) {
+    const deps = lock.packages?.[dir]?.dependencies;
+    if (deps && "@patterkit/runtime" in deps) deps["@patterkit/runtime"] = version;
+  }
+  return JSON.stringify(lock, null, 2) + "\n";
+});
+
 // --- 2. changelogs ------------------------------------------------------------
 
 for (const rel of [
