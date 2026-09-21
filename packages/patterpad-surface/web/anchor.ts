@@ -14,8 +14,12 @@ import type { EditorView } from "prosemirror-view";
 const MARGIN = 8;  // breathing room at the viewport edge
 const GAP = 4;     // between the caret line and the panel
 
+// This only positions: it must not set `display`. Each caller has already shown the element (the
+// floating helper's show() before it calls this; the jump picker is appended visible), and the jump
+// picker is a flex column whose list scrolls only inside it. Forcing `display: block` here flattened
+// that on the `/` route, so a long jump list ran out of the panel and could not be scrolled (#75);
+// the Inspector's Jump row never came through here, which is why it was fine.
 export function anchorBelowCaret(view: EditorView, el: HTMLElement): void {
-  el.style.display = "block";
   let left: number | null = null;
   let above = 0;  // y of the caret's TOP (a flipped panel sits above this)
   let below = 0;  // y of the caret's BOTTOM (a normal panel hangs from this)
@@ -37,7 +41,7 @@ export function anchorBelowCaret(view: EditorView, el: HTMLElement): void {
     }
   }
 
-  // Measure AFTER display:block, so a menu that has just been filled reports its real size.
+  // Measure now, with the element shown, so a menu that has just been filled reports its real size.
   const h = el.offsetHeight || 0;
   const w = el.offsetWidth || 0;
   const vw = window.innerWidth, vh = window.innerHeight;

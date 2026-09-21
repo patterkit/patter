@@ -143,6 +143,18 @@ describe("anchorBelowCaret keeps a panel inside the viewport", () => {
     anchorBelowCaret(viewAt({ top: 100, bottom: 118, left: 1000 }), el);
     expect(el.style.left).toBe("776px");  // 1024 - 240 - 8
   });
+
+  it("positions only: it leaves the panel's display alone (#75)", () => {
+    // The jump picker is a flex column whose list scrolls inside it. Forcing display:block here
+    // flattened it on the "/" route, so a long list ran out of the panel with no scroll.
+    const el = panel(240, 100);
+    el.style.display = "flex";
+    anchorBelowCaret(viewAt({ top: 100, bottom: 118, left: 200 }), el);
+    expect(el.style.display).toBe("flex");
+    const bare = panel(240, 100);
+    anchorBelowCaret(viewAt({ top: 100, bottom: 118, left: 200 }), bare);
+    expect(bare.style.display).toBe("");
+  });
 });
 
 describe('the "/" menu never types a slash into the line', () => {

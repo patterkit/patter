@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A long jump list opened from `/` scrolls again.** Choosing Jump from the `/` menu opened a list that
+  ran out of the bottom of its panel and could not be scrolled, so targets past the fold were out of
+  reach. The Inspector's Jump row was not affected. Reported by jlafos in #75.
+
 ## [0.17.0] - 2026-09-16
 
 ### Changed
