@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-09-21
+
 ### Fixed
 
 - **A long jump list opened from `/` scrolls again.** Choosing Jump from the `/` menu opened a list that
