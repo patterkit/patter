@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The problems bar keeps clear of the live-link chip.** With a game connected, the chip in the bottom
+  right corner was drawn over the end of the problems bar, covering a long message and, when the problem
+  had one, its fix button. The chip now says how much of the corner it takes, and the bar stops short of
+  it.
+
 ## [0.17.1] - 2026-09-21
 
 ### Fixed
