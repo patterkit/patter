@@ -13,4 +13,4 @@
 // meaning is supplied by a Dialect (see Dialect.h).
 #pragma once
 
-#include "Patter/Expr/Ast.h"
+#include "Patter/Kernel.h"   // the shared node struct, Expr/Ast.h, and its names in `patter`

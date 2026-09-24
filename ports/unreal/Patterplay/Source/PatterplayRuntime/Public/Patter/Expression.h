@@ -12,5 +12,4 @@
 
 #include "Patter/Ast.h"
 #include "Patter/Dialect.h"
-#include "Patter/Expr/Expr.h"
-#include "Patter/PatterValue.h"
+#include "Patter/Kernel.h"

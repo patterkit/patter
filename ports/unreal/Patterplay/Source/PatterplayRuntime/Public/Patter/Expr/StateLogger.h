@@ -14,8 +14,13 @@
 //
 // Line format: `${label}${path}: ${from} -> ${to}`, `<unset>` for nullopt.
 // Port of @wildwinter/scoperegistry's state logger (expr/packages/scoperegistry/src/state-logger.ts).
+// Part of the shared kernel, vendored from expr/ports/unreal: see Errors.h.
 
-#pragma once
+#include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
+// Compiled once per translation unit, and never beside a different kernel: Errors.h stops
+// that build with an #error, and this copy then stays out of the way of the first.
+#if !defined(WILDWINTER_EXPR_k11805ede_STATELOGGER_H) && WILDWINTER_EXPR_KERNEL == 0x11805ede
+#define WILDWINTER_EXPR_k11805ede_STATELOGGER_H
 
 #include <cstdio>
 #include <functional>
@@ -26,21 +31,21 @@
 #include <utility>
 #include <vector>
 
-#include "Patter/Expr/OrderedMap.h"
-#include "Patter/Expr/PropertyBag.h"
-#include "Patter/PatterValue.h"
+#include "OrderedMap.h"
+#include "PropertyBag.h"
+#include "Value.h"
 
-namespace patter
+namespace wildwinter { namespace expr { inline namespace k11805ede
 {
     /** A flattened snapshot: path -> value. */
-    using StateSnapshot = OrderedMap<std::string, PatterValue>;
+    using StateSnapshot = OrderedMap<std::string, ExprValue>;
 
     /** One flattened state transition. nullopt = unset. */
     struct StateChange
     {
         std::string path;
-        std::optional<PatterValue> from;
-        std::optional<PatterValue> to;
+        std::optional<ExprValue> from;
+        std::optional<ExprValue> to;
     };
 
     /**
@@ -48,7 +53,7 @@ namespace patter
      *
      * Named for the LOG, not the bag: a product may already have its own type for enumerating
      * bags (the Storylet Engine's BagMount labels a mount "story" for its own purposes), and
-     * here the shared file lands in the SAME NAMESPACE as that type.
+     * each product brings the kernel's names into its own namespace beside that type.
      *
      * `pathPrefix` is used VERBATIM, separator included, exactly as the bag's own is. Leave it
      * empty and the bag's own pathPrefix is used, which is what a product wants whenever its
@@ -88,8 +93,8 @@ namespace patter
         std::vector<StateChange> changes;
         for (const std::string& path : paths)
         {
-            const PatterValue* from = prev.get(path);
-            const PatterValue* to = next.get(path);
+            const ExprValue* from = prev.get(path);
+            const ExprValue* to = next.get(path);
             bool equal = from == nullptr ? to == nullptr : (to != nullptr && from->valueEquals(*to));
             if (equal) continue;
             StateChange c;
@@ -153,7 +158,7 @@ namespace patter
             PropertyBag::Unsubscribe off;
         };
 
-        static std::string show(const std::optional<PatterValue>& v)
+        static std::string show(const std::optional<ExprValue>& v)
         {
             return v.has_value() ? v->toJsonString() : "<unset>";
         }
@@ -224,4 +229,6 @@ namespace patter
         std::vector<StateChange> pushed_;
         std::vector<Mounted> mounted_;
     };
-}
+}}} // namespace wildwinter::expr
+
+#endif

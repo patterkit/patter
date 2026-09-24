@@ -19,7 +19,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Patterkit.Patterplay
+namespace Wildwinter.Expr
 {
     public sealed class Mulberry32
     {

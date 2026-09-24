@@ -13,24 +13,28 @@
 // the dialect's per-scope missing-property policy; calls dispatch to the
 // dialect's functions.
 //
-// Lands directly in the plugin's own namespace (`storylets` / `patter`). Two
+// Part of the kernel, in wildwinter::expr with no product identity. Two
 // header-only copies under ONE name would be an ODR violation the linker
 // resolves silently, which is the worst failure mode available here because it
-// is invisible; two copies under the two plugins' own namespaces are simply
-// two types. Identity belongs to the installing plugin, never to the shared
-// source. See expr/docs/port-sharing.md.
+// is invisible, so the kernel's inline namespace is its content hash, its
+// guards carry it, and a translation unit that sees two different kernels
+// stops: see Errors.h and expr/docs/port-sharing.md.
 //
-// What the family must provide before including this:
-//   - its value type, with Bool/Num/Str/Flags factories, isBool/isNumber/
-//     isString/isFlags, asBool/asNumber/asString/asFlags, and valueEquals
-//   - `EvalError`, a std::runtime_error subclass
-//   - the AST (the shared Ast.h beside this one)
+// It needs only the rest of the kernel: ExprValue (Value.h), the AST (Ast.h),
+// and ExprError (Errors.h), which is what every refusal here throws. A family
+// catches ExprError where it evaluates and rethrows its own error type, so its
+// games keep the catch they had. An error a dialect's own function throws
+// passes through untouched.
 //
 // TRUTHINESS IS NOT HERE, on purpose. Turning a value into a condition's
 // yes/no is applied to a condition rather than computed by the evaluator, so
 // it lives in each family's own code.
 // ---------------------------------------------------------------------------
-#pragma once
+#include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
+// Compiled once per translation unit, and never beside a different kernel: Errors.h stops
+// that build with an #error, and this copy then stays out of the way of the first.
+#if !defined(WILDWINTER_EXPR_k11805ede_EXPR_H) && WILDWINTER_EXPR_KERNEL == 0x11805ede
+#define WILDWINTER_EXPR_k11805ede_EXPR_H
 
 #include <algorithm>
 #include <functional>
@@ -40,28 +44,28 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Patter/PatterValue.h"
-#include "Patter/Expr/Ast.h"
+#include "Value.h"
+#include "Ast.h"
 
-namespace patter
+namespace wildwinter { namespace expr { inline namespace k11805ede
 {
     /** A scope readable by the evaluator: a static bag or a host resolver.
      *  get returns nullopt when the property is not present (TS undefined). */
-    class IScopeSource
+    class WILDWINTER_EXPR_VISIBLE IScopeSource
     {
     public:
         virtual ~IScopeSource() = default;
-        virtual std::optional<PatterValue> get(const std::string& name) const = 0;
+        virtual std::optional<ExprValue> get(const std::string& name) const = 0;
     };
 
     /** A scope backed by a plain callable, for a host that would rather write a
      *  lambda than a class. */
-    class FnScope : public IScopeSource
+    class WILDWINTER_EXPR_VISIBLE FnScope : public IScopeSource
     {
     public:
-        using Fn = std::function<std::optional<PatterValue>(const std::string&)>;
+        using Fn = std::function<std::optional<ExprValue>(const std::string&)>;
         explicit FnScope(Fn fn) : fn_(std::move(fn)) {}
-        std::optional<PatterValue> get(const std::string& name) const override
+        std::optional<ExprValue> get(const std::string& name) const override
         {
             return fn_ ? fn_(name) : std::nullopt;
         }
@@ -70,7 +74,7 @@ namespace patter
     };
 
     /** Policy when a property is missing from a PRESENT scope: False resolves
-     *  to false (the default), Throw raises an EvalError. A scope entirely
+     *  to false (the default), Throw raises an ExprError. A scope entirely
      *  absent from the EvalContext always resolves to false regardless. */
     enum class MissingPolicy { False, Throw };
 
@@ -99,7 +103,7 @@ namespace patter
     struct EvalHelpers
     {
         /** Evaluate a child node (for functions to evaluate their arguments). */
-        std::function<PatterValue(const AstPtr&)> evaluate;
+        std::function<ExprValue(const AstPtr&)> evaluate;
         /** The active evaluation context (scopes + host). */
         EvalContext* ctx = nullptr;
     };
@@ -114,7 +118,7 @@ namespace patter
         bool flagDeltaArgs = false;
         /** Evaluate the call. Receives the RAW argument nodes (not
          *  pre-evaluated); implementations own their own arity/type checks. */
-        std::function<PatterValue(const std::vector<AstPtr>&, EvalHelpers&)> eval;
+        std::function<ExprValue(const std::vector<AstPtr>&, EvalHelpers&)> eval;
     };
 
     struct Dialect
@@ -127,7 +131,7 @@ namespace patter
     };
 
     /** JS typeof for error messages (a flags array is "object"). */
-    inline std::string TypeOf(const PatterValue& v)
+    inline std::string TypeOf(const ExprValue& v)
     {
         if (v.isBool()) return "boolean";
         if (v.isNumber()) return "number";
@@ -147,20 +151,20 @@ namespace patter
 
         /** Index of a stage in a ladder; an unknown stage is an error naming the
          *  value (a drifted save is exactly what lands here). */
-        inline int StageIndex(const PatterValue& value, const std::vector<std::string>& ladder, const std::string& op)
+        inline int StageIndex(const ExprValue& value, const std::vector<std::string>& ladder, const std::string& op)
         {
-            if (!value.isString()) throw EvalError("'" + op + "' on a quality compares stages, got " + TypeOf(value));
+            if (!value.isString()) throw ExprError("'" + op + "' on a quality compares stages, got " + TypeOf(value));
             for (size_t i = 0; i < ladder.size(); i++) if (ladder[i] == value.asString()) return (int)i;
             std::string all;
             for (size_t i = 0; i < ladder.size(); i++) all += (i ? ", " : "") + ladder[i];
-            throw EvalError("\"" + value.asString() + "\" is not a stage of this quality (stages: " + all + ")");
+            throw ExprError("\"" + value.asString() + "\" is not a stage of this quality (stages: " + all + ")");
         }
 
-        inline void AssertNumbers(const PatterValue& l, const PatterValue& r, const std::string& op)
+        inline void AssertNumbers(const ExprValue& l, const ExprValue& r, const std::string& op)
         {
             if (!l.isNumber() || !r.isNumber())
             {
-                throw EvalError("'" + op + "' requires numeric operands, got " + TypeOf(l) + " and " + TypeOf(r));
+                throw ExprError("'" + op + "' requires numeric operands, got " + TypeOf(l) + " and " + TypeOf(r));
             }
         }
 
@@ -177,14 +181,14 @@ namespace patter
                 for (const auto& s : d.scopes) missingPolicy[s.token] = s.missing;
             }
 
-            PatterValue rec(const AstPtr& n)
+            ExprValue rec(const AstPtr& n)
             {
-                if (!n) throw EvalError("null expression node");
+                if (!n) throw ExprError("null expression node");
                 switch (n->tag)
                 {
-                    case AstTag::Bool: return PatterValue::Bool(n->b);
-                    case AstTag::Number: return PatterValue::Num(n->n);
-                    case AstTag::Str: return PatterValue::Str(n->s);
+                    case AstTag::Bool: return ExprValue::Bool(n->b);
+                    case AstTag::Number: return ExprValue::Num(n->n);
+                    case AstTag::Str: return ExprValue::Str(n->s);
 
                     case AstTag::ScopedVar:
                     {
@@ -192,19 +196,19 @@ namespace patter
                         if (it == ctx.scopes.end() || !it->second)
                         {
                             // Scope context absent -> graceful false.
-                            return PatterValue::Bool(false);
+                            return ExprValue::Bool(false);
                         }
-                        std::optional<PatterValue> val = it->second->get(n->name);
+                        std::optional<ExprValue> val = it->second->get(n->name);
                         if (!val.has_value())
                         {
                             // Property not declared on the present scope. Policy decides.
                             auto policy = missingPolicy.find(n->scope);
                             if (policy != missingPolicy.end() && policy->second == MissingPolicy::Throw)
                             {
-                                throw EvalError("@" + n->scope + "." + n->name
+                                throw ExprError("@" + n->scope + "." + n->name
                                     + " is not declared on the current " + n->scope + ".");
                             }
-                            return PatterValue::Bool(false);
+                            return ExprValue::Bool(false);
                         }
                         return *val;
                     }
@@ -219,21 +223,21 @@ namespace patter
                         {
                             if (n->args.size() != 1)
                             {
-                                throw EvalError("advance() takes exactly 1 argument, got " + std::to_string(n->args.size()));
+                                throw ExprError("advance() takes exactly 1 argument, got " + std::to_string(n->args.size()));
                             }
                             const std::vector<std::string>* ladder = LadderOf(n->args[0], ctx);
                             if (!ladder)
                             {
-                                throw EvalError("advance() needs a quality reference (@scope.name of a quality property)");
+                                throw ExprError("advance() needs a quality reference (@scope.name of a quality property)");
                             }
                             const int current = StageIndex(rec(n->args[0]), *ladder, "advance");
                             const size_t next = std::min((size_t)current + 1, ladder->size() - 1);
-                            return PatterValue::Str((*ladder)[next]);
+                            return ExprValue::Str((*ladder)[next]);
                         }
                         auto def = dialect.functions.find(n->fn);
                         if (def == dialect.functions.end())
                         {
-                            throw EvalError("unknown function '" + n->fn + "'");
+                            throw ExprError("unknown function '" + n->fn + "'");
                         }
                         EvalHelpers helpers;
                         helpers.evaluate = [this](const AstPtr& child) { return rec(child); };
@@ -242,20 +246,20 @@ namespace patter
                     }
 
                     case AstTag::FlagDelta:
-                        throw EvalError("flagdelta node is only valid as an argument to a flag-delta function");
+                        throw ExprError("flagdelta node is only valid as an argument to a flag-delta function");
 
                     case AstTag::Unary:
                     {
                         if (n->op == "not")
                         {
-                            PatterValue val = rec(n->operand);
-                            if (!val.isBool()) throw EvalError("'not' requires a boolean operand, got " + TypeOf(val));
-                            return PatterValue::Bool(!val.asBool());
+                            ExprValue val = rec(n->operand);
+                            if (!val.isBool()) throw ExprError("'not' requires a boolean operand, got " + TypeOf(val));
+                            return ExprValue::Bool(!val.asBool());
                         }
                         // neg
-                        PatterValue operand = rec(n->operand);
-                        if (!operand.isNumber()) throw EvalError("unary '-' requires a numeric operand, got " + TypeOf(operand));
-                        return PatterValue::Num(-operand.asNumber());
+                        ExprValue operand = rec(n->operand);
+                        if (!operand.isNumber()) throw ExprError("unary '-' requires a numeric operand, got " + TypeOf(operand));
+                        return ExprValue::Num(-operand.asNumber());
                     }
 
                     case AstTag::Binary:
@@ -263,25 +267,25 @@ namespace patter
                         // Short-circuit operators first.
                         if (n->op == "and")
                         {
-                            PatterValue l = rec(n->left);
-                            if (!l.isBool()) throw EvalError("'and' requires boolean operands, left is " + TypeOf(l));
-                            if (!l.asBool()) return PatterValue::Bool(false);
-                            PatterValue r = rec(n->right);
-                            if (!r.isBool()) throw EvalError("'and' requires boolean operands, right is " + TypeOf(r));
+                            ExprValue l = rec(n->left);
+                            if (!l.isBool()) throw ExprError("'and' requires boolean operands, left is " + TypeOf(l));
+                            if (!l.asBool()) return ExprValue::Bool(false);
+                            ExprValue r = rec(n->right);
+                            if (!r.isBool()) throw ExprError("'and' requires boolean operands, right is " + TypeOf(r));
                             return r;
                         }
                         if (n->op == "or")
                         {
-                            PatterValue l = rec(n->left);
-                            if (!l.isBool()) throw EvalError("'or' requires boolean operands, left is " + TypeOf(l));
-                            if (l.asBool()) return PatterValue::Bool(true);
-                            PatterValue r = rec(n->right);
-                            if (!r.isBool()) throw EvalError("'or' requires boolean operands, right is " + TypeOf(r));
+                            ExprValue l = rec(n->left);
+                            if (!l.isBool()) throw ExprError("'or' requires boolean operands, left is " + TypeOf(l));
+                            if (l.asBool()) return ExprValue::Bool(true);
+                            ExprValue r = rec(n->right);
+                            if (!r.isBool()) throw ExprError("'or' requires boolean operands, right is " + TypeOf(r));
                             return r;
                         }
 
-                        PatterValue left = rec(n->left);
-                        PatterValue right = rec(n->right);
+                        ExprValue left = rec(n->left);
+                        ExprValue right = rec(n->right);
 
                         // Quality: when either operand REFERENCES a quality,
                         // ordering compares by ladder position and arithmetic is
@@ -295,81 +299,83 @@ namespace patter
                                 const bool ordering = n->op == ">" || n->op == ">=" || n->op == "<" || n->op == "<=";
                                 if (ordering && lLadder && rLadder && *lLadder != *rLadder)
                                 {
-                                    throw EvalError("'" + n->op + "' compares two different qualities, whose stage orders are unrelated");
+                                    throw ExprError("'" + n->op + "' compares two different qualities, whose stage orders are unrelated");
                                 }
                                 if (ordering)
                                 {
                                     const int li = StageIndex(left, *ladder, n->op);
                                     const int ri = StageIndex(right, *ladder, n->op);
-                                    if (n->op == ">") return PatterValue::Bool(li > ri);
-                                    if (n->op == ">=") return PatterValue::Bool(li >= ri);
-                                    if (n->op == "<") return PatterValue::Bool(li < ri);
-                                    return PatterValue::Bool(li <= ri);
+                                    if (n->op == ">") return ExprValue::Bool(li > ri);
+                                    if (n->op == ">=") return ExprValue::Bool(li >= ri);
+                                    if (n->op == "<") return ExprValue::Bool(li < ri);
+                                    return ExprValue::Bool(li <= ri);
                                 }
                                 if (n->op == "+" || n->op == "-" || n->op == "*" || n->op == "/")
                                 {
-                                    throw EvalError("'" + n->op + "' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it");
+                                    throw ExprError("'" + n->op + "' cannot be applied to a quality - a stage is a position, not a number; use advance() to move it");
                                 }
                             }
                         }
 
-                        if (n->op == "==") return PatterValue::Bool(left.valueEquals(right));
-                        if (n->op == "!=") return PatterValue::Bool(!left.valueEquals(right));
+                        if (n->op == "==") return ExprValue::Bool(left.valueEquals(right));
+                        if (n->op == "!=") return ExprValue::Bool(!left.valueEquals(right));
                         if (n->op == ">")
                         {
                             AssertNumbers(left, right, ">");
-                            return PatterValue::Bool(left.asNumber() > right.asNumber());
+                            return ExprValue::Bool(left.asNumber() > right.asNumber());
                         }
                         if (n->op == ">=")
                         {
                             AssertNumbers(left, right, ">=");
-                            return PatterValue::Bool(left.asNumber() >= right.asNumber());
+                            return ExprValue::Bool(left.asNumber() >= right.asNumber());
                         }
                         if (n->op == "<")
                         {
                             AssertNumbers(left, right, "<");
-                            return PatterValue::Bool(left.asNumber() < right.asNumber());
+                            return ExprValue::Bool(left.asNumber() < right.asNumber());
                         }
                         if (n->op == "<=")
                         {
                             AssertNumbers(left, right, "<=");
-                            return PatterValue::Bool(left.asNumber() <= right.asNumber());
+                            return ExprValue::Bool(left.asNumber() <= right.asNumber());
                         }
                         if (n->op == "+")
                         {
-                            if (left.isNumber() && right.isNumber()) return PatterValue::Num(left.asNumber() + right.asNumber());
-                            if (left.isString() && right.isString()) return PatterValue::Str(left.asString() + right.asString());
-                            throw EvalError("'+' requires two numbers or two strings, got " + TypeOf(left) + " and " + TypeOf(right));
+                            if (left.isNumber() && right.isNumber()) return ExprValue::Num(left.asNumber() + right.asNumber());
+                            if (left.isString() && right.isString()) return ExprValue::Str(left.asString() + right.asString());
+                            throw ExprError("'+' requires two numbers or two strings, got " + TypeOf(left) + " and " + TypeOf(right));
                         }
                         if (n->op == "-")
                         {
                             AssertNumbers(left, right, "-");
-                            return PatterValue::Num(left.asNumber() - right.asNumber());
+                            return ExprValue::Num(left.asNumber() - right.asNumber());
                         }
                         if (n->op == "*")
                         {
                             AssertNumbers(left, right, "*");
-                            return PatterValue::Num(left.asNumber() * right.asNumber());
+                            return ExprValue::Num(left.asNumber() * right.asNumber());
                         }
                         if (n->op == "/")
                         {
                             AssertNumbers(left, right, "/");
-                            if (right.asNumber() == 0) throw EvalError("division by zero");
-                            return PatterValue::Num(left.asNumber() / right.asNumber());
+                            if (right.asNumber() == 0) throw ExprError("division by zero");
+                            return ExprValue::Num(left.asNumber() / right.asNumber());
                         }
-                        throw EvalError("unknown operator '" + n->op + "'");
+                        throw ExprError("unknown operator '" + n->op + "'");
                     }
 
                     default:
-                        throw EvalError("unknown expression node");
+                        throw ExprError("unknown expression node");
                 }
             }
         };
     }
 
-    inline PatterValue Evaluate(const AstPtr& node, EvalContext& ctx, const Dialect& dialect)
+    inline ExprValue Evaluate(const AstPtr& node, EvalContext& ctx, const Dialect& dialect)
     {
         detail::Evaluator evaluator(ctx, dialect);
         return evaluator.rec(node);
     }
-}
+}}} // namespace wildwinter::expr
+
+#endif

@@ -225,6 +225,9 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
 		Engine->openFlow(Std(Id), Std(Scene));
 		UPatterFlow* Flow = NewObject<UPatterFlow>(this);
 		Flow->Init(this, Id, Engine->flowPtr(Std(Id))); // an OWNING handle: see UPatterFlow::Flow
+		// A reopen REPLACES: the core has closed the flow this name used to mean, so its wrapper
+		// leaves the list. Kept, the next re-bind by id would point it at this new flow.
+		WrappedFlows.RemoveAll([&Id](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid() || Weak->GetFlowId() == Id; });
 		WrappedFlows.Add(Flow); // so a live hot swap can re-bind the wrapper by id
 		return Flow;
 	}
@@ -308,19 +311,27 @@ bool UPatterEngine::GetPropertyBool(const FString& Ref) const
 	return (V && V->isBool()) ? V->b : false;
 }
 
+// A refused write (a scope the game lent with no setter, an @scene ref) is logged like every other
+// guarded call here, never thrown through Blueprint.
 void UPatterEngine::SetPropertyNumber(const FString& Ref, float Value)
 {
-	if (Engine) Engine->setProperty(Std(Ref), patter::PatterValue::Num(Value));
+	if (!Engine) return;
+	try { Engine->setProperty(Std(Ref), patter::PatterValue::Num(Value)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 void UPatterEngine::SetPropertyBool(const FString& Ref, bool bValue)
 {
-	if (Engine) Engine->setProperty(Std(Ref), patter::PatterValue::Bool(bValue));
+	if (!Engine) return;
+	try { Engine->setProperty(Std(Ref), patter::PatterValue::Bool(bValue)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 void UPatterEngine::SetPropertyString(const FString& Ref, const FString& Value)
 {
-	if (Engine) Engine->setProperty(Std(Ref), patter::PatterValue::Str(Std(Value)));
+	if (!Engine) return;
+	try { Engine->setProperty(Std(Ref), patter::PatterValue::Str(Std(Value))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 FString UPatterEngine::GetBuildId() const
@@ -376,13 +387,14 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 UPatterFlow* UPatterEngine::GetFlow(const FString& FlowName)
 {
 	if (!Engine) return nullptr;
-	// Hand back the wrapper we already made for this id, so a Blueprint that fetches twice gets one
-	// object rather than two views of the same flow.
-	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
-		if (UPatterFlow* Wrapper = Weak.Get())
-			if (Wrapper->GetFlowId() == FlowName) return Wrapper->IsClosed() ? nullptr : Wrapper;
 	std::shared_ptr<patter::Flow> F = Engine->flowPtr(Std(FlowName));
 	if (!F) return nullptr; // not open: null, not an inert wrapper nobody asked for
+	// Hand back the wrapper we already made for THIS flow, so a Blueprint that fetches twice gets one
+	// object rather than two views of it. Matched by the flow it holds, not by id: after a reopen the
+	// old wrapper carries the same id and the closed flow.
+	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
+		if (UPatterFlow* Wrapper = Weak.Get())
+			if (Wrapper->Flow == F) return Wrapper;
 	UPatterFlow* Flow = NewObject<UPatterFlow>(this);
 	Flow->Init(this, FlowName, F);
 	WrappedFlows.Add(Flow);
@@ -415,6 +427,9 @@ void UPatterEngine::RebindFlows()
 	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
 		if (UPatterFlow* Wrapper = Weak.Get())
 			Wrapper->Rebind(Engine->flowPtr(Std(Wrapper->GetFlowId())));
+	// A wrapper whose flow did not survive (closed, reset, not in the save) is closed for good: it
+	// leaves the list, so a later re-bind cannot revive it on the next flow opened under its name.
+	WrappedFlows.RemoveAll([](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid() || Weak->IsClosed(); });
 }
 
 TArray<FString> UPatterEngine::GetPropertyFlags(const FString& Ref) const
@@ -432,7 +447,8 @@ void UPatterEngine::SetPropertyFlags(const FString& Ref, const TArray<FString>& 
 	std::vector<std::string> Flags;
 	Flags.reserve(Values.Num());
 	for (const FString& V : Values) Flags.push_back(Std(V));
-	Engine->setProperty(Std(Ref), patter::PatterValue::Flags(std::move(Flags)));
+	try { Engine->setProperty(Std(Ref), patter::PatterValue::Flags(std::move(Flags))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
 TArray<FPatterLogEntry> UPatterEngine::GetLog() const

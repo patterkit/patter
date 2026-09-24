@@ -52,7 +52,7 @@ cp -R "$samples/." "$staged/"
 # real compile, and afterwards require every one of them to exist and to be newer than the
 # moment the run started.
 assemblies="$project/Library/ScriptAssemblies"
-expected=(Patterplay.Runtime.dll Patterplay.Runtime.Json.dll Patterplay.Runtime.Unity.dll Patterplay.Editor.dll Assembly-CSharp.dll)
+expected=(Patterplay.Expr.dll Patterplay.Runtime.dll Patterplay.Runtime.Json.dll Patterplay.Runtime.Unity.dll Patterplay.Editor.dll Assembly-CSharp.dll)
 rm -rf "$assemblies"
 stamp="$(mktemp "${TMPDIR:-/tmp}/check-unity-editor-stamp.XXXXXX")"
 # Unity's build step crashed ("Unhandled exception during build") under a long TMPDIR, so

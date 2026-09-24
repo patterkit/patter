@@ -81,6 +81,10 @@ scene** - import, open the scene, press Play, nothing to set up:
   `EngineOptions.Registry` to share it with another engine (a Storylet Engine, say) and save it once
   with `PatterSave.SaveRegistry` / `LoadRegistry`; leave it out and the engine keeps its own.
   See [the Unity guide](https://patterkit.dev/play/unity/#one-registry-per-game).
+- **The shared kernel**: the registry and the value type, `ExprValue`, are in the `Wildwinter.Expr`
+  namespace, in the `Patterplay.Expr` assembly, shared with the Storylet Engine so a game with both
+  compiles it once. A game assembly definition that references `Patterplay.Runtime` also references
+  `Patterplay.Expr` and `StoryletEngine.Expr`.
 - **Audio**: `PatterAudioResolver` reads the `patteraudio.json` manifest exported next to a
   Patter audio folder and resolves each line to its winning take - it resolves the path,
   you play it. See [the audio guide](https://patterkit.dev/play/audio/).

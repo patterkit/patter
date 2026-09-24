@@ -2,6 +2,7 @@
 // (merge-at-read). Port of @patterkit/runtime's gamedata.ts.
 
 using System.Collections.Generic;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -21,7 +22,7 @@ namespace Patterkit.Patterplay
             var outData = new GameData();
             foreach (var f in fields)
             {
-                PatterValue v = (node != null && node.ContainsKey(f.Name)) ? node[f.Name] : f.Default;
+                ExprValue v = (node != null && node.ContainsKey(f.Name)) ? node[f.Name] : f.Default;
                 if (v != null) outData[f.Name] = v;
             }
             if (node != null)

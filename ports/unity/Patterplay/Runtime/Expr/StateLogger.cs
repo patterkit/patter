@@ -18,14 +18,14 @@
 using System;
 using System.Collections.Generic;
 
-namespace Patterkit.Patterplay
+namespace Wildwinter.Expr
 {
     /// <summary>One flattened state transition. Null = unset.</summary>
     public sealed class StateChange
     {
         public string Path;
-        public PatterValue From;
-        public PatterValue To;
+        public ExprValue From;
+        public ExprValue To;
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ namespace Patterkit.Patterplay
     public sealed class StateLoggerAdapter
     {
         public Func<List<LogMount>> Mounts;
-        public Func<OrderedMap<string, PatterValue>> Extra;
+        public Func<OrderedMap<string, ExprValue>> Extra;
     }
 
     public sealed class StateLogger : IDisposable
@@ -67,7 +67,7 @@ namespace Patterkit.Patterplay
         private readonly StateLoggerAdapter _adapter;
         private readonly Action<string> _sink;
         private readonly string _label;
-        private OrderedMap<string, PatterValue> _baseline;
+        private OrderedMap<string, ExprValue> _baseline;
         private List<StateChange> _pushed = new List<StateChange>();
         private List<Mounted> _mounted = new List<Mounted>();
 
@@ -81,7 +81,7 @@ namespace Patterkit.Patterplay
             Mount();
         }
 
-        private static string Show(PatterValue v) => v == null ? "<unset>" : v.ToJsonString();
+        private static string Show(ExprValue v) => v == null ? "<unset>" : v.ToJsonString();
 
         private static string PrefixOf(LogMount m) => m.PathPrefix ?? m.Bag.PathPrefix;
 
@@ -89,11 +89,11 @@ namespace Patterkit.Patterplay
 
         /// <summary>The full flattened snapshot: every mounted bag's values under its prefix,
         /// plus the adapter's non-property paths.</summary>
-        public OrderedMap<string, PatterValue> Snapshot() => Full();
+        public OrderedMap<string, ExprValue> Snapshot() => Full();
 
-        private OrderedMap<string, PatterValue> Full()
+        private OrderedMap<string, ExprValue> Full()
         {
-            var snapshot = new OrderedMap<string, PatterValue>();
+            var snapshot = new OrderedMap<string, ExprValue>();
             foreach (var mount in _adapter.Mounts())
             {
                 string prefix = PrefixOf(mount);
@@ -163,7 +163,7 @@ namespace Patterkit.Patterplay
 
         /// <summary>The changed paths between two snapshots, sorted; null = unset.</summary>
         public static List<StateChange> DiffState(
-            OrderedMap<string, PatterValue> prev, OrderedMap<string, PatterValue> next)
+            OrderedMap<string, ExprValue> prev, OrderedMap<string, ExprValue> next)
         {
             var paths = new List<string>();
             var seen = new HashSet<string>();

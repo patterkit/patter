@@ -30,7 +30,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace Patterkit.Patterplay.TestHost
+namespace Wildwinter.Expr.Testing
 {
     /// <summary>What a run of the registry corpus found: cases passed, cases run, and
     /// every failure (each names its case and step).</summary>
@@ -107,7 +107,7 @@ namespace Patterkit.Patterplay.TestHost
         {
             var fails = new List<string>();
             var r = new ScopeRegistry();
-            var stores = new Dictionary<string, OrderedMap<string, PatterValue>>();
+            var stores = new Dictionary<string, OrderedMap<string, ExprValue>>();
             string caseName = NameOf(c);
             var steps = (List<object>)c.GetOrDefault("steps");
 
@@ -161,7 +161,7 @@ namespace Patterkit.Patterplay.TestHost
 
                     case "foreign":
                     {
-                        var store = new OrderedMap<string, PatterValue>();
+                        var store = new OrderedMap<string, ExprValue>();
                         if (step.GetOrDefault("store") is OrderedMap<string, object> seed)
                         {
                             foreach (var pair in seed) store.Set(pair.Key, ToValue(pair.Value));
@@ -345,11 +345,11 @@ namespace Patterkit.Patterplay.TestHost
         /// (`settable: false`) it refuses every write, for everyone.</summary>
         private sealed class MapResolver : IScopeResolver
         {
-            private readonly OrderedMap<string, PatterValue> _store;
-            public MapResolver(OrderedMap<string, PatterValue> store, bool canSet) { _store = store; CanSet = canSet; }
+            private readonly OrderedMap<string, ExprValue> _store;
+            public MapResolver(OrderedMap<string, ExprValue> store, bool canSet) { _store = store; CanSet = canSet; }
             public bool CanSet { get; }
-            public PatterValue Get(string name) => _store.GetOrDefault(name);
-            public void Set(string name, PatterValue value)
+            public ExprValue Get(string name) => _store.GetOrDefault(name);
+            public void Set(string name, ExprValue value)
             {
                 if (!CanSet) throw new InvalidOperationException("this resolver has no set");
                 _store.Set(name, value);
@@ -392,24 +392,24 @@ namespace Patterkit.Patterplay.TestHost
 
         /// <summary>A corpus scalar as a runtime value. The corpus carries only the
         /// four kinds, so anything else is a malformed corpus and says so.</summary>
-        private static PatterValue ToValue(object node)
+        private static ExprValue ToValue(object node)
         {
             switch (node)
             {
-                case bool b: return PatterValue.Bool(b);
-                case double n: return PatterValue.Num(n);
-                case string s: return PatterValue.Str(s);
-                case List<object> items: return PatterValue.Flags(Strings(items));
+                case bool b: return ExprValue.Bool(b);
+                case double n: return ExprValue.Num(n);
+                case string s: return ExprValue.Str(s);
+                case List<object> items: return ExprValue.Flags(Strings(items));
                 default: throw new InvalidOperationException($"not a corpus value: {Show(node)}");
             }
         }
 
-        private static OrderedMap<string, OrderedMap<string, PatterValue>> ToBlob(object node)
+        private static OrderedMap<string, OrderedMap<string, ExprValue>> ToBlob(object node)
         {
-            var blob = new OrderedMap<string, OrderedMap<string, PatterValue>>();
+            var blob = new OrderedMap<string, OrderedMap<string, ExprValue>>();
             foreach (var section in (OrderedMap<string, object>)node)
             {
-                var values = new OrderedMap<string, PatterValue>();
+                var values = new OrderedMap<string, ExprValue>();
                 foreach (var pair in (OrderedMap<string, object>)section.Value) values.Set(pair.Key, ToValue(pair.Value));
                 blob.Set(section.Key, values);
             }
@@ -418,7 +418,7 @@ namespace Patterkit.Patterplay.TestHost
 
         /// <summary>A runtime value in the corpus's own terms: null (the registry's
         /// "not there") becomes Unset.</summary>
-        private static object Neutral(PatterValue v)
+        private static object Neutral(ExprValue v)
         {
             if (v == null) return Unset;
             if (v.IsBool) return v.AsBool;
@@ -429,14 +429,14 @@ namespace Patterkit.Patterplay.TestHost
             return list;
         }
 
-        private static OrderedMap<string, object> NeutralMap(OrderedMap<string, PatterValue> values)
+        private static OrderedMap<string, object> NeutralMap(OrderedMap<string, ExprValue> values)
         {
             var m = new OrderedMap<string, object>();
             foreach (var pair in values) m.Set(pair.Key, Neutral(pair.Value));
             return m;
         }
 
-        private static OrderedMap<string, object> NeutralBlob(OrderedMap<string, OrderedMap<string, PatterValue>> blob)
+        private static OrderedMap<string, object> NeutralBlob(OrderedMap<string, OrderedMap<string, ExprValue>> blob)
         {
             var m = new OrderedMap<string, object>();
             foreach (var pair in blob) m.Set(pair.Key, NeutralMap(pair.Value));
@@ -515,8 +515,8 @@ namespace Patterkit.Patterplay.TestHost
             {
                 case null: sb.Append("null"); return;
                 case bool b: sb.Append(Js(b)); return;
-                case double n: sb.Append(PatterValue.JsNumber(n)); return;
-                case string s: sb.Append(PatterValue.JsonQuote(s)); return;
+                case double n: sb.Append(ExprValue.JsNumber(n)); return;
+                case string s: sb.Append(ExprValue.JsonQuote(s)); return;
                 case List<object> list:
                     sb.Append('[');
                     for (int i = 0; i < list.Count; i++)
@@ -536,7 +536,7 @@ namespace Patterkit.Patterplay.TestHost
                         if (pair.Value == Unset) continue;
                         if (!first) sb.Append(',');
                         first = false;
-                        sb.Append(PatterValue.JsonQuote(pair.Key)).Append(':');
+                        sb.Append(ExprValue.JsonQuote(pair.Key)).Append(':');
                         Write(sb, pair.Value);
                     }
                     sb.Append('}');

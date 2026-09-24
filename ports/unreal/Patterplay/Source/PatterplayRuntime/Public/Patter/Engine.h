@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <utility>
 #include <iostream>
-#include "PatterValue.h"
+#include "Kernel.h"         // the shared kernel, its names in `patter`, and kernelCall
 #include "Mulberry32.h"   // ToUint32: the shared JS seed coercion
 #include "Bundle.h"
 #include "Ast.h"
@@ -806,17 +806,21 @@ namespace patter
         void setProperty(const std::string& ref, const PatterValue& value) { writeProperty(ref, value, true); }
 
         // The write itself. `host` says WHO is writing, which is all `writable: false` cares about: the
-        // registry refuses a story's write to a read-only declaration, bound or self-backed alike.
+        // registry refuses a story's write to a read-only declaration, bound or self-backed alike. A
+        // refusal is the kernel's RegistryError, rethrown as Patterplay's EvalError.
         void writeProperty(const std::string& ref, const PatterValue& value, bool host)
         {
-            auto sp = splitHostRef(*host_, ref);
-            if (sp.first == "patter") patterSet(sp.second, value);
-            else if (sp.first == "scene")
+            kernelCall([&]
             {
-                if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
-                sceneSet(sp.second, value);
-            }
-            else host_->registry->set(sp.first, sp.second, value, host); // host scopes, other engines' scopes
+                auto sp = splitHostRef(*host_, ref);
+                if (sp.first == "patter") patterSet(sp.second, value);
+                else if (sp.first == "scene")
+                {
+                    if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
+                    sceneSet(sp.second, value);
+                }
+                else host_->registry->set(sp.first, sp.second, value, host); // host scopes, other engines' scopes
+            });
         }
 
         // Expand {@ref} slots against this flow's CURRENT state. An IDs-only game calls this on a string it
@@ -1050,8 +1054,15 @@ namespace patter
         {
             local_ = newLocal();
             const std::string key = registrykeys::flowGlobals(id_);
-            host_->registry->mountOwned(key, local_, std::string(PATTER_OWNER));
+            mount(key, local_);
             registered_.push_back(key);
+        }
+
+        /** Register one of this flow's bags. A clash is the kernel's RegistryError, naming the
+         *  holder, rethrown as Patterplay's EvalError. */
+        void mount(const std::string& key, const std::shared_ptr<PropertyBag>& bag)
+        {
+            kernelCall([&] { host_->registry->mountOwned(key, bag, std::string(PATTER_OWNER)); });
         }
 
         /** Make (and register) scene `s`'s stage bag and this flow's bag for it, if not made yet. A bag
@@ -1070,7 +1081,7 @@ namespace patter
                 std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, false);
                 auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
                 const std::string key = registrykeys::flowScene(id_, s);
-                host_->registry->mountOwned(key, bag, std::string(PATTER_OWNER));
+                mount(key, bag);
                 registered_.push_back(key);
                 sceneBags_.emplace(s, std::move(bag));
             }
@@ -1078,7 +1089,7 @@ namespace patter
             {
                 std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, true);
                 auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
-                host_->registry->mountOwned(registrykeys::stage(s), bag, std::string(PATTER_OWNER));
+                mount(registrykeys::stage(s), bag);
                 host_->stageBags.emplace(s, std::move(bag));
             }
         }
@@ -1411,7 +1422,11 @@ namespace patter
             if (!node->condition) return true;
             return truthy(evalExpr(*node->condition));
         }
-        PatterValue evalExpr(const Expression& expr) { return Evaluate(expr.ast, context(), PatterDialect()); }
+        // A refusal from the evaluator is the kernel's ExprError, rethrown as Patterplay's EvalError.
+        PatterValue evalExpr(const Expression& expr)
+        {
+            return kernelCall([&] { return Evaluate(expr.ast, context(), PatterDialect()); });
+        }
         void enter(const std::string& id)
         {
             visitCounts_[id] = visitCounts_.count(id) ? visitCounts_[id] + 1 : 1;
@@ -1956,7 +1971,7 @@ namespace patter
         {
             auto sp = splitHostRef(host_, ref);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            host_.registry->set(sp.first, sp.second, value, /*host=*/true);
+            kernelCall([&] { host_.registry->set(sp.first, sp.second, value, /*host=*/true); });
         }
 
         // The shared @patter properties for a live state inspector: each with its ref, type, current
@@ -2217,8 +2232,9 @@ namespace patter
             catch (...)
             {
                 // A clash leaves the game's registry as it was: the half-built engine takes nothing with it.
+                // The clash itself is the kernel's RegistryError, rethrown as Patterplay's EvalError.
                 for (const auto& k : registered) if (reg.has(k)) reg.remove(k, true);
-                throw;
+                rethrowKernelError();
             }
         }
 

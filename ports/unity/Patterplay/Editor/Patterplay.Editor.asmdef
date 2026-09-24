@@ -4,7 +4,9 @@
   "references": [
     "Patterplay.Runtime",
     "Patterplay.Runtime.Json",
-    "Patterplay.Runtime.Unity"
+    "Patterplay.Runtime.Unity",
+    "Patterplay.Expr",
+    "StoryletEngine.Expr"
   ],
   "includePlatforms": [
     "Editor"

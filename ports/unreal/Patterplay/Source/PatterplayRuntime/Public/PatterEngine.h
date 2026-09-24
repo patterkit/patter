@@ -10,12 +10,14 @@
 #include "UObject/Object.h"
 #include "PatterTypes.h"
 #include "PatterStructure.h"
+#include "Patter/PatterValue.h"   // patter::ScopeRegistry, the shared kernel's (declared only: nothing that throws)
 #include "PatterEngine.generated.h"
 
 class UPatterBundle;
 class UPatterEngine;
 class UPatterWorld;
-namespace patter { class Engine; class Flow; class ScopeRegistry; }
+
+namespace patter { class Engine; class Flow; }
 
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterFlow : public UObject
@@ -73,6 +75,10 @@ public:
 	void Rebind(const std::shared_ptr<patter::Flow>& InFlow) { Flow = InFlow; }
 
 private:
+	// GetFlow matches a wrapper to the core's live flow by pointer, not by id alone: after a reopen the
+	// old wrapper carries the same id and a closed flow.
+	friend class UPatterEngine;
+
 	UPROPERTY()
 	TObjectPtr<UPatterEngine> Owner = nullptr;
 
@@ -112,9 +118,10 @@ public:
 	// values out; save `Registry->save()` beside it, and load it before or after LoadStateFromJson.
 	// Returns nullptr (and logs) on error, including a token the registry already holds.
 	//
-	// Not a Blueprint node: patter::ScopeRegistry is a std C++ type in this plugin's own namespace (the
-	// Storylet Engine vendors its own copy), so a Blueprint handle to it could not be shared with another
-	// product's engine, which is the only reason a Blueprint game would pass one.
+	// patter::ScopeRegistry is the shared kernel's wildwinter::expr::ScopeRegistry, the SAME type the
+	// Storylet Engine's UStoryletEngine::CreateWithRegistry takes, so a game combining the two passes one
+	// registry to both. Not a Blueprint node, as a std C++ type has no Blueprint handle. The module that
+	// makes the registry includes "Patter/Kernel.h" and sets bEnableExceptions in its Build.cs.
 	static UPatterEngine* CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
 		UPatterWorld* World = nullptr);
 
@@ -263,7 +270,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UPatterBundle> StringsBundleRef = nullptr;
 
-	// Every wrapper handed out by OpenFlow, so a hot swap can re-bind them by id.
+	// Every LIVE wrapper handed out by OpenFlow or GetFlow, so a hot swap or a load can re-bind them by
+	// id. A wrapper leaves when its flow is closed or replaced: re-binding by id would otherwise point
+	// it at the next flow opened under the same name, and a closed flow stays closed.
 	TArray<TWeakObjectPtr<UPatterFlow>> WrappedFlows;
 
 public:

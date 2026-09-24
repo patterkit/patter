@@ -79,7 +79,18 @@ namespace
 
 }
 
-namespace patter
+// The kernel's own namespace, since a template is specialised where it lives (the kernel is
+// shared with the Storylet Engine, which reads a neutral tree instead and specialises nothing: a
+// second specialisation of this one type in a game would be an ODR violation).
+//
+// A KNOWN RISK, recorded rather than fixed (2026-09-24). The kernel is one type across every
+// plugin in a game, so this specialisation is too. A second AstJson<TSharedPtr<FJsonValue>>
+// anywhere in the same game, in another plugin or in the Storylet Engine one day, is an ODR
+// violation that no compiler or linker reports, and which definition runs is then anyone's guess.
+// Any such specialisation belongs in the shared kernel (expr/ports/unreal), once, not here and
+// not in a second plugin; move this one there before anything else needs it. See
+// expr/docs/port-sharing.md, "One kernel type in Unreal".
+namespace wildwinter { namespace expr
 {
 	/** How to read an Unreal FJsonValue, for the shared AST deserialiser. Six
 	 *  accessors: everything else about deserialising is in the shared source. */
@@ -96,7 +107,7 @@ namespace patter
 		static double num(const J& v) { return v->AsNumber(); }
 		static bool boolean(const J& v) { return v->AsBool(); }
 	};
-}
+}}
 
 namespace
 {

@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay.TestHost
 {
@@ -43,7 +44,7 @@ namespace Patterkit.Patterplay.TestHost
 
         private static readonly List<ScopeDeclaration> WorldDecls = new List<ScopeDeclaration>
         {
-            new ScopeDeclaration { Name = "gold", Type = "number", Default = PatterValue.Num(0) },
+            new ScopeDeclaration { Name = "gold", Type = "number", Default = ExprValue.Num(0) },
         };
 
         /// <summary>The JS test's bundle: shared `fame` and per-flow `mood`; a scene with per-flow `count`
@@ -54,16 +55,16 @@ namespace Patterkit.Patterplay.TestHost
             b.Locales.Default = "en";
             b.Locales.Included.Add("en");
             b.Strings["en"] = new Dictionary<string, string> { ["L"] = "gold {@world.gold}" };
-            b.Properties.Add(new PropertyDecl { Name = "fame", Type = "number", Default = PatterValue.Num(0), Shared = true });
-            b.Properties.Add(new PropertyDecl { Name = "mood", Type = "number", Default = PatterValue.Num(0), Shared = false });
+            b.Properties.Add(new PropertyDecl { Name = "fame", Type = "number", Default = ExprValue.Num(0), Shared = true });
+            b.Properties.Add(new PropertyDecl { Name = "mood", Type = "number", Default = ExprValue.Num(0), Shared = false });
             b.ScopeRegistry = new HostScopeRegistry();
             b.ScopeRegistry.Scopes.Add(new HostScopeSpec { Token = "world", Declarations = new List<HostScopeDecl>
             {
-                new HostScopeDecl { Name = "gold", Type = "number", Default = PatterValue.Num(0) },
+                new HostScopeDecl { Name = "gold", Type = "number", Default = ExprValue.Num(0) },
             } });
             var scene = new Scene { Id = "s", GameId = "s", Name = "S" };
-            scene.SceneProps.Add(new PropertyDecl { Name = "count", Type = "number", Default = PatterValue.Num(0) });
-            scene.SceneProps.Add(new PropertyDecl { Name = "tally", Type = "number", Default = PatterValue.Num(0), Shared = true });
+            scene.SceneProps.Add(new PropertyDecl { Name = "count", Type = "number", Default = ExprValue.Num(0) });
+            scene.SceneProps.Add(new PropertyDecl { Name = "tally", Type = "number", Default = ExprValue.Num(0), Shared = true });
             scene.Blocks.Add(new Block { Id = "b", GameId = "b", Name = "B", Children = new List<Node>
             {
                 new Node { Id = "sn", Type = "snippet",
@@ -95,7 +96,7 @@ namespace Patterkit.Patterplay.TestHost
         }
 
         /// <summary>A registry save as sorted text: `key{name=value,...}` per section, keys and names sorted.</summary>
-        private static string Dump(OrderedMap<string, OrderedMap<string, PatterValue>> blob)
+        private static string Dump(OrderedMap<string, OrderedMap<string, ExprValue>> blob)
         {
             if (blob == null) return "null";
             return string.Join(" ", blob.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv =>
@@ -103,11 +104,23 @@ namespace Patterkit.Patterplay.TestHost
                     .Select(v => v.Key + "=" + v.Value.ToJsonString())) + "}"));
         }
 
-        private static double Num(PatterValue v) => v != null && v.IsNumber ? v.AsNumber : double.NaN;
+        private static double Num(ExprValue v) => v != null && v.IsNumber ? v.AsNumber : double.NaN;
+
+        /// <summary>A scope the game lends with no way to write it.</summary>
+        private sealed class NoSetScope : IScopeResolver
+        {
+            public ExprValue Get(string name) => ExprValue.Num(0);
+            public bool CanSet => false;
+            public void Set(string name, ExprValue value) { }
+        }
+
+        /// <summary>The type of the last exception Throws caught.</summary>
+        private static string _thrown;
 
         private static string Throws(Action act)
         {
-            try { act(); return null; } catch (Exception ex) { return ex.Message; }
+            _thrown = null;
+            try { act(); return null; } catch (Exception ex) { _thrown = ex.GetType().Name; return ex.Message; }
         }
 
         /// <summary>A save through this package's own JSON boundary, as a game stores it.</summary>
@@ -233,7 +246,7 @@ namespace Patterkit.Patterplay.TestHost
             {
                 var registry = new ScopeRegistry().DefineOwned("world", new[]
                 {
-                    new ScopeDeclaration { Name = "gold", Type = "number", Default = PatterValue.Num(0) },
+                    new ScopeDeclaration { Name = "gold", Type = "number", Default = ExprValue.Num(0) },
                 }, new OwnedScopeOptions { Owner = "Game" });                      // @world, stored and saved
                 var patter = new Engine(bundle, new EngineOptions { Registry = registry });
                 PlayOut(patter.OpenFlow("f", "s"));
@@ -247,7 +260,7 @@ namespace Patterkit.Patterplay.TestHost
 
                 var registry2 = new ScopeRegistry().DefineOwned("world", new[]
                 {
-                    new ScopeDeclaration { Name = "gold", Type = "number", Default = PatterValue.Num(0) },
+                    new ScopeDeclaration { Name = "gold", Type = "number", Default = ExprValue.Num(0) },
                 }, new OwnedScopeOptions { Owner = "Game" });
                 var patter2 = new Engine(bundle, new EngineOptions { Registry = registry2 });
                 var loaded = Newtonsoft.Json.Linq.JObject.Parse(text);
@@ -280,7 +293,7 @@ namespace Patterkit.Patterplay.TestHost
                 var flow = patter.OpenFlow("f", "s");
                 var first = flow.Advance();
                 RegistryCheck("late scope: intro", first.Type == StepType.Text && first.Text == "intro", first.Text);
-                registry.DefineOwned("story", new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = PatterValue.Num(2) } },
+                registry.DefineOwned("story", new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(2) } },
                     new OwnedScopeOptions { Owner = "Other engine" });
                 var second = flow.Advance();
                 RegistryCheck("late scope: a scope registered after the flow opened is read", second.Type == StepType.Text && second.Text == "act two",
@@ -292,7 +305,10 @@ namespace Patterkit.Patterplay.TestHost
                 var registry = new ScopeRegistry();
                 new Engine(bundle, new EngineOptions { Registry = registry });
                 var msg = Throws(() => new Engine(bundle, new EngineOptions { Registry = registry }));
-                RegistryCheck("clash names the holder", msg != null && msg.Contains("scope '@patter' is already registered by Patter"), msg ?? "no error");
+                // Patterplay's own EvalError, as the engine threw before the kernel was shared: the
+                // kernel's RegistryError is rethrown as it.
+                RegistryCheck("clash names the holder", msg != null && msg.Contains("scope '@patter' is already registered by Patter")
+                    && _thrown == nameof(EvalError), $"{_thrown}: {msg ?? "no error"}");
 
                 var withWorld = new ScopeRegistry().DefineOwned("world", new List<ScopeDeclaration>(), new OwnedScopeOptions { Owner = "Game" });
                 msg = Throws(() => new Engine(bundle, new EngineOptions
@@ -303,6 +319,59 @@ namespace Patterkit.Patterplay.TestHost
                 RegistryCheck("a binding clashing with the game's @world names the game",
                     msg != null && msg.Contains("scope '@world' is already registered by Game"), msg ?? "no error");
                 RegistryCheck("the half-built engine took nothing with it", !withWorld.Has("patter"));
+            });
+
+            // The kernel throws its own ExprError / RegistryError; every place the engine calls it, the game
+            // must still see Patterplay's EvalError, with the kernel's message. One case per rethrow site.
+            Case("A flow's bag clashing with a key the game holds is Patterplay's EvalError (flow mount)", () =>
+            {
+                var (registry, patter) = Game(bundle);
+                registry.DefineOwned("patter/flow/f/patter", new List<ScopeDeclaration>(), new OwnedScopeOptions { Owner = "Game" });
+                var msg = Throws(() => patter.OpenFlow("f", "s"));
+                RegistryCheck("a flow mount clash is an EvalError naming the holder",
+                    msg != null && msg.Contains("scope '@patter/flow/f/patter' is already registered by Game") && _thrown == nameof(EvalError),
+                    $"{_thrown}: {msg ?? "no error"}");
+            });
+
+            Case("A malformed expression in a bundle is Patterplay's EvalError (AST load)", () =>
+            {
+                const string json = @"{""schema"":""patter/bundle@0"",""locales"":{""default"":""en"",""included"":[""en""]},
+                    ""scenes"":{""s"":{""id"":""s"",""gameId"":""s"",""blocks"":[],
+                    ""onEntry"":[{""target"":""@patter.x"",""value"":{""src"":""?"",""ast"":[""zz""]}}]}}}";
+                var msg = Throws(() => PatterBundleLoader.Parse(json));
+                RegistryCheck("a malformed AST is an EvalError with the kernel's message",
+                    msg != null && msg.Contains("unknown ast tag: zz") && _thrown == nameof(EvalError), $"{_thrown}: {msg ?? "no error"}");
+            });
+
+            Case("An expression the kernel refuses is Patterplay's EvalError (evaluation)", () =>
+            {
+                var b = new Bundle { Schema = "patter/bundle@0" };
+                b.Locales.Default = "en";
+                b.Locales.Included.Add("en");
+                b.Strings["en"] = new Dictionary<string, string> { ["T"] = "hi" };
+                b.Properties.Add(new PropertyDecl { Name = "fame", Type = "number", Default = ExprValue.Num(0), Shared = true });
+                var scene = new Scene { Id = "s", GameId = "s", Name = "S" };
+                scene.Blocks.Add(new Block { Id = "b", GameId = "b", Name = "B", Children = new List<Node>
+                {
+                    new Node { Id = "sn", Type = "snippet",
+                        Beats = new List<Beat> { new Beat { Id = "T", Kind = "text" } },
+                        OnEnter = new List<Effect> { new Effect { Target = "@fame", Value = Ex(A("bin", "/", A("n", 1.0), A("n", 0.0))) } },
+                        Jump = new Jump { To = "END" } },
+                } });
+                b.Scenes["s"] = scene;
+                var (_, patter) = Game(b);
+                var msg = Throws(() => patter.OpenFlow("f", "s").Advance());
+                RegistryCheck("an evaluation refusal is an EvalError with the kernel's message",
+                    msg != null && msg.Contains("division by zero") && _thrown == nameof(EvalError), $"{_thrown}: {msg ?? "no error"}");
+            });
+
+            Case("The game's write to a scope with no setter is Patterplay's EvalError (Engine.SetProperty)", () =>
+            {
+                var (registry, patter) = Game(bundle);
+                registry.DefineForeign("clock", new NoSetScope(), new List<ScopeDeclaration>(), new ForeignScopeOptions { Owner = "Game" });
+                var msg = Throws(() => patter.SetProperty("@clock.hour", ExprValue.Num(9)));
+                RegistryCheck("a refused game write is an EvalError with the kernel's message",
+                    msg != null && msg.Contains("'@clock.hour' is read-only") && _thrown == nameof(EvalError), $"{_thrown}: {msg ?? "no error"}");
             });
 
             Case("Escapes a flow id in its keys, so no two flows' keys can meet", () =>
@@ -327,8 +396,8 @@ namespace Patterkit.Patterplay.TestHost
                     Dump(registry.Save()));
                 // Values a load left waiting for "f" belong to the saved flow, not to a new one of the same name.
                 var blob = registry.Save();
-                blob.Set("patter/flow/f/scene/s", new OrderedMap<string, PatterValue>());
-                blob["patter/flow/f/scene/s"].Set("count", PatterValue.Num(9));
+                blob.Set("patter/flow/f/scene/s", new OrderedMap<string, ExprValue>());
+                blob["patter/flow/f/scene/s"].Set("count", ExprValue.Num(9));
                 registry.Load(blob);
                 var fresh = patter.OpenFlow("f", "s");
                 RegistryCheck("a fresh flow does not claim a loaded flow's values", Num(fresh.GetProperty("@scene.count")) == 0,
@@ -339,8 +408,8 @@ namespace Patterkit.Patterplay.TestHost
             {
                 var (registry, patter) = Game(bundle);
                 var blob = registry.Save();
-                var elsewhere = new OrderedMap<string, PatterValue>(); elsewhere.Set("tally", PatterValue.Num(3));
-                var inn = new OrderedMap<string, PatterValue>(); inn.Set("drawn", PatterValue.Num(1));
+                var elsewhere = new OrderedMap<string, ExprValue>(); elsewhere.Set("tally", ExprValue.Num(3));
+                var inn = new OrderedMap<string, ExprValue>(); inn.Set("drawn", ExprValue.Num(1));
                 blob.Set("patter/scene/elsewhere", elsewhere);
                 blob.Set("other/deck/inn", inn);
                 registry.Load(blob);
@@ -389,10 +458,10 @@ namespace Patterkit.Patterplay.TestHost
             b.Locales.Default = "en";
             b.Locales.Included.Add("en");
             b.Strings["en"] = new Dictionary<string, string> { ["T"] = "hi" };
-            b.Properties.Add(new PropertyDecl { Name = "gold", Type = "number", Default = PatterValue.Num(0) });
+            b.Properties.Add(new PropertyDecl { Name = "gold", Type = "number", Default = ExprValue.Num(0) });
             var scene = new Scene { Id = "s", GameId = "s", Name = "S" };
-            scene.SceneProps.Add(new PropertyDecl { Name = "count", Type = "number", Default = PatterValue.Num(0) });
-            scene.SceneProps.Add(new PropertyDecl { Name = "tally", Type = "number", Default = PatterValue.Num(0), Shared = true });
+            scene.SceneProps.Add(new PropertyDecl { Name = "count", Type = "number", Default = ExprValue.Num(0) });
+            scene.SceneProps.Add(new PropertyDecl { Name = "tally", Type = "number", Default = ExprValue.Num(0), Shared = true });
             scene.Blocks.Add(new Block { Id = "b", GameId = "b", Name = "B", Children = new List<Node>
             {
                 new Node { Id = "sn", Type = "snippet", Beats = new List<Beat> { new Beat { Id = "T", Kind = "text" } }, Jump = new Jump { To = "END" } },
@@ -448,8 +517,8 @@ namespace Patterkit.Patterplay.TestHost
             Case("A version 2 save moved into a registry the game supplied, beside values the game already loaded", () =>
             {
                 var registry = new ScopeRegistry();
-                var waiting = new OrderedMap<string, OrderedMap<string, PatterValue>>();
-                var deck = new OrderedMap<string, PatterValue>(); deck.Set("drawn", PatterValue.Num(3));
+                var waiting = new OrderedMap<string, OrderedMap<string, ExprValue>>();
+                var deck = new OrderedMap<string, ExprValue>(); deck.Set("drawn", ExprValue.Num(3));
                 waiting.Set("another-engine/deck/inn", deck);
                 registry.Load(waiting); // the game's own load, waiting for its engine
                 var engine = new Engine(b, new EngineOptions { Seed = 0, Registry = registry });
@@ -478,7 +547,7 @@ namespace Patterkit.Patterplay.TestHost
             b.Locales.Included.Add("en");
             b.Strings["en"] = new Dictionary<string, string> { ["L"] = "A fine blade." };
             b.Cast.Add(new Cast { Name = "MERCHANT" });
-            b.Properties.Add(new PropertyDecl { Name = "visits", Type = "number", Default = PatterValue.Num(0), Shared = true });
+            b.Properties.Add(new PropertyDecl { Name = "visits", Type = "number", Default = ExprValue.Num(0), Shared = true });
             // The storylet's published bundle declares the scopes Patter may read; Patter compiles against it.
             b.ScopeRegistry = new HostScopeRegistry();
             b.ScopeRegistry.Scopes.Add(new HostScopeSpec { Token = "world", Declarations = new List<HostScopeDecl>
@@ -508,7 +577,7 @@ namespace Patterkit.Patterplay.TestHost
                 new ScopeDeclaration { Name = "gold", Type = "number" }, new ScopeDeclaration { Name = "reputation", Type = "number" },
             };
             void StoryStandIn(ScopeRegistry r) => r.DefineOwned("story",
-                new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = PatterValue.Num(1) } },
+                new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(1) } },
                 new OwnedScopeOptions { Normalise = n => n, Owner = "Storylet Engine" });
             // The game: one registry, @world registered by the game, then each engine.
             (ScopeRegistry registry, Engine patter) Combined()
@@ -521,8 +590,8 @@ namespace Patterkit.Patterplay.TestHost
             Case("Both sides read and write one registry live, and each reads the other's scope", () =>
             {
                 var (registry, patter) = Combined();
-                registry.Set("world", "gold", PatterValue.Num(25), host: true);
-                registry.Set("story", "act", PatterValue.Num(2));
+                registry.Set("world", "gold", ExprValue.Num(25), host: true);
+                registry.Set("story", "act", ExprValue.Num(2));
                 var flow = patter.OpenFlow("main", "shop");
                 RegistryCheck("combined: Patter reads @story", Num(patter.GetProperty("@story.act")) == 2);
                 var line = flow.Advance();
@@ -534,9 +603,9 @@ namespace Patterkit.Patterplay.TestHost
             Case("Saves the registry once, with every engine's properties, and Patter's save holds none", () =>
             {
                 var (registry, patter) = Combined();
-                registry.Set("world", "gold", PatterValue.Num(25), host: true);
-                registry.Set("world", "reputation", PatterValue.Num(3), host: true);
-                registry.Set("story", "act", PatterValue.Num(2));
+                registry.Set("world", "gold", ExprValue.Num(25), host: true);
+                registry.Set("world", "reputation", ExprValue.Num(3), host: true);
+                registry.Set("story", "act", ExprValue.Num(2));
                 var f = patter.OpenFlow("main", "shop");
                 f.Advance(); f.Advance();
                 var saved = Dump(registry.Save());
@@ -549,8 +618,8 @@ namespace Patterkit.Patterplay.TestHost
             Case("Resumes both sides from the one save, loading the registry first or last", () =>
             {
                 var g1 = Combined();
-                g1.registry.Set("world", "gold", PatterValue.Num(25), host: true);
-                g1.registry.Set("story", "act", PatterValue.Num(2));
+                g1.registry.Set("world", "gold", ExprValue.Num(25), host: true);
+                g1.registry.Set("story", "act", ExprValue.Num(2));
                 var f1 = g1.patter.OpenFlow("main", "shop");
                 f1.Advance(); f1.Advance();
                 g1.patter.OpenFlow("main", "shop"); // a fresh run at the gate, saved mid-flow
@@ -576,13 +645,13 @@ namespace Patterkit.Patterplay.TestHost
 
             Case("Loads a save forward across content drift (lenient by design)", () =>
             {
-                OrderedMap<string, PatterValue> Section(params (string, double)[] values)
+                OrderedMap<string, ExprValue> Section(params (string, double)[] values)
                 {
-                    var m = new OrderedMap<string, PatterValue>();
-                    foreach (var (k, v) in values) m.Set(k, PatterValue.Num(v));
+                    var m = new OrderedMap<string, ExprValue>();
+                    foreach (var (k, v) in values) m.Set(k, ExprValue.Num(v));
                     return m;
                 }
-                var stale = new OrderedMap<string, OrderedMap<string, PatterValue>>();
+                var stale = new OrderedMap<string, OrderedMap<string, ExprValue>>();
                 stale.Set("world", Section(("gold", 7), ("retired_flag", 1)));
                 stale.Set("patter", Section(("visits", 9)));
                 stale.Set("story", Section(("act", 3)));

@@ -25,9 +25,11 @@
 
 #include <string>
 
+#include "Patter/PatterValue.h"   // patter::PatterValue, the shared kernel's ExprValue (nothing that throws)
+
 #include "PatterWorld.generated.h"
 
-namespace patter { struct HostScope; struct PatterValue; }
+namespace patter { struct HostScope; }
 struct FPatterWorldImpl;
 
 /** Fired on every change to a bound world: the host's own writes (bFromStory false) and the story's

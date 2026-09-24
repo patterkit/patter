@@ -5,7 +5,14 @@
 // silent but always auditable), examiner rows, one sanctioned clone door, and
 // bare-value save/load. Port of @wildwinter/scoperegistry's PropertyBag
 // (expr/packages/scoperegistry/src/index.ts).
-#pragma once
+//
+// Part of the shared kernel, vendored from expr/ports/unreal: see Errors.h. A
+// refused write is a RegistryError.
+#include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
+// Compiled once per translation unit, and never beside a different kernel: Errors.h stops
+// that build with an #error, and this copy then stays out of the way of the first.
+#if !defined(WILDWINTER_EXPR_k11805ede_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x11805ede
+#define WILDWINTER_EXPR_k11805ede_PROPERTYBAG_H
 
 #include <algorithm>
 #include <cctype>
@@ -16,14 +23,15 @@
 #include <utility>
 #include <vector>
 
-#include "Patter/Expr/OrderedMap.h"
-#include "Patter/PatterValue.h"
+#include "OrderedMap.h"
+#include "Value.h"
 
-namespace patter
+namespace wildwinter { namespace expr { inline namespace k11805ede
 {
     /** The property type vocabulary (boolean / number / string / enum /
      *  flags). Kept as strings, exactly as the kernel and the bundle carry
-     *  it; an enum value is a string at runtime. */
+     *  it; an enum value is a string at runtime. Constants, not state: each
+     *  module may hold its own copy, and every comparison is by content. */
     namespace PropertyTypes
     {
         inline const char* const Boolean = "boolean";
@@ -43,28 +51,28 @@ namespace patter
         std::optional<std::vector<std::string>> values;    // for enum / flags
         /** A quality's ordered ladder of stage names (quality.md). */
         std::optional<std::vector<std::string>> stages;
-        std::optional<PatterValue> defaultValue;         // owned scopes: seed value
+        std::optional<ExprValue> defaultValue;         // owned scopes: seed value
         std::optional<bool> writable;                      // default true
 
         /** The type default when no explicit default is declared (the kernel's
          *  defaultFor). */
-        PatterValue defaultOrTypeDefault() const
+        ExprValue defaultOrTypeDefault() const
         {
             if (defaultValue.has_value()) return *defaultValue;
-            if (type == PropertyTypes::Boolean) return PatterValue::Bool(false);
-            if (type == PropertyTypes::Number) return PatterValue::Num(0);
-            if (type == PropertyTypes::String) return PatterValue::Str("");
+            if (type == PropertyTypes::Boolean) return ExprValue::Bool(false);
+            if (type == PropertyTypes::Number) return ExprValue::Num(0);
+            if (type == PropertyTypes::String) return ExprValue::Str("");
             if (type == PropertyTypes::Enum)
             {
-                return PatterValue::Str(values.has_value() && !values->empty() ? (*values)[0] : "");
+                return ExprValue::Str(values.has_value() && !values->empty() ? (*values)[0] : "");
             }
-            if (type == PropertyTypes::Flags) return PatterValue::Flags({});
+            if (type == PropertyTypes::Flags) return ExprValue::Flags({});
             // A quality starts at the first rung of its ladder (quality.md).
             if (type == PropertyTypes::Quality)
             {
-                return PatterValue::Str(stages.has_value() && !stages->empty() ? (*stages)[0] : "");
+                return ExprValue::Str(stages.has_value() && !stages->empty() ? (*stages)[0] : "");
             }
-            return PatterValue::Bool(false);
+            return ExprValue::Bool(false);
         }
     };
 
@@ -74,8 +82,8 @@ namespace patter
     struct BagChange
     {
         std::string name;
-        std::optional<PatterValue> prev;     // absent when the property had no value
-        PatterValue next;
+        std::optional<ExprValue> prev;     // absent when the property had no value
+        ExprValue next;
         bool silent = false;
         std::string reason;
     };
@@ -91,8 +99,8 @@ namespace patter
          *  field, once per runtime. */
         std::string path;
         std::string type;
-        PatterValue value;
-        PatterValue defaultValue;
+        ExprValue value;
+        ExprValue defaultValue;
         std::optional<std::vector<std::string>> values;
         /** A quality's ladder, when this row is one. Present on the JS and
          *  Godot rows since the qualities work and absent here, so the same
@@ -131,7 +139,7 @@ namespace patter
         /** The live values map (stable identity across reseed, so an eval
          *  context built over it stays valid). Read-path for evaluation; writes
          *  go through set() so the firing rule applies. */
-        const OrderedMap<std::string, PatterValue>& values() const { return values_; }
+        const OrderedMap<std::string, ExprValue>& values() const { return values_; }
 
         /** The address prefix this bag composes its rows' paths from, separator included. */
         const std::string& pathPrefix() const { return pathPrefix_; }
@@ -141,10 +149,10 @@ namespace patter
          *  (identity) bag is not folded to lower case one layer up. */
         std::string normalise(const std::string& name) const { return norm_(name); }
 
-        std::optional<PatterValue> get(const std::string& name) const
+        std::optional<ExprValue> get(const std::string& name) const
         {
-            const PatterValue* v = values_.get(norm_(name));
-            return v ? std::optional<PatterValue>(*v) : std::nullopt;
+            const ExprValue* v = values_.get(norm_(name));
+            return v ? std::optional<ExprValue>(*v) : std::nullopt;
         }
 
         /** Write a property. Engine writes (the default) notify subscribers;
@@ -154,17 +162,17 @@ namespace patter
          *  it (ruled 2026-09-05). The two are separate: one says who hears the
          *  write, the other who may make it. Throws on a read-only property.
          *  Returns the change. */
-        BagChange set(const std::string& name, const PatterValue& value, bool silent = false, const std::string& reason = "", bool host = false)
+        BagChange set(const std::string& name, const ExprValue& value, bool silent = false, const std::string& reason = "", bool host = false)
         {
             std::string n = norm_(name);
             const ScopeDeclaration* decl = decls_.get(n);
             if (!host && decl && decl->writable.has_value() && !*decl->writable)
             {
-                throw EvalError("'" + name + "' is read-only");
+                throw RegistryError("'" + name + "' is read-only");
             }
             BagChange change;
             change.name = n;
-            const PatterValue* prev = values_.get(n);
+            const ExprValue* prev = values_.get(n);
             if (prev) change.prev = *prev;
             change.next = value;
             change.silent = silent;
@@ -197,7 +205,7 @@ namespace patter
             std::vector<PropertyRow> out;
             for (const auto& pair : decls_)
             {
-                std::optional<PatterValue> value = get(pair.first);
+                std::optional<ExprValue> value = get(pair.first);
                 out.push_back(RowFor(pair.second,
                     value.has_value() ? *value : pair.second.defaultOrTypeDefault(),
                     std::nullopt, pair.first, pathPrefix_));
@@ -233,9 +241,9 @@ namespace patter
         }
 
         /** Bare values, ready to embed in a product's save. */
-        OrderedMap<std::string, PatterValue> save() const
+        OrderedMap<std::string, ExprValue> save() const
         {
-            OrderedMap<std::string, PatterValue> copy;
+            OrderedMap<std::string, ExprValue> copy;
             for (const auto& pair : values_) copy.set(pair.first, pair.second);
             return copy;
         }
@@ -243,14 +251,14 @@ namespace patter
         /** Lay saved values over the current ones (call after a fresh seed:
          *  orphans land as strays, new declarations keep their defaults; the
          *  product decides whether to prune). Does not fire events. */
-        void load(const OrderedMap<std::string, PatterValue>& values)
+        void load(const OrderedMap<std::string, ExprValue>& values)
         {
             for (const auto& pair : values) values_.set(norm_(pair.first), pair.second);
         }
 
         static PropertyRow RowFor(
             const ScopeDeclaration& d,
-            const PatterValue& value,
+            const ExprValue& value,
             std::optional<bool> writable,
             const std::string& name = "",
             const std::string& pathPrefix = "")
@@ -280,7 +288,7 @@ namespace patter
             {
                 std::string name = norm_(d.name);
                 decls_.set(name, d);
-                // PatterValue is a value type, so seeding shares no mutable
+                // ExprValue is a value type, so seeding shares no mutable
                 // default (the kernel structuredClones for the same reason).
                 values_.set(name, d.defaultOrTypeDefault());
             }
@@ -308,7 +316,7 @@ namespace patter
             return out;
         }
 
-        OrderedMap<std::string, PatterValue> values_;
+        OrderedMap<std::string, ExprValue> values_;
         OrderedMap<std::string, ScopeDeclaration> decls_;
         std::vector<Entry> subscribers_;
         std::vector<Entry> auditors_;
@@ -319,4 +327,6 @@ namespace patter
         std::string pathPrefix_;
         Normalise norm_;
     };
-}
+}}} // namespace wildwinter::expr
+
+#endif

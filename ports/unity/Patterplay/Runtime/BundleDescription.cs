@@ -16,6 +16,7 @@
 // Cheap by construction: one walk, no expression parsing, no string tables.
 
 using System.Collections.Generic;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -62,7 +63,7 @@ namespace Patterkit.Patterplay
         public string Name;
         public string Type;
         public bool HasDefault;
-        public PatterValue Default;
+        public ExprValue Default;
         /// <summary>Shared across all flows, or kept per-flow. The defaults differ by scope
         /// (@patter shared, @scene per-flow), so it is resolved here rather than left to the reader.</summary>
         public bool Shared;

@@ -6,22 +6,27 @@
 // Authored in expr/ports/unreal and VENDORED into each consuming plugin by
 // expr/scripts/vendor-ports.mjs. Do not edit a vendored copy.
 //
-// Lands in the plugin's own namespace, so two installed plugins never collide.
+// Part of the kernel, in wildwinter::expr with no product identity: see
+// Errors.h.
 //
 // A PURER shared thing than the evaluator: no value type, no dialect, no
 // scopes. Just an AST walk plus a truthiness callback the host supplies, which
 // is exactly why truthiness being host policy does not stop it being shared.
 // ---------------------------------------------------------------------------
-#pragma once
+#include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
+// Compiled once per translation unit, and never beside a different kernel: Errors.h stops
+// that build with an #error, and this copy then stays out of the way of the first.
+#if !defined(WILDWINTER_EXPR_k11805ede_SPECIFICITY_H) && WILDWINTER_EXPR_KERNEL == 0x11805ede
+#define WILDWINTER_EXPR_k11805ede_SPECIFICITY_H
 
 #include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
 
-#include "Patter/Expr/Ast.h"
+#include "Ast.h"
 
-namespace patter
+namespace wildwinter { namespace expr { inline namespace k11805ede
 {
     /** Evaluate an expression subtree to a boolean, with the host's own
      *  truthiness coercion (storylets' conditionPasses). */
@@ -40,10 +45,14 @@ namespace patter
     namespace detail
     {
         /** check_flags(v, f1..fN) counts as N constraints - an N-ary AND over
-         *  the flag operands - never fewer than 1. */
-        inline const std::vector<CountingCall>& DefaultCountingCalls()
+         *  the flag operands - never fewer than 1.
+         *
+         *  Built per call, not held in a function-local static: a kernel
+         *  static is one per module in an Unreal editor and one per game in a
+         *  packaged build, so the kernel keeps none (see Errors.h). */
+        inline std::vector<CountingCall> DefaultCountingCalls()
         {
-            static const std::vector<CountingCall> calls = {
+            return {
                 CountingCall{
                     "check_flags",
                     [](const AstNode& node)
@@ -52,7 +61,6 @@ namespace patter
                     },
                 },
             };
-            return calls;
         }
 
         inline int SpecificityWalk(
@@ -108,7 +116,9 @@ namespace patter
         bool want = true,
         const std::vector<CountingCall>* countingCalls = nullptr)
     {
-        return detail::SpecificityWalk(node, want, evalTruthy,
-            countingCalls ? *countingCalls : detail::DefaultCountingCalls());
+        if (countingCalls) return detail::SpecificityWalk(node, want, evalTruthy, *countingCalls);
+        return detail::SpecificityWalk(node, want, evalTruthy, detail::DefaultCountingCalls());
     }
-}
+}}} // namespace wildwinter::expr
+
+#endif

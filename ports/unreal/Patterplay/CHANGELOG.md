@@ -9,6 +9,28 @@ runtime behaviour.
 
 ### Changed
 
+- **One kernel type, shared with the Storylet Engine.** The expression and state kernel vendored as
+  `Patter/Expr/` (the evaluator, the AST, `PropertyBag`, the state logger core, `ScopeRegistry`) is
+  now `wildwinter::expr`, byte-identical to the Storylet Engine's copy, and a game module that
+  includes both plugins compiles it once. So a C++ game running both makes ONE registry and hands
+  the same `std::shared_ptr` to `UPatterEngine::CreateWithRegistry` and to
+  `UStoryletEngine::CreateWithRegistry`; until now the two plugins' registries were two types. Game
+  code does not change: `patter::PatterValue`, `patter::PatterKind`, `patter::ScopeRegistry`,
+  `patter::PropertyBag` and every other kernel name still resolve, as aliases of the kernel's
+  (`ExprValue`, `ExprKind`, and the rest), declared in `Patter/PatterValue.h` and `Patter/Kernel.h`.
+  Two things to know:
+  - **Both plugins must carry the same kernel.** Their headers are compiled into your game module,
+    so two different kernels there would be two definitions of one type. A game module that
+    includes both plugins built from different kernels stops at a compile error saying so: update
+    the older plugin. Patterplay and the Storylet Engine release a kernel change together.
+  - **Errors.** The kernel throws its own `wildwinter::expr::ExprError` and `RegistryError`. The
+    engine catches both where it calls the kernel and rethrows `patter::EvalError` with the same
+    message, as it threw before, so an existing `catch (const patter::EvalError&)` keeps working and
+    no kernel exception leaves the plugin. A game calling the registry itself sees `RegistryError`.
+  A module that makes a registry includes `Patter/Kernel.h` and sets `bEnableExceptions = true` in
+  its Build.cs, as the kernel throws; one that only passes a registry along through
+  `PatterEngine.h` does not. A game that forward-declared `patter::ScopeRegistry` or
+  `patter::PatterValue` itself now includes `Patter/PatterValue.h` instead, since both are aliases.
 - **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry`
   (vendored as `Patter/Expr/ScopeRegistry.h`, the same registry every Patterplay runtime uses):
   `@patter` under `patter`, and each flow's and scene's bag under a key starting `patter/`. The core's
@@ -39,6 +61,19 @@ runtime behaviour.
   values kept, and closes its flows, so a `UPatterFlow` that outlives its engine reads as closed.
 - The state logger's `snapshotState` reads the bags rather than the save, since the save no longer
   holds the properties.
+
+### Fixed
+
+- `SetPropertyNumber`, `SetPropertyBool`, `SetPropertyString` and `SetPropertyFlags` on
+  `UPatterEngine` log a refused write (a scope the game lent with no way to write it, an `@scene`
+  reference) like every other guarded call, instead of throwing through Blueprint.
+- **`UPatterEngine::GetFlow` answers with the live flow after its name is reopened.** It took the
+  first wrapper it had handed out under that name, which after a second `OpenFlow` (or a
+  `CloseFlow` and an `OpenFlow`) is the old, closed one, and so answered null for a flow that was
+  open. It now hands back the wrapper for the flow the engine holds under that name, as
+  `engine.getFlow` does on every other runtime. With it, a wrapper whose flow was replaced or
+  closed stays closed: closing another flow, or loading a save, re-bound every wrapper by name and
+  brought the old one back to life on the new flow.
 
 ## [0.13.0] - 2026-09-05
 

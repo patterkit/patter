@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay.Editor
 {
@@ -124,7 +125,7 @@ namespace Patterkit.Patterplay.Editor
             return lines;
         }
 
-        private static string ShowLogValue(PatterValue v) => v == null ? "<unset>" : v.ToDisplayString();
+        private static string ShowLogValue(ExprValue v) => v == null ? "<unset>" : v.ToDisplayString();
 
         /// <summary>One line per entry. A `select` names the children it walked AND their verdicts,
         /// because that is the whole point: "why is my line missing" is unanswerable from the
@@ -213,7 +214,7 @@ namespace Patterkit.Patterplay.Editor
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField(row.Path, GUILayout.Width(140));
 
-                PatterValue edited = DrawValueField(engine, row);
+                ExprValue edited = DrawValueField(engine, row);
                 if (edited != null && !edited.ValueEquals(row.Value)) engine.SetProperty(row.Path, edited);
 
                 // Reset-to-default arrow.
@@ -225,23 +226,23 @@ namespace Patterkit.Patterplay.Editor
             }
         }
 
-        private PatterValue DrawValueField(Engine engine, PropertyRow row)
+        private ExprValue DrawValueField(Engine engine, PropertyRow row)
         {
             switch (row.Type)
             {
                 case "boolean":
-                    return PatterValue.Bool(EditorGUILayout.Toggle(row.Value.IsBool && row.Value.AsBool));
+                    return ExprValue.Bool(EditorGUILayout.Toggle(row.Value.IsBool && row.Value.AsBool));
                 case "number":
-                    return PatterValue.Num(EditorGUILayout.DoubleField(row.Value.IsNumber ? row.Value.AsNumber : 0));
+                    return ExprValue.Num(EditorGUILayout.DoubleField(row.Value.IsNumber ? row.Value.AsNumber : 0));
                 case "string":
-                    return PatterValue.Str(EditorGUILayout.TextField(row.Value.IsString ? row.Value.AsString : ""));
+                    return ExprValue.Str(EditorGUILayout.TextField(row.Value.IsString ? row.Value.AsString : ""));
                 case "enum":
                 case "quality": // a stage edits as a dropdown of its LADDER - closed, like an enum's values
                 {
                     var opts = (row.Type == "quality" ? row.Stages : row.Values) ?? new List<string>();
                     int cur = row.Value.IsString ? Mathf.Max(0, opts.IndexOf(row.Value.AsString)) : 0;
                     int next = EditorGUILayout.Popup(cur, opts.ToArray());
-                    return opts.Count > 0 ? PatterValue.Str(opts[Mathf.Clamp(next, 0, opts.Count - 1)]) : row.Value;
+                    return opts.Count > 0 ? ExprValue.Str(opts[Mathf.Clamp(next, 0, opts.Count - 1)]) : row.Value;
                 }
                 case "flags":
                 {
@@ -254,7 +255,7 @@ namespace Patterkit.Patterplay.Editor
                     {
                         _flagEdits[key] = next;
                         var list = next.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
-                        return PatterValue.Flags(list);
+                        return ExprValue.Flags(list);
                     }
                     return null;
                 }

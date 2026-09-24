@@ -14,12 +14,12 @@
 //   ["bin",op,left,right] ["call",name,...args] ["fd",sign,name]
 //
 // Dialect-agnostic: scope tokens and function names are plain strings here;
-// meaning is supplied by a Dialect. Lands in the package's own namespace.
+// meaning is supplied by a Dialect. Part of the kernel assembly (see Errors.cs).
 // ---------------------------------------------------------------------------
 
 using System.Collections.Generic;
 
-namespace Patterkit.Patterplay
+namespace Wildwinter.Expr
 {
     /// <summary>One node of a compiled expression. A class per node kind, so the
     /// evaluator switches on the type rather than a tag field.</summary>
@@ -66,12 +66,12 @@ namespace Patterkit.Patterplay
         {
             if (node == null || node.Count < 1 || !(node[0] is string tag))
             {
-                throw new EvalError("malformed ast node");
+                throw new ExprError("malformed ast node");
             }
 
             void Arity(int n)
             {
-                if (node.Count < n) throw new EvalError($"malformed '{tag}' ast node");
+                if (node.Count < n) throw new ExprError($"malformed '{tag}' ast node");
             }
 
             IReadOnlyList<object> Child(int i) => (IReadOnlyList<object>)node[i];
@@ -99,7 +99,7 @@ namespace Patterkit.Patterplay
                     for (int i = 2; i < node.Count; i++) args.Add(DeserialiseAst(Child(i)));
                     return new CallNode { Name = (string)node[1], Args = args.ToArray() };
                 }
-                default: throw new EvalError($"unknown ast tag: {tag}");
+                default: throw new ExprError($"unknown ast tag: {tag}");
             }
         }
     }

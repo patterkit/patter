@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -219,12 +220,12 @@ namespace Patterkit.Patterplay
 
         // -- scope resolvers ----------------------------------------------------
 
-        private PatterValue PatterGet(string n)
+        private ExprValue PatterGet(string n)
         {
             if (_host.PatterSharedNames.Contains(n)) return _host.SharedPatter.Get(n);
             return _local.Get(n);
         }
-        private void PatterSet(string n, PatterValue v)
+        private void PatterSet(string n, ExprValue v)
         {
             if (_host.PatterSharedNames.Contains(n)) _host.Registry.Set("patter", n, v); else _local.Set(n, v);
         }
@@ -239,12 +240,12 @@ namespace Patterkit.Patterplay
             if (shared) return _host.StageBags.TryGetValue(s, out var sb) ? sb : null;
             return _sceneBags.TryGetValue(s, out var fb) ? fb : null;
         }
-        private PatterValue SceneGet(string n)
+        private ExprValue SceneGet(string n)
         {
             var bag = SceneBagFor(n);
             return bag?.Get(n);
         }
-        private void SceneSet(string n, PatterValue v)
+        private void SceneSet(string n, ExprValue v)
         {
             var bag = SceneBagFor(n);
             // Not silent: an engine write notifies subscribers and is audited, where a host write
@@ -347,7 +348,7 @@ namespace Patterkit.Patterplay
 
         /// <summary>Read a property by ref: @patter / @scene (each routed by its `shared` flag), or any
         /// other scope the registry holds (a host scope, another engine's).</summary>
-        public PatterValue GetProperty(string refStr)
+        public ExprValue GetProperty(string refStr)
         {
             var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
             if (scope == "patter") return PatterGet(name);
@@ -357,11 +358,17 @@ namespace Patterkit.Patterplay
 
         /// <summary>Write a property by ref. The GAME's surface, so a host declaration's `writable: false`
         /// binds the story, not the game that owns the value. Effects use WriteProperty(.., host: false).</summary>
-        public void SetProperty(string refStr, PatterValue value) => WriteProperty(refStr, value, true);
+        public void SetProperty(string refStr, ExprValue value) => WriteProperty(refStr, value, true);
 
         /// <summary>The write itself. `host` says WHO is writing, which is all `writable: false` cares
         /// about: the story is refused, the game is not.</summary>
-        private void WriteProperty(string refStr, PatterValue value, bool host)
+        private void WriteProperty(string refStr, ExprValue value, bool host)
+        {
+            try { WritePropertyTo(refStr, value, host); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
+
+        private void WritePropertyTo(string refStr, ExprValue value, bool host)
         {
             var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
             if (scope == "patter") PatterSet(name, value);
@@ -648,7 +655,7 @@ namespace Patterkit.Patterplay
             return Specificity.MatchedSpecificity(node, n =>
             {
                 try { return Truthy(Expr.Evaluate(n, ctx, PatterDialect.Instance)); }
-                catch (EvalError) { return false; }   // an eval error scores as false
+                catch (Exception e) when (e is EvalError || e is ExprError) { return false; }   // an eval error scores as false
             }, want);
         }
 
@@ -680,7 +687,11 @@ namespace Patterkit.Patterplay
             return Truthy(EvalExpr(node.Condition));
         }
 
-        private PatterValue EvalExpr(Expression expr) => Expr.Evaluate(expr.Ast, Context(), PatterDialect.Instance);
+        private ExprValue EvalExpr(Expression expr)
+        {
+            try { return Expr.Evaluate(expr.Ast, Context(), PatterDialect.Instance); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
 
         private void Enter(string id)
         {
@@ -833,14 +844,14 @@ namespace Patterkit.Patterplay
             {
                 var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, false), null, "@scene.");
                 var key = PatterKeys.FlowScene(Id, s);
-                _host.Registry.MountOwned(key, bag, PatterKeys.Owner);
+                Mount(key, bag);
                 _registered.Add(key);
                 _sceneBags[s] = bag;
             }
             if (!_host.StageBags.ContainsKey(s))
             {
                 var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, true), null, "@scene.");
-                _host.Registry.MountOwned(PatterKeys.Stage(s), bag, PatterKeys.Owner);
+                Mount(PatterKeys.Stage(s), bag);
                 _host.StageBags[s] = bag;
             }
         }
@@ -857,8 +868,15 @@ namespace Patterkit.Patterplay
         {
             _local = FreshLocal();
             var key = PatterKeys.FlowGlobals(Id);
-            _host.Registry.MountOwned(key, _local, PatterKeys.Owner);
+            Mount(key, _local);
             _registered.Add(key);
+        }
+
+        /// <summary>Register one of this engine's bags; a clash is Patterplay's EvalError.</summary>
+        private void Mount(string key, PropertyBag bag)
+        {
+            try { _host.Registry.MountOwned(key, bag, PatterKeys.Owner); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
         }
 
         /// <summary>Remove every bag this flow registered; with `keep`, their values wait in the registry
@@ -971,6 +989,6 @@ namespace Patterkit.Patterplay
 
         /// <summary>Truthiness for a bare condition. One line, because the rule is
         /// on the SHARED value type.</summary>
-        internal static bool Truthy(PatterValue v) => v.Truthy;
+        internal static bool Truthy(ExprValue v) => v.Truthy;
     }
 }

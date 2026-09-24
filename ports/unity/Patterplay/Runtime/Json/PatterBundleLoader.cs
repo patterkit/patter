@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -91,19 +92,19 @@ namespace Patterkit.Patterplay
             return outd;
         }
 
-        private static PatterValue ToValue(JToken t)
+        private static ExprValue ToValue(JToken t)
         {
             switch (t.Type)
             {
-                case JTokenType.Boolean: return PatterValue.Bool((bool)t);
+                case JTokenType.Boolean: return ExprValue.Bool((bool)t);
                 case JTokenType.Integer:
-                case JTokenType.Float: return PatterValue.Num((double)t);
-                case JTokenType.String: return PatterValue.Str((string)t);
+                case JTokenType.Float: return ExprValue.Num((double)t);
+                case JTokenType.String: return ExprValue.Str((string)t);
                 case JTokenType.Array:
                 {
                     var list = new List<string>();
                     foreach (var x in (JArray)t) list.Add((string)x);
-                    return PatterValue.Flags(list);
+                    return ExprValue.Flags(list);
                 }
                 default: throw new Exception($"unsupported value token: {t.Type}");
             }
@@ -156,7 +157,12 @@ namespace Patterkit.Patterplay
         // NORMALISED tree, so all this layer does is turn Newtonsoft's JToken into
         // plain objects. That conversion is genuinely library-specific; the dispatch
         // it used to sit beside was not, and existed six times across the family.
-        private static ExprNode ParseAst(JArray e) => Ast.DeserialiseAst((IReadOnlyList<object>)ToTree(e));
+        private static ExprNode ParseAst(JArray e)
+        {
+            // The kernel refuses a malformed tree with its own ExprError; a bundle load throws EvalError.
+            try { return Ast.DeserialiseAst((IReadOnlyList<object>)ToTree(e)); }
+            catch (ExprError err) { throw new EvalError(err.Message); }
+        }
 
         private static object ToTree(JToken token)
         {

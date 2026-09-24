@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections.Generic;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -66,7 +67,7 @@ namespace Patterkit.Patterplay
                 var host = HostOf(h);
                 var cb = shared ? host?.PatterVisits : host?.Visits;
                 int n = cb != null ? cb(NodeId(args, h, name)) : 0;
-                return asBool ? PatterValue.Bool(n > 0) : PatterValue.Num(n);
+                return asBool ? ExprValue.Bool(n > 0) : ExprValue.Num(n);
             },
         };
 
@@ -90,7 +91,7 @@ namespace Patterkit.Patterplay
                     if (a.AsNumber != Math.Floor(a.AsNumber) || b.AsNumber != Math.Floor(b.AsNumber))
                         throw new EvalError("random(a, b) arguments must be integers");
                     double lo = Math.Min(a.AsNumber, b.AsNumber), hi = Math.Max(a.AsNumber, b.AsNumber);
-                    return PatterValue.Num(Math.Floor(host.NextRandom() * (hi - lo + 1)) + lo);
+                    return ExprValue.Num(Math.Floor(host.NextRandom() * (hi - lo + 1)) + lo);
                 },
             };
 
@@ -105,9 +106,9 @@ namespace Patterkit.Patterplay
                         if (!(args[i] is FlagDeltaNode fd))
                             throw new EvalError("check_flags() flag args must be +flagName or -flagName");
                         bool has = flags.Contains(fd.Name);
-                        if (fd.Sign == "+" ? !has : has) return PatterValue.False;
+                        if (fd.Sign == "+" ? !has : has) return ExprValue.False;
                     }
-                    return PatterValue.True;
+                    return ExprValue.True;
                 },
             };
 
@@ -124,7 +125,7 @@ namespace Patterkit.Patterplay
                         if (fd.Sign == "+") { if (!result.Contains(fd.Name)) result.Add(fd.Name); }
                         else { result.Remove(fd.Name); }
                     }
-                    return PatterValue.Flags(result);
+                    return ExprValue.Flags(result);
                 },
             };
 

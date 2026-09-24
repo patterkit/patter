@@ -4,6 +4,7 @@
 // Bundle / Scene / Block / node / Beat / Jump / Expression / Effect shapes.
 
 using System.Collections.Generic;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -72,7 +73,7 @@ namespace Patterkit.Patterplay
         public string Type;          // boolean | number | string | flags | enum | quality
         public bool? Shared;
         public bool Temporary;
-        public PatterValue Default;  // null => the type default
+        public ExprValue Default;  // null => the type default
         public List<string> Values;  // enum
         public List<string> Stages;  // quality: the ORDERED stage ladder (order IS the meaning)
     }
@@ -86,7 +87,7 @@ namespace Patterkit.Patterplay
         public string Type;          // boolean | number | string | flags | enum | quality
         public List<string> Values;  // enum / flags
         public List<string> Stages;  // quality: the ordered stage ladder
-        public PatterValue Default;
+        public ExprValue Default;
         public bool? Writable;
     }
 
@@ -197,10 +198,10 @@ namespace Patterkit.Patterplay
     {
         public string Name;
         public string Type;
-        public PatterValue Default;
+        public ExprValue Default;
         public List<string> Values;
     }
 
     /// <summary>A node's sparse gameData overrides (name -> value).</summary>
-    public sealed class GameData : Dictionary<string, PatterValue> { }
+    public sealed class GameData : Dictionary<string, ExprValue> { }
 }

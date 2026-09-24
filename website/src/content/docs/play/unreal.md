@@ -137,11 +137,25 @@ A token is taken once. Two engines that both want the same one fail as you build
 is left as it was. Rebuilding an engine on an edited bundle (`HotSwap`, `ApplyLiveBundle`) hands its
 bags to the replacement on the same registry.
 
-`CreateWithRegistry` is C++ only. The registry is a standard C++ type in this plugin's own namespace
-(the Storylet Engine plugin carries its own), so a Blueprint handle to it could not be shared with
-another product's engine, which is what a Blueprint game would pass one for. A Blueprint game uses
-`Create`, and `UPatterSave` saves everything. In the core, the same option is
-`patter::EngineOptions::registry`.
+`CreateWithRegistry` is C++ only: the registry is a standard C++ object shared by pointer, and no
+Blueprint pin carries one. A Blueprint game uses `Create`, and `UPatterSave` saves everything. In the
+core, the same option is `patter::EngineOptions::registry`.
+
+### With the Storylet Engine
+
+`patter::ScopeRegistry` is the shared expression kernel's `wildwinter::expr::ScopeRegistry`, and the
+Storylet Engine plugin carries the same kernel, byte for byte. In a game with both plugins,
+`patter::ScopeRegistry` and `storylets::ScopeRegistry` are one type, so the registry above goes to
+`UStoryletEngine::CreateWithRegistry` too, and each engine reads the other's scopes through it.
+
+- **Build both plugins from the same kernel.** Their headers are compiled into your game module, so
+  if one plugin is older, the module that includes both stops at a compile error that says so.
+  Update the older plugin.
+- **The module that makes the registry needs exceptions**: `bEnableExceptions = true` in its
+  `Build.cs`, and `#include "Patter/Kernel.h"`, since the registry refuses by throwing. A module
+  that only calls `UPatterEngine` needs neither.
+- **Errors.** The engine reports every refusal as `patter::EvalError`, as it always has; a call you
+  make on the registry yourself throws the kernel's `wildwinter::expr::RegistryError`.
 
 ## Send the story somewhere
 

@@ -1473,6 +1473,101 @@ static void runOneRegistry()
     std::cout << "  [one-registry] the game's registry, one save, loaded in either order: " << g_regPass << "/" << g_regTotal << "\n";
 }
 
+// ----- kernel errors -----------------------------------------------------------------------------------
+//
+// The kernel (wildwinter::expr, shared with the Storylet Engine since 2026-09-24) throws its own
+// ExprError and RegistryError, never Patterplay's. Every place the engine calls it for something that
+// can refuse catches them and rethrows Patterplay's EvalError with the kernel's message, as the engine
+// threw before the kernel was shared, so a game's `catch (const patter::EvalError&)` still works and no
+// kernel exception crosses the plugin's API. One case per rethrow site in Engine.h, each of which fails
+// (the kernel's own type arrives instead) when that site's kernelCall is removed.
+
+static int g_kernelPass = 0, g_kernelTotal = 0;
+
+static void kernelCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_kernelTotal;
+    try { body(); ++g_kernelPass; }
+    catch (const std::exception& ex) { fail("kernel-errors", name, ex.what()); }
+}
+
+/** body must throw Patterplay's EvalError whose message contains `contains`; the kernel's own type, or
+ *  any other, is a failure that names what arrived instead. */
+static void expectEvalError(const std::function<void()>& body, const std::string& contains, const std::string& what)
+{
+    std::string message, type;
+    try { body(); }
+    catch (const EvalError& ex) { message = ex.what(); type = "EvalError"; }
+    catch (const wildwinter::expr::ExprError& ex) { message = ex.what(); type = "the kernel's ExprError"; }
+    catch (const wildwinter::expr::RegistryError& ex) { message = ex.what(); type = "the kernel's RegistryError"; }
+    catch (const std::exception& ex) { message = ex.what(); type = "some other std::exception"; }
+    if (type.empty()) throw std::runtime_error(what + ": did not throw");
+    if (type != "EvalError") throw std::runtime_error(what + ": threw " + type + " (\"" + message + "\"), not Patterplay's EvalError");
+    if (message.find(contains) == std::string::npos) throw std::runtime_error(what + ": threw \"" + message + "\", expected it to say \"" + contains + "\"");
+}
+
+/** A scope the game lends with no way to write it. */
+struct NoSetScope : IScopeResolver
+{
+    std::optional<PatterValue> get(const std::string&) const override { return PatterValue::Num(0); }
+    bool canSet() const override { return false; }
+    void set(const std::string&, const PatterValue&) override {}
+};
+
+static void runKernelErrorCases()
+{
+    kernelCase("a story write the registry refuses is Patterplay's EvalError (Flow::writeProperty)", []
+    {
+        Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"T":"hi"}},"properties":[],
+          "scopeRegistry":{"version":1,"scopes":[{"token":"world","declarations":[{"name":"clock","type":"string","default":"day","writable":false}]}]},
+          "scenes":{"s":{"id":"s","gameId":"s","blocks":[{"id":"b","gameId":"b","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],
+            "onEnter":[{"kind":"set","target":"@world.clock","value":{"src":"\"night\"","ast":["s","night"]}}],"jump":{"to":"END"}}]}]}}})JSON"));
+        Engine engine(bundle);
+        expectEvalError([&] { engine.openFlow("main", "s", "b")->advance(); }, "'@world.clock' is read-only", "the story's write to a read-only @world");
+    });
+
+    kernelCase("a flow's bag clashing with a key the game holds is Patterplay's EvalError (Flow::mount)", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        EngineOptions opts; opts.registry = registry;
+        Engine engine(orBundle(), opts);
+        OwnedScopeOptions game; game.owner = "Game";
+        registry->defineOwned("patter/flow/f/patter", {}, game);
+        expectEvalError([&] { engine.openFlow("f", "s"); }, "scope '@patter/flow/f/patter' is already registered by Game", "a flow mount clash");
+    });
+
+    kernelCase("an expression the evaluator refuses is Patterplay's EvalError (Flow::evalExpr)", []
+    {
+        Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"T":"hi"}},
+          "properties":[{"name":"fame","type":"number","default":0,"shared":true}],
+          "scenes":{"s":{"id":"s","gameId":"s","blocks":[{"id":"b","gameId":"b","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],
+            "onEnter":[{"kind":"set","target":"@fame","value":{"src":"1 / 0","ast":["bin","/",["n",1],["n",0]]}}],"jump":{"to":"END"}}]}]}}})JSON"));
+        Engine engine(bundle);
+        expectEvalError([&] { engine.openFlow("f", "s")->advance(); }, "division by zero", "an evaluation refusal");
+    });
+
+    kernelCase("the game's write to a scope with no setter is Patterplay's EvalError (Engine::setProperty)", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        ForeignScopeOptions game; game.owner = "Game";
+        registry->defineForeign("clock", std::make_shared<NoSetScope>(), nullptr, game);
+        EngineOptions opts; opts.registry = registry;
+        Engine engine(orBundle(), opts);
+        expectEvalError([&] { engine.setProperty("@clock.hour", PatterValue::Num(9)); }, "'@clock.hour' is read-only", "a refused game write");
+    });
+
+    kernelCase("a token clash as the engine registers is Patterplay's EvalError (Engine::registerScopes)", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        OwnedScopeOptions game; game.owner = "Game";
+        registry->defineOwned("patter", {}, game);
+        EngineOptions opts; opts.registry = registry;
+        expectEvalError([&] { Engine engine(orBundle(), opts); }, "scope '@patter' is already registered by Game (wanted by Patter)", "a registration clash");
+    });
+
+    std::cout << "  [kernel-errors] every kernel refusal reaches the game as Patterplay's EvalError: " << g_kernelPass << "/" << g_kernelTotal << "\n";
+}
+
 static void runInspectorSmoke()
 {
     Bundle b;
@@ -1716,6 +1811,7 @@ int main(int argc, char** argv)
     if (sv != static_cast<int>(savesArr->arr.size())) fail("saves", "section total", std::to_string(sv) + " of " + std::to_string(savesArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
+    runKernelErrorCases();
     runHostScopeWritableSmoke();
     runTraceLogSmoke();
     runOutlineSmoke();
@@ -1752,7 +1848,7 @@ int main(int argc, char** argv)
         const size_t slash = path.find_last_of("/\\");
         const std::string registryPath =
             (slash == std::string::npos ? std::string() : path.substr(0, slash + 1)) + "registry-corpus.json";
-        const RegistryCorpusResult reg = RunRegistryCorpus(registryPath);
+        const wildwinter::expr::testing::RegistryCorpusResult reg = wildwinter::expr::testing::RunRegistryCorpus(registryPath);
         for (const std::string& f : reg.failures) fail("registry", "corpus", f);
         std::cout << "registry corpus: " << reg.passed << "/" << reg.total << "\n";
     }

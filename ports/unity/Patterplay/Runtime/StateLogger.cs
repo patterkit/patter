@@ -7,7 +7,7 @@
 // This used to diff whole SaveGame() snapshots, so it reported the NET change between captures:
 // a value that changed and changed back was invisible, and every write was late. It also
 // carried its own StateChange, its own DiffState and its own FormatValue; all three are the
-// kernel's now, and its value rendering goes through PatterValue.ToJsonString, which is the
+// kernel's now, and its value rendering goes through ExprValue.ToJsonString, which is the
 // same rule the JS runtime's JSON.stringify applies.
 //
 // Paths, unchanged:
@@ -19,6 +19,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -29,9 +30,9 @@ namespace Patterkit.Patterplay
         /// public "what is the state right now" call, and it reads the same mounts, so the two agree on the
         /// path space. A bag loaded into the registry but not yet claimed (a scene no flow has re-entered
         /// since a load) appears once it is.</summary>
-        public static Dictionary<string, PatterValue> SnapshotState(Engine engine)
+        public static Dictionary<string, ExprValue> SnapshotState(Engine engine)
         {
-            var outMap = new Dictionary<string, PatterValue>();
+            var outMap = new Dictionary<string, ExprValue>();
             foreach (var m in AllMounts(engine))
             {
                 var prefix = m.PathPrefix ?? m.Bag.PathPrefix;
@@ -51,24 +52,24 @@ namespace Patterkit.Patterplay
 
         /// <summary>The visit counts, which live in no bag and so have no audit hook: the kernel
         /// diffs these on Capture, which is all this logger used to do for everything.</summary>
-        internal static OrderedMap<string, PatterValue> VisitState(Engine engine)
+        internal static OrderedMap<string, ExprValue> VisitState(Engine engine)
         {
             var save = engine.SaveGame();
-            var outMap = new OrderedMap<string, PatterValue>();
-            foreach (var kv in save.SharedVisits) outMap.Set($"visit:{kv.Key}", PatterValue.Num(kv.Value));
+            var outMap = new OrderedMap<string, ExprValue>();
+            foreach (var kv in save.SharedVisits) outMap.Set($"visit:{kv.Key}", ExprValue.Num(kv.Value));
             foreach (var flow in save.Flows)
-                foreach (var kv in flow.Value.Visits) outMap.Set($"{flow.Key}/visit:{kv.Key}", PatterValue.Num(kv.Value));
+                foreach (var kv in flow.Value.Visits) outMap.Set($"{flow.Key}/visit:{kv.Key}", ExprValue.Num(kv.Value));
             return outMap;
         }
 
         /// <summary>JSON.stringify-compatible rendering; null -> "&lt;unset&gt;". The kernel renders
-        /// state lines with exactly this rule (PatterValue.ToJsonString); it stays public because
+        /// state lines with exactly this rule (ExprValue.ToJsonString); it stays public because
         /// step tracing renders text and gameData, which are not bag values.</summary>
-        public static string FormatValue(PatterValue v) => v == null ? "<unset>" : v.ToJsonString();
+        public static string FormatValue(ExprValue v) => v == null ? "<unset>" : v.ToJsonString();
 
         /// <summary>The sorted set of paths that differ between two snapshots. Delegates to the
         /// kernel, so there is one diff rule rather than two.</summary>
-        public static List<StateChange> DiffState(Dictionary<string, PatterValue> prev, Dictionary<string, PatterValue> next)
+        public static List<StateChange> DiffState(Dictionary<string, ExprValue> prev, Dictionary<string, ExprValue> next)
         {
             return StateLogger.DiffState(Engine.OrderedOf(prev), Engine.OrderedOf(next));
         }
@@ -108,7 +109,7 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>The current flattened state (no logging): the whole game, off the envelope.</summary>
-        public Dictionary<string, PatterValue> Snapshot() => PatterStateLogger.SnapshotState(_engine);
+        public Dictionary<string, ExprValue> Snapshot() => PatterStateLogger.SnapshotState(_engine);
 
         /// <summary>Everything since the last capture: the property writes already logged as they
         /// landed, plus the visit counts, diffed and re-baselined.</summary>
@@ -124,8 +125,8 @@ namespace Patterkit.Patterplay
         {
             switch (step.Type)
             {
-                case StepType.Line: return $"line {step.Character ?? "?"}: {PatterStateLogger.FormatValue(PatterValue.Str(step.Text ?? ""))}{Gd(step)}";
-                case StepType.Text: return $"text: {PatterStateLogger.FormatValue(PatterValue.Str(step.Text ?? ""))}{Gd(step)}";
+                case StepType.Line: return $"line {step.Character ?? "?"}: {PatterStateLogger.FormatValue(ExprValue.Str(step.Text ?? ""))}{Gd(step)}";
+                case StepType.Text: return $"text: {PatterStateLogger.FormatValue(ExprValue.Str(step.Text ?? ""))}{Gd(step)}";
                 case StepType.GameEvent: return $"game event {step.Id}{Gd(step)}";
                 case StepType.Choice: return $"choice ({step.Options.Count} option{(step.Options.Count == 1 ? "" : "s")})";
                 case StepType.End: return "end";
@@ -137,7 +138,7 @@ namespace Patterkit.Patterplay
         {
             if (step.GameData == null || step.GameData.Count == 0) return "";
             var parts = step.GameData.OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => $"{PatterStateLogger.FormatValue(PatterValue.Str(kv.Key))}:{PatterStateLogger.FormatValue(kv.Value)}");
+                .Select(kv => $"{PatterStateLogger.FormatValue(ExprValue.Str(kv.Key))}:{PatterStateLogger.FormatValue(kv.Value)}");
             return " gameData={" + string.Join(",", parts) + "}";
         }
     }

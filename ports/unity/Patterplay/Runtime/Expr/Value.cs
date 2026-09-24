@@ -8,8 +8,9 @@
 //
 // The four kinds the expression language has. Both families had their own, 68%
 // alike and with character-identical ValueEquals, so most of the difference was
-// spelling. Lands in the package's own namespace, inside its Runtime asmdef.
-// The family supplies its own EvalError before this is used.
+// spelling; since 2026-09-24 there is one, ExprValue, shared by every family, so
+// one registry can hold every engine's values. Part of the kernel assembly: see
+// Errors.cs for how the kernel is packaged.
 // ---------------------------------------------------------------------------
 
 using System;
@@ -17,40 +18,40 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace Patterkit.Patterplay
+namespace Wildwinter.Expr
 {
-    public enum PatterKind { Bool, Number, Str, Flags }
+    public enum ExprKind { Bool, Number, Str, Flags }
 
-    public sealed class PatterValue
+    public sealed class ExprValue
     {
-        public PatterKind Kind { get; }
+        public ExprKind Kind { get; }
         private readonly bool _b;
         private readonly double _n;
         private readonly string _s;
         private readonly IReadOnlyList<string> _f;
 
-        private PatterValue(PatterKind kind, bool b = false, double n = 0, string s = null, IReadOnlyList<string> f = null)
+        private ExprValue(ExprKind kind, bool b = false, double n = 0, string s = null, IReadOnlyList<string> f = null)
         {
             Kind = kind; _b = b; _n = n; _s = s; _f = f;
         }
 
-        public static PatterValue Bool(bool v) => v ? True : False;
-        public static PatterValue Num(double v) => new PatterValue(PatterKind.Number, n: v);
-        public static PatterValue Str(string v) => new PatterValue(PatterKind.Str, s: v ?? "");
-        /// <summary>Flags list. The list is copied, so a PatterValue is immutable.</summary>
-        public static PatterValue Flags(IEnumerable<string> v)
+        public static ExprValue Bool(bool v) => v ? True : False;
+        public static ExprValue Num(double v) => new ExprValue(ExprKind.Number, n: v);
+        public static ExprValue Str(string v) => new ExprValue(ExprKind.Str, s: v ?? "");
+        /// <summary>Flags list. The list is copied, so a ExprValue is immutable.</summary>
+        public static ExprValue Flags(IEnumerable<string> v)
         {
             var list = v != null ? new List<string>(v) : new List<string>();
-            return new PatterValue(PatterKind.Flags, f: list);
+            return new ExprValue(ExprKind.Flags, f: list);
         }
 
-        public static readonly PatterValue False = new PatterValue(PatterKind.Bool, b: false);
-        public static readonly PatterValue True = new PatterValue(PatterKind.Bool, b: true);
+        public static readonly ExprValue False = new ExprValue(ExprKind.Bool, b: false);
+        public static readonly ExprValue True = new ExprValue(ExprKind.Bool, b: true);
 
-        public bool IsBool => Kind == PatterKind.Bool;
-        public bool IsNumber => Kind == PatterKind.Number;
-        public bool IsString => Kind == PatterKind.Str;
-        public bool IsFlags => Kind == PatterKind.Flags;
+        public bool IsBool => Kind == ExprKind.Bool;
+        public bool IsNumber => Kind == ExprKind.Number;
+        public bool IsString => Kind == ExprKind.Str;
+        public bool IsFlags => Kind == ExprKind.Flags;
 
         public bool AsBool => _b;
         public double AsNumber => _n;
@@ -59,12 +60,12 @@ namespace Patterkit.Patterplay
 
         /// <summary>`==` / `!=` semantics: primitives by value; flags element-wise,
         /// in order; mixed kinds unequal (the evaluator's valueEquals).</summary>
-        public bool ValueEquals(PatterValue other)
+        public bool ValueEquals(ExprValue other)
         {
             if (other == null) return false;
-            if (Kind == PatterKind.Flags || other.Kind == PatterKind.Flags)
+            if (Kind == ExprKind.Flags || other.Kind == ExprKind.Flags)
             {
-                if (Kind != PatterKind.Flags || other.Kind != PatterKind.Flags) return false;
+                if (Kind != ExprKind.Flags || other.Kind != ExprKind.Flags) return false;
                 if (_f.Count != other._f.Count) return false;
                 // Compared as a SET: order is an artefact of the order somebody
                 // happened to add things in, and was significant until
@@ -78,9 +79,9 @@ namespace Patterkit.Patterplay
             if (Kind != other.Kind) return false;
             switch (Kind)
             {
-                case PatterKind.Bool: return _b == other._b;
-                case PatterKind.Number: return _n == other._n;
-                case PatterKind.Str: return _s == other._s;
+                case ExprKind.Bool: return _b == other._b;
+                case ExprKind.Number: return _n == other._n;
+                case ExprKind.Str: return _s == other._s;
                 default: return false;
             }
         }
@@ -91,10 +92,10 @@ namespace Patterkit.Patterplay
         {
             switch (Kind)
             {
-                case PatterKind.Bool: return _b ? "true" : "false";
-                case PatterKind.Number: return JsNumber(_n);
-                case PatterKind.Str: return JsonQuote(_s);
-                case PatterKind.Flags:
+                case ExprKind.Bool: return _b ? "true" : "false";
+                case ExprKind.Number: return JsNumber(_n);
+                case ExprKind.Str: return JsonQuote(_s);
+                case ExprKind.Flags:
                 {
                     var sb = new StringBuilder("[");
                     for (int i = 0; i < _f.Count; i++)
@@ -154,10 +155,10 @@ namespace Patterkit.Patterplay
         {
             switch (Kind)
             {
-                case PatterKind.Bool: return _b ? "true" : "false";
-                case PatterKind.Number: return JsNumber(_n);
-                case PatterKind.Str: return _s;
-                case PatterKind.Flags: return string.Join(",", _f);
+                case ExprKind.Bool: return _b ? "true" : "false";
+                case ExprKind.Number: return JsNumber(_n);
+                case ExprKind.Str: return _s;
+                case ExprKind.Flags: return string.Join(",", _f);
                 default: return "";
             }
         }
@@ -172,10 +173,10 @@ namespace Patterkit.Patterplay
             {
                 switch (Kind)
                 {
-                    case PatterKind.Bool: return _b;
-                    case PatterKind.Number: return _n != 0;
-                    case PatterKind.Str: return _s.Length > 0;
-                    case PatterKind.Flags: return _f.Count > 0;
+                    case ExprKind.Bool: return _b;
+                    case ExprKind.Number: return _n != 0;
+                    case ExprKind.Str: return _s.Length > 0;
+                    case ExprKind.Flags: return _f.Count > 0;
                     default: return false;
                 }
             }

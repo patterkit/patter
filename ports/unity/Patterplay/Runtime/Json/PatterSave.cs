@@ -28,16 +28,17 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
-    /// <summary>PatterValue as JSON: bool / number / string / flags (a string array). A save value is a
+    /// <summary>ExprValue as JSON: bool / number / string / flags (a string array). A save value is a
     /// bare scalar, never an object - the two-level scope maps are handled by the save reader itself.</summary>
-    public sealed class PatterValueConverter : JsonConverter<PatterValue>
+    public sealed class PatterValueConverter : JsonConverter<ExprValue>
     {
-        public override void WriteJson(JsonWriter w, PatterValue v, JsonSerializer s) => PatterSave.ValueToken(v).WriteTo(w);
+        public override void WriteJson(JsonWriter w, ExprValue v, JsonSerializer s) => PatterSave.ValueToken(v).WriteTo(w);
 
-        public override PatterValue ReadJson(JsonReader r, Type t, PatterValue existing, bool hasExisting, JsonSerializer s)
+        public override ExprValue ReadJson(JsonReader r, Type t, ExprValue existing, bool hasExisting, JsonSerializer s)
             => PatterSave.ReadValue(JToken.Load(r));
     }
 
@@ -97,7 +98,7 @@ namespace Patterkit.Patterplay
         /// before or after each engine's DeserializeState.</summary>
         public static void LoadRegistry(ScopeRegistry registry, JObject values)
         {
-            registry.Load(ReadRegistry(values) ?? new OrderedMap<string, OrderedMap<string, PatterValue>>());
+            registry.Load(ReadRegistry(values) ?? new OrderedMap<string, OrderedMap<string, ExprValue>>());
         }
 
         // -- writing: literal keys, in the JS reference's order -----------------------------------
@@ -176,14 +177,14 @@ namespace Patterkit.Patterplay
             return o;
         }
 
-        private static JObject ValueMap(IEnumerable<KeyValuePair<string, PatterValue>> m)
+        private static JObject ValueMap(IEnumerable<KeyValuePair<string, ExprValue>> m)
         {
             var o = new JObject();
             if (m != null) foreach (var kv in m) o[kv.Key] = ValueToken(kv.Value);
             return o;
         }
 
-        private static JObject RegistryMap(OrderedMap<string, OrderedMap<string, PatterValue>> m)
+        private static JObject RegistryMap(OrderedMap<string, OrderedMap<string, ExprValue>> m)
         {
             var o = new JObject();
             foreach (var kv in m) o[kv.Key] = ValueMap(kv.Value);
@@ -207,15 +208,15 @@ namespace Patterkit.Patterplay
             return o;
         }
 
-        public static JToken ValueToken(PatterValue v)
+        public static JToken ValueToken(ExprValue v)
         {
             switch (v.Kind)
             {
-                case PatterKind.Bool: return v.AsBool;
-                case PatterKind.Number: return v.AsNumber;
-                case PatterKind.Str: return v.AsString;
-                case PatterKind.Flags: return JArray.FromObject(v.AsFlags ?? new List<string>());
-                default: throw new JsonSerializationException($"unsupported PatterValue kind: {v.Kind}");
+                case ExprKind.Bool: return v.AsBool;
+                case ExprKind.Number: return v.AsNumber;
+                case ExprKind.Str: return v.AsString;
+                case ExprKind.Flags: return JArray.FromObject(v.AsFlags ?? new List<string>());
+                default: throw new JsonSerializationException($"unsupported ExprValue kind: {v.Kind}");
             }
         }
 
@@ -252,13 +253,13 @@ namespace Patterkit.Patterplay
 
         /// <summary>A version 3 save's `registry` section (registry key -> name -> value), in document
         /// order; null when absent (a game that passed its own registry saves it separately).</summary>
-        private static OrderedMap<string, OrderedMap<string, PatterValue>> ReadRegistry(JObject o)
+        private static OrderedMap<string, OrderedMap<string, ExprValue>> ReadRegistry(JObject o)
         {
             if (o == null) return null;
-            var m = new OrderedMap<string, OrderedMap<string, PatterValue>>();
+            var m = new OrderedMap<string, OrderedMap<string, ExprValue>>();
             foreach (var p in o.Properties())
             {
-                var values = new OrderedMap<string, PatterValue>();
+                var values = new OrderedMap<string, ExprValue>();
                 if (p.Value is JObject section) foreach (var v in section.Properties()) values.Set(v.Name, ReadValue(v.Value));
                 m.Set(p.Name, values);
             }
@@ -268,9 +269,9 @@ namespace Patterkit.Patterplay
         /// <summary>`{ patter: { name: value } }` (the family's two-level shape), or the bare
         /// `{ name: value }` this port wrote before 0.11.0. A flat map's values are scalars and arrays,
         /// never objects, which is what tells the two apart.</summary>
-        private static Dictionary<string, PatterValue> ReadScope(JObject o)
+        private static Dictionary<string, ExprValue> ReadScope(JObject o)
         {
-            if (o == null || o.Count == 0) return new Dictionary<string, PatterValue>();
+            if (o == null || o.Count == 0) return new Dictionary<string, ExprValue>();
             bool twoLevel = o.Properties().All(p => p.Value.Type == JTokenType.Object);
             return ReadValueMap(twoLevel ? Obj(o, "patter") : o);
         }
@@ -347,9 +348,9 @@ namespace Patterkit.Patterplay
             return list;
         }
 
-        private static Dictionary<string, PatterValue> ReadValueMap(JObject o)
+        private static Dictionary<string, ExprValue> ReadValueMap(JObject o)
         {
-            var m = new Dictionary<string, PatterValue>();
+            var m = new Dictionary<string, ExprValue>();
             if (o != null) foreach (var p in o.Properties()) m[p.Name] = ReadValue(p.Value);
             return m;
         }
@@ -361,9 +362,9 @@ namespace Patterkit.Patterplay
             return m;
         }
 
-        private static Dictionary<string, Dictionary<string, PatterValue>> ReadBagMap(JObject o)
+        private static Dictionary<string, Dictionary<string, ExprValue>> ReadBagMap(JObject o)
         {
-            var m = new Dictionary<string, Dictionary<string, PatterValue>>();
+            var m = new Dictionary<string, Dictionary<string, ExprValue>>();
             if (o != null) foreach (var p in o.Properties()) m[p.Name] = ReadValueMap(p.Value as JObject);
             return m;
         }
@@ -385,21 +386,21 @@ namespace Patterkit.Patterplay
             return m;
         }
 
-        public static PatterValue ReadValue(JToken tok)
+        public static ExprValue ReadValue(JToken tok)
         {
             switch (tok.Type)
             {
-                case JTokenType.Boolean: return PatterValue.Bool((bool)tok);
+                case JTokenType.Boolean: return ExprValue.Bool((bool)tok);
                 case JTokenType.Integer:
-                case JTokenType.Float: return PatterValue.Num((double)tok);
-                case JTokenType.String: return PatterValue.Str((string)tok);
+                case JTokenType.Float: return ExprValue.Num((double)tok);
+                case JTokenType.String: return ExprValue.Str((string)tok);
                 case JTokenType.Array:
                 {
                     var list = new List<string>();
                     foreach (var x in (JArray)tok) list.Add((string)x);
-                    return PatterValue.Flags(list);
+                    return ExprValue.Flags(list);
                 }
-                default: throw new JsonSerializationException($"unsupported PatterValue token: {tok.Type}");
+                default: throw new JsonSerializationException($"unsupported ExprValue token: {tok.Type}");
             }
         }
     }

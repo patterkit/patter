@@ -15,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -26,8 +27,8 @@ namespace Patterkit.Patterplay
     public interface IHostScope
     {
         /// <summary>The current value, or null when this scope has no such property (reads graceful-false).</summary>
-        PatterValue Get(string name);
-        void Set(string name, PatterValue value);
+        ExprValue Get(string name);
+        void Set(string name, ExprValue value);
     }
 
     /// <summary>An <see cref="IHostScope"/> as the registry takes a foreign scope. The registry hands it
@@ -37,8 +38,8 @@ namespace Patterkit.Patterplay
         private readonly IHostScope _scope;
         public HostScopeResolver(IHostScope scope) { _scope = scope; }
         public bool CanSet => true;
-        public PatterValue Get(string name) => _scope.Get(name);
-        public void Set(string name, PatterValue value) => _scope.Set(name, value);
+        public ExprValue Get(string name) => _scope.Get(name);
+        public void Set(string name, ExprValue value) => _scope.Set(name, value);
     }
 
     /// <summary>The registry keys this engine stores its instance bags under. An id is escaped (`%` and
@@ -158,8 +159,8 @@ namespace Patterkit.Patterplay
         public List<(string Id, bool Eligible)> Considered;
         public string Picked;
         public string Selector;
-        public PatterValue Value;
-        public PatterValue Prev;
+        public ExprValue Value;
+        public ExprValue Prev;
         public string Detail;
     }
 
@@ -348,10 +349,11 @@ namespace Patterkit.Patterplay
                         selfBacked.Add(spec.Token);
                     }
             }
-            catch
+            catch (Exception e)
             {
                 // A clash leaves the game's registry as it was.
                 foreach (var k in registered) registry.Remove(k, keep: true);
+                if (KernelErrors.Is(e)) throw KernelErrors.As(e);
                 throw;
             }
 
@@ -791,7 +793,7 @@ namespace Patterkit.Patterplay
 
         /// <summary>Read a shared (@patter / host / another engine's) property by ref. @scene refs are
         /// rejected: they are flow-level.</summary>
-        public PatterValue GetProperty(string refStr)
+        public ExprValue GetProperty(string refStr)
         {
             var (scope, name) = SplitShared(refStr);
             return _host.Registry.Get(scope, name);
@@ -800,10 +802,11 @@ namespace Patterkit.Patterplay
         /// <summary>Write a shared property by ref. The GAME's surface, so a host declaration's
         /// `writable: false` does not refuse it: that is the story's promise about the story's writes
         /// (from-storylets/host-writes-to-read-only-world). Effects write through Flow instead.</summary>
-        public void SetProperty(string refStr, PatterValue value)
+        public void SetProperty(string refStr, ExprValue value)
         {
             var (scope, name) = SplitShared(refStr);
-            _host.Registry.Set(scope, name, value, host: true);
+            try { _host.Registry.Set(scope, name, value, host: true); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
         }
 
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
@@ -898,17 +901,17 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>A version 2 save's property values, as registry sections under this engine's keys.</summary>
-        private static OrderedMap<string, OrderedMap<string, PatterValue>> SectionsFromV2(SaveGame save)
+        private static OrderedMap<string, OrderedMap<string, ExprValue>> SectionsFromV2(SaveGame save)
         {
 #pragma warning disable CS0618 // the version 2 fields are read here, and only here
-            var out_ = new OrderedMap<string, OrderedMap<string, PatterValue>>();
+            var out_ = new OrderedMap<string, OrderedMap<string, ExprValue>>();
             if (save.Shared != null) out_.Set("patter", OrderedOf(save.Shared));
-            foreach (var kv in save.StageBags ?? new Dictionary<string, Dictionary<string, PatterValue>>())
+            foreach (var kv in save.StageBags ?? new Dictionary<string, Dictionary<string, ExprValue>>())
                 out_.Set(PatterKeys.Stage(kv.Key), OrderedOf(kv.Value));
             foreach (var f in save.Flows ?? new Dictionary<string, FlowSnapshot>())
             {
                 if (f.Value.Scopes != null) out_.Set(PatterKeys.FlowGlobals(f.Key), OrderedOf(f.Value.Scopes));
-                foreach (var kv in f.Value.SceneBags ?? new Dictionary<string, Dictionary<string, PatterValue>>())
+                foreach (var kv in f.Value.SceneBags ?? new Dictionary<string, Dictionary<string, ExprValue>>())
                     out_.Set(PatterKeys.FlowScene(f.Key, kv.Key), OrderedOf(kv.Value));
             }
 #pragma warning restore CS0618
@@ -1024,25 +1027,25 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>A flat name/value map as PropertyBag.Load and the registry take it.</summary>
-        internal static OrderedMap<string, PatterValue> OrderedOf(Dictionary<string, PatterValue> flat)
+        internal static OrderedMap<string, ExprValue> OrderedOf(Dictionary<string, ExprValue> flat)
         {
-            var values = new OrderedMap<string, PatterValue>();
-            foreach (var e in flat ?? new Dictionary<string, PatterValue>()) values.Set(e.Key, e.Value);
+            var values = new OrderedMap<string, ExprValue>();
+            foreach (var e in flat ?? new Dictionary<string, ExprValue>()) values.Set(e.Key, e.Value);
             return values;
         }
 
-        internal static PatterValue PropDefault(PropertyDecl d)
+        internal static ExprValue PropDefault(PropertyDecl d)
         {
             if (d.Default != null) return d.Default;
             switch (d.Type)
             {
-                case "boolean": return PatterValue.False;
-                case "number": return PatterValue.Num(0);
-                case "string": return PatterValue.Str("");
-                case "flags": return PatterValue.Flags(new List<string>());
-                case "enum": return PatterValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
-                case "quality": return PatterValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
-                default: return PatterValue.False;
+                case "boolean": return ExprValue.False;
+                case "number": return ExprValue.Num(0);
+                case "string": return ExprValue.Str("");
+                case "flags": return ExprValue.Flags(new List<string>());
+                case "enum": return ExprValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
+                case "quality": return ExprValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
+                default: return ExprValue.False;
             }
         }
 
@@ -1074,7 +1077,7 @@ namespace Patterkit.Patterplay
         /// <summary>The engine's own registry's values, keyed by registry key (`patter`,
         /// `patter/flow/&lt;flow&gt;/scene/&lt;scene&gt;`, `world`, and so on): present only when the engine made
         /// the registry itself (a standalone game). A game that passed a registry saves it once, beside this.</summary>
-        public OrderedMap<string, OrderedMap<string, PatterValue>> Registry;
+        public OrderedMap<string, OrderedMap<string, ExprValue>> Registry;
         /// <summary>World-wide per-node entry counts (node id -> times entered by any flow).</summary>
         public Dictionary<string, int> SharedVisits;
         /// <summary>Shared selector cursors (node id -> state) for `shared` memoried selectors.</summary>
@@ -1084,10 +1087,10 @@ namespace Patterkit.Patterplay
 
         /// <summary>Version 2 only: the shared @patter globals. Read from an older save, never written.</summary>
         [Obsolete("Version 2 saves only. Property values are the registry's now: see Registry.")]
-        public Dictionary<string, PatterValue> Shared;
+        public Dictionary<string, ExprValue> Shared;
         /// <summary>Version 2 only: the shared @scene bags (scene id -> name -> value). Read, never written.</summary>
         [Obsolete("Version 2 saves only. Property values are the registry's now: see Registry.")]
-        public Dictionary<string, Dictionary<string, PatterValue>> StageBags;
+        public Dictionary<string, Dictionary<string, ExprValue>> StageBags;
     }
 
     /// <summary>The serialised cursor, PRNG, and visits of one flow. Its properties are the registry's.</summary>
@@ -1095,10 +1098,10 @@ namespace Patterkit.Patterplay
     {
         /// <summary>Version 2 only: the flow's not-shared @patter globals. Read, never written.</summary>
         [Obsolete("Version 2 saves only. Property values are the registry's now: see SaveGame.Registry.")]
-        public Dictionary<string, PatterValue> Scopes;
+        public Dictionary<string, ExprValue> Scopes;
         /// <summary>Version 2 only: the flow's per-scene @scene bags. Read, never written.</summary>
         [Obsolete("Version 2 saves only. Property values are the registry's now: see SaveGame.Registry.")]
-        public Dictionary<string, Dictionary<string, PatterValue>> SceneBags;
+        public Dictionary<string, Dictionary<string, ExprValue>> SceneBags;
         public uint RngState;
         public Dictionary<string, int> Visits;
         public bool FlowEnded;

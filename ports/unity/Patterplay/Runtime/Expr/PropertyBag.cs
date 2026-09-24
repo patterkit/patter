@@ -9,7 +9,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Patterkit.Patterplay
+namespace Wildwinter.Expr
 {
     /// <summary>The property type vocabulary (boolean / number / string / enum /
     /// flags). Kept as strings, exactly as the kernel and the bundle carry it;
@@ -33,24 +33,24 @@ namespace Patterkit.Patterplay
         public List<string> Values;         // for enum / flags
         /// <summary>A quality's ordered ladder of stage names (quality.md).</summary>
         public List<string> Stages;
-        public PatterValue Default;       // owned scopes: seed value
+        public ExprValue Default;       // owned scopes: seed value
         public bool? Writable;              // default true
 
         /// <summary>The type default when no explicit default is declared
         /// (the kernel's defaultFor).</summary>
-        public PatterValue DefaultOrTypeDefault()
+        public ExprValue DefaultOrTypeDefault()
         {
             if (Default != null) return Default;
             switch (Type)
             {
-                case PropertyTypes.Boolean: return PatterValue.False;
-                case PropertyTypes.Number: return PatterValue.Num(0);
-                case PropertyTypes.String: return PatterValue.Str("");
-                case PropertyTypes.Enum: return PatterValue.Str(Values != null && Values.Count > 0 ? Values[0] : "");
-                case PropertyTypes.Flags: return PatterValue.Flags(null);
+                case PropertyTypes.Boolean: return ExprValue.False;
+                case PropertyTypes.Number: return ExprValue.Num(0);
+                case PropertyTypes.String: return ExprValue.Str("");
+                case PropertyTypes.Enum: return ExprValue.Str(Values != null && Values.Count > 0 ? Values[0] : "");
+                case PropertyTypes.Flags: return ExprValue.Flags(null);
                 // A quality starts at the first rung of its ladder (quality.md).
-                case PropertyTypes.Quality: return PatterValue.Str(Stages != null && Stages.Count > 0 ? Stages[0] : "");
-                default: return PatterValue.False;
+                case PropertyTypes.Quality: return ExprValue.Str(Stages != null && Stages.Count > 0 ? Stages[0] : "");
+                default: return ExprValue.False;
             }
         }
     }
@@ -61,8 +61,8 @@ namespace Patterkit.Patterplay
     public sealed class BagChange
     {
         public string Name;
-        public PatterValue Prev;          // null when the property had no value
-        public PatterValue Next;
+        public ExprValue Prev;          // null when the property had no value
+        public ExprValue Next;
         public bool Silent;
         public string Reason;
     }
@@ -78,8 +78,8 @@ namespace Patterkit.Patterplay
         /// field, once per runtime.</summary>
         public string Path;
         public string Type;
-        public PatterValue Value;
-        public PatterValue Default;
+        public ExprValue Value;
+        public ExprValue Default;
         public List<string> Values;
         /// <summary>A quality's ladder, when this row is one, so an examiner can offer
         /// the stages instead of a free-text box.
@@ -98,7 +98,7 @@ namespace Patterkit.Patterplay
         /// <summary>The live values map (stable identity across Reseed, so an eval
         /// context built over it stays valid). Read-path for evaluation; writes go
         /// through Set so the firing rule applies.</summary>
-        public OrderedMap<string, PatterValue> Values { get; } = new OrderedMap<string, PatterValue>();
+        public OrderedMap<string, ExprValue> Values { get; } = new OrderedMap<string, ExprValue>();
 
         private OrderedMap<string, ScopeDeclaration> _decls = new OrderedMap<string, ScopeDeclaration>();
         private readonly List<Action<BagChange>> _subscribers = new List<Action<BagChange>>();
@@ -130,7 +130,7 @@ namespace Patterkit.Patterplay
             {
                 var name = _norm(d.Name);
                 _decls.Set(name, d);
-                // PatterValue is immutable, so seeding shares no mutable default
+                // ExprValue is immutable, so seeding shares no mutable default
                 // (the kernel structuredClones for the same reason).
                 Values.Set(name, d.DefaultOrTypeDefault());
             }
@@ -141,7 +141,7 @@ namespace Patterkit.Patterplay
         /// (identity) bag is not folded to lower case one layer up.</summary>
         public string Normalise(string name) => _norm(name);
 
-        public PatterValue Get(string name)
+        public ExprValue Get(string name)
         {
             return Values.GetOrDefault(_norm(name));
         }
@@ -153,11 +153,11 @@ namespace Patterkit.Patterplay
         /// (ruled 2026-09-05). The two are separate: one says who hears the write,
         /// the other who may make it. Throws on a read-only property. Returns the
         /// change.</summary>
-        public BagChange Set(string name, PatterValue value, bool silent = false, string reason = null, bool host = false)
+        public BagChange Set(string name, ExprValue value, bool silent = false, string reason = null, bool host = false)
         {
             var n = _norm(name);
             var decl = _decls.GetOrDefault(n);
-            if (!host && decl != null && decl.Writable == false) throw new EvalError($"'{name}' is read-only");
+            if (!host && decl != null && decl.Writable == false) throw new RegistryError($"'{name}' is read-only");
             var change = new BagChange
             {
                 Name = n,
@@ -222,9 +222,9 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>Bare values, ready to embed in a product's save.</summary>
-        public OrderedMap<string, PatterValue> Save()
+        public OrderedMap<string, ExprValue> Save()
         {
-            var copy = new OrderedMap<string, PatterValue>();
+            var copy = new OrderedMap<string, ExprValue>();
             foreach (var pair in Values) copy.Set(pair.Key, pair.Value);
             return copy;
         }
@@ -232,12 +232,12 @@ namespace Patterkit.Patterplay
         /// <summary>Lay saved values over the current ones (call after a fresh
         /// seed: orphans land as strays, new declarations keep their defaults; the
         /// product decides whether to prune). Does not fire events.</summary>
-        public void Load(OrderedMap<string, PatterValue> values)
+        public void Load(OrderedMap<string, ExprValue> values)
         {
             foreach (var pair in values) Values.Set(_norm(pair.Key), pair.Value);
         }
 
-        internal static PropertyRow RowFor(ScopeDeclaration d, PatterValue value, bool? writable, string name = null,
+        internal static PropertyRow RowFor(ScopeDeclaration d, ExprValue value, bool? writable, string name = null,
                                            string pathPrefix = "")
         {
             string rowName = name ?? d.Name.ToLowerInvariant();

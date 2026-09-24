@@ -11,7 +11,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Patterkit.Patterplay
+namespace Wildwinter.Expr
 {
     public sealed class OrderedMap<TKey, TValue> : IEnumerable<KeyValuePair<TKey, TValue>>
     {

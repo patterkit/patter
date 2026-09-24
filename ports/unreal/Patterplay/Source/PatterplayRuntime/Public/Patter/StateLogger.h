@@ -132,8 +132,8 @@ namespace patter
 
     /** Patterplay's state logger: the kernel logger plus logStep.
      *
-     *  Named PatterStateLog rather than StateLogger because the kernel's class - vendored into
-     *  this namespace - is the StateLogger now. */
+     *  Named PatterStateLog rather than StateLogger because the kernel's class - named in this
+     *  namespace by Kernel.h - is the StateLogger now. */
     class PatterStateLog
     {
     public:

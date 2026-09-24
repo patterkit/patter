@@ -5,6 +5,7 @@
 using System;
 using System.Text;
 using System.Text.RegularExpressions;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -12,7 +13,7 @@ namespace Patterkit.Patterplay
     {
         private static readonly Regex BareRef = new Regex("^@[A-Za-z0-9_.]+$");
 
-        public static string Expand(string text, Func<string, PatterValue> resolve)
+        public static string Expand(string text, Func<string, ExprValue> resolve)
         {
             if (string.IsNullOrEmpty(text)) return text;
             if (text.IndexOf('{') < 0) return text; // fast path: no slot opener -> nothing to interpolate (the common case)
@@ -96,13 +97,13 @@ namespace Patterkit.Patterplay
             return outSb.ToString();
         }
 
-        private static string RenderSlot(PatterValue v)
+        private static string RenderSlot(ExprValue v)
         {
             switch (v.Kind)
             {
-                case PatterKind.Flags: return string.Join(", ", v.AsFlags);
-                case PatterKind.Bool: return v.AsBool ? "true" : "false";
-                case PatterKind.Number: return PatterValue.JsNumber(v.AsNumber);
+                case ExprKind.Flags: return string.Join(", ", v.AsFlags);
+                case ExprKind.Bool: return v.AsBool ? "true" : "false";
+                case ExprKind.Number: return ExprValue.JsNumber(v.AsNumber);
                 default: return v.AsString;
             }
         }

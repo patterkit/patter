@@ -69,7 +69,11 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   whole run as one JSON string (save version 3; older saves still load).
 - **One registry per game** (C++): every property lives in a `patter::ScopeRegistry`. An engine
   makes its own by default; `UPatterEngine::CreateWithRegistry` builds one on your game's registry,
-  which your game then saves once with `patter::saveRegistry`. See
+  which your game then saves once with `patter::saveRegistry`. The registry is the shared kernel's
+  `wildwinter::expr::ScopeRegistry`, the same type the Storylet Engine takes, so a game running both
+  hands one registry to each; include `Patter/Kernel.h` where you make it, with
+  `bEnableExceptions = true` in that module's Build.cs. Both plugins must be built from the same
+  kernel (a mismatch is a compile error naming the fix). See
   [the Unreal guide](https://patterkit.dev/play/unreal/#one-registry-per-game).
 - **Audio**: `UPatterAudio` reads the `patteraudio.json` manifest exported next to a Patter
   audio folder and resolves each line to its winning take - it resolves the path, you play

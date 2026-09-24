@@ -96,11 +96,13 @@ token (`Get` / `Set`, keyed by property name) that the story reads before every 
 through on an effect. Bind the same object to anything else that shares those values:
 
 ```csharp
+using Wildwinter.Expr;   // ExprValue, the value type
+
 sealed class WorldScope : IHostScope
 {
-    public readonly Dictionary<string, PatterValue> Values = new() { ["time_of_day"] = PatterValue.Str("night") };
-    public PatterValue Get(string name) => Values.TryGetValue(name, out var v) ? v : null;   // null = unset
-    public void Set(string name, PatterValue value) => Values[name] = value;
+    public readonly Dictionary<string, ExprValue> Values = new() { ["time_of_day"] = ExprValue.Str("night") };
+    public ExprValue Get(string name) => Values.TryGetValue(name, out var v) ? v : null;   // null = unset
+    public void Set(string name, ExprValue value) => Values[name] = value;
 }
 
 var world = new WorldScope();
@@ -128,10 +130,11 @@ to each engine through **`EngineOptions.Registry`**:
 
 ```csharp
 using Newtonsoft.Json.Linq;
+using Wildwinter.Expr;   // ScopeRegistry, ExprValue
 
 var registry = new ScopeRegistry().DefineOwned("world", new[]
 {
-    new ScopeDeclaration { Name = "gold", Type = "number", Default = PatterValue.Num(0) },
+    new ScopeDeclaration { Name = "gold", Type = "number", Default = ExprValue.Num(0) },
 }, new OwnedScopeOptions { Owner = "Game" });                      // @world, stored and saved
 var patter = Bundle.CreateEngine(new EngineOptions { Registry = registry });
 
@@ -157,6 +160,15 @@ condition can test another engine's `@story.act` once that engine is in the same
 A token is taken once. Two engines that both want the same one fail as you build the second, with an
 error that names who got there first, and your registry is left as it was. Rebuilding an engine on an
 edited bundle (`HotSwap`) hands its bags to the replacement on the same registry.
+
+The registry, the value type `ExprValue`, and the rest of the shared expression kernel live in the
+`Wildwinter.Expr` namespace, in their own assembly, `Patterplay.Expr`. The Storylet Engine carries the
+same kernel, and with both packages installed it compiles once, in Patterplay, so one `ScopeRegistry`
+is the same type to both engines. The Storylet Engine then needs Patterplay 0.14.0 or newer, and stops
+the compile with an error saying so if it finds an older one. If your scripts have their own assembly
+definition, reference `Patterplay.Expr` and `StoryletEngine.Expr` beside `Patterplay.Runtime`: Unity
+ignores whichever is not installed. The engine's own errors are still `EvalError`; a call you make
+straight to the registry throws the kernel's `RegistryError`.
 
 ## Send the story somewhere
 

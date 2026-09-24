@@ -8,6 +8,17 @@ same runtime behaviour.
 
 ### Changed
 
+- **Breaking: one expression kernel, shared with the Storylet Engine.** `PatterValue` and `PatterKind`
+  are now `ExprValue` and `ExprKind`, in the `Wildwinter.Expr` namespace with the rest of the shared
+  kernel (`ScopeRegistry`, `PropertyBag`, `OrderedMap`, `Mulberry32`, and the evaluator), which now
+  has its own assembly definition, `Patterplay.Expr`. The Storylet Engine carries the same kernel, and
+  a game with both installed compiles it once, here, so one `ScopeRegistry` is the same type to both
+  engines. Patterplay's API still throws `EvalError`, with the same messages; a call straight to the
+  registry or a property bag throws the kernel's `RegistryError`, and `Expr.Evaluate` its `ExprError`.
+  **To migrate:** rename `PatterValue` to `ExprValue` and `PatterKind` to `ExprKind`, and add
+  `using Wildwinter.Expr;`. A game assembly definition that references `Patterplay.Runtime` must also
+  reference `Patterplay.Expr` and `StoryletEngine.Expr` (Unity ignores whichever is not installed);
+  scripts with no assembly definition need nothing more.
 - **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry`
   (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's
   bag under a key starting `patter/`. A new `EngineOptions.Registry` takes the game's own registry,

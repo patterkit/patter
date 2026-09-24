@@ -3,7 +3,9 @@
   "rootNamespace": "Patterkit.Patterplay",
   "references": [
     "Patterplay.Runtime",
-    "Patterplay.Runtime.Json"
+    "Patterplay.Runtime.Json",
+    "Patterplay.Expr",
+    "StoryletEngine.Expr"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

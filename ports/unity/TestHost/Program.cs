@@ -20,6 +20,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Patterkit.Patterplay;
+using Wildwinter.Expr;
+using Wildwinter.Expr.Testing;
 
 namespace Patterkit.Patterplay.TestHost
 {
@@ -225,9 +227,9 @@ namespace Patterkit.Patterplay.TestHost
         // throw", so it is pinned here, beside the other checks the corpus cannot express.
         private sealed class RecordingScope : IHostScope
         {
-            public readonly Dictionary<string, PatterValue> Values = new Dictionary<string, PatterValue>();
-            public PatterValue Get(string name) => Values.TryGetValue(name, out var v) ? v : null;
-            public void Set(string name, PatterValue value) { Values[name] = value; }
+            public readonly Dictionary<string, ExprValue> Values = new Dictionary<string, ExprValue>();
+            public ExprValue Get(string name) => Values.TryGetValue(name, out var v) ? v : null;
+            public void Set(string name, ExprValue value) { Values[name] = value; }
         }
 
         private static void RunHostScopeWritableCheck()
@@ -239,8 +241,8 @@ namespace Patterkit.Patterplay.TestHost
             b.ScopeRegistry = new HostScopeRegistry();
             b.ScopeRegistry.Scopes.Add(new HostScopeSpec { Token = "world", Declarations = new List<HostScopeDecl>
             {
-                new HostScopeDecl { Name = "clock", Type = "string", Default = PatterValue.Str("day"), Writable = false },
-                new HostScopeDecl { Name = "known", Type = "boolean", Default = PatterValue.False },
+                new HostScopeDecl { Name = "clock", Type = "string", Default = ExprValue.Str("day"), Writable = false },
+                new HostScopeDecl { Name = "known", Type = "boolean", Default = ExprValue.False },
             } });
             var scene = new Scene { Id = "s", GameId = "s" };
             scene.Blocks.Add(new Block { Id = "b", GameId = "b", Children = new List<Node>
@@ -266,22 +268,25 @@ namespace Patterkit.Patterplay.TestHost
                 string message = null;
                 // The refusal surfaces from OpenFlow: a flow settles into its first snippet on open and
                 // runs that snippet's effects there, before any Advance.
-                try { engine.OpenFlow("main", "s", "b").Advance(); } catch (Exception ex) { message = ex.Message; }
-                if (message == null || !message.Contains("'@world.clock' is read-only"))
-                    Fail("host-scope", label, $"a story write to a writable:false declaration was not refused (got: {message ?? "no error"})");
+                // Refused as Patterplay's own EvalError, which the kernel's RegistryError is rethrown as, so
+                // a game's `catch (EvalError)` still sees it.
+                string thrown = null;
+                try { engine.OpenFlow("main", "s", "b").Advance(); } catch (Exception ex) { message = ex.Message; thrown = ex.GetType().Name; }
+                if (message == null || !message.Contains("'@world.clock' is read-only") || thrown != nameof(EvalError))
+                    Fail("host-scope", label, $"a story write to a writable:false declaration was not refused as an EvalError (got: {thrown} {message ?? "no error"})");
                 if (bound && scope.Values.ContainsKey("clock"))
                     Fail("host-scope", label, "the refused write still landed in the game's scope");
                 // The GAME's own path through the engine is NOT refused: `writable: false` is the story's
                 // promise about the story's writes, never a lock on the value's owner (ruled across the
                 // family 2026-09-05, from-storylets/host-writes-to-read-only-world).
                 message = null;
-                try { engine.SetProperty("@world.clock", PatterValue.Str("night")); } catch (Exception ex) { message = ex.Message; }
+                try { engine.SetProperty("@world.clock", ExprValue.Str("night")); } catch (Exception ex) { message = ex.Message; }
                 if (message != null)
                     Fail("host-scope", label, $"the GAME's SetProperty on a writable:false declaration was refused: {message}");
                 if (engine.GetProperty("@world.clock")?.AsString != "night")
                     Fail("host-scope", label, "the game's write did not land");
                 // And a writable name still lands.
-                engine.SetProperty("@world.known", PatterValue.True);
+                engine.SetProperty("@world.known", ExprValue.True);
                 if (engine.GetProperty("@world.known")?.AsBool != true)
                     Fail("host-scope", label, "a writable declaration was refused too");
             }
@@ -295,8 +300,8 @@ namespace Patterkit.Patterplay.TestHost
             b.Locales.Included.Add("en");
             b.Strings["en"] = new Dictionary<string, string> { ["T"] = "hi" };
             var scene = new Scene { Id = "s", GameId = "s" };
-            scene.SceneProps.Add(new PropertyDecl { Name = "mood", Type = "string", Default = PatterValue.Str("calm"), Shared = false });
-            scene.SceneProps.Add(new PropertyDecl { Name = "alarm", Type = "boolean", Default = PatterValue.False, Shared = true });
+            scene.SceneProps.Add(new PropertyDecl { Name = "mood", Type = "string", Default = ExprValue.Str("calm"), Shared = false });
+            scene.SceneProps.Add(new PropertyDecl { Name = "alarm", Type = "boolean", Default = ExprValue.False, Shared = true });
             scene.Blocks.Add(new Block { Id = "b", GameId = "b", Children = new List<Node>
             {
                 new Node { Id = "sn", Type = "snippet",
@@ -309,7 +314,7 @@ namespace Patterkit.Patterplay.TestHost
             var engine = new Engine(b, new EngineOptions());
             var flow = engine.OpenFlow("main", "s", "b");
             for (int i = 0; i < 10; i++) { var r = flow.Advance(); if (r == null || r.Type == StepType.End) break; }
-            flow.SetProperty("@scene.mood", PatterValue.Str("tense"));
+            flow.SetProperty("@scene.mood", ExprValue.Str("tense"));
 
             string json = PatterSave.SerializeState(engine);
             using var sdoc = JsonDocument.Parse(json);
@@ -362,7 +367,7 @@ namespace Patterkit.Patterplay.TestHost
             };
             b.Locales.Default = "en";
             b.Locales.Included.AddRange(new[] { "en", "fr" });
-            b.Properties.Add(new PropertyDecl { Name = "gold", Type = "number", Default = PatterValue.Num(5) });
+            b.Properties.Add(new PropertyDecl { Name = "gold", Type = "number", Default = ExprValue.Num(5) });
 
             b.ScopeRegistry = new HostScopeRegistry();
             b.ScopeRegistry.Scopes.Add(new HostScopeSpec
@@ -370,7 +375,7 @@ namespace Patterkit.Patterplay.TestHost
                 Token = "world",
                 Declarations = new List<HostScopeDecl>
                 {
-                    new HostScopeDecl { Name = "isnight", Type = "boolean", Default = PatterValue.Bool(true) },
+                    new HostScopeDecl { Name = "isnight", Type = "boolean", Default = ExprValue.Bool(true) },
                 },
             });
             // No Declarations at all: an OPAQUE scope, which is not the same as an empty list.
@@ -585,7 +590,7 @@ namespace Patterkit.Patterplay.TestHost
                     var ctx = new EvalContext();
                     foreach (var scope in c.GetProperty("scopes").EnumerateObject())
                     {
-                        var bag = new Dictionary<string, PatterValue>();
+                        var bag = new Dictionary<string, ExprValue>();
                         foreach (var p in scope.Value.EnumerateObject()) bag[p.Name] = ToValue(p.Value);
                         ctx.Scopes[scope.Name] = new BagScope(bag);
                     }
@@ -599,7 +604,7 @@ namespace Patterkit.Patterplay.TestHost
                     // about most of the language. Needed for the expr parity corpus,
                     // which is mostly made of them.
                     bool expectError = c.TryGetProperty("expectError", out _);
-                    PatterValue actual = default;
+                    ExprValue actual = default;
                     string error = null;
                     try { actual = Expr.Evaluate(node, ctx, PatterDialect.Instance); }
                     catch (Exception ex) { error = ex.Message; }
@@ -639,7 +644,7 @@ namespace Patterkit.Patterplay.TestHost
                     var ctx = new EvalContext();
                     foreach (var scope in c.GetProperty("scopes").EnumerateObject())
                     {
-                        var bag = new Dictionary<string, PatterValue>();
+                        var bag = new Dictionary<string, ExprValue>();
                         foreach (var p in scope.Value.EnumerateObject()) bag[p.Name] = ToValue(p.Value);
                         ctx.Scopes[scope.Name] = new BagScope(bag);
                     }
@@ -1019,14 +1024,14 @@ namespace Patterkit.Patterplay.TestHost
             return o;
         }
 
-        private static object ValueToObject(PatterValue v)
+        private static object ValueToObject(ExprValue v)
         {
             switch (v.Kind)
             {
-                case PatterKind.Bool: return v.AsBool;
-                case PatterKind.Number: return v.AsNumber;
-                case PatterKind.Str: return v.AsString;
-                case PatterKind.Flags: return v.AsFlags.ToList();
+                case ExprKind.Bool: return v.AsBool;
+                case ExprKind.Number: return v.AsNumber;
+                case ExprKind.Str: return v.AsString;
+                case ExprKind.Flags: return v.AsFlags.ToList();
                 default: return null;
             }
         }
@@ -1087,22 +1092,22 @@ namespace Patterkit.Patterplay.TestHost
                     return "[" + string.Join(",", l.Select(Dump)) + "]";
                 case string s: return $"\"{s}\"";
                 case bool b: return b ? "true" : "false";
-                case double n: return PatterValue.JsNumber(n);
+                case double n: return ExprValue.JsNumber(n);
                 default: return "null";
             }
         }
 
         // -- JSON -> model ------------------------------------------------------
 
-        private static PatterValue ToValue(JsonElement e)
+        private static ExprValue ToValue(JsonElement e)
         {
             switch (e.ValueKind)
             {
-                case JsonValueKind.True: return PatterValue.True;
-                case JsonValueKind.False: return PatterValue.False;
-                case JsonValueKind.Number: return PatterValue.Num(e.GetDouble());
-                case JsonValueKind.String: return PatterValue.Str(e.GetString());
-                case JsonValueKind.Array: return PatterValue.Flags(e.EnumerateArray().Select(x => x.GetString()).ToList());
+                case JsonValueKind.True: return ExprValue.True;
+                case JsonValueKind.False: return ExprValue.False;
+                case JsonValueKind.Number: return ExprValue.Num(e.GetDouble());
+                case JsonValueKind.String: return ExprValue.Str(e.GetString());
+                case JsonValueKind.Array: return ExprValue.Flags(e.EnumerateArray().Select(x => x.GetString()).ToList());
                 default: throw new Exception($"unsupported value kind: {e.ValueKind}");
             }
         }

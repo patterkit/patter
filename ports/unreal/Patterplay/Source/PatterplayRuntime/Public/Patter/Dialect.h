@@ -20,8 +20,7 @@
 #include <string>
 #include <vector>
 
-#include "Patter/Expr/Expr.h"
-#include "Patter/PatterValue.h"
+#include "Patter/Kernel.h"   // the shared evaluator this configures, and EvalError
 
 namespace patter
 {

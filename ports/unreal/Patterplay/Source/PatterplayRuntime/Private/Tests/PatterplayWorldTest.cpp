@@ -19,7 +19,7 @@
 #include "PatterEngine.h"
 #include "PatterSave.h"
 #include "PatterWorld.h"
-#include "Patter/Expr/ScopeRegistry.h"
+#include "Patter/Kernel.h"   // patter::ScopeRegistry, the shared kernel's
 
 namespace
 {
