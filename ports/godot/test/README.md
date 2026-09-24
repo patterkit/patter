@@ -23,7 +23,10 @@ Headless checks for the Godot addon. **Not part of the shipped addon zip** (only
   ```
 
   Prints per-section counts then `ALL PASS` (exit 0) or `N FAILED` (exit 1). The
-  `play-godot-v*` release pipeline runs this gate before packaging.
+  `play-godot-v*` release pipeline runs this gate before packaging. It also runs the two corpora
+  vendored from `../expr` beside `corpus.json`: `expr-corpus.json` (the evaluator's) and
+  `registry-corpus.json` (the ScopeRegistry's, through the shared runner `registry_corpus.gd`,
+  vendored here too, printing `registry corpus: N/N`; a missing file is a failure).
 
 - `tour_check.gd` - a smoke check that the bundled tour demo loads and steps:
 

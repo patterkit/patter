@@ -94,6 +94,13 @@ static func _copy_value(v) -> Variant:
 	return (v as Array).duplicate() if v is Array else v
 
 
+## A name as this bag keys it: its normalisation policy applied. The registry keys
+## quality ladders the bag's own way with it, so a case-significant (identity) bag is
+## not folded to lower case one layer up.
+func normalise(name: String) -> String:
+	return _normalise.call(name)
+
+
 ## Read a property's value, or null when undeclared and never written.
 ## (Named get_value / set_value because Object already owns get / set.)
 func get_value(name: String) -> Variant:

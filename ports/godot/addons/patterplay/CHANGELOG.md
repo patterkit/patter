@@ -6,6 +6,10 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`PatterScopeRegistry`, the shared scope registry** (2026-09-24). A thin shim over `runtime/expr/scope_registry.gd`, vendored from expr and shared with the Storylet Engine: one registry per game, holding owned scopes (property bags it reads, writes, lists, and saves) and foreign ones (resolved by the game), and building the eval context the shared evaluator reads. It matches `@wildwinter/scoperegistry` 0.7.0 and runs that package's registry corpus: owners named in clash errors and carried on `list_properties()` rows, `remove(token, {"keep": true})`, values loaded for a key nobody has registered parked until it registers, `discard_parked(prefix)`, a `revision` counter, and aliases on `to_eval_context`. A refused call returns its error String ("" on success). The engine does not use it yet: nothing about how Patterplay plays or saves changes.
+
 ## [0.13.0] - 2026-09-05
 
 ### Changed

@@ -140,6 +140,19 @@ jobs:
             exit 1
           fi
           echo "vendored expr corpus is current"
+      # The registry corpus is the contract every native copy of the ScopeRegistry runs,
+      # authored beside the TypeScript package in ../expr and vendored here the same way.
+      - name: The vendored registry corpus matches the authored one
+        run: |
+          if ! diff -q expr/packages/scoperegistry/corpus.json \
+                       patter/packages/conformance/registry-corpus.json; then
+            echo "::error::The vendored registry corpus is out of date."
+            echo "Run 'node scripts/sync-conformance.mjs' in ../expr and commit the result here."
+            diff -u expr/packages/scoperegistry/corpus.json \
+                    patter/packages/conformance/registry-corpus.json | head -40
+            exit 1
+          fi
+          echo "vendored registry corpus is current"
       # The evaluator itself is now ONE implementation, authored in expr/ports and
       # vendored into this addon. A hand edit to the vendored copy is how six
       # transliterations of the same 200 lines started; this is what stops a

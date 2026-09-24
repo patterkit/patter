@@ -19,6 +19,7 @@
 #include "Patter/StateLogger.h"
 #include "Patter/Engine.h"
 #include "Patter/Mulberry32.h"
+#include "RegistryCorpus.h"   // the shared registry corpus runner, vendored from ../expr
 
 using namespace patter;
 
@@ -1045,64 +1046,6 @@ static double exprSeed(const JsonValue& v)
     return v.num;
 }
 
-static bool jsonHas(const JsonValue& obj, const std::string& key) { return obj.has(key); }
-
-// The scope kernel's `writable` rule: decl.writable ?? scope.writable ?? true.
-//
-// This port has no ScopeRegistry - Patterplay mounts its host scopes by hand - so a
-// case with a "scope" is run by FOLDING the scope default into each declaration that
-// says nothing of its own, then seeding the bag. The fold is the rule, written down
-// once; what these cases pin here is the shared PropertyBag, which is the code that
-// actually refuses. The value is read back on BOTH outcomes.
-static int runExprRegistry(const JsonValue& arr)
-{
-    int pass = 0;
-    for (const auto& c : arr.arr)
-    {
-        std::string name = c.at("name").str;
-        std::optional<bool> scopeWritable;
-        if (jsonHas(c, "scope") && jsonHas(c.at("scope"), "writable")) scopeWritable = c.at("scope").at("writable").b;
-        std::vector<ScopeDeclaration> decls;
-        for (const auto& d : c.at("declarations").arr)
-        {
-            ScopeDeclaration decl;
-            decl.name = d.at("name").str;
-            decl.type = d.at("type").str;
-            decl.defaultValue = toValue(d.at("default"));
-            if (jsonHas(d, "writable")) decl.writable = d.at("writable").b;
-            else decl.writable = scopeWritable;
-            decls.push_back(std::move(decl));
-        }
-        const std::string setName = c.at("set").at("name").str;
-        const PatterValue value = toValue(c.at("set").at("value"));
-        const bool expectError = c.has("expectError") && c.at("expectError").b;
-        const PatterValue expected = toValue(c.at("expected"));
-
-        PropertyBag bag(&decls);
-        std::optional<std::string> error;
-        // `host: true` makes the write as the HOST, whom `writable: false` never bound: it is the
-        // STORY's promise (expr corpus, 2026-09-05).
-        const bool asHost = c.has("host") && c.at("host").b;
-        try { bag.set(setName, value, false, "", asHost); } catch (const std::exception& ex) { error = ex.what(); }
-        std::optional<PatterValue> readBack = bag.get(setName);
-
-        bool ok = true;
-        if (expectError)
-        {
-            if (!error) { fail("expr/registry", name, "expected a read-only refusal, the write landed"); ok = false; }
-            else if (error->find("is read-only") == std::string::npos) { fail("expr/registry", name, "refused, but not as read-only: " + *error); ok = false; }
-        }
-        else if (error) { fail("expr/registry", name, "unexpected refusal: " + *error); ok = false; }
-        if (!readBack || !readBack->valueEquals(expected))
-        {
-            fail("expr/registry", name, "read back " + (readBack ? readBack->toJsonString() : std::string("<unset>")) + ", expected " + expected.toJsonString());
-            ok = false;
-        }
-        if (ok) ++pass;
-    }
-    return pass;
-}
-
 static int runExprPrng(const JsonValue& arr)
 {
     int pass = 0;
@@ -1199,15 +1142,22 @@ int main(int argc, char** argv)
         const JsonValue& xexpr = exprRoot.at("expressions");
         int xp = runExprPrng(xprng);
         int xe = runExpressions(xexpr);
-        // A family the corpus carries and this harness does not run is a check
-        // that cannot fail here, so a missing key is a failure, not a skip.
-        if (!jsonHas(exprRoot, "registry")) { std::cerr << "expr parity corpus has no registry family\n"; return 2; }
-        const JsonValue& xreg = exprRoot.at("registry");
-        int xr = runExprRegistry(xreg);
         std::cout << "expr corpus v" << static_cast<int>(exprRoot.at("version").num)
             << " - prng: " << xp << "/" << xprng.arr.size()
-            << "  expressions: " << xe << "/" << xexpr.arr.size()
-            << "  registry: " << xr << "/" << xreg.arr.size() << "\n";
+            << "  expressions: " << xe << "/" << xexpr.arr.size() << "\n";
+    }
+
+    // The registry corpus, vendored from ../expr beside the other two, run through the
+    // shared runner against the vendored ScopeRegistry. It is the registry's contract,
+    // the `writable` rule included. Absent is a failure here too: the runner reports a
+    // missing file as one.
+    {
+        const size_t slash = path.find_last_of("/\\");
+        const std::string registryPath =
+            (slash == std::string::npos ? std::string() : path.substr(0, slash + 1)) + "registry-corpus.json";
+        const RegistryCorpusResult reg = RunRegistryCorpus(registryPath);
+        for (const std::string& f : reg.failures) fail("registry", "corpus", f);
+        std::cout << "registry corpus: " << reg.passed << "/" << reg.total << "\n";
     }
     std::cout << (g_fails == 0 ? "ALL PASS" : (std::to_string(g_fails) + " FAILED")) << "\n";
     return g_fails == 0 ? 0 : 1;

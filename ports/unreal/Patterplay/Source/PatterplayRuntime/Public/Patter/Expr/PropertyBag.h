@@ -136,6 +136,11 @@ namespace patter
         /** The address prefix this bag composes its rows' paths from, separator included. */
         const std::string& pathPrefix() const { return pathPrefix_; }
 
+        /** A name as this bag keys it: its normalisation policy applied. The registry
+         *  keys quality ladders the bag's own way with it, so a case-significant
+         *  (identity) bag is not folded to lower case one layer up. */
+        std::string normalise(const std::string& name) const { return norm_(name); }
+
         std::optional<PatterValue> get(const std::string& name) const
         {
             const PatterValue* v = values_.get(norm_(name));

@@ -1,0 +1,2289 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "an owned scope seeds each property from its default, else its type's",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            },
+            {
+              "name": "met",
+              "type": "boolean"
+            },
+            {
+              "name": "title",
+              "type": "string"
+            },
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ]
+            },
+            {
+              "name": "marks",
+              "type": "flags"
+            },
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend",
+                "kin"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 10
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "met",
+          "expect": false
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "title",
+          "expect": ""
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "mood",
+          "expect": "calm"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "marks",
+          "expect": []
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "standing",
+          "expect": "stranger"
+        }
+      ]
+    },
+    {
+      "name": "an owned write lands and reads back",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 3
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 3
+        }
+      ]
+    },
+    {
+      "name": "a write to an undeclared name lands as a stray, saved but not listed",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "extra",
+          "value": "x"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "extra",
+          "expect": "x"
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 10,
+              "extra": "x"
+            }
+          }
+        },
+        {
+          "op": "rows",
+          "expect": [
+            {
+              "scope": "game",
+              "name": "hp",
+              "path": "game.hp",
+              "value": 10,
+              "writable": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a scope nobody registered reads as unset and refuses a write",
+      "steps": [
+        {
+          "op": "get",
+          "scope": "nowhere",
+          "name": "x",
+          "expectUnset": true
+        },
+        {
+          "op": "set",
+          "scope": "nowhere",
+          "name": "x",
+          "value": 1,
+          "expectError": "unknown scope"
+        },
+        {
+          "op": "has",
+          "token": "nowhere",
+          "expect": false
+        }
+      ]
+    },
+    {
+      "name": "a foreign scope reads through its resolver",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "gold",
+          "expect": 7
+        }
+      ]
+    },
+    {
+      "name": "a foreign write reaches the resolver",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "gold",
+          "value": 9
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "gold": 9
+          }
+        }
+      ]
+    },
+    {
+      "name": "a foreign scope with no setter refuses every writer, the host included",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "settable": false,
+          "store": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "gold",
+          "value": 9,
+          "expectError": "is read-only"
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "gold",
+          "value": 9,
+          "host": true,
+          "expectError": "is read-only"
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "gold": 7
+          }
+        }
+      ]
+    },
+    {
+      "name": "a foreign scope is never saved",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 10
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a load ignores a section for a foreign scope, and parks nothing for it",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "world": {
+              "gold": 1
+            }
+          }
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "save",
+          "expect": {}
+        }
+      ]
+    },
+    {
+      "name": "a read-only declaration refuses a write",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": false
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 9,
+          "expectError": "is read-only"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 3
+        }
+      ]
+    },
+    {
+      "name": "a declaration with no flag takes the write",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 9
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 9
+        }
+      ]
+    },
+    {
+      "name": "a declaration marked writable takes the write",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": true
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 9
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 9
+        }
+      ]
+    },
+    {
+      "name": "a refused write leaves a flags value exactly as seeded",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "marks",
+              "type": "flags",
+              "default": [
+                "a"
+              ],
+              "writable": false
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "marks",
+          "value": [
+            "a",
+            "b"
+          ],
+          "expectError": "is read-only"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "marks",
+          "expect": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a read-only declaration takes a HOST write",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": false
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 9,
+          "host": true
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 9
+        }
+      ]
+    },
+    {
+      "name": "a read-only declaration in a read-only scope takes a HOST write",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "writable": false,
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": false
+            }
+          ],
+          "store": {
+            "hp": 3
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9,
+          "host": true
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "hp": 9
+          }
+        }
+      ]
+    },
+    {
+      "name": "a host write to a writable declaration is an ordinary write",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 9,
+          "host": true
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 9
+        }
+      ]
+    },
+    {
+      "name": "a refusal on one declaration does not touch its neighbour",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": false
+            },
+            {
+              "name": "mood",
+              "type": "string",
+              "default": "calm"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 9,
+          "expectError": "is read-only"
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "mood",
+          "value": "tense"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "mood",
+          "expect": "tense"
+        }
+      ]
+    },
+    {
+      "name": "a read-only scope default covers a declaration that says nothing",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "writable": false,
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3
+            }
+          ],
+          "store": {
+            "hp": 3
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9,
+          "expectError": "is read-only"
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "hp": 3
+          }
+        }
+      ]
+    },
+    {
+      "name": "a declaration's own flag overrides a read-only scope default",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "writable": false,
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": true
+            }
+          ],
+          "store": {
+            "hp": 3
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "hp": 9
+          }
+        }
+      ]
+    },
+    {
+      "name": "a declaration's own flag overrides a writable scope default",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "writable": true,
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3,
+              "writable": false
+            }
+          ],
+          "store": {
+            "hp": 3
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9,
+          "expectError": "is read-only"
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "hp": 3
+          }
+        }
+      ]
+    },
+    {
+      "name": "a scope that says nothing is writable",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 3
+            }
+          ],
+          "store": {
+            "hp": 3
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "hp": 9
+          }
+        }
+      ]
+    },
+    {
+      "name": "names fold to lower case by default",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "Gold",
+              "type": "number",
+              "default": 5
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "GOLD",
+          "expect": 5
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "gOlD",
+          "value": 6
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "gold",
+          "expect": 6
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "gold": 6
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an identity scope keeps names as written",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "normalise": "identity",
+          "declarations": [
+            {
+              "name": "Gold",
+              "type": "number",
+              "default": 5
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "Gold",
+          "expect": 5
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "gold",
+          "expectUnset": true
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "Gold": 5
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a foreign scope passes lower-cased names to its resolver by default",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 3
+          }
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "GOLD",
+          "expect": 3
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "Gold",
+          "value": 4
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "gold": 4
+          }
+        }
+      ]
+    },
+    {
+      "name": "an identity foreign scope passes names to its resolver as written",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "normalise": "identity",
+          "store": {
+            "Gold": 3
+          }
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "Gold",
+          "expect": 3
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "gold",
+          "expectUnset": true
+        }
+      ]
+    },
+    {
+      "name": "a save is each owned scope's values, keyed by token",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "a",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "owned",
+          "token": "b",
+          "declarations": [
+            {
+              "name": "marks",
+              "type": "flags",
+              "default": [
+                "p",
+                "q"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "save",
+          "expect": {
+            "a": {
+              "x": 1
+            },
+            "b": {
+              "marks": [
+                "p",
+                "q"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a load lays saved values over the current ones",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 3
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 7
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 7
+        }
+      ]
+    },
+    {
+      "name": "a property the save predates keeps its default",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            },
+            {
+              "name": "mp",
+              "type": "number",
+              "default": 4
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 7
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 7
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "mp",
+          "expect": 4
+        }
+      ]
+    },
+    {
+      "name": "a property the content has since dropped comes back as a stray, and is saved again",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 7,
+              "gone": 2
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "gone",
+          "expect": 2
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 7,
+              "gone": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a section for a key nobody has registered is parked and kept in the next save",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "e/1/here/inn": {
+              "seen": true
+            }
+          }
+        },
+        {
+          "op": "has",
+          "token": "e/1/here/inn",
+          "expect": false
+        },
+        {
+          "op": "save",
+          "expect": {
+            "e/1/here/inn": {
+              "seen": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "registering the key claims its parked values over the seeded defaults",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "e/1/here/inn": {
+              "x": 5
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 0
+            },
+            {
+              "name": "y",
+              "type": "number",
+              "default": 2
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "e/1/here/inn",
+          "name": "x",
+          "expect": 5
+        },
+        {
+          "op": "get",
+          "scope": "e/1/here/inn",
+          "name": "y",
+          "expect": 2
+        },
+        {
+          "op": "save",
+          "expect": {
+            "e/1/here/inn": {
+              "x": 5,
+              "y": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "defineOwned claims parked values too",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 3
+            }
+          }
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 3
+        }
+      ]
+    },
+    {
+      "name": "a claimed value is not parked twice",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 3
+            }
+          }
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "remove",
+          "token": "game"
+        },
+        {
+          "op": "save",
+          "expect": {}
+        }
+      ]
+    },
+    {
+      "name": "discardParked drops what nobody claimed, and nothing else",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 4
+            },
+            "later": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "op": "discardParked"
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a load replaces whatever an earlier load parked",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "a": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "b": {
+              "y": 2
+            }
+          }
+        },
+        {
+          "op": "save",
+          "expect": {
+            "b": {
+              "y": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a load that keeps what is parked adds to it, and replaces a section for the same key",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "a": {
+              "x": 1
+            },
+            "b": {
+              "y": 1
+            }
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "b": {
+              "y": 2
+            },
+            "c": {
+              "z": 3
+            }
+          },
+          "keepParked": true
+        },
+        {
+          "op": "save",
+          "expect": {
+            "a": {
+              "x": 1
+            },
+            "b": {
+              "y": 2
+            },
+            "c": {
+              "z": 3
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a load that keeps what is parked still lays values over a registered scope",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "blob": {
+            "a": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 6
+            }
+          },
+          "keepParked": true
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 6
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 6
+            },
+            "a": {
+              "x": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "discardParked with a prefix drops only the keys that start with it",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "e/1/here/inn": {
+              "x": 1
+            },
+            "e/2/here/inn": {
+              "x": 2
+            },
+            "f/1/here/inn": {
+              "x": 3
+            },
+            "e": {
+              "x": 4
+            }
+          }
+        },
+        {
+          "op": "discardParked",
+          "prefix": "e/1/"
+        },
+        {
+          "op": "save",
+          "expect": {
+            "e/2/here/inn": {
+              "x": 2
+            },
+            "f/1/here/inn": {
+              "x": 3
+            },
+            "e": {
+              "x": 4
+            }
+          }
+        },
+        {
+          "op": "discardParked",
+          "prefix": "e/"
+        },
+        {
+          "op": "save",
+          "expect": {
+            "f/1/here/inn": {
+              "x": 3
+            },
+            "e": {
+              "x": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the revision moves on each registration and removal, and on nothing else",
+      "steps": [
+        {
+          "op": "revision",
+          "expect": 0
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "revision",
+          "expect": 1
+        },
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 1
+          }
+        },
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 0
+            }
+          ]
+        },
+        {
+          "op": "revision",
+          "expect": 3
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 4
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "hp": 5
+            },
+            "later": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 5
+            },
+            "e/1/here/inn": {
+              "x": 0
+            },
+            "later": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "op": "discardParked"
+        },
+        {
+          "op": "revision",
+          "expect": 3
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ],
+          "expectError": "is already registered"
+        },
+        {
+          "op": "revision",
+          "expect": 3
+        },
+        {
+          "op": "remove",
+          "token": "e/1/here/inn",
+          "keep": true
+        },
+        {
+          "op": "revision",
+          "expect": 4
+        },
+        {
+          "op": "remove",
+          "token": "nowhere",
+          "expectError": "unknown scope"
+        },
+        {
+          "op": "revision",
+          "expect": 4
+        }
+      ]
+    },
+    {
+      "name": "remove unregisters a scope",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "remove",
+          "token": "game"
+        },
+        {
+          "op": "has",
+          "token": "game",
+          "expect": false
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expectUnset": true
+        },
+        {
+          "op": "save",
+          "expect": {}
+        }
+      ]
+    },
+    {
+      "name": "remove with keep parks the values for the next registration of the key",
+      "steps": [
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 0
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "e/1/here/inn",
+          "name": "x",
+          "value": 4
+        },
+        {
+          "op": "remove",
+          "token": "e/1/here/inn",
+          "keep": true
+        },
+        {
+          "op": "save",
+          "expect": {
+            "e/1/here/inn": {
+              "x": 4
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 0
+            },
+            {
+              "name": "y",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "e/1/here/inn",
+          "name": "x",
+          "expect": 4
+        },
+        {
+          "op": "get",
+          "scope": "e/1/here/inn",
+          "name": "y",
+          "expect": 1
+        }
+      ]
+    },
+    {
+      "name": "remove without keep forgets the values",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "hp",
+          "value": 4
+        },
+        {
+          "op": "remove",
+          "token": "game"
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 10
+        }
+      ]
+    },
+    {
+      "name": "removing a key nobody registered is an error",
+      "steps": [
+        {
+          "op": "remove",
+          "token": "nowhere",
+          "expectError": "unknown scope"
+        }
+      ]
+    },
+    {
+      "name": "remove with keep on a foreign scope keeps nothing: its values were never the registry's",
+      "steps": [
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "gold": 7
+          }
+        },
+        {
+          "op": "remove",
+          "token": "world",
+          "keep": true
+        },
+        {
+          "op": "save",
+          "expect": {}
+        },
+        {
+          "op": "store",
+          "scope": "world",
+          "expect": {
+            "gold": 7
+          }
+        }
+      ]
+    },
+    {
+      "name": "an alias makes a token read a registered key",
+      "steps": [
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "seen",
+              "type": "boolean",
+              "default": true
+            }
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.seen",
+          "aliases": {
+            "here": "e/1/here/inn"
+          },
+          "expect": true,
+          "ast": [
+            "sv",
+            "here",
+            "seen"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "without an alias the token is absent, and reads as false",
+      "steps": [
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "seen",
+              "type": "boolean",
+              "default": true
+            }
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.seen",
+          "expect": false,
+          "ast": [
+            "sv",
+            "here",
+            "seen"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "two instances, one token: the alias picks which",
+      "steps": [
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "noise",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "mount",
+          "token": "e/1/here/forge",
+          "declarations": [
+            {
+              "name": "noise",
+              "type": "number",
+              "default": 5
+            }
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.noise > 3",
+          "aliases": {
+            "here": "e/1/here/forge"
+          },
+          "expect": true,
+          "ast": [
+            "bin",
+            ">",
+            [
+              "sv",
+              "here",
+              "noise"
+            ],
+            [
+              "n",
+              3
+            ]
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.noise > 3",
+          "aliases": {
+            "here": "e/1/here/inn"
+          },
+          "expect": false,
+          "ast": [
+            "bin",
+            ">",
+            [
+              "sv",
+              "here",
+              "noise"
+            ],
+            [
+              "n",
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an alias carries the key's quality ladder",
+      "steps": [
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend",
+                "kin"
+              ],
+              "default": "friend"
+            }
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.standing > \"stranger\"",
+          "aliases": {
+            "here": "e/1/here/inn"
+          },
+          "expect": true,
+          "ast": [
+            "bin",
+            ">",
+            [
+              "sv",
+              "here",
+              "standing"
+            ],
+            [
+              "s",
+              "stranger"
+            ]
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.standing > \"friend\"",
+          "aliases": {
+            "here": "e/1/here/inn"
+          },
+          "expect": false,
+          "ast": [
+            "bin",
+            ">",
+            [
+              "sv",
+              "here",
+              "standing"
+            ],
+            [
+              "s",
+              "friend"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an alias shadows a registered key of the same name",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "declarations": [
+            {
+              "name": "x",
+              "type": "number",
+              "default": 2
+            }
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.x == 2",
+          "aliases": {
+            "here": "e/1/here/inn"
+          },
+          "expect": true,
+          "ast": [
+            "bin",
+            "==",
+            [
+              "sv",
+              "here",
+              "x"
+            ],
+            [
+              "n",
+              2
+            ]
+          ]
+        },
+        {
+          "op": "eval",
+          "src": "@here.x == 1",
+          "expect": true,
+          "ast": [
+            "bin",
+            "==",
+            [
+              "sv",
+              "here",
+              "x"
+            ],
+            [
+              "n",
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an alias to a key nobody registered is an error, not a quiet false",
+      "steps": [
+        {
+          "op": "eval",
+          "src": "@here.seen",
+          "aliases": {
+            "here": "e/1/here/nowhere"
+          },
+          "expectError": "is not registered",
+          "ast": [
+            "sv",
+            "here",
+            "seen"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "every scope is readable from any expression",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "a",
+          "declarations": [
+            {
+              "name": "gold",
+              "type": "number",
+              "default": 5
+            }
+          ]
+        },
+        {
+          "op": "owned",
+          "token": "b",
+          "declarations": [
+            {
+              "name": "act",
+              "type": "number",
+              "default": 2
+            }
+          ]
+        },
+        {
+          "op": "foreign",
+          "token": "world",
+          "store": {
+            "night": true
+          }
+        },
+        {
+          "op": "eval",
+          "src": "@a.gold > 4 and @b.act == 2 and @world.night",
+          "expect": true,
+          "ast": [
+            "bin",
+            "and",
+            [
+              "bin",
+              "and",
+              [
+                "bin",
+                ">",
+                [
+                  "sv",
+                  "a",
+                  "gold"
+                ],
+                [
+                  "n",
+                  4
+                ]
+              ],
+              [
+                "bin",
+                "==",
+                [
+                  "sv",
+                  "b",
+                  "act"
+                ],
+                [
+                  "n",
+                  2
+                ]
+              ]
+            ],
+            [
+              "sv",
+              "world",
+              "night"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a token is taken once",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": []
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [],
+          "expectError": "is already registered"
+        }
+      ]
+    },
+    {
+      "name": "owned and foreign scopes share one namespace",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "world",
+          "declarations": []
+        },
+        {
+          "op": "foreign",
+          "token": "world",
+          "expectError": "is already registered"
+        }
+      ]
+    },
+    {
+      "name": "a clash names the owner that got there first",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [],
+          "owner": "Engine A"
+        },
+        {
+          "op": "mount",
+          "token": "game",
+          "declarations": [],
+          "owner": "Engine B",
+          "expectError": "already registered by Engine A"
+        }
+      ]
+    },
+    {
+      "name": "a key is free again once removed",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": []
+        },
+        {
+          "op": "remove",
+          "token": "game"
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "has",
+          "token": "game",
+          "expect": true
+        }
+      ]
+    },
+    {
+      "name": "examiner rows carry the owner, and a scope registered without one carries none",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "a",
+          "declarations": [
+            {
+              "name": "gold",
+              "type": "number",
+              "default": 5
+            }
+          ],
+          "owner": "Engine A"
+        },
+        {
+          "op": "foreign",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "night",
+              "type": "boolean",
+              "writable": false
+            }
+          ],
+          "store": {
+            "night": true
+          },
+          "owner": "Game"
+        },
+        {
+          "op": "owned",
+          "token": "b",
+          "declarations": [
+            {
+              "name": "act",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "rows",
+          "expect": [
+            {
+              "scope": "a",
+              "owner": "Engine A",
+              "name": "gold",
+              "path": "a.gold",
+              "value": 5,
+              "writable": true
+            },
+            {
+              "scope": "world",
+              "owner": "Game",
+              "name": "night",
+              "path": "world.night",
+              "value": true,
+              "writable": false
+            },
+            {
+              "scope": "b",
+              "name": "act",
+              "path": "b.act",
+              "value": 1,
+              "writable": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a mounted bag's rows use the prefix its holder gave it",
+      "steps": [
+        {
+          "op": "mount",
+          "token": "e/1/here/inn",
+          "pathPrefix": "@here.",
+          "declarations": [
+            {
+              "name": "noise",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "rows",
+          "expect": [
+            {
+              "scope": "e/1/here/inn",
+              "name": "noise",
+              "path": "@here.noise",
+              "value": 1,
+              "writable": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a spec is read from its well-known key",
+      "steps": [
+        {
+          "op": "spec",
+          "source": {
+            "scopeRegistrySpec": {
+              "version": 1,
+              "scopes": [
+                {
+                  "token": "world",
+                  "declarations": [
+                    {
+                      "name": "gold",
+                      "type": "number",
+                      "default": 0
+                    }
+                  ]
+                },
+                {
+                  "token": "game"
+                }
+              ]
+            }
+          },
+          "expect": {
+            "version": 1,
+            "tokens": [
+              "world",
+              "game"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a document without the key has no spec",
+      "steps": [
+        {
+          "op": "spec",
+          "source": {
+            "other": 1
+          },
+          "expectAbsent": true
+        }
+      ]
+    },
+    {
+      "name": "an unsupported spec version is refused",
+      "steps": [
+        {
+          "op": "spec",
+          "source": {
+            "scopeRegistrySpec": {
+              "version": 2,
+              "scopes": []
+            }
+          },
+          "expectError": "unsupported scopeRegistrySpec version"
+        }
+      ]
+    },
+    {
+      "name": "a spec scope without a string token is refused",
+      "steps": [
+        {
+          "op": "spec",
+          "source": {
+            "scopeRegistrySpec": {
+              "version": 1,
+              "scopes": [
+                {
+                  "declarations": []
+                }
+              ]
+            }
+          },
+          "expectError": "needs a string token"
+        }
+      ]
+    },
+    {
+      "name": "a spec whose scopes are not a list is refused",
+      "steps": [
+        {
+          "op": "spec",
+          "source": {
+            "scopeRegistrySpec": {
+              "version": 1,
+              "scopes": {}
+            }
+          },
+          "expectError": "must be an array"
+        }
+      ]
+    }
+  ]
+}

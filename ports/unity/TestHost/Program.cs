@@ -101,17 +101,16 @@ namespace Patterkit.Patterplay.TestHost
             var xexpr = exprRoot.GetProperty("expressions");
             int xp = RunExprPrng(xprng);
             int xe = RunExpressions(xexpr);
-            // A family the corpus carries and this harness does not run is a check
-            // that cannot fail here, so a missing key is a failure, not a skip.
-            if (!exprRoot.TryGetProperty("registry", out var xreg))
-            {
-                Console.Error.WriteLine("expr parity corpus has no registry family");
-                return 2;
-            }
-            int xr = RunExprRegistry(xreg);
             Console.WriteLine($"expr corpus v{exprRoot.GetProperty("version").GetInt32()}"
-                + $" - prng: {xp}/{xprng.GetArrayLength()}  expressions: {xe}/{xexpr.GetArrayLength()}"
-                + $"  registry: {xr}/{xreg.GetArrayLength()}");
+                + $" - prng: {xp}/{xprng.GetArrayLength()}  expressions: {xe}/{xexpr.GetArrayLength()}");
+
+            // The registry corpus (packages/scoperegistry/corpus.json in ../expr) sits beside
+            // it too, and runs through the vendored shared ScopeRegistry. It is the registry's
+            // contract, the `writable` rule included. Absent is a failure here as well:
+            // RegistryCorpus.Run reports a missing file as one.
+            var registry = RegistryCorpus.Run(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".", "registry-corpus.json"));
+            foreach (var f in registry.Failures) { _fails++; Console.Error.WriteLine($"  FAIL [registry corpus] {f}"); }
+            Console.WriteLine($"registry corpus: {registry.Passed}/{registry.Total}");
             Console.WriteLine(_fails == 0 ? "ALL PASS" : $"{_fails} FAILED");
             return _fails == 0 ? 0 : 1;
         }
@@ -520,65 +519,6 @@ namespace Patterkit.Patterplay.TestHost
                 case "-Infinity": return double.NegativeInfinity;
                 default: throw new Exception($"unknown seed literal: {v.GetString()}");
             }
-        }
-
-        // The scope kernel's `writable` rule: decl.writable ?? scope.writable ?? true.
-        //
-        // This port has no ScopeRegistry - Patterplay mounts its host scopes by hand - so
-        // a case with a "scope" is run by FOLDING the scope default into each declaration
-        // that says nothing of its own, then seeding the bag. The fold is the rule,
-        // written down once; what these cases pin here is the shared PropertyBag, which
-        // is the code that actually refuses. The value is read back on BOTH outcomes.
-        private static int RunExprRegistry(JsonElement arr)
-        {
-            int pass = 0;
-            foreach (var c in arr.EnumerateArray())
-            {
-                string name = c.GetProperty("name").GetString();
-                bool? scopeWritable = null;
-                if (c.TryGetProperty("scope", out var scope) && scope.TryGetProperty("writable", out var sw))
-                    scopeWritable = sw.GetBoolean();
-                var decls = new List<ScopeDeclaration>();
-                foreach (var d in c.GetProperty("declarations").EnumerateArray())
-                {
-                    bool? writable = d.TryGetProperty("writable", out var w) ? w.GetBoolean() : scopeWritable;
-                    decls.Add(new ScopeDeclaration
-                    {
-                        Name = d.GetProperty("name").GetString(),
-                        Type = d.GetProperty("type").GetString(),
-                        Default = ToValue(d.GetProperty("default")),
-                        Writable = writable,
-                    });
-                }
-                string setName = c.GetProperty("set").GetProperty("name").GetString();
-                var value = ToValue(c.GetProperty("set").GetProperty("value"));
-                bool expectError = c.TryGetProperty("expectError", out var ee) && ee.GetBoolean();
-                var expected = ToValue(c.GetProperty("expected"));
-
-                var bag = new PropertyBag(decls);
-                string error = null;
-                // `host: true` makes the write as the HOST, whom `writable: false` never bound: it is
-                // the STORY's promise (expr corpus, 2026-09-05).
-                bool asHost = c.TryGetProperty("host", out var hv) && hv.GetBoolean();
-                try { bag.Set(setName, value, host: asHost); } catch (Exception ex) { error = ex.Message; }
-                var readBack = bag.Get(setName);
-
-                bool ok = true;
-                if (expectError)
-                {
-                    if (error == null) { Fail("expr/registry", name, "expected a read-only refusal, the write landed"); ok = false; }
-                    else if (!error.Contains("is read-only")) { Fail("expr/registry", name, "refused, but not as read-only: " + error); ok = false; }
-                }
-                else if (error != null) { Fail("expr/registry", name, "unexpected refusal: " + error); ok = false; }
-                bool same = readBack == null ? expected == null : (expected != null && readBack.ValueEquals(expected));
-                if (!same)
-                {
-                    Fail("expr/registry", name, $"read back {(readBack == null ? "<unset>" : readBack.ToJsonString())}, expected {expected.ToJsonString()}");
-                    ok = false;
-                }
-                if (ok) pass++;
-            }
-            return pass;
         }
 
         private static int RunExprPrng(JsonElement arr)

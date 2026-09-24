@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
+    <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />
     <!-- Runtime/Unity/* depends on UnityEngine (PatterBundleAsset); not part of the headless verify. -->
     <Compile Remove="../Patterplay/Runtime/Unity/**/*.cs" />
