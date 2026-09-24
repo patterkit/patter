@@ -68,8 +68,13 @@ length of the run. That's what lets a story using `@world` play standalone, in t
 [playable HTML](/setup/building-and-shipping/#a-playable-html-to-send-anyone) export, or a quick
 test, with no host wiring.
 
-Either way the values never enter Patter's save: your game owns them, and you persist them however you
-already do.
+A self-backed `@world` is a property like any other, so it is saved with the game. Only values your
+game keeps and lends through a resolver stay out of the save, because your game persists those itself.
+
+In a game that runs more than one engine, or that hands Patter a registry of its own, register
+`@world` once in that registry instead, and give no engine a resolver. Register it owned when the
+registry should store and save it, or foreign, with a resolver, when your game keeps the values.
+[One registry per game](/play/integration/#one-registry-per-game) has the pattern.
 
 ## The native ports
 
@@ -80,7 +85,7 @@ none:
 - **Unreal** binds a `UPatterWorld` at `UPatterEngine::Create(Bundle, World)`, covered on the [Unreal](/play/unreal/#your-games-state) page.
 - **Godot** uses the `host_scopes` option, a `get` / `set` pair per token, covered on the [Godot](/play/godot/#your-games-state) page.
 
-The rules are the same everywhere: `@world` is never in a Patter save; a `writable: false`
+The rules are the same everywhere: a bound `@world` is never in a save, a self-backed one is; a `writable: false`
 declaration refuses the STORY's write with the same sentence (`'@world.x' is read-only`), bound or
 self-backed, while the game's own `setProperty` writes it; and a per-name policy your game keeps on
 its own container is the container's to refuse.

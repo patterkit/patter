@@ -45,7 +45,8 @@ payoffs:
 - The editor **checks** `@world.*` references, so a condition against a value your game feeds is
   validated like any other.
 - While the game runs it **supplies** these values; if nothing sets them, the runtime falls back
-  to the defaults you declared (see [Save/load & Game Data](/play/integration/)).
+  to the defaults you declared and saves them with the rest of the run (see
+  [Save/load & Game Data](/play/integration/)).
 
 One thing to know now is that because the game sets `@world` values while it runs, the editor's
 [coverage test](/production/coverage-testing/) can't know them, so a branch gated on

@@ -1,54 +1,50 @@
 // ---------------------------------------------------------------------------
-// Phase D - the combined-game reference harness: a single shared narrative state
-// container across two engines, with one unified save/load blob.
+// The combined-game reference harness: ONE ScopeRegistry for the whole game,
+// and one save.
 //
-// Shape of a real combined game: a storylet engine (flow / draw-play) and a
-// Patter engine (spoken scenes) run side by side and share world state. Here the
-// shared `@world` lives in ONE `ScopeRegistry` instance (the container); both
-// sides read/write it LIVE:
-//   - the "storylet side" owns @world and reads/writes it directly on the registry
-//     (modelled by a small stand-in below; in production this is the storylet
-//     engine's WorldContext, bridged through the same resolver);
-//   - the Patter engine sees @world as a FOREIGN scope, bridged to the shared
-//     registry by a resolver, alongside its own owned shared `@patter` globals.
+// Shape of a real combined game: a storylet engine (draw and play) and a Patter
+// engine (spoken scenes) run side by side and share world state. The game owns
+// the registry and hands it to each engine. Here the "storylet side" is a small
+// stand-in that registers its own game-wide scope (`@story`) the way an engine
+// does; the real Storylet Engine is proven beside Patter in the storylets repo.
 //
-// One unified save blob carries every owner's owned scopes:
-//   { world: <shared>, patter: <Patter shared @patter globals>, ... }
-// Foreign/host state is saved once at its source (the shared container), never
-// duplicated per engine. Restore feeds each section back to its owner and both
-// engines resume against consistent state.
+//   - The game registers `@world` itself, as a property the registry stores.
+//   - Patter registers `@patter` and its per-flow and per-scene bags.
+//   - Every expression reads every scope: Patter gates on `@story.act`.
 //
-// Content-drift policy (scoperegistry `load`): values for known properties are
-// restored; properties added since the save keep their seeded defaults; values
-// for properties that no longer exist are dropped on the floor. So a save taken
-// against an older content version loads forward without error.
+// One save: `{ registry, patter }`. The registry's values are saved once, for
+// every engine; Patter's part holds only what is not a property (cursors,
+// visits, selectors). Loading works in either order, and across content drift
+// (the bag's load rule: known properties restored, new ones keep defaults,
+// vanished ones kept as strays).
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
 import { Engine } from "@patterkit/runtime";
-import type { EngineSave } from "@patterkit/runtime";
+import type { SaveGame } from "@patterkit/runtime";
 import { exportBundle } from "@patterkit/compiler";
 import { ScopeRegistry, readScopeRegistrySpec } from "@wildwinter/scoperegistry";
-import type { ScopeResolver } from "@wildwinter/scoperegistry";
 import type { ProjectFile, Scene, LocaleFile } from "@patterkit/model";
 
-// The storylet's published bundle declares its global scopes; the foreign engine
-// reads them to validate + wire the shared container.
+// The storylet's published bundle declares the scopes Patter may read; Patter compiles against it.
 const storyworldBundle = {
   storyworldVersion: "2.3",
   scopeRegistrySpec: {
     version: 1,
-    scopes: [{ token: "world", declarations: [
-      { name: "gold", type: "number" },
-      { name: "reputation", type: "number" },
-    ] }],
+    scopes: [
+      { token: "world", declarations: [
+        { name: "gold", type: "number" },
+        { name: "reputation", type: "number" },
+      ] },
+      { token: "story", declarations: [{ name: "act", type: "number" }] },
+    ],
   },
 };
 const spec = readScopeRegistrySpec(storyworldBundle)!;
 const worldDecls = spec.scopes.find((s) => s.token === "world")!.declarations!;
 
-// A Patter project: scene reads @world.gold (shared), gates on it, and on exit
-// both spends from @world.gold (shared) and bumps its own @patter.visits (owned).
+// A Patter project: the purchase needs gold AND the second act; on exit it spends shared
+// gold and bumps Patter's own shared `@patter.visits`.
 const project: ProjectFile = {
   schema: "patter/project@0",
   project: { id: "p", name: "P" },
@@ -62,10 +58,10 @@ const scene: Scene = {
     id: "b", type: "block", name: "B",
     children: [{
       id: "buy", type: "snippet",
-      condition: "@world.gold >= 10",
+      condition: "@world.gold >= 10 && @story.act >= 2",
       onExit: [
-        { kind: "set", target: "@world.gold", value: "@world.gold - 10" },     // shared write
-        { kind: "set", target: "@visits", value: "@visits + 1" },              // owned write
+        { kind: "set", target: "@world.gold", value: "@world.gold - 10" },
+        { kind: "set", target: "@visits", value: "@visits + 1" },
       ],
       beats: [{ id: "L", kind: "line", character: "MERCHANT" }],
       jump: { to: "END" },
@@ -75,86 +71,102 @@ const scene: Scene = {
 const en: LocaleFile = { schema: "patter/strings@0", scene: "shop", locale: "en", strings: { L: "A fine blade." } };
 const bundle = exportBundle({ project, scenes: [scene], locales: [en], foreignScopes: spec });
 
-// The shared container + a Patter engine bound to its @world. The container is
-// the single source of truth for cross-engine world state.
+/** The storylet side, as far as this test needs it: an engine that registers its own scope. */
+class StoryStandIn {
+  constructor(readonly registry: ScopeRegistry) {
+    registry.defineOwned("story", [{ name: "act", type: "number", default: 1 }], { normalise: (n) => n, owner: "Storylet Engine" });
+  }
+}
+
+/** The game: one registry, `@world` registered by the game, then each engine. */
 function combinedGame() {
-  const container = new ScopeRegistry().defineOwned("world", worldDecls);
-  const worldResolver: ScopeResolver = {
-    get: (n) => container.get("world", n),
-    set: (n, v) => container.set("world", n, v),
-  };
-  const patter = new Engine(bundle, { world: worldResolver });
-  return { container, patter };
+  const registry = new ScopeRegistry().defineOwned("world", worldDecls, { owner: "Game" });
+  const storylets = new StoryStandIn(registry);
+  const patter = new Engine(bundle, { registry });
+  return { registry, storylets, patter };
 }
 
-// One blob from every owner; foreign @world is saved once, at the container.
-function saveAll(container: ScopeRegistry, patter: Engine): EngineSave {
-  return { ...container.save(), ...patter.save() };
-}
+interface GameSave { registry: ReturnType<ScopeRegistry["save"]>; patter: SaveGame }
+const saveAll = (g: ReturnType<typeof combinedGame>): GameSave =>
+  JSON.parse(JSON.stringify({ registry: g.registry.save(), patter: g.patter.saveGame() }));
 
-describe("Phase D: combined-game shared container + unified save", () => {
-  it("both engines read/write one shared @world live", () => {
-    const { container, patter } = combinedGame();
-    container.set("world", "gold", 25); // the storylet side stocks the world
+describe("combined game: one registry, one save", () => {
+  it("both sides read and write one registry live, and each reads the other's scope", () => {
+    const { registry, patter } = combinedGame();
+    registry.set("world", "gold", 25, { host: true }); // the game stocks the world
+    registry.set("story", "act", 2);                   // the storylet side moves the story on
 
     const flow = patter.openFlow("main", { scene: "shop" });
-    // Patter reads the shared value through the container.
-    expect(patter.getProperty("@world.gold")).toBe(25);
-    // gold(25) >= 10: the gated line plays.
+    expect(patter.getProperty("@story.act")).toBe(2);
     expect(flow.advance()).toMatchObject({ type: "line", id: "L", character: "MERCHANT" });
-    // onExit fires on the next advance: spends shared gold + bumps owned visits.
-    expect(flow.advance()).toEqual({ type: "end" });
+    expect(flow.advance()).toEqual({ type: "end" }); // onExit: spends gold, bumps visits
 
-    // The shared write is visible to the storylet side on the same container.
-    expect(container.get("world", "gold")).toBe(15);
-    expect(patter.getProperty("@world.gold")).toBe(15);
-    // The owned write landed in Patter's own scope, not the shared one.
-    expect(patter.getProperty("@visits")).toBe(1);
+    expect(registry.get("world", "gold")).toBe(15);
+    expect(registry.get("patter", "visits")).toBe(1);
   });
 
-  it("saves all narrative state to one blob and resumes both engines", () => {
-    // --- session 1: play once, then save everything ---
+  it("saves the registry once, with every engine's properties, and Patter's save holds none", () => {
+    const g = combinedGame();
+    g.registry.set("world", "gold", 25, { host: true });
+    g.registry.set("world", "reputation", 3, { host: true });
+    g.registry.set("story", "act", 2);
+    const f = g.patter.openFlow("main", { scene: "shop" });
+    f.advance(); f.advance();
+
+    const save = saveAll(g);
+    expect(save.registry.world).toEqual({ gold: 15, reputation: 3 });
+    expect(save.registry.story).toEqual({ act: 2 });
+    expect(save.registry.patter).toEqual({ visits: 1 });
+    expect(save.patter.registry).toBeUndefined();
+    expect(JSON.stringify(save.patter)).not.toContain("reputation");
+  });
+
+  it("resumes both sides from the one save, loading the registry first or last", () => {
     const g1 = combinedGame();
-    g1.container.set("world", "gold", 25);
-    g1.container.set("world", "reputation", 3);
+    g1.registry.set("world", "gold", 25, { host: true });
+    g1.registry.set("story", "act", 2);
     const f1 = g1.patter.openFlow("main", { scene: "shop" });
-    f1.advance(); // line
-    f1.advance(); // end -> onExit: gold 25->15, visits 0->1
+    f1.advance(); f1.advance();
+    g1.patter.openFlow("main", { scene: "shop" }); // a fresh run at the gate, saved mid-flow
+    const save = saveAll(g1);
 
-    const blob = saveAll(g1.container, g1.patter);
-    // One blob, every owner's owned scopes; no foreign duplication.
-    expect(blob.world).toEqual({ gold: 15, reputation: 3 });
-    expect(blob.patter).toEqual({ visits: 1 });
+    for (const registryFirst of [true, false]) {
+      const g2 = combinedGame();
+      if (registryFirst) g2.registry.load(save.registry);
+      g2.patter.loadGame(save.patter);
+      if (!registryFirst) g2.registry.load(save.registry);
 
-    // --- session 2: fresh engines, restore the blob, resume ---
-    const g2 = combinedGame();
-    g2.container.load(blob);          // storylet side restores @world
-    g2.patter.load(blob);             // restore Patter's owned scopes (@patter)
-    const f2 = g2.patter.openFlow("main", { scene: "shop" }); // resume at the saved position
-
-    // Restored shared + owned state is intact and consistent across both sides.
-    expect(g2.container.get("world", "gold")).toBe(15);
-    expect(g2.patter.getProperty("@world.gold")).toBe(15);
-    expect(g2.patter.getProperty("@visits")).toBe(1);
-
-    // gold(15) >= 10 still holds, so a second purchase proceeds on restored state.
-    expect(f2.advance()).toMatchObject({ type: "line", id: "L" });
-    expect(f2.advance()).toEqual({ type: "end" });
-    expect(g2.container.get("world", "gold")).toBe(5); // 15 - 10
-    expect(g2.patter.getProperty("@visits")).toBe(2);  // 1 + 1
+      expect(g2.patter.getProperty("@world.gold")).toBe(15);
+      expect(g2.patter.getProperty("@story.act")).toBe(2);
+      expect(g2.patter.getProperty("@visits")).toBe(1);
+      // gold(15) >= 10 and act 2: a second purchase proceeds on the restored state.
+      const f2 = g2.patter.getFlow("main")!;
+      expect(f2.advance()).toMatchObject({ type: "line", id: "L" });
+      expect(f2.advance()).toEqual({ type: "end" });
+      expect(g2.registry.get("world", "gold")).toBe(5);
+      expect(g2.registry.get("patter", "visits")).toBe(2);
+    }
   });
 
   it("loads a save forward across content drift (lenient by design)", () => {
-    // A blob from older content: an extra world prop that no longer exists, and
-    // missing the newer `reputation` (which keeps its seeded default).
-    const stale: EngineSave = { world: { gold: 7, retired_flag: 1 }, patter: { visits: 9 } };
-    const { container, patter } = combinedGame();
-    container.load(stale);
-    patter.load(stale); // @patter restore needs no open flow
+    // A registry save from older content: a world property that no longer exists, none of the newer
+    // `reputation`, and a section for an engine this build no longer runs.
+    const stale = { world: { gold: 7, retired_flag: 1 }, patter: { visits: 9 }, story: { act: 3 }, retired_engine: { x: 1 } };
+    const { registry, patter } = combinedGame();
+    registry.load(stale);
 
-    expect(container.get("world", "gold")).toBe(7);           // known -> restored
-    expect(container.get("world", "reputation")).toBe(0);     // newer prop -> default
-    expect(container.get("world", "retired_flag")).toBe(1);   // unknown -> tolerated, not fatal
+    expect(registry.get("world", "gold")).toBe(7);         // known -> restored
+    expect(registry.get("world", "reputation")).toBe(0);   // newer -> default
+    expect(registry.get("world", "retired_flag")).toBe(1); // vanished -> kept as a stray, not fatal
     expect(patter.getProperty("@visits")).toBe(9);
+    expect(registry.save().retired_engine).toEqual({ x: 1 }); // nobody claimed it: kept, until discarded
+    registry.discardParked();
+    expect(registry.save().retired_engine).toBeUndefined();
+  });
+
+  it("a clash between engines fails as the game combines them, naming who holds the token", () => {
+    const registry = new ScopeRegistry();
+    new StoryStandIn(registry);
+    expect(() => new StoryStandIn(registry)).toThrow("scope '@story' is already registered by Storylet Engine");
   });
 });

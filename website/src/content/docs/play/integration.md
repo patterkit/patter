@@ -27,21 +27,18 @@ Save/load differs per engine (see each engine guide's *Save and load*).
 One call snapshots the whole game; one restores it:
 
 ```ts
-const save = engine.saveGame();   // a plain serialisable object (version 2)
+const save = engine.saveGame();   // a plain serialisable object (version 3)
 // ...later...
 engine.loadGame(save);
 ```
 
-The snapshot holds everything needed to resume, meaning shared state, world and per-flow visit
-counts, selector cursors and shuffle bags, each flow's position and call/return stack,
-the PRNG position, and any pending choice (saved as its exact option set and replayed
-verbatim on load, so conditions aren't re-evaluated and the PRNG never double-draws).
-**Locale is not in the save**: it's presentation, not game state. A saved position
+The snapshot holds everything needed to resume: world and per-flow visit counts, selector cursors
+and shuffle bags, each flow's position and call/return stack, the PRNG position, and any pending
+choice (saved as its exact option set and replayed verbatim on load, so conditions aren't
+re-evaluated and the PRNG never double-draws). An engine you built on its own also carries every
+property value, `@patter`, `@scene`, and a self-backed `@world` alike, so one call is still the
+whole game. **Locale is not in the save**: it's presentation, not game state. A saved position
 that points at content you've since deleted resumes best-effort rather than throwing.
-**`@world` is not in it either**: it's your game's state, reached through the resolver you
-bind, so your game saves it. That is also what makes running Patter beside
-[Storylet Studio](https://storylet.studio)'s engine safe. Both exclude `@world` from their own
-saves, your game saves its one world once, and nothing is written twice.
 
 **Every runtime writes and reads the same save format**, `patter/save@0`, so a save crosses
 engines. A game that saves from a web build loads in Godot, and a Patterpad Play-window save loads
@@ -49,6 +46,8 @@ in Unity. The shape is the JS runtime's, documented in `@patterkit/model`, and t
 holds every engine to it by carrying a save the JS runtime wrote that each engine must load, write
 back in the same shape, and continue. Semantically equivalent is the promise, not byte-identical.
 Key order and number formatting can differ between engines, and nothing should compare the text.
+A save written before property values moved into the registry (version 2) still loads on every
+runtime, and its values move into the registry as it does.
 
 The **`@patterkit/play-helpers`** package wraps this for storage:
 
@@ -58,6 +57,43 @@ import { serializeState, deserializeState } from "@patterkit/play-helpers";
 localStorage.setItem("save", serializeState(engine));   // → a JSON string in an envelope
 deserializeState(engine, localStorage.getItem("save"));
 ```
+
+## One registry per game
+
+Every property value lives in a **registry**, a `ScopeRegistry` from
+[`@wildwinter/scoperegistry`](https://www.npmjs.com/package/@wildwinter/scoperegistry). A game has
+one, and it holds every property from every engine in the game, except values your game keeps
+itself and lends through a resolver. The registry is saved and loaded as one.
+
+An engine you build without one makes its own and acts as its own game, which is why the one-call
+save above needs no wiring. A game that runs more than one engine, or that wants to hold the
+properties itself, makes the registry and hands it to each engine:
+
+```ts
+import { ScopeRegistry } from "@wildwinter/scoperegistry";
+
+const registry = new ScopeRegistry()
+  .defineOwned("world", worldDeclarations, { owner: "Game" });   // @world, stored and saved
+const patter = new Engine(bundle, { registry });
+
+// One save for the game: the registry's values once, and each engine's part.
+const save = { registry: registry.save(), patter: patter.saveGame() };
+
+// Load in either order: values for bags that aren't open yet wait in the registry.
+registry.load(save.registry);
+patter.loadGame(save.patter);
+```
+
+Given a registry, the engine registers `@patter` under `patter` and each flow's and scene's bag
+under a key starting `patter/`, which no expression can name. Its `saveGame()` then leaves the
+values out, because your game saves the registry. `@world` is yours to register: owned, as above,
+when the registry should store and save it, or foreign, with a resolver, when your game keeps the
+values. Every expression can read every registered scope, so a condition can test another
+engine's `@story.act` once that engine is in the same registry.
+
+A token is taken once. Two engines that both want the same one fail as you build the second,
+with an error that names who got there first. Rebuilding an engine on an edited bundle
+(`hotSwap`) hands its bags to the replacement on the same registry.
 
 ## Reading Game Data
 

@@ -33,23 +33,23 @@ export type { StateChange, StateSnapshot };
 export type StateValue = ScalarValue;
 
 /** Flatten the engine's whole-game state into a path -> value map (shared scopes + every live
- *  flow), off `saveGame()`. The logger no longer diffs this - it mounts the bags directly - but
- *  it stays as the public "what is the state right now" call, and as the definition of the path
- *  space the mounts compose. */
+ *  flow). The logger does not diff this - it mounts the bags directly - but it stays as the public
+ *  "what is the state right now" call, and it reads the same mounts, so the two agree on the path
+ *  space. A bag loaded into the registry but not yet claimed (a scene no flow has re-entered since
+ *  a load) appears once it is. */
 export function snapshotState(engine: Engine): StateSnapshot {
-  const save = engine.saveGame();
   const out: StateSnapshot = {};
-  for (const [name, v] of Object.entries(save.shared.patter ?? {})) out[`@patter.${name}`] = v as ScalarValue;
-  for (const [scene, vals] of Object.entries(save.stageBags))
-    for (const [name, v] of Object.entries(vals)) out[`@scene:${scene}.${name}`] = v as ScalarValue;
-  for (const [id, n] of Object.entries(save.sharedVisits)) out[`visit:${id}`] = n;
-  for (const [fid, snap] of Object.entries(save.flows)) {
-    for (const [name, v] of Object.entries(snap.scopes.patter ?? {})) out[`${fid}/@patter.${name}`] = v as ScalarValue;
-    for (const [scene, vals] of Object.entries(snap.sceneBags))
-      for (const [name, v] of Object.entries(vals)) out[`${fid}/@scene:${scene}.${name}`] = v as ScalarValue;
-    for (const [id, n] of Object.entries(snap.visits)) out[`${fid}/visit:${id}`] = n;
+  for (const m of allMounts(engine)) {
+    const prefix = m.pathPrefix ?? m.bag.pathPrefix;
+    for (const [name, v] of Object.entries(m.bag.save())) out[`${prefix}${name}`] = v;
   }
+  Object.assign(out, visitState(engine));
   return out;
+}
+
+/** Every bag the engine and its flows hold, with the path each answers to in a log. */
+function allMounts(engine: Engine): LogMount[] {
+  return [...engine.listBags(), ...engine.flows().flatMap((f) => f.listBags())];
 }
 
 export interface StateLoggerOptions {
@@ -101,7 +101,7 @@ export function createStateLogger(engine: Engine, opts: StateLoggerOptions = {})
   const kernel = createKernelStateLogger({
     // Re-read on every capture: openFlow and loadGame both replace bags, and the kernel
     // re-mounts whatever it is handed.
-    mounts: (): LogMount[] => [...engine.listBags(), ...engine.flows().flatMap((f) => f.listBags())],
+    mounts: (): LogMount[] => allMounts(engine),
     extra: () => visitState(engine),
   }, { sink: opts.sink, label: tag });
 

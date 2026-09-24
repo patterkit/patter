@@ -1038,13 +1038,24 @@ export const DEFAULT_CAPTION_CHARACTER = "SFX";
 // first time while ours crossed nowhere: three ports, three key namings, and nothing that said which
 // was right (from-storylets/save-shape-across-engines, 2026-09-03; design/patter-schema.md 9).
 //
-// Keys are camelCase literals, values are bare scalars, `@world` is never here (the host owns it), and
-// semantic parity is what the conformance corpus pins - byte parity is not required, key-path parity is.
+// Keys are camelCase literals, values are bare scalars, and semantic parity is what the conformance
+// corpus pins - byte parity is not required, key-path parity is.
+//
+// Version 3 (the one-registry model): property values are the game's ScopeRegistry's, not the
+// engine's. A save holds only what is NOT a property (cursors, PRNGs, visits, selectors), plus, when
+// the engine made its own registry (a standalone game), that registry's values under `registry`. A
+// game that passed a registry saves it once itself. Version 2 saves still load on every runtime:
+// their property sections move into the registry under the keys below.
+//
+// Registry keys (identical on every runtime, since they are in the save): `patter` for the shared
+// globals; `patter/scene/<sceneId>` for a scene's shared `@scene` props; `patter/flow/<flowId>/patter`
+// and `patter/flow/<flowId>/scene/<sceneId>` for a flow's own. Ids escape `%` as `%25` and `/` as `%2F`.
+// A self-backed `@world` (no resolver bound) is a stored property too, under `world`.
 // ---------------------------------------------------------------------------
 
 export const SAVE_SCHEMA = "patter/save@0";
 /** The `save.version` inside the envelope. Bumped only when a reader would MISREAD an older save. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /** The tagged envelope a host stores: `serializeState` writes it, `deserializeState` refuses anything else. */
 export interface SaveEnvelope {
@@ -1052,7 +1063,7 @@ export interface SaveEnvelope {
   save: SaveGame;
 }
 
-/** A property-state snapshot: owned scope -> property name -> value (`{ patter: { gold: 7 } }`). */
+/** A registry's values: registry key -> property name -> value (`{ patter: { gold: 7 } }`). */
 export type EngineSave = Record<string, Record<string, ScalarValue>>;
 
 /** Serialised `sequence` selector visit state for one group (spec §4 / §7). Every key is OPTIONAL and
@@ -1117,12 +1128,8 @@ export interface FlowCursor {
   selectors: Record<string, SelectorSnapshot>;
 }
 
-/** The serialised cursor + scopes + PRNG of a single flow. */
+/** The serialised cursor + PRNG + visits of a single flow. Its properties are the registry's. */
 export interface FlowSnapshot {
-  /** This flow's owned-scope values = the NOT-shared `@patter` globals, under token "patter". */
-  scopes: EngineSave;
-  /** Per-scene NOT-shared `@scene` bags (scene id -> name -> value); persist across re-entries (spec §7). */
-  sceneBags: Record<string, Record<string, ScalarValue>>;
   /** This flow's built-in PRNG position (mulberry32 state, uint32; older saves may carry it signed). */
   rngState: number;
   /** This flow's per-node entry counts (node id -> times entered by this flow). */
@@ -1130,17 +1137,38 @@ export interface FlowSnapshot {
   cursor: FlowCursor;
 }
 
-/** A full resumable save-game: shared `@patter` state + every live flow. */
+/** A full resumable save-game (version 3): everything that is not a property, plus the registry's
+ *  values when the engine made its own registry. */
 export interface SaveGame {
-  version: number;
-  /** Shared `@patter` globals (owned scope "patter"). */
-  shared: EngineSave;
+  version: 3;
+  /** The engine's own registry's values, keyed by registry key: present only when the engine made the
+   *  registry itself (a standalone game). A game that passed a registry saves it once, beside this. */
+  registry?: EngineSave;
   /** World-wide per-node entry counts (node id -> times entered by any flow). */
   sharedVisits: Record<string, number>;
   /** Shared selector cursors (node id -> snapshot) for `shared` memoried selectors. */
   sharedSelectors: Record<string, SelectorSnapshot>;
-  /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value) - the shared scene props. */
-  stageBags: Record<string, Record<string, ScalarValue>>;
   /** Each live flow's snapshot, keyed by flow id. */
   flows: Record<string, FlowSnapshot>;
+}
+
+/** A version 2 flow snapshot, which carried the flow's property values itself. Still read. */
+export interface FlowSnapshotV2 extends FlowSnapshot {
+  /** The NOT-shared `@patter` globals, under token "patter". */
+  scopes: EngineSave;
+  /** Per-scene NOT-shared `@scene` bags (scene id -> name -> value). */
+  sceneBags: Record<string, Record<string, ScalarValue>>;
+}
+
+/** A version 2 save, from before the registry held the properties. Every runtime still reads it: its
+ *  property sections move into the registry (under the keys in the header above) as it loads. */
+export interface SaveGameV2 {
+  version: 2;
+  /** Shared `@patter` globals (owned scope "patter"). */
+  shared: EngineSave;
+  sharedVisits: Record<string, number>;
+  sharedSelectors: Record<string, SelectorSnapshot>;
+  /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value). */
+  stageBags: Record<string, Record<string, ScalarValue>>;
+  flows: Record<string, FlowSnapshotV2>;
 }

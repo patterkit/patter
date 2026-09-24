@@ -40,9 +40,11 @@ for (;;) {
 }
 ```
 
-`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, world?, replayPromptOnChoose?, closedCaptions? }`:
+`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, world?, registry?, replayPromptOnChoose?, closedCaptions? }`:
 - `world` is the host's resolver for `@world` properties (World Properties): `{ get(name), set?(name, value) }`.
-  Omit it and the runtime self-backs `@world` from the declared defaults.
+  Omit it and the runtime self-backs `@world` from the declared defaults, as a property it saves.
+- `registry` is the game's one `ScopeRegistry` (from `@wildwinter/scoperegistry`), holding every
+  engine's properties. Omit it and the engine makes its own. See *One registry per game* below.
 - `locale` plays a non-default language (embedded localisation; an IDs-only bundle ignores it).
 - A string the active locale is missing falls back to the default-locale source,
   flagged `<Untranslated: {id}> {source}` so a partial translation is impossible to miss.
@@ -90,7 +92,24 @@ The release zip's `demos/` folder holds two working references (in the repo:
 
 ## Save / load
 
-`engine.saveGame()` returns a JSON-serialisable snapshot of the whole game (shared
-state, visit counts, every live flow); `engine.loadGame(blob)` restores it.
-[@patterkit/play-helpers](../play-helpers) wraps these as `serializeState` /
-`deserializeState` with a tagged envelope.
+`engine.saveGame()` returns a JSON-serialisable snapshot of the whole game (visit counts,
+selector cursors, every live flow, and, for an engine built without a registry, every property
+value); `engine.loadGame(blob)` restores it. Saves from before property values moved into the
+registry (version 2) still load. [@patterkit/play-helpers](../play-helpers) wraps these as
+`serializeState` / `deserializeState` with a tagged envelope.
+
+## One registry per game
+
+A game has one `ScopeRegistry` holding every property from every engine, except values the game
+keeps itself and lends through a resolver, and saves it once. Pass it as `registry`:
+
+```ts
+import { ScopeRegistry } from "@wildwinter/scoperegistry";
+
+const registry = new ScopeRegistry().defineOwned("world", worldDeclarations, { owner: "Game" });
+const engine = new Engine(bundle, { registry });
+const save = { registry: registry.save(), patter: engine.saveGame() };   // saveGame() holds no values now
+```
+
+The engine registers `@patter` under `patter` and every per-flow and per-scene bag under a key
+starting `patter/`; `@world` is the game's to register. Loading works in either order.

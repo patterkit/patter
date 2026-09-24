@@ -115,7 +115,9 @@ details (including reading typed **Game Data** and **tags** off each step) are i
 ## Save and load
 
 The whole run: every flow's position, the shared state, visit counts, even the seeded random
-generator's place in its sequence: serialises in one call and restores in one call.
+generator's place in its sequence: serialises in one call and restores in one call. A game running
+Patter beside another engine keeps every property in one registry and saves it once, beside each
+engine's own save.
 Every runtime handles save/load the same way, so a save made by one engine round-trips
 exactly. See your engine's guide for the local call and
 [Save/load & Game Data](/play/integration/) for the shape.

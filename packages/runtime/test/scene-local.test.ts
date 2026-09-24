@@ -57,7 +57,7 @@ describe("scene-local persistence", () => {
     const flow = engine.openFlow("f", { scene: "s" });
     expect(flow.advance()).toMatchObject({ type: "text", text: "visit 1" }); // count is now 1
     const save = JSON.parse(JSON.stringify(engine.saveGame()));
-    expect(save.flows.f!.sceneBags.s).toEqual({ count: 1 });
+    expect(save.registry["patter/flow/f/scene/s"]).toEqual({ count: 1 }); // the flow's own bag, in the registry
 
     const restored = new Engine(bundle);
     restored.loadGame(save);

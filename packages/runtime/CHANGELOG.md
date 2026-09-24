@@ -33,6 +33,33 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry`
+  (`@wildwinter/scoperegistry` 0.7.0): `@patter` under `patter`, and each flow's and scene's bag
+  under a key starting `patter/`. A new `registry` option takes the game's own registry, shared
+  with any other engine in the game; without one the engine makes its own and acts as its own game,
+  so a single-engine game needs no change.
+- **The save is version 3.** `saveGame()` holds what is not a property (cursors, PRNGs, visit
+  counts, selector cursors). An engine built without a registry also carries that registry's values
+  under `registry`, so one call is still the whole game; an engine given the game's registry leaves
+  them to the game, which saves the registry once. Version 2 saves still load, their values moving
+  into the registry.
+- **A self-backed `@world` is saved.** When the game binds no resolver, `@world` is a property the
+  engine's registry stores, so it rides in the save. A resolver the game binds is still external and
+  never saved. Given the game's registry, the engine self-backs nothing: `@world` is the game's to
+  register there.
+- **Every expression reads every registered scope**, so a condition can test another engine's
+  `@story.act` in a combined game. A token two engines both want fails as the second is built, naming
+  the first.
+- `hotSwap` hands every bag to the replacement engine on the same registry. The engine it replaces is
+  released and its flows are closed. If the restore fails, the fallback engine keeps the shared
+  properties and restarts each flow, where it used to start everything cold.
+
+### Deprecated
+
+- `Engine.save()` / `Engine.load()`, the shared `@patter` values alone. Save the registry instead.
+
 ## [0.13.0] - 2026-09-05
 
 ### Changed

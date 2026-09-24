@@ -64,7 +64,7 @@ describe("shared @scene props (the shared half of the scene scope)", () => {
     engine.openFlow("bob", { scene: "s" }).advance();        // tally now 2
 
     const save = JSON.parse(JSON.stringify(engine.saveGame()));
-    expect(save.stageBags.s.tally).toBe(2);
+    expect(save.registry["patter/scene/s"].tally).toBe(2); // the scene's shared bag, in the registry
 
     const restored = new Engine(bundle);
     restored.loadGame(save);

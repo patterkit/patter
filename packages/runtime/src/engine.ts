@@ -21,8 +21,13 @@
 // beats, runs onExit, follows its jump. Falling off the end ends the flow.
 // Cross-flow jumps are not a thing - the host switches flows.
 //
-// `engine.saveGame()` / `loadGame()` snapshot + restore the WHOLE game: `@patter`
-// plus every live flow's scopes + PRNG + cursor.
+// Every property bag lives in ONE ScopeRegistry per game (the one-registry model): the
+// game hands the engine its registry (`options.registry`) or the engine makes its own
+// and acts as its own game. `@patter` is registered under `patter`; the per-flow and
+// per-scene bags under keys starting `patter/` (see `keys` below), which no expression
+// can name. `engine.saveGame()` / `loadGame()` snapshot + restore what is NOT a property:
+// cursors, PRNGs, visits, and selectors. The registry's values ride in `saveGame()` only
+// when the engine made the registry itself; otherwise the game saves the registry once.
 // ---------------------------------------------------------------------------
 
 import { evaluate, deserialiseAst, makePrng, toUint32 } from "@wildwinter/expr";
@@ -34,8 +39,9 @@ import type { LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wi
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
+import { SAVE_VERSION } from "@patterkit/model";
 import type {
-  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, FlowSnapshot, SaveGame,
+  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, FlowSnapshot, SaveGame, SaveGameV2,
   Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet,
   CompiledEffect, Beat, LineBeat, TextBeat, GameData, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
 } from "@patterkit/model";
@@ -51,8 +57,32 @@ const astCache = new WeakMap<Expression, ExprNode>();
 // working; this engine's saveGame() output IS that document, and every port writes the same.
 export type {
   EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoiceOption, SavedChoicePrompt,
-  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope,
+  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope, SaveGameV2, FlowSnapshotV2,
 } from "@patterkit/model";
+
+/** The owner label on everything this engine registers: named in a clash error and carried on
+ *  the registry's examiner rows, so one inspector can group a combined game by engine. */
+const OWNER = "Patter";
+
+/** The registry keys this engine stores its instance bags under. An id is escaped (`%` and `/`)
+ *  so a flow named `npc/bob` cannot collide with another flow's scene. Every runtime writes the
+ *  same keys: they are in the save. */
+const esc = (id: string): string => id.replace(/%/g, "%25").replace(/\//g, "%2F");
+/** Internal: marks a hotSwap replacement of a standalone engine, which shares its predecessor's registry
+ *  but is still its own game (it self-backs host scopes and saves the registry's values). */
+const OWNS_REGISTRY = Symbol("ownsRegistry");
+type InternalOptions = EngineOptions & { [OWNS_REGISTRY]?: boolean };
+
+const keys = {
+  /** A scene's SHARED `@scene` props (one bag per scene, every flow's). */
+  stage: (sceneId: string): string => `patter/scene/${esc(sceneId)}`,
+  /** Everything one flow registers starts with this. */
+  flow: (flowId: string): string => `patter/flow/${esc(flowId)}/`,
+  /** A flow's NOT-shared `@patter` globals. */
+  flowGlobals: (flowId: string): string => `patter/flow/${esc(flowId)}/patter`,
+  /** A flow's NOT-shared `@scene` props for one scene. */
+  flowScene: (flowId: string, sceneId: string): string => `patter/flow/${esc(flowId)}/scene/${esc(sceneId)}`,
+};
 
 /** What `Flow.advance()` surfaces to the host at each stop. */
 export type StepResult =
@@ -241,8 +271,18 @@ export interface EngineOptions {
    *  Ignored by an "ids" bundle, which emits beat IDs for the game to localise itself. */
   locale?: string;
   /** The host's resolver for **World Properties** (`@world.*`): the values the game owns and the story
-   *  reads. Omit it and the runtime self-backs `@world` from the declared defaults. Shared by all flows. */
+   *  reads. Omit it and the runtime self-backs `@world` from the declared defaults, as a property the
+   *  registry stores and saves. Shared by all flows. A game running several engines registers `@world`
+   *  in its registry itself instead, and no engine is given a resolver. */
   world?: WorldResolver;
+  /** The game's registry: ONE per game, holding every engine's properties except those the game keeps
+   *  itself, saved once. Given one, the engine registers its own scopes in it (`@patter` under `patter`,
+   *  its per-flow and per-scene bags under keys starting `patter/`, and `@world` if `world` is passed),
+   *  reads every other scope from it, and `saveGame()` leaves the property values to the game. Host
+   *  scopes the bundle declares (`@world`) are then the game's to register: owned if the registry should
+   *  store them, foreign if the game keeps them. Omit it and the engine makes its own registry and acts as
+   *  its own game: it self-backs `@world`, and `saveGame()` carries the registry's values too. */
+  registry?: ScopeRegistry;
   /**
    * Replay a chosen option's `prompt` as its first played beat (spec §5). Default `false`:
    * the prompt is a label only and `choose()` plays just the option's content. `true`: the
@@ -321,8 +361,14 @@ interface FlowHost {
   blockGameIdToId: Map<string, Map<string, string>>;
   /** Author tags (#215): node id -> accumulated tags (own + every ancestor's, deduped). Built once. */
   tagIndex: Map<string, string[]>;
-  /** The SHARED `@patter` globals (owned scope "patter") + world properties (`@world`). */
-  shared: ScopeRegistry;
+  /** The game's one registry: `@patter` (the SHARED globals), host scopes, every instance bag. */
+  registry: ScopeRegistry;
+  /** True when the engine made the registry (a standalone game): `saveGame()` then carries its values. */
+  readonly ownsRegistry: boolean;
+  /** The SHARED `@patter` globals' bag, registered under `patter`. */
+  patterBag: PropertyBag;
+  /** Host scopes this engine self-backed and registered (the game bound none, nobody else had). */
+  hostScopes: string[];
   /** Decls for the shared `@patter` globals - (re)seed on `engine.reset()`. */
   patterSharedDecls: ScopeDeclaration[];
   /** Decls for the per-flow `@patter` globals - seed each flow's local registry. */
@@ -335,11 +381,8 @@ interface FlowHost {
   sharedVisits: Map<string, number>;
   /** Shared selector cursors (node id -> SelectorState) for `shared` memoried selectors. */
   sharedSelectors: Map<string, SelectorState>;
-  /** Shared, scene-namespaced `@scene` bags (scene id -> name -> value) for shared scene props. */
-  /** Per-scene SHARED scene props. A PropertyBag rather than a bare record since
-   *  2026-09-02: seeding, name normalisation and the mutable-default clone were all
-   *  written out by hand here, and the shared bag already had them. The SAVE is
-   *  unchanged - bag.save() is a bare record, which is what the envelope carries. */
+  /** Per-scene SHARED scene props, each registered under `keys.stage(sceneId)`. Made the first time any
+   *  flow needs the scene, so a bag loaded before then waits in the registry and is claimed here. */
   stageBags: Map<string, PropertyBag>;
   customRng?: () => number;
   /** Play a chosen option's prompt as its first beat (spec §5); default false. */
@@ -357,9 +400,10 @@ interface FlowHost {
    *  fallback - so it falls through and the flow continues past it. Zero cost when unset; the coverage
    *  harness passes it to surface silent fall-throughs. Not a gameplay signal (the behaviour is unchanged). */
   onDryChoice?: (groupId: string) => void;
-  /** Memoised `splitRef` results (ref string -> {scope,name}). The split depends only on `shared`'s scope
-   *  set, which is fixed for the engine's life, so every effect target / `{@ref}` slot parses once. */
+  /** Memoised `splitRef` results (ref string -> {scope,name}). The split depends only on the registry's
+   *  scope set, so the cache is dropped whenever that moves (`refSplitRevision`). */
   refSplitCache: Map<string, { scope: string; name: string }>;
+  refSplitRevision: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -439,24 +483,40 @@ export class Engine {
     // "@patter." so a row addresses itself the way getProperty takes it. `@gold` also
     // resolves - splitRef defaults an unqualified name to the patter scope - but the
     // qualified form is the address, and the shorthand is a shorthand.
-    const shared = new ScopeRegistry().defineOwned("patter", patterSharedDecls, "@patter.");
-    const hostBound = new Set<string>();
-    // The host's World Properties resolver binds `@world`; its declarations (types, read-only) come from
-    // the compiled bundle's declared world properties. An explicit binding always wins over the self-backed
-    // fallback below.
-    if (options.world) {
-      const worldSpec = bundle.scopeRegistry?.scopes.find((s) => s.token === "world");
-      const decls = (worldSpec?.declarations ?? []).map(toForeignDecl);
-      shared.defineForeign("world", options.world, decls, worldSpec?.writable ?? true);
-      hostBound.add("world");
-    }
-    // A project that DECLARES `@world` but whose embedder binds no resolver (the standalone case) gets a
-    // self-backed one: a live in-memory bag seeded from the declarations' defaults. The story reads/writes
-    // it like any scope; it stays *foreign* (not in Patter's save: the host owns it conceptually).
-    for (const spec of bundle.scopeRegistry?.scopes ?? []) {
-      if (hostBound.has(spec.token)) continue;
-      const decls = (spec.declarations ?? []).map(toForeignDecl);
-      shared.defineForeign(spec.token, selfBackedResolver(spec.declarations ?? []), decls, spec.writable ?? true);
+    const registry = options.registry ?? new ScopeRegistry();
+    const ownsRegistry = !options.registry || (options as InternalOptions)[OWNS_REGISTRY] === true;
+    const patterBag = new PropertyBag(patterSharedDecls, { pathPrefix: "@patter." });
+    const hostScopes: string[] = [];
+    const registered: string[] = [];
+    try {
+      registry.mountOwned("patter", patterBag, { owner: OWNER }); // claims values the game loaded first
+      registered.push("patter");
+      // The host's World Properties resolver binds `@world` as an external scope: the game keeps the values,
+      // the registry never saves them. Its declarations (types, read-only) come from the compiled bundle.
+      const hostBound = new Set<string>();
+      if (options.world) {
+        const worldSpec = bundle.scopeRegistry?.scopes.find((s) => s.token === "world");
+        const decls = (worldSpec?.declarations ?? []).map(toForeignDecl);
+        registry.defineForeign("world", options.world, decls, { writable: worldSpec?.writable ?? true, owner: OWNER });
+        registered.push("world");
+        hostBound.add("world");
+      }
+      // A declared host scope nobody bound. A standalone engine is its own game, so it self-backs the scope:
+      // a property bag seeded from the declarations, stored and SAVED by the registry like any other, since
+      // only a resolver the game binds is external. Given the GAME's registry, the engine registers nothing
+      // here: those tokens are the game's to register, or another engine's (a bundle compiled against the
+      // Storylet Engine's spec declares `@story`), and self-backing one would clash with its real owner
+      // depending only on which engine was built first.
+      for (const spec of ownsRegistry ? bundle.scopeRegistry?.scopes ?? [] : []) {
+        if (hostBound.has(spec.token) || registry.has(spec.token)) continue;
+        const decls = (spec.declarations ?? []).map((d) => selfBackedDecl(d, spec.writable));
+        registry.defineOwned(spec.token, decls, { owner: OWNER });
+        registered.push(spec.token);
+        hostScopes.push(spec.token);
+      }
+    } catch (e) {
+      for (const k of registered) registry.remove(k, { keep: true }); // a clash leaves the game's registry as it was
+      throw e;
     }
 
     // Scene props (`@scene`) split by `shared` (default per-flow): record, per
@@ -472,7 +532,7 @@ export class Engine {
       emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
       bundle, emitIds, strings, defaultStrings, castDisplay, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
-      tagIndex: buildTagIndex(bundle), shared,
+      tagIndex: buildTagIndex(bundle), registry, ownsRegistry, patterBag, hostScopes,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
       sharedVisits: new Map(),
       sharedSelectors: new Map(),
@@ -485,6 +545,7 @@ export class Engine {
       captionClose: (bundle.closedCaptions ?? DEFAULT_CAPTION_DELIMITERS).close,
       captionCharacter: bundle.closedCaptions?.character || DEFAULT_CAPTION_CHARACTER, // absent/empty -> SFX
       refSplitCache: new Map(),
+      refSplitRevision: registry.revision,
     };
   }
 
@@ -530,10 +591,12 @@ export class Engine {
    * content-drift policy (§9.8) resolves edits under the cursor: stack frames re-find their next
    * child by id, drifted options drop, a vanished snippet is skipped.
    *
-   * Returns the REPLACEMENT engine; this one is left untouched and should be discarded. Hosts
-   * re-bind their flow handles via `next.getFlow(id)`. If the restore throws (defensive - §9.8
-   * makes this unreachable for ordinary edits), the swap falls back to a cold engine with each
-   * saved flow restarted from the top of the scene it was in.
+   * Returns the REPLACEMENT engine, on the same registry. This one hands its bags over (each is
+   * removed from the registry with its values kept, and the replacement claims them as it
+   * registers), its flows are closed, and it should be discarded. Hosts re-bind their flow handles
+   * via `next.getFlow(id)`. If the restore throws (defensive - §9.8 makes this unreachable for
+   * ordinary edits), the swap falls back to a fresh engine with each saved flow restarted from the
+   * top of the scene it was in; the shared properties carry over.
    */
   hotSwap(bundle: Bundle): Engine {
     const snapshot = this.saveGame();
@@ -542,14 +605,21 @@ export class Engine {
       next.setClosedCaptions(this.host.captionsOn);
       return next;
     };
-    const next = new Engine(bundle, this.creationOptions);
+    // The replacement registers on the SAME registry, and a standalone engine's replacement is still its
+    // own game (so its saveGame keeps carrying the registry's values).
+    const make = (): Engine => new Engine(bundle, {
+      ...this.creationOptions, registry: this.host.registry, [OWNS_REGISTRY]: this.host.ownsRegistry,
+    } as InternalOptions);
+    this.release(true);
+    const next = make();
     try {
       next.loadGame(snapshot);
       return carryOver(next);
     } catch {
-      // A partial load may have mutated `next`: fall back on a THIRD, cold engine and restart each
-      // flow at the top of the scene it was in (dropped when that scene is gone too).
-      const fresh = new Engine(bundle, this.creationOptions);
+      // A partial load may have mutated `next`: hand its bags back, fall back on a THIRD engine and
+      // restart each flow at the top of the scene it was in (dropped when that scene is gone too).
+      next.release(true);
+      const fresh = make();
       for (const [id, f] of Object.entries(snapshot.flows)) {
         const sceneId = f.cursor.currentSceneId;
         try { fresh.openFlow(id, sceneId !== null ? { scene: sceneId } : {}); } catch { /* scene deleted: drop the flow */ }
@@ -825,7 +895,7 @@ export class Engine {
    * loadGame() replaces every bag, so re-enumerate after a load.
    */
   listBags(): LogMount[] {
-    const mounts: LogMount[] = [{ bag: this.host.shared.ownedBag("patter") }];
+    const mounts: LogMount[] = [{ bag: this.host.patterBag }];
     for (const [sceneId, bag] of this.host.stageBags) mounts.push({ bag, pathPrefix: `@scene:${sceneId}.` });
     return mounts;
   }
@@ -846,16 +916,32 @@ export class Engine {
   reset(): void {
     for (const flow of this.flowsById.values()) flow.close(); // finish them, don't just forget them
     this.flowsById.clear();
-    this.host.shared.reseedOwned("patter", this.host.patterSharedDecls);
+    this.host.patterBag.reseed(this.host.patterSharedDecls);
     this.host.sharedVisits.clear();
     this.host.sharedSelectors.clear();
+    for (const s of this.host.stageBags.keys()) this.host.registry.remove(keys.stage(s));
     this.host.stageBags.clear();
+    // Values loaded for bags nobody has claimed yet are the old game's too: a flow opened after the
+    // reset must not pick them up. Other engines' parked values are theirs, and stay.
+    this.host.registry.discardParked("patter/");
+  }
+
+  /** Remove every bag this engine registered, keeping the values parked when `keep` (a live reload
+   *  handing its state to a replacement), and close its flows. The engine is inert afterwards. */
+  private release(keep: boolean): void {
+    for (const flow of this.flowsById.values()) { flow.releaseBags(keep); flow.close(); }
+    this.flowsById.clear();
+    const reg = this.host.registry;
+    for (const s of this.host.stageBags.keys()) reg.remove(keys.stage(s), { keep });
+    this.host.stageBags.clear();
+    for (const t of ["patter", ...this.host.hostScopes]) if (reg.has(t)) reg.remove(t, { keep });
+    if (this.creationOptions.world && reg.has("world")) reg.remove("world");
   }
 
   /** Read a shared (`@patter` / foreign) property by ref. `@scene` refs are rejected (flow-level). */
   getProperty(ref: string): ScalarValue | undefined {
     const { scope, name } = this.splitShared(ref);
-    return this.host.shared.get(scope, name);
+    return this.host.registry.get(scope, name);
   }
 
   /** Write a shared (`@patter` / foreign) property by ref. `@scene` refs are rejected (flow-level).
@@ -867,7 +953,7 @@ export class Engine {
    *  were each refused the one property they existed to move.) */
   setProperty(ref: string, value: ScalarValue): void {
     const { scope, name } = this.splitShared(ref);
-    this.host.shared.set(scope, name, value, { host: true });
+    this.host.registry.set(scope, name, value, { host: true });
   }
 
   /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
@@ -920,58 +1006,71 @@ export class Engine {
   // @scene is scene-namespaced and needs a flow's current scene - silently
   // routing it into the shared bag (as a junk "scene.x" key) was a trap.
   private splitShared(ref: string): { scope: string; name: string } {
-    let split = this.host.refSplitCache.get(ref);
-    if (!split) { split = splitRef(ref, (t) => t === "scene" || this.host.shared.has(t)); this.host.refSplitCache.set(ref, split); }
+    const split = splitHostRef(this.host, ref);
     if (split.scope === "scene") {
       throw new Error(`'${ref}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine`);
     }
     return split;
   }
 
-  /** Snapshot shared `@patter` state only (for a unified cross-engine save blob, Phase D). */
+  /** The shared `@patter` values alone, as `{ patter: {...} }`.
+   *  @deprecated The registry holds every property now: a game saves `registry.save()` once, and a
+   *  standalone engine's `saveGame()` carries its registry's values. Removed at the next breaking release. */
   save(): EngineSave {
-    return this.host.shared.save();
+    return { patter: this.host.patterBag.save() };
   }
 
-  /** Restore shared `@patter` values (world properties untouched). */
+  /** Lay a `{ patter: {...} }` section over the shared `@patter` values; anything else is ignored.
+   *  @deprecated See `save`. Removed at the next breaking release. */
   load(blob: EngineSave): void {
-    this.host.shared.load(blob);
+    if (blob.patter) this.host.patterBag.load(blob.patter);
   }
 
-  /** Snapshot the whole game: shared `@patter` + visit counts + every live flow. */
+  /** Snapshot the whole game's NON-property state: visit counts, shared selector cursors, and every
+   *  live flow's cursor and PRNG. The property values are the registry's: a standalone engine (one that
+   *  made its own registry) carries them here under `registry`; a game that passed a registry saves it
+   *  once itself, beside each engine's `saveGame()`. */
   saveGame(): SaveGame {
     const flows: Record<string, FlowSnapshot> = {};
     for (const [id, flow] of this.flowsById) flows[id] = flow.snapshot();
     return {
-      version: 2,
-      shared: this.host.shared.save(),
+      version: SAVE_VERSION,
+      ...(this.host.ownsRegistry ? { registry: this.host.registry.save() } : {}),
       sharedVisits: Object.fromEntries(this.host.sharedVisits),
       sharedSelectors: serialiseSelectors(this.host.sharedSelectors),
-      stageBags: Object.fromEntries([...this.host.stageBags].map(([s, bag]) => [s, bag.save()])),
       flows,
     };
   }
 
-  /** Restore a `saveGame()`: shared globals + visit counts + shared scene bags + reconstruct every flow. */
-  loadGame(save: SaveGame): void {
-    if (save.version !== 2) throw new Error(`unsupported save version: ${save.version}`);
-    this.host.shared.load(save.shared);
+  /**
+   * Restore a `saveGame()`: visit counts, shared selector cursors, and every flow. Property values come
+   * from the registry. A save that carries them (a standalone engine's, or a version 2 save from before
+   * the registry held them) has them moved into the registry here; otherwise the game loads its
+   * registry itself, before or after this call. Either order works: this engine's bags are handed back
+   * to the registry (values kept) and the restored flows claim them as they register.
+   */
+  loadGame(save: SaveGame | SaveGameV2): void {
+    const version: unknown = (save as { version?: unknown }).version;
+    if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported save version: ${String(version)}`);
+    const reg = this.host.registry;
+    // Flows the save does not have are over: their bags go. The rest are handed back with their values,
+    // which is what a game that loaded its registry first has just laid the save's values over.
+    for (const [id, flow] of this.flowsById) { flow.releaseBags(id in save.flows); flow.close(); }
+    this.flowsById.clear();
+    for (const s of this.host.stageBags.keys()) reg.remove(keys.stage(s), { keep: true });
+    this.host.stageBags.clear();
+
+    const values = save.version === 2 ? sectionsFromV2(save) : save.registry;
+    if (values) {
+      // The engine's own registry takes the save wholesale. A game's registry may hold values the game
+      // loaded for other engines, still waiting to be claimed: add to those, never replace them.
+      if (this.host.ownsRegistry) reg.load(values);
+      else reg.load(values, { keepParked: true });
+    }
     this.host.sharedVisits.clear();
     for (const [id, n] of Object.entries(save.sharedVisits ?? {})) this.host.sharedVisits.set(id, n);
     this.host.sharedSelectors.clear();
     for (const [id, st] of deserialiseSelectors(save.sharedSelectors)) this.host.sharedSelectors.set(id, st);
-    this.host.stageBags.clear();
-    for (const [s, values] of Object.entries(save.stageBags ?? {})) {
-      // Seeded from the bundle's declarations first, then the saved values laid over: a
-      // property the save predates keeps its declared default rather than vanishing, and
-      // one the bundle has since dropped lands as a stray, exactly as before.
-      const shared = this.host.sceneSharedNames.get(s) ?? new Set<string>();
-      const decls = (this.host.bundle.scenes[s]?.sceneProps ?? []).filter((d) => shared.has(d.name.toLowerCase()));
-      const bag = new PropertyBag(decls as never);
-      bag.load(values);
-      this.host.stageBags.set(s, bag);
-    }
-    this.flowsById.clear();
     for (const [id, snap] of Object.entries(save.flows)) {
       const flow = new Flow(id, this.host, this.defaultSeed);
       flow.restore(snap);
@@ -987,7 +1086,9 @@ export class Engine {
 export class Flow {
   readonly id: string;
   private readonly host: FlowHost;
-  private local: ScopeRegistry;   // owns "patter" = the NOT-shared globals (this flow's copy)
+  private local: PropertyBag;     // the NOT-shared `@patter` globals (this flow's copy), keys.flowGlobals
+  /** The registry keys this flow has registered (its globals and each scene bag). */
+  private readonly registered = new Set<string>();
   private rngState: number;
 
   // Execution cursor. The `stack` is the continuation stack: each frame is a
@@ -1014,19 +1115,20 @@ export class Flow {
   private visitCounts = new Map<string, number>();
 
   // Per-flow halves of the two scopes. The NOT-shared `@patter` globals live in
-  // `local` (owned scope "patter"); the NOT-shared `@scene` props live in
-  // `sceneBags` (namespaced per scene; they PERSIST across re-entries, spec §7).
-  // The SHARED halves live on the host (`host.shared` / `host.stageBags`). Each
-  // resolver presents one merged scope, routing each property to its half by the
-  // declared `shared` flag.
+  // `local`; the NOT-shared `@scene` props live in `sceneBags` (namespaced per
+  // scene; they PERSIST across re-entries, spec §7). The SHARED halves live on the
+  // host (`host.patterBag` / `host.stageBags`). All of them are registered in the
+  // game's registry. Each resolver presents one merged scope, routing each property
+  // to its half by the declared `shared` flag: that split is why `@patter` and
+  // `@scene` are composed here rather than aliased to a single registry key.
   /** This flow's per-scene LOCAL scene props; see FlowHost.stageBags. */
   private sceneBags = new Map<string, PropertyBag>();
 
   private readonly patterResolver: ScopeResolver = {
-    get: (n) => (this.host.patterSharedNames.has(n) ? this.host.shared.get("patter", n) : this.local.get("patter", n)),
+    get: (n) => (this.host.patterSharedNames.has(n) ? this.host.patterBag.get(n) : this.local.get(n)),
     set: (n, v) => {
-      if (this.host.patterSharedNames.has(n)) this.host.shared.set("patter", n, v);
-      else this.local.set("patter", n, v);
+      if (this.host.patterSharedNames.has(n)) this.host.registry.set("patter", n, v);
+      else this.local.set(n, v);
     },
   };
 
@@ -1034,13 +1136,12 @@ export class Flow {
     get: (n) => {
       const s = this.currentSceneId;
       if (s === null) return undefined;
-      const bag = this.host.sceneSharedNames.get(s)?.has(n) ? this.host.stageBags.get(s) : this.sceneBags.get(s);
-      return bag?.get(n);
+      return this.sceneBagFor(s, n)?.get(n);
     },
     set: (n, v) => {
       const s = this.currentSceneId;
       if (s === null) return;
-      const bag = this.host.sceneSharedNames.get(s)?.has(n) ? this.host.stageBags.get(s) : this.sceneBags.get(s);
+      const bag = this.sceneBagFor(s, n);
       // NOT silent, which is the bag's rule rather than an accident: an engine write
       // notifies subscribers and is audited, where a HOST write (an inspector poking a
       // value) is silent but still audited. A scene-prop write during play is the
@@ -1049,12 +1150,16 @@ export class Flow {
     },
   };
 
-  // The eval context is built ONCE: every constituent resolves live state at
-  // call time (shared bags mutate in place per scoperegistry's contract;
-  // patter/scene route through this flow's resolvers, which read the current
-  // `local`/`sceneBags`/`currentSceneId`; the host callbacks read current flow
-  // fields). Rebuilding it per evaluation was the engine's hottest allocation.
+  // The eval context is built once and REFRESHED only when the registry's set of
+  // scopes moves (its `revision`): every constituent resolves live state at call
+  // time (bags mutate in place per scoperegistry's contract; patter/scene route
+  // through this flow's resolvers, which read the current `local`/`sceneBags`/
+  // `currentSceneId`; the host callbacks read current flow fields), but another
+  // engine registering `@story` after this flow opened must still be readable.
+  // Rebuilding it per evaluation was the engine's hottest allocation.
   private readonly evalCtx: EvalContext;
+  private ctxRevision = -1;
+  private registryQualities: EvalContext["qualities"];
   private readonly flowLog: LogEntry[] = [];
   /** Monotonic across the flow's life; survives clearLog so two reads agree on order. */
   private flowSeq = 0;
@@ -1063,13 +1168,10 @@ export class Flow {
     this.id = id;
     this.host = host;
     this.rngState = toUint32(seed);
-    this.local = this.freshLocal();
+    this.local = this.newLocal(); // registered by start() / restore()
 
-    const scopes = { ...host.shared.toEvalContext().scopes }; // shared @patter bag + foreign resolvers
-    scopes["patter"] = this.patterResolver; // override with the merged shared+per-flow view
-    scopes["scene"] = this.sceneResolver;
     this.evalCtx = {
-      scopes,
+      scopes: {},
       host: {
         nextRandom: this.rng,
         visits: (id: string) => this.visitCounts.get(id) ?? 0,
@@ -1081,6 +1183,22 @@ export class Flow {
       // and because @scene declarations belong to whichever scene the flow is in RIGHT NOW.
       qualities: (scope, name) => this.stagesFor(scope, name),
     };
+  }
+
+  /** The eval context, its scopes refreshed if the registry's set of scopes has moved since. */
+  private context(): EvalContext {
+    const reg = this.host.registry;
+    if (reg.revision !== this.ctxRevision) {
+      const base = reg.toEvalContext();
+      const scopes = this.evalCtx.scopes;
+      for (const k of Object.keys(scopes)) delete scopes[k];
+      Object.assign(scopes, base.scopes);  // every registered scope: other engines' too
+      scopes["patter"] = this.patterResolver; // override with the merged shared+per-flow views
+      scopes["scene"] = this.sceneResolver;
+      this.registryQualities = base.qualities;
+      this.ctxRevision = reg.revision;
+    }
+    return this.evalCtx;
   }
 
   /** The stage ladder of `@scope.name` when it is a declared quality, else undefined. Names compare
@@ -1096,15 +1214,20 @@ export class Flow {
       const scene = this.currentSceneId != null ? this.host.bundle.scenes[this.currentSceneId] : undefined;
       return fromDecls(scene?.sceneProps);
     }
-    return fromDecls(this.host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope)?.declarations);
+    // Any other scope's ladder is the registry's (another engine's `@story`, the game's `@world`), with
+    // the bundle's own host-scope declarations behind it for a game that registered `@world` undeclared.
+    return this.registryQualities?.(scope, name)
+      ?? fromDecls(this.host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope)?.declarations);
   }
 
   // -- Host API -------------------------------------------------------------
 
   /** Begin this flow at a scene (and optionally a specific block within it). */
   start(sceneId?: string, blockId?: string): void {
-    this.sceneBags.clear();
-    this.local = this.freshLocal();
+    // A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
+    this.releaseBags(false);
+    this.host.registry.discardParked(keys.flow(this.id));
+    this.mountLocal();
     this.selectors.clear();
     this.visitCounts.clear();
     this.stack = [];
@@ -1198,6 +1321,7 @@ export class Flow {
    * cannot quietly mutate the world. Terminal: unlike ending, a close is never revived.
    */
   close(): void {
+    this.releaseBags(false);
     this.closed = true;
     this.flowEnded = true;
     this.stack = [];
@@ -1302,7 +1426,7 @@ export class Flow {
    * halves are the Engine's listBags.
    */
   listBags(): LogMount[] {
-    const mounts: LogMount[] = [{ bag: this.local.ownedBag("patter"), pathPrefix: `${this.id}/@patter.` }];
+    const mounts: LogMount[] = [{ bag: this.local, pathPrefix: `${this.id}/@patter.` }];
     for (const [sceneId, bag] of this.sceneBags) mounts.push({ bag, pathPrefix: `${this.id}/@scene:${sceneId}.` });
     return mounts;
   }
@@ -1360,7 +1484,7 @@ export class Flow {
     const { scope, name } = this.splitRef(ref);
     if (scope === "patter") return this.patterResolver.get(name);
     if (scope === "scene") return this.sceneResolver.get(name);
-    return this.host.shared.get(scope, name); // foreign
+    return this.host.registry.get(scope, name); // host scopes, other engines' scopes
   }
 
   /** Write a property by ref (routed by scope, then by the property's `shared` flag). The GAME's
@@ -1382,17 +1506,15 @@ export class Flow {
       if (this.currentSceneId === null) throw new Error(`'${ref}': the flow has not entered a scene yet`);
       this.sceneResolver.set!(name, value);
     } else {
-      this.host.shared.set(scope, name, value, host ? { host: true } : undefined); // foreign
+      this.host.registry.set(scope, name, value, host ? { host: true } : undefined); // host / other scopes
     }
   }
 
   // -- Save / restore (engine-driven) --------------------------------------
 
-  /** @internal Snapshot this flow's cursor + per-flow scopes (not-shared `@patter`/`@scene`) + PRNG. */
+  /** @internal Snapshot this flow's cursor + PRNG + visits. Its properties are the registry's. */
   snapshot(): FlowSnapshot {
     return {
-      scopes: this.local.save(), // owned scope "patter" = the NOT-shared globals (@scene saved separately)
-      sceneBags: Object.fromEntries([...this.sceneBags].map(([s, bag]) => [s, bag.save()])),
       rngState: this.rngState,
       visits: Object.fromEntries(this.visitCounts),
       cursor: {
@@ -1437,17 +1559,14 @@ export class Flow {
       return { ...frame };
     });
 
-    // Restore the per-flow @scene bags, then the per-flow @patter globals. @scene
-    // resolves through `sceneResolver` over these bags, so nothing else to reseed.
-    this.sceneBags = new Map(Object.entries(snap.sceneBags ?? {}).map(([s, values]) => {
-      const shared = this.host.sceneSharedNames.get(s) ?? new Set<string>();
-      const decls = (this.host.bundle.scenes[s]?.sceneProps ?? []).filter((d) => !shared.has(d.name.toLowerCase()));
-      const bag = new PropertyBag(decls as never);
-      bag.load(values);
-      return [s, bag] as const;
-    }));
-    this.local = this.freshLocal();
-    this.local.load(snap.scopes); // loads the owned not-shared globals; shared halves live on the host
+    // Register this flow's bags: each claims the values the registry holds for it (loaded by the game, by
+    // loadGame from the save, or handed back by the engine this one replaces), laid over fresh defaults.
+    // The scenes the cursor stands in are registered now; any other scene's bag is claimed on entry.
+    this.releaseBags(false);
+    this.mountLocal();
+    for (const s of new Set([c.currentSceneId, ...this.stack.map((f) => f.sceneId)])) {
+      if (s !== null && this.host.bundle.scenes[s]) this.ensureSceneBags(s);
+    }
 
     // Content-drift policy (§9.8): if a saved position points at content deleted
     // since the save, resume best-effort rather than throwing - the missing
@@ -1765,7 +1884,7 @@ export class Flow {
     // Delegates to the shared @wildwinter/expr-specificity scorer (same walk,
     // shared with Storylet Studio). We supply Patter's truthiness rule and keep
     // check_flags counting via the package's default counting call.
-    const evalTruthy: EvalTruthy = (n) => truthy(evaluate(n, this.evalCtx, patterDialect));
+    const evalTruthy: EvalTruthy = (n) => truthy(evaluate(n, this.context(), patterDialect));
     return scoreSpecificity(node, evalTruthy, { want });
   }
 
@@ -1797,7 +1916,7 @@ export class Flow {
   }
 
   private evalExpr(expr: Expression): ScalarValue {
-    return evaluate(this.conditionAst(expr), this.evalCtx, patterDialect);
+    return evaluate(this.conditionAst(expr), this.context(), patterDialect);
   }
 
   /** The deserialised (in-memory) AST for an expression, cached per Expression. Shared by the
@@ -1948,17 +2067,58 @@ export class Flow {
     return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.castDisplay.get(character);
   }
 
-  /** Split a ref into scope + name. Tokens: `@scene`, foreign tokens, else `@patter` (incl. bare `@name`). */
+  /** Split a ref into scope + name. Tokens: `@scene`, registered tokens, else `@patter` (incl. bare `@name`). */
   private splitRef(ref: string): { scope: string; name: string } {
-    // host.shared.has("patter") is true, so it covers @patter + every foreign token; @scene is explicit.
-    let hit = this.host.refSplitCache.get(ref);
-    if (!hit) { hit = splitRef(ref, (t) => t === "scene" || this.host.shared.has(t)); this.host.refSplitCache.set(ref, hit); }
-    return hit;
+    return splitHostRef(this.host, ref);
   }
 
-  /** The per-flow registry: the NOT-shared `@patter` globals (the shared ones live on the host). */
-  private freshLocal(): ScopeRegistry {
-    return new ScopeRegistry().defineOwned("patter", this.host.patterLocalDecls, "@patter.");
+  /** A fresh, unregistered bag for the NOT-shared `@patter` globals (the shared ones live on the host). */
+  private newLocal(): PropertyBag {
+    return new PropertyBag(this.host.patterLocalDecls, { pathPrefix: "@patter." });
+  }
+
+  /** Register a fresh globals bag under this flow's key; it claims any values waiting there. */
+  private mountLocal(): void {
+    this.local = this.newLocal();
+    const key = keys.flowGlobals(this.id);
+    this.host.registry.mountOwned(key, this.local, { owner: OWNER });
+    this.registered.add(key);
+  }
+
+  /** @internal Remove every bag this flow registered; with `keep`, their values wait in the registry for
+   *  the flow that replaces this one. Engine-driven (close, loadGame, hotSwap). */
+  releaseBags(keep: boolean): void {
+    for (const key of this.registered) this.host.registry.remove(key, { keep });
+    this.registered.clear();
+    this.sceneBags.clear();
+  }
+
+  /** The bag a `@scene` property of scene `s` lives in (stage or this flow's), made if missing. */
+  private sceneBagFor(s: string, name: string): PropertyBag | undefined {
+    if (!this.host.bundle.scenes[s]) return undefined;
+    this.ensureSceneBags(s);
+    return this.host.sceneSharedNames.get(s)?.has(name.toLowerCase()) ? this.host.stageBags.get(s) : this.sceneBags.get(s);
+  }
+
+  /** Make (and register) scene `s`'s stage bag and this flow's bag for it, if not made yet. A bag made
+   *  here claims whatever values the registry holds for its key: that is how a loaded save reaches it. */
+  private ensureSceneBags(s: string): void {
+    const shared = this.host.sceneSharedNames.get(s) ?? new Set<string>();
+    // The bag's constructor seeds each declared default (the type's when none), normalises the name,
+    // and clones the default so two bags from one declaration set never share a mutable flags array.
+    const props = this.host.bundle.scenes[s]?.sceneProps ?? [];
+    if (!this.sceneBags.has(s)) {
+      const bag = new PropertyBag(props.filter((d) => !shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
+      const key = keys.flowScene(this.id, s);
+      this.host.registry.mountOwned(key, bag, { owner: OWNER });
+      this.registered.add(key);
+      this.sceneBags.set(s, bag);
+    }
+    if (!this.host.stageBags.has(s)) {
+      const bag = new PropertyBag(props.filter((d) => shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
+      this.host.registry.mountOwned(keys.stage(s), bag, { owner: OWNER });
+      this.host.stageBags.set(s, bag);
+    }
   }
 
   /**
@@ -1970,16 +2130,7 @@ export class Flow {
    */
   private seedScene(scene: CompiledScene): void {
     const shared = this.host.sceneSharedNames.get(scene.id) ?? new Set<string>();
-    // The bag's constructor IS this loop: lowercase the name, seed the declared default
-    // else the type's, and structuredClone it so two bags from one declaration set never
-    // share a mutable flags array. That last part was missing here.
-    const props = scene.sceneProps ?? [];
-    if (!this.sceneBags.has(scene.id)) {
-      this.sceneBags.set(scene.id, new PropertyBag(props.filter((d) => !shared.has(d.name.toLowerCase())) as never));
-    }
-    if (!this.host.stageBags.has(scene.id)) {
-      this.host.stageBags.set(scene.id, new PropertyBag(props.filter((d) => shared.has(d.name.toLowerCase())) as never));
-    }
+    this.ensureSceneBags(scene.id);
 
     // `temporary` props are reseeded to their default on EVERY entry ("fresh each
     // playthrough"), rather than persisting across re-entries like the rest.
@@ -2047,22 +2198,37 @@ function toForeignDecl(decl: HostScopeDecl): ScopeDeclaration {
 }
 
 
-/** Build a live in-memory `{ get, set }` resolver for a self-backed host scope (the standalone `@world`):
- *  a plain bag seeded from declaration defaults. Declared-but-unseeded names still read `undefined`; an
- *  opaque scope (no declarations) starts empty and accepts any name. Per-property read-only is enforced at
- *  validation, not here (the registry is per-scope), so `set` accepts any name. */
-function selfBackedResolver(decls: HostScopeDecl[]): ScopeResolver {
-  // Keyed LOWERCASE. The compiler lowercases every property reference, so an AST reads `isnight` where
-  // the declaration says `isNight`; seeding the bag verbatim meant any declared name carrying a capital
-  // was never found, read as undefined, and silently took the falsy branch. `@patter` and `@scene`
-  // already normalise (patterSharedNames / sceneSharedNames); this resolver was the one that did not.
-  const key = (name: string): string => name.toLowerCase();
-  const bag = new Map<string, ScalarValue>();
-  for (const d of decls) bag.set(key(d.name), defaultFor(d));
-  return {
-    get: (name) => bag.get(key(name)),
-    set: (name, value) => { bag.set(key(name), value); },
-  };
+/** A self-backed host scope's declaration (the standalone `@world`): the scope's own `writable` default
+ *  folded in, since an owned bag reads writability per declaration. Names fold to lower case in the bag,
+ *  as the compiler emits every reference (`isNight` is read as `isnight`). */
+function selfBackedDecl(decl: HostScopeDecl, scopeWritable: boolean | undefined): ScopeDeclaration {
+  const d = toForeignDecl(decl);
+  const writable = decl.writable ?? scopeWritable;
+  return writable === undefined ? d : { ...d, writable };
+}
+
+/** Split a ref into scope + name against the registry's current tokens (`@scene` is always Patter's).
+ *  Memoised per ref; the memo is dropped when the registry's set of scopes moves. */
+function splitHostRef(host: FlowHost, ref: string): { scope: string; name: string } {
+  if (host.refSplitRevision !== host.registry.revision) {
+    host.refSplitCache.clear();
+    host.refSplitRevision = host.registry.revision;
+  }
+  let hit = host.refSplitCache.get(ref);
+  if (!hit) { hit = splitRef(ref, (t) => t === "scene" || host.registry.has(t)); host.refSplitCache.set(ref, hit); }
+  return hit;
+}
+
+/** A version 2 save's property values, as registry sections under this engine's keys. */
+function sectionsFromV2(save: SaveGameV2): EngineSave {
+  const out: EngineSave = {};
+  if (save.shared?.patter) out["patter"] = save.shared.patter;
+  for (const [s, v] of Object.entries(save.stageBags ?? {})) out[keys.stage(s)] = v;
+  for (const [id, f] of Object.entries(save.flows ?? {})) {
+    if (f.scopes?.patter) out[keys.flowGlobals(id)] = f.scopes.patter;
+    for (const [s, v] of Object.entries(f.sceneBags ?? {})) out[keys.flowScene(id, s)] = v;
+  }
+  return out;
 }
 
 

@@ -9496,9 +9496,14 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 2,
-          "shared": {
-            "patter": {}
+          "version": 3,
+          "registry": {
+            "patter": {},
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {
+              "laps": 0
+            },
+            "patter/scene/s": {}
           },
           "sharedVisits": {
             "s": 1,
@@ -9507,19 +9512,8 @@
             "one": 1
           },
           "sharedSelectors": {},
-          "stageBags": {
-            "s": {}
-          },
           "flows": {
             "main": {
-              "scopes": {
-                "patter": {}
-              },
-              "sceneBags": {
-                "s": {
-                  "laps": 0
-                }
-              },
               "rngState": 2654435769,
               "visits": {
                 "s": 1,
@@ -9573,26 +9567,23 @@
         "save/flows/main/cursor/stack[0]/nextId",
         "save/flows/main/cursor/stack[0]/sceneId",
         "save/flows/main/rngState",
-        "save/flows/main/sceneBags",
-        "save/flows/main/sceneBags/s",
-        "save/flows/main/sceneBags/s/laps",
-        "save/flows/main/scopes",
-        "save/flows/main/scopes/patter",
         "save/flows/main/visits",
         "save/flows/main/visits/loop",
         "save/flows/main/visits/one",
         "save/flows/main/visits/s",
         "save/flows/main/visits/seq",
-        "save/shared",
-        "save/shared/patter",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/flow/main/scene/s/laps",
+        "save/registry/patter/scene/s",
         "save/sharedSelectors",
         "save/sharedVisits",
         "save/sharedVisits/loop",
         "save/sharedVisits/one",
         "save/sharedVisits/s",
         "save/sharedVisits/seq",
-        "save/stageBags",
-        "save/stageBags/s",
         "save/version",
         "schema"
       ],
@@ -9726,9 +9717,12 @@
       "envelope": {
         "schema": "patter/save@0",
         "save": {
-          "version": 2,
-          "shared": {
-            "patter": {}
+          "version": 3,
+          "registry": {
+            "patter": {},
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
           },
           "sharedVisits": {
             "s": 1,
@@ -9736,17 +9730,8 @@
             "g": 1
           },
           "sharedSelectors": {},
-          "stageBags": {
-            "s": {}
-          },
           "flows": {
             "main": {
-              "scopes": {
-                "patter": {}
-              },
-              "sceneBags": {
-                "s": {}
-              },
               "rngState": 2654435769,
               "visits": {
                 "s": 1,
@@ -9825,23 +9810,20 @@
         "save/flows/main/cursor/stack[0]/index",
         "save/flows/main/cursor/stack[0]/sceneId",
         "save/flows/main/rngState",
-        "save/flows/main/sceneBags",
-        "save/flows/main/sceneBags/s",
-        "save/flows/main/scopes",
-        "save/flows/main/scopes/patter",
         "save/flows/main/visits",
         "save/flows/main/visits/b",
         "save/flows/main/visits/g",
         "save/flows/main/visits/s",
-        "save/shared",
-        "save/shared/patter",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
         "save/sharedSelectors",
         "save/sharedVisits",
         "save/sharedVisits/b",
         "save/sharedVisits/g",
         "save/sharedVisits/s",
-        "save/stageBags",
-        "save/stageBags/s",
         "save/version",
         "schema"
       ],
