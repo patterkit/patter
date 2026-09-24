@@ -1,5 +1,13 @@
 # @patterkit/dialect
 
+## 0.2.1
+
+### Patch Changes
+
+- 40befdb: Requires `@wildwinter/scoperegistry` ^0.8.0, whose new editing entry point (`@wildwinter/scoperegistry/scopes`) these packages do not use; no behaviour change.
+- Updated dependencies [40befdb]
+  - @patterkit/model@0.7.0
+
 ## 0.2.0
 
 ### Minor Changes

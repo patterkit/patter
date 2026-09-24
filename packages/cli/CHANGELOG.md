@@ -1,5 +1,32 @@
 # @patterkit/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- 40befdb: Packs carry the game's shared scopes (patterkit/design/shared-scopes.md, "Packs").
+
+  `@patterkit/ops`: where the project has a game scopes folder (found as the loaders find it, `gameScopes` override included), `runPack` carries every `*.scopes.json` in it as `game-scopes/<name>` entries, as the files are on disk, and the manifest (`DocumentManifest`) gains an optional sorted `gameScopes` list of their names. A project with no folder packs to the same bytes as before. `runUnpack` now returns `{ shards, scopes }` (it returned the shard writes as an array): `scopes` plans the snapshot into `<targetDir>/game-scopes/`, where the unpacked project finds it first, and is empty for a pack without one. `runUnpackMerge` never writes a returned pack's snapshot; when the project has a game scopes folder and the returned project file's copy of the game's scopes differs from the base pack's (the recipient edited World properties), it adds a write of the scopes they changed to `game.scopes.json`, keeping the file's other scopes, and reports it as `gameScopes: { path }` (with `error`, and no write, when that file won't parse). New helpers: `gameScopesSnapshot`, `planReturnedWorld`, and the `UnpackResult` type.
+
+  `@patterkit/cli`: `unpack` writes and lists a pack's game scopes snapshot, and `unpack --merge` prints a `game scopes:` line when it writes the recipient's World edit to `game.scopes.json` (or a warning when that file won't parse).
+
+- 40befdb: Shared game scopes (requires `@wildwinter/scoperegistry` ^0.8.0). A game can keep one `game-scopes/` folder where each editing tool writes the properties it declares and reads the others'.
+
+  `@patterkit/model`: `ProjectFile.gameScopes`, a path (relative to the project file) naming the folder when the walk-up from the project would not find it.
+
+  `@patterkit/compiler`: `validateConditions` and `validateInterpolation` take `gameScopes` (the merged folder) and check every scope in it the host spec doesn't hold, with warnings only: an undeclared name (worded by `referenceNote`), a type mismatch, or a write to a read-only property. `exportBundle` takes `gameScopes` too: `game.scopes.json` wins over the project's copy of a host scope, its `@world` is baked into `scopeRegistry` even when the project doesn't declare it, and every other scope in the folder compiles as another engine's does, named in `externalScopes` and never baked in. New exports: `projectScopes`, `externalGameScopes`, `PATTER_SCOPE`, and `EXTERNAL_SCOPES` (re-exported from the dialect).
+
+  `@patterkit/ops`: the loaders discover the folder (`LoadedProject.gameScopes`, `gameScopesMissing`), and export, validate, play, coverage, and reachability pass it on. `runValidate` gains `gameScopes` issues (a file that won't parse, a token two files claim, and a missing override are errors; `patter.scopes.json` out of date and the project's copy of a game scope differing are warnings), and `ok` now counts only errors among condition and interpolation issues. `runPlay` and coverage stand other engines in from the folder (`previewRegistry`) when the bundle names them. New helpers for editors: `patterScopesFile`, `patterScopesWrite`, `planWorldSave`, `planShareScopes`, `worldSettingsScopes`, `defaultGameScopesDir`, `gameScopesCatalogue`, `gameScopeTokens`.
+
+  `@patterkit/cli`: `export` writes `game-scopes/patter.scopes.json` when there is a folder and the file would change; `validate` prints the folder's issues as `[game-scopes]`, and prints warnings as such without failing; `play` and `coverage` run content naming another engine's scope where the folder declares it.
+
+### Patch Changes
+
+- Updated dependencies [40befdb]
+- Updated dependencies [40befdb]
+  - @patterkit/ops@0.8.0
+  - @patterkit/core@0.2.6
+
 ## 0.3.9
 
 ### Patch Changes
