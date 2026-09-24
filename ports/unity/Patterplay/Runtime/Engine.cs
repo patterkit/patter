@@ -220,10 +220,14 @@ namespace Patterkit.Patterplay
         public string CaptionClose;
         public string CaptionCharacter; // a cast member whose whole lines are captions (silent when off)
 
-        /// <summary>Whether `t` names a scope when splitting a ref: `@scene` (always Patter's) or any
-        /// token the registry holds, so `@world.gold` and another engine's `@story.act` are not read as a
-        /// @patter property literally named "world.gold".</summary>
-        public bool IsScopeToken(string t) => t == "scene" || Registry.Has(t);
+        /// <summary>Whether `t` names a scope when splitting a ref: `@scene` (always Patter's), any token the
+        /// registry holds, or another engine's scope the content names (Bundle.ExternalScopes), so
+        /// `@world.gold` and `@story.act` are not read as a @patter property literally named "world.gold".
+        /// The last is a scope even while no engine registers it (a flow cannot open without it, but the
+        /// other engine may take it away mid-game): a write to `@story.act` then fails naming the scope,
+        /// where it would otherwise land in @patter as `story.act`.</summary>
+        public bool IsScopeToken(string t) =>
+            t == "scene" || Registry.Has(t) || (Bundle.ExternalScopes != null && Bundle.ExternalScopes.Contains(t));
     }
 
     public sealed class Engine
@@ -487,6 +491,7 @@ namespace Patterkit.Patterplay
 
         public Flow OpenFlow(string id, string scene = null, string block = null, double? seed = null)
         {
+            AssertExternalScopes();
             string sceneId = ResolveSceneRef(scene);
             string blockId = ResolveBlockRef(sceneId, block);
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
@@ -496,6 +501,22 @@ namespace Patterkit.Patterplay
             _flows[id] = flow;
             flow.Start(sceneId, blockId);
             return flow;
+        }
+
+        /// <summary>Other engines' scopes the content names (Bundle.ExternalScopes), in listed order: the first
+        /// one the registry does not hold refuses the open or the load, before anything changes. Content that
+        /// names another engine's scope needs that engine on this registry; without it every read of the
+        /// scope would answer false and every write would fail, so the engine says so where the game starts
+        /// playing, not partway through a run.</summary>
+        private void AssertExternalScopes()
+        {
+            if (_host.Bundle.ExternalScopes == null) return;
+            foreach (var token in _host.Bundle.ExternalScopes)
+            {
+                if (!_host.Registry.Has(token))
+                    throw new Exception($"this content names @{token}, which no engine on this registry registered: "
+                        + "give every engine the game's one registry");
+            }
         }
 
         public Flow GetFlow(string id) => _flows.TryGetValue(id, out var f) ? f : null;
@@ -871,6 +892,7 @@ namespace Patterkit.Patterplay
         public void LoadGame(SaveGame save)
         {
             if (save.Version != 2 && save.Version != SaveVersion) throw new Exception($"unsupported save version: {save.Version}");
+            AssertExternalScopes();
             var reg = _host.Registry;
             var saved = save.Flows ?? new Dictionary<string, FlowSnapshot>();
             // Flows the save does not have are over: their bags go. The rest are handed back with their

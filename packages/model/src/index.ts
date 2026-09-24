@@ -990,6 +990,10 @@ export interface Bundle {
   /** Host / world scope declarations, baked from the project so the runtime can self-back a declared
    *  scope (`@world`, ...) when no host resolver claims its token. Absent = no host scopes. */
   scopeRegistry?: HostScopeRegistry;
+  /** Other engines' game-wide scopes the content names (`story`), sorted: the family's shared vocabulary,
+   *  opaque to the compiler and never self-backed. The engine reports when the game has not registered
+   *  one. Absent when none. */
+  externalScopes?: string[];
   gameDataFields?: GameDataFields;
   scenes: Record<string, CompiledScene>;
   /** locale -> (beatId -> text). In "embedded" localisation this carries every included locale; in "ids"

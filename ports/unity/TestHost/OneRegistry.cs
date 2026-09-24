@@ -271,32 +271,34 @@ namespace Patterkit.Patterplay.TestHost
                     && Num(patter2.GetFlow("f").GetProperty("@scene.count")) == 1, text);
             });
 
-            Case("Reads a scope another engine registered after the flow opened", () =>
+            Case("Reads a scope another engine registered again after the flow opened", () =>
             {
+                // The JS test's bundle: compiled with no scope setting, so @story is an external scope the
+                // content names, never one to self-back.
                 var withStory = OneRegistryBundle();
-                withStory.ScopeRegistry = new HostScopeRegistry();
-                withStory.ScopeRegistry.Scopes.Add(new HostScopeSpec { Token = "story", Declarations = new List<HostScopeDecl>
-                {
-                    new HostScopeDecl { Name = "act", Type = "number" },
-                } });
+                withStory.ScopeRegistry = null;
+                withStory.ExternalScopes = new List<string> { "story" };
                 withStory.Strings["en"] = new Dictionary<string, string> { ["I"] = "intro", ["L"] = "act two" };
                 withStory.Scenes["s"].Blocks[0].Children = new List<Node>
                 {
-                    // Evaluated first, so the flow has built its evaluation context before @story exists.
+                    // Evaluated first, so the flow has built its evaluation context before @story is replaced.
                     new Node { Id = "intro", Type = "snippet", Condition = Ex(A("bin", ">=", A("sv", "patter", "fame"), A("n", 0.0))),
                         Beats = new List<Beat> { new Beat { Id = "I", Kind = "text" } } },
                     new Node { Id = "yes", Type = "snippet", Condition = Ex(A("bin", ">=", A("sv", "story", "act"), A("n", 2.0))),
                         Beats = new List<Beat> { new Beat { Id = "L", Kind = "text" } }, Jump = new Jump { To = "END" } },
                 };
-                var registry = new ScopeRegistry();
+                var registry = new ScopeRegistry().DefineOwned("story",
+                    new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(1) } },
+                    new OwnedScopeOptions { Owner = "Other engine" });
                 var patter = new Engine(withStory, new EngineOptions { Registry = registry });
                 var flow = patter.OpenFlow("f", "s");
                 var first = flow.Advance();
                 RegistryCheck("late scope: intro", first.Type == StepType.Text && first.Text == "intro", first.Text);
-                registry.DefineOwned("story", new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(2) } },
+                // The other engine rebuilds (a live edit): its scope goes, and comes back holding a new value.
+                registry.Remove("story").DefineOwned("story", new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(2) } },
                     new OwnedScopeOptions { Owner = "Other engine" });
                 var second = flow.Advance();
-                RegistryCheck("late scope: a scope registered after the flow opened is read", second.Type == StepType.Text && second.Text == "act two",
+                RegistryCheck("late scope: a scope registered again after the flow opened is read", second.Type == StepType.Text && second.Text == "act two",
                     $"{second.Type} {second.Text}");
             });
 
@@ -446,6 +448,7 @@ namespace Patterkit.Patterplay.TestHost
 
             RunOldShapeChecks();
             RunCombinedGameChecks();
+            RunExternalScopesChecks();
             Console.WriteLine($"  [one-registry] the game's registry, from the game's side: {_registryChecks} checks");
         }
 
@@ -673,6 +676,83 @@ namespace Patterkit.Patterplay.TestHost
                 var msg = Throws(() => StoryStandIn(registry));
                 RegistryCheck("combined: a clash names the holder", msg != null && msg.Contains("scope '@story' is already registered by Storylet Engine"), msg ?? "no error");
             });
+        }
+
+        // -------------------------------------------------------------------------------------------
+        // Other engines' scopes (expr/family/engine-scopes.json): a Patter line may name `@story.act`
+        // with no project setting. The compiler lets it through unchecked and records it in the bundle
+        // as `externalScopes`, never as a scope to self-back; the engine reads and writes it through the
+        // game's registry, and refuses to open or load where nobody registered it. Ported from the JS
+        // runtime's one-registry.test.ts ("other engines' scopes"); the compiler's own cases stay in JS,
+        // since a native runtime never compiles. The bundle is that test's, as its exportBundle wrote it.
+        // -------------------------------------------------------------------------------------------
+
+        /// <summary>The JS test's `gateBundle`: one snippet gated on `@story.act >= 2`, whose exit adds one
+        /// to it, and a text line interpolating it.</summary>
+        private const string GateBundleJson = @"{""schema"":""patter/bundle@0"",""content"":{""project"":""or"",""hash"":""0m5p8ho"",""structureHash"":""168d7pm""},""voiced"":false,""locales"":{""default"":""en"",""included"":[""en""]},""properties"":[{""name"":""fame"",""type"":""number"",""default"":0,""shared"":true},{""name"":""mood"",""type"":""number"",""default"":0,""shared"":false}],""scenes"":{""gate"":{""id"":""gate"",""type"":""scene"",""name"":""Gate"",""gameId"":""gate"",""blocks"":[{""id"":""b"",""type"":""block"",""name"":""B"",""children"":[{""id"":""shout"",""type"":""snippet"",""condition"":{""src"":""@story.act >= 2"",""ast"":[""bin"","">="",[""sv"",""story"",""act""],[""n"",2]]},""beats"":[{""id"":""L"",""kind"":""text""}],""onExit"":[{""kind"":""set"",""target"":""@story.act"",""value"":{""src"":""@story.act + 1"",""ast"":[""bin"",""+"",[""sv"",""story"",""act""],[""n"",1]]}}],""jump"":{""to"":""END""}}]}]}},""strings"":{""en"":{""L"":""act {@story.act}""}},""externalScopes"":[""story""]}";
+
+        private static void RunExternalScopesChecks()
+        {
+            // Every case through BOTH loaders: each has to carry externalScopes, or the engine cannot know.
+            var loaders = new (string name, Func<string, Bundle> load)[]
+            {
+                ("System.Text.Json", json => { using var doc = JsonDocument.Parse(json); return ParseBundle(doc.RootElement); }),
+                ("Newtonsoft (Unity)", json => PatterBundleLoader.Parse(json)),
+            };
+            foreach (var (loader, load) in loaders)
+            {
+                Case($"[{loader}] the bundle carries externalScopes, and none is none", () =>
+                {
+                    var ext = load(GateBundleJson).ExternalScopes;
+                    RegistryCheck($"[{loader}] externalScopes read", ext != null && ext.SequenceEqual(new[] { "story" }),
+                        ext == null ? "null" : string.Join(",", ext));
+                    var none = load(GateBundleJson.Replace(@",""externalScopes"":[""story""]", "")).ExternalScopes;
+                    RegistryCheck($"[{loader}] absent is null", none == null);
+                });
+
+                Case($"[{loader}] reads and writes it through the game's registry", () =>
+                {
+                    var registry = new ScopeRegistry().DefineOwned("story",
+                        new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(2) } },
+                        new OwnedScopeOptions { Owner = "Storylet Engine" });
+                    var flow = new Engine(load(GateBundleJson), new EngineOptions { Registry = registry }).OpenFlow("f", "gate");
+                    var line = flow.Advance();
+                    RegistryCheck($"[{loader}] the gate opens and interpolates @story", line.Type == StepType.Text && line.Text == "act 2", line.Text ?? line.Type.ToString());
+                    RegistryCheck($"[{loader}] then the end", flow.Advance().Type == StepType.End);
+                    RegistryCheck($"[{loader}] the exit wrote @story.act", Num(registry.Get("story", "act")) == 3, Dump(registry.Save()));
+                });
+
+                Case($"[{loader}] refuses to open a flow, or load a save, where nobody registered it, before anything changes", () =>
+                {
+                    const string refusal = "this content names @story, which no engine on this registry registered: give every engine the game's one registry";
+                    var alone = new Engine(load(GateBundleJson), new EngineOptions { Registry = new ScopeRegistry() });
+                    var err = Throws(() => alone.OpenFlow("f", "gate"));
+                    RegistryCheck($"[{loader}] OpenFlow is refused", err == refusal, err ?? "no throw");
+                    RegistryCheck($"[{loader}] and opened nothing", alone.GetFlow("f") == null);
+
+                    // A save made where the Storylet Engine was present, loaded where it is not: refused whole.
+                    var registry = new ScopeRegistry().DefineOwned("story",
+                        new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(2) } },
+                        new OwnedScopeOptions { Owner = "Storylet Engine" });
+                    var game = new Engine(load(GateBundleJson), new EngineOptions { Registry = registry });
+                    var flow = game.OpenFlow("f", "gate");
+                    var save = game.SaveGame();
+                    var elsewhere = new ScopeRegistry().DefineOwned("story",
+                        new[] { new ScopeDeclaration { Name = "act", Type = "number", Default = ExprValue.Num(1) } });
+                    var other = new Engine(load(GateBundleJson), new EngineOptions { Registry = elsewhere });
+                    other.OpenFlow("keep", "gate");
+                    elsewhere.Remove("story");
+                    err = Throws(() => other.LoadGame(save));
+                    RegistryCheck($"[{loader}] LoadGame is refused", err == refusal, err ?? "no throw");
+                    RegistryCheck($"[{loader}] and the load changed nothing", other.GetFlow("keep") != null && other.GetFlow("f") == null,
+                        string.Join(",", other.Flows().Select(f => f.Id)));
+
+                    // The engine that took the scope away mid-game: a write names it.
+                    registry.Remove("story");
+                    err = Throws(() => flow.SetProperty("@story.act", ExprValue.Num(1)));
+                    RegistryCheck($"[{loader}] a write fails naming the scope", err != null && err.Contains("unknown scope '@story'"), err ?? "no throw");
+                });
+            }
         }
     }
 }

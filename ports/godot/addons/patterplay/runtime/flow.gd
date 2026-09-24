@@ -1045,6 +1045,11 @@ static func key_flow_scene(flow_id: String, scene_id: String) -> String:
 ## Split a ref into [scope, name] against the registry's current tokens (`@scene` is always the
 ## flow's). Memoised per ref on the engine's host; the memo is dropped when the registry's set of
 ## scopes moves.
+##
+## Another engine's scope the content names (the bundle's externalScopes, `@story.act`) is a scope
+## even while nothing registers it (a flow cannot open without it, but that engine can take it away
+## mid-game): a write then fails naming it, where it would otherwise land in @patter as a property
+## called `story.act`.
 static func split_host_ref(host: Dictionary, ref: String) -> Array:
 	var reg = host["registry"]
 	if host["split_revision"] != reg.revision:
@@ -1052,8 +1057,9 @@ static func split_host_ref(host: Dictionary, ref: String) -> Array:
 		host["split_revision"] = reg.revision
 	var cache: Dictionary = host["split_cache"]
 	if not cache.has(ref):
+		var external: Array = host.get("external_scopes", [])
 		cache[ref] = PatterBundle.split_ref_with(ref, func(t: String) -> bool:
-			return t == "scene" or reg.has(t))
+			return t == "scene" or reg.has(t) or external.has(t))
 	return cache[ref]
 
 

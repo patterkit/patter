@@ -109,6 +109,15 @@ self-backs nothing on a registry you pass. Every expression can read every regis
 condition can test another engine's `@story.act` once that engine is in the same registry, and
 `engine.get_property("@story.act")` reads it too.
 
+**Other engines' scopes need no setting.** A Patter line can name the Storylet Engine's `@story.act`
+(in a condition, an effect, or a `{@story.act}` slot) in any project, and the bundle records it in
+`externalScopes` (`PatterBundle.external_scopes(bundle)` reads it). That content runs only where the
+other engine is on the same registry. If it is not, `open_flow` and `load_game` refuse before anything
+changes: each `push_error`s `this content names @story, which no engine on this registry registered:
+give every engine the game's one registry`, then `open_flow` returns null and `load_game` returns
+false. If that engine takes its scope away mid-game, a write to it fails in the registry naming the
+scope (a `push_error`, `unknown scope '@story'`) rather than landing in `@patter`.
+
 A token is taken once. Two engines that both want the same one clash as you build the second: GDScript
 has no exceptions, so the registry `push_error`s a message naming who got there first, the engine's
 `init_error()` returns it, the new engine is inert, and your registry is left as it was. Values a load

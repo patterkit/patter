@@ -195,6 +195,7 @@ static Bundle parseBundle(const JsonValue& b)
                 bundle.scopeRegistry.scopes.push_back(spec);
             }
     }
+    if (const JsonValue* ext = b.find("externalScopes")) bundle.externalScopes = strList(*ext);
     if (const JsonValue* strs = b.find("strings")) bundle.strings = parseStrings(*strs);
     if (const JsonValue* gdf = b.find("gameDataFields"))
         for (const auto& kind : gdf->obj)
@@ -936,10 +937,11 @@ static const Bundle& orBundle()
 }
 
 // The same, reading `@story.act` (compiled against another engine's spec, which it does not declare
-// as its own) after a first snippet that makes the flow build its context.
+// as its own, so the bundle lists it in externalScopes) after a first snippet that makes the flow build
+// its context before @story is replaced.
 static const Bundle& withStoryBundle()
 {
-    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"or","hash":"0oj4bfr","structureHash":"1cazdgj"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"fame","type":"number","default":0,"shared":true},{"name":"mood","type":"number","default":0,"shared":false}],"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"count","type":"number","default":0},{"name":"tally","type":"number","default":0,"shared":true}],"blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"intro","type":"snippet","condition":{"src":"@fame >= 0","ast":["bin",">=",["sv","patter","fame"],["n",0]]},"beats":[{"id":"I","kind":"text"}]},{"id":"yes","type":"snippet","condition":{"src":"@story.act >= 2","ast":["bin",">=",["sv","story","act"],["n",2]]},"beats":[{"id":"L","kind":"text"}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"I":"intro","L":"act two"}}})JSON"));
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"or","hash":"0oj4bfr","structureHash":"1cazdgj"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"fame","type":"number","default":0,"shared":true},{"name":"mood","type":"number","default":0,"shared":false}],"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"count","type":"number","default":0},{"name":"tally","type":"number","default":0,"shared":true}],"blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"intro","type":"snippet","condition":{"src":"@fame >= 0","ast":["bin",">=",["sv","patter","fame"],["n",0]]},"beats":[{"id":"I","kind":"text"}]},{"id":"yes","type":"snippet","condition":{"src":"@story.act >= 2","ast":["bin",">=",["sv","story","act"],["n",2]]},"beats":[{"id":"L","kind":"text"}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"I":"intro","L":"act two"}},"externalScopes":["story"]})JSON"));
     return b;
 }
 
@@ -947,7 +949,7 @@ static const Bundle& withStoryBundle()
 // bumps Patter's own shared `@patter.visits`.
 static const Bundle& combinedBundle()
 {
-    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"p","hash":"0l7gt7r","structureHash":"0o6kky5"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"MERCHANT"}],"properties":[{"name":"visits","type":"number","shared":true,"default":0}],"scenes":{"shop":{"id":"shop","type":"scene","name":"Shop","blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"buy","type":"snippet","condition":{"src":"@world.gold >= 10 && @story.act >= 2","ast":["bin","and",["bin",">=",["sv","world","gold"],["n",10]],["bin",">=",["sv","story","act"],["n",2]]]},"beats":[{"id":"L","kind":"line","character":"MERCHANT"}],"onExit":[{"kind":"set","target":"@world.gold","value":{"src":"@world.gold - 10","ast":["bin","-",["sv","world","gold"],["n",10]]}},{"kind":"set","target":"@visits","value":{"src":"@visits + 1","ast":["bin","+",["sv","patter","visits"],["n",1]]}}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L":"A fine blade."}}})JSON"));
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"p","hash":"0l7gt7r","structureHash":"0o6kky5"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"MERCHANT"}],"properties":[{"name":"visits","type":"number","shared":true,"default":0}],"scenes":{"shop":{"id":"shop","type":"scene","name":"Shop","blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"buy","type":"snippet","condition":{"src":"@world.gold >= 10 && @story.act >= 2","ast":["bin","and",["bin",">=",["sv","world","gold"],["n",10]],["bin",">=",["sv","story","act"],["n",2]]]},"beats":[{"id":"L","kind":"line","character":"MERCHANT"}],"onExit":[{"kind":"set","target":"@world.gold","value":{"src":"@world.gold - 10","ast":["bin","-",["sv","world","gold"],["n",10]]}},{"kind":"set","target":"@visits","value":{"src":"@visits + 1","ast":["bin","+",["sv","patter","visits"],["n",1]]}}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L":"A fine blade."}},"externalScopes":["story"]})JSON"));
     return b;
 }
 
@@ -1121,16 +1123,18 @@ static void runOneRegistryCases()
         for (const auto& k : registryKeys(*g.registry)) need(k.find("stray") == std::string::npos, "a stray flow's bag survived: " + k);
     });
 
-    regCase("reads a scope another engine registered after the flow opened", []
+    regCase("reads a scope another engine registered again after the flow opened", []
     {
         auto registry = std::make_shared<ScopeRegistry>();
+        OwnedScopeOptions other; other.owner = "Other engine";
+        registry->defineOwned("story", { numberDecl("act", 1) }, other);
         EngineOptions opts; opts.registry = registry;
         Engine patter(withStoryBundle(), opts);
         Flow* flow = patter.openFlow("f", "s");
         StepResult first = flow->advance();
         need(first.type == StepType::Text && first.text == "intro", "expected the intro, got " + dump(normalize(first)));
-        OwnedScopeOptions other; other.owner = "Other engine";
-        registry->defineOwned("story", { numberDecl("act", 2) }, other);
+        // The other engine rebuilds (a live edit): its scope goes, and comes back holding a new value.
+        registry->remove("story").defineOwned("story", { numberDecl("act", 2) }, other);
         StepResult second = flow->advance();
         need(second.type == StepType::Text && second.text == "act two", "the flow did not read @story: got " + dump(normalize(second)));
     });
@@ -1465,12 +1469,124 @@ static void runSaveEnvelopeCases()
     });
 }
 
+// ----- other engines' scopes -------------------------------------------------------------------------
+//
+// expr/family/engine-scopes.json: a Patter line may name another engine's game-wide scope (`@story.act`)
+// with no project setting. The compiler records the tokens it names in the bundle (`externalScopes`),
+// never as a scope to self-back; the engine reads and writes them through the game's registry, and
+// refuses to open a flow (or load a save) where nobody registered one, before anything changes. A ref
+// in that list is a scope even when its engine is gone, so a write after another engine took its scope
+// away mid-game fails naming it. Ports of the runtime cases of one-registry.test.ts's "other engines'
+// scopes", over the bundles its gate and intro scenes export to (written out by running that test's
+// own builders); the compile-only cases belong to the TS compiler, which native runtimes never run.
+
+static int g_extPass = 0, g_extTotal = 0;
+
+static void extCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_extTotal;
+    try { body(); ++g_extPass; }
+    catch (const std::exception& ex) { fail("external-scopes", name, ex.what()); }
+}
+
+// The gate: `@story.act >= 2` gates a text line reading `{@story.act}`, and its exit sets
+// `@story.act + 1`. Compiled with no scope setting at all.
+static const Bundle& gateBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"or","hash":"0m5p8ho","structureHash":"168d7pm"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"fame","type":"number","default":0,"shared":true},{"name":"mood","type":"number","default":0,"shared":false}],"scenes":{"gate":{"id":"gate","type":"scene","name":"Gate","gameId":"gate","blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"shout","type":"snippet","condition":{"src":"@story.act >= 2","ast":["bin",">=",["sv","story","act"],["n",2]]},"beats":[{"id":"L","kind":"text"}],"onExit":[{"kind":"set","target":"@story.act","value":{"src":"@story.act + 1","ast":["bin","+",["sv","story","act"],["n",1]]}}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L":"act {@story.act}"}},"externalScopes":["story"]})JSON"));
+    return b;
+}
+
+/** The refusal, the same on every runtime. */
+static const char* kExternalRefusal =
+    "this content names @story, which no engine on this registry registered: give every engine the game's one registry";
+
+/** A registry holding a stand-in for the Storylet Engine's `@story`. */
+static std::shared_ptr<ScopeRegistry> storyRegistry(double act, std::optional<std::string> owner = std::string("Storylet Engine"))
+{
+    auto registry = std::make_shared<ScopeRegistry>();
+    OwnedScopeOptions story; story.owner = std::move(owner);
+    registry->defineOwned("story", { numberDecl("act", act) }, story);
+    return registry;
+}
+
+static void runExternalScopeCases()
+{
+    extCase("reads externalScopes from the bundle, and never self-backs one", []
+    {
+        need(gateBundle().externalScopes == std::vector<std::string>{ "story" }, "externalScopes: " + joined(gateBundle().externalScopes));
+        need(!gateBundle().scopeRegistry.present, "the bundle declares a scope registry");
+        need(orBundle().externalScopes.empty(), "a bundle that names no other engine has externalScopes " + joined(orBundle().externalScopes));
+        auto registry = storyRegistry(1);
+        EngineOptions opts; opts.registry = registry;
+        Engine patter(gateBundle(), opts);
+        patter.openFlow("f", "gate");
+        for (const auto& k : registryKeys(*registry))
+            need(k == "story" || k.rfind("patter", 0) == 0, "the engine registered a key of another engine's: " + k);
+    });
+
+    extCase("reads and writes it through the game's registry", []
+    {
+        auto registry = storyRegistry(2);
+        EngineOptions opts; opts.registry = registry;
+        Engine engine(gateBundle(), opts);
+        Flow* flow = engine.openFlow("f", "gate");
+        StepResult line = flow->advance();
+        need(line.type == StepType::Text && line.text == "act 2", "expected the text \"act 2\", got " + dump(normalize(line)));
+        need(flow->advance().type == StepType::End, "the flow did not end");
+        expectNumber(registry->get("story", "act"), 3, "story.act after the exit");
+    });
+
+    extCase("refuses to open a flow, or load a save, where nobody registered it, before anything changes", []
+    {
+        EngineOptions lone; lone.registry = std::make_shared<ScopeRegistry>();
+        Engine alone(gateBundle(), lone);
+        expectThrow([&] { alone.openFlow("f", "gate"); }, kExternalRefusal, "the open");
+        need(alone.getFlow("f") == nullptr, "the refused open left a flow behind");
+
+        // A save made where the Storylet Engine was present, loaded where it is not: refused whole.
+        auto registry = storyRegistry(2);
+        EngineOptions gameOpts; gameOpts.registry = registry;
+        Engine game(gateBundle(), gameOpts);
+        Flow* flow = game.openFlow("f", "gate");
+        SaveGame save = game.saveGame();
+        auto elsewhere = storyRegistry(1, std::nullopt);
+        EngineOptions otherOpts; otherOpts.registry = elsewhere;
+        Engine other(gateBundle(), otherOpts);
+        other.openFlow("keep", "gate");
+        elsewhere->remove("story");
+        expectThrow([&] { other.loadGame(save); }, kExternalRefusal, "the load");
+        need(other.getFlow("keep") != nullptr && !other.getFlow("keep")->isClosed(), "the refused load closed the flow it had");
+        need(other.getFlow("f") == nullptr, "the refused load restored a flow");
+
+        // The engine that took the scope away mid-game: a write names it.
+        registry->remove("story");
+        expectThrow([&] { flow->setProperty("@story.act", PatterValue::Num(1)); }, "unknown scope '@story'", "a flow's write");
+        expectThrow([&] { game.setProperty("@story.act", PatterValue::Num(1)); }, "unknown scope '@story'", "the engine's write");
+    });
+
+    extCase("opens once the game has registered it, whatever order it built its engines in", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        EngineOptions opts; opts.registry = registry;
+        Engine engine(gateBundle(), opts);
+        // Registered after the engine was built, before any flow opens.
+        OwnedScopeOptions story; story.owner = "Storylet Engine";
+        registry->defineOwned("story", { numberDecl("act", 2) }, story);
+        StepResult line = engine.openFlow("f", "gate")->advance();
+        need(line.type == StepType::Text && line.text == "act 2", "expected the text \"act 2\", got " + dump(normalize(line)));
+    });
+
+    std::cout << "  [external-scopes] other engines' scopes, read, written, and refused where nobody registered them: " << g_extPass << "/" << g_extTotal << "\n";
+}
+
 static void runOneRegistry()
 {
     runOneRegistryCases();
     runCombinedGameCases();
     runSaveEnvelopeCases();
     std::cout << "  [one-registry] the game's registry, one save, loaded in either order: " << g_regPass << "/" << g_regTotal << "\n";
+    runExternalScopeCases();
 }
 
 // ----- kernel errors -----------------------------------------------------------------------------------

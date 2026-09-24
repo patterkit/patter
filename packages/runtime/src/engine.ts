@@ -656,6 +656,7 @@ export class Engine {
    * call to reach for when you want a speaker's variation state to carry on.
    */
   openFlow(id: string, opts: OpenFlowOptions = {}): Flow {
+    this.assertExternalScopes();
     const sceneId = this.resolveSceneRef(opts.scene);
     const blockId = this.resolveBlockRef(sceneId, opts.block);
     this.flowsById.get(id)?.close(); // finish the flow this name used to mean
@@ -695,6 +696,19 @@ export class Engine {
       throw new Error(`runFlow: address not found: ${scene}${block === undefined ? "" : ` / ${block}`}`);
     }
     return existing.advanceToStop().played;
+  }
+
+  /** Content that names another engine's scope (`@story.act`) runs only where that engine is on this
+   *  registry: without it every read would answer false and every write fail, so the flow is refused as
+   *  it opens (or the save as it loads), before anything changes. By then a game has built all of its
+   *  engines, whatever order it built them in. The same message on every runtime. */
+  private assertExternalScopes(): void {
+    for (const token of this.host.bundle.externalScopes ?? []) {
+      if (!this.host.registry.has(token)) {
+        throw new Error(`this content names @${token}, which no engine on this registry registered: `
+          + `give every engine the game's one registry`);
+      }
+    }
   }
 
   /** Resolve a scene reference (a gameId address OR an internal id) to its internal id. */
@@ -1052,6 +1066,7 @@ export class Engine {
   loadGame(save: SaveGame | SaveGameV2): void {
     const version: unknown = (save as { version?: unknown }).version;
     if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported save version: ${String(version)}`);
+    this.assertExternalScopes();
     const reg = this.host.registry;
     // Flows the save does not have are over: their bags go. The rest are handed back with their values,
     // which is what a game that loaded its registry first has just laid the save's values over.
@@ -2215,7 +2230,12 @@ function splitHostRef(host: FlowHost, ref: string): { scope: string; name: strin
     host.refSplitRevision = host.registry.revision;
   }
   let hit = host.refSplitCache.get(ref);
-  if (!hit) { hit = splitRef(ref, (t) => t === "scene" || host.registry.has(t)); host.refSplitCache.set(ref, hit); }
+  // Another engine's scope the content names (`@story.act`) is a scope even before that engine
+  // registers it: a write then fails naming it, where it would otherwise land in @patter as `story.act`.
+  if (!hit) {
+    hit = splitRef(ref, (t) => t === "scene" || host.registry.has(t) || (host.bundle.externalScopes?.includes(t) ?? false));
+    host.refSplitCache.set(ref, hit);
+  }
   return hit;
 }
 

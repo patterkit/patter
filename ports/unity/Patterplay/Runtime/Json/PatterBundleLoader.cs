@@ -57,6 +57,14 @@ namespace Patterkit.Patterplay
                 }
             }
 
+            // Other engines' scopes the content names (`@story.act`): a scope before any engine registers it,
+            // and reported when none has.
+            if (b["externalScopes"] is JArray ext)
+            {
+                bundle.ExternalScopes = new List<string>();
+                foreach (var t in ext) bundle.ExternalScopes.Add((string)t);
+            }
+
             if (b["cast"] is JArray cast)
                 foreach (var c in cast)
                     bundle.Cast.Add(new Cast { Name = (string)c["name"], DisplayName = (string)c["displayName"] });

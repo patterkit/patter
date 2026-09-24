@@ -310,6 +310,10 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 				}
 		}
 
+		// Other engines' scopes the content names (`story`). Skipped, a write to one would land in
+		// @patter under a dotted name, and a game that never registered it would hear nothing.
+		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("externalScopes"))) Out.externalScopes = StrList(*P);
+
 		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("strings"))) Out.strings = ToStrings((*P)->AsObject());
 
 		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("gameDataFields")))

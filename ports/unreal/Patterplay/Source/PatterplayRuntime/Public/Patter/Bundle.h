@@ -141,6 +141,10 @@ namespace patter
         std::map<std::string, std::vector<GameDataField>> gameDataFields;
         CaptionDelimiters closedCaptions;   // #214; `present=false` => use the default ( / )
         HostScopeRegistry scopeRegistry;    // declared host scopes; `present=false` => the project declares none
+        // Other engines' game-wide scopes the content names (`story`), sorted: the family's shared
+        // vocabulary, opaque to the compiler and never self-backed. A ref to one is a scope even before
+        // its engine registers it, and the engine reports when the game has not. Empty = none.
+        std::vector<std::string> externalScopes;
     };
 
     // ----- gameData merge-at-read (port of gamedata.ts) ------------------------

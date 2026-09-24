@@ -9,7 +9,29 @@ static func load_from_string(json: String):
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_error("Patterplay: not a valid .patterc bundle")
 		return null
+	if parsed.has("externalScopes"):
+		var ext = parsed["externalScopes"]
+		var ok: bool = ext is Array
+		if ok:
+			for t in ext:
+				ok = ok and t is String
+		if not ok:
+			push_error("Patterplay: a .patterc bundle's externalScopes must be an array of scope tokens")
+			return null
 	return parsed
+
+
+## Other engines' game-wide scopes the content names (`story`), sorted, from the bundle's
+## "externalScopes": the family's shared vocabulary, which the compiler lets through unchecked and
+## never self-backs. [] when the bundle names none (the key is absent then).
+static func external_scopes(bundle: Dictionary) -> Array:
+	var out: Array = []
+	var ext = bundle.get("externalScopes")
+	if ext is Array:
+		for t in ext:
+			if t is String and t != "":
+				out.append(t)
+	return out
 
 
 # Split a ref ("@name" / "@scope.name") into [scope, lowercased name].

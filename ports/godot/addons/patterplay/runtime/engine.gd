@@ -86,6 +86,10 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		"self_backed": [],
 		# Host scopes the game bound through the "host_scopes" option, registered as foreign scopes.
 		"bound_scopes": [],
+		# Other engines' game-wide scopes the content names (the bundle's externalScopes): every one
+		# must be registered for a flow to open or a load to run, and each is a scope to
+		# PatterFlow.split_host_ref whether or not anybody registers it now.
+		"external_scopes": PatterBundle.external_scopes(bundle),
 		# Memoised ref splits (ref -> [scope, name]), dropped whenever the registry's scopes move.
 		"split_cache": {},
 		"split_revision": -1,
@@ -295,9 +299,16 @@ func clear_log() -> void:
 	_engine_log.clear()
 
 
+## Open (and start) a named flow; re-opening a name replaces it. Returns null (with push_error, and
+## nothing changed) when this engine was refused its registration, or when the content names another
+## engine's scope that nothing on this registry registered.
 func open_flow(id: String, scene: String = "", block: String = "", seed_value = null) -> PatterFlow:
 	if _init_error != "":
 		push_error("open_flow: this engine was refused its registration (%s)" % _init_error)
+		return null
+	var unregistered := _external_scope_refusal()
+	if unregistered != "":
+		push_error("open_flow: " + unregistered)
 		return null
 	var scene_id := _resolve_scene_ref(scene)
 	var block_id := _resolve_block_ref(scene_id, block)
@@ -314,6 +325,18 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	_flows[id] = flow
 	flow.start(scene_id, block_id)
 	return flow
+
+
+## Other engines' scopes the content names (the bundle's externalScopes) must all be registered
+## by the time a flow opens or a load restores the run: by then a game has built all of its engines,
+## whatever order it built them in. The first token in the list the registry does not have is the
+## refusal (a message for push_error), or "" when every one is there.
+func _external_scope_refusal() -> String:
+	for token in _host["external_scopes"]:
+		if not _host["registry"].has(token):
+			return ("this content names @%s, which no engine on this registry registered: " % token) \
+				+ "give every engine the game's one registry"
+	return ""
 
 
 ## Every currently-open flow. Parity with the JS runtime's flows() and the C# / C++ ports:
@@ -613,7 +636,8 @@ func save_game() -> Dictionary:
 ## registry itself, before or after this call. Either order works: this engine's bags are handed back
 ## to the registry (values kept) and the restored flows claim them as they register.
 ##
-## Returns false (with push_error, and nothing changed) for a save version this engine cannot read.
+## Returns false (with push_error, and nothing changed) for a save version this engine cannot read,
+## or when the content names another engine's scope that nothing on this registry registered.
 func load_game(save: Dictionary) -> bool:
 	var version = save.get("version")
 	var v := float(version) if (version is int or version is float) else -1.0
@@ -622,6 +646,10 @@ func load_game(save: Dictionary) -> bool:
 		return false
 	if _init_error != "":
 		push_error("load_game: this engine was refused its registration (%s)" % _init_error)
+		return false
+	var unregistered := _external_scope_refusal()
+	if unregistered != "":
+		push_error("load_game: " + unregistered)
 		return false
 	var reg = _host["registry"]
 	var saved_flows: Dictionary = save.get("flows", {}) if save.get("flows") is Dictionary else {}

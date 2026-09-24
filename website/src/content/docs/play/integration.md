@@ -88,8 +88,16 @@ Given a registry, the engine registers `@patter` under `patter` and each flow's 
 under a key starting `patter/`, which no expression can name. Its `saveGame()` then leaves the
 values out, because your game saves the registry. `@world` is yours to register: owned, as above,
 when the registry should store and save it, or foreign, with a resolver, when your game keeps the
-values. Every expression can read every registered scope, so a condition can test another
-engine's `@story.act` once that engine is in the same registry.
+values. Every expression can read every registered scope.
+
+**Other engines' scopes need no setting.** A Patter line can name the Storylet Engine's
+`@story.act` (in a condition, an effect, or a `{@story.act}` slot) in any project: the compiler
+lets it through without checking its names, since the Storylet Engine owns them. Only the other
+engine's shared values are visible. Content that names another engine runs only where that
+engine is on the same registry: without it, `openFlow` and `loadGame` refuse, naming the token,
+before anything changes. A tool that runs Patter alone, such as a preview or a coverage run,
+refuses that content for the same reason. The list of these tokens is shared by every engine in the family, so combining them
+never needs wiring.
 
 A token is taken once. Two engines that both want the same one fail as you build the second,
 with an error that names who got there first. Rebuilding an engine on an edited bundle

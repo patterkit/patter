@@ -18,6 +18,9 @@
 // (engine-owned + host/foreign tokens).
 // ---------------------------------------------------------------------------
 
+import { ENGINE_SCOPES } from "./engine-scopes.js";
+export { ENGINE_SCOPES } from "./engine-scopes.js";
+export type { EngineScope } from "./engine-scopes.js";
 import type {
   Dialect, EvalHelpers, ExprNode, ScalarValue,
   ExpressionSchema, PropertyType as ExprPropertyType,
@@ -115,6 +118,31 @@ export const patterDialect: Dialect = {
 };
 
 /**
+ * Other engines' game-wide scopes a Patter expression may name, from the family's
+ * shared list (expr/family/engine-scopes.json): `@story.act` reads the Storylet
+ * Engine's shared @story in a game that runs both. On by default, with no project
+ * setting, so combining the engines needs no wiring. They are opaque here (the
+ * other engine owns their names and types), never self-backed, and the engine
+ * reports at run time when the game has not registered one.
+ */
+export const EXTERNAL_SCOPES: readonly string[] = ENGINE_SCOPES
+  .map((s) => s.token)
+  .filter((t) => t !== "patter" && t !== "scene");
+
+/**
+ * A foreign-scope spec with the family's other engines added as OPAQUE scopes
+ * (no declarations), unless the spec already declares them: a project that
+ * imported the Storylet Engine's spec keeps its checked declarations. For
+ * compiling and validating only; a bundle's own scopeRegistry never carries
+ * these, because the runtime self-backs what it lists.
+ */
+export function withEngineScopes(spec?: ScopeRegistrySpec): ScopeRegistrySpec {
+  const present = new Set((spec?.scopes ?? []).map((s) => s.token));
+  const extra = EXTERNAL_SCOPES.filter((t) => !present.has(t)).map((token) => ({ token }));
+  return { version: spec?.version ?? 1, scopes: [...(spec?.scopes ?? []), ...extra] };
+}
+
+/**
  * A Patter dialect extended with FOREIGN scope tokens imported from another
  * owner's `scopeRegistrySpec` (e.g. a storylet's `@world` / `@player` / `@system`).
  * The parser needs every referenced scope token registered, so authoring tools
@@ -122,8 +150,10 @@ export const patterDialect: Dialect = {
  * Foreign scopes use the default missing policy (graceful-false). With no spec
  * (or an empty one) this returns the base `patterDialect` unchanged.
  */
-export function dialectWithForeignScopes(spec?: ScopeRegistrySpec): Dialect {
-  if (!spec || spec.scopes.length === 0) return patterDialect;
+export function dialectWithForeignScopes(given?: ScopeRegistrySpec): Dialect {
+  // The family's other engines are always in: a Patter line can name `@story`.
+  const spec = withEngineScopes(given);
+  if (spec.scopes.length === 0) return patterDialect;
   const known = new Set(patterDialect.scopes.map((s) => s.token));
   const extra = spec.scopes
     .filter((s) => !known.has(s.token))

@@ -6,6 +6,23 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Other engines' scopes, with no setting.** A Patter line can name another engine's game-wide
+  scope from the family's shared list (`@story.act` in a condition, an effect, or a `{@story.act}`
+  slot) in any project. It is opaque to the compiler, recorded in the bundle (`externalScopes`, which
+  `PatterBundle.load_from_string` checks and `PatterBundle.external_scopes(bundle)` reads), and never
+  self-backed. Content that names one runs only where that engine is on the same registry: without
+  it, `open_flow` and `load_game` refuse before anything changes, checking `externalScopes` in order
+  and refusing on the first token the registry does not have, the way they refuse anything else
+  (`push_error`, then `open_flow` returns null and `load_game` false) with the same message as every
+  runtime: `this content names @story, which no engine on this registry registered: give every
+  engine the game's one registry`. `load_game` checks right after the save version, so a refused
+  load leaves every flow as it was. A write can still meet
+  an unregistered scope when another engine takes its scope away mid-game: it fails in the registry
+  naming the scope (`unknown scope '@story'`) instead of landing in `@patter` as a property called
+  `story.act`.
+
 ### Changed
 
 - **One registry per game.** Every property bag the engine holds now lives in a `PatterScopeRegistry`

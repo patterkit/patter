@@ -36,6 +36,10 @@ namespace Patterkit.Patterplay
         public CaptionDelimiters ClosedCaptions;
         /// <summary>Declared host scopes (`@world`), or null for a project that declares none.</summary>
         public HostScopeRegistry ScopeRegistry;
+        /// <summary>Other engines' game-wide scopes the content names (`story`), sorted: the family's shared
+        /// vocabulary, never self-backed. The engine reports when the game has not registered one. Null when
+        /// the content names none.</summary>
+        public List<string> ExternalScopes;
     }
 
     /// <summary>Closed-caption config (#214): the open/close cue delimiters, plus a `Character` whose whole

@@ -39,8 +39,9 @@ same runtime behaviour.
   engine's registry stores, so it rides in the save. Given the game's registry, the engine self-backs
   nothing: `@world` is the game's to register there.
 - **Every expression reads every registered scope**, so a condition can test another engine's
-  `@story.act` in a combined game, even one registered after the flow opened. A token two engines both
-  want fails as the second is built, naming the first, and leaves the game's registry as it was.
+  `@story.act` in a combined game, even one the other engine registers again after the flow opened
+  (a live edit). A token two engines both want fails as the second is built, naming the first, and
+  leaves the game's registry as it was.
 - `HotSwap` hands every bag to the replacement engine on the same registry. The engine it replaces is
   released and its flows are closed. If the restore fails, the fallback engine keeps the shared
   properties and restarts each flow, where it used to throw.
@@ -53,6 +54,13 @@ same runtime behaviour.
 
 - `PatterSave.SaveRegistry(registry)` and `PatterSave.LoadRegistry(registry, json)`: a game's
   registry as JSON, for a game that saves its registry once beside each engine's part.
+- **Other engines' scopes, with no setting.** A bundle now lists the other engines' game-wide scopes
+  its content names (`externalScopes`, such as `story` for a line that reads `@story.act`), and both
+  loaders read it. `OpenFlow` and `LoadGame` refuse content that names one no engine on the registry
+  has registered, before anything changes, with `this content names @story, which no engine on this
+  registry registered: give every engine the game's one registry`. Such a scope is still a scope if
+  the other engine takes it away mid-game, so a write to `@story.act` then fails naming `@story`
+  instead of landing in `@patter` as a property called `story.act`.
 
 ## [0.13.0] - 2026-09-05
 

@@ -160,6 +160,12 @@ jobs:
             exit 1
           fi
           echo "vendored registry corpus is current"
+      # The family's shared vocabulary (other engines' scope tokens the compiler accepts), written
+      # into packages/dialect/src/engine-scopes.ts from expr/family/engine-scopes.json. This also
+      # re-checks both corpora above.
+      - name: The vendored family vocabulary matches the authored one
+        working-directory: expr
+        run: node scripts/sync-conformance.mjs --check
       # The evaluator itself is now ONE implementation, authored in expr/ports and
       # vendored into this addon. A hand edit to the vendored copy is how six
       # transliterations of the same 200 lines started; this is what stops a

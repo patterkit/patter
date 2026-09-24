@@ -7,6 +7,10 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Other engines' scopes, with no setting.** A Patter line can name another engine's game-wide scope from the family's shared list (`@story.act` in a condition, an effect, or a `{@story.act}` slot) in any project. The compiler records the tokens a bundle names in `externalScopes`, which both bundle readers now read (`patter::Bundle::externalScopes`); the engine never self-backs one. A ref whose scope is in that list is a scope even before its engine registers it, so a write to an unregistered `@story.act` fails naming the scope (`unknown scope '@story'`, as Patterplay's `EvalError`) instead of landing in `@patter` under a dotted name. Content that names a scope no engine on the registry registered cannot run, so `openFlow` and `loadGame` refuse it before anything changes, checking the bundle's `externalScopes` in order and throwing on the first missing one: `this content names @story, which no engine on this registry registered: give every engine the game's one registry` (the same message on every runtime). `loadGame` checks right after the save version, so a refused load leaves every flow as it was. The UE wrapper reports it the way it reports any refused open or load: `OpenFlow` returns null and `UPatterSave::LoadStateFromJson` returns false, each logging the message as an error. A write can still meet an unregistered scope when another engine takes its scope away mid-game, and fails naming it as above.
+
 ### Changed
 
 - **One kernel type, shared with the Storylet Engine.** The expression and state kernel vendored as

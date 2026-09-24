@@ -12,7 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { Engine } from "@patterkit/runtime";
 import type { StepResult } from "@patterkit/runtime";
-import { exportBundle } from "@patterkit/compiler";
+import { compileExpression, exportBundle, validateConditions, validateInterpolation } from "@patterkit/compiler";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import type { ProjectFile, Scene, LocaleFile, HostScopeRegistry } from "@patterkit/model";
 
@@ -163,23 +163,24 @@ describe("one registry per game: Patter", () => {
     });
   });
 
-  it("reads a scope another engine registered after the flow opened", () => {
+  it("reads a scope another engine registered again after the flow opened", () => {
     const withStory = exportBundle({
       project: { ...project, scopeRegistry: undefined },
       scenes: [{ ...scene, blocks: [{ id: "b", type: "block", name: "B", children: [
-        // Evaluated first, so the flow has built its evaluation context before @story exists.
+        // Evaluated first, so the flow has built its evaluation context before @story is replaced.
         { id: "intro", type: "snippet", condition: "@fame >= 0", beats: [{ id: "I", kind: "text" }] },
         { id: "yes", type: "snippet", condition: "@story.act >= 2", beats: [{ id: "L", kind: "text" }], jump: { to: "END" } },
       ] }] }],
       locales: [{ ...en, strings: { I: "intro", L: "act two" } }],
       foreignScopes: { version: 1, scopes: [{ token: "story", declarations: [{ name: "act", type: "number" }] }] },
     });
-    const registry = new ScopeRegistry();
+    const registry = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "number", default: 1 }], { owner: "Other engine" });
     const patter = new Engine(withStory, { registry });
     const flow = patter.openFlow("f", { scene: "s" });
     expect(flow.advance()).toMatchObject({ type: "text", text: "intro" });
 
-    registry.defineOwned("story", [{ name: "act", type: "number", default: 2 }], { owner: "Other engine" });
+    // The other engine rebuilds (a live edit): its scope goes, and comes back holding a new value.
+    registry.remove("story").defineOwned("story", [{ name: "act", type: "number", default: 2 }], { owner: "Other engine" });
     expect(flow.advance()).toMatchObject({ type: "text", text: "act two" });
   });
 
@@ -245,5 +246,78 @@ describe("one registry per game: Patter", () => {
     const next = patter.hotSwap(bundle);
     expect(next.getProperty("@world.gold")).toBe(5);
     expect(next.saveGame().registry?.world).toEqual({ gold: 5 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Other engines' scopes (expr/family/engine-scopes.json): a Patter line may name
+// `@story.act` with no project setting. The compiler lets it through unchecked
+// and records it in the bundle, never as a scope to self-back; the engine reads
+// and writes it through the game's registry, and says when nobody registered it.
+// ---------------------------------------------------------------------------
+
+describe("other engines' scopes", () => {
+  const storyProject: ProjectFile = { ...project, scopeRegistry: undefined };
+  const gate: Scene = {
+    id: "gate", type: "scene", name: "Gate", gameId: "gate",
+    blocks: [{ id: "b", type: "block", name: "B", children: [{
+      id: "shout", type: "snippet", condition: "@story.act >= 2",
+      onExit: [{ kind: "set", target: "@story.act", value: "@story.act + 1" }],
+      beats: [{ id: "L", kind: "text" }], jump: { to: "END" },
+    }] }],
+  };
+  const gateEn: LocaleFile = { schema: "patter/strings@0", scene: "gate", locale: "en", strings: { L: "act {@story.act}" } };
+  const gateBundle = exportBundle({ project: storyProject, scenes: [gate], locales: [gateEn] });
+
+  it("compiles @story with no setting, records it, and never lists it as a scope to self-back", () => {
+    expect(gateBundle.externalScopes).toEqual(["story"]);
+    expect(gateBundle.scopeRegistry).toBeUndefined();
+    expect(validateConditions({ project: storyProject, scenes: [gate] })).toEqual([]);
+    expect(validateInterpolation({ project: storyProject, scenes: [gate], locales: [gateEn] })).toEqual([]);
+  });
+
+  it("compileExpression takes @story with no spec at all (the editor's path)", () => {
+    expect(compileExpression("@story.act >= 1").ast).toEqual(["bin", ">=", ["sv", "story", "act"], ["n", 1]]);
+  });
+
+  it("a condition alone records it, and so does an effect target alone", () => {
+    const only = (s: Scene) => exportBundle({ project: storyProject, scenes: [s], locales: [] }).externalScopes;
+    const snip = (gate.blocks[0]!.children[0]!) as Extract<Scene["blocks"][number]["children"][number], { type: "snippet" }>;
+    const withSnippet = (patch: object): Scene => ({ ...gate, blocks: [{ ...gate.blocks[0]!, children: [{ ...snip, ...patch }] }] });
+    expect(only(withSnippet({ onExit: [] }))).toEqual(["story"]);
+    expect(only(withSnippet({ condition: undefined, onExit: [{ kind: "set", target: "@story.act", value: "1" }] }))).toEqual(["story"]);
+    expect(only(withSnippet({ condition: undefined, onExit: [] }))).toBeUndefined();
+  });
+
+  it("reads and writes it through the game's registry", () => {
+    const registry = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "number", default: 2 }], { owner: "Storylet Engine" });
+    const flow = new Engine(gateBundle, { registry }).openFlow("f", { scene: "gate" });
+    expect(flow.advance()).toMatchObject({ type: "text", text: "act 2" });
+    expect(flow.advance()).toEqual({ type: "end" });
+    expect(registry.get("story", "act")).toBe(3);
+  });
+
+  it("refuses to open a flow, or load a save, where nobody registered it, before anything changes", () => {
+    const refusal = "this content names @story, which no engine on this registry registered: give every engine the game's one registry";
+    const alone = new Engine(gateBundle, { registry: new ScopeRegistry() });
+    expect(() => alone.openFlow("f", { scene: "gate" })).toThrow(refusal);
+    expect(alone.getFlow("f")).toBeUndefined();
+
+    // A save made where the Storylet Engine was present, loaded where it is not: refused whole.
+    const registry = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "number", default: 2 }], { owner: "Storylet Engine" });
+    const game = new Engine(gateBundle, { registry });
+    const flow = game.openFlow("f", { scene: "gate" });
+    const save = game.saveGame();
+    const elsewhere = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "number", default: 1 }]);
+    const other = new Engine(gateBundle, { registry: elsewhere });
+    other.openFlow("keep", { scene: "gate" });
+    elsewhere.remove("story");
+    expect(() => other.loadGame(save)).toThrow(refusal);
+    expect(other.getFlow("keep")).toBeDefined();                 // the load changed nothing
+    expect(other.getFlow("f")).toBeUndefined();
+
+    // The engine that took the scope away mid-game: a write names it.
+    registry.remove("story");
+    expect(() => flow.setProperty("@story.act", 1)).toThrow("unknown scope '@story'");
   });
 });

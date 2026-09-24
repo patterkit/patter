@@ -510,8 +510,15 @@ namespace patter
         }
         auto hit = host.refSplitCache.find(ref);
         if (hit != host.refSplitCache.end()) return hit->second;
+        // Another engine's scope the content names (`@story.act`) is a scope even before that engine
+        // registers it: a write then fails naming it, where it would otherwise land in @patter as
+        // `story.act`.
+        const std::vector<std::string>& external = host.bundle->externalScopes;
         auto split = splitRef(ref, std::function<bool(const std::string&)>(
-            [&reg](const std::string& t) { return reg.has(t); }));
+            [&reg, &external](const std::string& t)
+            {
+                return reg.has(t) || std::find(external.begin(), external.end(), t) != external.end();
+            }));
         host.refSplitCache.emplace(ref, split);
         return split;
     }
@@ -1766,6 +1773,7 @@ namespace patter
 
         Flow* openFlow(const std::string& id, const std::string& scene = "", const std::string& block = "", const int64_t* seed = nullptr)
         {
+            assertExternalScopes();
             std::string sceneId = resolveSceneRef(scene);
             std::string blockId = resolveBlockRef(sceneId, block);
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
@@ -2131,6 +2139,7 @@ namespace patter
         {
             if (save.version != 2 && save.version != SAVE_VERSION)
                 throw std::runtime_error("unsupported save version: " + std::to_string(save.version));
+            assertExternalScopes();
             ScopeRegistry& reg = *host_.registry;
             // Flows the save does not have are over: their bags go. The rest are handed back with their
             // values, which is what a game that loaded its registry first has just laid the save's values
@@ -2163,6 +2172,20 @@ namespace patter
         }
 
     private:
+        // Content that names another engine's scope (`@story.act`) runs only where that engine is on this
+        // registry: without it every read would answer false and every write fail, so the flow is refused
+        // as it opens (or the save as it loads), before anything changes. By then a game has built all of
+        // its engines, whatever order it built them in. The same message on every runtime.
+        void assertExternalScopes() const
+        {
+            for (const std::string& token : host_.bundle->externalScopes)
+            {
+                if (!host_.registry->has(token))
+                    throw std::runtime_error("this content names @" + token
+                        + ", which no engine on this registry registered: give every engine the game's one registry");
+            }
+        }
+
         // A version 2 save's property values, as registry sections under this engine's keys.
         static ScopeRegistry::SaveBlob sectionsFromV2(const SaveGame& save)
         {

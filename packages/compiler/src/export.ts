@@ -15,7 +15,7 @@ import type {
 } from "@patterkit/model";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import { canonicalStringify, hash32 } from "@patterkit/core";
-import { hostScopesToSpec } from "@patterkit/dialect";
+import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
 import { compileExpression } from "./expressions.js";
 
 export interface ExportInput {
@@ -98,6 +98,29 @@ function compileScene(scene: Scene, foreign?: ScopeRegistrySpec): CompiledScene 
   };
 }
 
+/** The family's other engines' scope tokens the compiled content names (conditions, effect values, and
+ *  effect targets), sorted. */
+function externalScopesIn(scenes: Record<string, CompiledScene>): string[] {
+  const found = new Set<string>();
+  const external = new Set(EXTERNAL_SCOPES);
+  const walk = (node: unknown): void => {
+    if (!Array.isArray(node) && (node === null || typeof node !== "object")) return;
+    if (Array.isArray(node)) {
+      if (node[0] === "sv" && typeof node[1] === "string" && external.has(node[1])) found.add(node[1]);
+      for (const n of node) walk(n);
+      return;
+    }
+    const o = node as Record<string, unknown>;
+    if (o["kind"] === "set" && typeof o["target"] === "string") {
+      const head = o["target"].replace(/^@/, "").split(".")[0]!;
+      if (o["target"].includes(".") && external.has(head)) found.add(head);
+    }
+    for (const v of Object.values(o)) walk(v);
+  };
+  walk(scenes);
+  return [...found].sort();
+}
+
 /** Compile a project's source into the runtime bundle. */
 export function exportBundle(input: ExportInput): Bundle {
   const { project, scenes, locales = [], includeLocales } = input;
@@ -108,8 +131,13 @@ export function exportBundle(input: ExportInput): Bundle {
   // is baked into the bundle so the runtime can self-back the scope when no host resolver claims it.
   const foreignScopes = input.foreignScopes ?? hostScopesToSpec(project.scopeRegistry);
 
+  // Compiled against the family's other engines too (`@story` parses with no setting), but the bundle's
+  // own scopeRegistry keeps only what the project declared: the runtime self-backs what it lists, and
+  // another engine's scope is that engine's to register.
+  const compileScopes = withEngineScopes(foreignScopes);
   const scenesOut: Record<string, CompiledScene> = {};
-  for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, foreignScopes);
+  for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, compileScopes);
+  const externalScopes = externalScopesIn(scenesOut);
 
   const strings: Record<string, Record<string, string>> = {};
   for (const loc of locales) {
@@ -168,5 +196,7 @@ export function exportBundle(input: ExportInput): Bundle {
     ...(project.closedCaptions ? { closedCaptions: project.closedCaptions } : {}),
     scenes: scenesOut,
     strings,
+    // Other engines' scopes the content names, so the engine can say when the game has not registered one.
+    ...(externalScopes.length > 0 ? { externalScopes } : {}),
   };
 }

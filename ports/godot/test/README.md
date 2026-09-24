@@ -33,8 +33,11 @@ Headless checks for the Godot addon. **Not part of the shipped addon zip** (only
   registers under, `save_game()` leaving the values out given a game registry and carrying them
   standalone, loading in either order, a version 2 save's values moving into the registry, a token
   clash leaving the registry as it was, reset and a fresh flow dropping only Patter's waiting values,
-  `hot_swap` handing bags over, the `host_scopes` option, and a combined game with a stand-in engine
-  that registers `@story`.
+  `hot_swap` handing bags over, the `host_scopes` option, a combined game with a stand-in engine
+  that registers `@story`, and other engines' scopes (the JS test's "other engines' scopes": a
+  bundle's `externalScopes` read and checked, `@story` read and written through the registry,
+  `open_flow` and `load_game` refused before anything changes when nobody registered it, and a write
+  after another engine took it away landing nowhere rather than in `@patter`).
 
   ```sh
   godot --headless --path ports/godot --script res://test/test_one_registry.gd

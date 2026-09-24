@@ -84,6 +84,7 @@ func _initialize() -> void:
 	_keys_and_lifetime()
 	_hot_swap()
 	_combined_game()
+	_other_engines_scopes()
 	print("test_one_registry: " + ("ALL PASS" if _fails == 0 else str(_fails) + " FAILED"))
 	quit(1 if _fails > 0 else 0)
 
@@ -262,27 +263,31 @@ func _old_save() -> void:
 		_eq(back.get("version"), 3) and _eq(back.get("registry"), want_alone), JSON.stringify(back.get("registry")))
 
 
-# -- a scope another engine registers after the flow opened ---------------------------
+# -- a scope another engine registers again after the flow opened ---------------------
 
 func _late_scope() -> void:
 	var bundle := _bundle()
 	bundle.erase("scopeRegistry")
 	bundle["strings"] = {"en": {"I": "intro", "L": "act two"}}
 	bundle["scenes"]["s"]["blocks"] = [{"id": "b", "gameId": "b", "name": "B", "children": [
-		# Evaluated first, so the flow has built its evaluation context before @story exists.
+		# Evaluated first, so the flow has built its evaluation context before @story is replaced.
 		{"id": "intro", "type": "snippet", "condition": {"src": "@fame >= 0", "ast": ["bin", ">=", ["sv", "patter", "fame"], ["n", 0]]},
 			"beats": [{"id": "I", "kind": "text"}]},
 		{"id": "yes", "type": "snippet", "condition": {"src": "@story.act >= 2", "ast": ["bin", ">=", ["sv", "story", "act"], ["n", 2]]},
 			"beats": [{"id": "L", "kind": "text"}], "jump": {"to": "END"}},
 	]}]
+	bundle["externalScopes"] = ["story"]   # as exportBundle records it
 	var registry := PatterScopeRegistry.new()
+	registry.define_owned("story", [{"name": "act", "type": "number", "default": 1}], {"owner": "Other engine"})
 	var patter := PatterEngine.new(bundle, {"registry": registry})
 	var flow := patter.open_flow("f", "s")
 	var first: Dictionary = flow.advance()
-	_check("reads a scope registered after the flow opened: the intro plays first", first.get("text") == "intro", str(first))
+	_check("reads a scope another engine registered again: the intro plays first", first.get("text") == "intro", str(first))
+	# The other engine rebuilds (a live edit): its scope goes, and comes back holding a new value.
+	registry.remove("story")
 	registry.define_owned("story", [{"name": "act", "type": "number", "default": 2}], {"owner": "Other engine"})
 	var second: Dictionary = flow.advance()
-	_check("reads a scope registered after the flow opened", second.get("text") == "act two", str(second))
+	_check("reads a scope another engine registered again after the flow opened", second.get("text") == "act two", str(second))
 
 
 # -- clashes ---------------------------------------------------------------------
@@ -510,6 +515,99 @@ func _combined_game() -> void:
 	_story_stand_in(clash)
 	var refused := _story_stand_in(clash)
 	_check("combined: a clash names who holds the token", refused.contains("scope '@story' is already registered by Storylet Engine"), refused)
+
+
+# -- other engines' scopes ---------------------------------------------------------
+#
+# The JS test's "other engines' scopes" (expr/family/engine-scopes.json): a Patter line may name
+# `@story.act` with no project setting. The compiler lets it through unchecked and records it in the
+# bundle's externalScopes, never as a scope to self-back; the engine reads and writes it through the
+# game's registry, and refuses to open a flow or load a save when nobody registered it. The bundle is
+# exportBundle's output for the JS test's gate scene, build hashes included.
+
+const GATE_BUNDLE_JSON := """{"schema":"patter/bundle@0","content":{"project":"or","hash":"0m5p8ho","structureHash":"168d7pm"},"voiced":false,"locales":{"default":"en","included":["en"]},
+"properties":[{"name":"fame","type":"number","default":0,"shared":true},{"name":"mood","type":"number","default":0,"shared":false}],
+"scenes":{"gate":{"id":"gate","type":"scene","name":"Gate","gameId":"gate","blocks":[{"id":"b","type":"block","name":"B","children":[
+ {"id":"shout","type":"snippet","condition":{"src":"@story.act >= 2","ast":["bin",">=",["sv","story","act"],["n",2]]},"beats":[{"id":"L","kind":"text"}],
+  "onExit":[{"kind":"set","target":"@story.act","value":{"src":"@story.act + 1","ast":["bin","+",["sv","story","act"],["n",1]]}}],"jump":{"to":"END"}}]}]}},
+"strings":{"en":{"L":"act {@story.act}"}},"externalScopes":["story"]}"""
+
+
+## What `fn` returned, and the messages it push_error'd: the refusal channel of a verb that has no
+## exceptions to throw.
+class _Caught extends Logger:
+	var errors: Array = []
+	func _log_error(_function: String, _file: String, _line: int, code: String, _rationale: String,
+			_editor_notify: bool, _error_type: int, _script_backtrace: Array[ScriptBacktrace]) -> void:
+		errors.append(code)
+
+
+static func _catching(fn: Callable) -> Dictionary:
+	var caught := _Caught.new()
+	OS.add_logger(caught)
+	var result = fn.call()
+	OS.remove_logger(caught)
+	return {"result": result, "errors": caught.errors}
+
+
+func _other_engines_scopes() -> void:
+	# The loader reads the list, and refuses one that is not a list of tokens.
+	var gate = PatterBundle.load_from_string(GATE_BUNDLE_JSON)
+	_check("other engines: the loader reads externalScopes", gate != null
+		and _eq(PatterBundle.external_scopes(gate), ["story"]), str(gate))
+	var bad: Dictionary = JSON.parse_string(GATE_BUNDLE_JSON)
+	bad["externalScopes"] = "story"
+	_check("other engines: and refuses one that is not a list of tokens",
+		PatterBundle.load_from_string(JSON.stringify(bad)) == null, "")
+	_check("other engines: a bundle that names none has none",
+		_eq(PatterBundle.external_scopes(_bundle()), []), "")
+
+	# Reads and writes it through the game's registry.
+	var registry := PatterScopeRegistry.new()
+	registry.define_owned("story", [{"name": "act", "type": "number", "default": 2}], {"owner": "Storylet Engine"})
+	var engine := PatterEngine.new(gate, {"registry": registry})
+	var flow = engine.open_flow("f", "gate")
+	var step: Dictionary = flow.advance()
+	_check("other engines: reads @story through the game's registry", step.get("type") == "text"
+		and step.get("text") == "act 2", str(step))
+	_check("other engines: then ends", flow.advance().get("type") == "end", "")
+	_check("other engines: and writes it there", _eq(registry.get_value("story", "act"), 3), str(registry.save()))
+
+	# Refuses to open a flow, or load a save, where nobody registered it, before anything changes.
+	# GDScript has no exceptions: the refusal is push_error'd, and the verb hands back null or false.
+	var refusal := "this content names @story, which no engine on this registry registered: give every engine the game's one registry"
+	var alone := PatterEngine.new(gate, {"registry": PatterScopeRegistry.new()})
+	var opened := _catching(func(): return alone.open_flow("f", "gate"))
+	_check("other engines: open_flow is refused where nobody registered it", opened["result"] == null
+		and _eq(opened["errors"], ["open_flow: " + refusal]), str(opened))
+	_check("other engines: and opens nothing", alone.get_flow("f") == null and alone.flows().is_empty(), "")
+
+	# A save made where the Storylet Engine was present, loaded where it is not: refused whole.
+	var shared := PatterScopeRegistry.new()
+	shared.define_owned("story", [{"name": "act", "type": "number", "default": 2}], {"owner": "Storylet Engine"})
+	var game := PatterEngine.new(gate, {"registry": shared})
+	var played = game.open_flow("f", "gate")
+	var save: Dictionary = game.save_game()
+	var elsewhere := PatterScopeRegistry.new()
+	elsewhere.define_owned("story", [{"name": "act", "type": "number", "default": 1}])
+	var other := PatterEngine.new(gate, {"registry": elsewhere})
+	var keep = other.open_flow("keep", "gate")
+	elsewhere.remove("story")
+	var loaded := _catching(func(): return other.load_game(save))
+	_check("other engines: load_game is refused where nobody registered it", loaded["result"] == false
+		and _eq(loaded["errors"], ["load_game: " + refusal]), str(loaded))
+	_check("other engines: and the load changed nothing", other.flows().map(func(fl): return fl.id) == ["keep"]
+		and other.get_flow("keep") == keep and not keep.is_closed() and other.get_flow("f") == null,
+		str(other.flows().map(func(fl): return fl.id)))
+
+	# The engine that took the scope away mid-game: a write names it (in the registry, where JS
+	# throws), rather than landing in @patter as a property called `story.act`.
+	shared.remove("story")
+	var wrote := _catching(func(): played.set_property("@story.act", 1))
+	_check("other engines: a write after the scope went names it", (wrote["errors"] as Array).size() == 1
+		and str(wrote["errors"][0]).contains("unknown scope '@story'"), str(wrote["errors"]))
+	_check("other engines: and lands nowhere", played.get_property("@story.act") == null
+		and not JSON.stringify(shared.save()).contains("story"), JSON.stringify(shared.save()))
 
 
 # -- helpers ---------------------------------------------------------------------

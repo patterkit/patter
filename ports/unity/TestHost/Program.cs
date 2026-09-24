@@ -1214,6 +1214,10 @@ namespace Patterkit.Patterplay.TestHost
                 }
             }
 
+            // Other engines' scopes the content names, parsed by BOTH loaders like scopeRegistry.
+            if (b.TryGetProperty("externalScopes", out var ext))
+                bundle.ExternalScopes = ext.EnumerateArray().Select(t => t.GetString()).ToList();
+
             if (b.TryGetProperty("strings", out var strs)) bundle.Strings = ParseStrings(strs);
 
             if (b.TryGetProperty("gameDataFields", out var gdf))

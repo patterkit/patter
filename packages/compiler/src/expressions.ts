@@ -7,7 +7,7 @@
 
 import { compile, parse, validateExpr } from "@wildwinter/expr";
 import type { ExprNode } from "@wildwinter/expr";
-import { dialectWithForeignScopes, buildSchema, extractSlots, splitRef } from "@patterkit/dialect";
+import { dialectWithForeignScopes, buildSchema, extractSlots, splitRef, withEngineScopes } from "@patterkit/dialect";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import { walkNodes } from "@patterkit/model";
 import type {
@@ -49,7 +49,8 @@ export function validateConditions(
   options: { foreignScopes?: ScopeRegistrySpec } = {},
 ): ConditionIssue[] {
   const issues: ConditionIssue[] = [];
-  const foreign = options.foreignScopes;
+  // The family's other engines (`@story`) are in by default, opaque unless the spec declares them.
+  const foreign = withEngineScopes(options.foreignScopes);
   const dialect = dialectWithForeignScopes(foreign);
   const readOnly = readOnlyForeignTargets(foreign);
   const opaqueForeign = opaqueForeignTokens(foreign);
@@ -165,11 +166,12 @@ export function validateInterpolation(
   const voiced = input.project.voiced ?? false;
   const tables = (input.locales ?? []).map((l) => ({ locale: l.locale, strings: l.strings }));
   const defaultLocale = input.project.locales.default;
-  const opaqueForeign = opaqueForeignTokens(options.foreignScopes);
-  const isScopeToken = scopeTokenTest(options.foreignScopes);
+  const foreign = withEngineScopes(options.foreignScopes);   // `@story` is in by default, opaque
+  const opaqueForeign = opaqueForeignTokens(foreign);
+  const isScopeToken = scopeTokenTest(foreign);
 
   for (const scene of input.scenes) {
-    const schema = buildSchema(input.project, scene.sceneProps, options.foreignScopes);
+    const schema = buildSchema(input.project, scene.sceneProps, foreign);
     const known = (ref: string): boolean => {
       const { scope, name } = splitRef(ref, isScopeToken);
       if (opaqueForeign.has(scope)) return true; // the foreign owner declares it; graceful here

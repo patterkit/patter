@@ -129,8 +129,17 @@ a key starting `patter/`, which no expression can name. Its save then leaves the
 your game saves the registry. `@world` is yours to register: owned, as above, when the registry should
 store and save it, or bound through a `UPatterWorld` passed as the third argument, when your game
 keeps the values. The engine self-backs nothing on a registry you pass. Every expression can read
-every registered scope, so a condition can test another system's `@story.act` once it is in the same
-registry.
+every registered scope.
+
+**Other engines' scopes need no setting.** A Patter line can name the Storylet Engine's `@story.act`
+(in a condition, an effect, or a `{@story.act}` slot) in any project: the compiler lets it through
+without checking its names, since the Storylet Engine owns them, and lists it in the bundle. Only the
+other engine's shared values are visible. If no engine on Patterplay's registry registered that
+scope, Patterplay refuses the content before anything changes: `OpenFlow` returns null and
+`UPatterSave::LoadStateFromJson` returns false, each logging `this content names @story, which no
+engine on this registry registered: give every engine the game's one registry` as an error. So build
+every engine on the game's one registry before opening a flow or loading a save. If another engine
+takes its scope away mid-game, a write to it fails naming the scope rather than landing in `@patter`.
 
 A token is taken once. Two engines that both want the same one fail as you build the second:
 `CreateWithRegistry` returns null and logs an error that names who got there first, and your registry
