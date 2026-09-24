@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-24
+
 ### Changed
 
 - **Breaking: one expression kernel, shared with the Storylet Engine.** `PatterValue` and `PatterKind`

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-24
+
 ### Added
 
 - **Other engines' scopes, with no setting.** A Patter line can name another engine's game-wide scope from the family's shared list (`@story.act` in a condition, an effect, or a `{@story.act}` slot) in any project. It is opaque to the compiler, recorded in the bundle (`externalScopes`), and never self-backed. Content that names one runs only where that engine is on the same registry: without it, `openFlow` and `loadGame` refuse before anything changes (`this content names @story, which no engine on this registry registered: give every engine the game's one registry`), and a write to a scope another engine has since removed fails naming the scope instead of landing in `@patter`.

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-24
+
 ### Added
 
 - **Other engines' scopes, with no setting.** A Patter line can name another engine's game-wide
