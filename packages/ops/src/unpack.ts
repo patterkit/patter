@@ -12,6 +12,11 @@
 //     VCS lookup. (Embedding BASE in the returned document is a future
 //     editor-integration refinement.)
 //
+// A pack's game scopes snapshot (`game-scopes/<name>.scopes.json` entries, see pack.ts) is not source:
+// EXTRACT puts it in `game-scopes/` inside the new project folder, where discovery looks first, and
+// MERGE never writes it anywhere, since the sender's folder is the truth. A World edit the recipient
+// made comes back in the project file instead, and MERGE takes it to `game.scopes.json`.
+//
 // A document may arrive from an untrusted external author, so entry paths are
 // validated twice: a screen on the entry NAME (no absolute paths, no `..`), and
 // containment of the resolved WRITE PATH inside the target, which is the one
@@ -28,22 +33,35 @@ import type { MergeResult } from "./merge.js";
 import type { DocumentManifest } from "./pack.js";
 import type { PlannedWrite } from "./write.js";
 import { escapesTarget, isUnsafeEntry } from "@wildwinter/toolkit/archive";
+import type { ProjectFile } from "@patterkit/model";
+import { discoverGameScopes, planReturnedWorld, GAME_SCOPES_DIR, GAME_SCOPES_FILE } from "./game-scopes.js";
+import { SCOPES_FILE_SUFFIX } from "@wildwinter/scoperegistry/scopes";
 
 const MANIFEST = "patter.manifest.json";
+
+/** A game scopes snapshot entry: a scopes file directly in `game-scopes/`, which is all a pack writes
+ *  there. Anything else under that folder is a shard, as it always was. */
+const isScopesEntry = (name: string): boolean => {
+  const rest = name.startsWith(`${GAME_SCOPES_DIR}/`) ? name.slice(GAME_SCOPES_DIR.length + 1) : undefined;
+  return rest !== undefined && !rest.includes("/") && rest.endsWith(SCOPES_FILE_SUFFIX);
+};
 
 /** A document entry whose path escapes the target dir (rejected). */
 export class UnsafeEntryError extends Error {}
 
-/** A document's contents: its shards as relpath -> text (paths validated), and its manifest when it has
- *  a readable one. One zip load for both, since every caller that wants the manifest wants the shards. */
+/** A document's contents: its shards as relpath -> text (paths validated), its game scopes snapshot as
+ *  entry name -> text (paths validated the same way), and its manifest when it has a readable one. One
+ *  zip load for all three, since every caller that wants the manifest wants the shards. */
 interface DocContents {
   shards: Map<string, string>;
+  scopes: Map<string, string>;
   manifest?: DocumentManifest;
 }
 
 async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
   const zip = await JSZip.loadAsync(bytes);
   const shards = new Map<string, string>();
+  const scopes = new Map<string, string>();
   let manifest: DocumentManifest | undefined;
   for (const [name, entry] of Object.entries(zip.files)) {
     if (entry.dir) continue;
@@ -54,22 +72,27 @@ async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
       continue;
     }
     if (isUnsafeEntry(name)) throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
-    shards.set(name, await entry.async("string"));
+    (isScopesEntry(name) ? scopes : shards).set(name, await entry.async("string"));
   }
-  return { shards, manifest };
+  return { shards, scopes, ...(manifest ? { manifest } : {}) };
 }
 
-/** Read a `.patterpack` document's shards as relpath -> text (manifest excluded, paths validated). */
-async function readDocShards(bytes: Buffer | Uint8Array): Promise<Map<string, string>> {
-  return (await readDoc(bytes)).shards;
+/** What unpacking a document plans: its shards, and its game scopes snapshot (empty for a pack with none,
+ *  which is every pack from before packs carried one). */
+export interface UnpackResult {
+  /** The shards, under `targetDir`. */
+  shards: PlannedWrite[];
+  /** The game's scopes files, in `<targetDir>/game-scopes/`, where the new project finds them first. */
+  scopes: PlannedWrite[];
 }
 
 /** Unpack a `.patterpack` document (zip bytes) into planned writes under `targetDir`. */
-export async function runUnpack(bytes: Buffer | Uint8Array, targetDir: string): Promise<PlannedWrite[]> {
-  const shards = await readDocShards(bytes);
-  return [...shards.entries()]
+export async function runUnpack(bytes: Buffer | Uint8Array, targetDir: string): Promise<UnpackResult> {
+  const doc = await readDoc(bytes);
+  const plan = (entries: Map<string, string>): PlannedWrite[] => [...entries.entries()]
     .map(([name, content]) => ({ path: containedWrite(targetDir, name), content }))
     .sort((a, b) => a.path.localeCompare(b.path));
+  return { shards: plan(doc.shards), scopes: plan(doc.scopes) };
 }
 
 /** One shard's outcome in a merge-unpack. */
@@ -132,7 +155,8 @@ function targetProjectId(projectDir: string): string | undefined {
 
 export interface UnpackMergeResult {
   shards: MergedShard[];
-  /** Merged (and added) shard contents to write into the project. */
+  /** Merged (and added) shard contents to write into the project, and `game.scopes.json` when the
+   *  recipient changed the game's scopes (`gameScopes`). */
   writes: PlannedWrite[];
   /** `.patterconflict` sidecars for shards with conflicts. */
   sidecars: PlannedWrite[];
@@ -140,6 +164,10 @@ export interface UnpackMergeResult {
   warnings: number;
   /** Do the returned document, the base document and the target project agree on their project id? */
   provenance: ProvenanceCheck;
+  /** The recipient changed the game's scopes (World properties) and the project has a game scopes
+   *  folder: `path` is its `game.scopes.json`, which `writes` brings up to date, or, with `error`, the
+   *  file that won't parse and so was left alone. Absent otherwise. */
+  gameScopes?: { path: string; error?: string };
 }
 
 /**
@@ -164,6 +192,9 @@ export async function runUnpackMerge(
   const writes: PlannedWrite[] = [];
   const sidecars: PlannedWrite[] = [];
   let conflicts = 0, warnings = 0;
+  // The project file's three sides, for the game's scopes (below): the one `.patterproj` at the root.
+  const projectRel = projectEntry(theirs);
+  let projectSides: { ours: ProjectFile; base: ProjectFile; theirs: ProjectFile; merged: ProjectFile } | undefined;
 
   for (const [rel, theirText] of [...theirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const outPath = containedWrite(projectDir, rel);
@@ -189,6 +220,9 @@ export async function runUnpackMerge(
 
     const result = runMerge(baseObj, oursObj, theirsObj);
     writes.push({ path: outPath, content: canonicalStringify(result.merged) });
+    if (rel === projectRel && baseText !== undefined) {
+      projectSides = { ours: oursObj as unknown as ProjectFile, base: baseObj as unknown as ProjectFile, theirs: theirsObj as unknown as ProjectFile, merged: result.merged as unknown as ProjectFile };
+    }
     if (result.conflicts.length > 0) {
       sidecars.push({ path: `${outPath}.patterconflict`, content: JSON.stringify({ type: result.type, conflicts: result.conflicts, warnings: result.warnings }, null, 2) + "\n" });
       conflicts += result.conflicts.length;
@@ -197,7 +231,24 @@ export async function runUnpackMerge(
     shards.push({ path: rel, result, added: false });
   }
 
-  return { shards, writes, sidecars, conflicts, warnings, provenance };
+  // The returned pack's game scopes snapshot is never written: the sender's folder stays the truth. But
+  // a World edit the recipient made is in the project file's synced copy, and the sender's next save
+  // would sync that copy from `game.scopes.json` and lose it, so it goes to the shared file now.
+  let gameScopes: UnpackMergeResult["gameScopes"];
+  const local = projectSides && discoverGameScopes(resolve(projectDir), projectSides.ours).gameScopes;
+  if (projectSides && local) {
+    const world = planReturnedWorld(projectSides.ours, projectSides.base, projectSides.theirs, projectSides.merged, local);
+    if (world.write) { writes.push(world.write); gameScopes = { path: world.write.path }; }
+    else if (world.error) gameScopes = { path: join(local.dir, GAME_SCOPES_FILE), error: world.error };
+  }
+
+  return { shards, writes, sidecars, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}) };
+}
+
+/** A document's project file: the one `.patterproj` at its root, or undefined when there isn't exactly one. */
+function projectEntry(shards: Map<string, string>): string | undefined {
+  const at = [...shards.keys()].filter((n) => !n.includes("/") && n.endsWith(".patterproj"));
+  return at.length === 1 ? at[0] : undefined;
 }
 
 // The entry guards are @wildwinter/toolkit's. Both families had a correct copy,

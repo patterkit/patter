@@ -14,7 +14,15 @@ export { applyWrites } from "./write.js";
 export type { PlannedWrite } from "./write.js";
 export { runValidate } from "./validate.js";
 export { reachabilityIssues } from "./reachability.js";
-export type { ValidateResult, HygieneIssue } from "./validate.js";
+export type { ValidateResult, HygieneIssue, GameScopesIssue } from "./validate.js";
+export {
+  readGameScopes, discoverGameScopes, patterScopesFile, patterScopesWrite, patterScopesStale, previewRegistry,
+  drivableScopes, hostScopeTokens, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes,
+  gameScopesSnapshot, planReturnedWorld,
+  defaultGameScopesDir, serialiseScopesFile, PATTER_SCOPES_FILE, PATTER_SCOPES_OWNER, GAME_SCOPES_OWNER,
+  GAME_SCOPES_DIR, GAME_SCOPES_FILE,
+} from "./game-scopes.js";
+export type { GameScopes } from "./game-scopes.js";
 export { runExport, runExportFull, bundleOutputPath } from "./export.js";
 export { runExportHtml, runExportWeb } from "./export-html.js";
 export { scanAudioStatus } from "./audio-scan.js";
@@ -52,7 +60,7 @@ export type { ReplaceOptions, ReplaceHit, ReplacePlan } from "./replace.js";
 export { runPack, SHARD_EXTENSIONS } from "./pack.js";
 export type { DocumentManifest } from "./pack.js";
 export { runUnpack, runUnpackMerge, UnsafeEntryError, isUnsafeEntry } from "./unpack.js";
-export type { UnpackMergeResult, MergedShard, ProvenanceCheck } from "./unpack.js";
+export type { UnpackResult, UnpackMergeResult, MergedShard, ProvenanceCheck } from "./unpack.js";
 export { resolveDocumentation, classesForChannel } from "./documentation.js";
 export { runMerge, detectMergeType, UnsupportedMergeError, sidecarIssues, CONFLICT_SIDECAR, AUTHORING_HANDLED } from "./merge.js";
 export type { MergeResult, MergeFileType, Conflict, ConflictKind } from "./merge.js";

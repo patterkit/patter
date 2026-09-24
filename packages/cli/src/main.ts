@@ -16,7 +16,7 @@ import {
   loadProject, runValidate, runExport, runExportHtml, bundleOutputPath, runFormat, runPlay, renderPlay, runCoverage, renderCoverageText, proposeCoverageDrivers, runInit, runResolve, runPropertyUsage,
   runReport, renderReportText, runReportXlsx, runPack, runUnpack, runUnpackMerge, runMerge, UnsupportedMergeError, SHARD_EXTENSIONS,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
-  runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus,
+  runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus, patterScopesWrite,
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog } from "@patterkit/ops";
 
@@ -264,23 +264,29 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
 
     case "validate": {
       const loaded = loadProject(positionals[0] ?? ".");
-      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, ok } = runValidate(loaded);
+      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, gameScopes, ok } = runValidate(loaded);
+      // A warning (another tool's scope, say) is printed as one and never fails the run.
+      const warn = (i: { severity: "error" | "warning" }): string => (i.severity === "warning" ? "warning: " : "");
       for (const i of structural) console.error(`  [${i.code}] ${i.message}`);
-      for (const i of conditions) console.error(`  [${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`);
-      for (const i of interpolation) console.error(`  [${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`);
+      for (const i of conditions) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
+      for (const i of interpolation) console.error(`  [${i.field}] ${i.nodeId}: ${warn(i)}${i.message}  (${i.src})`);
       for (const i of hygiene) console.error(`  [hygiene] ${i.file}: ${i.message}`);
       for (const i of staleBundles) console.error(`  [stale-bundle] ${i.file}: ${i.message}`);
       for (const i of unresolvedMerges) console.error(`  [unresolved-merge] ${i.file}: ${i.message}`);
       for (const i of orphans) console.error(`  [not-in-project] ${i.message}`); // the message names the file
+      for (const i of gameScopes) console.error(`  [game-scopes] ${i.file}: ${warn(i)}${i.message}`);
       // Advisory, and outside `ok` and the count: a gate whose writer is not authored yet is the normal
       // state mid-work, and must never fail a build.
       for (const i of reachability) console.error(`  [unreachable] ${i.nodeId}: ${i.message}  (${i.src})`);
-      const count = structural.length + conditions.length + interpolation.length + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
-      // A reachability warning is not an issue, but "no issues" printed directly under one reads as a
-      // contradiction, so say what was said.
-      const advisory = reachability.length ? `, ${reachability.length} warning(s) above` : "";
+      const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
+      const warnings = reachability.length + [...conditions, ...interpolation, ...gameScopes].filter((i) => !isError(i)).length;
+      const count = structural.length + [...conditions, ...interpolation, ...gameScopes].filter(isError).length
+        + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
+      // A warning is not an issue, but "no issues" printed directly under one reads as a contradiction,
+      // so say what was said.
+      const advisory = warnings ? `, ${warnings} warning(s) above` : "";
       if (ok) console.log(`ok - ${loaded.scenes.length} scene(s), no issues${advisory}`);
-      else console.error(`\n${count} issue(s)`);
+      else console.error(`\n${count} issue(s)${advisory}`);
       return ok ? 0 : 1;
     }
 
@@ -310,8 +316,11 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
       // dist/<name>.patterc) - so `patter export` alone produces the artifact and
       // validate's staleness gate has a stable place to find it (spec §11).
       const target = typeof flags.o === "string" ? flags.o : bundleOutputPath(loaded);
-      if (!commitWrites([{ path: target, content: out }])) return 1;
+      // The game's scopes folder, when there is one, gets Patter's file too, and only when it changed.
+      const scopes = patterScopesWrite(loaded.project, loaded.gameScopes);
+      if (!commitWrites([{ path: target, content: out }, ...(scopes ? [scopes] : [])])) return 1;
       console.log(`wrote ${target}`);
+      if (scopes) console.log(`wrote ${scopes.path}`);
       return 0;
     }
 
@@ -486,14 +495,18 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
           const n = s.result ? s.result.conflicts.length : 0;
           console.log(`${s.added ? "added" : "merged"}: ${s.path}${n > 0 ? ` (${n} conflict(s))` : ""}`);
         }
+        // Their World edit, taken to the game's shared file so the next save doesn't sync it away. The
+        // returned pack's own copy of the game's scopes is never written: ours is the truth.
+        if (res.gameScopes?.error) console.error(`warning: their World properties were not written to ${res.gameScopes.path}: ${res.gameScopes.error}`);
+        else if (res.gameScopes) console.log(`game scopes: ${res.gameScopes.path} (their World properties)`);
         console.log(`\n${res.shards.length} shard(s) -> ${flags.o}; ${res.conflicts} conflict(s), ${res.warnings} warning(s)`);
         return res.conflicts > 0 ? 1 : 0;
       }
 
-      const writes = await runUnpack(readFileSync(file), flags.o);
-      if (!commitWrites(writes)) return 1;
-      for (const w of writes) console.log(`unpacked: ${w.path}`);
-      console.log(`\n${writes.length} shard(s) -> ${flags.o}`);
+      const { shards, scopes } = await runUnpack(readFileSync(file), flags.o);
+      if (!commitWrites([...shards, ...scopes])) return 1;
+      for (const w of [...shards, ...scopes]) console.log(`unpacked: ${w.path}`);
+      console.log(`\n${shards.length} shard(s)${scopes.length ? ` and ${scopes.length} game scopes file(s)` : ""} -> ${flags.o}`);
       return 0;
     }
 

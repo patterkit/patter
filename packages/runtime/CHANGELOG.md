@@ -33,6 +33,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **Requires `@wildwinter/scoperegistry` ^0.8.0.** That release adds a separate entry point for editing
+  tools (`@wildwinter/scoperegistry/scopes`, shared game scopes), which the runtime does not use; its
+  behaviour is unchanged.
+
 ## [0.14.0] - 2026-09-24
 
 ### Added

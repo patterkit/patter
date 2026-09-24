@@ -10,16 +10,27 @@ import { basename, isAbsolute, join, relative } from "node:path";
 import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
-import { validateConditions, validateInterpolation, exportBundle, hostScopesToSpec } from "@patterkit/compiler";
+import { validateConditions, validateInterpolation, exportBundle, hostScopesToSpec, projectScopes } from "@patterkit/compiler";
 import type { ConditionIssue } from "@patterkit/compiler";
 import { reachabilityIssues } from "./reachability.js";
 import { walkFiles } from "./load.js";
 import type { LoadedProject } from "./load.js";
+import { patterScopesStale } from "./game-scopes.js";
 
 /** A raw-bytes hygiene problem in one source file (repairable by `format`). */
 export interface HygieneIssue {
   file: string;
   message: string;
+}
+
+/** A problem with the game's shared scopes folder, or between it and the project, anchored to a file. */
+export interface GameScopesIssue {
+  file: string;
+  message: string;
+  /** "error" (a scopes file that won't parse, a token two files claim, an override that names no folder)
+   *  blocks a clean build; "warning" (Patter's file out of date, the project's copy of a game scope
+   *  differing from the shared file) does not. */
+  severity: "error" | "warning";
 }
 
 export interface ValidateResult {
@@ -39,6 +50,10 @@ export interface ValidateResult {
   unresolvedMerges: HygieneIssue[];
   /** Patter shards on disk that the project does NOT contain - see `orphanShards`. */
   orphans: HygieneIssue[];
+  /** The game's shared scopes folder: its files, and how the project stands against them. Only the
+   *  errors count against `ok`. Empty when the project has no folder. */
+  gameScopes: GameScopesIssue[];
+  /** Only ERRORS count: a warning (another tool's scope, say) never fails a build. */
   ok: boolean;
 }
 
@@ -47,17 +62,22 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const { project, scenes, locales } = loaded;
   const structural = validateProject({ project, scenes, authoring: loaded.authoring });
   // The project's own host scopes (`@world`, ...) are foreign to Patter's owned schema but first-class to
-  // the project: pass them so references into them validate (and read-only writes are flagged).
-  const foreignScopes = hostScopesToSpec(project.scopeRegistry);
-  const conditions = validateConditions({ project, scenes }, { foreignScopes });
-  const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes });
+  // the project: pass them so references into them validate (and read-only writes are flagged). With a
+  // game scopes folder, they are as the folder leaves them, and every other scope in it is checked too,
+  // with warnings.
+  const merged = loaded.gameScopes?.merged;
+  const scopes = projectScopes(project, merged);
+  const foreignScopes = hostScopesToSpec(scopes.host);
+  const conditions = validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged });
+  const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged });
+  const gameScopes = gameScopesIssues(loaded, scopes.notes);
   const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles]);
   const staleBundles = checkBundles(loaded);
   const unresolvedMerges = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
   const orphans = orphanShards(loaded);
   // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
   // breakage, and the real errors are already being told.
-  const reachability = structural.length === 0 && conditions.length === 0 ? reachabilityIssues(loaded) : [];
+  const reachability = structural.length === 0 && !conditions.some(isError) ? reachabilityIssues(loaded) : [];
   return {
     structural,
     conditions,
@@ -67,10 +87,30 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
     staleBundles,
     unresolvedMerges,
     orphans,
-    ok: structural.length === 0 && conditions.length === 0 && interpolation.length === 0
+    gameScopes,
+    ok: structural.length === 0 && !conditions.some(isError) && !interpolation.some(isError)
       && hygiene.length === 0 && staleBundles.length === 0 && unresolvedMerges.length === 0
-      && orphans.length === 0,
+      && orphans.length === 0 && !gameScopes.some(isError),
   };
+}
+
+const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
+
+/**
+ * The game scopes folder's own problems (a file that won't parse, a token two files claim), an override
+ * naming a folder that isn't there, Patter's file out of date, and where the project's host scopes and
+ * the folder disagree. Nothing at all for a project with no folder.
+ */
+function gameScopesIssues(loaded: LoadedProject, notes: { file: string; message: string }[]): GameScopesIssue[] {
+  const out: GameScopesIssue[] = [];
+  if (loaded.gameScopesMissing) out.push({ file: loaded.projectFile, severity: "error", message: loaded.gameScopesMissing });
+  const gs = loaded.gameScopes;
+  if (!gs) return out;
+  for (const i of gs.issues) out.push({ file: i.file, severity: i.severity, message: i.message });
+  for (const n of notes) out.push({ file: join(gs.dir, n.file), severity: "warning", message: n.message });
+  const stale = patterScopesStale(loaded.project, gs);
+  if (stale) out.push({ ...stale, severity: "warning" });
+  return out;
 }
 
 /**
@@ -133,7 +173,7 @@ function checkBundles(loaded: LoadedProject): HygieneIssue[] {
 
   let fresh: unknown;
   try {
-    fresh = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales }).content.hash;
+    fresh = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged }).content.hash;
   } catch {
     // The compile itself failed (e.g. a broken condition); validateConditions
     // already reports the cause - don't double-report by failing staleness too.

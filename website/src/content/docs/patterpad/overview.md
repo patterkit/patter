@@ -99,7 +99,8 @@ where to unpack it, then opens the result.
 
 Because a Patterpack is a real copy, the person you send it to can open it, write, and send
 one back. It is the friendly way to pass a project to a collaborator who is not on your
-version-control system.
+version-control system. If your game shares its scopes with other tools, a snapshot of them travels
+in the pack too (see [the game's shared scopes travel too](/setup/building-and-shipping/#the-games-shared-scopes-travel-too)).
 
 ## The workspace
 

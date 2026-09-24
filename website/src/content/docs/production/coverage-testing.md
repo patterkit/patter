@@ -62,6 +62,11 @@ and declared up front in **Project Settings ▸ World Properties**. Declaring th
 matters here is that a declared `@world` value gives the test a **default** to fall back on, and
 a place to hang a driver.
 
+Where the game [shares its scopes](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools),
+the test also stands in the other editing tools' scopes a line names, such as the Storylet
+Engine's `@story`, from the defaults their files declare, so a story that reads them runs rather
+than being refused.
+
 ### Input drivers
 
 Since your game sets these while it runs, the coverage test can't know them, so a branch that

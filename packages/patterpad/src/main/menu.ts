@@ -99,6 +99,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Delete Scene…", click: () => send("delete-scene") },
         { type: "separator" },
         { ...FILE_MENU.projectSettings, click: () => send("project-settings") },
+        // Make the game's shared scopes folder, so the game's other editing tools and this project check
+        // each other's names (patterkit/design/shared-scopes.md). Needs an open project.
+        { label: "Share Scopes with Other Tools…", enabled: spelling?.hasProject ?? false, click: () => send("share-scopes") },
         // User identity (name + optional email) lives in the macOS app menu; on other platforms it sits here.
         ...(isMac ? [] : [{ ...APP_MENU.userInfo, click: () => send("user-info") }]),
         // macOS: no File ▸ Close Window - the App menu's Quit (and the window's close button) already cover

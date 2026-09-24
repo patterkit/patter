@@ -14,9 +14,11 @@ import type {
   ProjectFile, Scene, Block, Group, Snippet, Effect, LocaleFile,
 } from "@patterkit/model";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
+import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
 import { canonicalStringify, hash32 } from "@patterkit/core";
 import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
 import { compileExpression } from "./expressions.js";
+import { externalGameScopes, projectScopes } from "./game-scopes.js";
 
 export interface ExportInput {
   project: ProjectFile;
@@ -31,6 +33,13 @@ export interface ExportInput {
    * unregistered scope token, so cross-engine refs need this.
    */
   foreignScopes?: ScopeRegistrySpec;
+  /**
+   * The game's merged `game-scopes/` folder, when the project has one (patterkit/design/shared-scopes.md).
+   * Its `game.scopes.json` wins over the project's copy of a host scope, and its `@world` is baked in
+   * even when the project doesn't declare it; every other scope in it compiles as another engine's
+   * does: named in `externalScopes`, never baked in.
+   */
+  gameScopes?: MergedScopes;
 }
 
 function compileEffect(e: Effect, foreign?: ScopeRegistrySpec): CompiledEffect {
@@ -98,11 +107,10 @@ function compileScene(scene: Scene, foreign?: ScopeRegistrySpec): CompiledScene 
   };
 }
 
-/** The family's other engines' scope tokens the compiled content names (conditions, effect values, and
- *  effect targets), sorted. */
-function externalScopesIn(scenes: Record<string, CompiledScene>): string[] {
+/** The external scope tokens the compiled content names (conditions, effect values, and effect targets),
+ *  sorted: the family's other engines', and any the game's scopes folder declares for someone else. */
+function externalScopesIn(scenes: Record<string, CompiledScene>, external: ReadonlySet<string>): string[] {
   const found = new Set<string>();
-  const external = new Set(EXTERNAL_SCOPES);
   const walk = (node: unknown): void => {
     if (!Array.isArray(node) && (node === null || typeof node !== "object")) return;
     if (Array.isArray(node)) {
@@ -129,15 +137,22 @@ export function exportBundle(input: ExportInput): Bundle {
   // apply to every compile without each caller re-passing them; an explicit `input.foreignScopes` (another
   // owner's spec, e.g. a storylet's) takes precedence when given. The chosen spec lets `@world.x` parse and
   // is baked into the bundle so the runtime can self-back the scope when no host resolver claims it.
-  const foreignScopes = input.foreignScopes ?? hostScopesToSpec(project.scopeRegistry);
+  // With a game scopes folder, the host scopes are the project's as the folder leaves them (the shared
+  // file wins, and its `@world` joins); without one they are the project's own, exactly as before.
+  const hostScopes = projectScopes(project, input.gameScopes).host;
+  const foreignScopes = input.foreignScopes ?? hostScopesToSpec(hostScopes);
+  const gameExternal = externalGameScopes(foreignScopes, input.gameScopes);
 
-  // Compiled against the family's other engines too (`@story` parses with no setting), but the bundle's
-  // own scopeRegistry keeps only what the project declared: the runtime self-backs what it lists, and
-  // another engine's scope is that engine's to register.
-  const compileScopes = withEngineScopes(foreignScopes);
+  // Compiled against the family's other engines too (`@story` parses with no setting), and every token
+  // the game's folder declares, but the bundle's own scopeRegistry keeps only the host scopes: the
+  // runtime self-backs what it lists, and another engine's scope is that engine's to register.
+  const compileScopes = withEngineScopes({
+    version: foreignScopes?.version ?? 1,
+    scopes: [...(foreignScopes?.scopes ?? []), ...gameExternal.map((s) => ({ token: s.token }))],
+  });
   const scenesOut: Record<string, CompiledScene> = {};
   for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, compileScopes);
-  const externalScopes = externalScopesIn(scenesOut);
+  const externalScopes = externalScopesIn(scenesOut, new Set([...EXTERNAL_SCOPES, ...gameExternal.map((s) => s.token)]));
 
   const strings: Record<string, Record<string, string>> = {};
   for (const loc of locales) {
@@ -189,7 +204,7 @@ export function exportBundle(input: ExportInput): Bundle {
     }),
 
     properties: project.properties,
-    scopeRegistry: project.scopeRegistry,
+    scopeRegistry: hostScopes,
     gameDataFields: project.gameDataFields,
     // Closed-caption delimiters ride along only when the project pins a non-default pair (#214); the
     // runtime falls back to `[` / `]` when absent, so default projects keep their exact prior bundle.

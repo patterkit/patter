@@ -996,7 +996,7 @@ describe("a line that names another engine's scope", () => {
     project.startPlay(sceneId);
     const refused = project.playToStop();
     expect(refused.stop).toBe("error");
-    expect(refused.error).toMatch(/^This project names @story, which another engine provides\. To play it here, declare @story in Project Settings > World properties/);
+    expect(refused.error).toMatch(/^This project names @story, which the Storylet Engine provides\. To play it here, share scopes with the Storylet Engine \(File > Share Scopes with Other Tools\), or declare @story in Project Settings > World properties/);
     expect(refused.error).toContain("this content names @story, which no engine on this registry registered");
 
     const s = project.readSettings()!;
@@ -1013,5 +1013,152 @@ describe("a line that names another engine's scope", () => {
 
   it("leaves any other failure in the engine's own words", () => {
     expect(project.playRefusal("unknown scene \"x\"")).toBe("unknown scene \"x\"");
+  });
+});
+
+// The same line in a game that shares its scopes (patterkit/design/shared-scopes.md). A `game-scopes/`
+// folder above the project holds the Storylet Engine's file and the game's own. The editors take the
+// folder's properties (who declares each in the tip, the shared file winning over the project's copy),
+// the play window stands @story in from its defaults and keeps doing so across a live refresh, World
+// properties write the game's file first and keep a copy in the project, and saving the properties
+// keeps Patter's own file there current.
+describe("a game that shares its scopes", () => {
+  const storylets = {
+    version: 1, owner: "Storylet Engine",
+    scopes: [{ token: "story", declarations: [{ name: "act", type: "number", default: 2, purpose: "Which act the story is in" }] }],
+  };
+  const game = {
+    version: 1, owner: "Game",
+    scopes: [
+      { token: "world", declarations: [{ name: "threat", type: "number", default: 3 }] },
+      { token: "player", declarations: [{ name: "name", type: "string", default: "Ash" }] },
+    ],
+  };
+  const setUp = async (files: Record<string, unknown> = { "storylets.scopes.json": storylets, "game.scopes.json": game }) => {
+    const gameDir = mkdtempSync(join(tmpdir(), "pp-game-"));
+    const scopes = join(gameDir, "game-scopes");
+    mkdirSync(scopes);
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(scopes, name), JSON.stringify(body, null, 2));
+    const opened = await project.createProject(join(gameDir, "story.patter"), "Story");
+    const sceneId = opened.scenes[0]!.id;
+    const src = project.readScene(sceneId);
+    const flow = parseSource(src.flowSource) as { scene: { blocks: { children: Record<string, unknown>[] }[] } };
+    flow.scene.blocks[0]!.children[0]!["condition"] = "@story.act >= 2";
+    expect((await project.saveScene(sceneId, canonicalStringify(flow), src.locSource)).ok).toBe(true);
+    return { gameDir, scopes, sceneId };
+  };
+
+  it("gives the editors the folder's properties, with whose they are in the tip, and every token", async () => {
+    const { sceneId } = await setUp();
+    const read = project.readScene(sceneId);
+    expect(read.properties).toContainEqual({ scope: "story", name: "act", type: "number", purpose: "Storylet Engine: Which act the story is in" });
+    expect(read.properties).toContainEqual({ scope: "player", name: "name", type: "string", purpose: "Game" });
+    expect(read.hostScopes).toEqual(expect.arrayContaining(["world", "player", "story"]));
+  });
+
+  it("lets the shared file win over a host scope of the same token in the editors", async () => {
+    const { sceneId } = await setUp();
+    const s = project.readSettings()!;
+    // Write the project's copy behind the tools' backs, as a hand edit would.
+    const loadedFile = join(project.currentRoot()!, "story.patterproj");
+    const raw = parseSource(readFileSync(loadedFile, "utf8")) as Record<string, unknown>;
+    raw["scopeRegistry"] = { version: 1, scopes: [{ token: "world", declarations: [{ name: "threat", type: "string" }] }] };
+    writeFileSync(loadedFile, canonicalStringify(raw));
+    project.openProject(project.currentRoot()!);
+    expect(project.readScene(sceneId).properties.filter((p) => p.scope === "world")).toEqual([{ scope: "world", name: "threat", type: "number", purpose: "Game" }]);
+    expect(s.worldFile).toMatch(/game-scopes[/\\]game\.scopes\.json$/);
+  });
+
+  it("plays @story in the play window, standing it in, and keeps it across a live refresh", async () => {
+    const { sceneId } = await setUp();
+    project.startPlay(sceneId);
+    const first = project.playStep();
+    expect(first.stop).not.toBe("error");
+
+    const src = project.readScene(sceneId);
+    const loc = parseSource(src.locSource) as { strings: Record<string, string> };
+    loc.strings[Object.keys(loc.strings)[0]!] = "Reworded, live.";
+    project.setPlaySource({ sceneId, flow: src.flowSource, loc: canonicalStringify(loc) });
+    expect(project.refreshPlay().kind).toBe("text");
+
+    const flowDoc = parseSource(src.flowSource) as { scene: { blocks: Array<{ children: unknown[] }> } };
+    flowDoc.scene.blocks[0]!.children.push({ id: "sn_live", type: "snippet", condition: "@player.name == \"Ash\"", beats: [{ id: "L_live", kind: "text" }] });
+    project.setPlaySource({ sceneId, flow: canonicalStringify(flowDoc), loc: canonicalStringify(loc) });
+    expect(project.refreshPlay().kind).toBe("structure"); // hot-swapped on the same stand-in registry
+    expect(project.playToStop().stop).not.toBe("error");
+    project.setPlaySource(null);
+  });
+
+  it("names the missing file when the folder has no Storylets file", async () => {
+    const { sceneId } = await setUp({ "game.scopes.json": game });
+    project.startPlay(sceneId);
+    const refused = project.playToStop();
+    expect(refused.stop).toBe("error");
+    expect(refused.error).toContain("no storylets.scopes.json: open the Storylets project in Storyletter and save");
+    expect(refused.error).toContain("this content names @story, which no engine on this registry registered");
+  });
+
+  it("saves World properties to game.scopes.json first, keeps the project's copy, and keeps Patter's own file current", async () => {
+    const { scopes } = await setUp();
+    const s = project.readSettings()!;
+    expect(s.scopeRegistry?.scopes.map((x) => x.token)).toEqual(["world"]); // the shared @world, shown for editing
+    const world = { version: 1, scopes: [{ token: "world", declarations: [{ name: "threat", type: "number" as const, default: 9 }] }] };
+    const res = await project.saveSettings({ ...s, scopeRegistry: world, properties: [{ name: "gold", type: "number", default: 1 }] });
+    expect(res.ok).toBe(true);
+    const shared = JSON.parse(readFileSync(join(scopes, "game.scopes.json"), "utf8"));
+    expect(shared.scopes.map((x: { token: string }) => x.token)).toEqual(["world", "player"]);
+    expect(shared.scopes[0].declarations[0].default).toBe(9);
+    const projectFile = parseSource(readFileSync(join(project.currentRoot()!, "story.patterproj"), "utf8")) as { scopeRegistry?: unknown };
+    expect(projectFile.scopeRegistry).toEqual(world); // the synced copy
+    const patter = JSON.parse(readFileSync(join(scopes, "patter.scopes.json"), "utf8"));
+    expect(patter).toEqual({ version: 1, owner: "Patter", scopes: [{ token: "patter", declarations: [{ name: "gold", type: "number", default: 1 }] }] });
+    expect(project.validate().problems.filter((p) => p.category === "game-scopes")).toEqual([]);
+  });
+
+  it("packs the game's scopes, unpacks them into the new project, and a merge takes the recipient's World edit home", async () => {
+    const { gameDir, scopes } = await setUp();
+    const sender = project.currentRoot()!;
+    const world = (n: number) => ({ version: 1, scopes: [{ token: "world", declarations: [{ name: "threat", type: "number" as const, default: n }] }] });
+    expect((await project.saveSettings({ ...project.readSettings()!, scopeRegistry: world(3) })).ok).toBe(true); // the synced copy
+    const sent = join(gameDir, "sent.patterpack");
+    writeFileSync(sent, await project.packBytes());
+
+    // The recipient unpacks it somewhere with no folder of its own: the snapshot comes with it.
+    const dest = join(mkdtempSync(join(tmpdir(), "pp-recv-")), "story.patter");
+    expect((await project.unpackTo(sent, dest)).ok).toBe(true);
+    expect(readFileSync(join(dest, "game-scopes", "storylets.scopes.json"), "utf8")).toBe(JSON.stringify(storylets, null, 2));
+    project.openProject(dest);
+    expect(project.readSettings()!.worldFile).toBe(join(dest, "game-scopes", "game.scopes.json"));
+    expect((await project.saveSettings({ ...project.readSettings()!, scopeRegistry: world(9) })).ok).toBe(true);
+    const returned = join(gameDir, "returned.patterpack");
+    writeFileSync(returned, await project.packBytes());
+
+    project.openProject(sender);
+    const plan = await project.planPackMerge(returned, sent);
+    if ("error" in plan) throw new Error(plan.error);
+    expect(plan.summary.gameScopes).toEqual({ path: join("..", "game-scopes", "game.scopes.json") }); // project-relative, for the dialog
+    expect(JSON.parse(readFileSync(join(scopes, "game.scopes.json"), "utf8")).scopes[0].declarations[0].default).toBe(3); // planned, not written
+    expect((await project.commitPackMerge(plan)).ok).toBe(true);
+    expect(JSON.parse(readFileSync(join(scopes, "game.scopes.json"), "utf8")).scopes[0].declarations[0].default).toBe(9);
+    expect(project.readSettings()!.scopeRegistry).toEqual(world(9)); // the shared file and the copy agree
+    expect(existsSync(join(sender, "game-scopes"))).toBe(false); // their snapshot went nowhere
+  });
+
+  it("shares a project's scopes: creates the folder with Patter's file and the game's, and the editors pick them up", async () => {
+    const gameDir = mkdtempSync(join(tmpdir(), "pp-share-"));
+    mkdirSync(join(gameDir, ".git"));
+    const opened = await project.createProject(join(gameDir, "story.patter"), "Story");
+    const s = project.readSettings()!;
+    const world = { version: 1, scopes: [{ token: "world", declarations: [{ name: "threat", type: "number" as const }] }] };
+    expect((await project.saveSettings({ ...s, scopeRegistry: world })).ok).toBe(true);
+    const info = project.shareScopesInfo()!;
+    expect(info).toEqual({ suggested: join(gameDir, "game-scopes") });
+    expect((await project.shareScopes(info.suggested)).ok).toBe(true);
+    expect(JSON.parse(readFileSync(join(gameDir, "game-scopes", "game.scopes.json"), "utf8")).scopes).toEqual(world.scopes);
+    expect(existsSync(join(gameDir, "game-scopes", "patter.scopes.json"))).toBe(true);
+    expect(project.readSettings()!.scopeRegistry).toEqual(world); // the project keeps its copy
+    expect(project.shareScopesInfo()!.shared).toBe(join(gameDir, "game-scopes"));
+    expect((await project.shareScopes(info.suggested)).ok).toBe(false); // once is enough
+    expect(project.readScene(opened.scenes[0]!.id).properties).toContainEqual({ scope: "world", name: "threat", type: "number", purpose: "Game" });
   });
 });

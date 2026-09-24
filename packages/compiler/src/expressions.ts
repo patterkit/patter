@@ -6,9 +6,12 @@
 // ---------------------------------------------------------------------------
 
 import { compile, parse, validateExpr } from "@wildwinter/expr";
-import type { ExprNode } from "@wildwinter/expr";
-import { dialectWithForeignScopes, buildSchema, extractSlots, splitRef, withEngineScopes } from "@patterkit/dialect";
+import type { ExprNode, ExpressionValidationIssue } from "@wildwinter/expr";
+import { dialectWithForeignScopes, buildSchema, extractSlots, splitRef, withEngineScopes, hostScopesToSpec } from "@patterkit/dialect";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
+import { referenceNote } from "@wildwinter/scoperegistry/scopes";
+import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
+import { externalGameScopes, projectScopes } from "./game-scopes.js";
 import { walkNodes } from "@patterkit/model";
 import type {
   Expression, ProjectFile, Scene, Block, Effect, Beat, LocaleFile,
@@ -21,6 +24,54 @@ import type {
  */
 export function compileExpression(src: string, foreign?: ScopeRegistrySpec): Expression {
   return compile(src, dialectWithForeignScopes(foreign));
+}
+
+/**
+ * What the validators take besides the project. `foreignScopes` is the host spec, checked strictly (a
+ * project's own `@world`, or another owner's spec). `gameScopes` is the game's merged `game-scopes/`
+ * folder: every scope in it the host spec doesn't hold is checked too, but only ever with WARNINGS
+ * (patterkit/design/shared-scopes.md decision 3). Given `gameScopes` and no `foreignScopes`, the host
+ * spec is the project's host scopes as the folder leaves them (`projectScopes`).
+ */
+export interface ValidateOptions {
+  foreignScopes?: ScopeRegistrySpec;
+  gameScopes?: MergedScopes;
+}
+
+/** The scopes a validation pass works over, worked out once per call. */
+interface ValidationScopes {
+  /** Host scopes plus every external token OPAQUE: the strict pass, as a project with no folder has. */
+  foreign: ScopeRegistrySpec;
+  /** The same with the folder's external declarations filled in, when there are any: the warning pass. */
+  checked?: ScopeRegistrySpec;
+  /** Tokens whose findings are warnings: the folder's scopes the host spec doesn't hold. */
+  external: Set<string>;
+  merged?: MergedScopes;
+}
+
+function validationScopes(project: ProjectFile, options: ValidateOptions): ValidationScopes {
+  const merged = options.gameScopes;
+  const strict = options.foreignScopes ?? (merged ? hostScopesToSpec(projectScopes(project, merged).host) : undefined);
+  const external = externalGameScopes(strict, merged);
+  const base = strict?.scopes ?? [];
+  // The family's other engines (`@story`) are in by default, opaque unless something declares them.
+  const foreign = withEngineScopes({ version: strict?.version ?? 1, scopes: [...base, ...external.map((s) => ({ token: s.token }))] });
+  const checked = external.some((s) => s.declarations?.length)
+    ? withEngineScopes({ version: strict?.version ?? 1, scopes: [...base, ...external] })
+    : undefined;
+  return { foreign, checked, external: new Set(external.map((s) => s.token)), merged };
+}
+
+/** An issue's identity within one expression, for telling the warning pass's findings from the strict pass's. */
+const issueKey = (i: ExpressionValidationIssue): string => `${i.kind}|${JSON.stringify(i.path)}|${i.message}`;
+
+/** The warning pass's own words for a finding in another tool's scope: an undeclared name says whose file doesn't declare it. */
+function externalMessage(i: ExpressionValidationIssue, merged: MergedScopes | undefined): string {
+  if (merged && i.kind === "unresolved-scoped-property" && i.reference) {
+    const [token, name] = i.reference.split(".");
+    if (token && name) return referenceNote(merged, token, name) ?? i.message;
+  }
+  return i.message;
 }
 
 export interface ConditionIssue {
@@ -46,11 +97,10 @@ export interface ConditionIssue {
  */
 export function validateConditions(
   input: { project: ProjectFile; scenes: Scene[] },
-  options: { foreignScopes?: ScopeRegistrySpec } = {},
+  options: ValidateOptions = {},
 ): ConditionIssue[] {
   const issues: ConditionIssue[] = [];
-  // The family's other engines (`@story`) are in by default, opaque unless the spec declares them.
-  const foreign = withEngineScopes(options.foreignScopes);
+  const { foreign, checked, external, merged } = validationScopes(input.project, options);
   const dialect = dialectWithForeignScopes(foreign);
   const readOnly = readOnlyForeignTargets(foreign);
   const opaqueForeign = opaqueForeignTokens(foreign);
@@ -82,6 +132,7 @@ export function validateConditions(
     elementId: string,
   ): void => {
     const schema = buildSchema(input.project, sceneProps, foreign);
+    const checkedSchema = checked ? buildSchema(input.project, sceneProps, checked) : undefined;
 
     const check = (nodeId: string, field: string, src: string): void => {
       let ast;
@@ -91,8 +142,17 @@ export function validateConditions(
         issues.push({ nodeId, field, src, severity: "error", message: e instanceof Error ? e.message : String(e) });
         return;
       }
-      for (const iss of validateExpr(ast, schema, dialect)) {
+      const strict = validateExpr(ast, schema, dialect);
+      for (const iss of strict) {
         issues.push({ nodeId, field, src, severity: iss.severity, message: iss.message });
+      }
+      // Again with the other tools' declarations filled in: whatever that finds and the strict pass
+      // did not (an undeclared name, a type mismatch) is about their scopes, so it is a warning.
+      if (checkedSchema) {
+        const seen = new Set(strict.map(issueKey));
+        for (const iss of validateExpr(ast, checkedSchema, dialect)) {
+          if (!seen.has(issueKey(iss))) issues.push({ nodeId, field, src, severity: "warning", message: externalMessage(iss, merged) });
+        }
       }
       checkVisitIds(ast, nodeId, field, src);
     };
@@ -113,6 +173,12 @@ export function validateConditions(
         return;
       }
       const { scope, name } = splitRef(target, isScopeToken);
+      // Another tool's scope: its file says whether the name exists and may be written, as a warning.
+      if (external.has(scope)) {
+        const note = merged ? referenceNote(merged, scope, name, { write: true }) : undefined;
+        if (note) issues.push({ nodeId, field, src: target, severity: "warning", message: note });
+        return;
+      }
       if (opaqueForeign.has(scope)) return;
       if (!schema.properties.get(scope)?.has(name)) {
         issues.push({ nodeId, field, src: target, severity: "error",
@@ -160,20 +226,23 @@ export function validateConditions(
  */
 export function validateInterpolation(
   input: { project: ProjectFile; scenes: Scene[]; locales?: LocaleFile[] },
-  options: { foreignScopes?: ScopeRegistrySpec } = {},
+  options: ValidateOptions = {},
 ): ConditionIssue[] {
   const issues: ConditionIssue[] = [];
   const voiced = input.project.voiced ?? false;
   const tables = (input.locales ?? []).map((l) => ({ locale: l.locale, strings: l.strings }));
   const defaultLocale = input.project.locales.default;
-  const foreign = withEngineScopes(options.foreignScopes);   // `@story` is in by default, opaque
+  const { foreign, external, merged } = validationScopes(input.project, options); // `@story` is in by default, opaque
   const opaqueForeign = opaqueForeignTokens(foreign);
   const isScopeToken = scopeTokenTest(foreign);
 
   for (const scene of input.scenes) {
     const schema = buildSchema(input.project, scene.sceneProps, foreign);
-    const known = (ref: string): boolean => {
+    /** True when the slot's property is known here; a string when another tool's file has something to
+     *  say about it (a warning); false when nobody declares it. */
+    const known = (ref: string): boolean | string => {
       const { scope, name } = splitRef(ref, isScopeToken);
+      if (external.has(scope)) return (merged ? referenceNote(merged, scope, name) : undefined) ?? true;
       if (opaqueForeign.has(scope)) return true; // the foreign owner declares it; graceful here
       return schema.properties.get(scope)?.has(name) ?? false;
     };
@@ -195,7 +264,10 @@ export function validateInterpolation(
               message: `interpolation slot holds a bare property reference only, got '${slot.inner}' (spec §16)` });
             continue;
           }
-          if (!known(slot.ref)) {
+          const ok = known(slot.ref);
+          if (typeof ok === "string") {
+            issues.push({ nodeId, field, src: slot.raw, severity: "warning", message: ok });
+          } else if (!ok) {
             issues.push({ nodeId, field, src: slot.raw, severity: "error",
               message: `unknown property in interpolation slot: '${slot.ref}'` });
           }

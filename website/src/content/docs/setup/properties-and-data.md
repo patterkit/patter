@@ -54,6 +54,62 @@ One thing to know now is that because the game sets `@world` values while it run
 stand-ins, **coverage drivers**, live in the same World Properties tab and are covered with
 the test itself under [Input drivers](/production/coverage-testing/#input-drivers).
 
+## Sharing scopes with the game's other tools
+
+A game can have more than one editing tool in it: Patter for conversations, the Storylet Engine's
+Storyletter for storylets, and others. Each can name the others' properties (a Patter condition on
+`@story.act`, a storylet testing `@patter.met_the_guard`), and each can check those names if the
+game keeps one **`game-scopes/`** folder where every tool writes what it declares:
+
+```
+my-game/
+  game-scopes/
+    patter.scopes.json      written by Patterpad and the patter CLI
+    storylets.scopes.json   written by Storyletter and the storyletengine CLI
+    game.scopes.json        the game's own scopes (@world, and any others)
+  story/the-village.patter/...
+```
+
+- **Patter's file** holds the project's shared `@patter` properties (per-flow ones are not
+  game-wide, so they stay out). Patterpad writes it whenever the properties are saved, and on a
+  build; `patter export` writes it too. It changes only when the declarations do, so it sits in
+  version control beside the project without churn. `patter validate` warns when it is out of date.
+- **Other tools' names are checked, with warnings.** A name another tool's file doesn't declare,
+  a comparison of the wrong type, or a write to a property that file marks read-only is a
+  warning, never an error, because the other project may be a save behind on someone's branch. A
+  token nobody declares is accepted unchecked, as it is without a folder. The condition and effect
+  editors offer the other tools' properties by name, with who declares each in the tip.
+- **The game's own scopes live in `game.scopes.json`.** With the folder, **Project Settings ▸ World
+  Properties** edits that file (and leaves the scopes it doesn't show alone), and the project keeps
+  a copy, so it still compiles packed or checked out on its own. The shared file wins: if the two
+  ever differ, `validate` says so. Its `@world` is compiled into the bundle, so a game running
+  Patter alone still starts from those defaults.
+- **Previews stand the other tools in.** The Play window, `patter play`, and coverage runs play a
+  line that names `@story`, reading the defaults the Storylet Engine's file declares. A real game
+  still needs the other engine on the same registry (see
+  [One registry per game](/play/integration/#one-registry-per-game)).
+
+Patter finds the folder by walking up from the project to the first `game-scopes/`, stopping at
+the root of your version control, so a folder above your repository is never picked up. To keep
+it somewhere else, name it in the project file, relative to it:
+
+```json5
+gameScopes: "../../shared/game-scopes",
+```
+
+A **`.patterpack`** carries a read-only snapshot of the folder, and unpacking puts it in
+`game-scopes/` inside the new project folder, so the person you sent it to has the same checks,
+pickers, and previews. Merging their pack back never writes that snapshot anywhere: your folder
+stays the truth. If they changed World properties, the merge writes their change to your
+`game.scopes.json` and tells you so (see
+[Handing the project to someone](/setup/building-and-shipping/#the-games-shared-scopes-travel-too)).
+
+A project with no folder works alone, exactly as before. **File ▸ Share Scopes with Other Tools**
+creates the folder (at your version-control root, unless you choose another place) with Patter's
+file and a `game.scopes.json` holding your World properties. An `@story` you imported under World
+properties before the folder existed is superseded once Storyletter writes its file there, and
+`validate` asks you to remove it.
+
 ## Game Data: what your game reads back
 
 Properties drive the *story*; **Game Data** hands cues to the *game*. In **Project

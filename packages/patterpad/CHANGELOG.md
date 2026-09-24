@@ -6,6 +6,51 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Patterpad reads the game's shared scopes.** A game can keep one `game-scopes/` folder, where each
+  editing tool writes the properties it declares and reads the others'. Patterpad finds it by walking up
+  from the project (or where the project's `gameScopes` names it), and then the condition and effects
+  editors offer the other tools' properties by name, such as the Storylet Engine's `@story.act`, with who
+  declares each in the tip. Their names, types, and read-only properties are checked, as warnings, since
+  the other project may be a save behind.
+- **Patterpad keeps its own file in that folder current.** Saving the project's properties, or a build,
+  writes `patter.scopes.json` (the shared `@patter` properties) when it would change, and not otherwise.
+- **World properties are the game's, where it shares its scopes.** The World Properties tab edits the
+  game's `game.scopes.json`, re-read before each save so the scopes it doesn't show are kept, and the
+  project keeps a copy so it still works packed or on its own. The tab says where they are saved.
+- **File > Share Scopes with Other Tools.** Creates the game's `game-scopes/` folder (at the
+  version-control root above the project, unless you choose another place) with Patter's file and a
+  `game.scopes.json` holding the project's World properties.
+- **The play window plays a line that names another engine's scope**, where the game shares its
+  scopes: it stands that engine in, reading the defaults its file declares, and keeps doing so across a
+  live refresh. So does a coverage run.
+- **A Patterpack carries the game's shared scopes.** Where the project has a `game-scopes/` folder,
+  Export as Patterpack puts a read-only snapshot of it in the pack, and Open Patterpack writes it into
+  `game-scopes/` inside the new project folder, so the recipient's checks, pickers, and play window know
+  the other tools' scopes. A project with no folder packs exactly as before, and an older pack opens as
+  it always did.
+- **Merge Returned Patterpack brings a World properties edit home.** The returned pack's snapshot is
+  never written anywhere: your folder stays the truth. But when the recipient changed World properties,
+  the merge writes the scopes they changed to your `game.scopes.json` (keeping the rest of the file), so
+  your next save doesn't quietly undo their change. The confirmation and the summary after the merge
+  say so.
+
+### Changed
+
+- **The play window's hint for `@story` points at the shared folder.** With no folder, it suggests sharing
+  scopes with the Storylet Engine (or declaring `@story` under World properties); with a folder but no
+  Storylets file in it, it names the missing file and how to write it.
+- **Problems list the shared folder's faults**: a scopes file that won't parse or a scope two files claim
+  (errors), and Patter's own file being out of date or the project's copy of a game scope differing from
+  the shared file (warnings).
+
+### Fixed
+
+- **World properties keep each scope's token.** A scope imported under another token (`@story`) was folded
+  into `@world` the next time Project Settings were saved, and every property's purpose note was dropped;
+  both are kept now.
+
 ## [0.18.0] - 2026-09-24
 
 ### Added

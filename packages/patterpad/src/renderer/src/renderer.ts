@@ -41,7 +41,6 @@ import { renderInspector } from "./inspector.js";
 // open, because they are all the one panel.
 import { openConditionEditor, renderConditionPills } from "./cond-editor.js";
 import { setPropertyActions, setHostScopeTokens, type PropertyAction } from "./expr-shared.js";
-import { hostScopeProperties, hostScopeTokens } from "../../shared/host-scopes.js";
 import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // The gameId editor is the shell's now: it IS this app's, generalised, and it
 // gained a stopPropagation on keydown that ours lacked (a Delete typed into an
@@ -906,7 +905,7 @@ function relToProject(path: string | undefined): string | undefined {
 const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
   structure: "Structure", condition: "Condition", interpolation: "Text",
   hygiene: "Tidy-up", "stale-bundle": "Build", merge: "Merge", "not-in-project": "Not in project",
-  spelling: "Spelling",
+  spelling: "Spelling", "game-scopes": "Shared scopes",
 };
 
 // The sentences themselves (one per validator code, plus the softened fallback) live in problem-copy.ts,
@@ -2348,11 +2347,16 @@ async function mergePatterpack(): Promise<void> {
   const added = r.summary.shards.filter((sh) => sh.added).length;
   const merged = r.summary.shards.length - added;
   const counts = `${merged} merged${added ? `, ${added} added` : ""}`;
+  // Their World edit went to the game's shared file (or couldn't, which is the error voice's too).
+  const world = r.summary.gameScopes;
+  const worldNote = !world ? "" : world.error
+    ? `\nTheir World properties were not written to ${world.path}: ${world.error}`
+    : `\nTheir World properties are in ${world.path}`;
   // A conflict is not a failure - the merge committed - but it is not a quiet success either. The error
   // voice is what stops an author walking away from unresolved conflicts thinking they were done.
   if (r.summary.conflicts > 0) {
-    toast(`${counts}. ${plural(r.summary.conflicts, "conflict")} need a look.\nSee the .patterconflict files.`, "error");
-  } else toast(`Merged the returned pack\n${counts}`, "ok");
+    toast(`${counts}. ${plural(r.summary.conflicts, "conflict")} need a look.\nSee the .patterconflict files.${worldNote}`, "error");
+  } else toast(`Merged the returned pack\n${counts}${worldNote}`, world?.error ? "error" : "ok");
 }
 
 /** Publish ▸ Publish for Web: write the story to a FOLDER as a customisable page (index.html +
@@ -2469,7 +2473,7 @@ const settingsDlg = mountSettingsDialog({
     { id: "world", label: "World properties", group: "Story data", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       const worldHost = el("div"); host.append(worldHost);
-      const world = mountWorld(worldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers() });
+      const world = mountWorld(worldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers(), ...(s.worldFile ? { worldFile: s.worldFile } : {}) });
       Object.assign(live, { world, worldHost });
       // Two gates. A duplicate name is a data hazard. An illegal one is a declared property no
       // expression can reach (a hyphen reads as subtraction, a leading digit or a keyword will not parse,
@@ -2593,19 +2597,47 @@ async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
     // rebuild the condition-editor catalogue so they're selectable immediately, without a scene reload or a
     // restart. Mirrors openSceneProps for the scene scope; keeps the load-time order (@patter first). New
     // default values reach the run through the play window's live refresh (the main process triggers it).
-    // The host scopes (#159) may have changed too: rebuild their properties, and the editors' dialect.
+    // The host scopes (#159) may have changed too, and with a game scopes folder so may the shared file:
+    // rebuild their properties, and the editors' dialect.
     sceneProps = [
       ...s.properties.map((d): ConditionProperty => ({ scope: "patter", name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) })),
-      ...hostScopeProperties(s.scopeRegistry),
       ...sceneProps.filter((p) => p.scope === "scene"),
     ];
-    setHostScopeTokens(hostScopeTokens(s.scopeRegistry));
+    await refreshEditorScopes();
     void refreshVcStatus(); // the PROJECT shard just changed on disk: re-badge the Properties row
     await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
     void refreshProblems();  // refresh the spelling entries in the problems panel for the new setup
     pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
     lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // refresh the status dropdown + condition pills
   }
+}
+
+/** Rebuild the editors' other scopes from the main process, the one place that knows them all: the
+ *  host scopes, and the game scopes folder's (another engine's `@story`, whose tip says whose it is).
+ *  Keeps this scene's `@patter` and `@scene` entries as they are, since those may be unsaved edits. */
+async function refreshEditorScopes(): Promise<void> {
+  if (!currentSceneId) return;
+  const fresh = await window.patter.readScene(currentSceneId);
+  sceneProps = [
+    ...sceneProps.filter((p) => p.scope === "patter"),
+    ...fresh.properties.filter((p) => p.scope !== "patter" && p.scope !== "scene"),
+    ...sceneProps.filter((p) => p.scope === "scene"),
+  ];
+  setHostScopeTokens(fresh.hostScopes);
+}
+
+/** File ▸ Share Scopes with Other Tools: make the game's shared scopes folder (main asks where), then
+ *  pick up the folder's scopes in the editors. */
+async function shareScopes(): Promise<void> {
+  if (!project) return;
+  const r = await window.patter.shareScopes();
+  if (!r) return; // cancelled
+  if ("error" in r) { toast(`Could not share scopes: ${r.error}`, "error"); return; }
+  if ("shared" in r) { toast(`This project already shares its scopes\n${r.shared}`, "ok"); return; }
+  await refreshEditorScopes();
+  void refreshProblems();
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
+  toast(`Scopes shared\n${r.dir}`, "ok");
 }
 
 /** Scene inspector > Properties: edit the open scene's local `@scene` property declarations. Persists
@@ -2786,6 +2818,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "save-as") void saveAs();
   else if (cmd === "export-patterpack") void exportPatterpack();
   else if (cmd === "merge-patterpack") void mergePatterpack();
+  else if (cmd === "share-scopes") void shareScopes();
   else if (cmd === "find") openSearch();
   else if (cmd === "replace") openSearch("replace");
   else if (cmd === "play") void play();

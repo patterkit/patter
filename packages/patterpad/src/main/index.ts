@@ -612,6 +612,10 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
     ? `${plural(summary.conflicts, "conflict")} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.`
     : "";
   const cannotUndo = "This edits the open project and cannot be undone from the Edit menu.";
+  // Their World edit goes to the game's shared file too, which the game's other tools read, so say so.
+  const worldLine = summary.gameScopes?.error
+    ? `They changed the World properties, but ${summary.gameScopes.path} won't parse, so their change will not be written there: ${summary.gameScopes.error}`
+    : summary.gameScopes ? `They changed the World properties, so ${summary.gameScopes.path}, which the game's other tools share, will take their change too.` : "";
 
   // A project-id mismatch takes the headline and flips the default button to Cancel. It nearly always
   // means the wrong file was chosen at one of the two prompts, and the merge that follows would be a
@@ -624,7 +628,7 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
         defaultId: 0,
         cancelId: 1,
         message: what,
-        detail: [conflictLine, cannotUndo].filter(Boolean).join("\n\n"),
+        detail: [conflictLine, worldLine, cannotUndo].filter(Boolean).join("\n\n"),
       }
     : {
         type: "warning",
@@ -643,14 +647,56 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
           ].join(", "),
           "Usually that means the wrong file was chosen at one of the two prompts. Merging anyway will work, but if the ancestor is wrong you will get conflicts everywhere rather than only where you and they really disagreed.",
           what.replace(/\?$/, "."),
+          worldLine,
           cannotUndo,
-        ].join("\n\n"),
+        ].filter(Boolean).join("\n\n"),
       });
   if (confirm.response !== 0) return null;
 
   const res = await project.commitPackMerge(plan);
   if (!res.ok || !res.project) return { error: res.error ?? "merge failed" };
   return { project: res.project, summary };
+}
+
+/**
+ * File ▸ Share Scopes with Other Tools (patterkit/design/shared-scopes.md): make the game's `game-scopes/`
+ * folder, the one place each editing tool writes its own scopes and reads the others'. Creating it is an
+ * explicit act, so no tool scatters folders by itself; this is where Patterpad does it. The suggested
+ * place is the version-control root above the project (else beside it), where every project in the game
+ * finds it by walking up; another folder can be chosen, and the project then names it.
+ */
+async function shareScopesDialog(): Promise<{ dir: string } | { shared: string } | { error: string } | null> {
+  if (!win) return null;
+  const info = project.shareScopesInfo();
+  if (!info) return { error: "no project open" };
+  if (info.shared) return { shared: info.shared };
+  const ask = await dialog.showMessageBox(win, {
+    type: "question",
+    buttons: ["Share", "Choose Another Folder…", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+    message: "Share this project's scopes with the game's other tools?",
+    detail: [
+      `Patterpad will create ${info.suggested} and write this project's shared properties and its World properties there.`,
+      "The game's other editing tools (Storyletter, and any others) find the folder by walking up from their projects, so they can check the names this project declares, and this project can check theirs. The project keeps its own copy of the World properties, so it still works on its own.",
+    ].join("\n\n"),
+  });
+  if (ask.response === 2) return null;
+  let dir = info.suggested;
+  if (ask.response === 1) {
+    const r = await dialog.showOpenDialog(win, {
+      title: "Choose where the game's scopes folder goes",
+      message: "Patterpad will create a “game-scopes” folder here.",
+      buttonLabel: "Create here",
+      defaultPath: dirname(info.suggested),
+      properties: ["openDirectory", "createDirectory"],
+    });
+    const parent = r.filePaths[0];
+    if (r.canceled || !parent) return null;
+    dir = join(parent, "game-scopes");
+  }
+  const res = await project.shareScopes(dir);
+  return res.ok ? { dir } : { error: res.error ?? "could not share the scopes" };
 }
 
 /** Unpack a `.patterpack` (menu-chosen OR double-clicked) into a NEW `.patter` folder, ALWAYS asking where
@@ -841,6 +887,7 @@ function registerIpc(): void {
   ipcMain.handle("patterpack:export", (): Promise<ExportResult> => publishJob(exportPatterpack));
   ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
   ipcMain.handle("patterpack:merge", () => publishJob(mergePatterpack));
+  ipcMain.handle("project:shareScopes", () => shareScopesDialog());
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());

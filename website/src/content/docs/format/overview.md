@@ -40,6 +40,18 @@ Files are UTF-8 with LF line endings; the source form is JSON with comments and
 trailing commas allowed (`patter validate` enforces the encoding, `patter format`
 repairs it).
 
+## The game's shared scopes (`game-scopes/`)
+
+A game with more than one editing tool can keep a **`game-scopes/`** folder beside its projects,
+where each tool writes the properties it declares for the others to check against: Patter's is
+`patter.scopes.json` (the project's shared `@patter` properties), and the game's own `@world`
+lives in `game.scopes.json`. Each file is plain JSON, written the same way every time, and only
+when it changes. It lives outside the `.patter` folder, so a project that is packed or checked
+out alone keeps its own copy of the game's scopes and still compiles. Patter finds the folder by
+walking up from the project; the project file's `gameScopes` field names it when it lives
+elsewhere. [Properties & Game Data](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools)
+covers what it's for.
+
 ## The compiled bundle (`.patterc`)
 
 `patter export` (or **Publish Bundle** in Patterpad) compiles the whole project into a
@@ -64,6 +76,12 @@ produces a single **`.patterpack`** file (a zip, like a `.docx`). It's a lossles
 of the shards, not a second source of truth, and being a single binary file is the
 point: it says "this is a delivery, not the canonical files." `patter unpack
 --merge` folds a returned pack's edits back into the project by id.
+
+Where the project has a [`game-scopes/` folder](#the-games-shared-scopes-game-scopes), the pack
+also carries every `*.scopes.json` in it as `game-scopes/<name>` entries (the files as they are on
+disk), named in the manifest's `gameScopes` list. It's a read-only snapshot for the recipient:
+unpacking writes it into `game-scopes/` inside the new project folder, and a merge never writes it
+back. A project with no folder packs exactly as before.
 
 ## Why it's shaped this way
 

@@ -96,8 +96,16 @@ lets it through without checking its names, since the Storylet Engine owns them.
 engine's shared values are visible. Content that names another engine runs only where that
 engine is on the same registry: without it, `openFlow` and `loadGame` refuse, naming the token,
 before anything changes. A tool that runs Patter alone, such as a preview or a coverage run,
-refuses that content for the same reason. The list of these tokens is shared by every engine in the family, so combining them
-never needs wiring.
+refuses that content for the same reason, unless the game shares its scopes: with a
+[`game-scopes/` folder](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools),
+the compiler checks `@story`'s names and types against the Storylet Engine's file (as warnings),
+and Patterpad's Play window, `patter play`, and coverage stand `@story` in from that file's
+defaults. That is a preview's convenience only: a bundle never carries another engine's
+declarations, and your game still registers every engine on the one registry. A game scope that
+`game.scopes.json` declares and the project doesn't (an `@player`, say) is treated the same way:
+named in `externalScopes`, for your game to register. `@world` from that file is the exception,
+compiled into the bundle so a standalone engine backs it from its defaults. The list of these
+tokens is shared by every engine in the family, so combining them never needs wiring.
 
 A token is taken once. Two engines that both want the same one fail as you build the second,
 with an error that names who got there first. Rebuilding an engine on an edited bundle

@@ -4,7 +4,9 @@
 // ---------------------------------------------------------------------------
 
 export { compileExpression, validateConditions, validateInterpolation } from "./expressions.js";
-export type { ConditionIssue } from "./expressions.js";
-export { hostScopesToSpec } from "@patterkit/dialect";
+export type { ConditionIssue, ValidateOptions } from "./expressions.js";
+export { hostScopesToSpec, EXTERNAL_SCOPES } from "@patterkit/dialect";
 export { exportBundle } from "./export.js";
 export type { ExportInput } from "./export.js";
+export { projectScopes, externalGameScopes, PATTER_SCOPE } from "./game-scopes.js";
+export type { ProjectScopes, HostScopeNote } from "./game-scopes.js";

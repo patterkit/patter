@@ -31,7 +31,11 @@ The **World Properties** tab holds the `@world` values your game owns and your s
 reads (declaring them is covered in
 [Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)), plus
 the **coverage drivers** that stand in for them during a
-[coverage test](/production/coverage-testing/#input-drivers).
+[coverage test](/production/coverage-testing/#input-drivers). Where the game shares its scopes
+with its other editing tools, the tab says so: saving writes the game's `game.scopes.json`
+first, then keeps a copy in the project (see
+[Sharing scopes with the game's other tools](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools)).
+**File ▸ Share Scopes with Other Tools** sets that sharing up.
 
 The **Cast** tab lists your characters, each with a script name, an optional display name
 for translation, and an actor. Expand a row (▸) for **Grammatical gender**, free text

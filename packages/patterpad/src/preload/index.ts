@@ -84,6 +84,7 @@ const api: PatterApi = {
   exportPatterpack: () => ipcRenderer.invoke("patterpack:export"),
   openPatterpack: () => ipcRenderer.invoke("patterpack:open"),
   mergePatterpack: () => ipcRenderer.invoke("patterpack:merge"),
+  shareScopes: () => ipcRenderer.invoke("project:shareScopes"),
   exportLoc: (request) => ipcRenderer.invoke("project:exportLoc", request),
   importLoc: (fallbackLocale) => ipcRenderer.invoke("project:importLoc", fallbackLocale),
   readSettings: () => ipcRenderer.invoke("project:readSettings"),

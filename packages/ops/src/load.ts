@@ -16,6 +16,8 @@ import { join, dirname, resolve, basename } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene } from "@patterkit/model";
 import { isCaseOnlyPropertyName } from "@patterkit/model";
+import { discoverGameScopes } from "./game-scopes.js";
+import type { GameScopes } from "./game-scopes.js";
 
 export interface LoadedProject {
   root: string;
@@ -31,6 +33,17 @@ export interface LoadedProject {
   authoring: AuthoringFile[];
   /** Source file of each entry in `authoring`, index-aligned. */
   authoringFiles: string[];
+  /** The game's shared scopes folder, read and merged, when the project has one (discovered by walking
+   *  up, or named by the project's `gameScopes`). Absent = the project works alone. */
+  gameScopes?: GameScopes;
+  /** The project names a game scopes folder (`gameScopes`) that doesn't exist: a project error. */
+  gameScopesMissing?: string;
+}
+
+/** A project's game scopes, as the two loaders carry them: nothing at all when there is no folder. */
+function withGameScopes(root: string, project: ProjectFile): Pick<LoadedProject, "gameScopes" | "gameScopesMissing"> {
+  const { gameScopes, missing } = discoverGameScopes(root, project);
+  return { ...(gameScopes ? { gameScopes } : {}), ...(missing ? { gameScopesMissing: missing } : {}) };
 }
 
 function readDirSafe(dir: string) {
@@ -251,7 +264,7 @@ export function loadProjectLanding(startPath: string, opts?: { launchPath?: stri
     }
   }
 
-  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring: [], authoringFiles: [] };
+  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring: [], authoringFiles: [], ...withGameScopes(root, project) };
 }
 
 /** Sort scenes into the project's authored nav order (`ProjectFile.sceneOrder`), in place.
@@ -305,5 +318,5 @@ export function loadProject(startPath: string): LoadedProject {
     authoringFiles.push(f);
   }
 
-  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring, authoringFiles };
+  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring, authoringFiles, ...withGameScopes(root, project) };
 }

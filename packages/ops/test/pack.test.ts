@@ -48,7 +48,8 @@ describe("pack / unpack round-trip", () => {
     // Unpack into a fresh dir: the manifest is dropped, the shards are restored
     // byte-for-byte, and the result loads as the same project.
     const out = join(mkdtempSync(join(tmpdir(), "patter-unpack-")), "restored");
-    const writes = await runUnpack(buffer, out);
+    const { shards: writes, scopes } = await runUnpack(buffer, out);
+    expect(scopes).toEqual([]); // no game scopes folder, so no snapshot
     expect(writes.map((w) => w.path).some((p) => p.endsWith("patter.manifest.json"))).toBe(false);
     applyWrites(writes);
     expect(readFileSync(join(out, "scenes/start.patterflow"), "utf8"))
@@ -84,7 +85,7 @@ describe("pack / unpack round-trip", () => {
     zip.file("../escape.patterflow", "{}");
     const bytes = await zip.generateAsync({ type: "nodebuffer" });
     const target = scaffold();
-    const writes = await runUnpack(bytes, target);
+    const { shards: writes } = await runUnpack(bytes, target);
     expect(writes.map((w) => w.path)).toEqual([join(target, "escape.patterflow")]);
   });
 
@@ -94,7 +95,7 @@ describe("pack / unpack round-trip", () => {
     // what the op now checks at the point each write path is formed.
     const src = scaffold();
     const target = scaffold();
-    const writes = await runUnpack(await runPack(src), target);
+    const { shards: writes } = await runUnpack(await runPack(src), target);
     expect(writes.length).toBeGreaterThan(0);
     for (const w of writes) expect(w.path.startsWith(target + "/")).toBe(true);
   });
@@ -247,7 +248,7 @@ describe("runUnpackMerge (fold a returned document into existing shards)", () =>
 
     // Their copy comes from the pack we sent, so every id matches by construction.
     const theirsDir = join(mkdtempSync(join(tmpdir(), "patter-ret-")), "proj");
-    applyWrites(await runUnpack(baseDoc, theirsDir));
+    applyWrites((await runUnpack(baseDoc, theirsDir)).shards);
     const locPath = join(theirsDir, "loc", "en", "start.patterloc");
     const locFile = parseSource(readFileSync(locPath, "utf8")) as { strings: Record<string, string> };
     const firstKey = Object.keys(locFile.strings)[0]!;

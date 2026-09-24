@@ -11,6 +11,7 @@ import type { StepResult, ChoiceOption } from "@patterkit/runtime";
 import type { GameData } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { resolveStart } from "./loaded-helpers.js";
+import { previewRegistry } from "./game-scopes.js";
 
 export interface PlayOptions {
   /** Scene id to start at (defaults to the bundle's first scene). */
@@ -47,9 +48,11 @@ export interface PlayResult {
  * pipeline in one call: load -> export -> Engine playthrough.
  */
 export function runPlay(loaded: LoadedProject, opts: PlayOptions = {}): PlayResult {
-  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales });
+  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
   const events: PlayEvent[] = [];
-  const engine = new Engine(bundle, { seed: opts.seed });
+  // Playing alone: another engine's scope the story names is stood in from the game's scopes files.
+  const registry = previewRegistry(loaded.gameScopes, bundle);
+  const engine = new Engine(bundle, { seed: opts.seed, ...(registry ? { registry } : {}) });
 
   const start = resolveStart(loaded, opts); // explicit override, else the project's authored start point
   const flow = engine.openFlow("main", { scene: start.scene, block: start.block });

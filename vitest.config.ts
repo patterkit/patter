@@ -25,6 +25,9 @@ export default defineConfig({
       "@patterkit/ops": fileURLToPath(new URL("./packages/ops/src/index.ts", import.meta.url)),
       // @wildwinter/simple-vc-lib resolves from the npm registry via node_modules - no alias.
       ...(expr("expr") ? { "@wildwinter/expr": expr("expr")! } : {}),
+      // The subpath first: a string alias matches its key as a PREFIX too, so the bare package's entry
+      // would otherwise swallow `@wildwinter/scoperegistry/scopes` and resolve it inside index.ts.
+      ...(expr("scoperegistry", "scopes") ? { "@wildwinter/scoperegistry/scopes": expr("scoperegistry", "scopes")! } : {}),
       ...(expr("scoperegistry") ? { "@wildwinter/scoperegistry": expr("scoperegistry")! } : {}),
     },
   },

@@ -713,6 +713,12 @@ export interface ProjectFile {
    *  resolver is bound, and coverage drives their values. Omitted = no host scopes (`@world.x` is then a
    *  compile error). See design/scope-registry.md §6. */
   scopeRegistry?: HostScopeRegistry;
+  /** Where the game's shared scopes folder is, relative to this project file's folder
+   *  (`"../../shared/game-scopes"`), for a folder the walk-up would not find. Omitted = walk up from the
+   *  project to the first `game-scopes/`, stopping at the version-control root; none found = the project
+   *  works alone. A path that doesn't exist is a project error. See the Patter site's World properties
+   *  page and patterkit/design/shared-scopes.md. Editor and compiler only; never reaches the bundle. */
+  gameScopes?: string;
   /** Coverage input drivers (#159): values to feed host scopes (`@world`) during a coverage run so
    *  externally-gated branches get exercised. Authoring-only (never reaches the runtime bundle). */
   coverageDrivers?: CoverageDriver[];

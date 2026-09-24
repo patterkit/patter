@@ -25,6 +25,7 @@ import { deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { ExprNode } from "@wildwinter/expr";
 import type { LoadedProject } from "./load.js";
 import { sourceStrings, resolveStart } from "./loaded-helpers.js";
+import { hostScopeTokens, previewRegistry } from "./game-scopes.js";
 
 export interface CoverageOptions {
   /** Number of random playthroughs (default 5000). */
@@ -342,14 +343,17 @@ function blockedGates(
  * writes are skipped (they are covered for free). The author edits + saves the result as `coverageDrivers`.
  */
 export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] {
-  const hostTokens = new Set((loaded.project.scopeRegistry?.scopes ?? []).map((s) => s.token));
+  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
+  // The bundle's host scopes (the project's, as a game scopes folder leaves them): World properties,
+  // where proposals are edited, holds only those.
+  const hostScopes = bundle.scopeRegistry?.scopes ?? [];
+  const hostTokens = new Set(hostScopes.map((s) => s.token));
   if (hostTokens.size === 0) return [];
-  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales });
   const { written, proposals } = analyzeHostScopes(bundle, hostTokens);
 
   // Fill in declared enum / bool ranges where the conditions gave no literals (e.g. a bare `if @world.flag`).
   const declByRef = new Map<string, { type: string; values?: string[]; stages?: string[] }>();
-  for (const s of loaded.project.scopeRegistry?.scopes ?? []) {
+  for (const s of hostScopes) {
     for (const d of s.declarations ?? []) declByRef.set(`@${s.token}.${d.name}`, { type: d.type, values: d.values, stages: d.stages });
   }
 
@@ -426,12 +430,13 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
   const dryRuns = new Map<string, number>(); // choice group id -> distinct runs it ran dry in
   const termination = { ended: 0, capped: 0, stalled: 0, evalError: 0 };
 
-  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales });
+  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
   const rng = mulberry32(seed);
 
   // Host-scope (`@world`) drivers + the static analysis behind the unwritten-input hint. Only drivers
-  // into a DECLARED host scope with a non-empty pool are live (an undeclared scope can't be set).
-  const hostTokens = new Set((loaded.project.scopeRegistry?.scopes ?? []).map((s) => s.token));
+  // into a DECLARED host scope with a non-empty pool are live (an undeclared scope can't be set). With a
+  // game scopes folder, that is the bundle's host scopes plus the other scopes the preview stands in.
+  const hostTokens = hostScopeTokens(loaded, bundle);
   const analysis = analyzeHostScopes(bundle, hostTokens);
   const drivers = (options.drivers ?? loaded.project.coverageDrivers ?? []).filter(
     (d) => d.values.length > 0 && hostTokens.has(d.ref.replace(/^@/, "").split(".")[0] ?? ""),
@@ -451,9 +456,12 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     // reset), so the samples are unbiased. The per-run engine seed is drawn from the same harness stream.
     // The onDryChoice hook records which choices fell through this run (deduped per run below).
     const dryThisRun = new Set<string>();
+    // Another engine's scope the story names is stood in from the game's scopes files, afresh each run.
+    const registry = previewRegistry(loaded.gameScopes, bundle);
     const engine = new Engine(bundle, {
       seed: Math.floor(rng() * 0x100000000),
       onDryChoice: (groupId) => dryThisRun.add(groupId),
+      ...(registry ? { registry } : {}),
     });
     // Initial drivers feed the host scope BEFORE the flow enters its start scene, so first-scene entry
     // gates see them. (No-op when there are none.)

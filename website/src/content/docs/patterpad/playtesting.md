@@ -42,6 +42,13 @@ always plays its full clip.
 Options you can take are buttons; ones whose condition isn't met are shown faded and
 can't be clicked. Pick one and the story moves on.
 
+A line that names another engine's scope, such as the Storylet Engine's `@story.act`, plays
+where the game [shares its scopes](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools):
+the window stands that engine in, reading the defaults its file declares. Without the shared
+folder, the window can't know those values and says so, with the way to fix it (**File ▸ Share
+Scopes with Other Tools**, or declaring the scope under World Properties); with the folder but no
+file for that engine yet, it names the file that's missing.
+
 Rewind (**↺**, top-left) starts the run again from the top at any time, and **↺ Restart**
 shows up at the end.
 

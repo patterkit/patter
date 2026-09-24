@@ -58,7 +58,7 @@ export function problemCode(p: Pick<Problem, "category" | "detail">): string | u
   switch (p.category) {
     case "stale-bundle": return "stale-build";
     case "merge": return "merge-conflict";
-    case "not-in-project": case "spelling": case "hygiene": return undefined; // already writer-facing (#177)
+    case "not-in-project": case "spelling": case "hygiene": case "game-scopes": return undefined; // already writer-facing (#177)
     default: return p.detail;
   }
 }

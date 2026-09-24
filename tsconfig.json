@@ -24,6 +24,7 @@
       "@patterkit/ops": ["packages/ops/src/index.ts"],
       "@wildwinter/expr": ["../expr/packages/expr/src/index.ts"],
       "@wildwinter/scoperegistry": ["../expr/packages/scoperegistry/src/index.ts"],
+      "@wildwinter/scoperegistry/scopes": ["../expr/packages/scoperegistry/src/scopes.ts"],
       "@wildwinter/expr-editor": ["../expr/packages/expr-editor/src/index.ts"]
     }
   },

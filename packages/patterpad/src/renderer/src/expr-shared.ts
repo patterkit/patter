@@ -23,10 +23,11 @@ export const setPropertyActions = (fn: (ref: { scope: string; name: string }) =>
  *  right-clicked before the renderer has registered anything simply has no menu. */
 export const propertyActions = (ref: { scope: string; name: string }): PropertyAction[] => provider?.(ref) ?? [];
 
-/** The project's host-scope tokens (`@world`, an imported `@story`, opaque ones too), set when a scene
- *  loads and after a settings save. The editors parse with Patter's dialect plus these plus the family's
- *  other engines' scopes: the base dialect knows only `@patter` and `@scene`, so an editor built on it
- *  could not read `@world.time_of_day` at all, let alone a storylet's `@story.act`. */
+/** The project's host-scope tokens (`@world`, an imported `@story`, opaque ones too) and, where the game
+ *  has a shared scopes folder, every token the folder declares, set when a scene loads and after a
+ *  settings save. The editors parse with Patter's dialect plus these plus the family's other engines'
+ *  scopes: the base dialect knows only `@patter` and `@scene`, so an editor built on it could not read
+ *  `@world.time_of_day` at all, let alone a storylet's `@story.act`. */
 let hostTokens: string[] = [];
 let memo: { key: string; dialect: Dialect } | undefined;
 export const setHostScopeTokens = (tokens: readonly string[]): void => { hostTokens = [...tokens].sort(); };
@@ -36,8 +37,9 @@ export function editorDialect(): Dialect {
   return memo.dialect;
 }
 
-/** Another engine's game-wide scopes (`@story` when not imported with declarations): the editors draw
- *  a reference into one as an ordinary pill, since that engine checks the names. */
+/** Another engine's game-wide scopes (`@story` when nothing here declares it: no shared scopes file, no
+ *  import): the editors draw a reference into one as an ordinary pill, since that engine checks the names.
+ *  Where the folder declares it, its properties are in the catalogue like any other. */
 export const OTHER_ENGINE_SCOPES: readonly string[] = EXTERNAL_SCOPES;
 
 /** Scope display order in the property picker (project globals first, then scene-locals). */

@@ -4,10 +4,12 @@
 // Perforce/Plastic; a plain write for git/none), falling back to a direct write if the VC layer throws.
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
-import { basename, dirname, join, isAbsolute, resolve, sep } from "node:path";
+import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
+  discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
+  patterScopesWrite, previewRegistry, GAME_SCOPES_DIR, GAME_SCOPES_FILE, PATTER_SCOPES_FILE,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
@@ -20,7 +22,8 @@ import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
-import { hostScopeProperties, hostScopeTokens } from "../shared/host-scopes.js";
+import { editorScopes } from "../shared/host-scopes.js";
+import type { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { startAudioIndex, audioManifest, AUDIO_MANIFEST_FILE, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 
 interface SceneShards {
@@ -217,6 +220,36 @@ function summarise(p: LoadedProject): OpenedProject {
     audioRoot: p.project.audioRoot ?? null,
     scratchStatus: p.project.scratchStatus ?? null,
   };
+}
+
+// --- the game's shared scopes (patterkit/design/shared-scopes.md) -----------------------------------
+// Where the game has a `game-scopes/` folder, Patter keeps `patter.scopes.json` there current (whenever
+// the project's properties are saved, and on a build), World properties edit the game's
+// `game.scopes.json`, and the project keeps a synced copy. With no folder, none of this does anything.
+
+/** Re-read the game scopes folder (after a write to it, or before showing World properties, since
+ *  another tool may have changed it since the project opened). */
+function refreshGameScopes(): void {
+  if (!loaded) return;
+  const { gameScopes, missing } = discoverGameScopes(loaded.root, loaded.project);
+  if (gameScopes) loaded.gameScopes = gameScopes; else delete loaded.gameScopes;
+  if (missing) loaded.gameScopesMissing = missing; else delete loaded.gameScopesMissing;
+}
+
+/** The write that brings `patter.scopes.json` in line with `project`, as a list to spread into a batch:
+ *  empty with no folder, or when the file already says exactly this. */
+function patterScopesWrites(project: ProjectFile): { path: string; content: string }[] {
+  const w = loaded ? patterScopesWrite(project, loaded.gameScopes) : undefined;
+  return w ? [w] : [];
+}
+
+/** After a batch with Patter's file in it landed: remember what the file now says, so the next save
+ *  compares against it rather than re-writing. */
+function notePatterScopesWritten(writes: { path: string; content: string }[]): void {
+  const gs = loaded?.gameScopes;
+  if (!gs) return;
+  const w = writes.find((x) => x.path === join(gs.dir, PATTER_SCOPES_FILE));
+  if (w) gs.patterText = w.content;
 }
 
 /** Write through the VC layer (lock-aware); fall back to a plain write if it throws. */
@@ -456,14 +489,15 @@ export async function packBytes(): Promise<Buffer> {
 /** Unpack a `.patterpack` document (chosen by the caller) into a fresh `.patter` folder at `destDir`, ready
  *  to open. The shards are project-root-relative, so `destDir` IS the new project folder. Writes go through
  *  the VC-aware path (like `createProject`), so unpacking inside a git working copy stages the new files.
- *  `runUnpack` validates every entry path (no traversal / no escape). */
+ *  `runUnpack` validates every entry path (no traversal / no escape). A pack's snapshot of the game's
+ *  scopes lands in `game-scopes/` inside the new folder, where the project finds it first. */
 export async function unpackTo(packPath: string, destDir: string): Promise<{ ok: boolean; error?: string }> {
   return enqueueWrite(async () => {
     try {
       const bytes = readFileSync(packPath);
-      const writes = await runUnpack(bytes, destDir);
-      if (!writes.length) return { ok: false, error: "the patterpack has no project files" };
-      return await commitWrites(writes);
+      const { shards, scopes } = await runUnpack(bytes, destDir);
+      if (!shards.length) return { ok: false, error: "the patterpack has no project files" };
+      return await commitWrites([...shards, ...scopes]);
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
@@ -506,6 +540,7 @@ export async function planPackMerge(returnedPath: string, basePath: string): Pro
         conflicts: res.conflicts,
         warnings: res.warnings,
         provenance: res.provenance,
+        ...(res.gameScopes ? { gameScopes: { path: relative(root, res.gameScopes.path) || res.gameScopes.path, ...(res.gameScopes.error ? { error: res.gameScopes.error } : {}) } } : {}),
       },
     };
   } catch (e) {
@@ -556,13 +591,21 @@ export function sceneForPath(path: string): string | undefined {
 /** Cheap structural equality (the status ladders are small, plain, order-stable JSON). */
 const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
+/** The scopes the editors know besides `@patter` and `@scene`: the host scopes and, where the game has a
+ *  shared scopes folder, every other tool's scopes in it (whose declarations win for a token both have). */
+function projectEditorScopes(): ReturnType<typeof editorScopes> {
+  const gs = loaded?.gameScopes;
+  return editorScopes(loaded?.project.scopeRegistry, { entries: gameScopesCatalogue(gs), tokens: gameScopeTokens(gs) });
+}
+
 /** The properties referenceable in a scene's conditions: project globals (`@patter`), the host scopes'
- *  declared properties (`@world`, an imported `@story`), and scene-locals (`@scene`). Patter's property
- *  types are the same vocabulary as the condition editor's, so no mapping is needed. */
+ *  declared properties (`@world`, an imported `@story`), the game scopes folder's (another engine's
+ *  `@story`, with whose it is in the tip), and scene-locals (`@scene`). Patter's property types are the
+ *  same vocabulary as the condition editor's, so no mapping is needed. */
 function sceneProperties(sceneId: string): ConditionProperty[] {
   const out: ConditionProperty[] = [];
   for (const d of loaded?.project.properties ?? []) out.push({ scope: "patter", name: d.name, type: d.type, enumValues: d.values, stages: d.stages, purpose: d.purpose });
-  out.push(...hostScopeProperties(loaded?.project.scopeRegistry));
+  out.push(...projectEditorScopes().properties);
   const scene = loaded?.scenes.find((s) => s.id === sceneId);
   for (const d of scene?.sceneProps ?? []) out.push({ scope: "scene", name: d.name, type: d.type, enumValues: d.values, stages: d.stages, purpose: d.purpose });
   return out;
@@ -694,7 +737,7 @@ export function readScene(sceneId: string): SceneSource {
     locSource: src.loc,
     sceneName: s.name,
     properties: sceneProperties(sceneId),
-    hostScopes: hostScopeTokens(loaded?.project.scopeRegistry),
+    hostScopes: projectEditorScopes().tokens,
   };
 }
 
@@ -911,6 +954,9 @@ let flow: Flow | null = null;
 let engine: Engine | null = null; // kept so a live toggle (closed captions) reaches the running run without a restart
 let playBundle: import("@patterkit/model").Bundle | null = null; // the bundle the run plays - compared on live refresh
 let playError: string | null = null;
+// The registry the run is built on when it stands other engines in (a game scopes folder, and a bundle
+// naming someone else's scope); null when the engine made its own, as it always did before.
+let playRegistry: ScopeRegistry | null = null;
 // The locale the play window runs in (#195). null = the project's source language. A run compiles the
 // full bundle (every locale's strings inline), so switching is just a fresh openFlow with this locale;
 // untranslated strings fall back to source flagged `<Untranslated: {id}>`, which usefully shows the gaps.
@@ -928,7 +974,7 @@ export function setPlaySource(src: { sceneId: string; flow: string; loc: string 
 
 /** Clear the interactive play session, so opening a DIFFERENT project can't replay the previous one's flow
  *  / stashed source / error (the play state is keyed by the old project's scene ids). Called by openProject. */
-function resetPlaySession(): void { flow = null; engine = null; playBundle = null; playError = null; playLiveSource = null; }
+function resetPlaySession(): void { flow = null; engine = null; playBundle = null; playError = null; playLiveSource = null; playRegistry = null; }
 
 // `scene` is the flow's CURRENT scene (Flow.currentScene), captured right after the advance that
 // produced this beat - the runtime sets it when a jump crosses scenes, so it is the authority on
@@ -942,16 +988,33 @@ const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
 };
 const mapOptions = (options: ChoiceOption[]): PlayChoiceOption[] =>
   options.map((o) => ({ id: o.id, text: o.prompt?.text ?? "", character: o.prompt?.character, eligible: o.eligible }));
+/** The family's other engines, by token: which file in the game's scopes folder declares each, and
+ *  which project and editor write it. */
+const OTHER_ENGINES: Record<string, { engine: string; file: string; project: string; editor: string }> = {
+  story: { engine: "the Storylet Engine", file: "storylets.scopes.json", project: "the Storylets project", editor: "Storyletter" },
+};
+
 /** What the play window says when the engine refuses the project. It runs Patter on its own, so a
- *  line naming another engine's scope (`@story.act`) that the project has not declared is refused as
- *  the flow opens. Declaring the scope under World properties lets Patter back it with the declared
- *  defaults, which is how to play it here; the engine's own words are kept. */
-export function playRefusal(message: string): string {
-  const other = /^this content names (@\S+?),/.exec(message)?.[1];
-  return other === undefined ? message
-    : `This project names ${other}, which another engine provides. To play it here, declare ${other} in `
-      + `Project Settings > World properties, with the properties you read; or play it in a game that runs `
-      + `both engines on one registry.\n\n${message}`;
+ *  line naming another engine's scope (`@story.act`) is refused as the flow opens unless something
+ *  stands that scope in. With a game scopes folder, the play window stands in every scope the folder
+ *  declares, so a refusal there means the other engine's file is missing, and the way out is to write
+ *  it. With no folder, the way out is to share scopes with that engine, or to declare the scope under
+ *  World properties, which Patter backs with the declared defaults. The engine's own words are kept. */
+export function playRefusal(message: string, gameScopesDir?: string): string {
+  const other = /^this content names @(\S+?),/.exec(message)?.[1];
+  if (other === undefined) return message;
+  const known = OTHER_ENGINES[other];
+  const engineName = known?.engine ?? "another engine";
+  const both = "or play it in a game that runs both engines on one registry.";
+  if (gameScopesDir !== undefined) {
+    const fix = known
+      ? `no ${known.file}: open ${known.project} in ${known.editor} and save, and the play window stands @${other} in from it; `
+      : `no file there declares @${other}; `;
+    return `This project names @${other}, which ${engineName} provides, and the game's scopes folder has ${fix}${both}\n\n${message}`;
+  }
+  const share = known ? `share scopes with ${known.engine} (File > Share Scopes with Other Tools), or ` : "";
+  return `This project names @${other}, which ${engineName} provides. To play it here, ${share}declare @${other} in `
+    + `Project Settings > World properties, with the properties you read; ${both}\n\n${message}`;
 }
 
 const errBatch = (e: unknown): PlayBatch => ({ steps: [], stop: "error", error: e instanceof Error ? e.message : String(e) });
@@ -972,10 +1035,15 @@ export function startPlay(sceneId: string, blockId?: string): void {
     // regardless of the project's SHIP localisation mode (an "ids" build would otherwise emit bare IDs).
     const locale = playLocale && loaded.project.locales.all.includes(playLocale) ? playLocale : undefined;
     playBundle = runExportFull(fresh);
-    engine = new Engine(playBundle, { ...(locale ? { locale } : {}), closedCaptions: playCaptionsOn });
+    // Playing alone: a scope the story names that another tool owns is stood in from the game's scopes folder.
+    playRegistry = previewRegistry(loaded.gameScopes, playBundle) ?? null;
+    engine = new Engine(playBundle, { ...(locale ? { locale } : {}), closedCaptions: playCaptionsOn, ...(playRegistry ? { registry: playRegistry } : {}) });
     flow = engine.openFlow("main", { scene: sceneId, ...(blockId ? { block: blockId } : {}) });
     playError = null;
-  } catch (e) { flow = null; engine = null; playBundle = null; playError = playRefusal(e instanceof Error ? e.message : String(e)); }
+  } catch (e) {
+    flow = null; engine = null; playBundle = null; playRegistry = null;
+    playError = playRefusal(e instanceof Error ? e.message : String(e), loaded.gameScopes ? GAME_SCOPES_DIR : undefined);
+  }
 }
 
 /** What a live refresh did, so the play window knows how (whether) to react. `options` rides along on a
@@ -1009,6 +1077,11 @@ export function refreshPlay(): PlayRefreshResult {
       playBundle = next;
       return { kind: "text" };
     }
+    // A run on stand-ins keeps its registry across the swap: top it up with anything the edit newly
+    // names, so the values the run has so far stay. A run that needs stand-ins it wasn't built with
+    // restarts instead.
+    if (playRegistry) previewRegistry(loaded.gameScopes, next, playRegistry);
+    else if (previewRegistry(loaded.gameScopes, next)) return { kind: "stale" };
     engine = engine.hotSwap(next);       // tier 2: the whole run carried over (§9.8)
     flow = engine.getFlow("main") ?? null;
     playBundle = next;
@@ -1195,6 +1268,9 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
       // A shard outside the layout loads for nobody. A warning, not an error: the project is fine,
       // but a scene the author thinks exists does not (from-storylets/load-issues-and-the-strict-loader).
       ...r.orphans.map((i): Problem => ({ category: "not-in-project", severity: "warning", message: i.message, file: i.file })),
+      // The game's shared scopes folder: a scopes file that won't parse or a token two files claim is an
+      // error; Patter's file out of date, or the project's copy of a game scope differing from it, a warning.
+      ...r.gameScopes.map((i): Problem => ({ category: "game-scopes", severity: i.severity, message: i.message, file: i.file })),
     ];
     // Which scene each node-bearing problem is in, so the renderer can switch to it before revealing.
     const sceneOf = sceneIndex(fresh);
@@ -1219,8 +1295,11 @@ export function applyFix(fix: QuickFix): Promise<SaveResult> {
     if (fix.kind === "declare-property") {
       const properties = [...(loaded.project.properties ?? [])];
       if (!properties.some((p) => p.name === fix.name)) properties.push({ name: fix.name, type: fix.propType });
-      const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify({ ...loaded.project, properties }) }]);
-      if (res.ok) loaded.project = { ...loaded.project, properties }; // reflect the new property in the cached project
+      const next = { ...loaded.project, properties };
+      // The properties changed, so the game's scopes folder (when there is one) hears about it too.
+      const writes = [{ path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
+      const res = await commitWrites(writes);
+      if (res.ok) { loaded.project = next; notePatterScopesWritten(writes); } // reflect the new property in the cached project
       return res;
     }
     return { ok: false, error: "unknown fix (handled in the renderer?)" }; // e.g. retarget-jump is a surface edit
@@ -1460,6 +1539,7 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
       const bundle = runExport(loaded);
       builtHash = bundle.content.hash;
       writes.push({ path, content: canonicalStringify(bundle, { trailingComma: false }) });
+      writes.push(...patterScopesWrites(loaded.project)); // a build brings the game's scopes folder up to date too
     } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     // Audio Folders (#206): also emit the sidecar `patteraudio.json` next to the audio, so a game can resolve
     // each beat's winning clip without a folder search. Only when folder mode + a root are set and some audio
@@ -1470,7 +1550,7 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
       writes.push({ path: join(dir, AUDIO_MANIFEST_FILE), content: audioManifest(audioSnapshot, loaded!.root, p.audioRoot) });
     }
     const res = await commitWrites(writes);
-    if (res.ok) lastBuiltHash = builtHash; // prime the Auto-Rebuild dedup: no redundant auto-build after a manual one
+    if (res.ok) { lastBuiltHash = builtHash; notePatterScopesWritten(writes); } // prime the Auto-Rebuild dedup: no redundant auto-build after a manual one
     return res.ok ? { ok: true, path } : { ok: false, error: res.error };
   });
 }
@@ -1553,6 +1633,7 @@ export function writeAudioManifest(): Promise<{ ok: boolean; path?: string; erro
 /** The project-level settings for the Project Settings modal (General section). */
 export function readSettings(): ProjectSettingsDto | null {
   if (!loaded) return null;
+  refreshGameScopes(); // World properties show the shared file as it is now, not as it was at open
   const p = loaded.project;
   return {
     name: p.project.name,
@@ -1568,7 +1649,10 @@ export function readSettings(): ProjectSettingsDto | null {
     locales: p.locales.all,
     gameDataFields: p.gameDataFields ?? {},
     properties: p.properties ?? [],
-    scopeRegistry: p.scopeRegistry,
+    // With a game scopes folder, the game's own scopes come from its `game.scopes.json` (the project
+    // holds a synced copy); without one, the project's.
+    scopeRegistry: worldSettingsScopes(p, loaded.gameScopes),
+    ...(loaded.gameScopes ? { worldFile: join(loaded.gameScopes.dir, GAME_SCOPES_FILE) } : {}),
     coverageDrivers: p.coverageDrivers,
     cast: p.cast ?? [],
     // Build output (Build tab): the pinned `export.bundle`, else the sibling default - so the field always
@@ -1634,6 +1718,17 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const prevVcs = loaded.project.vcs ?? "none";
+    // World properties. With a game scopes folder, the game's own scopes are written to its
+    // `game.scopes.json` FIRST (re-read, so another tool's scopes are kept), and the project keeps the
+    // same as its synced copy, so it still compiles packed or checked out alone.
+    let scopeRegistry = s.scopeRegistry && s.scopeRegistry.scopes.length ? s.scopeRegistry : undefined;
+    const sharedWrites: { path: string; content: string }[] = [];
+    if (loaded.gameScopes) {
+      const plan = planWorldSave(loaded.project, loaded.gameScopes, scopeRegistry);
+      if (plan.error) return { ok: false, error: plan.error };
+      if (plan.write) sharedWrites.push(plan.write);
+      scopeRegistry = plan.scopeRegistry;
+    }
     const next: ProjectFile = {
       ...loaded.project,
       project: { ...loaded.project.project, name: s.name },
@@ -1653,7 +1748,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       properties: s.properties.length ? s.properties : undefined,
       // Host scopes (#159): keep a clean file - store only when at least one scope is declared, and only
       // drivers when present.
-      scopeRegistry: s.scopeRegistry && s.scopeRegistry.scopes.length ? s.scopeRegistry : undefined,
+      scopeRegistry,
       coverageDrivers: s.coverageDrivers && s.coverageDrivers.length ? s.coverageDrivers : undefined,
       cast: s.cast.length ? s.cast : undefined,
       // Status ladders: store only when they DIFFER from the built-in defaults, so a project that takes
@@ -1676,7 +1771,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       // clean file) + `export.locales` only when "external", preserving any other export fields (e.g. targets).
       export: buildExport(loaded, s.buildBundle, s.buildLocalisation, s.buildSourceDebug, loaded.project.export),
     };
-    const writes = [{ path: loaded.projectFile, content: canonicalStringify(next) }];
+    const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
     // Switching VCS re-emits its config files (vcs-setup.md, .gitattributes, ignore) for the new system.
     if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, "commit"));
     const res = await commitWrites(writes);
@@ -1692,6 +1787,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       }
     }
     loaded.project = next; // reflect in the cached project
+    if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)
     syncAudioIndex();      // audio config may have changed (mode toggle / rung folders) (#206)
     return { ok: true, project: summarise(loaded) };
@@ -1945,6 +2041,37 @@ export function setDictionary(patch: { enabled?: boolean; language?: string }): 
 }
 
 /** Scaffold a new project into `dir` (runInit), commit the shards, then open it. */
+/** For File > Share Scopes with Other Tools: the folder the project already shares through, or where
+ *  the command suggests creating one (the version-control root above the project, else beside it). */
+export function shareScopesInfo(): { shared?: string; suggested: string } | null {
+  if (!loaded) return null;
+  refreshGameScopes();
+  return { ...(loaded.gameScopes ? { shared: loaded.gameScopes.dir } : {}), suggested: defaultGameScopesDir(loaded.root) };
+}
+
+/**
+ * Share the project's scopes with the game's other tools: create `game-scopes/` at `dir` holding
+ * `patter.scopes.json` and a `game.scopes.json` with the project's host scopes (the game's own; the
+ * project keeps its copy, so it still compiles alone). A folder the walk-up from the project would not
+ * find is named in the project (`gameScopes`). Refused when the project already shares one.
+ */
+export function shareScopes(dir: string): Promise<SaveResult & { dir?: string }> {
+  return enqueueWrite(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    refreshGameScopes();
+    if (loaded.gameScopes) return { ok: false, error: `this project already shares its scopes through ${loaded.gameScopes.dir}` };
+    const plan = planShareScopes(loaded.root, loaded.project, dir);
+    try { mkdirSync(dir, { recursive: true }); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+    const projectChanged = plan.project.gameScopes !== loaded.project.gameScopes;
+    const writes = [...plan.writes, ...(projectChanged ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];
+    const res = await commitWrites(writes);
+    if (!res.ok) return res;
+    loaded.project = plan.project;
+    refreshGameScopes();
+    return { ok: true, dir };
+  });
+}
+
 export function createProject(dir: string, name?: string, vcs?: VcsKind, buildBundle?: string): Promise<OpenedProject> {
   return enqueueWrite(async () => {
     const init = runInit({ dir, name, vcs: vcs && vcs !== "none" ? vcs : undefined });

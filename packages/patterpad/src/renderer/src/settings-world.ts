@@ -7,6 +7,12 @@
 //      exercised, written to ProjectFile.coverageDrivers. "Propose from story" seeds them from the
 //      conditions (proposeCoverageDrivers in ops).
 // value() returns a clean { scopeRegistry, coverageDrivers } for the save round-trip (blank rows pruned).
+//
+// Where the game has a shared scopes folder (`game-scopes/`), these are the game's scopes and live in its
+// `game.scopes.json` (the main process writes that first, then the project's synced copy); the tab says
+// so, and edits exactly the same rows either way. A scope with another token (imported from an engine's
+// published spec before the shared folder existed) keeps its token: it is shown as such, and saved back
+// as its own scope rather than folded into @world.
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
 import { el } from "./dom.js";
@@ -43,13 +49,18 @@ const valuesText = (vals: ScalarValue[]): string => vals.map((v) => String(v)).j
 
 export function mountWorld(
   host: HTMLElement,
-  initial: { scopeRegistry?: HostScopeRegistry; coverageDrivers?: CoverageDriver[]; onPropose: () => Promise<CoverageDriver[]> },
+  initial: { scopeRegistry?: HostScopeRegistry; coverageDrivers?: CoverageDriver[]; onPropose: () => Promise<CoverageDriver[]>; worldFile?: string },
 ): WorldHandle {
-  // Flatten the registry into editable rows (token carried per row); regrouped on save.
+  // Flatten the registry into editable rows (token carried per row); regrouped by token on save. A scope
+  // with no declarations (opaque) has no rows to edit, so it is carried through as it is; so is each
+  // scope's own `writable` default, which no row edits.
   const scopeRows: ScopeRow[] = [];
+  const opaque: HostScopeSpec[] = [];
+  const scopeWritable = new Map<string, boolean>();
   for (const s of initial.scopeRegistry?.scopes ?? []) {
+    if (s.writable !== undefined) scopeWritable.set(s.token, s.writable);
     for (const d of s.declarations ?? []) scopeRows.push({ token: s.token, ...structuredClone(d) });
-    if (!s.declarations?.length) scopeRows.push({ token: s.token, name: "", type: "number", writable: false });
+    if (!s.declarations?.length) opaque.push(structuredClone(s));
   }
   // New world properties default to READ-ONLY: they're game-owned values the story reads, so the common
   // case is the story can't write them. Uncheck Read-only on the row to let the story set one.
@@ -76,8 +87,8 @@ export function mountWorld(
     // Renaming a declaration makes every driver pointing at the old name wrong from that moment, with
     // nothing typed into any of them, so the driver rows are re-checked here rather than on their own input.
     bindPropertyName(name, (v) => { p.name = v; revalidatePropertyRefs(driversHost); }, { hint: PROPERTY_NAME_HINT });
-    ref.append(el("span", "world-at", "@"), el("span", "world-scope", "world"), el("span", "world-dot", "."), name);
-    guard.track(name, () => `world.${p.name}`);
+    ref.append(el("span", "world-at", "@"), el("span", "world-scope", p.token), el("span", "world-dot", "."), name);
+    guard.track(name, () => `${p.token}.${p.name}`);
 
     const type = el("select", "insp-select gd-type") as HTMLSelectElement;
     for (const [v, l] of TYPES) { const o = el("option", undefined, l) as HTMLOptionElement; o.value = v; if (v === p.type) o.selected = true; type.append(o); }
@@ -203,6 +214,10 @@ export function mountWorld(
   host.replaceChildren();
   host.append(el("h3", "world-cap", "World properties"));
   host.append(el("p", "settings-note", "Values your game owns and your story reads as @world.name. Each starts at its default until the game sets it."));
+  // With a game scopes folder, say where these live: the shared file every tool in the game reads.
+  if (initial.worldFile) {
+    host.append(el("p", "settings-note", `Shared with the game's other tools: saved to ${initial.worldFile}, and a copy kept in this project so it still works on its own.`));
+  }
   host.append(scopesHost);
   host.append(el("h3", "world-cap", "Coverage drivers"));
   host.append(el("p", "settings-note", "Values the coverage test feeds @world so gated branches run. Propose them from the story, then adjust."));
@@ -212,8 +227,8 @@ export function mountWorld(
 
   const handle: WorldHandle = {
     value() {
-      // Every world property is @world: collect the named rows into the single world scope.
-      const declarations: HostScopeDecl[] = [];
+      // Collect the named rows back into their scopes, in first-seen order (@world for every new row).
+      const byToken = new Map<string, HostScopeDecl[]>();
       for (const r of scopeRows) {
         const name = r.name.trim();
         if (!name) continue;
@@ -222,9 +237,16 @@ export function mountWorld(
         if ((r.type === "enum" || r.type === "flags") && r.values?.length) decl.values = [...r.values];
         if (r.type === "quality" && r.stages?.length) decl.stages = [...r.stages];
         if (r.writable === false) decl.writable = false;
-        declarations.push(decl);
+        if (r.purpose) decl.purpose = r.purpose;
+        const list = byToken.get(r.token) ?? [];
+        list.push(decl);
+        byToken.set(r.token, list);
       }
-      const scopes: HostScopeSpec[] = declarations.length ? [{ token: "world", declarations }] : [];
+      const scopes: HostScopeSpec[] = [...byToken].map(([token, declarations]) => {
+        const writable = scopeWritable.get(token);
+        return { token, ...(writable !== undefined ? { writable } : {}), declarations };
+      });
+      for (const o of opaque) if (!byToken.has(o.token)) scopes.push(o);
       const cleanDrivers = drivers
         .filter((d) => d.ref.replace(/^@world\./, "").trim() && d.values.length)
         .map((d): CoverageDriver => ({

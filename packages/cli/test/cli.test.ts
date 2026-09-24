@@ -357,3 +357,100 @@ describe("a line that names another engine's scope", () => {
     });
   }
 });
+
+// The same line in a game that shares its scopes (patterkit/design/shared-scopes.md): a `game-scopes/`
+// folder above the project with the Storylet Engine's file. `validate` checks @story's names against it
+// with warnings (exit 0), `export` keeps Patter's own file there current and leaves it alone when it
+// would not change, and `play` and `coverage` stand @story in from its declared defaults.
+describe("a game that shares its scopes", () => {
+  const storylets = {
+    version: 1, owner: "Storylet Engine",
+    scopes: [{ token: "story", declarations: [
+      { name: "act", type: "number", default: 2 },
+      { name: "ending", type: "string", default: "", writable: false },
+    ] }],
+  };
+  const gameWith = async (condition: string): Promise<{ dir: string; scopes: string }> => {
+    const game = mkdtempSync(join(tmpdir(), "patter-game-"));
+    const scopes = join(game, "game-scopes");
+    mkdirSync(scopes);
+    writeFileSync(join(scopes, "storylets.scopes.json"), JSON.stringify(storylets));
+    const dir = join(game, "story.patter");
+    expect(await main(["init", dir, "--name", "Story"])).toBe(0);
+    const flowPath = join(dir, "scenes", "start.patterflow");
+    const text = readFileSync(flowPath, "utf8");
+    writeFileSync(flowPath, text.replace(/"type": "snippet",/, `"type": "snippet", "condition": ${JSON.stringify(condition)},`));
+    return { dir, scopes };
+  };
+
+  it("validate warns about another tool's names and still exits 0", async () => {
+    const { dir } = await gameWith("@story.acts >= 2");
+    expect(await main(["validate", dir])).toBe(0);
+    expect(lastError()).toContain("warning: @story.acts is not declared by Storylet Engine (game-scopes/storylets.scopes.json)");
+    expect(lastError()).toContain("[game-scopes]");
+  });
+
+  it("export writes patter.scopes.json, and a second export leaves it byte-identical and unwritten", async () => {
+    const { dir, scopes } = await gameWith("@story.act >= 2");
+    const file = join(scopes, "patter.scopes.json");
+    expect(await main(["export", dir])).toBe(0);
+    expect(existsSync(file)).toBe(true);
+    const first = readFileSync(file, "utf8");
+    expect(JSON.parse(first)).toMatchObject({ version: 1, owner: "Patter", scopes: [{ token: "patter" }] });
+    vi.mocked(console.log).mockClear();
+    expect(await main(["export", dir])).toBe(0);
+    expect(readFileSync(file, "utf8")).toBe(first);
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toContain("patter.scopes.json");
+  });
+
+  for (const command of ["play", "coverage"]) {
+    it(`${command} stands @story in and runs`, async () => {
+      const { dir } = await gameWith("@story.act >= 2");
+      expect(await main([command, dir])).toBe(0);
+      expect(lastError()).not.toContain("this content names @story");
+    });
+  }
+
+  const log = () => vi.mocked(console.log).mock.calls.map((c) => c.join(" ")).join("\n");
+  const world = (n: number) => ({ version: 1, scopes: [{ token: "world", declarations: [{ name: "threat", type: "number", default: n }] }] });
+  const setWorld = (dir: string, n: number): void => {
+    const path = join(dir, "story.patterproj");
+    writeFileSync(path, JSON.stringify({ ...(parseSource(readFileSync(path, "utf8")) as object), scopeRegistry: world(n) }));
+  };
+
+  it("unpack writes the pack's snapshot of the game's scopes into the new project, and says so", async () => {
+    const { dir } = await gameWith("@story.acts >= 2");
+    const out = mkdtempSync(join(tmpdir(), "patter-cli-recv-"));
+    const pack = join(out, "sent.patterpack");
+    expect(await main(["pack", dir, "-o", pack])).toBe(0);
+    const target = join(out, "story.patter");
+    expect(await main(["unpack", pack, "-o", target])).toBe(0);
+    expect(readFileSync(join(target, "game-scopes", "storylets.scopes.json"), "utf8")).toBe(JSON.stringify(storylets));
+    expect(log()).toContain(`unpacked: ${join(target, "game-scopes", "storylets.scopes.json")}`);
+    expect(log()).toMatch(/shard\(s\) and 1 game scopes file\(s\) ->/);
+    expect(await main(["validate", target])).toBe(0);
+    expect(lastError()).toContain("warning: @story.acts is not declared by Storylet Engine");
+  });
+
+  it("unpack --merge takes their World edit to game.scopes.json and says so, and never writes their snapshot", async () => {
+    const { dir, scopes } = await gameWith("@story.act >= 2");
+    writeFileSync(join(scopes, "game.scopes.json"), JSON.stringify({ version: 1, owner: "Game", scopes: world(3).scopes }));
+    setWorld(dir, 3);
+    const out = mkdtempSync(join(tmpdir(), "patter-cli-recv-"));
+    const sent = join(out, "sent.patterpack");
+    expect(await main(["pack", dir, "-o", sent])).toBe(0);
+    const theirs = join(out, "story.patter");
+    expect(await main(["unpack", sent, "-o", theirs])).toBe(0);
+    setWorld(theirs, 7);
+    writeFileSync(join(theirs, "game-scopes", "storylets.scopes.json"), "{ theirs }");
+    const returned = join(out, "returned.patterpack");
+    expect(await main(["pack", theirs, "-o", returned])).toBe(0);
+
+    vi.mocked(console.log).mockClear();
+    expect(await main(["unpack", returned, "--merge", "--base", sent, "-o", dir])).toBe(0);
+    expect(log()).toContain(`game scopes: ${join(scopes, "game.scopes.json")} (their World properties)`);
+    expect(JSON.parse(readFileSync(join(scopes, "game.scopes.json"), "utf8")).scopes[0].declarations[0].default).toBe(7);
+    expect(readFileSync(join(scopes, "storylets.scopes.json"), "utf8")).toBe(JSON.stringify(storylets));
+    expect(existsSync(join(dir, "game-scopes"))).toBe(false);
+  });
+});

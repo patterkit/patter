@@ -55,7 +55,7 @@ function refuseUnresolvedMerge(loaded: LoadedProject): void {
 export function runExport(loaded: LoadedProject): Bundle {
   refuseUnresolvedMerge(loaded);
   const { project, locales } = loaded;
-  const full = exportBundle({ project, scenes: compileScenes(loaded), locales });
+  const full = exportBundle({ project, scenes: compileScenes(loaded), locales, gameScopes: loaded.gameScopes?.merged });
   const loc = project.export?.localisation;
   if (!loc || loc.mode === "embedded") return full;
   // "ids": drop all strings (sourceDebug keeps the source locale for debugging only).
@@ -68,7 +68,7 @@ export function runExport(loaded: LoadedProject): Bundle {
 export function runExportFull(loaded: LoadedProject): Bundle {
   refuseUnresolvedMerge(loaded);
   const { project, locales } = loaded;
-  return exportBundle({ project, scenes: compileScenes(loaded), locales });
+  return exportBundle({ project, scenes: compileScenes(loaded), locales, gameScopes: loaded.gameScopes?.merged });
 }
 
 /**

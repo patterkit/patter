@@ -153,8 +153,13 @@ export interface ProjectSettingsDto {
   gameDataFields: GameDataFields;
   /** Project-global `@patter` property declarations (the Properties settings tab). */
   properties: PropertyDecl[];
-  /** Host / world scope declarations (`@world`, ...) - the World Properties settings tab (#159). Absent = none. */
+  /** Host / world scope declarations (`@world`, ...) - the World Properties settings tab (#159). Absent = none.
+   *  With a game scopes folder, the game's own scopes come from its `game.scopes.json`, and saving writes
+   *  them there first and then to the project's synced copy. */
   scopeRegistry?: HostScopeRegistry;
+  /** The shared `game.scopes.json` World properties are saved to, when the game has a scopes folder
+   *  (read-only; the tab names it). Absent = the project alone holds them. */
+  worldFile?: string;
   /** Coverage input drivers feeding host scopes during a coverage run - the World Properties settings tab (#159). */
   coverageDrivers?: CoverageDriver[];
   /** The master cast (the Cast settings tab). */
@@ -375,6 +380,11 @@ export interface PackMergeSummary {
    *  An id is absent where none could be read (a pack with no manifest, an unreadable project file).
    *  That is "cannot say", never a mismatch: refusing on ignorance would block a legitimate merge. */
   provenance: { returned?: string; base?: string; target?: string; ok: boolean };
+  /** They changed the game's scopes (World properties) and the project has a game scopes folder: the
+   *  merge writes their change to its `game.scopes.json` (`path`, project-relative), so the next save
+   *  doesn't sync it away; or, with `error`, that file won't parse and was left alone. The pack's own
+   *  copy of the game's scopes is never written back. Absent when they changed none. */
+  gameScopes?: { path: string; error?: string };
 }
 
 /** A localisation export: a format + an optional target locale (omitted = a blank source template). */
@@ -643,7 +653,7 @@ export interface PatterCoverageApi {
   onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
-export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling";
+export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling" | "game-scopes";
 
 /** A one-click remedy for a problem (spec §4). Extensible discriminated union.
  *  `add-to-cast` / `declare-property` are project-file writes (applyFix); `retarget-jump`,
@@ -735,6 +745,11 @@ export interface PatterApi {
    *  in main; the renderer never sees a path. Null when any of the three is dismissed, which writes
    *  nothing. Unlike Open Patterpack this edits the project in place rather than opening another one. */
   mergePatterpack(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string } | null>;
+  /** File ▸ Share Scopes with Other Tools: create the game's `game-scopes/` folder (where, asked in main)
+   *  with Patter's file and a `game.scopes.json` of the project's World properties, so the game's other
+   *  editing tools check and preview this project's names and it checks theirs. `shared` when the
+   *  project already shares one (nothing written); null when the author cancelled. */
+  shareScopes(): Promise<{ dir: string } | { shared: string } | { error: string } | null>;
   /** Export localisation strings (spec §14) in the chosen format: opens a native Save dialog, writes the file. */
   exportLoc(request: LocExportRequest): Promise<ExportResult>;
   /** Import a translated file: opens a native Open dialog, applies it (format by extension). `fallbackLocale`

@@ -57,6 +57,15 @@ expressions, encoding + line-endings (UTF-8 no-BOM, LF), and **bundle staleness*
 (any committed `.patterc` whose embedded hash no longer matches source). Exits
 non-zero if there are any issues. Ideal as a pre-commit hook and in CI.
 
+Where the game keeps a shared `game-scopes/` folder (found by walking up from the
+project, or named by the project's `gameScopes`), it also checks the names and
+types the project uses from other tools' scopes against their files, and reports
+the folder (`[game-scopes]`): a file that won't parse or a scope two files claim is
+an issue; another tool's undeclared name, a type mismatch, a write to a read-only
+property, `patter.scopes.json` out of date, or the project's copy of a game scope
+differing from `game.scopes.json` is a **warning**, printed as one, which never
+fails the run.
+
 ```sh
 patter validate
 patter validate my-game
@@ -93,11 +102,18 @@ patter export -o build/game.patterc
 patter export -o - | gzip > game.patterc.gz
 ```
 
+Where the game keeps a shared `game-scopes/` folder, `export` also writes
+`game-scopes/patter.scopes.json` (the project's shared `@patter` properties), and
+only when its content would change. Not with `-o -`.
+
 ### `patter play [path]`
 
 Play a project through the reference runtime and print a transcript - lines,
 text, game events, and choices. Exits non-zero if the playthrough cannot finish
-(a stall / max-steps), which makes it usable as a smoke test.
+(a stall / max-steps), which makes it usable as a smoke test. A line naming another
+engine's scope (`@story.act`) plays where the game's `game-scopes/` folder declares
+it, standing that engine in from its declared defaults; without the folder it is
+refused, since Patter is playing alone. `patter coverage` does the same.
 
 | Option | Values | Meaning |
 |--------|--------|---------|
@@ -145,7 +161,11 @@ patter report --json | jq '.totals'
 
 Pack a project (the `.patter` folder) into a single portable **`.patterpack`** - a
 binary zip envelope, the send-and-return artifact for collaborators without VCS
-(you cannot email a folder; this is the zip of it). `-o` is required.
+(you cannot email a folder; this is the zip of it). `-o` is required. When the
+project has a game scopes folder (`game-scopes/`, found as every command finds it),
+the pack also carries a read-only snapshot of every `*.scopes.json` in it, as
+`game-scopes/<name>` entries listed in the manifest's `gameScopes`. A project with
+no folder packs to exactly the same bytes as before.
 
 ```sh
 patter pack my-game.patter -o my-game.patterpack
@@ -155,11 +175,13 @@ patter pack my-game.patter -o my-game.patterpack
 
 Explode a `.patterpack` back into source shards under `<dir>`. Both the input
 file and `-o <dir>` are required. Entry paths that would escape the target
-directory are rejected.
+directory are rejected. A pack's game scopes snapshot is written to
+`<dir>/game-scopes/`, where the unpacked project finds it first, so `validate`,
+`play`, and `coverage` there know the other tools' scopes.
 
 | Option | Meaning |
 |--------|---------|
-| `--merge --base <sent.patterpack>` | Instead of extracting, **fold a returned document's edits back into the existing project** at `<dir>` via the 3-way merge engine. `--base` is the `.patterpack` you originally packed and sent (the common ancestor). Per shard: a clean merge updates the file, a conflict writes a `.patterconflict` sidecar; a file only in the returned document is added. Exits non-zero if any shard conflicts. |
+| `--merge --base <sent.patterpack>` | Instead of extracting, **fold a returned document's edits back into the existing project** at `<dir>` via the 3-way merge engine. `--base` is the `.patterpack` you originally packed and sent (the common ancestor). Per shard: a clean merge updates the file, a conflict writes a `.patterconflict` sidecar; a file only in the returned document is added. Exits non-zero if any shard conflicts. The returned pack's game scopes snapshot is never written. When the project has a game scopes folder and the returned project file's copy of the game's scopes (World properties) differs from the base pack's, the scopes they changed are written to `game.scopes.json` (the rest of the file is kept) and a `game scopes:` line says so. |
 
 ```sh
 patter unpack returned.patterpack -o ./my-game.patter --merge --base sent.patterpack

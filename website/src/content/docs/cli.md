@@ -39,7 +39,12 @@ in place stays a plain folder.)
 
 ### `patter validate [path]`
 Check structure, expressions, interpolation, encoding, a stale bundle, and unresolved
-merges. Exit **1** if anything is wrong: the command to gate a PR on.
+merges. Exit **1** if anything is wrong: the command to gate a PR on. Where the game
+[shares its scopes](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools),
+it also checks the other tools' names and types against their files, and reports the folder
+itself (`[game-scopes]`): a file that won't parse or a scope two files claim is an error, while
+another tool's name, `patter.scopes.json` being out of date, or the project's copy of a game
+scope differing from `game.scopes.json` is a warning, printed as one, which never fails the run.
 
 ### `patter format [files…]` (alias `fmt`)
 Rewrite source to canonical form. `--check` reports what *would* change and writes
@@ -51,7 +56,8 @@ nothing, exiting **1** if anything differs: a CI formatting gate.
 Compile to a `.patterc` bundle (a single JSON file). Defaults to the project's configured
 output, else `dist/<name>.patterc`; `-o -` writes to stdout. `--ids` builds an
 IDs-only bundle (ships no strings); `--source-debug` is IDs-only but embeds the source
-language for debug playback.
+language for debug playback. Where the game shares its scopes, it also writes
+`game-scopes/patter.scopes.json`, and only when its content would change (not with `-o -`).
 
 ### `patter export-script [path] [-o file.pdf|.docx]`
 Export a **readable screenplay** of the script + flow: dialogue, narration, choices (with their
@@ -70,7 +76,9 @@ Run the story through the reference runtime **non-interactively** and print a tr
 scripted checks and CI, not for exploring (to actually play through a story, use Patterpad's Play
 window). Choices come from `--choices a,b,c` (option ids taken in order; otherwise the first
 eligible is picked). `--scene id` · `--block id` · `--seed N`. Exits **1** if the playthrough
-didn't reach the end: a completion gate for CI.
+didn't reach the end: a completion gate for CI. A line that names another engine's scope
+(`@story.act`) plays where the game shares its scopes, standing that engine in from its file's
+defaults; without the folder it is refused, since Patter is playing alone.
 
 ### `patter coverage [path]`
 Narrative coverage: play the story many times with random choices and tally how often each
@@ -119,7 +127,10 @@ error. `--all` includes every voiced line (otherwise only those ready to record)
 ### `patter pack [path] -o file` / `patter unpack <file> -o dir`
 Pack a project into a portable `.patterpack`, or explode one back into source shards.
 `unpack --merge --base sent.patterpack` folds a returned pack's edits into the project
-(a 3-way merge using `--base` as the common ancestor).
+(a 3-way merge using `--base` as the common ancestor). Where the project has a `game-scopes/`
+folder, `pack` carries a snapshot of it and `unpack` writes that into `game-scopes/` inside the new
+project; `unpack --merge` never writes the snapshot back, but when the returned pack changed World
+properties it writes that change to your `game.scopes.json` and prints a `game scopes:` line.
 
 ### `patter merge BASE OURS THEIRS`
 A 3-way structural merge of Patter source **by node id**. `-o out` (otherwise stdout)

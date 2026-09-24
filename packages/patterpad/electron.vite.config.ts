@@ -17,6 +17,7 @@ const alias: Record<string, string> = {
   "@patterkit/runtime": resolve(root, "packages/runtime/src/index.ts"),
   "@patterkit/ops": resolve(root, "packages/ops/src/index.ts"),
   "@wildwinter/expr": resolve(expr, "packages/expr/src/index.ts"),
+  "@wildwinter/scoperegistry/scopes": resolve(expr, "packages/scoperegistry/src/scopes.ts"), // before the bare package: a key matches as a prefix too
   "@wildwinter/scoperegistry": resolve(expr, "packages/scoperegistry/src/index.ts"),
   "@wildwinter/expr-editor/styles.css": resolve(expr, "packages/expr-editor/src/styles.css"),
   "@wildwinter/expr-editor": resolve(expr, "packages/expr-editor/src/index.ts"),
