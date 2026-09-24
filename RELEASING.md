@@ -138,11 +138,12 @@ never published.)
 > below). `changeset publish` still publishes it (it publishes any public package whose
 > local version is ahead of the registry), but its version comes from `bump:play` - so do
 > not add a changeset that names it, and if a "Version Packages" PR touches
-> `packages/runtime`, something went wrong. Its dependency on `@patterkit/model` is the wide
-> range `>=0.4.0 <1.0.0` rather than a caret, so a model MINOR does not cascade-bump it on its
-> own (a caret let that happen twice, on the Version Packages PRs 42 and 50, unseen because
-> bot-PR CI never ran; now that it does, the lockstep check would fail that PR and `ship:npm`
-> would stall). Its other internal deps are caret ranges, which patch-bumps stay inside.
+> `packages/runtime`, something went wrong. Its dependencies on `@patterkit/model` and
+> `@patterkit/dialect` are wide ranges (`>=0.4.0 <1.0.0`, `>=0.1.6 <1.0.0`) rather than carets,
+> so a MINOR of either does not cascade-bump it on its own (a caret on model let that happen
+> twice, on the Version Packages PRs 42 and 50, unseen because bot-PR CI never ran; the caret on
+> dialect did it again on PR 76, for dialect 0.2.0). Any internal dependency the runtime gains
+> takes a wide range for the same reason: on a 0.x caret, every minor is out of range.
 
 1. With each change touching a published package, add a changeset:
    ```sh
