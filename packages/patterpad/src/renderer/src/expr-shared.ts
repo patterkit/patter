@@ -7,7 +7,8 @@ import {
   callNode, strLit, numLit, binary, scopedVar, flagDelta,
   type FunctionTemplateSpec, type CatalogueEntry,
 } from "@wildwinter/expr-editor";
-import type { ExpressionSchema, PropertyMeta } from "@wildwinter/expr";
+import type { Dialect, ExpressionSchema, PropertyMeta } from "@wildwinter/expr";
+import { dialectWithForeignScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
 import type { ConditionProperty } from "../../shared/api.js";
 
 /** The right-click menu a property pill offers (from-storylets/property-visibility): "where is this
@@ -21,6 +22,23 @@ export const setPropertyActions = (fn: (ref: { scope: string; name: string }) =>
 /** Stable to pass as an option: the editor opens a menu only when this returns items, so a pill
  *  right-clicked before the renderer has registered anything simply has no menu. */
 export const propertyActions = (ref: { scope: string; name: string }): PropertyAction[] => provider?.(ref) ?? [];
+
+/** The project's host-scope tokens (`@world`, an imported `@story`, opaque ones too), set when a scene
+ *  loads and after a settings save. The editors parse with Patter's dialect plus these plus the family's
+ *  other engines' scopes: the base dialect knows only `@patter` and `@scene`, so an editor built on it
+ *  could not read `@world.time_of_day` at all, let alone a storylet's `@story.act`. */
+let hostTokens: string[] = [];
+let memo: { key: string; dialect: Dialect } | undefined;
+export const setHostScopeTokens = (tokens: readonly string[]): void => { hostTokens = [...tokens].sort(); };
+export function editorDialect(): Dialect {
+  const key = hostTokens.join(",");
+  if (memo?.key !== key) memo = { key, dialect: dialectWithForeignScopes({ version: 1, scopes: hostTokens.map((token) => ({ token })) }) };
+  return memo.dialect;
+}
+
+/** Another engine's game-wide scopes (`@story` when not imported with declarations): the editors draw
+ *  a reference into one as an ordinary pill, since that engine checks the names. */
+export const OTHER_ENGINE_SCOPES: readonly string[] = EXTERNAL_SCOPES;
 
 /** Scope display order in the property picker (project globals first, then scene-locals). */
 export const SCOPE_ORDER = ["patter", "scene"];

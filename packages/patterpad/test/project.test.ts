@@ -979,3 +979,39 @@ describe("merge returned patterpack", () => {
     expect("error" in plan).toBe(true);
   });
 });
+
+// Another engine's scope in a Patter line. The play window runs Patter on its own, so a line naming
+// @story that the project never declared is refused as the flow opens, with a way out: declare it
+// under World properties, and Patter backs it with the declared defaults. Declared, it also joins
+// the editors' properties, and its token the editors' parser.
+describe("a line that names another engine's scope", () => {
+  it("is refused in the play window until the project declares it, then plays", async () => {
+    const opened = await project.createProject(mkdtempSync(join(tmpdir(), "pp-story-")), "Story");
+    const sceneId = opened.scenes[0]!.id;
+    const src = project.readScene(sceneId);
+    const flow = parseSource(src.flowSource) as { scene: { blocks: { children: Record<string, unknown>[] }[] } };
+    flow.scene.blocks[0]!.children[0]!["condition"] = "@story.act >= 2";
+    expect((await project.saveScene(sceneId, canonicalStringify(flow), src.locSource)).ok).toBe(true);
+
+    project.startPlay(sceneId);
+    const refused = project.playToStop();
+    expect(refused.stop).toBe("error");
+    expect(refused.error).toMatch(/^This project names @story, which another engine provides\. To play it here, declare @story in Project Settings > World properties/);
+    expect(refused.error).toContain("this content names @story, which no engine on this registry registered");
+
+    const s = project.readSettings()!;
+    expect((await project.saveSettings({ ...s, scopeRegistry: { version: 1, scopes: [
+      { token: "story", declarations: [{ name: "act", type: "number", default: 2 }] },
+    ] } })).ok).toBe(true);
+    const read = project.readScene(sceneId);
+    expect(read.hostScopes).toEqual(["story"]);
+    expect(read.properties).toContainEqual({ scope: "story", name: "act", type: "number" });
+
+    project.startPlay(sceneId);
+    expect(["choice", "end"]).toContain(project.playToStop().stop);
+  });
+
+  it("leaves any other failure in the engine's own words", () => {
+    expect(project.playRefusal("unknown scene \"x\"")).toBe("unknown scene \"x\"");
+  });
+});

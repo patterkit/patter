@@ -40,7 +40,8 @@ import { renderInspector } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
 import { openConditionEditor, renderConditionPills } from "./cond-editor.js";
-import { setPropertyActions, type PropertyAction } from "./expr-shared.js";
+import { setPropertyActions, setHostScopeTokens, type PropertyAction } from "./expr-shared.js";
+import { hostScopeProperties, hostScopeTokens } from "../../shared/host-scopes.js";
 import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // The gameId editor is the shell's now: it IS this app's, generalised, and it
 // gained a stopPropagation on keydown that ours lacked (a Delete typed into an
@@ -1756,8 +1757,9 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   editorEl.replaceChildren();
   lastInspectorSig = null; // force the first selection in the new scene to render (don't match the old scene's)
 
-  const { flowSource, locSource, properties } = await window.patter.readScene(sceneId);
+  const { flowSource, locSource, properties, hostScopes } = await window.patter.readScene(sceneId);
   sceneProps = properties; // referenceable properties for this scene's condition editor
+  setHostScopeTokens(hostScopes); // the editors' parser knows @world, an imported @story, and the rest
   docMap = await window.patter.readDocs(sceneId); docsDirty = false; // typed documentation for this scene
   comments = await window.patter.readComments(sceneId); commentsDirty = false; // threaded comments for this scene
   suggestions = await window.patter.readSuggestions(sceneId); suggestionsDirty = false; // rewrite proposals for this scene
@@ -2591,10 +2593,13 @@ async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
     // rebuild the condition-editor catalogue so they're selectable immediately, without a scene reload or a
     // restart. Mirrors openSceneProps for the scene scope; keeps the load-time order (@patter first). New
     // default values reach the run through the play window's live refresh (the main process triggers it).
+    // The host scopes (#159) may have changed too: rebuild their properties, and the editors' dialect.
     sceneProps = [
       ...s.properties.map((d): ConditionProperty => ({ scope: "patter", name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) })),
-      ...sceneProps.filter((p) => p.scope !== "patter"),
+      ...hostScopeProperties(s.scopeRegistry),
+      ...sceneProps.filter((p) => p.scope === "scene"),
     ];
+    setHostScopeTokens(hostScopeTokens(s.scopeRegistry));
     void refreshVcStatus(); // the PROJECT shard just changed on disk: re-badge the Properties row
     await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
     void refreshProblems();  // refresh the spelling entries in the problems panel for the new setup

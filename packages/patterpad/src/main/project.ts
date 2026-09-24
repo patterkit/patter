@@ -20,6 +20,7 @@ import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
+import { hostScopeProperties, hostScopeTokens } from "../shared/host-scopes.js";
 import { startAudioIndex, audioManifest, AUDIO_MANIFEST_FILE, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 
 interface SceneShards {
@@ -555,11 +556,13 @@ export function sceneForPath(path: string): string | undefined {
 /** Cheap structural equality (the status ladders are small, plain, order-stable JSON). */
 const sameJson = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-/** The properties referenceable in a scene's conditions: project globals (`@patter`) + scene-locals (`@scene`).
- *  Patter's property types are the same vocabulary as the condition editor's, so no mapping is needed. */
+/** The properties referenceable in a scene's conditions: project globals (`@patter`), the host scopes'
+ *  declared properties (`@world`, an imported `@story`), and scene-locals (`@scene`). Patter's property
+ *  types are the same vocabulary as the condition editor's, so no mapping is needed. */
 function sceneProperties(sceneId: string): ConditionProperty[] {
   const out: ConditionProperty[] = [];
   for (const d of loaded?.project.properties ?? []) out.push({ scope: "patter", name: d.name, type: d.type, enumValues: d.values, stages: d.stages, purpose: d.purpose });
+  out.push(...hostScopeProperties(loaded?.project.scopeRegistry));
   const scene = loaded?.scenes.find((s) => s.id === sceneId);
   for (const d of scene?.sceneProps ?? []) out.push({ scope: "scene", name: d.name, type: d.type, enumValues: d.values, stages: d.stages, purpose: d.purpose });
   return out;
@@ -691,6 +694,7 @@ export function readScene(sceneId: string): SceneSource {
     locSource: src.loc,
     sceneName: s.name,
     properties: sceneProperties(sceneId),
+    hostScopes: hostScopeTokens(loaded?.project.scopeRegistry),
   };
 }
 
@@ -938,6 +942,18 @@ const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
 };
 const mapOptions = (options: ChoiceOption[]): PlayChoiceOption[] =>
   options.map((o) => ({ id: o.id, text: o.prompt?.text ?? "", character: o.prompt?.character, eligible: o.eligible }));
+/** What the play window says when the engine refuses the project. It runs Patter on its own, so a
+ *  line naming another engine's scope (`@story.act`) that the project has not declared is refused as
+ *  the flow opens. Declaring the scope under World properties lets Patter back it with the declared
+ *  defaults, which is how to play it here; the engine's own words are kept. */
+export function playRefusal(message: string): string {
+  const other = /^this content names (@\S+?),/.exec(message)?.[1];
+  return other === undefined ? message
+    : `This project names ${other}, which another engine provides. To play it here, declare ${other} in `
+      + `Project Settings > World properties, with the properties you read; or play it in a game that runs `
+      + `both engines on one registry.\n\n${message}`;
+}
+
 const errBatch = (e: unknown): PlayBatch => ({ steps: [], stop: "error", error: e instanceof Error ? e.message : String(e) });
 
 /** Start (or restart) an interactive run; re-loads from disk so it reflects the last save. When
@@ -959,7 +975,7 @@ export function startPlay(sceneId: string, blockId?: string): void {
     engine = new Engine(playBundle, { ...(locale ? { locale } : {}), closedCaptions: playCaptionsOn });
     flow = engine.openFlow("main", { scene: sceneId, ...(blockId ? { block: blockId } : {}) });
     playError = null;
-  } catch (e) { flow = null; engine = null; playBundle = null; playError = e instanceof Error ? e.message : String(e); }
+  } catch (e) { flow = null; engine = null; playBundle = null; playError = playRefusal(e instanceof Error ? e.message : String(e)); }
 }
 
 /** What a live refresh did, so the play window knows how (whether) to react. `options` rides along on a

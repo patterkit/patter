@@ -332,3 +332,28 @@ describe("CLI writes through the configured VCS", () => {
     expect(lastError()).toMatch(/locked by bob@bob-ws/);
   });
 });
+
+// A Patter line naming another engine's scope that the project never declared. `play` and `coverage`
+// run Patter on its own, and the engine refuses such content as a flow opens: each says so as an
+// error and exits 1, never a crash. Declaring the scope (World properties / scopeRegistry) is the fix,
+// and the refusal says so.
+describe("a line that names another engine's scope", () => {
+  const withStory = async (): Promise<string> => {
+    const dir = join(mkdtempSync(join(tmpdir(), "patter-story-")), "story.patter");
+    expect(await main(["init", dir, "--name", "Story"])).toBe(0);
+    const flowPath = join(dir, "scenes", "start.patterflow");
+    const text = readFileSync(flowPath, "utf8");
+    const edited = text.replace(/"type": "snippet",/, '"type": "snippet", "condition": "@story.act >= 2",');
+    expect(edited).not.toBe(text);
+    writeFileSync(flowPath, edited);
+    return dir;
+  };
+
+  for (const command of ["play", "coverage"]) {
+    it(`${command} reports the refusal and exits 1`, async () => {
+      const dir = await withStory();
+      expect(await main([command, dir])).toBe(1);
+      expect(lastError()).toContain("this content names @story, which no engine on this registry registered");
+    });
+  }
+});

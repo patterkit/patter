@@ -299,6 +299,8 @@ export interface SceneSource {
   sceneName: string;
   /** Properties referenceable in this scene's conditions (for the inspector's condition editor). */
   properties: ConditionProperty[];
+  /** The project's host-scope tokens, declared or opaque, which the editors' parser must know. */
+  hostScopes: string[];
 }
 
 export interface SaveResult {
