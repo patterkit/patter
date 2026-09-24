@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-24
+
 ### Added
 
 - **Patterpad reads the game's shared scopes.** A game can keep one `game-scopes/` folder, where each
