@@ -3,15 +3,22 @@
 // a run). THE WHOLE ENVELOPE IS THE FAMILY'S CONTRACT: `patter/save@0`, the shape the JS reference
 // writes (@patterkit/model documents it; design/patter-schema.md 9), written and read identically by
 // every Patterplay runtime so a save crosses engines. camelCase literal keys, the execution position
-// under `cursor`, a pending choice as `{groupId, options}`, scopes two-level (`{"patter": {...}}`),
-// selector cursors with every key optional. Until 0.11.0 this port wrote its own flat shape, which a
-// JS save loaded into only partly: the flow came back and its pending choice did not
-// (from-storylets/save-shape-across-engines, 2026-09-03). Reading still accepts that shape.
+// under `cursor`, a pending choice as `{groupId, options}`, selector cursors with every key optional.
+// Until 0.11.0 this port wrote its own flat shape, which a JS save loaded into only partly: the flow
+// came back and its pending choice did not (from-storylets/save-shape-across-engines, 2026-09-03).
+// Reading still accepts that shape.
+//
+// Version 3 (the one-registry model): property values are the registry's, not the engine's. A save
+// holds only what is NOT a property (cursors, PRNGs, visits, selectors), plus, when the engine made
+// its own registry (a standalone game), that registry's values under `registry`, keyed by registry
+// key (`patter`, `patter/scene/<scene>`, `patter/flow/<flow>/patter`, `patter/flow/<flow>/scene/<scene>`,
+// and a self-backed host scope's token). Version 2 saves still load: their property sections
+// (`shared`, `stageBags`, and each flow's `scopes` and `sceneBags`) move into the registry.
 //
 // std-only, and deliberately self-contained: the core is JSON-library-agnostic (Bundle.h), so this
 // header carries its own compact JSON writer + reader for the SaveGame shape - which also makes the
 // envelope testable in the clang TestHost, where Unreal's FJson does not exist. Reading accepts a
-// bare version-2 snapshot (no envelope) for compatibility with files written before the envelope.
+// bare snapshot (no envelope) for compatibility with files written before the envelope.
 #pragma once
 
 #include <cstdio>
@@ -40,6 +47,21 @@ namespace patter
         {
             std::string out = "{"; bool first = true;
             for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueJson(kv.second); }
+            return out + "}";
+        }
+
+        inline std::string valueMapJson(const OrderedMap<std::string, PatterValue>& m)
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueJson(kv.second); }
+            return out + "}";
+        }
+
+        // Registry values: registry key -> name -> value, in the registry's own order.
+        inline std::string registryJson(const ScopeRegistry::SaveBlob& blob)
+        {
+            std::string out = "{"; bool first = true;
+            for (const auto& kv : blob) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueMapJson(kv.second); }
             return out + "}";
         }
 
@@ -77,13 +99,6 @@ namespace patter
             return out + "}";
         }
 
-        inline std::string bagMapJson(const std::map<std::string, std::map<std::string, PatterValue>>& m)
-        {
-            std::string out = "{"; bool first = true;
-            for (const auto& kv : m) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueMapJson(kv.second); }
-            return out + "}";
-        }
-
         inline std::string optionJson(const ChoiceOption& o)
         {
             std::string out = "{\"id\":" + jsonQuote(o.id) + ",\"eligible\":" + (o.eligible ? "true" : "false");
@@ -102,10 +117,9 @@ namespace patter
 
         inline std::string flowJson(const FlowSnapshot& f)
         {
+            // A flow holds no properties since version 3: those are the registry's.
             std::string out = "{";
-            out += "\"scopes\":{\"patter\":" + valueMapJson(f.scopes) + "}";
-            out += ",\"sceneBags\":" + bagMapJson(f.sceneBags);
-            out += ",\"rngState\":" + std::to_string(static_cast<unsigned long long>(f.rngState));
+            out += "\"rngState\":" + std::to_string(static_cast<unsigned long long>(f.rngState));
             out += ",\"visits\":" + intMapJson(f.visits);
             // The execution position sits under `cursor`, as the JS reference writes it. An absent id
             // is null, not "" (this core keeps "" for none).
@@ -140,17 +154,17 @@ namespace patter
 
 
 
-    /// Serialise the whole game (shared state, visits, every live flow) to a tagged JSON string.
+    /// Serialise the whole game (visits, selectors, every live flow, and a standalone engine's registry
+    /// values) to a tagged JSON string. A game that passed its own registry saves that once, beside this.
     inline std::string serializeState(Engine& engine)
     {
         using namespace savedetail;
         SaveGame s = engine.saveGame();
         std::string out = "{\"schema\":" + jsonQuote(SAVE_SCHEMA) + ",\"save\":{";
         out += "\"version\":" + std::to_string(s.version);
-        out += ",\"shared\":{\"patter\":" + valueMapJson(s.shared) + "}";   // owned scope -> name -> value
+        if (s.registry) out += ",\"registry\":" + registryJson(*s.registry);   // registry key -> name -> value
         out += ",\"sharedVisits\":" + intMapJson(s.sharedVisits);
         out += ",\"sharedSelectors\":" + selectorMapJson(s.sharedSelectors);
-        out += ",\"stageBags\":" + bagMapJson(s.stageBags);
         out += ",\"flows\":{";
         bool first = true;
         for (const auto& kv : s.flows) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + flowJson(kv.second); }
@@ -374,9 +388,24 @@ namespace patter
             return o;
         }
 
+        // Registry values: an object of objects, each a registry key's name -> value section.
+        inline ScopeRegistry::SaveBlob toRegistry(const JV* o)
+        {
+            ScopeRegistry::SaveBlob blob;
+            if (!o || o->t != JV::T::Obj) return blob;
+            for (const auto& kv : o->obj)
+            {
+                OrderedMap<std::string, PatterValue> section;
+                if (kv.second.t == JV::T::Obj) for (const auto& p : kv.second.obj) section.set(p.first, toValue(p.second));
+                blob.set(kv.first, std::move(section));
+            }
+            return blob;
+        }
+
         inline FlowSnapshot toFlow(const JV& v)
         {
             FlowSnapshot f;
+            // Version 2 only: the flow's own property values (absent from a version 3 save).
             f.scopes = toScope(v.get("scopes"));
             f.sceneBags = toBagMap(v.get("sceneBags"));
             // The JS runtime accumulated this state with `| 0` until 0.x, so saves in
@@ -420,8 +449,9 @@ namespace patter
         }
     }
 
-    /// Parse + restore a serializeState string (or a bare version-2 snapshot from before the
-    /// envelope existed). Throws on malformed JSON or a foreign envelope.
+    /// Parse + restore a serializeState string (version 3, or a version 2 save whose values move into
+    /// the registry, or a bare snapshot from before the envelope existed). Throws on malformed JSON, a
+    /// foreign envelope, or a save version this runtime does not read.
     inline void deserializeState(Engine& engine, const std::string& json)
     {
         using namespace savedetail;
@@ -438,13 +468,34 @@ namespace patter
 
         SaveGame s;
         s.version = static_cast<int>(saveObj->num("version"));
-        s.shared = toScope(saveObj->get("shared"));
+        if (const JV* reg = saveObj->get("registry")) if (reg->t == JV::T::Obj) s.registry = toRegistry(reg);
         s.sharedVisits = toIntMap(saveObj->get("sharedVisits"));
         s.sharedSelectors = toSelectorMap(saveObj->get("sharedSelectors"));
+        // Version 2 only: the shared property sections (absent from a version 3 save).
+        s.shared = toScope(saveObj->get("shared"));
         s.stageBags = toBagMap(saveObj->get("stageBags"));
         if (const JV* flows = saveObj->get("flows"))
             if (flows->t == JV::T::Obj)
                 for (const auto& kv : flows->obj) s.flows[kv.first] = toFlow(kv.second);
         engine.loadGame(s);
+    }
+
+    /// The game's registry as JSON (registry key -> name -> value), for a game that passed its own
+    /// registry to its engines and saves it once, beside each engine's serializeState. The same object
+    /// a standalone engine's save carries under `registry`.
+    inline std::string saveRegistry(const ScopeRegistry& registry)
+    {
+        return savedetail::registryJson(registry.save());
+    }
+
+    /// Lay a saveRegistry string over the game's registry. Values for keys nobody has registered yet
+    /// wait there and are claimed as the engines re-register (a flow reopening, a scene re-entered),
+    /// so this may run before or after each engine's deserializeState. Throws on malformed JSON.
+    inline void loadRegistry(ScopeRegistry& registry, const std::string& json)
+    {
+        using namespace savedetail;
+        JV root = JParse(json).parse();
+        if (root.t != JV::T::Obj) throw std::runtime_error("loadRegistry: not a registry save");
+        registry.load(toRegistry(&root));
     }
 }

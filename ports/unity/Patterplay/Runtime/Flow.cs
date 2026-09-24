@@ -15,8 +15,16 @@ namespace Patterkit.Patterplay
         private readonly List<LogEntry> _log = new List<LogEntry>();
         /// <summary>Monotonic across the flow's life; survives ClearLog so order is stable.</summary>
         private int _seq;
-        private PropertyBag _local;                                           // not-shared @patter
-        private Dictionary<string, PropertyBag> _sceneBags = new Dictionary<string, PropertyBag>();
+        // The per-flow halves of the two scopes. The NOT-shared @patter globals live in `_local`; the
+        // NOT-shared @scene props live in `_sceneBags` (namespaced per scene; they PERSIST across
+        // re-entries, spec §7). The SHARED halves live on the host (SharedPatter / StageBags). All of
+        // them are registered in the game's registry. Each resolver presents one merged scope, routing
+        // each property to its half by the declared `shared` flag: that split is why @patter and @scene
+        // are composed here rather than aliased to a single registry key.
+        private PropertyBag _local;                                           // PatterKeys.FlowGlobals
+        private readonly Dictionary<string, PropertyBag> _sceneBags = new Dictionary<string, PropertyBag>();
+        /// <summary>The registry keys this flow has registered (its globals and each scene bag).</summary>
+        private readonly List<string> _registered = new List<string>();
         private uint _rngState;
 
         private bool _started;
@@ -36,15 +44,23 @@ namespace Patterkit.Patterplay
         private Dictionary<string, SelectorState> _selectors = new Dictionary<string, SelectorState>();
         private Dictionary<string, int> _visitCounts = new Dictionary<string, int>();
 
+        // The eval context is built once and REFRESHED only when the registry's set of scopes moves
+        // (its Revision): every constituent resolves live state at call time (bags mutate in place;
+        // patter and scene route through this flow's resolvers, which read the current bags and scene),
+        // but another engine registering `@story` after this flow opened must still be readable.
         private readonly EvalContext _evalCtx;
         private readonly PatterHost _evalHost;
+        private readonly IScopeSource _patterScope;
+        private readonly IScopeSource _sceneScope;
+        private int _ctxRevision = -1;
+        private Func<string, string, List<string>> _registryQualities;
 
         internal Flow(string id, FlowHost host, double seed)
         {
             Id = id;
             _host = host;
             _rngState = Mulberry32.ToUint32(seed);
-            _local = FreshLocal();
+            _local = FreshLocal(); // registered by Start / Restore
 
             // The dialect's host hooks. The shared EvalContext carries them as an
             // opaque object; PatterDialect casts it back to PatterHost.
@@ -58,24 +74,34 @@ namespace Patterkit.Patterplay
             {
                 Host = _evalHost,
                 // The quality channel: a property's stage ladder, from wherever the declaration lives -
-                // @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
+                // @patter decls, the CURRENT scene's decls (they move with the flow), or the registry.
                 Qualities = StagesFor,
             };
-            _evalCtx.Scopes["patter"] = new ResolverScope(PatterGet);
-            _evalCtx.Scopes["scene"] = new ResolverScope(SceneGet);
-            // Declared host scopes (@world): bound by the embedder, or self-backed from the bundle's
-            // declarations. Registering them is what stops `@world.x` reading as a graceful false.
-            foreach (var kv in _host.HostScopes)
+            _patterScope = new ResolverScope(PatterGet);
+            _sceneScope = new ResolverScope(SceneGet);
+        }
+
+        /// <summary>The eval context, its scopes refreshed if the registry's set of scopes has moved since.</summary>
+        private EvalContext Context()
+        {
+            var reg = _host.Registry;
+            if (reg.Revision != _ctxRevision)
             {
-                var scope = kv.Value;
-                _evalCtx.Scopes[kv.Key] = new ResolverScope(name => scope.Get(name));
+                var basis = reg.ToEvalContext();
+                _evalCtx.Scopes.Clear();
+                foreach (var kv in basis.Scopes) _evalCtx.Scopes[kv.Key] = kv.Value; // every registered scope: other engines' too
+                _evalCtx.Scopes["patter"] = _patterScope; // the merged shared + per-flow views
+                _evalCtx.Scopes["scene"] = _sceneScope;
+                _registryQualities = basis.Qualities;
+                _ctxRevision = reg.Revision;
             }
+            return _evalCtx;
         }
 
         public string CurrentScene => _currentSceneId;
 
         /// <summary>The stage ladder of `@scope.name` when it is a declared quality, else null. Names
-        /// compare lowercase, as the compiler emits references (the SelfBackedScope lesson). Mirrors the
+        /// compare lowercase, as the compiler emits references (the self-backed scope lesson). Mirrors the
         /// JS Flow.stagesFor.</summary>
         private List<string> StagesFor(string scope, string name)
         {
@@ -95,7 +121,11 @@ namespace Patterkit.Patterplay
                 if (_currentSceneId == null || !_host.Bundle.Scenes.TryGetValue(_currentSceneId, out var scene)) return null;
                 return FromDecls(scene.SceneProps);
             }
-            var spec = _host.Bundle.ScopeRegistry?.Scopes?.Find(s => s.Token == scope);
+            // Any other scope's ladder is the registry's (another engine's `@story`, the game's `@world`), with
+            // the bundle's own host-scope declarations behind it for a game that registered `@world` undeclared.
+            var fromRegistry = _registryQualities?.Invoke(scope, name);
+            if (fromRegistry != null) return fromRegistry;
+            var spec = _host.Bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == scope);
             if (spec?.Declarations == null) return null;
             foreach (var d in spec.Declarations)
             {
@@ -161,6 +191,7 @@ namespace Patterkit.Patterplay
         /// shared state. Closing makes that stale reference inert. Terminal: never revived.</summary>
         public void Close()
         {
+            ReleaseBags(false);
             _closed = true;
             _flowEnded = true;
             _stack = new List<StackFrame>();
@@ -195,14 +226,18 @@ namespace Patterkit.Patterplay
         }
         private void PatterSet(string n, PatterValue v)
         {
-            if (_host.PatterSharedNames.Contains(n)) _host.SharedPatter.Set(n, v); else _local.Set(n, v);
+            if (_host.PatterSharedNames.Contains(n)) _host.Registry.Set("patter", n, v); else _local.Set(n, v);
         }
+        /// <summary>The bag a @scene property of the current scene lives in (stage or this flow's), made
+        /// and registered if missing.</summary>
         private PropertyBag SceneBagFor(string n)
         {
-            if (_currentSceneId == null) return null;
-            bool shared = _host.SceneSharedNames.TryGetValue(_currentSceneId, out var names) && names.Contains(n);
-            if (shared) return _host.StageBags.TryGetValue(_currentSceneId, out var sb) ? sb : null;
-            return _sceneBags.TryGetValue(_currentSceneId, out var fb) ? fb : null;
+            var s = _currentSceneId;
+            if (s == null || !_host.Bundle.Scenes.ContainsKey(s)) return null;
+            EnsureSceneBags(s);
+            bool shared = _host.SceneSharedNames.TryGetValue(s, out var names) && names.Contains(n.ToLowerInvariant());
+            if (shared) return _host.StageBags.TryGetValue(s, out var sb) ? sb : null;
+            return _sceneBags.TryGetValue(s, out var fb) ? fb : null;
         }
         private PatterValue SceneGet(string n)
         {
@@ -221,8 +256,10 @@ namespace Patterkit.Patterplay
 
         public void Start(string sceneId, string blockId)
         {
-            _sceneBags.Clear();
-            _local = FreshLocal();
+            // A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
+            ReleaseBags(false);
+            _host.Registry.DiscardParked(PatterKeys.Flow(Id));
+            MountLocal();
             _selectors.Clear();
             _visitCounts.Clear();
             _stack = new List<StackFrame>();
@@ -308,16 +345,14 @@ namespace Patterkit.Patterplay
             EnterChild(node);
         }
 
-        /// <summary>A host scope token counts as a scope for ref-splitting, or `@world.gold` would be read
-        /// as a @patter property literally named "world.gold".</summary>
-        private bool IsScopeToken(string t) => t == "scene" || t == "patter" || _host.HostScopes.ContainsKey(t);
-
+        /// <summary>Read a property by ref: @patter / @scene (each routed by its `shared` flag), or any
+        /// other scope the registry holds (a host scope, another engine's).</summary>
         public PatterValue GetProperty(string refStr)
         {
-            var (scope, name) = Engine.SplitRef(refStr, IsScopeToken);
+            var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
             if (scope == "patter") return PatterGet(name);
             if (scope == "scene") return SceneGet(name);
-            return _host.HostScopes.TryGetValue(scope, out var host) ? host.Get(name) : null;
+            return _host.Registry.Get(scope, name); // host scopes, other engines' scopes
         }
 
         /// <summary>Write a property by ref. The GAME's surface, so a host declaration's `writable: false`
@@ -328,19 +363,20 @@ namespace Patterkit.Patterplay
         /// about: the story is refused, the game is not.</summary>
         private void WriteProperty(string refStr, PatterValue value, bool host)
         {
-            var (scope, name) = Engine.SplitRef(refStr, IsScopeToken);
+            var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
             if (scope == "patter") PatterSet(name, value);
             else if (scope == "scene")
             {
+                // The resolver stays graceful for expression evaluation, but a host write with nowhere to
+                // land must error, not silently vanish.
                 if (_currentSceneId == null) throw new Exception($"'{refStr}': the flow has not entered a scene yet");
                 SceneSet(name, value);
             }
-            else if (_host.HostScopes.TryGetValue(scope, out var hostScope))
+            else
             {
-                if (!host && _host.StoryReadOnly.TryGetValue(scope, out var readOnly)
-                    && (readOnly.Contains("*") || readOnly.Contains(name.ToLowerInvariant())))
-                    throw new EvalError($"'@{scope}.{name}' is read-only");
-                hostScope.Set(name, value);
+                // Host scopes and other engines' scopes. The registry refuses a STORY write to a
+                // `writable: false` declaration, bound or self-backed, and never the game's.
+                _host.Registry.Set(scope, name, value, host);
             }
         }
 
@@ -599,7 +635,7 @@ namespace Patterkit.Patterplay
         // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
         private int SpecScore(Node node)
         {
-            return node.Condition != null ? MatchedSpec(node.Condition.Ast, _evalCtx, true) : 0;
+            return node.Condition != null ? MatchedSpec(node.Condition.Ast, Context(), true) : 0;
         }
 
         // Matched-constraint specificity is the SHARED scorer (Expr/Specificity.cs,
@@ -644,7 +680,7 @@ namespace Patterkit.Patterplay
             return Truthy(EvalExpr(node.Condition));
         }
 
-        private PatterValue EvalExpr(Expression expr) => Expr.Evaluate(expr.Ast, _evalCtx, PatterDialect.Instance);
+        private PatterValue EvalExpr(Expression expr) => Expr.Evaluate(expr.Ast, Context(), PatterDialect.Instance);
 
         private void Enter(string id)
         {
@@ -770,13 +806,9 @@ namespace Patterkit.Patterplay
         private void SeedScene(Scene scene)
         {
             var shared = _host.SceneSharedNames.TryGetValue(scene.Id, out var names) ? names : new HashSet<string>();
-            // The bag's constructor IS the loop this replaced: lowercase the name, seed the declared
-            // default else the type's, and copy it so two bags seeded from one declaration set never
-            // share a mutable flags list.
-            if (!_sceneBags.ContainsKey(scene.Id))
-                _sceneBags[scene.Id] = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, false));
-            if (!_host.StageBags.ContainsKey(scene.Id))
-                _host.StageBags[scene.Id] = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, true));
+            EnsureSceneBags(scene.Id);
+            // `temporary` props are reseeded to their default on EVERY entry ("fresh each playthrough"),
+            // rather than persisting across re-entries like the rest.
             foreach (var decl in scene.SceneProps ?? new List<PropertyDecl>())
             {
                 if (!decl.Temporary) continue;
@@ -789,21 +821,62 @@ namespace Patterkit.Patterplay
             }
         }
 
-        /// <summary>This flow's NOT-shared @patter half, in a bag for the same reasons as the
-        /// shared one.</summary>
+        /// <summary>Make (and register) scene `s`'s stage bag and this flow's bag for it, if not made yet.
+        /// A bag made here claims whatever values the registry holds for its key: that is how a loaded save
+        /// reaches it. The bag's constructor seeds each declared default (the type's when none) and
+        /// normalises the name.</summary>
+        private void EnsureSceneBags(string s)
+        {
+            if (!_host.Bundle.Scenes.TryGetValue(s, out var scene)) return;
+            var shared = _host.SceneSharedNames.TryGetValue(s, out var names) ? names : new HashSet<string>();
+            if (!_sceneBags.ContainsKey(s))
+            {
+                var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, false), null, "@scene.");
+                var key = PatterKeys.FlowScene(Id, s);
+                _host.Registry.MountOwned(key, bag, PatterKeys.Owner);
+                _registered.Add(key);
+                _sceneBags[s] = bag;
+            }
+            if (!_host.StageBags.ContainsKey(s))
+            {
+                var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, true), null, "@scene.");
+                _host.Registry.MountOwned(PatterKeys.Stage(s), bag, PatterKeys.Owner);
+                _host.StageBags[s] = bag;
+            }
+        }
+
+        /// <summary>A fresh, unregistered bag for this flow's NOT-shared @patter half (the shared
+        /// globals live on the host).</summary>
         private PropertyBag FreshLocal()
         {
             return new PropertyBag(_host.PatterLocalDecls.Select(Engine.ToScopeDecl), null, "@patter.");
         }
 
+        /// <summary>Register a fresh globals bag under this flow's key; it claims any values waiting there.</summary>
+        private void MountLocal()
+        {
+            _local = FreshLocal();
+            var key = PatterKeys.FlowGlobals(Id);
+            _host.Registry.MountOwned(key, _local, PatterKeys.Owner);
+            _registered.Add(key);
+        }
+
+        /// <summary>Remove every bag this flow registered; with `keep`, their values wait in the registry
+        /// for the flow that replaces this one. Engine-driven (Close, LoadGame, HotSwap).</summary>
+        internal void ReleaseBags(bool keep)
+        {
+            foreach (var key in _registered) _host.Registry.Remove(key, keep);
+            _registered.Clear();
+            _sceneBags.Clear();
+        }
+
         // -- save / restore -----------------------------------------------------
 
+        /// <summary>Snapshot this flow's cursor, PRNG, and visits. Its properties are the registry's.</summary>
         internal FlowSnapshot Snapshot()
         {
             return new FlowSnapshot
             {
-                Scopes = Engine.FlatOf(_local),
-                SceneBags = Engine.SaveBags(_sceneBags),
                 RngState = _rngState,
                 Visits = new Dictionary<string, int>(_visitCounts),
                 FlowEnded = _flowEnded,
@@ -850,9 +923,16 @@ namespace Patterkit.Patterplay
                 return frame;
             }).ToList();
 
-            _sceneBags = Engine.LoadBags(_host, snap.SceneBags, false);
-            _local = FreshLocal();
-            _local.Load(Engine.OrderedOf(snap.Scopes));
+            // Register this flow's bags: each claims the values the registry holds for it (loaded by the
+            // game, by LoadGame from the save, or handed back by the engine this one replaces), laid over
+            // fresh defaults. The scenes the cursor stands in are registered now; any other scene's bag is
+            // claimed on entry.
+            ReleaseBags(false);
+            MountLocal();
+            var standing = new List<string>();
+            if (_currentSceneId != null) standing.Add(_currentSceneId);
+            foreach (var f in _stack) if (f.SceneId != null && !standing.Contains(f.SceneId)) standing.Add(f.SceneId);
+            foreach (var s in standing) EnsureSceneBags(s);
 
             _activeSnippet = null;
             if (snap.ActiveSnippetId != null && _host.NodeIndex.TryGetValue(snap.ActiveSnippetId, out var node) && node.IsSnippet)

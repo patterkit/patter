@@ -2,6 +2,14 @@
 // corpus-verified C# port). Engine = the world + flow manager; Flow = one playable cursor.
 // std-only (no Unreal types) so it compiles standalone for the clang corpus TestHost and
 // inside the UE plugin alike. Header-only; all members inline.
+//
+// Every property bag lives in ONE ScopeRegistry per game (the one-registry model): the game
+// hands the engine its registry (EngineOptions::registry) or the engine makes its own and acts
+// as its own game. `@patter` is registered under `patter`; the per-flow and per-scene bags
+// under keys starting `patter/` (see registrykeys below), which no expression can name.
+// saveGame() / loadGame() snapshot and restore what is NOT a property: cursors, PRNGs, visits,
+// and selectors. The registry's values ride in saveGame() only when the engine made the
+// registry itself; otherwise the game saves the registry once.
 #pragma once
 
 #include <string>
@@ -22,6 +30,7 @@
 #include "Dialect.h"        // the Patter dialect, and the shared evaluator it configures
 #include "Expr/Specificity.h"  // the shared matched-constraint scorer
 #include "Expr/PropertyBag.h"   // the shared state kernel: scene and stage props live in these
+#include "Expr/ScopeRegistry.h" // the game's one registry: every bag above is registered in it
 #include "Expr/StateLogger.h"   // LogMount: what listBags() hands a state logger
 #include "Interp.h"
 #include "StepResult.h"
@@ -37,65 +46,116 @@ namespace patter
         return r;
     }
 
-    // `hostTokens` are the scopes a project DECLARES (@world and friends). They have to be passed in
-    // rather than hard-coded: without them "@world.gold" splits to a @patter property literally named
-    // "world.gold", which reads as absent and takes the falsy branch in silence.
+    // Split a ref into scope + name. `isScope` says which heads are scopes: the registry's tokens
+    // (@world, another engine's @story) plus @scene. Without them "@world.gold" splits to a @patter
+    // property literally named "world.gold", which reads as absent and takes the falsy branch in
+    // silence. A head that is not a scope, and a bare `@name`, are @patter.
     inline std::pair<std::string, std::string> splitRef(const std::string& ref,
-                                                       const std::set<std::string>& hostTokens = {})
+                                                       const std::function<bool(const std::string&)>& isScope)
     {
         std::string body = (!ref.empty() && ref[0] == '@') ? ref.substr(1) : ref;
         size_t dot = body.find('.');
         if (dot != std::string::npos && body.find('.', dot + 1) == std::string::npos)
         {
             std::string head = body.substr(0, dot), tail = body.substr(dot + 1);
-            if (head == "scene" || head == "patter" || hostTokens.count(head)) return { head, toLower(tail) };
+            if (head == "scene" || head == "patter" || (isScope && isScope(head))) return { head, toLower(tail) };
         }
         return { "patter", toLower(body) };
     }
 
-    // The seed value for a self-backed host property: its `default`, else the type default.
-    inline PatterValue hostScopeDefault(const HostScopeDecl& d)
+    // The same split against a fixed set of tokens (the form this function had before the registry).
+    inline std::pair<std::string, std::string> splitRef(const std::string& ref,
+                                                       const std::set<std::string>& hostTokens = {})
     {
-        if (d.hasDefault) return d.def;
-        if (d.type == "boolean") return PatterValue::Bool(false);
-        if (d.type == "number") return PatterValue::Num(0);
-        if (d.type == "string") return PatterValue::Str("");
-        if (d.type == "flags") return PatterValue::Flags({});
-        if (d.type == "enum") return PatterValue::Str(d.values.empty() ? "" : d.values[0]);
-        if (d.type == "quality") return PatterValue::Str(d.stages.empty() ? "" : d.stages[0]); // the ladder's start
-        return PatterValue::Bool(false);
+        return splitRef(ref, std::function<bool(const std::string&)>(
+            [&hostTokens](const std::string& t) { return hostTokens.count(t) > 0; }));
     }
 
-    // A host scope the story reads and writes: the GAME owns the value. An embedder binds one per
-    // token through EngineOptions::hostScopes; a declared scope with no binding is SELF-BACKED from
-    // its declaration defaults, so a standalone build plays the same story a bound one does.
+    // A host scope the story reads and writes, whose values the GAME keeps: an embedder binds one per
+    // token through EngineOptions::hostScopes, and the engine registers it in the game's registry as an
+    // EXTERNAL (foreign) scope, never stored or saved there. A declared scope nobody binds is
+    // self-backed by a standalone engine, as a property the registry stores and saves.
     struct HostScope
     {
         // Returns nullptr when this scope has no such name (which reads as a graceful false). The
-        // pointer must stay valid until the next call on this scope, exactly as patterGet's does: the
-        // evaluator copies immediately, and a binding that computes values should hold its own slot.
+        // pointer must stay valid until the next call on this scope: the registry copies immediately,
+        // and a binding that computes values should hold its own slot.
         std::function<const PatterValue*(const std::string&)> get;
         std::function<void(const std::string&, const PatterValue&)> set;
     };
 
-    // The self-backed fallback. Keyed LOWER CASE, which is load-bearing rather than tidy: the compiler
-    // folds every property reference, so an AST reads "isnight" where the declaration says "isNight".
-    // Seeding verbatim means a declared name carrying a capital is never found, reads as absent, and
-    // silently takes the falsy branch - the bug the JS runtime shipped (fixed 2026-08-18) and this port
-    // must not repeat. An OPAQUE scope (no `declarations`) starts empty and accepts any name.
-    inline HostScope selfBackedScope(const HostScopeSpec& spec)
+    // A bound HostScope as the registry's resolver: the one adapter between the shape a game binds
+    // (and UPatterWorld hands over) and the shared registry's foreign scope.
+    class HostScopeResolver : public IScopeResolver
     {
-        auto bag = std::make_shared<std::map<std::string, PatterValue>>();
-        for (const HostScopeDecl& d : spec.declarations)
-            if (!d.name.empty()) (*bag)[toLower(d.name)] = hostScopeDefault(d);
-        HostScope s;
-        // Pointers into a std::map stay valid across inserts, so the bag is its own stable storage.
-        s.get = [bag](const std::string& n) -> const PatterValue* {
-            auto it = bag->find(toLower(n));
-            return it != bag->end() ? &it->second : nullptr;
-        };
-        s.set = [bag](const std::string& n, const PatterValue& v) { (*bag)[toLower(n)] = v; };
-        return s;
+    public:
+        explicit HostScopeResolver(HostScope scope) : scope_(std::move(scope)) {}
+        std::optional<PatterValue> get(const std::string& name) const override
+        {
+            if (!scope_.get) return std::nullopt;
+            const PatterValue* v = scope_.get(name);
+            return v ? std::optional<PatterValue>(*v) : std::nullopt;
+        }
+        bool canSet() const override { return static_cast<bool>(scope_.set); }
+        void set(const std::string& name, const PatterValue& value) override { scope_.set(name, value); }
+    private:
+        HostScope scope_;
+    };
+
+    // A bundle's host-scope declaration in the registry's vocabulary.
+    inline ScopeDeclaration toForeignDecl(const HostScopeDecl& d)
+    {
+        ScopeDeclaration sd;
+        sd.name = d.name;
+        sd.type = d.type;
+        if (!d.values.empty()) sd.values = d.values;
+        if (!d.stages.empty()) sd.stages = d.stages;
+        if (d.hasDefault) sd.defaultValue = d.def;
+        if (d.hasWritable) sd.writable = d.writable;
+        return sd;
+    }
+
+    // A self-backed host scope's declaration (the standalone @world): the scope's own `writable`
+    // default folded in, since an owned bag reads writability per declaration. Names fold to lower
+    // case in the bag, as the compiler emits every reference ("isNight" is read as "isnight").
+    inline ScopeDeclaration selfBackedDecl(const HostScopeDecl& d, const HostScopeSpec& spec)
+    {
+        ScopeDeclaration sd = toForeignDecl(d);
+        if (!d.hasWritable && spec.hasWritable) sd.writable = spec.writable;
+        return sd;
+    }
+
+    // ----- the one registry ---------------------------------------------------------
+
+    // The owner label on everything this engine registers: named in a clash error and carried on the
+    // registry's examiner rows, so one inspector can group a combined game by engine.
+    inline const char* const PATTER_OWNER = "Patter";
+
+    // The registry keys this engine stores its instance bags under. An id is escaped (`%` then `/`) so
+    // a flow named "npc/bob" cannot collide with another flow's scene. Every runtime writes the same
+    // keys: they are in the save.
+    namespace registrykeys
+    {
+        inline std::string esc(const std::string& id)
+        {
+            std::string out;
+            out.reserve(id.size());
+            for (char c : id)
+            {
+                if (c == '%') out += "%25";
+                else if (c == '/') out += "%2F";
+                else out += c;
+            }
+            return out;
+        }
+        /** A scene's SHARED @scene props (one bag per scene, every flow's). */
+        inline std::string stage(const std::string& sceneId) { return "patter/scene/" + esc(sceneId); }
+        /** Everything one flow registers starts with this. */
+        inline std::string flow(const std::string& flowId) { return "patter/flow/" + esc(flowId) + "/"; }
+        /** A flow's NOT-shared @patter globals. */
+        inline std::string flowGlobals(const std::string& flowId) { return flow(flowId) + "patter"; }
+        /** A flow's NOT-shared @scene props for one scene. */
+        inline std::string flowScene(const std::string& flowId, const std::string& sceneId) { return flow(flowId) + "scene/" + esc(sceneId); }
     }
 
     inline PatterValue propDefault(const PropertyDecl& d)
@@ -280,22 +340,13 @@ namespace patter
         return values;
     }
 
-    inline std::map<std::string, std::map<std::string, PatterValue>> saveBags(
-        const std::map<std::string, std::shared_ptr<PropertyBag>>& bags)
-    {
-        std::map<std::string, std::map<std::string, PatterValue>> out;
-        for (const auto& kv : bags)
-        {
-            std::map<std::string, PatterValue> flat;
-            for (const auto& e : kv.second->save()) flat[e.first] = e.second;
-            out[kv.first] = flat;
-        }
-        return out;
-    }
-
+    // The serialised cursor + PRNG + visits of a single flow. Its properties are the registry's.
     struct FlowSnapshot
     {
-        std::map<std::string, PatterValue> scopes;                                  // not-shared @patter
+        // VERSION 2 ONLY, read and never written: the flow's NOT-shared @patter globals and its
+        // per-scene NOT-shared @scene bags, which a version 2 save carried itself. loadGame moves
+        // them into the registry under the flow's keys.
+        std::map<std::string, PatterValue> scopes;
         std::map<std::string, std::map<std::string, PatterValue>> sceneBags;
         uint32_t rngState = 0;
         std::map<std::string, int> visits;
@@ -310,14 +361,27 @@ namespace patter
         std::map<std::string, SelectorState> selectors;
     };
 
+    /** The save version saveGame() writes. Bumped only when a reader would MISREAD an older save. */
+    inline constexpr int SAVE_VERSION = 3;
+
+    // A full resumable save-game (version 3): everything that is not a property, plus the registry's
+    // values when the engine made its own registry. loadGame also reads version 2, from before the
+    // registry held the properties; its property sections (the fields marked VERSION 2 ONLY) move
+    // into the registry as it loads.
     struct SaveGame
     {
-        int version = 2;
-        std::map<std::string, PatterValue> shared;
+        int version = SAVE_VERSION;
+        // The engine's own registry's values, keyed by registry key: present only when the engine
+        // made the registry itself (a standalone game). A game that passed a registry saves it once,
+        // beside this.
+        std::optional<ScopeRegistry::SaveBlob> registry;
         std::map<std::string, int> sharedVisits;
         std::map<std::string, SelectorState> sharedSelectors;
-        std::map<std::string, std::map<std::string, PatterValue>> stageBags;
         std::map<std::string, FlowSnapshot> flows;
+        // VERSION 2 ONLY, read and never written: the shared @patter globals and the shared,
+        // scene-namespaced @scene bags.
+        std::map<std::string, PatterValue> shared;
+        std::map<std::string, std::map<std::string, PatterValue>> stageBags;
     };
 
     // ----- the shared host context the Engine hands to every flow --------------
@@ -371,25 +435,31 @@ namespace patter
         std::map<std::string, std::string> sceneGameIdToId;
         std::map<std::string, std::map<std::string, std::string>> blockGameIdToId;
         std::map<std::string, std::vector<std::string>> tagIndex;   // author tags (#215): node id -> accumulated
-        /** The @patter globals. A bag, not a map: it carries the audit hook a state logger
-         *  pushes from, and the clone guard on a mutable default. Shared by pointer so a flow
-         *  writes through the same one. */
-        std::shared_ptr<PropertyBag> sharedPatter;
+        /** The game's one registry: @patter (the SHARED globals), host scopes, every instance bag. */
+        std::shared_ptr<ScopeRegistry> registry;
+        /** True when the engine made the registry (a standalone game): saveGame() then carries its values. */
+        bool ownsRegistry = true;
+        /** The SHARED @patter globals' bag, registered under `patter`. A bag, not a map: it carries
+         *  the audit hook a state logger pushes from, and the clone guard on a mutable default. */
+        std::shared_ptr<PropertyBag> patterBag;
+        /** Host scopes this engine self-backed and registered (the game bound none, nobody else had). */
+        std::vector<std::string> hostScopes;
+        /** Host scopes the embedder bound (EngineOptions::hostScopes), registered as external scopes. */
+        std::vector<std::string> boundScopes;
         std::vector<PropertyDecl> patterSharedDecls;
         std::vector<PropertyDecl> patterLocalDecls;
         std::set<std::string> patterSharedNames;
         std::map<std::string, std::set<std::string>> sceneSharedNames;
         std::map<std::string, int> sharedVisits;
         std::map<std::string, SelectorState> sharedSelectors;
+        /** Per-scene SHARED scene props, each registered under registrykeys::stage(sceneId). Made the
+         *  first time any flow needs the scene, so a bag loaded before then waits in the registry and
+         *  is claimed here. */
         std::map<std::string, std::shared_ptr<PropertyBag>> stageBags;
-        // Host scopes by token, already resolved: an embedder's binding where one was given, a
-        // self-backed bag for every other token the bundle declares. Empty for a bundle with none.
-        std::map<std::string, HostScope> hostScopes;
-        // Per host token, the names a STORY may not write ("*" = the whole scope). The game writes them
-        // freely: `writable: false` is the story's promise, not a lock on the value's owner (ruled across
-        // the family 2026-09-05, from-storylets/host-writes-to-read-only-world). Flows read this too.
-        std::map<std::string, std::set<std::string>> storyReadOnly;
-        std::set<std::string> hostTokens;
+        /** Memoised splitRef results (ref -> {scope, name}). The split depends only on the registry's
+         *  set of scopes, so the memo is dropped whenever that moves (refSplitRevision). */
+        mutable std::map<std::string, std::pair<std::string, std::string>> refSplitCache;
+        mutable int refSplitRevision = -1;
         std::function<double()> customRng;
         bool replayPromptOnChoose = false;
         // Closed captions (#214): captionsOn shows cues in dialogue lines (default true); when false the
@@ -413,17 +483,37 @@ namespace patter
         /// Fired with the choice's group id whenever a choice runs dry. Unaffected by `log`
         /// and useful with it off: live feedback, not an audit read afterwards.
         std::function<void(const std::string&)> onDryChoice;
-        // Live game state per host-scope token ("world" -> your resolver). A binding WINS over the
-        // self-backed bag for that token; declared tokens you do not bind are self-backed.
+        // Live game state per host-scope token ("world" -> your resolver): values the GAME keeps. Each
+        // binding is registered in the registry as an external scope (read and written through, never
+        // stored or saved there). Declared tokens you do not bind are self-backed by a standalone
+        // engine, as properties the registry stores and saves; given the game's registry, the engine
+        // self-backs nothing, since those tokens are the game's to register (or another engine's).
         std::map<std::string, HostScope> hostScopes;
+        // The game's registry: ONE per game, holding every engine's properties except those the game
+        // keeps itself, saved once. Given one, the engine registers its own scopes in it (@patter under
+        // `patter`, its per-flow and per-scene bags under keys starting `patter/`, and each bound host
+        // scope), reads every other scope from it, and saveGame() leaves the property values to the
+        // game. Leave it null and the engine makes its own registry and acts as its own game: it
+        // self-backs declared host scopes, and saveGame() carries the registry's values too.
+        std::shared_ptr<ScopeRegistry> registry;
     };
 
-    // Is this host property read-only TO THE STORY? ("*" = the whole scope was declared read-only.)
-    inline bool storyRefuses(const FlowHost& host, const std::string& token, const std::string& name)
+    // Split a ref against the registry's current tokens (@scene is always Patter's). Memoised per ref;
+    // the memo is dropped when the registry's set of scopes moves.
+    inline std::pair<std::string, std::string> splitHostRef(const FlowHost& host, const std::string& ref)
     {
-        auto it = host.storyReadOnly.find(token);
-        if (it == host.storyReadOnly.end()) return false;
-        return it->second.count("*") > 0 || it->second.count(toLower(name)) > 0;
+        const ScopeRegistry& reg = *host.registry;
+        if (host.refSplitRevision != reg.revision())
+        {
+            host.refSplitCache.clear();
+            host.refSplitRevision = reg.revision();
+        }
+        auto hit = host.refSplitCache.find(ref);
+        if (hit != host.refSplitCache.end()) return hit->second;
+        auto split = splitRef(ref, std::function<bool(const std::string&)>(
+            [&reg](const std::string& t) { return reg.has(t); }));
+        host.refSplitCache.emplace(ref, split);
+        return split;
     }
 
     // ----- Flow ----------------------------------------------------------------
@@ -436,43 +526,13 @@ namespace patter
         StepResult stop;
     };
 
-    /** The reverse of saveBags: seed each bag from the BUNDLE's declarations, then lay the
-     *  saved values over. A property the save predates keeps its declared default rather than
-     *  vanishing, and one the bundle has since dropped lands as a stray. */
-    inline std::map<std::string, std::shared_ptr<PropertyBag>> loadBags(
-        const FlowHost& host,
-        const std::map<std::string, std::map<std::string, PatterValue>>& saved,
-        bool wantShared)
-    {
-        std::map<std::string, std::shared_ptr<PropertyBag>> out;
-        for (const auto& kv : saved)
-        {
-            const std::set<std::string>* shared = nullptr;
-            auto sn = host.sceneSharedNames.find(kv.first);
-            if (sn != host.sceneSharedNames.end()) shared = &sn->second;
-
-            std::vector<ScopeDeclaration> decls;
-            if (host.bundle)
-            {
-                auto sc = host.bundle->scenes.find(kv.first);
-                if (sc != host.bundle->scenes.end()) decls = declsFor(sc->second.sceneProps, shared, wantShared);
-            }
-            auto bag = std::make_shared<PropertyBag>(&decls);
-            OrderedMap<std::string, PatterValue> values;
-            for (const auto& e : kv.second) values.set(e.first, e.second);
-            bag->load(values);
-            out.emplace(kv.first, std::move(bag));
-        }
-        return out;
-    }
-
     class Flow
     {
     public:
         Flow(std::string id, FlowHost* host, double seed) : id_(std::move(id)), host_(host)
         {
             rngState_ = Mulberry32::ToUint32(seed);
-            local_ = freshLocal();
+            local_ = newLocal(); // registered by start() / restore()
             // FnScope wraps a lambda as the shared IScopeSource. `get` returns an
             // optional rather than a pointer, because the Storylet Engine's scopes
             // compose values on the fly and cannot hand back a stable address.
@@ -484,15 +544,11 @@ namespace patter
                     return v ? std::optional<PatterValue>(*v) : std::nullopt;
                 });
             };
-            evalCtx_.scopes["patter"] = fnScope([this](const std::string& n) { return patterGet(n); });
-            evalCtx_.scopes["scene"] = fnScope([this](const std::string& n) { return sceneGet(n); });
-            // Declared host scopes (@world): bound by the embedder or self-backed by the engine.
-            // Registering them is what stops "@world.x" reading as a graceful false.
-            for (const auto& kv : host_->hostScopes)
-            {
-                const HostScope* scope = &kv.second;
-                evalCtx_.scopes[kv.first] = fnScope([scope](const std::string& n) { return scope->get(n); });
-            }
+            // @patter and @scene each span a shared bag and this flow's own, split by each property's
+            // `shared` flag, so the flow composes those two tokens itself over registered bags. Every
+            // other token comes from the registry's context (see context()).
+            patterScope_ = fnScope([this](const std::string& n) { return patterGet(n); });
+            sceneScope_ = fnScope([this](const std::string& n) { return sceneGet(n); });
             // The dialect's host hooks. The shared EvalContext carries them as an
             // opaque `const void*`; PatterDialect casts it back to PatterHost.
             evalHost_.nextRandom = [this]() { return rng(); };
@@ -527,6 +583,13 @@ namespace patter
                 auto it = host_->bundle->scenes.find(currentSceneId_);
                 if (it == host_->bundle->scenes.end()) return nullptr;
                 return fromProps(it->second.sceneProps);
+            }
+            // Any other scope's ladder is the registry's (another engine's @story, the game's @world),
+            // with the bundle's own host-scope declarations behind it for a game that registered
+            // @world undeclared.
+            if (registryQualities_)
+            {
+                if (const auto* s = registryQualities_(scope, name)) return s;
             }
             for (const auto& spec : host_->bundle->scopeRegistry.scopes)
             {
@@ -612,6 +675,7 @@ namespace patter
         // shared state. Closing makes that stale reference inert. Terminal: never revived.
         void close()
         {
+            releaseBags(false);
             closed_ = true;
             flowEnded_ = true;
             stack_.clear();
@@ -627,8 +691,10 @@ namespace patter
 
         void start(const std::string& sceneId, const std::string& blockId)
         {
-            sceneBags_.clear();
-            local_ = freshLocal();
+            // A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
+            releaseBags(false);
+            host_->registry->discardParked(registrykeys::flow(id_));
+            mountLocal();
             selectors_.clear();
             visitCounts_.clear();
             stack_.clear();
@@ -722,35 +788,35 @@ namespace patter
             enterChild(picked);
         }
 
+        // Read a property by ref: @patter and @scene through this flow's halves, anything else (host
+        // scopes, other engines' scopes) from the registry. The pointer is valid until the next call.
         const PatterValue* getProperty(const std::string& ref) const
         {
-            auto sp = splitRef(ref, host_->hostTokens);
+            auto sp = splitHostRef(*host_, ref);
             if (sp.first == "patter") return patterGet(sp.second);
             if (sp.first == "scene") return sceneGet(sp.second);
-            auto hs = host_->hostScopes.find(sp.first);
-            return hs != host_->hostScopes.end() ? hs->second.get(sp.second) : nullptr;
+            std::optional<PatterValue> v = host_->registry->get(sp.first, sp.second);
+            if (!v) return nullptr;
+            slot_ = std::move(*v);
+            return &slot_;
         }
 
         // Write a property by ref. The GAME's surface, so a host declaration's `writable: false` binds
         // the story, not the game that owns the value. Effects use writeProperty(.., false).
         void setProperty(const std::string& ref, const PatterValue& value) { writeProperty(ref, value, true); }
 
-        // The write itself. `host` says WHO is writing, which is all `writable: false` cares about.
+        // The write itself. `host` says WHO is writing, which is all `writable: false` cares about: the
+        // registry refuses a story's write to a read-only declaration, bound or self-backed alike.
         void writeProperty(const std::string& ref, const PatterValue& value, bool host)
         {
-            auto sp = splitRef(ref, host_->hostTokens);
+            auto sp = splitHostRef(*host_, ref);
             if (sp.first == "patter") patterSet(sp.second, value);
-            else if (auto hs = host_->hostScopes.find(sp.first); hs != host_->hostScopes.end())
-            {
-                if (!host && storyRefuses(*host_, sp.first, sp.second))
-                    throw std::runtime_error("'@" + sp.first + "." + sp.second + "' is read-only");
-                hs->second.set(sp.second, value);
-            }
             else if (sp.first == "scene")
             {
                 if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
                 sceneSet(sp.second, value);
             }
+            else host_->registry->set(sp.first, sp.second, value, host); // host scopes, other engines' scopes
         }
 
         // Expand {@ref} slots against this flow's CURRENT state. An IDs-only game calls this on a string it
@@ -776,11 +842,10 @@ namespace patter
             return mounts;
         }
 
+        /** @internal Snapshot this flow's cursor + PRNG + visits. Its properties are the registry's. */
         FlowSnapshot snapshot() const
         {
             FlowSnapshot s;
-            s.scopes = flatOf(*local_);
-            s.sceneBags = saveBags(sceneBags_);
             s.rngState = rngState_;
             s.visits = visitCounts_;
             s.flowEnded = flowEnded_;
@@ -825,9 +890,22 @@ namespace patter
                 }
                 frame.nextId.clear(); // live frames never carry it
             }
-            sceneBags_ = loadBags(*host_, snap.sceneBags, false);
-            local_ = freshLocal();
-            local_->load(orderedOf(snap.scopes));
+            // Register this flow's bags: each claims the values the registry holds for it (loaded by the
+            // game, by loadGame from the save, or handed back by the engine this one replaces), laid over
+            // fresh defaults. The scenes the cursor stands in are registered now; any other scene's bag
+            // is claimed on entry.
+            releaseBags(false);
+            mountLocal();
+            {
+                std::vector<std::string> scenes;
+                auto note = [&scenes](const std::string& s)
+                {
+                    if (!s.empty() && std::find(scenes.begin(), scenes.end(), s) == scenes.end()) scenes.push_back(s);
+                };
+                note(currentSceneId_);
+                for (const auto& frame : stack_) note(frame.sceneId);
+                for (const auto& s : scenes) if (host_->bundle->scenes.count(s)) ensureSceneBags(s);
+            }
 
             activeSnippet_ = nullptr;
             if (!snap.activeSnippetId.empty())
@@ -864,14 +942,34 @@ namespace patter
             if (!pendingPromptBeat_) pendingPromptOwnerId_.clear();
         }
 
+        /** @internal Remove every bag this flow registered; with `keep`, their values wait in the
+         *  registry for the flow that replaces this one. Engine-driven (close, loadGame, hotSwap). */
+        void releaseBags(bool keep)
+        {
+            ScopeRegistry& reg = *host_->registry;
+            for (const auto& key : registered_) if (reg.has(key)) reg.remove(key, keep);
+            registered_.clear();
+            sceneBags_.clear();
+        }
+
     private:
         std::string id_;
         FlowHost* host_;
         std::vector<LogEntry> log_;
         /// Monotonic across the flow's life; survives clearLog so order is stable.
         int seq_ = 0;
-        std::shared_ptr<PropertyBag> local_;   // this flow's not-shared @patter half
+        std::shared_ptr<PropertyBag> local_;   // this flow's not-shared @patter half, registrykeys::flowGlobals
         std::map<std::string, std::shared_ptr<PropertyBag>> sceneBags_;
+        /// The registry keys this flow has registered (its globals and each scene bag), in order.
+        std::vector<std::string> registered_;
+        /// The read slot getProperty hands out for a registry scope's value.
+        mutable PatterValue slot_;
+        std::shared_ptr<const IScopeSource> patterScope_;
+        std::shared_ptr<const IScopeSource> sceneScope_;
+        /// The registry revision evalCtx_'s scopes were built at; -1 = never.
+        int ctxRevision_ = -1;
+        /// The registry's quality ladders, from the context last built.
+        std::function<const std::vector<std::string>*(const std::string&, const std::string&)> registryQualities_;
         uint32_t rngState_ = 0;
         bool started_ = false, flowEnded_ = false;
         // Closed by the engine (see close()). Terminal, and distinct from flowEnded_: an ENDED flow is
@@ -900,21 +998,89 @@ namespace patter
         {
             if (host_->patterSharedNames.count(n))
             {
-                return host_->sharedPatter->values().get(n);
+                return host_->patterBag->values().get(n);
             }
             return local_->values().get(n);
         }
         void patterSet(const std::string& n, const PatterValue& v)
         {
-            if (host_->patterSharedNames.count(n)) host_->sharedPatter->set(n, v); else local_->set(n, v);
+            if (host_->patterSharedNames.count(n)) host_->registry->set("patter", n, v); else local_->set(n, v);
         }
+        // The bag a @scene property of the current scene lives in (stage or this flow's), made if
+        // missing. A closed flow makes nothing: it must not register bags after it has let them go.
         PropertyBag* sceneBagFor(const std::string& n)
         {
             if (currentSceneId_.empty()) return nullptr;
+            if (!closed_ && host_->bundle->scenes.count(currentSceneId_)) ensureSceneBags(currentSceneId_);
             auto sn = host_->sceneSharedNames.find(currentSceneId_);
             bool shared = sn != host_->sceneSharedNames.end() && sn->second.count(n);
             if (shared) { auto it = host_->stageBags.find(currentSceneId_); return it != host_->stageBags.end() ? it->second.get() : nullptr; }
-            auto it = sceneBags_.find(currentSceneId_); return it != sceneBags_.end() ? sceneBags_.at(currentSceneId_).get() : nullptr;
+            auto it = sceneBags_.find(currentSceneId_); return it != sceneBags_.end() ? it->second.get() : nullptr;
+        }
+
+        // The eval context, its scopes refreshed if the registry's set of scopes has moved since it was
+        // built: every constituent resolves live state at call time, but another engine registering
+        // @story after this flow opened must still be readable. Rebuilding it per evaluation was the
+        // engine's hottest allocation, so it is rebuilt only when the revision moves.
+        EvalContext& context()
+        {
+            const ScopeRegistry& reg = *host_->registry;
+            if (reg.revision() != ctxRevision_)
+            {
+                EvalContext base = reg.toEvalContext();
+                evalCtx_.scopes = std::move(base.scopes);  // every registered scope: other engines' too
+                evalCtx_.scopes["patter"] = patterScope_;  // overridden with the merged shared+per-flow views
+                evalCtx_.scopes["scene"] = sceneScope_;
+                registryQualities_ = std::move(base.qualities);
+                ctxRevision_ = reg.revision();
+            }
+            return evalCtx_;
+        }
+
+        /** A fresh, unregistered bag for the NOT-shared @patter globals (the shared ones live on the host). */
+        std::shared_ptr<PropertyBag> newLocal() const
+        {
+            std::vector<ScopeDeclaration> decls;
+            for (const auto& d : host_->patterLocalDecls) decls.push_back(toScopeDecl(d));
+            return std::make_shared<PropertyBag>(&decls, nullptr, "@patter.");
+        }
+
+        /** Register a fresh globals bag under this flow's key; it claims any values waiting there. */
+        void mountLocal()
+        {
+            local_ = newLocal();
+            const std::string key = registrykeys::flowGlobals(id_);
+            host_->registry->mountOwned(key, local_, std::string(PATTER_OWNER));
+            registered_.push_back(key);
+        }
+
+        /** Make (and register) scene `s`'s stage bag and this flow's bag for it, if not made yet. A bag
+         *  made here claims whatever values the registry holds for its key: that is how a loaded save
+         *  reaches it. The bag's constructor seeds each declared default (the type's when none),
+         *  normalises the name, and copies the default so two bags never share a flags vector. */
+        void ensureSceneBags(const std::string& s)
+        {
+            auto sc = host_->bundle->scenes.find(s);
+            if (sc == host_->bundle->scenes.end()) return;
+            const std::set<std::string>* shared = nullptr;
+            auto sn = host_->sceneSharedNames.find(s);
+            if (sn != host_->sceneSharedNames.end()) shared = &sn->second;
+            if (!sceneBags_.count(s))
+            {
+                std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, false);
+                auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
+                const std::string key = registrykeys::flowScene(id_, s);
+                host_->registry->mountOwned(key, bag, std::string(PATTER_OWNER));
+                registered_.push_back(key);
+                sceneBags_.emplace(s, std::move(bag));
+            }
+            if (!host_->stageBags.count(s))
+            {
+                std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, true);
+                auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
+                host_->registry->mountOwned(registrykeys::stage(s), bag, std::string(PATTER_OWNER));
+                host_->stageBags.emplace(s, std::move(bag));
+            }
         }
         const PatterValue* sceneGet(const std::string& n) const
         {
@@ -1218,7 +1384,7 @@ namespace patter
         // specificity. Scored against this flow's live eval context via the free matchedSpec.
         int specScore(const Node* node)
         {
-            return node->condition ? matchedSpec(node->condition->ast, evalCtx_, true) : 0;
+            return node->condition ? matchedSpec(node->condition->ast, context(), true) : 0;
         }
         SelectorState& selectorStateFor(const Node* group)
         {
@@ -1245,7 +1411,7 @@ namespace patter
             if (!node->condition) return true;
             return truthy(evalExpr(*node->condition));
         }
-        PatterValue evalExpr(const Expression& expr) { return Evaluate(expr.ast, evalCtx_, PatterDialect()); }
+        PatterValue evalExpr(const Expression& expr) { return Evaluate(expr.ast, context(), PatterDialect()); }
         void enter(const std::string& id)
         {
             visitCounts_[id] = visitCounts_.count(id) ? visitCounts_[id] + 1 : 1;
@@ -1369,19 +1535,7 @@ namespace patter
             if (sn != host_->sceneSharedNames.end()) shared = &sn->second;
             auto isShared = [&](const std::string& name) { return shared && shared->count(name); };
 
-            // The bag's constructor IS the loop this replaced: lowercase the name, seed the
-            // declared default else the type's, and copy it so two bags seeded from one
-            // declaration set never share a mutable flags vector.
-            if (!sceneBags_.count(scene.id))
-            {
-                std::vector<ScopeDeclaration> decls = declsFor(scene.sceneProps, shared, false);
-                sceneBags_.emplace(scene.id, std::make_shared<PropertyBag>(&decls));
-            }
-            if (!host_->stageBags.count(scene.id))
-            {
-                std::vector<ScopeDeclaration> decls = declsFor(scene.sceneProps, shared, true);
-                host_->stageBags.emplace(scene.id, std::make_shared<PropertyBag>(&decls));
-            }
+            ensureSceneBags(scene.id);
             for (const auto& decl : scene.sceneProps)
             {
                 if (!decl.temporary) continue;
@@ -1393,13 +1547,6 @@ namespace patter
             }
         }
 
-        /** This flow's NOT-shared @patter half, in a bag for the same reasons as the shared one. */
-        std::shared_ptr<PropertyBag> freshLocal()
-        {
-            std::vector<ScopeDeclaration> decls;
-            for (const auto& d : host_->patterLocalDecls) decls.push_back(toScopeDecl(d));
-            return std::make_shared<PropertyBag>(&decls, nullptr, "@patter.");
-        }
     };
 
     // ----- Engine --------------------------------------------------------------
@@ -1408,8 +1555,32 @@ namespace patter
     {
     public:
         Engine(const Bundle& bundle, const EngineOptions& options = EngineOptions())
+            : Engine(bundle, options, HotSwapTag{ !options.registry }) {}
+
+        // Engines are not copied: flows point at their engine's host, and bags are registered once.
+        Engine(const Engine&) = delete;
+        Engine& operator=(const Engine&) = delete;
+
+        // An engine that goes away hands its bags back to the registry with their values kept (the
+        // same as a live reload does), and closes its flows, so a wrapper still holding one reads as
+        // finished rather than reaching into a freed engine. A game's registry keeps saving those
+        // values, and the next engine built on it claims them. Nothing to do after hotSwap, whose
+        // replacement already holds the bags.
+        ~Engine()
         {
-            creationOptions_ = options; // reused verbatim by hotSwap (same seed source + settings)
+            if (released_) return;
+            try { release(true); } catch (...) { /* a destructor never throws */ }
+        }
+
+    private:
+        // Internal: the constructor hotSwap uses. A hotSwap replacement of a standalone engine shares
+        // its predecessor's registry but is still its own game (it self-backs host scopes and saves the
+        // registry's values); that is not a choice a caller makes, so it is not public API.
+        struct HotSwapTag { bool ownsRegistry; };
+
+        Engine(const Bundle& bundle, const EngineOptions& options, HotSwapTag tag)
+        {
+            creationOptions_ = options; // reused by hotSwap (same seed source + settings)
             allStrings_ = &bundle.strings;
             std::string locale = options.locale.empty() ? bundle.locales.defaultLocale : options.locale;
             const auto& allStrings = bundle.strings;
@@ -1457,7 +1628,6 @@ namespace patter
                 if (shared) { host_.patterSharedDecls.push_back(p); host_.patterSharedNames.insert(toLower(p.name)); }
                 else host_.patterLocalDecls.push_back(p);
             }
-            host_.sharedPatter = makeSharedPatter(host_.patterSharedDecls);
 
             for (const auto& kv : bundle.scenes)
             {
@@ -1474,33 +1644,16 @@ namespace patter
             host_.captionClose = bundle.closedCaptions.present ? bundle.closedCaptions.close : "]";
             host_.captionCharacter = (bundle.closedCaptions.present && !bundle.closedCaptions.character.empty()) ? bundle.closedCaptions.character : "SFX";
 
-            // Host scopes (design/scope-registry.md section 6). An embedder's binding wins for its
-            // token; every OTHER token the bundle declares gets a self-backed bag seeded from its
-            // declarations, so a standalone build plays the same story a bound one does.
-            for (const auto& kv : options.hostScopes) host_.hostScopes[kv.first] = kv.second;
-            for (const HostScopeSpec& spec : bundle.scopeRegistry.scopes)
-            {
-                if (spec.token.empty() || host_.hostScopes.count(spec.token)) continue;   // the binding wins
-                host_.hostScopes[spec.token] = selfBackedScope(spec);
-            }
-            // A declaration's `writable: false` is the STORY's promise, and the engine refuses the story's
-            // write whether the scope is bound or self-backed - and ONLY the story's: the GAME writes the
-            // value it owns, through setProperty, whatever the flag says (ruled across the family
-            // 2026-09-05, from-storylets/host-writes-to-read-only-world; this WRAPPED the resolver until
-            // then, which refused a game its own clock). A per-name read-only a GAME keeps on its own
-            // container is a third thing, and the container refuses that itself. Same message as the
-            // reference, so a host sees one sentence from every runtime.
-            for (const HostScopeSpec& spec : bundle.scopeRegistry.scopes)
-            {
-                auto it = host_.hostScopes.find(spec.token);
-                if (spec.token.empty() || it == host_.hostScopes.end()) continue;
-                std::set<std::string> readOnly;
-                if (spec.hasWritable && !spec.writable) readOnly.insert("*");   // the whole scope
-                for (const HostScopeDecl& d : spec.declarations) if (d.hasWritable && !d.writable) readOnly.insert(toLower(d.name));
-                if (!readOnly.empty()) host_.storyReadOnly[spec.token] = readOnly;
-            }
-            for (const auto& kv : host_.hostScopes) host_.hostTokens.insert(kv.first);
+            // The registry: the game's, or the engine's own, when it acts as its own game.
+            host_.registry = options.registry ? options.registry : std::make_shared<ScopeRegistry>();
+            host_.ownsRegistry = tag.ownsRegistry;
+            // @patter (the SHARED globals) prefixed "@patter.", which is both the address a row reports
+            // and the log path.
+            host_.patterBag = makeSharedPatter(host_.patterSharedDecls);
+            registerScopes(bundle, options);
         }
+
+    public:
 
         // The active locale (string + character-name lookups resolve in it).
         const std::string& locale() const { return currentLocale_; }
@@ -1538,14 +1691,42 @@ namespace patter
         // Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried
         // over (saveGame -> fresh engine -> loadGame) plus the presentation state that isn't save state
         // (active locale, captions toggle). Content drift resolves per spec 9.8: stack frames re-find
-        // their next child by id, drifted options drop, a vanished snippet is skipped. Returns the
-        // REPLACEMENT engine (caller owns it AND keeps `bundle` alive for its lifetime); discard this one
-        // and re-bind flow handles via next->getFlow(id).
+        // their next child by id, drifted options drop, a vanished snippet is skipped.
+        //
+        // Returns the REPLACEMENT engine, on the same registry (caller owns it AND keeps `bundle` alive
+        // for its lifetime). This one hands its bags over (each is removed from the registry with its
+        // values kept, and the replacement claims them as it registers), its flows are closed, and it
+        // should be discarded; re-bind flow handles via next->getFlow(id). If the restore throws
+        // (defensive: spec 9.8 makes this unreachable for ordinary edits), the swap falls back to a
+        // fresh engine with each saved flow restarted from the top of the scene it was in; the shared
+        // properties carry over.
         std::unique_ptr<Engine> hotSwap(const Bundle& bundle)
         {
             SaveGame snapshot = saveGame();
-            std::unique_ptr<Engine> next(new Engine(bundle, creationOptions_));
-            next->loadGame(snapshot);
+            // The replacement registers on the SAME registry, and a standalone engine's replacement is
+            // still its own game (so its saveGame keeps carrying the registry's values).
+            EngineOptions options = creationOptions_;
+            options.registry = host_.registry;
+            const HotSwapTag tag{ host_.ownsRegistry };
+            release(true);
+            std::unique_ptr<Engine> next(new Engine(bundle, options, tag));
+            try
+            {
+                next->loadGame(snapshot);
+            }
+            catch (const std::exception&)
+            {
+                // A partial load may have mutated `next`: hand its bags back, fall back on a THIRD
+                // engine and restart each flow at the top of the scene it was in (dropped when that
+                // scene is gone too).
+                next->release(true);
+                next.reset(new Engine(bundle, options, tag));
+                for (const auto& kv : snapshot.flows)
+                {
+                    try { next->openFlow(kv.first, kv.second.currentSceneId); }
+                    catch (const std::exception&) { /* scene deleted: drop the flow */ }
+                }
+            }
             next->setLocale(currentLocale_);
             next->setClosedCaptions(host_.captionsOn);
             return next;
@@ -1603,7 +1784,7 @@ namespace patter
         std::vector<LogMount> listBags()
         {
             std::vector<LogMount> mounts;
-            mounts.push_back(LogMount{host_.sharedPatter, std::nullopt});
+            mounts.push_back(LogMount{host_.patterBag, std::nullopt});
             for (auto& kv : host_.stageBags)
             {
                 mounts.push_back(LogMount{kv.second, "@scene:" + kv.first + "."});
@@ -1741,29 +1922,41 @@ namespace patter
         {
             for (auto& kv : flows_) kv.second->close(); // finish them, don't just forget them
             flows_.clear();
-            host_.sharedPatter = makeSharedPatter(host_.patterSharedDecls);
+            std::vector<ScopeDeclaration> decls;
+            for (const auto& d : host_.patterSharedDecls) decls.push_back(toScopeDecl(d));
+            host_.patterBag->reseed(&decls); // in place: it stays registered under `patter`
             host_.sharedVisits.clear();
             host_.sharedSelectors.clear();
+            for (const auto& kv : host_.stageBags)
+            {
+                const std::string key = registrykeys::stage(kv.first);
+                if (host_.registry->has(key)) host_.registry->remove(key);
+            }
             host_.stageBags.clear();
+            // Values loaded for bags nobody has claimed yet are the old game's too: a flow opened after
+            // the reset must not pick them up. Other engines' parked values are theirs, and stay.
+            host_.registry->discardParked(std::string("patter/"));
         }
 
+        // Read a shared (@patter, host scope, or another engine's) property by ref. @scene refs are
+        // rejected (flow-level). The pointer is valid until the next call on this engine.
         const PatterValue* getProperty(const std::string& ref) const
         {
-            auto sp = splitRef(ref, host_.hostTokens);
+            auto sp = splitHostRef(host_, ref);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            auto hs = host_.hostScopes.find(sp.first);
-            if (hs != host_.hostScopes.end()) return hs->second.get(sp.second);
-            return host_.sharedPatter->values().get(sp.second);
+            if (sp.first == "patter") return host_.patterBag->values().get(host_.patterBag->normalise(sp.second));
+            std::optional<PatterValue> v = host_.registry->get(sp.first, sp.second);
+            if (!v) return nullptr;
+            slot_ = std::move(*v);
+            return &slot_;
         }
         // Write a shared property by ref. The GAME's surface: a host declaration's `writable: false` is
         // the story's promise about the story's writes, never a lock on the value's owner.
         void setProperty(const std::string& ref, const PatterValue& value)
         {
-            auto sp = splitRef(ref, host_.hostTokens);
+            auto sp = splitHostRef(host_, ref);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            auto hs = host_.hostScopes.find(sp.first);
-            if (hs != host_.hostScopes.end()) { hs->second.set(sp.second, value); return; }
-            host_.sharedPatter->set(sp.second, value, false, "", true);
+            host_.registry->set(sp.first, sp.second, value, /*host=*/true);
         }
 
         // The shared @patter properties for a live state inspector: each with its ref, type, current
@@ -1785,7 +1978,7 @@ namespace patter
                 if (!d.values.empty()) r.values = d.values;
                 if (!d.stages.empty()) r.stages = d.stages;
                 r.defaultValue = propDefault(d);
-                const PatterValue* held = host_.sharedPatter->values().get(toLower(d.name));
+                const PatterValue* held = host_.patterBag->values().get(toLower(d.name));
                 r.value = held ? *held : r.defaultValue;
                 rows.push_back(std::move(r));
             }
@@ -1898,28 +2091,54 @@ namespace patter
         }
 
     public:
+        // Snapshot the whole game's NON-property state: visit counts, shared selector cursors, and every
+        // live flow's cursor and PRNG. The property values are the registry's: a standalone engine (one
+        // that made its own registry) carries them here under `registry`; a game that passed a registry
+        // saves it once itself, beside each engine's saveGame().
         SaveGame saveGame()
         {
             SaveGame s;
-            s.version = 2;
-            s.shared = flatOf(*host_.sharedPatter);
+            s.version = SAVE_VERSION;
+            if (host_.ownsRegistry) s.registry = host_.registry->save();
             s.sharedVisits = host_.sharedVisits;
             s.sharedSelectors = host_.sharedSelectors;
-            s.stageBags = saveBags(host_.stageBags);
             for (auto& kv : flows_) s.flows[kv.first] = kv.second->snapshot();
             return s;
         }
+
+        // Restore a saveGame(): visit counts, shared selector cursors, and every flow. Property values
+        // come from the registry. A save that carries them (a standalone engine's, or a version 2 save
+        // from before the registry held them) has them moved into the registry here; otherwise the game
+        // loads its registry itself, before or after this call. Either order works: this engine's bags
+        // are handed back to the registry (values kept) and the restored flows claim them as they
+        // register.
         void loadGame(const SaveGame& save)
         {
-            if (save.version != 2) throw std::runtime_error("unsupported save version");
-            // Seeded from the declarations, then the saved values laid over: a property the
-            // save predates keeps its default rather than vanishing.
-            host_.sharedPatter = makeSharedPatter(host_.patterSharedDecls);
-            host_.sharedPatter->load(orderedOf(save.shared));
+            if (save.version != 2 && save.version != SAVE_VERSION)
+                throw std::runtime_error("unsupported save version: " + std::to_string(save.version));
+            ScopeRegistry& reg = *host_.registry;
+            // Flows the save does not have are over: their bags go. The rest are handed back with their
+            // values, which is what a game that loaded its registry first has just laid the save's values
+            // over.
+            for (auto& kv : flows_) { kv.second->releaseBags(save.flows.count(kv.first) > 0); kv.second->close(); }
+            flows_.clear();
+            for (const auto& kv : host_.stageBags)
+            {
+                const std::string key = registrykeys::stage(kv.first);
+                if (reg.has(key)) reg.remove(key, true);
+            }
+            host_.stageBags.clear();
+
+            std::optional<ScopeRegistry::SaveBlob> values = save.version == 2 ? std::optional<ScopeRegistry::SaveBlob>(sectionsFromV2(save)) : save.registry;
+            if (values)
+            {
+                // The engine's own registry takes the save wholesale. A game's registry may hold values
+                // the game loaded for other engines, still waiting to be claimed: add to those, never
+                // replace them.
+                reg.load(*values, /*keepParked=*/!host_.ownsRegistry);
+            }
             host_.sharedVisits = save.sharedVisits;
             host_.sharedSelectors = save.sharedSelectors;
-            host_.stageBags = loadBags(host_, save.stageBags, true);
-            flows_.clear();
             for (const auto& kv : save.flows)
             {
                 auto flow = std::make_shared<Flow>(kv.first, &host_, static_cast<int64_t>(defaultSeed_));
@@ -1929,7 +2148,105 @@ namespace patter
         }
 
     private:
+        // A version 2 save's property values, as registry sections under this engine's keys.
+        static ScopeRegistry::SaveBlob sectionsFromV2(const SaveGame& save)
+        {
+            ScopeRegistry::SaveBlob out;
+            out.set("patter", orderedOf(save.shared));
+            for (const auto& kv : save.stageBags) out.set(registrykeys::stage(kv.first), orderedOf(kv.second));
+            for (const auto& f : save.flows)
+            {
+                out.set(registrykeys::flowGlobals(f.first), orderedOf(f.second.scopes));
+                for (const auto& kv : f.second.sceneBags) out.set(registrykeys::flowScene(f.first, kv.first), orderedOf(kv.second));
+            }
+            return out;
+        }
+
+        // Register this engine's game-wide scopes: @patter, every bound host scope (external), and, for a
+        // standalone engine only, a self-backed bag for each declared host scope nobody bound. On any
+        // throw, remove (keeping values) whatever this constructor registered, so a clash leaves the
+        // game's registry as it was, then rethrow.
+        void registerScopes(const Bundle& bundle, const EngineOptions& options)
+        {
+            ScopeRegistry& reg = *host_.registry;
+            const std::string owner = PATTER_OWNER;
+            std::vector<std::string> registered;
+            try
+            {
+                reg.mountOwned("patter", host_.patterBag, owner); // claims values the game loaded first
+                registered.push_back("patter");
+                // The game's bindings are EXTERNAL scopes: the game keeps the values, the registry never
+                // saves them. Declarations (types, read-only) come from the compiled bundle.
+                std::set<std::string> bound;
+                for (const auto& kv : options.hostScopes)
+                {
+                    const HostScopeSpec* spec = nullptr;
+                    for (const auto& sp : bundle.scopeRegistry.scopes) if (sp.token == kv.first) { spec = &sp; break; }
+                    std::vector<ScopeDeclaration> decls;
+                    if (spec) for (const auto& d : spec->declarations) decls.push_back(toForeignDecl(d));
+                    ForeignScopeOptions fo;
+                    fo.writable = spec && spec->hasWritable ? spec->writable : true;
+                    fo.owner = owner;
+                    reg.defineForeign(kv.first, std::make_shared<HostScopeResolver>(kv.second), &decls, fo);
+                    registered.push_back(kv.first);
+                    host_.boundScopes.push_back(kv.first);
+                    bound.insert(kv.first);
+                }
+                // A declared host scope nobody bound. A standalone engine is its own game, so it
+                // self-backs the scope: a property bag seeded from the declarations, stored and SAVED by
+                // the registry like any other, since only a resolver the game binds is external. Given
+                // the GAME's registry, the engine registers nothing here: those tokens are the game's to
+                // register, or another engine's (a bundle compiled against the Storylet Engine's spec
+                // declares @story), and self-backing one would clash with its real owner depending only
+                // on which engine was built first.
+                if (host_.ownsRegistry)
+                {
+                    for (const HostScopeSpec& spec : bundle.scopeRegistry.scopes)
+                    {
+                        if (spec.token.empty() || bound.count(spec.token) || reg.has(spec.token)) continue;
+                        std::vector<ScopeDeclaration> decls;
+                        for (const auto& d : spec.declarations) decls.push_back(selfBackedDecl(d, spec));
+                        OwnedScopeOptions oo;
+                        oo.owner = owner;
+                        reg.defineOwned(spec.token, decls, oo);
+                        registered.push_back(spec.token);
+                        host_.hostScopes.push_back(spec.token);
+                    }
+                }
+            }
+            catch (...)
+            {
+                // A clash leaves the game's registry as it was: the half-built engine takes nothing with it.
+                for (const auto& k : registered) if (reg.has(k)) reg.remove(k, true);
+                throw;
+            }
+        }
+
+        // Remove every bag this engine registered, keeping the values parked when `keep` (a live reload
+        // handing its state to a replacement), and close its flows. The engine is inert afterwards.
+        void release(bool keep)
+        {
+            released_ = true;
+            for (auto& kv : flows_) { kv.second->releaseBags(keep); kv.second->close(); }
+            flows_.clear();
+            ScopeRegistry& reg = *host_.registry;
+            for (const auto& kv : host_.stageBags)
+            {
+                const std::string key = registrykeys::stage(kv.first);
+                if (reg.has(key)) reg.remove(key, keep);
+            }
+            host_.stageBags.clear();
+            if (reg.has("patter")) reg.remove("patter", keep);
+            for (const auto& t : host_.hostScopes) if (reg.has(t)) reg.remove(t, keep);
+            for (const auto& t : host_.boundScopes) if (reg.has(t)) reg.remove(t);
+        }
+
+    private:
         FlowHost host_;
+        /// Set once release() has handed this engine's bags back: the engine is inert.
+        bool released_ = false;
+        /// The read slot getProperty hands out for a registry scope's value.
+        mutable PatterValue slot_;
         std::vector<LogEntry> engineLog_;
         uint32_t defaultSeed_ = 0x9e3779b9u;
         // SHARED, not unique: a wrapper (UPatterFlow, and any host object of that shape) outlives the
@@ -1946,7 +2263,7 @@ namespace patter
         // The live string-table source: the constructor's bundle, unless replaceStrings re-pointed it at a
         // pushed bundle's tables (whose lifetime the caller guarantees, same as the constructor's bundle).
         const std::map<std::string, std::map<std::string, std::string>>* allStrings_ = nullptr;
-        EngineOptions creationOptions_; // reused verbatim by hotSwap
+        EngineOptions creationOptions_; // reused by hotSwap, on the same registry
         bool sourceDebug_ = false; // source-only DEBUG build: strings are the source language, not shippable
 
         std::string resolveSceneRef(const std::string& r)

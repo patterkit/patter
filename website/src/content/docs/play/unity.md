@@ -107,11 +107,56 @@ var world = new WorldScope();
 var engine = Bundle.CreateEngine(new EngineOptions { HostScopes = new() { ["world"] = world } });
 ```
 
-Leave `HostScopes` null and the engine **self-backs** `@world` from the declared defaults. A property
-declared `writable: false` in the project is the *story's* promise, so the engine refuses the story's
-write with `'@world.x' is read-only`, bound or self-backed. Your own `SetProperty` isn't refused, because
-the value is the game's. A per-name policy of your own is yours to refuse from `Set`. The scope is never in a Patter save, so your game saves it once.
-[World Properties](/play/world-properties/) has the full picture.
+Each binding is registered as a **foreign** scope: the values stay in your object, and no Patterplay
+save holds them, so your game saves them. Leave `HostScopes` null and a standalone engine
+**self-backs** `@world` from the declared defaults, as a property it stores and saves with the rest of
+the run. A property declared `writable: false` in the project is the *story's* promise, so the engine
+refuses the story's write with `'@world.x' is read-only`, bound or self-backed. Your own `SetProperty`
+isn't refused, because the value is the game's. A per-name policy of your own is yours to refuse from
+`Set`. [World Properties](/play/world-properties/) has the full picture.
+
+## One registry per game
+
+Every property value lives in a **registry**, a `ScopeRegistry`. A game has one, and it holds every
+property from every engine in the game, except values your game keeps itself behind an `IHostScope`.
+The registry is saved and loaded as one.
+
+An engine you build without one makes its own and acts as its own game, which is why a single
+`PatterSave.SerializeState` needs no wiring. A game that runs more than one engine (Patter beside the
+Storylet Engine, say), or that wants to hold the properties itself, makes the registry and hands it
+to each engine through **`EngineOptions.Registry`**:
+
+```csharp
+using Newtonsoft.Json.Linq;
+
+var registry = new ScopeRegistry().DefineOwned("world", new[]
+{
+    new ScopeDeclaration { Name = "gold", Type = "number", Default = PatterValue.Num(0) },
+}, new OwnedScopeOptions { Owner = "Game" });                      // @world, stored and saved
+var patter = Bundle.CreateEngine(new EngineOptions { Registry = registry });
+
+// One save for the game: the registry's values once, and each engine's part.
+var save = new JObject
+{
+    ["registry"] = PatterSave.SaveRegistry(registry),
+    ["patter"] = PatterSave.Envelope(patter.SaveGame()),
+};
+
+// Load in either order: values for bags that aren't open yet wait in the registry.
+PatterSave.LoadRegistry(registry, (JObject)save["registry"]);
+PatterSave.DeserializeState(patter, save["patter"].ToString());
+```
+
+Given a registry, the engine registers `@patter` under `patter` and each flow's and scene's bag under
+a key starting `patter/`, which no expression can name. Its save then leaves the values out, because
+your game saves the registry. `@world` is yours to register: owned, as above, when the registry should
+store and save it, or bound through `HostScopes`, when your game keeps the values. The engine
+self-backs nothing on a registry you pass. Every expression can read every registered scope, so a
+condition can test another engine's `@story.act` once that engine is in the same registry.
+
+A token is taken once. Two engines that both want the same one fail as you build the second, with an
+error that names who got there first, and your registry is left as it was. Rebuilding an engine on an
+edited bundle (`HotSwap`) hands its bags to the replacement on the same registry.
 
 ## Send the story somewhere
 
@@ -159,11 +204,16 @@ The protocol and the editor side are on [Live refresh & debug](/play/live-debug/
 ## Save and load
 
 `PatterSave.SerializeState(engine)` and `DeserializeState(...)` round-trip the whole run: every
-flow's position, the shared state, visit counts, and the PRNG, as a tagged JSON envelope. It is the
-**same `patter/save@0` format every Patterplay runtime uses**, so a save written by a web build or by
-Patterpad loads here, and a save written here loads in Godot or Unreal. Saves written by this package
-before 0.11.0 (its old PascalCase shape) still load, and are written back in the shared shape on the
-next save. Persist the string wherever you keep saves, and see [Save/load & Game Data](/play/integration/) for the format.
+flow's position, visit counts, selector cursors, and the PRNG, as a tagged JSON envelope. An engine
+you built on its own also carries every property value, `@patter`, `@scene`, and a self-backed
+`@world` alike, so one call is still the whole game; an engine you gave a registry leaves them to
+[the registry's save](#one-registry-per-game). It is the **same `patter/save@0` format every
+Patterplay runtime uses**, so a save written by a web build or by Patterpad loads here, and a save
+written here loads in Godot or Unreal. A save written before property values moved into the registry
+(version 2) still loads, and its values move into the registry as it does. Saves written by this
+package before 0.11.0 (its old PascalCase shape) still load too, and are written back in the shared
+shape on the next save. Persist the string wherever you keep saves, and see
+[Save/load & Game Data](/play/integration/) for the format.
 
 ## Next
 

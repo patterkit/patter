@@ -18,12 +18,20 @@ static func load_from_string(json: String):
 # rather than hard-coded: without them "@world.gold" splits to a @patter property literally named
 # "world.gold", which reads as absent and takes the falsy branch in silence.
 static func split_ref(ref: String, host_tokens: Array = []) -> Array:
+	return split_ref_with(ref, func(t: String) -> bool:
+		return t == "scene" or t == "patter" or host_tokens.has(t))
+
+
+# The same split, asking `is_scope(token) -> bool` which heads are scopes. The engine asks its
+# registry, so a scope another engine registered (`@story`) splits as one too. Mirrors the JS
+# dialect's splitRef(ref, isScope).
+static func split_ref_with(ref: String, is_scope: Callable) -> Array:
 	var body := ref.substr(1) if ref.begins_with("@") else ref
 	var dot := body.find(".")
 	if dot != -1 and body.find(".", dot + 1) == -1:
 		var head := body.substr(0, dot)
 		var tail := body.substr(dot + 1)
-		if head == "scene" or head == "patter" or host_tokens.has(head):
+		if is_scope.call(head):
 			return [head, tail.to_lower()]
 	return ["patter", body.to_lower()]
 

@@ -73,7 +73,14 @@ scene** - import, open the scene, press Play, nothing to set up:
 ## Beyond the basics
 
 - **Save / load**: `PatterSave.SerializeState(engine)` / `DeserializeState` snapshot and
-  restore the whole run as JSON.
+  restore the whole run as JSON (the family's `patter/save@0`, version 3; version 2 saves still
+  load).
+- **Your game's state**: bind `@world` through `EngineOptions.HostScopes` (an `IHostScope` per
+  token), or leave it unbound and the engine self-backs it from the declared defaults, and saves it.
+- **One registry per game**: every property lives in a `ScopeRegistry`. Pass your own through
+  `EngineOptions.Registry` to share it with another engine (a Storylet Engine, say) and save it once
+  with `PatterSave.SaveRegistry` / `LoadRegistry`; leave it out and the engine keeps its own.
+  See [the Unity guide](https://patterkit.dev/play/unity/#one-registry-per-game).
 - **Audio**: `PatterAudioResolver` reads the `patteraudio.json` manifest exported next to a
   Patter audio folder and resolves each line to its winning take - it resolves the path,
   you play it. See [the audio guide](https://patterkit.dev/play/audio/).

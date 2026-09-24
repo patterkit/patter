@@ -5,10 +5,20 @@
 class_name PatterFlow
 extends RefCounted
 
+## The owner label on everything the engine registers in the game's registry: named in a clash
+## error and carried on the registry's examiner rows, so one inspector can group a combined game by
+## engine. The same on every runtime.
+const OWNER := "Patter"
+
 var id: String
 var _host: Dictionary
-var _local   # PatterPropertyBag: this flow's not-shared @patter half
+var _local   # PatterPropertyBag: this flow's not-shared @patter half, registered under key_flow_globals
 var _scene_bags: Dictionary = {}
+## The registry keys this flow has registered (its globals and each scene bag), in order.
+var _registered: Dictionary = {}
+## The eval context's scopes are rebuilt from the registry only when its revision moves.
+var _ctx_revision := -1
+var _registry_qualities = null   # the registry context's quality lookup, or null when none
 var _prng := PatterMulberry32.new(0)  # the seeded PRNG; its `a` is the saved rng_state
 
 var _started := false
@@ -36,24 +46,37 @@ var _dialect: Dictionary = PatterDialect.dialect()
 func _init(host: Dictionary, seed_value: float) -> void:
 	_host = host
 	_prng = PatterMulberry32.new(seed_value)
-	_local = _fresh_local()
+	_local = _fresh_local()   # registered by start() / restore()
 	_eval_ctx = {
-		"scopes": {
-			"patter": func(n): return _patter_get(n),
-			"scene": func(n): return _scene_get(n),
-		},
+		"scopes": {},   # filled from the registry by _context()
 		"next_random": func(): return _rng(),
 		"visits": func(nid): return _visit_counts.get(nid, 0),
 		"patter_visits": func(nid): return _host["shared_visits"].get(nid, 0),
 		# The quality channel: a property's stage ladder, from wherever the declaration lives -
-		# @patter decls, the CURRENT scene's decls (they move with the flow), or a host scope.
+		# @patter decls, the CURRENT scene's decls (they move with the flow), or the registry.
 		"qualities": func(scope, name): return _stages_for(scope, name),
 	}
-	# Declared host scopes (@world): bound by the embedder or self-backed by the engine. Registering
-	# them is what stops "@world.x" reading as a graceful false.
-	for token in _host.get("host_scopes", {}).keys():
-		var scope: Dictionary = _host["host_scopes"][token]
-		_eval_ctx["scopes"][token] = scope["get"]
+
+
+# The eval context is built once and REFRESHED only when the registry's set of scopes moves (its
+# revision): every constituent resolves live state at call time (bags mutate in place; @patter and
+# @scene route through this flow's resolvers, which read the current bags and scene), but another
+# engine registering `@story` after this flow opened must still be readable.
+#
+# `@patter` and `@scene` each span a shared bag and a per-flow bag, split by each property's `shared`
+# flag, so the flow composes those two tokens itself over its registered bags; one alias names one
+# key and cannot express that. Every other token is the registry's.
+func _context() -> Dictionary:
+	var reg = _host["registry"]
+	if reg.revision != _ctx_revision:
+		var base: Dictionary = reg.to_eval_context()
+		var scopes: Dictionary = (base.get("scopes", {}) as Dictionary).duplicate()
+		scopes["patter"] = func(n): return _patter_get(n)
+		scopes["scene"] = func(n): return _scene_get(n)
+		_eval_ctx["scopes"] = scopes
+		_registry_qualities = base.get("qualities")
+		_ctx_revision = reg.revision
+	return _eval_ctx
 
 
 func current_scene() -> String:
@@ -78,6 +101,13 @@ func _stages_for(scope: String, name: String):
 		if _current_scene_id == "" or not _host["bundle"]["scenes"].has(_current_scene_id):
 			return null
 		return from_decls.call(_host["bundle"]["scenes"][_current_scene_id].get("sceneProps"))
+	# Any other scope's ladder is the registry's (another engine's `@story`, the game's `@world`),
+	# with the bundle's own host-scope declarations behind it for a game that registered `@world`
+	# undeclared.
+	if _registry_qualities is Callable:
+		var hit = (_registry_qualities as Callable).call(scope, name)
+		if hit != null:
+			return hit
 	for spec in _host["bundle"].get("scopeRegistry", {}).get("scopes", []):
 		if spec.get("token", "") == scope:
 			return from_decls.call(spec.get("declarations"))
@@ -153,8 +183,10 @@ func goto(scene: String, block: String = "") -> bool:
 
 # Finish this flow for good. Engine-managed (close_flow, reset, and the open_flow replace path). A
 # dropped flow used to stay fully live, so a host still holding it could keep advancing it and move
-# shared state. Closing makes that stale reference inert. Terminal: never revived.
+# shared state. Closing makes that stale reference inert. Terminal: never revived. Its bags leave the
+# registry with it.
 func close() -> void:
+	_release_bags(false)
 	_closed = true
 	_flow_ended = true
 	_stack = []
@@ -217,8 +249,10 @@ func is_ended() -> bool:
 # -- host API ------------------------------------------------------------------
 
 func start(scene_id: String, block_id: String) -> void:
-	_scene_bags = {}
-	_local = _fresh_local()
+	# A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
+	_release_bags(false)
+	_host["registry"].discard_parked(key_flow(id))
+	_mount_local()
 	_selectors = {}
 	_visit_counts = {}
 	_stack = []
@@ -293,14 +327,12 @@ func choose(option_id: String) -> void:
 
 
 func get_property(ref: String):
-	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
+	var sp := split_host_ref(_host, ref)
 	if sp[0] == "patter":
 		return _patter_get(sp[1])
 	if sp[0] == "scene":
 		return _scene_get(sp[1])
-	if _host["host_scopes"].has(sp[0]):
-		return _host["host_scopes"][sp[0]]["get"].call(sp[1])
-	return null
+	return _host["registry"].get_value(sp[0], sp[1])   # host scopes, other engines' scopes
 
 
 ## Write a property by ref. The GAME's surface, so it writes with HOST authority: a host
@@ -312,7 +344,7 @@ func set_property(ref: String, value) -> void:
 
 ## The write itself. `host` says WHO is writing, which is all "writable": false cares about.
 func _write_property(ref: String, value, host: bool) -> void:
-	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
+	var sp := split_host_ref(_host, ref)
 	if sp[0] == "patter":
 		_patter_set(sp[1], value)
 	elif sp[0] == "scene":
@@ -320,12 +352,10 @@ func _write_property(ref: String, value, host: bool) -> void:
 			push_error("'%s': the flow has not entered a scene yet" % ref)
 			return
 		_scene_set(sp[1], value)
-	elif _host["host_scopes"].has(sp[0]):
-		if not host and _host["story_read_only"].has(sp[0]) \
-				and (_host["story_read_only"][sp[0]].has("*") or _host["story_read_only"][sp[0]].has(str(sp[1]).to_lower())):
-			push_error("'@%s.%s' is read-only" % [sp[0], sp[1]])
-			return
-		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
+	else:
+		# Host scopes and other engines' scopes. "writable": false is the STORY's promise, so the
+		# registry refuses a story write (push_error, no write) and lets the game's own through.
+		_host["registry"].set_value(sp[0], sp[1], value, {"host": true} if host else {})
 
 
 # -- scope resolvers -----------------------------------------------------------
@@ -338,18 +368,22 @@ func _patter_get(n: String):
 
 func _patter_set(n: String, v) -> void:
 	if _host["patter_shared_names"].has(n):
-		_host["shared_patter"].set_value(n, v)
+		_host["registry"].set_value("patter", n, v)
 	else:
 		_local.set_value(n, v)
 
 
+## The bag a `@scene` property of the current scene lives in (the scene's stage bag, or this flow's),
+## made and registered if missing.
 func _scene_bag_for(n: String):
-	if _current_scene_id == "":
+	var s := _current_scene_id
+	if s == "" or not _host["bundle"]["scenes"].has(s):
 		return null
-	var shared: bool = _host["scene_shared_names"].get(_current_scene_id, {}).has(n)
+	_ensure_scene_bags(s)
+	var shared: bool = _host["scene_shared_names"].get(s, {}).has(n.to_lower())
 	if shared:
-		return _host["stage_bags"].get(_current_scene_id)
-	return _scene_bags.get(_current_scene_id)
+		return _host["stage_bags"].get(s)
+	return _scene_bags.get(s)
 
 
 func _scene_get(n: String):
@@ -698,7 +732,7 @@ func _pick_specificity(eligible: Array, exhaust: String, st: Dictionary):
 func _spec_score(node: Dictionary) -> int:
 	if not node.has("condition"):
 		return 0
-	var ctx := _eval_ctx
+	var ctx := _context()
 	var truthy := func(n: Array) -> bool: return PatterValues.truthy(_spec_atom(n, ctx))
 	return PatterSpecificity.matched_specificity(node["condition"]["ast"], truthy)
 
@@ -761,7 +795,7 @@ func _eligible(node: Dictionary) -> bool:
 
 
 func _eval_expr(expr: Dictionary):
-	return PatterExpr.evaluate(expr["ast"], _eval_ctx, _dialect)
+	return PatterExpr.evaluate(expr["ast"], _context(), _dialect)
 
 
 func _enter(nid: String) -> void:
@@ -911,14 +945,7 @@ func _resolve_character_name(character: String):
 
 func _seed_scene(scene: Dictionary) -> void:
 	var shared: Dictionary = _host["scene_shared_names"].get(scene["id"], {})
-	# The bag's constructor IS the loop this replaced: lowercase the name, seed the declared
-	# default else the type's, and deep-copy it so two bags seeded from one declaration set
-	# never share a mutable flags array.
-	var props: Array = scene.get("sceneProps", [])
-	if not _scene_bags.has(scene["id"]):
-		_scene_bags[scene["id"]] = PatterPropertyBag.new(_props_for(props, shared, false))
-	if not _host["stage_bags"].has(scene["id"]):
-		_host["stage_bags"][scene["id"]] = PatterPropertyBag.new(_props_for(props, shared, true))
+	_ensure_scene_bags(scene["id"])
 	for decl in scene.get("sceneProps", []):
 		if not decl.get("temporary", false):
 			continue
@@ -939,34 +966,120 @@ static func _props_for(props: Array, shared: Dictionary, want_shared: bool) -> A
 	return out
 
 
-# Bags -> the flat name/value Dictionaries the save format has always carried. The bags
-# are a runtime detail; the envelope is a contract with every save already on disk.
-static func _save_bags(bags: Dictionary) -> Dictionary:
-	var out := {}
-	for sid in bags:
-		out[sid] = bags[sid].save()
-	return out
-
-
-# The reverse: seed each bag from the BUNDLE's declarations, then lay the saved values
-# over. A property the save predates keeps its declared default rather than vanishing,
-# and one the bundle has since dropped lands as a stray - the old duplicate() did the
-# second but not the first.
-static func _load_bags(host: Dictionary, saved: Dictionary, want_shared: bool) -> Dictionary:
-	var out := {}
-	var scenes: Dictionary = host["bundle"].get("scenes", {})
-	for sid in saved:
-		var shared: Dictionary = host["scene_shared_names"].get(sid, {})
-		var props: Array = scenes.get(sid, {}).get("sceneProps", [])
-		var bag = PatterPropertyBag.new(_props_for(props, shared, want_shared))
-		bag.load(saved[sid])
-		out[sid] = bag
-	return out
+## Make (and register) scene `s`'s stage bag and this flow's bag for it, if not made yet. A bag made
+## here claims whatever values the registry holds for its key: that is how a loaded save reaches it
+## (the bag's load rule: a property the save predates keeps its declared default, one the bundle has
+## since dropped lands as a stray).
+##
+## The bag's constructor seeds each declared default (the type's when none), lowercases the name, and
+## deep-copies the default so two bags from one declaration set never share a mutable flags array.
+func _ensure_scene_bags(s: String) -> void:
+	var shared: Dictionary = _host["scene_shared_names"].get(s, {})
+	var props: Array = _host["bundle"]["scenes"].get(s, {}).get("sceneProps", [])
+	if not _scene_bags.has(s):
+		var bag = PatterPropertyBag.new(_props_for(props, shared, false), {"path_prefix": "@scene."})
+		var key := key_flow_scene(id, s)
+		if _host["registry"].mount_owned(key, bag, {"owner": OWNER}) == "":
+			_registered[key] = true
+		_scene_bags[s] = bag
+	if not _host["stage_bags"].has(s):
+		var bag = PatterPropertyBag.new(_props_for(props, shared, true), {"path_prefix": "@scene."})
+		_host["registry"].mount_owned(key_stage(s), bag, {"owner": OWNER})
+		_host["stage_bags"][s] = bag
 
 
 func _fresh_local():
 	# This flow's NOT-shared @patter half, in a bag for the same reasons as the shared one.
 	return PatterPropertyBag.new(_host["patter_local_decls"], {"path_prefix": "@patter."})
+
+
+## Register a fresh globals bag under this flow's key; it claims any values waiting there.
+func _mount_local() -> void:
+	_local = _fresh_local()
+	var key := key_flow_globals(id)
+	if _host["registry"].mount_owned(key, _local, {"owner": OWNER}) == "":
+		_registered[key] = true
+
+
+## Engine-driven (close, load_game, hot_swap): remove every bag this flow registered. With `keep`,
+## their values wait in the registry for the flow that replaces this one.
+func _release_bags(keep: bool) -> void:
+	for key in _registered:
+		if _host["registry"].has(key):
+			_host["registry"].remove(key, {"keep": keep})
+	_registered = {}
+	_scene_bags = {}
+
+
+# -- registry keys ---------------------------------------------------------------
+#
+# The keys the engine stores its bags under. They are in the save, so every runtime writes the same
+# ones: `patter` for the shared globals, `patter/scene/<sceneId>` for a scene's shared `@scene` props,
+# `patter/flow/<flowId>/patter` and `patter/flow/<flowId>/scene/<sceneId>` for a flow's own. An id
+# is escaped (`%` as `%25`, then `/` as `%2F`) so a flow named `npc/bob` cannot meet another's key.
+
+static func _esc(s: String) -> String:
+	return s.replace("%", "%25").replace("/", "%2F")
+
+
+## A scene's SHARED `@scene` props (one bag per scene, every flow's).
+static func key_stage(scene_id: String) -> String:
+	return "patter/scene/" + _esc(scene_id)
+
+
+## Everything one flow registers starts with this.
+static func key_flow(flow_id: String) -> String:
+	return "patter/flow/%s/" % _esc(flow_id)
+
+
+## A flow's NOT-shared `@patter` globals.
+static func key_flow_globals(flow_id: String) -> String:
+	return key_flow(flow_id) + "patter"
+
+
+## A flow's NOT-shared `@scene` props for one scene.
+static func key_flow_scene(flow_id: String, scene_id: String) -> String:
+	return key_flow(flow_id) + "scene/" + _esc(scene_id)
+
+
+## Split a ref into [scope, name] against the registry's current tokens (`@scene` is always the
+## flow's). Memoised per ref on the engine's host; the memo is dropped when the registry's set of
+## scopes moves.
+static func split_host_ref(host: Dictionary, ref: String) -> Array:
+	var reg = host["registry"]
+	if host["split_revision"] != reg.revision:
+		host["split_cache"] = {}
+		host["split_revision"] = reg.revision
+	var cache: Dictionary = host["split_cache"]
+	if not cache.has(ref):
+		cache[ref] = PatterBundle.split_ref_with(ref, func(t: String) -> bool:
+			return t == "scene" or reg.has(t))
+	return cache[ref]
+
+
+## A version 2 save's property values, as registry sections under the engine's keys. Reads the
+## family's camelCase shape and the snake_case one this addon wrote before 0.11.0.
+static func sections_from_v2(save: Dictionary) -> Dictionary:
+	var out := {}
+	if save.get("shared") is Dictionary:
+		out["patter"] = _unwrap_scope(save["shared"], "patter")
+	var stage = _k(save, "stageBags", "stage_bags")
+	if stage is Dictionary:
+		for sid in stage:
+			out[key_stage(str(sid))] = stage[sid]
+	var flows = save.get("flows", {})
+	if flows is Dictionary:
+		for fid in flows:
+			var f = flows[fid]
+			if not (f is Dictionary):
+				continue
+			if f.get("scopes") is Dictionary:
+				out[key_flow_globals(str(fid))] = _unwrap_scope(f["scopes"], "patter")
+			var bags = _k(f, "sceneBags", "scene_bags")
+			if bags is Dictionary:
+				for sid in bags:
+					out[key_flow_scene(str(fid), str(sid))] = bags[sid]
+	return out
 
 
 # -- save / restore ------------------------------------------------------------
@@ -977,9 +1090,11 @@ func _fresh_local():
 #
 # A save is written in the FAMILY's shape: `patter/save@0`, the JS reference's, documented in
 # @patterkit/model and design/patter-schema.md 9. camelCase literal keys, the execution position
-# under `cursor`, a pending choice as `{groupId, options}`, scopes two-level (`{"patter": {...}}`),
-# selector cursors with every key optional. Every Patterplay runtime writes and reads exactly this, so
-# a save crosses engines. Until 0.11.0 this addon wrote snake_case keys with the cursor fields flat,
+# under `cursor`, a pending choice as `{groupId, options}`, selector cursors with every key optional.
+# Every Patterplay runtime writes and reads exactly this, so a save crosses engines. Version 3 holds no
+# property values: those are the registry's, carried under `registry` only when the engine made its
+# own. Version 2 carried them itself (`shared`, `stageBags`, each flow's `scopes` and `sceneBags`) and
+# still loads, its values moving into the registry (sections_from_v2). Until 0.11.0 this addon wrote snake_case keys with the cursor fields flat,
 # which loaded nowhere else and refused a JS save on its first key
 # (from-storylets/save-shape-across-engines, 2026-09-03); restore() and load_game() still READ that
 # shape, so a player's save on disk keeps loading.
@@ -1073,9 +1188,8 @@ func snapshot() -> Dictionary:
 	var pending = null
 	if _pending != null:
 		pending = {"groupId": _pending["group_id"], "options": (_pending["options"] as Array).duplicate(true)}
+	# The cursor, PRNG and visits. This flow's properties are the registry's, saved with it.
 	return {
-		"scopes": {"patter": _local.save()},
-		"sceneBags": _save_bags(_scene_bags),
 		"rngState": _prng.a,
 		"visits": _visit_counts.duplicate(true),
 		"cursor": {
@@ -1122,10 +1236,21 @@ func restore(snap: Dictionary) -> void:
 						f["index"] = i
 						break
 		_stack.append(f)
-	var scene_bags = _k(snap, "sceneBags", "scene_bags")
-	_scene_bags = _load_bags(_host, scene_bags if scene_bags is Dictionary else {}, false)
-	_local = _fresh_local()
-	_local.load(_unwrap_scope(snap.get("scopes", {}), "patter"))
+	# Register this flow's bags: each claims the values the registry holds for it (loaded by the game,
+	# by load_game from the save, or handed back by the engine this one replaces), laid over fresh
+	# defaults. The scenes the cursor stands in are registered now; any other scene's bag is claimed
+	# on entry. A version 2 snapshot's own "scopes" / "sceneBags" were moved into the registry by
+	# load_game before this ran.
+	_release_bags(false)
+	_mount_local()
+	var here := {}
+	if _current_scene_id != "":
+		here[_current_scene_id] = true
+	for f in _stack:
+		here[f["scene"]] = true
+	for s in here:
+		if _host["bundle"]["scenes"].has(s):
+			_ensure_scene_bags(s)
 	_active_snippet = null
 	var asid = _k(c, "activeSnippetId", "active_snippet_id")
 	if asid != null and str(asid) != "" and _host["node_index"].has(str(asid)):

@@ -31,37 +31,32 @@ func _init(engine, sink: Callable = Callable(), label: String = "") -> void:
 	# Re-read on every capture: open_flow and load_game both replace bags, and the core
 	# re-mounts whatever it is handed.
 	super._init(
-		func() -> Array:
-			var mounts: Array = engine.list_bags()
-			for f in engine.flows():
-				mounts.append_array(f.list_bags())
-			return mounts,
+		func() -> Array: return PatterStateLogger._all_mounts(engine),
 		func() -> Dictionary: return PatterStateLogger._visit_state(engine),
 		opts)
 
 
+## Every bag the engine and its flows hold, with the path each answers to in a log.
+static func _all_mounts(engine) -> Array:
+	var mounts: Array = engine.list_bags()
+	for f in engine.flows():
+		mounts.append_array(f.list_bags())
+	return mounts
+
+
 ## Flatten the engine's whole-game state into a path -> value map (shared scopes + every live flow).
+## It reads the same mounts the logger does, so the two agree on the path space; the property values
+## are the registry's now, and no longer in save_game(). A bag loaded into the registry but not yet
+## claimed (a scene no flow has re-entered since a load) appears once it is.
 static func snapshot_state(engine) -> Dictionary:
-	var save: Dictionary = engine.save_game()
 	var out := {}
-	var shared: Dictionary = save["shared"]["patter"]
-	for name in shared:
-		out["@patter.%s" % name] = shared[name]
-	for scene in save["stageBags"]:
-		for name in save["stageBags"][scene]:
-			out["@scene:%s.%s" % [scene, name]] = save["stageBags"][scene][name]
-	for id in save["sharedVisits"]:
-		out["visit:%s" % id] = save["sharedVisits"][id]
-	for fid in save["flows"]:
-		var snap: Dictionary = save["flows"][fid]
-		var scopes: Dictionary = snap["scopes"]["patter"]
-		for name in scopes:
-			out["%s/@patter.%s" % [fid, name]] = scopes[name]
-		for scene in snap["sceneBags"]:
-			for name in snap["sceneBags"][scene]:
-				out["%s/@scene:%s.%s" % [fid, scene, name]] = snap["sceneBags"][scene][name]
-		for id in snap["visits"]:
-			out["%s/visit:%s" % [fid, id]] = snap["visits"][id]
+	for m in _all_mounts(engine):
+		var bag = m["bag"]
+		var prefix: String = str(m.get("path_prefix", bag.path_prefix))
+		var values: Dictionary = bag.save()
+		for name in values:
+			out["%s%s" % [prefix, name]] = values[name]
+	out.merge(_visit_state(engine), true)
 	return out
 
 

@@ -16,6 +16,8 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <!-- The one-registry checks: the game's registry, from the game's side (ports of the JS tests). -->
+    <Compile Include="OneRegistry.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

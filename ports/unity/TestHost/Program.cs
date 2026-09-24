@@ -23,7 +23,7 @@ using Patterkit.Patterplay;
 
 namespace Patterkit.Patterplay.TestHost
 {
-    internal static class Program
+    internal static partial class Program
     {
         private static int _fails;
         // The bundle parser under test. Run once with System.Text.Json, once with the Unity
@@ -76,6 +76,7 @@ namespace Patterkit.Patterplay.TestHost
 
             RunSaveShapeCheck();
             RunHostScopeWritableCheck();
+            RunOneRegistryChecks();
 
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
@@ -313,17 +314,21 @@ namespace Patterkit.Patterplay.TestHost
             string json = PatterSave.SerializeState(engine);
             using var sdoc = JsonDocument.Parse(json);
             var save = sdoc.RootElement.GetProperty("save");
-            // The family's shape: camelCase literals, the cursor under `cursor`, scopes two-level. This
-            // port wrote PascalCase off reflection until 0.11.0, and nothing here noticed because the
+            // The family's shape: camelCase literals, the cursor under `cursor`, and (version 3) every
+            // property value under `registry`, keyed by registry key, each section a flat name -> value map.
+            // This port wrote PascalCase off reflection until 0.11.0, and nothing here noticed because the
             // check read the same PascalCase back.
-            var stage = save.GetProperty("stageBags").GetProperty("s");
-            Check("stage bag is flat", stage.TryGetProperty("alarm", out _) && !stage.TryGetProperty("values", out _), json);
+            Check("version 3", save.GetProperty("version").GetInt32() == 3, json);
+            var registry = save.GetProperty("registry");
+            var stage = registry.GetProperty("patter/scene/s");
+            Check("stage bag is flat, under its registry key", stage.TryGetProperty("alarm", out _) && !stage.TryGetProperty("values", out _), json);
             var flowJson = save.GetProperty("flows").GetProperty("main");
-            Check("scopes are two-level (owned scope -> name -> value)", flowJson.GetProperty("scopes").TryGetProperty("patter", out _), json);
+            Check("a flow holds no property values", !flowJson.TryGetProperty("scopes", out _) && !flowJson.TryGetProperty("sceneBags", out _), json);
+            Check("no engine-level property section survives", !save.TryGetProperty("shared", out _) && !save.TryGetProperty("stageBags", out _), json);
             Check("the cursor is nested", flowJson.TryGetProperty("cursor", out var cur) && cur.TryGetProperty("pendingChoice", out _), json);
-            Check("no PascalCase key survives", !save.TryGetProperty("StageBags", out _) && !save.TryGetProperty("Flows", out _), json);
-            var sceneJson = flowJson.GetProperty("sceneBags").GetProperty("s");
-            Check("scene bag is flat", sceneJson.TryGetProperty("mood", out var m) && m.GetString() == "tense", json);
+            Check("no PascalCase key survives", !save.TryGetProperty("Registry", out _) && !save.TryGetProperty("Flows", out _), json);
+            var sceneJson = registry.GetProperty("patter/flow/main/scene/s");
+            Check("scene bag is flat, under the flow's key", sceneJson.TryGetProperty("mood", out var m) && m.GetString() == "tense", json);
 
             // A save written by hand, in the format on disk today, still loads.
             var engine2 = new Engine(b, new EngineOptions());
@@ -765,12 +770,21 @@ namespace Patterkit.Patterplay.TestHost
                                     // Round-trip through the Unity save helper (Newtonsoft JSON string),
                                     // asserting the flattened state survives - which exercises the
                                     // StateLogger's snapshot/diff too (parity brief B1/B2).
+                                    //
+                                    // A restored flow claims the bags of the scenes its cursor stands in; any
+                                    // other scene's values wait in the registry until it is re-entered. So every
+                                    // value the reloaded engine SHOWS must be unchanged, and the envelope it
+                                    // writes back must carry everything, the waiting values included.
                                     var before = PatterStateLogger.SnapshotState(engine);
                                     string json = PatterSave.SerializeState(engine);
                                     engine = new Engine(bundle, opts);
                                     PatterSave.DeserializeState(engine, json);
-                                    if (PatterStateLogger.DiffState(before, PatterStateLogger.SnapshotState(engine)).Count != 0)
-                                        throw new Exception("envelope round-trip changed flattened state");
+                                    var after = PatterStateLogger.SnapshotState(engine);
+                                    var changed = PatterStateLogger.DiffState(before, after).Where(d => after.ContainsKey(d.Path)).ToList();
+                                    if (changed.Count != 0)
+                                        throw new Exception($"envelope round-trip changed flattened state: {string.Join(", ", changed.Select(d => d.Path))}");
+                                    if (!JsonEqual(json, PatterSave.SerializeState(engine)))
+                                        throw new Exception($"envelope round-trip did not write the same save back\n    before {json}\n    after  {PatterSave.SerializeState(engine)}");
                                 }
                                 else
                                 {
@@ -792,9 +806,9 @@ namespace Patterkit.Patterplay.TestHost
                                 }
                                 else
                                 {
-                                    var blob = engine.SaveGame();
-                                    engine = new Engine(bundleB, opts);
-                                    engine.LoadGame(blob);
+                                    // The engine's own HotSwap, as the JS runner uses: it hands every bag to the
+                                    // replacement on the same registry.
+                                    engine = engine.HotSwap(bundleB);
                                 }
                                 break;
                             }
@@ -888,6 +902,37 @@ namespace Patterkit.Patterplay.TestHost
                     break;
                 }
                 default: into.Add(path); break;
+            }
+        }
+
+        /// <summary>Two JSON documents equal as values: object key order ignored, array order kept.</summary>
+        private static bool JsonEqual(string a, string b)
+        {
+            using var da = JsonDocument.Parse(a);
+            using var db = JsonDocument.Parse(b);
+            return JsonElementEqual(da.RootElement, db.RootElement);
+        }
+
+        private static bool JsonElementEqual(JsonElement a, JsonElement b)
+        {
+            if (a.ValueKind != b.ValueKind) return false;
+            switch (a.ValueKind)
+            {
+                case JsonValueKind.Object:
+                {
+                    var pa = a.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+                    var pb = b.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+                    return pa.Count == pb.Count && pa.All(kv => pb.TryGetValue(kv.Key, out var v) && JsonElementEqual(kv.Value, v));
+                }
+                case JsonValueKind.Array:
+                {
+                    var xa = a.EnumerateArray().ToList();
+                    var xb = b.EnumerateArray().ToList();
+                    return xa.Count == xb.Count && xa.Zip(xb, JsonElementEqual).All(x => x);
+                }
+                case JsonValueKind.Number: return a.GetDouble() == b.GetDouble();
+                case JsonValueKind.String: return a.GetString() == b.GetString();
+                default: return true;
             }
         }
 

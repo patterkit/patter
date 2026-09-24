@@ -50,8 +50,14 @@ In `demo/` (delete the folder freely):
 
 ## Beyond the basics
 
-- **Save / load**: `engine.save_game()` / `engine.load_game(blob)` snapshot and restore the
-  whole run as a JSON-ready dictionary.
+- **Save / load**: `PatterSave.serialize_state(engine)` / `deserialize_state(engine, json)` (or
+  `engine.save_game()` / `engine.load_game(blob)` for the bare dictionary) snapshot and restore the
+  whole run. Saves are the shared `patter/save@0` format, version 3; older saves still load.
+- **Your game's state and one registry per game**: bind `@world` to your own store with the
+  `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`
+  option so every engine in the game shares one set of properties and one save. Without a registry
+  the engine makes its own, and its save carries every property value. See
+  [One registry per game](https://patterkit.dev/play/godot/#one-registry-per-game).
 - **Audio**: `PatterAudio` reads the `patteraudio.json` manifest exported next to a Patter
   audio folder and resolves each line to its winning take - it resolves the path, you play
   it. See [the audio guide](https://patterkit.dev/play/audio/).

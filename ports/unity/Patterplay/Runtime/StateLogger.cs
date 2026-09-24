@@ -24,26 +24,29 @@ namespace Patterkit.Patterplay
 {
     public static class PatterStateLogger
     {
-        /// <summary>Flatten the engine's whole-game state into a path -> value map (shared scopes
-        /// + every live flow), off SaveGame(). The logger no longer diffs this - it mounts the
-        /// bags directly - but it stays as the public "what is the state right now" call, and as
-        /// the definition of the path space the mounts compose.</summary>
+        /// <summary>Flatten the engine's whole-game state into a path -> value map (shared scopes + every
+        /// live flow). The logger does not diff this - it mounts the bags directly - but it stays as the
+        /// public "what is the state right now" call, and it reads the same mounts, so the two agree on the
+        /// path space. A bag loaded into the registry but not yet claimed (a scene no flow has re-entered
+        /// since a load) appears once it is.</summary>
         public static Dictionary<string, PatterValue> SnapshotState(Engine engine)
         {
-            var save = engine.SaveGame();
             var outMap = new Dictionary<string, PatterValue>();
-            foreach (var kv in save.Shared) outMap[$"@patter.{kv.Key}"] = kv.Value;
-            foreach (var scene in save.StageBags)
-                foreach (var kv in scene.Value) outMap[$"@scene:{scene.Key}.{kv.Key}"] = kv.Value;
-            foreach (var kv in save.SharedVisits) outMap[$"visit:{kv.Key}"] = PatterValue.Num(kv.Value);
-            foreach (var flow in save.Flows)
+            foreach (var m in AllMounts(engine))
             {
-                foreach (var kv in flow.Value.Scopes) outMap[$"{flow.Key}/@patter.{kv.Key}"] = kv.Value;
-                foreach (var scene in flow.Value.SceneBags)
-                    foreach (var kv in scene.Value) outMap[$"{flow.Key}/@scene:{scene.Key}.{kv.Key}"] = kv.Value;
-                foreach (var kv in flow.Value.Visits) outMap[$"{flow.Key}/visit:{kv.Key}"] = PatterValue.Num(kv.Value);
+                var prefix = m.PathPrefix ?? m.Bag.PathPrefix;
+                foreach (var kv in m.Bag.Save()) outMap[prefix + kv.Key] = kv.Value;
             }
+            foreach (var kv in VisitState(engine)) outMap[kv.Key] = kv.Value;
             return outMap;
+        }
+
+        /// <summary>Every bag the engine and its flows hold, with the path each answers to in a log.</summary>
+        internal static List<LogMount> AllMounts(Engine engine)
+        {
+            var mounts = engine.ListBags();
+            foreach (var f in engine.Flows()) mounts.AddRange(f.ListBags());
+            return mounts;
         }
 
         /// <summary>The visit counts, which live in no bag and so have no audit hook: the kernel
@@ -98,12 +101,7 @@ namespace Patterkit.Patterplay
             {
                 // Re-read on every capture: OpenFlow and LoadGame both replace bags, and the
                 // kernel re-mounts whatever it is handed.
-                Mounts = () =>
-                {
-                    var mounts = engine.ListBags();
-                    foreach (var f in engine.Flows()) mounts.AddRange(f.ListBags());
-                    return mounts;
-                },
+                Mounts = () => PatterStateLogger.AllMounts(engine),
                 Extra = () => PatterStateLogger.VisitState(engine),
             };
             _kernel = new StateLogger(adapter, _sink, _tag);

@@ -1,6 +1,8 @@
 // The game's @world container bound to the Unreal wrapper: read by conditions, written by effects,
 // refusing the game's read-only names AND the story's own `writable: false` promise, absent from a
-// save, restored by nothing but the host, and surviving a hot swap. Runs via
+// save (an external scope in the engine's registry), restored by nothing but the host, and surviving
+// a hot swap. Beside it, the self-backed @world a standalone engine SAVES, and an engine built on the
+// game's own registry (CreateWithRegistry). Runs via
 //   -ExecCmds="Automation RunTests Patterplay.World"
 //
 // The UE-boundary half the clang TestHost cannot reach: UPatterWorld is a UObject with a delegate,
@@ -17,6 +19,7 @@
 #include "PatterEngine.h"
 #include "PatterSave.h"
 #include "PatterWorld.h"
+#include "Patter/Expr/ScopeRegistry.h"
 
 namespace
 {
@@ -142,11 +145,47 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	World->SetBool(TEXT("knows_road"), true);
 	TestEqual(TEXT("and opens again when the host says so"), PlayScene(Engine, TEXT("r4"), TEXT("road")), FString(TEXT("The road north.")));
 
-	// --- and the self-backed path is unchanged ---------------------------------------
+	// --- the self-backed path: a property the engine stores, and SAVES ------------------
 	UPatterEngine* Plain = UPatterEngine::Create(Bundle);
 	if (!TestNotNull(TEXT("self-backed engine"), Plain)) return false;
 	TestNull(TEXT("no world bound"), Plain->GetBoundWorld());
 	TestEqual(TEXT("self-backed reads the default"), Plain->GetPropertyString(TEXT("@world.time_of_day")), FString(TEXT("day")));
+	TestEqual(TEXT("learn plays self-backed"), PlayScene(Plain, TEXT("l"), TEXT("learn")), FString(TEXT("You learn the road.")));
+	{
+		const FString PlainSave = UPatterSave::SaveStateToJson(Plain);
+		TestTrue(TEXT("a self-backed @world is saved"), PlainSave.Contains(TEXT("knows_road")));
+		UPatterEngine* Reloaded = UPatterEngine::Create(Bundle);
+		TestTrue(TEXT("self-backed save loads"), UPatterSave::LoadStateFromJson(Reloaded, PlainSave));
+		TestTrue(TEXT("and brings @world back"), Reloaded->GetPropertyBool(TEXT("@world.knows_road")));
+	}
+
+	// --- on the GAME's registry (C++ only) ----------------------------------------------
+	{
+		auto Registry = std::make_shared<patter::ScopeRegistry>();
+		UPatterWorld* GameWorld = NewObject<UPatterWorld>();
+		UPatterEngine* Shared = UPatterEngine::CreateWithRegistry(Bundle, Registry, GameWorld);
+		if (!TestNotNull(TEXT("engine on the game's registry"), Shared)) return false;
+		TestTrue(TEXT("@patter is registered in the game's registry"), Registry->has("patter"));
+		TestTrue(TEXT("the bound world is registered as @world"), Registry->has("world"));
+		bool bWorldIsPatters = false;
+		for (const patter::ScopePropertyRow& Row : Registry->listProperties())
+			if (Row.scope == "world" && Row.owner == std::optional<std::string>("Patter")) bWorldIsPatters = true;
+		TestTrue(TEXT("registered under Patter's owner label"), bWorldIsPatters);
+		TestEqual(TEXT("learn plays on the game's registry"), PlayScene(Shared, TEXT("l"), TEXT("learn")), FString(TEXT("You learn the road.")));
+		TestTrue(TEXT("the flow's bags are in the game's registry"), Registry->has("patter/flow/l/patter"));
+		TestTrue(TEXT("the world container took the story's write"), GameWorld->GetBool(TEXT("knows_road")));
+		const FString SharedSave = UPatterSave::SaveStateToJson(Shared);
+		TestFalse(TEXT("the game saves its registry, not the engine"), SharedSave.Contains(TEXT("\"registry\"")));
+
+		// A token the registry already holds fails as the game combines its engines, and says whose.
+		AddExpectedError(TEXT("already registered by Patter"), EAutomationExpectedErrorFlags::Contains, 1);
+		TestNull(TEXT("a second Patter on the same registry is refused"), UPatterEngine::CreateWithRegistry(Bundle, Registry));
+
+		// Given the game's registry and no world, the engine self-backs nothing: @world is the game's.
+		auto Bare = std::make_shared<patter::ScopeRegistry>();
+		TestNotNull(TEXT("engine on a bare registry"), UPatterEngine::CreateWithRegistry(Bundle, Bare));
+		TestFalse(TEXT("no self-backed @world in the game's registry"), Bare->has("world"));
+	}
 	return true;
 }
 

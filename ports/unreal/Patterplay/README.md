@@ -63,7 +63,14 @@ The **PatterplayDemo** sample project holds two working references (see its READ
 ## Beyond the basics
 
 - **Properties**: `GetProperty*` / `SetProperty*` read and write `@patter` (and wired
-  external) values from C++ or Blueprint - the game pushing state into the dialogue.
+  external) values from C++ or Blueprint - the game pushing state into the dialogue. Bind your
+  own `@world` container with `UPatterEngine::Create(Bundle, World)`.
+- **Save and load**: `UPatterSave::SaveStateToJson` / `LoadStateFromJson` write and read the
+  whole run as one JSON string (save version 3; older saves still load).
+- **One registry per game** (C++): every property lives in a `patter::ScopeRegistry`. An engine
+  makes its own by default; `UPatterEngine::CreateWithRegistry` builds one on your game's registry,
+  which your game then saves once with `patter::saveRegistry`. See
+  [the Unreal guide](https://patterkit.dev/play/unreal/#one-registry-per-game).
 - **Audio**: `UPatterAudio` reads the `patteraudio.json` manifest exported next to a Patter
   audio folder and resolves each line to its winning take - it resolves the path, you play
   it. See [the audio guide](https://patterkit.dev/play/audio/).

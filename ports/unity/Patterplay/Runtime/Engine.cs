@@ -2,6 +2,15 @@
 // Engine = the world + flow manager (shared @patter / @scene state, visit counts,
 // whole-game save/load); Flow = one playable cursor (its own callstack, PRNG, and the
 // not-shared half of the scopes). Verified against the conformance corpus.
+//
+// Every property bag lives in ONE ScopeRegistry per game (the one-registry model,
+// patterkit design/one-registry-handover.md): the game hands the engine its registry
+// (EngineOptions.Registry) or the engine makes its own and acts as its own game. @patter
+// is registered under `patter`; the per-flow and per-scene bags under keys starting
+// `patter/` (see PatterKeys), which no expression can name. SaveGame / LoadGame snapshot
+// and restore what is NOT a property: cursors, PRNGs, visits, and selectors. The
+// registry's values ride in SaveGame only when the engine made the registry itself;
+// otherwise the game saves the registry once.
 
 using System;
 using System.Collections.Generic;
@@ -10,8 +19,10 @@ using System.Linq;
 namespace Patterkit.Patterplay
 {
     /// <summary>A host scope the story reads and writes (`@world`): the GAME owns the value. Bind one per
-    /// token through <see cref="EngineOptions.HostScopes"/>; a declared scope with no binding is self-backed
-    /// from its declaration defaults, so a standalone build plays the same story a bound one does.</summary>
+    /// token through <see cref="EngineOptions.HostScopes"/>; the engine registers it in the game's registry
+    /// as a foreign scope, so its values stay the game's and are never saved by Patterplay. A standalone
+    /// engine self-backs a declared scope with no binding from its declaration defaults (a property its
+    /// registry stores and saves), so a standalone build plays the same story a bound one does.</summary>
     public interface IHostScope
     {
         /// <summary>The current value, or null when this scope has no such property (reads graceful-false).</summary>
@@ -19,44 +30,35 @@ namespace Patterkit.Patterplay
         void Set(string name, PatterValue value);
     }
 
-    /// <summary>The fallback for a scope the bundle DECLARES and the embedder does not bind: a live in-memory
-    /// bag seeded from the declarations' defaults.
-    ///
-    /// Keyed LOWER CASE, which is load-bearing rather than tidy: the compiler folds every property reference,
-    /// so an AST reads `isnight` where the declaration says `isNight`. Seeding verbatim means any declared
-    /// name carrying a capital is never found, reads as absent, and silently takes the falsy branch - the JS
-    /// runtime shipped exactly that bug (fixed 2026-08-18) and this port must not repeat it. Declaring such a
-    /// name is refused at compile time now, but a hand-written bundle can still carry one.</summary>
-    internal sealed class SelfBackedScope : IHostScope
+    /// <summary>An <see cref="IHostScope"/> as the registry takes a foreign scope. The registry hands it
+    /// names folded to lower case, as the compiler emits every reference.</summary>
+    internal sealed class HostScopeResolver : IScopeResolver
     {
-        private readonly Dictionary<string, PatterValue> _bag = new Dictionary<string, PatterValue>();
-
-        public SelfBackedScope(List<HostScopeDecl> decls)
-        {
-            if (decls == null) return;   // opaque scope: starts empty, accepts any name
-            foreach (var d in decls) if (d != null && d.Name != null) _bag[Key(d.Name)] = Engine.HostScopeDefault(d);
-        }
-
-        private static string Key(string name) => name == null ? null : name.ToLowerInvariant();
-        public PatterValue Get(string name) => _bag.TryGetValue(Key(name), out var v) ? v : null;
-        public void Set(string name, PatterValue value) { _bag[Key(name)] = value; }
+        private readonly IHostScope _scope;
+        public HostScopeResolver(IHostScope scope) { _scope = scope; }
+        public bool CanSet => true;
+        public PatterValue Get(string name) => _scope.Get(name);
+        public void Set(string name, PatterValue value) => _scope.Set(name, value);
     }
 
-    /// <summary>The names a STORY may not write in a host scope ("*" = the whole scope). A declaration's
-    /// `writable: false` is the story's promise and only the story's: the GAME writes the value it owns,
-    /// through SetProperty, whatever the flag says (ruled across the family 2026-09-05,
-    /// from-storylets/host-writes-to-read-only-world). This used to WRAP the scope, which refused the
-    /// game its own clock too.</summary>
-    internal static class StoryReadOnly
+    /// <summary>The registry keys this engine stores its instance bags under. An id is escaped (`%` and
+    /// `/`) so a flow named `npc/bob` cannot collide with another flow's scene. Every runtime writes the
+    /// same keys: they are in the save.</summary>
+    internal static class PatterKeys
     {
-        public static HashSet<string> For(HostScopeSpec spec)
-        {
-            var readOnly = new HashSet<string>();
-            if (spec.Writable == false) readOnly.Add("*");
-            foreach (var d in spec.Declarations ?? new List<HostScopeDecl>())
-                if (d != null && d.Name != null && d.Writable == false) readOnly.Add(d.Name.ToLowerInvariant());
-            return readOnly;
-        }
+        /// <summary>The owner label on everything this engine registers: named in a clash error and
+        /// carried on the registry's examiner rows, so one inspector can group a combined game by engine.</summary>
+        public const string Owner = "Patter";
+
+        private static string Esc(string id) => id.Replace("%", "%25").Replace("/", "%2F");
+        /// <summary>A scene's SHARED @scene props (one bag per scene, every flow's).</summary>
+        public static string Stage(string sceneId) => "patter/scene/" + Esc(sceneId);
+        /// <summary>Everything one flow registers starts with this.</summary>
+        public static string Flow(string flowId) => "patter/flow/" + Esc(flowId) + "/";
+        /// <summary>A flow's NOT-shared @patter globals.</summary>
+        public static string FlowGlobals(string flowId) => Flow(flowId) + "patter";
+        /// <summary>A flow's NOT-shared @scene props for one scene.</summary>
+        public static string FlowScene(string flowId, string sceneId) => Flow(flowId) + "scene/" + Esc(sceneId);
     }
 
     public sealed class EngineOptions
@@ -79,10 +81,35 @@ namespace Patterkit.Patterplay
         /// whenever a choice runs dry. Unaffected by Log and useful with it off - it is live
         /// feedback, not an audit read afterwards.</summary>
         public Action<string> OnDryChoice;
-        /// <summary>Live game state per host-scope token (`"world"` -> your resolver). A binding WINS over
-        /// the self-backed bag for that token; tokens the bundle declares and you do not bind are self-backed
-        /// from their defaults. Leave null for the standalone case.</summary>
+        /// <summary>Live game state per host-scope token (`"world"` -> your resolver). Each binding is
+        /// registered in the registry as a foreign scope: the game keeps the values, and nothing saves them
+        /// but the game. A standalone engine self-backs every token the bundle declares and you do not bind,
+        /// from its defaults, as a property its registry stores and saves. Given <see cref="Registry"/>, the
+        /// engine self-backs nothing: an unbound token is the game's to register (owned if the registry
+        /// should store it, foreign if the game keeps it), or another engine's. Leave null for the
+        /// standalone case.</summary>
         public Dictionary<string, IHostScope> HostScopes;
+        /// <summary>The game's registry: ONE per game, holding every engine's properties except those the
+        /// game keeps itself, saved once. Given one, the engine registers its own scopes in it (@patter under
+        /// `patter`, its per-flow and per-scene bags under keys starting `patter/`, and each HostScopes
+        /// binding), reads every other scope from it, and SaveGame leaves the property values to the game.
+        /// Leave null and the engine makes its own registry and acts as its own game: it self-backs `@world`,
+        /// and SaveGame carries the registry's values too.</summary>
+        public ScopeRegistry Registry;
+
+        /// <summary>Internal: set on a HotSwap replacement of a standalone engine, which shares its
+        /// predecessor's registry but is still its own game (it self-backs host scopes and saves the
+        /// registry's values). Not public API.</summary>
+        internal bool OwnsRegistry;
+
+        /// <summary>A copy on another registry, for a HotSwap replacement.</summary>
+        internal EngineOptions OnRegistry(ScopeRegistry registry, bool ownsRegistry)
+        {
+            var copy = (EngineOptions)MemberwiseClone();
+            copy.Registry = registry;
+            copy.OwnsRegistry = ownsRegistry;
+            return copy;
+        }
     }
 
     public sealed class StackFrame
@@ -161,23 +188,27 @@ namespace Patterkit.Patterplay
         public Dictionary<string, string> SceneGameIdToId;
         public Dictionary<string, Dictionary<string, string>> BlockGameIdToId;
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
-        /// <summary>The @patter globals. A bag, not a map: it is what carries the audit hook a
-        /// state logger pushes from, and the clone guard on a mutable default. "@patter." is the
-        /// address a row reports, and here also the log path - there is one shared globals bag.</summary>
+        /// <summary>The game's one registry: @patter (the SHARED globals), host scopes, every instance bag.</summary>
+        public ScopeRegistry Registry;
+        /// <summary>True when the engine made the registry (a standalone game): SaveGame then carries its values.</summary>
+        public bool OwnsRegistry;
+        /// <summary>The SHARED @patter globals' bag, registered under `patter`. A bag, not a map: it is
+        /// what carries the audit hook a state logger pushes from, and the clone guard on a mutable
+        /// default. "@patter." is the address a row reports, and here also the log path.</summary>
         public PropertyBag SharedPatter;
-        /// <summary>Host scopes by token, already resolved: an embedder's binding where one was given,
-        /// a self-backed bag for every other token the bundle declares. Empty for a bundle with none.</summary>
-        public Dictionary<string, IHostScope> HostScopes = new Dictionary<string, IHostScope>();
-        /// <summary>Per host token, the names a STORY may not write ("*" = the whole scope). The game
-        /// writes them freely: `writable: false` is the story's promise, not a lock on the value's
-        /// owner (from-storylets/host-writes-to-read-only-world). Flows read this on their write path.</summary>
-        public Dictionary<string, HashSet<string>> StoryReadOnly = new Dictionary<string, HashSet<string>>();
+        /// <summary>Host scopes this engine self-backed and registered (the game bound none, nobody else had).</summary>
+        public List<string> SelfBackedTokens = new List<string>();
+        /// <summary>Host scopes this engine registered from EngineOptions.HostScopes bindings.</summary>
+        public List<string> BoundTokens = new List<string>();
         public List<PropertyDecl> PatterSharedDecls;
         public List<PropertyDecl> PatterLocalDecls;
         public HashSet<string> PatterSharedNames;
         public Dictionary<string, HashSet<string>> SceneSharedNames;
         public Dictionary<string, int> SharedVisits = new Dictionary<string, int>();
         public Dictionary<string, SelectorState> SharedSelectors = new Dictionary<string, SelectorState>();
+        /// <summary>Per-scene SHARED scene props, each registered under PatterKeys.Stage(sceneId). Made the
+        /// first time any flow needs the scene, so a bag loaded before then waits in the registry and is
+        /// claimed here.</summary>
         public Dictionary<string, PropertyBag> StageBags = new Dictionary<string, PropertyBag>();
         public Func<double> CustomRng;
         public bool ReplayPromptOnChoose;
@@ -187,6 +218,11 @@ namespace Patterkit.Patterplay
         public string CaptionOpen;
         public string CaptionClose;
         public string CaptionCharacter; // a cast member whose whole lines are captions (silent when off)
+
+        /// <summary>Whether `t` names a scope when splitting a ref: `@scene` (always Patter's) or any
+        /// token the registry holds, so `@world.gold` and another engine's `@story.act` are not read as a
+        /// @patter property literally named "world.gold".</summary>
+        public bool IsScopeToken(string t) => t == "scene" || Registry.Has(t);
     }
 
     public sealed class Engine
@@ -269,7 +305,55 @@ namespace Patterkit.Patterplay
             var localDecls = props.Where(p => !(p.Shared ?? true)).ToList();
             var sharedNames = new HashSet<string>(sharedDecls.Select(d => d.Name.ToLowerInvariant()));
 
+            // "@patter." so a row addresses itself the way GetProperty takes it.
+            var registry = options.Registry ?? new ScopeRegistry();
+            bool ownsRegistry = options.Registry == null || options.OwnsRegistry;
             var sharedPatter = new PropertyBag(sharedDecls.Select(ToScopeDecl), null, "@patter.");
+            var selfBacked = new List<string>();
+            var bound = new List<string>();
+            var registered = new List<string>();
+            try
+            {
+                registry.MountOwned("patter", sharedPatter, PatterKeys.Owner); // claims values the game loaded first
+                registered.Add("patter");
+                // Each host-scope binding is an external scope: the game keeps the values, the registry never
+                // saves them. Its declarations (types, read-only) come from the compiled bundle.
+                if (options.HostScopes != null)
+                    foreach (var kv in options.HostScopes)
+                    {
+                        if (kv.Value == null || string.IsNullOrEmpty(kv.Key)) continue;
+                        var spec = bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == kv.Key);
+                        var decls = (spec?.Declarations ?? new List<HostScopeDecl>())
+                            .Where(d => d != null && d.Name != null).Select(ToForeignDecl).ToList();
+                        registry.DefineForeign(kv.Key, new HostScopeResolver(kv.Value), decls,
+                            new ForeignScopeOptions { Writable = spec?.Writable ?? true, Owner = PatterKeys.Owner });
+                        registered.Add(kv.Key);
+                        bound.Add(kv.Key);
+                    }
+                // A declared host scope nobody bound. A standalone engine is its own game, so it self-backs the
+                // scope: a property bag seeded from the declarations, stored and SAVED by the registry like any
+                // other, since only a resolver the game binds is external. Given the GAME's registry, the engine
+                // registers nothing here: those tokens are the game's to register, or another engine's (a bundle
+                // compiled against the Storylet Engine's spec declares `@story`), and self-backing one would
+                // clash with its real owner depending only on which engine was built first.
+                if (ownsRegistry && bundle.ScopeRegistry?.Scopes != null)
+                    foreach (var spec in bundle.ScopeRegistry.Scopes)
+                    {
+                        if (spec == null || string.IsNullOrEmpty(spec.Token)) continue;
+                        if (bound.Contains(spec.Token) || registry.Has(spec.Token)) continue;
+                        var decls = (spec.Declarations ?? new List<HostScopeDecl>())
+                            .Where(d => d != null && d.Name != null).Select(d => SelfBackedDecl(d, spec.Writable)).ToList();
+                        registry.DefineOwned(spec.Token, decls, new OwnedScopeOptions { Owner = PatterKeys.Owner });
+                        registered.Add(spec.Token);
+                        selfBacked.Add(spec.Token);
+                    }
+            }
+            catch
+            {
+                // A clash leaves the game's registry as it was.
+                foreach (var k in registered) registry.Remove(k, keep: true);
+                throw;
+            }
 
             var sceneSharedNames = new Dictionary<string, HashSet<string>>();
             foreach (var kv in bundle.Scenes)
@@ -287,6 +371,7 @@ namespace Patterkit.Patterplay
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
+                Registry = registry, OwnsRegistry = ownsRegistry, SelfBackedTokens = selfBacked, BoundTokens = bound,
                 SharedPatter = sharedPatter, PatterSharedDecls = sharedDecls, PatterLocalDecls = localDecls,
                 PatterSharedNames = sharedNames, SceneSharedNames = sceneSharedNames,
                 CustomRng = options.Rng, ReplayPromptOnChoose = options.ReplayPromptOnChoose,
@@ -295,33 +380,10 @@ namespace Patterkit.Patterplay
                 CaptionClose = bundle.ClosedCaptions?.Close ?? "]",
                 CaptionCharacter = string.IsNullOrEmpty(bundle.ClosedCaptions?.Character) ? "SFX" : bundle.ClosedCaptions.Character, // absent/empty -> SFX
             };
-
-            // Host scopes (design/scope-registry.md §6). An embedder's binding wins for its token; every
-            // OTHER token the bundle declares gets a self-backed bag seeded from its declaration defaults,
-            // so a standalone build plays the same story a bound one does. Without this the reference reads
-            // as a graceful false and a @world-gated branch is silently skipped.
-            if (options.HostScopes != null)
-                foreach (var kv in options.HostScopes)
-                    if (kv.Value != null) _host.HostScopes[kv.Key] = kv.Value;
-            if (bundle.ScopeRegistry != null)
-                foreach (var spec in bundle.ScopeRegistry.Scopes)
-                {
-                    if (spec == null || string.IsNullOrEmpty(spec.Token)) continue;
-                    if (_host.HostScopes.ContainsKey(spec.Token)) continue;   // the embedder's binding wins
-                    _host.HostScopes[spec.Token] = new SelfBackedScope(spec.Declarations);
-                }
-            // A declaration's `writable: false` is the STORY's promise, and the engine refuses the story's
-            // write whether the scope is bound or self-backed - the JS reference has always done so, and
-            // this package let a bound scope's Set straight through until 2026-09-03
-            // (from-storylets/unreal-wrapper-host-scopes). A per-name read-only a GAME keeps on its own
-            // scope is a different thing, and the scope refuses that itself. Same message as the reference.
-            if (bundle.ScopeRegistry != null)
-                foreach (var spec in bundle.ScopeRegistry.Scopes)
-                {
-                    if (spec == null || string.IsNullOrEmpty(spec.Token) || !_host.HostScopes.ContainsKey(spec.Token)) continue;
-                    var readOnly = StoryReadOnly.For(spec);
-                    if (readOnly.Count > 0) _host.StoryReadOnly[spec.Token] = readOnly;
-                }
+            // A declaration's `writable: false` is the STORY's promise, and the registry refuses the story's
+            // write whether the scope is bound (a foreign scope's declarations) or self-backed (each owned
+            // declaration carries its scope's default). The game's own SetProperty writes with host authority,
+            // which that promise never binds (ruled across the family 2026-09-05).
         }
 
         /// <summary>The active locale (string + character-name lookups resolve in it).</summary>
@@ -362,17 +424,48 @@ namespace Patterkit.Patterplay
         /// Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried
         /// over (SaveGame -> fresh engine -> LoadGame) plus the presentation state that isn't save state
         /// (active locale, captions toggle). Content drift resolves per §9.8: stack frames re-find their
-        /// next child by id, drifted options drop, a vanished snippet is skipped. Returns the REPLACEMENT
-        /// engine; this one should be discarded, and flow handles re-bound via <c>next.GetFlow(id)</c>.
+        /// next child by id, drifted options drop, a vanished snippet is skipped.
+        ///
+        /// Returns the REPLACEMENT engine, on the same registry. This one hands its bags over (each is
+        /// removed from the registry with its values kept, and the replacement claims them as it
+        /// registers), its flows are closed, and it should be discarded; re-bind flow handles via
+        /// <c>next.GetFlow(id)</c>. If the restore throws (defensive: §9.8 makes this unreachable for
+        /// ordinary edits), the swap falls back to a fresh engine with each saved flow restarted from the
+        /// top of the scene it was in; the shared properties carry over.
         /// </summary>
         public Engine HotSwap(Bundle bundle)
         {
             var snapshot = SaveGame();
-            var next = new Engine(bundle, _creationOptions);
-            next.LoadGame(snapshot);
-            next.SetLocale(_currentLocale);
-            next.SetClosedCaptions(_host.CaptionsOn);
-            return next;
+            Engine CarryOver(Engine next)
+            {
+                next.SetLocale(_currentLocale);
+                next.SetClosedCaptions(_host.CaptionsOn);
+                return next;
+            }
+            // The replacement registers on the SAME registry, and a standalone engine's replacement is still
+            // its own game (so its SaveGame keeps carrying the registry's values).
+            var options = _creationOptions.OnRegistry(_host.Registry, _host.OwnsRegistry);
+            Release(true);
+            var replacement = new Engine(bundle, options);
+            try
+            {
+                replacement.LoadGame(snapshot);
+                return CarryOver(replacement);
+            }
+            catch (Exception)
+            {
+                // A partial load may have mutated the replacement: hand its bags back, fall back on a THIRD
+                // engine and restart each flow at the top of the scene it was in (dropped when that scene is
+                // gone too).
+                replacement.Release(true);
+                var fresh = new Engine(bundle, options);
+                foreach (var kv in snapshot.Flows)
+                {
+                    try { fresh.OpenFlow(kv.Key, kv.Value.CurrentSceneId); }
+                    catch (Exception) { /* scene deleted: drop the flow */ }
+                }
+                return CarryOver(fresh);
+            }
         }
 
         /// <summary>The compiled bundle's build hash (content.hash). Pass it to PatterDebugLink so Patterpad's
@@ -653,6 +746,9 @@ namespace Patterkit.Patterplay
         private List<string> TagsOrNull(string id)
             => _host.TagIndex.TryGetValue(id, out var t) && t.Count > 0 ? t : null;
 
+        /// <summary>Reset the whole game to its initial state: drop every flow, re-seed the shared @patter
+        /// globals to their declared defaults, and clear all shared state (shared @scene bags, world visit
+        /// counts). Host scopes are untouched. After a reset, open fresh flows with OpenFlow.</summary>
         public void Reset()
         {
             foreach (var f in _flows.Values) f.Close(); // finish them, don't just forget them
@@ -660,21 +756,45 @@ namespace Patterkit.Patterplay
             _host.SharedPatter.Reseed(_host.PatterSharedDecls.Select(ToScopeDecl));
             _host.SharedVisits.Clear();
             _host.SharedSelectors.Clear();
+            foreach (var s in _host.StageBags.Keys) _host.Registry.Remove(PatterKeys.Stage(s));
             _host.StageBags.Clear();
+            // Values loaded for bags nobody has claimed yet are the old game's too: a flow opened after the
+            // reset must not pick them up. Other engines' parked values are theirs, and stay.
+            _host.Registry.DiscardParked("patter/");
         }
 
-        // A host-scope ref ("@world.x") resolves through the bound or self-backed scope, as it does on a
-        // Flow and in every other runtime's engine-level accessor. Until 2026-09-03 this pair knew only
-        // `scene` and `patter`, so "@world.x" split as a @patter name and landed in the shared bag as a
-        // stray - a silent miss the host-scope writable check caught (from-storylets/unreal-wrapper-host-scopes).
-        private bool IsEngineScopeToken(string t) => t == "scene" || t == "patter" || _host.HostScopes.ContainsKey(t);
+        /// <summary>Remove every bag this engine registered, keeping the values parked when `keep` (a live
+        /// reload handing its state to a replacement), and close its flows. The engine is inert afterwards.</summary>
+        private void Release(bool keep)
+        {
+            foreach (var f in _flows.Values) { f.ReleaseBags(keep); f.Close(); }
+            _flows.Clear();
+            var reg = _host.Registry;
+            foreach (var s in _host.StageBags.Keys) reg.Remove(PatterKeys.Stage(s), keep);
+            _host.StageBags.Clear();
+            foreach (var t in new[] { "patter" }.Concat(_host.SelfBackedTokens))
+                if (reg.Has(t)) reg.Remove(t, keep);
+            foreach (var t in _host.BoundTokens)
+                if (reg.Has(t)) reg.Remove(t);
+        }
 
+        // Any registered token resolves through the registry ("@world.x", another engine's "@story.x"), as it
+        // does on a Flow and in every other runtime's engine-level accessor. Until 2026-09-03 this pair knew
+        // only `scene` and `patter`, so "@world.x" split as a @patter name and landed in the shared bag as a
+        // stray (from-storylets/unreal-wrapper-host-scopes).
+        private (string scope, string name) SplitShared(string refStr)
+        {
+            var split = SplitRef(refStr, _host.IsScopeToken);
+            if (split.scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            return split;
+        }
+
+        /// <summary>Read a shared (@patter / host / another engine's) property by ref. @scene refs are
+        /// rejected: they are flow-level.</summary>
         public PatterValue GetProperty(string refStr)
         {
-            var (scope, name) = SplitRef(refStr, IsEngineScopeToken);
-            if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            if (_host.HostScopes.TryGetValue(scope, out var host)) return host.Get(name);
-            return _host.SharedPatter.Get(name);
+            var (scope, name) = SplitShared(refStr);
+            return _host.Registry.Get(scope, name);
         }
 
         /// <summary>Write a shared property by ref. The GAME's surface, so a host declaration's
@@ -682,10 +802,8 @@ namespace Patterkit.Patterplay
         /// (from-storylets/host-writes-to-read-only-world). Effects write through Flow instead.</summary>
         public void SetProperty(string refStr, PatterValue value)
         {
-            var (scope, name) = SplitRef(refStr, IsEngineScopeToken);
-            if (scope == "scene") throw new Exception($"'{refStr}': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
-            if (_host.HostScopes.TryGetValue(scope, out var host)) { host.Set(name, value); return; }
-            _host.SharedPatter.Set(name, value, host: true);
+            var (scope, name) = SplitShared(refStr);
+            _host.Registry.Set(scope, name, value, host: true);
         }
 
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
@@ -720,41 +838,81 @@ namespace Patterkit.Patterplay
 
         // -- save / load --------------------------------------------------------
 
+        /// <summary>Snapshot the whole game's NON-property state: visit counts, shared selector cursors, and
+        /// every live flow's cursor and PRNG. The property values are the registry's: a standalone engine
+        /// (one that made its own registry) carries them here under Registry; a game that passed a registry
+        /// saves it once itself, beside each engine's SaveGame.</summary>
         public SaveGame SaveGame()
         {
             var flows = new Dictionary<string, FlowSnapshot>();
             foreach (var kv in _flows) flows[kv.Key] = kv.Value.Snapshot();
             return new SaveGame
             {
-                Version = 2,
-                Shared = FlatOf(_host.SharedPatter),
+                Version = SaveVersion,
+                Registry = _host.OwnsRegistry ? _host.Registry.Save() : null,
                 SharedVisits = new Dictionary<string, int>(_host.SharedVisits),
                 SharedSelectors = CloneSelectors(_host.SharedSelectors),
-                StageBags = SaveBags(_host.StageBags),
                 Flows = flows,
             };
         }
 
+        /// <summary>The save version SaveGame writes. Version 2 saves (which carried the property values
+        /// in the engine's own sections) still load.</summary>
+        public const int SaveVersion = 3;
+
+        /// <summary>Restore a SaveGame: visit counts, shared selector cursors, and every flow. Property
+        /// values come from the registry. A save that carries them (a standalone engine's, or a version 2
+        /// save from before the registry held them) has them moved into the registry here; otherwise the
+        /// game loads its registry itself, before or after this call. Either order works: this engine's bags
+        /// are handed back to the registry (values kept) and the restored flows claim them as they register.</summary>
         public void LoadGame(SaveGame save)
         {
-            if (save.Version != 2) throw new Exception($"unsupported save version: {save.Version}");
-            // Seeded from the declarations, then the saved values laid over: a property the
-            // save predates keeps its default rather than vanishing.
-            _host.SharedPatter = new PropertyBag(_host.PatterSharedDecls.Select(ToScopeDecl), null, "@patter.");
-            _host.SharedPatter.Load(OrderedOf(save.Shared));
-            _host.SharedVisits.Clear();
-            foreach (var kv in save.SharedVisits) _host.SharedVisits[kv.Key] = kv.Value;
-            _host.SharedSelectors.Clear();
-            foreach (var kv in save.SharedSelectors) _host.SharedSelectors[kv.Key] = kv.Value.Clone();
-            _host.StageBags.Clear();
-            foreach (var kv in LoadBags(_host, save.StageBags, true)) _host.StageBags[kv.Key] = kv.Value;
+            if (save.Version != 2 && save.Version != SaveVersion) throw new Exception($"unsupported save version: {save.Version}");
+            var reg = _host.Registry;
+            var saved = save.Flows ?? new Dictionary<string, FlowSnapshot>();
+            // Flows the save does not have are over: their bags go. The rest are handed back with their
+            // values, which is what a game that loaded its registry first has just laid the save's values over.
+            foreach (var kv in _flows) { kv.Value.ReleaseBags(saved.ContainsKey(kv.Key)); kv.Value.Close(); }
             _flows.Clear();
-            foreach (var kv in save.Flows)
+            foreach (var s in _host.StageBags.Keys) reg.Remove(PatterKeys.Stage(s), keep: true);
+            _host.StageBags.Clear();
+
+            var values = save.Version == 2 ? SectionsFromV2(save) : save.Registry;
+            if (values != null)
+            {
+                // The engine's own registry takes the save wholesale. A game's registry may hold values the
+                // game loaded for other engines, still waiting to be claimed: add to those, never replace them.
+                if (_host.OwnsRegistry) reg.Load(values);
+                else reg.Load(values, keepParked: true);
+            }
+            _host.SharedVisits.Clear();
+            foreach (var kv in save.SharedVisits ?? new Dictionary<string, int>()) _host.SharedVisits[kv.Key] = kv.Value;
+            _host.SharedSelectors.Clear();
+            foreach (var kv in save.SharedSelectors ?? new Dictionary<string, SelectorState>()) _host.SharedSelectors[kv.Key] = kv.Value.Clone();
+            foreach (var kv in saved)
             {
                 var flow = new Flow(kv.Key, _host, _defaultSeed);
                 flow.Restore(kv.Value);
                 _flows[kv.Key] = flow;
             }
+        }
+
+        /// <summary>A version 2 save's property values, as registry sections under this engine's keys.</summary>
+        private static OrderedMap<string, OrderedMap<string, PatterValue>> SectionsFromV2(SaveGame save)
+        {
+#pragma warning disable CS0618 // the version 2 fields are read here, and only here
+            var out_ = new OrderedMap<string, OrderedMap<string, PatterValue>>();
+            if (save.Shared != null) out_.Set("patter", OrderedOf(save.Shared));
+            foreach (var kv in save.StageBags ?? new Dictionary<string, Dictionary<string, PatterValue>>())
+                out_.Set(PatterKeys.Stage(kv.Key), OrderedOf(kv.Value));
+            foreach (var f in save.Flows ?? new Dictionary<string, FlowSnapshot>())
+            {
+                if (f.Value.Scopes != null) out_.Set(PatterKeys.FlowGlobals(f.Key), OrderedOf(f.Value.Scopes));
+                foreach (var kv in f.Value.SceneBags ?? new Dictionary<string, Dictionary<string, PatterValue>>())
+                    out_.Set(PatterKeys.FlowScene(f.Key, kv.Key), OrderedOf(kv.Value));
+            }
+#pragma warning restore CS0618
+            return out_;
         }
 
         // -- ref resolution -----------------------------------------------------
@@ -775,9 +933,6 @@ namespace Patterkit.Patterplay
         }
 
         // -- helpers ------------------------------------------------------------
-
-        internal static Dictionary<string, PatterValue> CloneBag(Dictionary<string, PatterValue> bag)
-            => bag.ToDictionary(k => k.Key, k => k.Value);
 
         internal static Dictionary<string, SelectorState> CloneSelectors(Dictionary<string, SelectorState> m)
             => m.ToDictionary(k => k.Key, k => k.Value.Clone());
@@ -833,21 +988,21 @@ namespace Patterkit.Patterplay
             return string.Join("-", parts);
         }
 
-        /// <summary>The seed value for a self-backed host property: its `default`, else the type default.
-        /// Mirrors the JS runtime's hostScopeDefault.</summary>
-        internal static PatterValue HostScopeDefault(HostScopeDecl d)
+        /// <summary>A host-scope declaration (`@world.x`) as a registry declaration.</summary>
+        internal static ScopeDeclaration ToForeignDecl(HostScopeDecl d) => new ScopeDeclaration
         {
-            if (d.Default != null) return d.Default;
-            switch (d.Type)
-            {
-                case "boolean": return PatterValue.False;
-                case "number": return PatterValue.Num(0);
-                case "string": return PatterValue.Str("");
-                case "flags": return PatterValue.Flags(new List<string>());
-                case "enum": return PatterValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
-                case "quality": return PatterValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
-                default: return PatterValue.False;
-            }
+            Name = d.Name, Type = d.Type, Values = d.Values, Stages = d.Stages, Default = d.Default, Writable = d.Writable,
+        };
+
+        /// <summary>A self-backed host scope's declaration (the standalone `@world`): the scope's own
+        /// `writable` default folded in, since an owned bag reads writability per declaration. Names fold to
+        /// lower case in the bag, as the compiler emits every reference (`isNight` is read as `isnight`): the
+        /// JS runtime once seeded them verbatim, so a capitalised name read as absent (fixed 2026-08-18).</summary>
+        internal static ScopeDeclaration SelfBackedDecl(HostScopeDecl d, bool? scopeWritable)
+        {
+            var decl = ToForeignDecl(d);
+            decl.Writable = d.Writable ?? scopeWritable;
+            return decl;
         }
 
         /// <summary>A bundle PropertyDecl as the shared bag's ScopeDeclaration. The two describe the
@@ -868,49 +1023,7 @@ namespace Patterkit.Patterplay
             return out_;
         }
 
-        /// <summary>Bags -> the flat name/value maps the save format has always carried. The bag is a
-        /// runtime detail; the envelope is a contract with every save already on disk.</summary>
-        internal static Dictionary<string, Dictionary<string, PatterValue>> SaveBags(Dictionary<string, PropertyBag> bags)
-        {
-            var out_ = new Dictionary<string, Dictionary<string, PatterValue>>();
-            foreach (var kv in bags)
-            {
-                var flat = new Dictionary<string, PatterValue>();
-                foreach (var e in kv.Value.Save()) flat[e.Key] = e.Value;
-                out_[kv.Key] = flat;
-            }
-            return out_;
-        }
-
-        /// <summary>The reverse: seed each bag from the BUNDLE's declarations, then lay the saved
-        /// values over. A property the save predates keeps its declared default rather than
-        /// vanishing, and one the bundle has since dropped lands as a stray.</summary>
-        internal static Dictionary<string, PropertyBag> LoadBags(
-            FlowHost host, Dictionary<string, Dictionary<string, PatterValue>> saved, bool wantShared)
-        {
-            var out_ = new Dictionary<string, PropertyBag>();
-            foreach (var kv in saved ?? new Dictionary<string, Dictionary<string, PatterValue>>())
-            {
-                var shared = host.SceneSharedNames.TryGetValue(kv.Key, out var names) ? names : new HashSet<string>();
-                var props = host.Bundle.Scenes.TryGetValue(kv.Key, out var sc) ? sc.SceneProps : null;
-                var bag = new PropertyBag(DeclsFor(props, shared, wantShared));
-                var values = new OrderedMap<string, PatterValue>();
-                foreach (var e in kv.Value) values.Set(e.Key, e.Value);
-                bag.Load(values);
-                out_[kv.Key] = bag;
-            }
-            return out_;
-        }
-
-        /// <summary>One bag as the flat name/value map the save envelope carries.</summary>
-        internal static Dictionary<string, PatterValue> FlatOf(PropertyBag bag)
-        {
-            var flat = new Dictionary<string, PatterValue>();
-            foreach (var e in bag.Save()) flat[e.Key] = e.Value;
-            return flat;
-        }
-
-        /// <summary>The reverse, for PropertyBag.Load.</summary>
+        /// <summary>A flat name/value map as PropertyBag.Load and the registry take it.</summary>
         internal static OrderedMap<string, PatterValue> OrderedOf(Dictionary<string, PatterValue> flat)
         {
             var values = new OrderedMap<string, PatterValue>();
@@ -952,19 +1065,39 @@ namespace Patterkit.Patterplay
 
     // -- save-game records ------------------------------------------------------
 
+    /// <summary>A full resumable save (version 3): everything that is not a property, plus the registry's
+    /// values when the engine made its own registry. The shape is the family's (`patter/save@0`, written
+    /// by PatterSave): every runtime writes the same key paths.</summary>
     public sealed class SaveGame
     {
         public int Version;
-        public Dictionary<string, PatterValue> Shared;
+        /// <summary>The engine's own registry's values, keyed by registry key (`patter`,
+        /// `patter/flow/&lt;flow&gt;/scene/&lt;scene&gt;`, `world`, and so on): present only when the engine made
+        /// the registry itself (a standalone game). A game that passed a registry saves it once, beside this.</summary>
+        public OrderedMap<string, OrderedMap<string, PatterValue>> Registry;
+        /// <summary>World-wide per-node entry counts (node id -> times entered by any flow).</summary>
         public Dictionary<string, int> SharedVisits;
+        /// <summary>Shared selector cursors (node id -> state) for `shared` memoried selectors.</summary>
         public Dictionary<string, SelectorState> SharedSelectors;
-        public Dictionary<string, Dictionary<string, PatterValue>> StageBags;
+        /// <summary>Each live flow's snapshot, keyed by flow id.</summary>
         public Dictionary<string, FlowSnapshot> Flows;
+
+        /// <summary>Version 2 only: the shared @patter globals. Read from an older save, never written.</summary>
+        [Obsolete("Version 2 saves only. Property values are the registry's now: see Registry.")]
+        public Dictionary<string, PatterValue> Shared;
+        /// <summary>Version 2 only: the shared @scene bags (scene id -> name -> value). Read, never written.</summary>
+        [Obsolete("Version 2 saves only. Property values are the registry's now: see Registry.")]
+        public Dictionary<string, Dictionary<string, PatterValue>> StageBags;
     }
 
+    /// <summary>The serialised cursor, PRNG, and visits of one flow. Its properties are the registry's.</summary>
     public sealed class FlowSnapshot
     {
-        public Dictionary<string, PatterValue> Scopes;            // not-shared @patter
+        /// <summary>Version 2 only: the flow's not-shared @patter globals. Read, never written.</summary>
+        [Obsolete("Version 2 saves only. Property values are the registry's now: see SaveGame.Registry.")]
+        public Dictionary<string, PatterValue> Scopes;
+        /// <summary>Version 2 only: the flow's per-scene @scene bags. Read, never written.</summary>
+        [Obsolete("Version 2 saves only. Property values are the registry's now: see SaveGame.Registry.")]
         public Dictionary<string, Dictionary<string, PatterValue>> SceneBags;
         public uint RngState;
         public Dictionary<string, int> Visits;

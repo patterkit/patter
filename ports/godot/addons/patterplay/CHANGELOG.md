@@ -6,9 +6,47 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **One registry per game.** Every property bag the engine holds now lives in a `PatterScopeRegistry`
+  (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's
+  bag under a key starting `patter/`. A new `registry` option takes the game's own registry, shared
+  with any other engine in the game; without one the engine makes its own and acts as its own game,
+  so a single-engine game needs no change.
+- **The save is version 3.** `save_game()` holds what is not a property (cursors, PRNGs, visit
+  counts, selector cursors). An engine built without a registry also carries that registry's values
+  under `registry`, so one `PatterSave.serialize_state` is still the whole game; an engine given the
+  game's registry leaves them to the game, which saves the registry once (`registry.save()`). Version
+  2 saves still load, their values moving into the registry, and so does the snake_case shape this
+  addon wrote before 0.11.0.
+- **`host_scopes` bindings are registered in the registry.** Each `{"get", "set"}` binding becomes a
+  foreign scope: your game keeps the values, and no Patterplay save holds them. The option's shape is
+  unchanged. A `writable: false` declaration is still refused to the story and never to your game's
+  own `set_property`.
+- **A self-backed `@world` is saved.** When the game binds no `host_scopes` entry, `@world` is a
+  property the engine's registry stores, so it rides in the save. Given the game's registry, the
+  engine self-backs nothing: `@world` is the game's to register there.
+- **Every expression reads every registered scope**, so a condition can test another engine's
+  `@story.act` in a combined game, even one registered after the flow opened, and `get_property`
+  reads it too. A token two engines both want is refused as the second is built: the registry
+  `push_error`s a message naming the first, the new engine's `init_error()` returns it and the engine
+  is inert, and the game's registry is left as it was.
+- `hot_swap` hands every bag to the replacement engine on the same registry. The engine it replaces
+  is released and its flows are closed. If the restore is refused, the fallback engine keeps the
+  shared properties and restarts each flow.
+- `reset()` and a fresh `open_flow` drop values a load left waiting for this engine's keys, and no
+  other engine's. Closing a flow removes its bags from the registry.
+- `load_game()` returns `false` (with `push_error("unsupported save version: N")`) for a save it
+  cannot read, and `PatterSave.load_state` / `deserialize_state` pass that on; both used to report
+  success.
+- `PatterStateLogger.snapshot_state` reads the engine's bags rather than its save. A scene no flow has
+  re-entered since a load appears once it is.
+
 ### Added
 
-- **`PatterScopeRegistry`, the shared scope registry** (2026-09-24). A thin shim over `runtime/expr/scope_registry.gd`, vendored from expr and shared with the Storylet Engine: one registry per game, holding owned scopes (property bags it reads, writes, lists, and saves) and foreign ones (resolved by the game), and building the eval context the shared evaluator reads. It matches `@wildwinter/scoperegistry` 0.7.0 and runs that package's registry corpus: owners named in clash errors and carried on `list_properties()` rows, `remove(token, {"keep": true})`, values loaded for a key nobody has registered parked until it registers, `discard_parked(prefix)`, a `revision` counter, and aliases on `to_eval_context`. A refused call returns its error String ("" on success). The engine does not use it yet: nothing about how Patterplay plays or saves changes.
+- `PatterEngine.init_error()`: why construction was refused ("" when it was not), for an engine given
+  a registry in which one of its tokens was already taken.
+- **`PatterScopeRegistry`, the shared scope registry** (2026-09-24). A thin shim over `runtime/expr/scope_registry.gd`, vendored from expr and shared with the Storylet Engine: one registry per game, holding owned scopes (property bags it reads, writes, lists, and saves) and foreign ones (resolved by the game), and building the eval context the shared evaluator reads. It matches `@wildwinter/scoperegistry` 0.7.0 and runs that package's registry corpus: owners named in clash errors and carried on `list_properties()` rows, `remove(token, {"keep": true})`, values loaded for a key nobody has registered parked until it registers, `discard_parked(prefix)`, a `revision` counter, and aliases on `to_eval_context`. A refused call returns its error String ("" on success).
 
 ## [0.13.0] - 2026-09-05
 

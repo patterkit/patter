@@ -28,6 +28,28 @@ Headless checks for the Godot addon. **Not part of the shipped addon zip** (only
   `registry-corpus.json` (the ScopeRegistry's, through the shared runner `registry_corpus.gd`,
   vendored here too, printing `registry corpus: N/N`; a missing file is a failure).
 
+- `test_one_registry.gd` - one registry per game, from the GAME's side (the GDScript half of the JS
+  runtime's `one-registry.test.ts` and `combined-game.test.ts`): the keys and owner label the engine
+  registers under, `save_game()` leaving the values out given a game registry and carrying them
+  standalone, loading in either order, a version 2 save's values moving into the registry, a token
+  clash leaving the registry as it was, reset and a fresh flow dropping only Patter's waiting values,
+  `hot_swap` handing bags over, the `host_scopes` option, and a combined game with a stand-in engine
+  that registers `@story`.
+
+  ```sh
+  godot --headless --path ports/godot --script res://test/test_one_registry.gd
+  ```
+
+- `test_save_shape.gd` - the save's SHAPE, pinned against hand-written saves: version 3 as written,
+  version 2 and the pre-0.11.0 snake_case shape as still read.
+
+  ```sh
+  godot --headless --path ports/godot --script res://test/test_save_shape.gd
+  ```
+
+  Both print `ALL PASS` (exit 0) or `N FAILED` (exit 1). A script that fails to PARSE exits 0 without
+  printing either, so read for the verdict line.
+
 - `tour_check.gd` - a smoke check that the bundled tour demo loads and steps:
 
   ```sh

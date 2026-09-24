@@ -75,19 +75,73 @@ World->OnChanged.AddDynamic(this, &AMyActor::OnWorldChanged);   // (Name, Value,
 
 Everything on `UPatterWorld` is Blueprint-callable, with typed `Set*` / `Get*`, `Has`, `Names`,
 `SetReadOnly`, and an `OnChanged` delegate that tells your own writes from the story's. Names match
-case-insensitively, as the story's references do. Leave `World` out of `Create` and the engine
-**self-backs** `@world` from the declared defaults, which is right for a run that never leaves the
-engine; `GetBoundWorld()` says which you have.
+case-insensitively, as the story's references do. The engine registers a bound world as an
+**external** scope: the values stay in your container, and no Patter save holds them. Leave `World`
+out of `Create` and the engine **self-backs** `@world` from the declared defaults, as a property it
+stores and saves with the rest of the run, which is right for a run that never leaves the engine;
+`GetBoundWorld()` says which you have.
 
 Two read-only rules meet here and stay distinct. A property declared **`writable: false`** in the
 project is the *story's* promise, refused by the engine whether or not a world is bound. Only
 the story's write is refused; your own `SetProperty` writes it, because the value is the game's.
 **`SetReadOnly`** is the *game's* policy, a name the story may read but this game will not let it
 write. Either refusal fails the step and logs why, never crashes, and neither binds your own `Set*`
-calls. The container is never in a Patter save, so your game saves it once, however it already saves
-things, and a load never writes through it. The binding survives `HotSwap` and `ApplyLiveBundle`.
+calls. A bound container is never in a Patter save, so your game saves it once, however it already
+saves things, and a load never writes through it. The binding survives `HotSwap` and `ApplyLiveBundle`.
 It is the same shape as the Storylet Engine's `UStoryletEngine::Create(Bundle, …, World)`, so a
 project running both reads one API. [World Properties](/play/world-properties/) has the full picture.
+
+## One registry per game
+
+Every property value lives in a **registry**, a `patter::ScopeRegistry` (the plugin's
+`Patter/Expr/ScopeRegistry.h`, the same registry every Patterplay runtime uses). A game has one, and
+it holds every property in the game, except values your game keeps itself and lends through a
+container like `UPatterWorld`. The registry is saved and loaded as one.
+
+An engine you build with `Create` makes its own and acts as its own game, which is why a single
+`UPatterSave::SaveStateToJson` needs no wiring. A C++ game that wants to hold the properties itself,
+or share them with its own systems, makes the registry and hands it to the engine with
+**`UPatterEngine::CreateWithRegistry`**:
+
+```cpp
+#include "Patter/Save.h"   // patter::saveRegistry / loadRegistry
+
+auto Registry = std::make_shared<patter::ScopeRegistry>();
+patter::ScopeDeclaration Gold;
+Gold.name = "gold";
+Gold.type = "number";
+patter::OwnedScopeOptions Game;
+Game.owner = "Game";
+Registry->defineOwned("world", { Gold }, Game);   // @world, stored and saved
+UPatterEngine* Engine = UPatterEngine::CreateWithRegistry(Bundle, Registry);
+
+// One save for the game: the registry's values once, and the engine's part.
+const std::string RegistryJson = patter::saveRegistry(*Registry);
+const FString PatterJson = UPatterSave::SaveStateToJson(Engine);
+
+// Load in either order: values for bags that aren't open yet wait in the registry.
+patter::loadRegistry(*Registry, RegistryJson);
+UPatterSave::LoadStateFromJson(Engine, PatterJson);
+```
+
+Given a registry, the engine registers `@patter` under `patter` and each flow's and scene's bag under
+a key starting `patter/`, which no expression can name. Its save then leaves the values out, because
+your game saves the registry. `@world` is yours to register: owned, as above, when the registry should
+store and save it, or bound through a `UPatterWorld` passed as the third argument, when your game
+keeps the values. The engine self-backs nothing on a registry you pass. Every expression can read
+every registered scope, so a condition can test another system's `@story.act` once it is in the same
+registry.
+
+A token is taken once. Two engines that both want the same one fail as you build the second:
+`CreateWithRegistry` returns null and logs an error that names who got there first, and your registry
+is left as it was. Rebuilding an engine on an edited bundle (`HotSwap`, `ApplyLiveBundle`) hands its
+bags to the replacement on the same registry.
+
+`CreateWithRegistry` is C++ only. The registry is a standard C++ type in this plugin's own namespace
+(the Storylet Engine plugin carries its own), so a Blueprint handle to it could not be shared with
+another product's engine, which is what a Blueprint game would pass one for. A Blueprint game uses
+`Create`, and `UPatterSave` saves everything. In the core, the same option is
+`patter::EngineOptions::registry`.
 
 ## Send the story somewhere
 
@@ -144,8 +198,13 @@ The protocol and the editor side are on [Live refresh & debug](/play/live-debug/
 
 ## Save and load
 
-The runtime serialises the whole run: every flow's position, the shared `@patter` / `@scene`
-state, visit counts, and the seeded random generator.
+The runtime serialises the whole run: every flow's position, visit counts, selector cursors, and the
+seeded random generator. An engine you built with `Create` also carries every property value,
+`@patter`, `@scene`, and a self-backed `@world` alike, so one call is still the whole game; an engine
+you built on your own registry leaves them to [the registry's save](#one-registry-per-game). It is the
+same `patter/save@0` format every Patterplay runtime uses, so a save written on the web or in Unity
+loads here. A save written before property values moved into the registry (version 2) still loads,
+and its values move into the registry as it does.
 
 Use **`UPatterSave`**, which is Blueprint-callable and gives you the JSON to write where you like:
 `SaveStateToJson(Engine)` returns it, `LoadStateFromJson(Engine, Json)` restores it and returns

@@ -1,14 +1,13 @@
 // Blueprint/C++ API over the engine: UPatterEngine wraps patter::Engine, UPatterFlow wraps
-// a patter::Flow. The engine is held via a Pimpl pointer; a flow is held as a SHARED handle,
-// because the engine rebuilds or drops its flows (load, hot swap, close, reset) underneath
-// wrappers that outlive them.
+// a patter::Flow. Both are held as SHARED handles: the engine because a hot swap hands the
+// wrapper a replacement core, a flow because the engine rebuilds or drops its flows (load, hot
+// swap, close, reset) underneath wrappers that outlive them.
 #pragma once
 
 #include <memory>
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "Templates/PimplPtr.h"
 #include "PatterTypes.h"
 #include "PatterStructure.h"
 #include "PatterEngine.generated.h"
@@ -16,7 +15,7 @@
 class UPatterBundle;
 class UPatterEngine;
 class UPatterWorld;
-namespace patter { class Engine; class Flow; }
+namespace patter { class Engine; class Flow; class ScopeRegistry; }
 
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterFlow : public UObject
@@ -92,14 +91,32 @@ class PATTERPLAYRUNTIME_API UPatterEngine : public UObject
 public:
 	// Construct a play-ready engine on a (parsed) bundle. Returns nullptr (and logs) on error.
 	//
+	// The engine makes its own property registry and acts as its own game: every property it holds
+	// (@patter, each flow's and each scene's) is in that registry, and UPatterSave's SaveStateToJson
+	// carries all of it in one save.
+	//
 	// `World` is the GAME's @world container (UPatterWorld): bind one and the story reads and writes your
 	// values through it, and anything else bound to the same object - the Storylet Engine, your own
-	// systems - sees the same state. Leave it null and the engine self-backs @world from the declared
-	// defaults, which is right for a run that never leaves the engine. The binding survives HotSwap /
-	// ApplyLiveBundle and is never written by a load: @world is not in a Patter save, the host saves its
-	// container once. Same shape as UStoryletEngine::Create(Bundle, ..., World).
+	// systems - sees the same state. It is EXTERNAL to the engine: never in a Patter save, never written
+	// by a load; the game saves its container itself. Leave it null and the engine self-backs @world from
+	// the declared defaults, as a property it stores and SAVES with everything else. The binding survives
+	// HotSwap / ApplyLiveBundle. Same shape as UStoryletEngine::Create(Bundle, ..., World).
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	static UPatterEngine* Create(UPatterBundle* Bundle, UPatterWorld* World = nullptr);
+
+	// C++ only: construct on the GAME's registry, the one registry a game holds for every engine and
+	// system that keeps properties in it, saved once by the game. The engine registers its scopes in it
+	// (@patter under `patter`, its per-flow and per-scene bags under keys starting `patter/`, and a bound
+	// World as an external @world), reads every other scope from it, and self-backs nothing: a declared
+	// @world with no World bound is the game's to register. SaveStateToJson then leaves the property
+	// values out; save `Registry->save()` beside it, and load it before or after LoadStateFromJson.
+	// Returns nullptr (and logs) on error, including a token the registry already holds.
+	//
+	// Not a Blueprint node: patter::ScopeRegistry is a std C++ type in this plugin's own namespace (the
+	// Storylet Engine vendors its own copy), so a Blueprint handle to it could not be shared with another
+	// product's engine, which is the only reason a Blueprint game would pass one.
+	static UPatterEngine* CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
+		UPatterWorld* World = nullptr);
 
 	// The @world container bound at Create, or null for a self-backed engine.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
@@ -154,8 +171,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|LiveLink")
 	void ReplaceStrings(UPatterBundle* NewBundle);
 
-	// Tier 2 only: rebuild on the new bundle with the run carried over (save -> fresh core -> load,
-	// locale + captions preserved). Prefer ApplyLiveBundle. Returns false on a null/unparsed bundle.
+	// Tier 2 only: rebuild on the new bundle with the run carried over (the core's hotSwap: every
+	// property bag handed to the replacement on the same registry, the cursors restored, locale +
+	// captions preserved). Prefer ApplyLiveBundle. Returns false on a null/unparsed bundle.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|LiveLink")
 	bool HotSwap(UPatterBundle* NewBundle);
 
@@ -227,7 +245,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
 	void UnregisterForDebug();
 
-	patter::Engine* Raw() const { return Engine.Get(); }
+	patter::Engine* Raw() const { return Engine.get(); }
 
 	virtual void BeginDestroy() override;
 
@@ -277,6 +295,8 @@ public:
 	void Reset();
 
 private:
+	static UPatterEngine* Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry);
 
-	TPimplPtr<patter::Engine> Engine;
+	// SHARED rather than a pimpl: HotSwap takes the replacement core the engine hands back.
+	std::shared_ptr<patter::Engine> Engine;
 };

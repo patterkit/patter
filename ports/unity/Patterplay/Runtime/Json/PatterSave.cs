@@ -11,10 +11,15 @@
 // JS save loaded here threw on the first nested object (from-storylets/save-shape-across-engines,
 // 2026-09-03).
 //
-// Reading accepts three shapes. The canonical one; the shape this port wrote before 0.11.0 (PascalCase
-// keys, flat `Shared` and `Scopes`, cursor fields flat on the flow, `PendingOptions` + `PendingGroupId`),
-// so a player's save on disk still loads; and a bare version-2 snapshot with no envelope, as before.
-// Lookups are case-insensitive, so the first two share one reader.
+// Version 3 (the one-registry model) holds no property values of the engine's own: those are the
+// registry's. A standalone engine's save carries its registry's values under `registry`; a game that
+// passed its own registry saves that once, beside this.
+//
+// Reading accepts four shapes. The canonical version 3 one; version 2, whose property sections
+// (`shared`, `stageBags`, each flow's `scopes` and `sceneBags`) the engine moves into the registry as it
+// loads; the shape this port wrote before 0.11.0 (PascalCase keys, flat `Shared` and `Scopes`, cursor
+// fields flat on the flow, `PendingOptions` + `PendingGroupId`), so a player's save on disk still loads;
+// and a bare snapshot with no envelope, as before. Lookups are case-insensitive, so one reader serves.
 //
 // Pure (no UnityEngine), so it is corpus-verified in the dotnet TestHost too.
 
@@ -58,7 +63,8 @@ namespace Patterkit.Patterplay
     {
         public const string Schema = "patter/save@0";
 
-        /// <summary>Serialise the whole game (shared state, visits, every live flow) to a tagged JSON string.</summary>
+        /// <summary>Serialise the whole game (visits, selectors, every live flow, and the registry's values when the
+        /// engine made its own registry) to a tagged JSON string.</summary>
         public static string SerializeState(Engine engine) => Envelope(engine.SaveGame()).ToString(Formatting.None);
 
         /// <summary>The tagged envelope as a JObject: `{ schema, save }`, the save in the family's shape.</summary>
@@ -81,21 +87,32 @@ namespace Patterkit.Patterplay
             engine.LoadGame(ReadSave(save));
         }
 
+        /// <summary>A registry's values as JSON (registry key -> name -> value), for a game that made its own
+        /// registry and saves it once beside each engine's part. The same shape a standalone engine's save
+        /// carries under `registry`, and the same one `JSON.stringify(registry.save())` writes on the web.</summary>
+        public static JObject SaveRegistry(ScopeRegistry registry) => RegistryMap(registry.Save());
+
+        /// <summary>Lay a <see cref="SaveRegistry"/> object over a registry. Values for a key nobody has
+        /// registered yet wait in the registry and are handed over when it registers, so this can run
+        /// before or after each engine's DeserializeState.</summary>
+        public static void LoadRegistry(ScopeRegistry registry, JObject values)
+        {
+            registry.Load(ReadRegistry(values) ?? new OrderedMap<string, OrderedMap<string, PatterValue>>());
+        }
+
         // -- writing: literal keys, in the JS reference's order -----------------------------------
 
         private static JObject SaveToken(SaveGame s)
         {
             var flows = new JObject();
             foreach (var kv in s.Flows ?? new Dictionary<string, FlowSnapshot>()) flows[kv.Key] = FlowToken(kv.Value);
-            return new JObject
-            {
-                ["version"] = s.Version,
-                ["shared"] = new JObject { ["patter"] = ValueMap(s.Shared) },   // owned scope -> name -> value
-                ["sharedVisits"] = IntMap(s.SharedVisits),
-                ["sharedSelectors"] = SelectorMap(s.SharedSelectors),
-                ["stageBags"] = BagMap(s.StageBags),
-                ["flows"] = flows,
-            };
+            var save = new JObject { ["version"] = s.Version };
+            // Registry key -> name -> value, present only when the engine made its own registry.
+            if (s.Registry != null) save["registry"] = RegistryMap(s.Registry);
+            save["sharedVisits"] = IntMap(s.SharedVisits);
+            save["sharedSelectors"] = SelectorMap(s.SharedSelectors);
+            save["flows"] = flows;
+            return save;
         }
 
         private static JObject FlowToken(FlowSnapshot f)
@@ -116,8 +133,6 @@ namespace Patterkit.Patterplay
             }
             return new JObject
             {
-                ["scopes"] = new JObject { ["patter"] = ValueMap(f.Scopes) },
-                ["sceneBags"] = BagMap(f.SceneBags),
                 ["rngState"] = f.RngState,
                 ["visits"] = IntMap(f.Visits),
                 // The execution position sits under `cursor`; absent ids are null, not "".
@@ -168,10 +183,10 @@ namespace Patterkit.Patterplay
             return o;
         }
 
-        private static JObject BagMap(Dictionary<string, Dictionary<string, PatterValue>> m)
+        private static JObject RegistryMap(OrderedMap<string, OrderedMap<string, PatterValue>> m)
         {
             var o = new JObject();
-            foreach (var kv in m ?? new Dictionary<string, Dictionary<string, PatterValue>>()) o[kv.Key] = ValueMap(kv.Value);
+            foreach (var kv in m) o[kv.Key] = ValueMap(kv.Value);
             return o;
         }
 
@@ -220,15 +235,34 @@ namespace Patterkit.Patterplay
             var flows = new Dictionary<string, FlowSnapshot>();
             var fl = Obj(o, "flows");
             if (fl != null) foreach (var p in fl.Properties()) flows[p.Name] = ReadFlow(p.Value as JObject ?? new JObject());
-            return new SaveGame
+            var save = new SaveGame
             {
                 Version = (int?)Get(o, "version") ?? 0,
-                Shared = ReadScope(Obj(o, "shared")),
+                Registry = ReadRegistry(Obj(o, "registry")),
                 SharedVisits = ReadIntMap(Obj(o, "sharedVisits")),
                 SharedSelectors = ReadSelectorMap(Obj(o, "sharedSelectors")),
-                StageBags = ReadBagMap(Obj(o, "stageBags")),
                 Flows = flows,
             };
+#pragma warning disable CS0618 // version 2's property sections, read so the engine can move them into the registry
+            save.Shared = ReadScope(Obj(o, "shared"));
+            save.StageBags = ReadBagMap(Obj(o, "stageBags"));
+#pragma warning restore CS0618
+            return save;
+        }
+
+        /// <summary>A version 3 save's `registry` section (registry key -> name -> value), in document
+        /// order; null when absent (a game that passed its own registry saves it separately).</summary>
+        private static OrderedMap<string, OrderedMap<string, PatterValue>> ReadRegistry(JObject o)
+        {
+            if (o == null) return null;
+            var m = new OrderedMap<string, OrderedMap<string, PatterValue>>();
+            foreach (var p in o.Properties())
+            {
+                var values = new OrderedMap<string, PatterValue>();
+                if (p.Value is JObject section) foreach (var v in section.Properties()) values.Set(v.Name, ReadValue(v.Value));
+                m.Set(p.Name, values);
+            }
+            return m;
         }
 
         /// <summary>`{ patter: { name: value } }` (the family's two-level shape), or the bare
@@ -267,10 +301,8 @@ namespace Patterkit.Patterplay
                 pendingGroupId = StrOrNull(c, "pendingGroupId");
             }
 
-            return new FlowSnapshot
+            var snapshot = new FlowSnapshot
             {
-                Scopes = ReadScope(Obj(f, "scopes")),
-                SceneBags = ReadBagMap(Obj(f, "sceneBags")),
                 // Through ToUint32: the JS runtime wrote this SIGNED until it was fixed.
                 RngState = Mulberry32.ToUint32((double?)Get(f, "rngState") ?? 0),
                 Visits = ReadIntMap(Obj(f, "visits")),
@@ -284,6 +316,11 @@ namespace Patterkit.Patterplay
                 PendingPromptOwnerId = StrOrNull(c, "pendingPromptOwnerId"),
                 Selectors = ReadSelectorMap(Obj(c, "selectors")),
             };
+#pragma warning disable CS0618 // version 2's property sections
+            snapshot.Scopes = ReadScope(Obj(f, "scopes"));
+            snapshot.SceneBags = ReadBagMap(Obj(f, "sceneBags"));
+#pragma warning restore CS0618
+            return snapshot;
         }
 
         private static List<ChoiceOption> ReadOptions(JArray arr)

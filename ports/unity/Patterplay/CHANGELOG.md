@@ -6,6 +6,43 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry`
+  (the shared registry, vendored from `expr`): `@patter` under `patter`, and each flow's and scene's
+  bag under a key starting `patter/`. A new `EngineOptions.Registry` takes the game's own registry,
+  shared with any other engine in the game; without one the engine makes its own and acts as its own
+  game, so a single-engine game needs no change.
+- **The save is version 3.** `SaveGame()` holds what is not a property (cursors, PRNGs, visit counts,
+  selector cursors). An engine built without a registry also carries that registry's values under
+  `SaveGame.Registry` (`registry` in the JSON), so one `PatterSave.SerializeState` is still the whole
+  game; an engine given the game's registry leaves them to the game, which saves the registry once.
+  Version 2 saves still load, their values moving into the registry. `SaveGame.Shared`,
+  `SaveGame.StageBags`, `FlowSnapshot.Scopes`, and `FlowSnapshot.SceneBags` are now read from a
+  version 2 save only, and are marked obsolete.
+- **`IHostScope` is registered in the registry.** Each `EngineOptions.HostScopes` binding becomes a
+  foreign scope: your game keeps the values, and no Patterplay save holds them. The interface and the
+  option are unchanged. A `writable: false` declaration is still refused to the story and never to
+  your game's own `SetProperty`.
+- **A self-backed `@world` is saved.** When the game binds no `IHostScope`, `@world` is a property the
+  engine's registry stores, so it rides in the save. Given the game's registry, the engine self-backs
+  nothing: `@world` is the game's to register there.
+- **Every expression reads every registered scope**, so a condition can test another engine's
+  `@story.act` in a combined game, even one registered after the flow opened. A token two engines both
+  want fails as the second is built, naming the first, and leaves the game's registry as it was.
+- `HotSwap` hands every bag to the replacement engine on the same registry. The engine it replaces is
+  released and its flows are closed. If the restore fails, the fallback engine keeps the shared
+  properties and restarts each flow, where it used to throw.
+- `Reset()` and a fresh `OpenFlow` drop values a load left waiting for this engine's keys, and no
+  other engine's.
+- `PatterStateLogger.SnapshotState` reads the engine's bags rather than its save. A scene no flow has
+  re-entered since a load appears once it is.
+
+### Added
+
+- `PatterSave.SaveRegistry(registry)` and `PatterSave.LoadRegistry(registry, json)`: a game's
+  registry as JSON, for a game that saves its registry once beside each engine's part.
+
 ## [0.13.0] - 2026-09-05
 
 ### Changed

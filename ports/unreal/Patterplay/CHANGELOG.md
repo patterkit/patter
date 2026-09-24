@@ -7,6 +7,39 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **One registry per game.** Every property bag the engine holds now lives in a `ScopeRegistry`
+  (vendored as `Patter/Expr/ScopeRegistry.h`, the same registry every Patterplay runtime uses):
+  `@patter` under `patter`, and each flow's and scene's bag under a key starting `patter/`. The core's
+  `EngineOptions::registry` takes the game's own registry, shared with anything else in the game that
+  keeps properties there; without one the engine makes its own and acts as its own game, so a
+  single-engine game needs no change. From C++, `UPatterEngine::CreateWithRegistry(Bundle, Registry,
+  World)` builds the wrapper on the game's registry. It is not a Blueprint node: the registry is a
+  std C++ type, and a Blueprint game with one engine has nothing to share it with.
+- **The save is version 3.** `saveGame()` and `UPatterSave::SaveStateToJson` hold what is not a
+  property (cursors, PRNGs, visit counts, selector cursors). An engine built without a registry also
+  carries that registry's values under `registry`, so one call is still the whole game; an engine
+  given the game's registry leaves them to the game, which saves the registry once
+  (`patter::saveRegistry` / `patter::loadRegistry` in `Patter/Save.h`). Version 2 saves still load,
+  their values moving into the registry.
+- **A self-backed `@world` is saved.** With no `UPatterWorld` bound, `@world` is a property the
+  engine's registry stores, so it rides in the save. A bound `UPatterWorld` is still external: the
+  registry reads and writes it through the container and never saves it. Given the game's registry,
+  the engine self-backs nothing: `@world` is the game's to register there.
+- **Every expression reads every registered scope**, so a condition can test another system's
+  `@story.act` once it is in the same registry, even if it registered after the flow opened. A token
+  two engines both want fails as the second is built, naming the first, and leaves the registry as
+  it was.
+- `HotSwap` / `ApplyLiveBundle` now run the core's `hotSwap`, which hands every bag to the
+  replacement on the same registry; the engine it replaces is released and its flows are closed. If
+  the restore fails, the fallback keeps the shared properties and restarts each flow at the top of
+  the scene it was in, where it used to leave the wrappers with nothing.
+- A core `patter::Engine` that is destroyed now hands its bags back to the registry with their
+  values kept, and closes its flows, so a `UPatterFlow` that outlives its engine reads as closed.
+- The state logger's `snapshotState` reads the bags rather than the save, since the save no longer
+  holds the properties.
+
 ## [0.13.0] - 2026-09-05
 
 ### Changed

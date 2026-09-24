@@ -180,30 +180,37 @@ bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
 
 // ----- UPatterEngine ----------------------------------------------------------
 
-namespace
+UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)
 {
-	// The core takes its host scopes at construction, so every path that builds a core (Create, HotSwap)
-	// asks the same question: is a world bound? Rebuilt from the retained object rather than from a
-	// retained options struct, because the object is what the game holds and what GC must keep.
-	patter::EngineOptions OptionsFor(UPatterWorld* World)
-	{
-		patter::EngineOptions Opts;
-		if (World) Opts.hostScopes["world"] = World->MakeHostScope();
-		return Opts;
-	}
+	return Build(Bundle, World, nullptr);
 }
 
-UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)
+UPatterEngine* UPatterEngine::CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry, UPatterWorld* World)
+{
+	if (!Registry)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Patterplay: CreateWithRegistry called with a null registry"));
+		return nullptr;
+	}
+	return Build(Bundle, World, Registry);
+}
+
+UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry)
 {
 	if (!Bundle || !Bundle->Raw())
 	{
 		UE_LOG(LogTemp, Error, TEXT("Patterplay: Create called with a null/unparsed bundle"));
 		return nullptr;
 	}
+	// A bound world is an external scope in the registry, read and written through the container; the
+	// core keeps the binding for its whole life, hot swaps included.
+	patter::EngineOptions Opts;
+	if (World) Opts.hostScopes["world"] = World->MakeHostScope();
+	Opts.registry = Registry;
 	UPatterEngine* E = NewObject<UPatterEngine>(GetTransientPackage());
 	E->BundleRef = Bundle;
 	E->WorldRef = World;
-	try { E->Engine = MakePimpl<patter::Engine>(*Bundle->Raw(), OptionsFor(World)); }
+	try { E->Engine = std::make_shared<patter::Engine>(*Bundle->Raw(), Opts); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
 	return E;
 }
@@ -344,16 +351,12 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 	if (!Engine || !NewBundle || !NewBundle->Raw()) return false;
 	try
 	{
-		// The wrapper swaps IN PLACE (this UObject + every flow handle stay valid), so it mirrors the
-		// core's hotSwap here rather than calling it: snapshot, fresh core on the new bundle, restore,
-		// carry the presentation state that isn't save state, then re-bind each flow wrapper by id.
-		const patter::SaveGame Snapshot = Engine->saveGame();
-		const std::string Locale = Engine->locale();
-		const bool bCaptions = Engine->closedCaptions();
-		Engine = MakePimpl<patter::Engine>(*NewBundle->Raw(), OptionsFor(WorldRef)); // the world stays bound across the swap
-		Engine->loadGame(Snapshot);
-		Engine->setLocale(Locale);
-		Engine->setClosedCaptions(bCaptions);
+		// The wrapper swaps IN PLACE (this UObject + every flow handle stay valid) around the core's own
+		// hotSwap: the old core hands every property bag to the replacement on the same registry (the
+		// same world stays bound), the cursors carry across, and so do locale and captions. Then each
+		// flow wrapper re-binds by id. The old core is released and inert once the swap starts.
+		std::unique_ptr<patter::Engine> Next = Engine->hotSwap(*NewBundle->Raw());
+		Engine = std::shared_ptr<patter::Engine>(std::move(Next));
 		BundleRef = NewBundle;
 		StringsBundleRef = nullptr;
 		RebindFlows(); // the swap rebuilt the flows; the same re-bind the load path needs
@@ -361,11 +364,11 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 	}
 	catch (const std::exception& Ex)
 	{
-		// The old core is already gone (the pimpl was reassigned before the restore threw), so the
-		// wrappers must not keep dangling flow pointers: null them, and they no-op from here on.
+		// The core falls back on a fresh engine itself when the restore fails, so reaching here means no
+		// replacement could be built at all. The old core has already released its flows: re-bind, and
+		// every wrapper reads as closed rather than dangling.
 		UE_LOG(LogTemp, Error, TEXT("Patterplay: hot swap failed - %s"), UTF8_TO_TCHAR(Ex.what()));
-		for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
-			if (UPatterFlow* Wrapper = Weak.Get()) Wrapper->Rebind(nullptr);
+		RebindFlows();
 		return false;
 	}
 }

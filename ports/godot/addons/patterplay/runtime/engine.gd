@@ -4,10 +4,25 @@
 #   var engine := PatterEngine.new(bundle)            # bundle = PatterBundle.load_from_string(json)
 #   var flow := engine.open_flow("main", "demo")
 #   var step := flow.advance()                         # { "type": "line"/"text"/"choice"/"end", ... }
+#
+# Every property bag lives in ONE scope registry per game (the one-registry model): the game hands
+# the engine its registry ({"registry": PatterScopeRegistry}) or the engine makes its own and acts as
+# its own game. `@patter` is registered under `patter`; the per-flow and per-scene bags under keys
+# starting `patter/` (see PatterFlow.key_*), which no expression can name. save_game() / load_game()
+# snapshot and restore what is NOT a property: cursors, PRNGs, visits, and selectors. The registry's
+# values ride in save_game() only when the engine made the registry itself; otherwise the game saves
+# the registry once.
 class_name PatterEngine
 extends RefCounted
 
+## Internal option: a hot_swap replacement of an engine that made its own registry is still its own
+## game (it self-backs host scopes and saves the registry's values), though it is handed that
+## registry. Not public API.
+const _OWNS_REGISTRY := "_owns_registry"
+
 var _host: Dictionary
+## Why construction was refused ("" when it was not): see init_error().
+var _init_error := ""
 var _default_seed: int = 0x9e3779b9
 var _flows: Dictionary = {}
 var _scene_gameid_to_id: Dictionary = {}
@@ -33,10 +48,6 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_source_debug = loc.get("mode", "embedded") == "ids" and loc.get("sourceDebug", false)
 
 	_host = {
-		# Per host token, the names a STORY may not write ("*" = the whole scope). The game writes
-		# them freely: "writable": false is the story's promise, not a lock on the value's owner
-		# (from-storylets/host-writes-to-read-only-world). Flows read this on their own write path.
-		"story_read_only": {},
 		# The run's decision trace (parity with the JS runtime's engine.log()). Off unless
 		# asked for: a shipped game should pay nothing for a surface it never reads.
 		"log_enabled": bool(options.get("log", false)),
@@ -65,19 +76,29 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		"block_gameid_to_id": _block_gameid_to_id,
 		"block_by_id": {},
 		"tag_index": {},
-		"shared_patter": null,   # a PatterPropertyBag, built once the declarations are split
+		# The game's one registry: `@patter` (the SHARED globals), host scopes, every instance bag.
+		# Held untyped: a combined game may hand over a registry another addon's shim built.
+		"registry": null,
+		# True when the engine made the registry (a standalone game): save_game() then carries its values.
+		"owns_registry": false,
+		"shared_patter": null,   # the SHARED @patter globals' PatterPropertyBag, registered under `patter`
+		# Host scopes this engine self-backed and registered (the game bound none, nobody else had).
+		"self_backed": [],
+		# Host scopes the game bound through the "host_scopes" option, registered as foreign scopes.
+		"bound_scopes": [],
+		# Memoised ref splits (ref -> [scope, name]), dropped whenever the registry's scopes move.
+		"split_cache": {},
+		"split_revision": -1,
 		"patter_shared_decls": [],
 		"patter_local_decls": [],
 		"patter_shared_names": {},
 		"scene_shared_names": {},
 		"shared_visits": {},
 		"shared_selectors": {},
+		# Per-scene SHARED scene props, each registered under PatterFlow.key_stage(sceneId). Made the
+		# first time any flow needs the scene, so a bag loaded before then waits in the registry and
+		# is claimed there.
 		"stage_bags": {},
-		# Host scopes (design/scope-registry.md section 6), by token: either the embedder's own
-		# { "get": Callable, "set": Callable } binding, or a self-backed bag this engine seeds from the
-		# bundle's declarations. Empty for a bundle that declares none.
-		"host_scopes": {},
-		"host_tokens": [],
 		"custom_rng": options.get("rng"),
 		"replay_prompt_on_choose": options.get("replay_prompt_on_choose", false),
 		# Closed captions (#214): captions_on shows cues in dialogue lines (default true); when false the
@@ -97,51 +118,6 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	for c in bundle.get("cast", []):
 		if str(c.get("displayName", "")) != "":
 			_host["cast_display"][c["name"]] = c["displayName"]
-
-	# A declared scope the embedder binds is theirs; every other declared scope is SELF-BACKED from
-	# its declaration defaults, so a standalone build plays the same story a bound one does. Without
-	# this the reference reads as a graceful false and the @world-gated branch is silently skipped.
-	var bound: Dictionary = options.get("host_scopes", {})
-	for token in bound.keys():
-		_host["host_scopes"][token] = bound[token]
-	for spec in bundle.get("scopeRegistry", {}).get("scopes", []):
-		var token := str(spec.get("token", ""))
-		if token == "" or _host["host_scopes"].has(token):
-			continue   # the embedder's binding wins
-		# Keyed LOWER CASE, which is load-bearing: the compiler folds every property reference, so an
-		# AST reads "isnight" where the declaration says "isNight". Seeding verbatim means a declared
-		# name carrying a capital is never found and silently takes the falsy branch - the bug the JS
-		# runtime shipped and this port must not repeat. An OPAQUE scope (no "declarations" key)
-		# starts empty and accepts any name.
-		var bag := {}
-		for d in spec.get("declarations", []):
-			var nm := str(d.get("name", ""))
-			if nm != "":
-				bag[nm.to_lower()] = PatterBundle.host_scope_default(d)
-		_host["host_scopes"][token] = {
-			"get": func(n): return bag.get(str(n).to_lower()),
-			"set": func(n, v): bag[str(n).to_lower()] = v,
-		}
-	# A declaration's "writable": false is the STORY's promise and ONLY the story's: the engine
-	# refuses an effect's write, bound or self-backed, and lets the GAME write the value it owns
-	# (ruled across the family 2026-09-05, from-storylets/host-writes-to-read-only-world - this
-	# wrapped the resolver until then, which refused a game its own clock through set_property).
-	# So the read-only names are recorded here and consulted on the STORY's path alone
-	# (_write_property with host=false). push_error and no write, the bag's own convention
-	# (GDScript has no throw); same sentence as the reference.
-	for spec in bundle.get("scopeRegistry", {}).get("scopes", []):
-		var token := str(spec.get("token", ""))
-		if token == "" or not _host["host_scopes"].has(token):
-			continue
-		var read_only := {}
-		if spec.get("writable", true) == false:
-			read_only["*"] = true   # the whole scope: every name in it is the story's to read only
-		for d in spec.get("declarations", []):
-			if d.get("writable", true) == false and str(d.get("name", "")) != "":
-				read_only[str(d["name"]).to_lower()] = true
-		if not read_only.is_empty():
-			_host["story_read_only"][token] = read_only
-	_host["host_tokens"] = _host["host_scopes"].keys()
 
 	if options.has("seed"):
 		_default_seed = PatterMulberry32.to_uint32(float(options["seed"]))
@@ -182,6 +158,97 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 			if p.get("shared", false):
 				names[str(p["name"]).to_lower()] = true
 		_host["scene_shared_names"][sid] = names
+
+	_register(bundle, options)
+
+
+## Register this engine's game-wide scopes in the registry: `@patter`, each host scope the game
+## bound through "host_scopes", and (only when the engine is its own game) a self-backed bag for
+## every other declared host scope. A refusal (a token another engine or the game already holds)
+## removes whatever this constructor had registered, keeping the values, so the game's registry is
+## left as it was; the refusal is kept for init_error() and the engine is inert.
+func _register(bundle: Dictionary, options: Dictionary) -> void:
+	var given = options.get("registry")
+	var registry = given if given != null else PatterScopeRegistry.new()
+	_host["registry"] = registry
+	_host["owns_registry"] = given == null or bool(options.get(_OWNS_REGISTRY, false))
+	_host["split_revision"] = registry.revision
+	var registered: Array = []
+	var refused: String = registry.mount_owned("patter", _host["shared_patter"], {"owner": PatterFlow.OWNER})
+	if refused == "":
+		registered.append("patter")
+	var specs: Array = bundle.get("scopeRegistry", {}).get("scopes", [])
+	# A scope the game binds through "host_scopes" is EXTERNAL: the game keeps the values, and the
+	# registry reads and writes them through the game's { "get", "set" } resolver but never stores or
+	# saves them. Its declarations (types, read-only) come from the bundle. "writable": false binds the
+	# story and never the game (the registry's rule, ruled across the family 2026-09-05).
+	var bound: Dictionary = options.get("host_scopes", {})
+	for token in bound.keys():
+		if refused != "":
+			break
+		var spec := _spec_for(specs, str(token))
+		var decls: Array = []
+		for d in spec.get("declarations", []):
+			decls.append(_host_decl(d, null))
+		refused = registry.define_foreign(str(token), bound[token], decls,
+			{"writable": spec.get("writable", true) != false, "owner": PatterFlow.OWNER})
+		if refused == "":
+			registered.append(str(token))
+			_host["bound_scopes"].append(str(token))
+	# A declared host scope nobody bound. A standalone engine is its own game, so it self-backs the
+	# scope: a property bag seeded from the declarations, stored and SAVED by the registry like any
+	# other, since only a resolver the game binds is external. Given the GAME's registry the engine
+	# registers nothing here: those tokens are the game's to register, or another engine's (a bundle
+	# compiled against the Storylet Engine's spec declares `@story`), and self-backing one would clash
+	# with its real owner depending only on which engine was built first.
+	if _host["owns_registry"]:
+		for spec in specs:
+			if refused != "":
+				break
+			var token := str(spec.get("token", ""))
+			if token == "" or bound.has(token) or registry.has(token):
+				continue
+			var decls: Array = []
+			for d in spec.get("declarations", []):
+				decls.append(_host_decl(d, spec.get("writable")))
+			refused = registry.define_owned(token, decls, {"owner": PatterFlow.OWNER})
+			if refused == "":
+				registered.append(token)
+				_host["self_backed"].append(token)
+	if refused != "":
+		for k in registered:
+			registry.remove(k, {"keep": true})   # a clash leaves the game's registry as it was
+		_host["self_backed"] = []
+		_host["bound_scopes"] = []
+		_init_error = refused
+
+
+static func _spec_for(specs: Array, token: String) -> Dictionary:
+	for s in specs:
+		if str(s.get("token", "")) == token:
+			return s
+	return {}
+
+
+## A host scope declaration as the registry takes it. For a self-backed scope the scope's own
+## "writable" default is folded in (`scope_writable`), since an owned bag reads writability per
+## declaration. Names fold to lower case in the registry, as the compiler emits every reference
+## ("isNight" is read as "isnight").
+static func _host_decl(d: Dictionary, scope_writable) -> Dictionary:
+	var out := {"name": str(d.get("name", "")), "type": str(d.get("type", ""))}
+	for k in ["values", "stages", "default", "writable"]:
+		if d.has(k) and d[k] != null:
+			out[k] = d[k]
+	if not out.has("writable") and scope_writable != null:
+		out["writable"] = bool(scope_writable)
+	return out
+
+
+## Why construction was refused, or "" when it was not. A registration the registry turned down (a
+## token the game or another engine already holds, named in the message) leaves the game's registry
+## as it was and this engine inert: check it after PatterEngine.new(bundle, {"registry": ...}).
+func init_error() -> String:
+	return _init_error
 
 
 func _index_nodes(nodes: Array) -> void:
@@ -229,6 +296,9 @@ func clear_log() -> void:
 
 
 func open_flow(id: String, scene: String = "", block: String = "", seed_value = null) -> PatterFlow:
+	if _init_error != "":
+		push_error("open_flow: this engine was refused its registration (%s)" % _init_error)
+		return null
 	var scene_id := _resolve_scene_ref(scene)
 	var block_id := _resolve_block_ref(scene_id, block)
 	# Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep driving
@@ -297,16 +367,43 @@ func run_flow(flow_name: String, scene: String, block: String = "") -> Array:
 
 func reset() -> void:
 	for fid in _flows:
-		_flows[fid].close()  # finish them, don't just forget them
+		_flows[fid].close()  # finish them, don't just forget them; a close removes the flow's bags
 	_flows = {}
-	# The @patter globals live in a bag, like every other scope: it is what carries the
-	# audit hook a state logger pushes from, and the clone guard on a mutable default.
-	# "@patter." is the address a row reports; the LOG path is the same here, because
-	# there is only one shared globals bag.
-	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
+	# Reseeded IN PLACE: the bag stays the one registered under `patter`, so the registry, a
+	# state logger and any eval context keep reading it.
+	_host["shared_patter"].reseed(_host["patter_shared_decls"])
 	_host["shared_visits"] = {}
 	_host["shared_selectors"] = {}
+	var reg = _host["registry"]
+	for sid in _host["stage_bags"]:
+		if reg.has(PatterFlow.key_stage(sid)):
+			reg.remove(PatterFlow.key_stage(sid))
 	_host["stage_bags"] = {}
+	# Values loaded for bags nobody has claimed yet are the old game's too: a flow opened after the
+	# reset must not pick them up. Other engines' parked values are theirs, and stay.
+	reg.discard_parked("patter/")
+
+
+## Remove every bag this engine registered, keeping the values parked when `keep` (a live reload
+## handing its state to a replacement), and close its flows. The engine is inert afterwards.
+func _release(keep: bool) -> void:
+	for fid in _flows:
+		_flows[fid]._release_bags(keep)
+		_flows[fid].close()
+	_flows = {}
+	if _init_error != "":
+		return   # registered nothing: `patter` in this registry is somebody else's
+	var reg = _host["registry"]
+	for sid in _host["stage_bags"]:
+		if reg.has(PatterFlow.key_stage(sid)):
+			reg.remove(PatterFlow.key_stage(sid), {"keep": keep})
+	_host["stage_bags"] = {}
+	for t in ["patter"] + _host["self_backed"]:
+		if reg.has(t):
+			reg.remove(t, {"keep": keep})
+	for t in _host["bound_scopes"]:
+		if reg.has(t):
+			reg.remove(t)
 
 
 func locale() -> String:
@@ -347,12 +444,35 @@ func replace_strings(bundle: Dictionary) -> void:
 # Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried over
 # (save_game -> fresh engine -> load_game) plus the presentation state that isn't save state (active
 # locale, captions toggle). Content drift resolves per spec 9.8: stack frames re-find their next child
-# by id, drifted options drop, a vanished snippet is skipped. Returns the REPLACEMENT engine; discard
-# this one and re-bind flow handles via next.get_flow(id).
+# by id, drifted options drop, a vanished snippet is skipped.
+#
+# Returns the REPLACEMENT engine, on the same registry. This one hands its bags over (each is removed
+# from the registry with its values kept, and the replacement claims them as it registers), its flows
+# are closed, and it should be discarded; re-bind flow handles via next.get_flow(id). If the restore
+# is refused (defensive: 9.8 makes that unreachable for ordinary edits), the swap falls back to a
+# fresh engine with each saved flow restarted from the top of the scene it was in; the shared
+# properties carry over.
 func hot_swap(bundle: Dictionary) -> PatterEngine:
 	var snapshot := save_game()
-	var next := PatterEngine.new(bundle, _creation_options)
-	next.load_game(snapshot)
+	# The replacement registers on the SAME registry, and a standalone engine's replacement is still
+	# its own game (so its save_game keeps carrying the registry's values).
+	var opts := _creation_options.duplicate()
+	opts["registry"] = _host["registry"]
+	opts[_OWNS_REGISTRY] = _host["owns_registry"]
+	_release(true)
+	var next := PatterEngine.new(bundle, opts)
+	if next.init_error() != "" or not next.load_game(snapshot):
+		# A partial load may have mutated `next`: hand its bags back, fall back on a THIRD engine and
+		# restart each flow at the top of the scene it was in (dropped when that scene is gone too).
+		next._release(true)
+		next = PatterEngine.new(bundle, opts)
+		var flows: Dictionary = snapshot.get("flows", {})
+		for id in flows:
+			var sid = (flows[id].get("cursor", {}) as Dictionary).get("currentSceneId")
+			if sid == null:
+				next.open_flow(str(id))
+			elif (bundle.get("scenes", {}) as Dictionary).has(str(sid)):
+				next.open_flow(str(id), str(sid))
 	next.set_locale(_host["locale"])
 	next.set_closed_captions(_host["captions_on"])
 	return next
@@ -396,14 +516,14 @@ func set_closed_captions(on: bool) -> void:
 	_host["captions_on"] = on
 
 
+## Read a shared property by ref: a `@patter` global, a host scope, or any scope another engine
+## registered in the game's registry. `@scene` refs are refused (they are flow-level).
 func get_property(ref: String):
-	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
+	var sp := PatterFlow.split_host_ref(_host, ref)
 	if sp[0] == "scene":
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return null
-	if _host["host_scopes"].has(sp[0]):
-		return _host["host_scopes"][sp[0]]["get"].call(sp[1])
-	return _host["shared_patter"].get_value(sp[1])
+	return _host["registry"].get_value(sp[0], sp[1])
 
 
 # Editable @patter properties (the shared / engine-scoped ones), for a live inspector.
@@ -435,32 +555,14 @@ func list_properties() -> Array:
 
 ## Write a shared property by ref. The GAME's surface, so it writes with HOST authority: a host
 ## declaration's "writable": false is the story's promise not to write the value, never a lock on
-## the game that owns it. The story's own writes go through _write_property(.., false).
+## the game that owns it. The story's own writes go through the flow, which the registry holds to it.
 func set_property(ref: String, value) -> void:
-	_write_property(ref, value, true)
-
-
-## The write itself. `host` says WHO is writing, which is all "writable": false cares about.
-func _write_property(ref: String, value, host: bool) -> void:
-	var sp := PatterBundle.split_ref(ref, _host["host_tokens"])
+	var sp := PatterFlow.split_host_ref(_host, ref)
 	if sp[0] == "scene":
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return
-	if _host["host_scopes"].has(sp[0]):
-		if not host and _story_refuses(sp[0], sp[1]):
-			push_error("'@%s.%s' is read-only" % [sp[0], sp[1]])
-			return
-		_host["host_scopes"][sp[0]]["set"].call(sp[1], value)
-		return
-	_host["shared_patter"].set_value(sp[1], value, {"host": host} if host else {})
-
-
-## Is this host property read-only TO THE STORY? (A whole read-only scope is recorded as "*".)
-func _story_refuses(token: String, name: String) -> bool:
-	if not _host["story_read_only"].has(token):
-		return false
-	var names: Dictionary = _host["story_read_only"][token]
-	return names.has("*") or names.has(str(name).to_lower())
+	# A refusal (an unknown scope, or a resolver with no setter) is push_error'd by the registry.
+	_host["registry"].set_value(sp[0], sp[1], value, {"host": true})
 
 
 # -- save / load ---------------------------------------------------------------
@@ -481,42 +583,77 @@ func list_bags() -> Array:
 	return mounts
 
 
+## The save version this engine writes. Version 2 (from before the registry held the properties)
+## still loads.
+const SAVE_VERSION := 3
+
+
+## Snapshot the whole game's NON-property state: visit counts, shared selector cursors, and every
+## live flow's cursor and PRNG. The property values are the registry's: a standalone engine (one that
+## made its own registry) carries them here under "registry"; a game that passed a registry saves it
+## once itself (registry.save()), beside each engine's save_game().
 func save_game() -> Dictionary:
 	# The FAMILY's shape (patter/save@0): see PatterFlow's save-shape notes for why, and PatterSave for
 	# the envelope around this.
 	var flows := {}
 	for id in _flows.keys():
 		flows[id] = _flows[id].snapshot()
-	return {
-		"version": 2,
-		"shared": {"patter": _host["shared_patter"].save()},
-		"sharedVisits": _host["shared_visits"].duplicate(true),
-		"sharedSelectors": PatterFlow._save_selectors(_host["shared_selectors"]),
-		"stageBags": PatterFlow._save_bags(_host["stage_bags"]),
-		"flows": flows,
-	}
+	var out := {"version": SAVE_VERSION}
+	if _host["owns_registry"]:
+		out["registry"] = _host["registry"].save()
+	out["sharedVisits"] = _host["shared_visits"].duplicate(true)
+	out["sharedSelectors"] = PatterFlow._save_selectors(_host["shared_selectors"])
+	out["flows"] = flows
+	return out
 
 
-func load_game(save: Dictionary) -> void:
-	if int(save.get("version", 0)) != 2:
-		push_error("unsupported save version")
-		return
-	# Seeded from the declarations, then the saved values laid over: a property the save
-	# predates keeps its default rather than vanishing. Reads the family's camelCase shape and the
-	# snake_case one this addon wrote before 0.11.0.
-	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
-	_host["shared_patter"].load(PatterFlow._unwrap_scope(save.get("shared", {}), "patter"))
+## Restore a save_game(): visit counts, shared selector cursors, and every flow. Property values come
+## from the registry. A save that carries them (a standalone engine's, or a version 2 save from before
+## the registry held them) has them moved into the registry here; otherwise the game loads its
+## registry itself, before or after this call. Either order works: this engine's bags are handed back
+## to the registry (values kept) and the restored flows claim them as they register.
+##
+## Returns false (with push_error, and nothing changed) for a save version this engine cannot read.
+func load_game(save: Dictionary) -> bool:
+	var version = save.get("version")
+	var v := float(version) if (version is int or version is float) else -1.0
+	if v != 2.0 and v != float(SAVE_VERSION):
+		push_error("unsupported save version: %s" % (str(int(v)) if v == floorf(v) and v >= 0.0 else str(version)))
+		return false
+	if _init_error != "":
+		push_error("load_game: this engine was refused its registration (%s)" % _init_error)
+		return false
+	var reg = _host["registry"]
+	var saved_flows: Dictionary = save.get("flows", {}) if save.get("flows") is Dictionary else {}
+	# Flows the save does not have are over: their bags go. The rest are handed back with their values,
+	# which is what a game that loaded its registry first has just laid the save's values over.
+	for id in _flows:
+		_flows[id]._release_bags(saved_flows.has(id))
+		_flows[id].close()
+	_flows = {}
+	for sid in _host["stage_bags"]:
+		if reg.has(PatterFlow.key_stage(sid)):
+			reg.remove(PatterFlow.key_stage(sid), {"keep": true})
+	_host["stage_bags"] = {}
+
+	var values = PatterFlow.sections_from_v2(save) if v == 2.0 else save.get("registry")
+	if values is Dictionary:
+		# The engine's own registry takes the save wholesale. A game's registry may hold values the
+		# game loaded for other engines, still waiting to be claimed: add to those, never replace them.
+		if _host["owns_registry"]:
+			reg.load(values)
+		else:
+			reg.load(values, {"keep_parked": true})
+	# Reads the family's camelCase shape and the snake_case one this addon wrote before 0.11.0.
 	var visits = PatterFlow._k(save, "sharedVisits", "shared_visits")
 	_host["shared_visits"] = (visits as Dictionary).duplicate(true) if visits is Dictionary else {}
 	_host["shared_selectors"] = PatterFlow._load_selectors(PatterFlow._k(save, "sharedSelectors", "shared_selectors"))
-	# Seeded from the bundle's declarations, then the saved values laid over - see PatterFlow._load_bags.
-	var stage = PatterFlow._k(save, "stageBags", "stage_bags")
-	_host["stage_bags"] = PatterFlow._load_bags(_host, stage if stage is Dictionary else {}, true)
-	_flows = {}
-	for id in (save.get("flows", {}) as Dictionary).keys():
+	for id in saved_flows:
 		var flow := PatterFlow.new(_host, float(_default_seed))
-		flow.restore(save["flows"][id])
-		_flows[id] = flow
+		flow.id = str(id)
+		flow.restore(saved_flows[id])
+		_flows[str(id)] = flow
+	return true
 
 
 

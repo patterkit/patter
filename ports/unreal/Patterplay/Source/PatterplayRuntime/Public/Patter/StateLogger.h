@@ -76,27 +76,6 @@ namespace patter
         return "<unset>";
     }
 
-    /// Flatten the engine's whole-game state into a path -> value map (shared scopes + every live flow).
-    inline std::map<std::string, PatterValue> snapshotState(Engine& engine)
-    {
-        SaveGame save = engine.saveGame();
-        std::map<std::string, PatterValue> out;
-        for (const auto& kv : save.shared) out["@patter." + kv.first] = kv.second;
-        for (const auto& scene : save.stageBags)
-            for (const auto& kv : scene.second) out["@scene:" + scene.first + "." + kv.first] = kv.second;
-        for (const auto& kv : save.sharedVisits) out["visit:" + kv.first] = PatterValue::Num(kv.second);
-        for (const auto& flow : save.flows)
-        {
-            for (const auto& kv : flow.second.scopes) out[flow.first + "/@patter." + kv.first] = kv.second;
-            for (const auto& scene : flow.second.sceneBags)
-                for (const auto& kv : scene.second) out[flow.first + "/@scene:" + scene.first + "." + kv.first] = kv.second;
-            for (const auto& kv : flow.second.visits) out[flow.first + "/visit:" + kv.first] = PatterValue::Num(kv.second);
-        }
-        return out;
-    }
-
-    /// The sorted set of paths that differ between two snapshots (added / removed / changed).
-    /// std::map iterates in key order, so the result is already path-sorted like the JS logger's.
     /** The visit counts, which live in no bag and so have no audit hook: the kernel diffs
      *  these on capture(), which is all this logger used to do for everything. */
     inline StateSnapshot visitState(Engine& engine)
@@ -112,6 +91,37 @@ namespace patter
         return out;
     }
 
+    /** Every bag the engine and its flows hold, with the path each answers to in a log. */
+    inline std::vector<LogMount> allMounts(Engine& engine)
+    {
+        std::vector<LogMount> mounts = engine.listBags();
+        for (Flow* f : engine.flows())
+        {
+            std::vector<LogMount> own = f->listBags();
+            mounts.insert(mounts.end(), own.begin(), own.end());
+        }
+        return mounts;
+    }
+
+    /// Flatten the engine's whole-game state into a path -> value map (shared scopes + every live flow).
+    /// The logger does not diff this (it mounts the bags directly), but it is the public "what is the
+    /// state right now" call, and it reads the same mounts, so the two agree on the path space. It reads
+    /// the bags, not the save, since the save holds no properties any more. A bag loaded into the
+    /// registry but not yet claimed (a scene no flow has re-entered since a load) appears once it is.
+    inline std::map<std::string, PatterValue> snapshotState(Engine& engine)
+    {
+        std::map<std::string, PatterValue> out;
+        for (const LogMount& m : allMounts(engine))
+        {
+            const std::string prefix = m.pathPrefix.has_value() ? *m.pathPrefix : m.bag->pathPrefix();
+            for (const auto& kv : m.bag->save()) out[prefix + kv.first] = kv.second;
+        }
+        for (const auto& kv : visitState(engine)) out[kv.first] = kv.second;
+        return out;
+    }
+
+    /// The sorted set of paths that differ between two snapshots (added / removed / changed).
+    /// std::map iterates in key order, so the result is already path-sorted like the JS logger's.
     /** The changed paths between two whole-game snapshots, for callers holding the flat map
      *  snapshotState returns. Delegates to the kernel's diff, so there is one rule, not two. */
     inline std::vector<StateChange> diffState(const std::map<std::string, PatterValue>& prev,
@@ -136,16 +146,7 @@ namespace patter
             Engine* enginePtr = &engine;
             // Re-read on every capture: openFlow and loadGame both replace bags, and the kernel
             // re-mounts whatever it is handed.
-            adapter.mounts = [enginePtr]()
-            {
-                std::vector<LogMount> mounts = enginePtr->listBags();
-                for (Flow* f : enginePtr->flows())
-                {
-                    std::vector<LogMount> own = f->listBags();
-                    mounts.insert(mounts.end(), own.begin(), own.end());
-                }
-                return mounts;
-            };
+            adapter.mounts = [enginePtr]() { return allMounts(*enginePtr); };
             adapter.extra = [enginePtr]() { return visitState(*enginePtr); };
 
             StateLoggerOptions opts;
@@ -154,7 +155,7 @@ namespace patter
             kernel_ = std::make_unique<StateLogger>(std::move(adapter), std::move(opts));
         }
 
-        /** The current flattened state (no logging): the whole game, off the save envelope. */
+        /** The current flattened state (no logging): the whole game, off the bags. */
         std::map<std::string, PatterValue> snapshot() { return snapshotState(engine_); }
 
         /** Everything since the last capture: the property writes already logged as they landed,

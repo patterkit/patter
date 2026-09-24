@@ -61,6 +61,13 @@ jobs:
       # each engine's properties and log, and the Live Link's status.
       - name: The state panel draws what it is given
         run: ./godot --headless --path ports/godot --script res://test/test_state_panel.gd
+      # One registry per game: the engine's side of it (keys, owner, saves with and without the
+      # game's registry, either load order, old saves, clashes, reset, hot swap) and the save's
+      # version 3 shape. Neither is in the corpus, which runs one engine on its own.
+      - name: One registry per game
+        run: ./godot --headless --path ports/godot --script res://test/test_one_registry.gd
+      - name: The save's shape
+        run: ./godot --headless --path ports/godot --script res://test/test_save_shape.gd
 
   # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
   # makes that hard: an installed, activated Unity compiles from the command line, and

@@ -540,7 +540,9 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     ++envelopeRoundTrips;
                 }
                 // Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
-                else if (kind == "hotSwap") { SaveGame blob = engine->saveGame(); engine = std::make_shared<Engine>(bundleB, opts); engine->loadGame(blob); }
+                // Through the core's own hotSwap, as the reference runner does: the bags are handed to the
+                // replacement on the same registry.
+                else if (kind == "hotSwap") engine = std::shared_ptr<Engine>(engine->hotSwap(bundleB));
                 else if (kind == "setLocale") engine->setLocale(op.at("locale").str);
                 else if (kind == "setClosedCaptions") engine->setClosedCaptions(op.at("on").b);
                 else if (kind == "reset") { engine->reset(); current.clear(); }
@@ -764,12 +766,6 @@ static void runTraceLogSmoke()
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
 // the shared corpus, so exercise it directly - only shared @patter decls, each with type / value /
 // default / enum values, and a live setProperty reflected on the next read.
-// The save envelope's SHAPE, checked rather than round-tripped.
-//
-// Scene and stage state is held in a shared PropertyBag; the SAVE is still a flat
-// name -> value map per scene. A round-trip cannot tell the difference - a bag that
-// serialised itself would round-trip perfectly and still break every save on disk.
-// So this reads the JSON, and loads one edited by hand.
 // A host-scope declaration's `writable: false` is refused by the ENGINE, whether the scope is bound by
 // the game or self-backed. The JS reference always did; this core let a bound scope's set straight
 // through until 2026-09-03 (from-storylets/unreal-wrapper-host-scopes). Not a corpus case: the script
@@ -831,49 +827,650 @@ static void runHostScopeWritableSmoke()
     std::cout << "  [host-scope] writable:false is the story's promise, refused bound or self-backed\n";
 }
 
-static void runSaveShapeSmoke()
+// ----- one registry per game -------------------------------------------------------------------------
+//
+// The engine registers every property bag it has in the game's ScopeRegistry: @patter under `patter`,
+// and its per-flow and per-scene bags under keys that start `patter/`. saveGame() keeps only what is
+// not a property, unless the engine made its own registry (a standalone game), when the registry's
+// values ride along. Ports of the JS reference's one-registry.test.ts, combined-game.test.ts and
+// save-envelope-shape.test.ts (packages/runtime/test), held to the same expectations: the bundles
+// below are those tests' fixtures as the JS compiler exports them. Not corpus cases: the script
+// grammar has no registry of the game's own, no "this must throw", and no second engine.
+
+static int g_regPass = 0, g_regTotal = 0;
+
+static void regCase(const std::string& name, const std::function<void()>& body)
 {
-    Bundle b;
-    b.locales.defaultLocale = "en";
-    b.locales.included = { "en" };
-    b.strings["en"]["T"] = "hi";
+    ++g_regTotal;
+    try { body(); ++g_regPass; }
+    catch (const std::exception& ex) { fail("one-registry", name, ex.what()); }
+}
 
-    Scene scene; scene.id = "s"; scene.gameId = "s";
-    { PropertyDecl d; d.name = "mood"; d.type = "string"; d.hasDefault = true; d.def = PatterValue::Str("calm");
-      d.hasShared = true; d.shared = false; scene.sceneProps.push_back(d); }
-    { PropertyDecl d; d.name = "alarm"; d.type = "boolean"; d.hasDefault = true; d.def = PatterValue::Bool(false);
-      d.hasShared = true; d.shared = true; scene.sceneProps.push_back(d); }
-    Block block; block.id = "b"; block.gameId = "b";
-    auto sn = std::make_shared<Node>(); sn->id = "sn"; sn->type = "snippet";
-    { Beat beat; beat.id = "T"; beat.kind = "text"; sn->beats.push_back(beat); }
-    sn->jump = std::make_shared<Jump>(); sn->jump->to = "END";
-    block.children.push_back(sn);
-    scene.blocks.push_back(block);
-    b.scenes["s"] = scene;
+static void need(bool ok, const std::string& what) { if (!ok) throw std::runtime_error(what); }
 
+static JsonValue parseJ(const std::string& text) { return JsonParser(text).parse(); }
+
+/** A registry's values as JSON, for an order-insensitive comparison (the JS tests' toEqual). */
+static JsonValue blobJson(const ScopeRegistry::SaveBlob& blob)
+{
+    JsonValue o = JsonValue::Obj();
+    for (const auto& kv : blob)
+    {
+        JsonValue section = JsonValue::Obj();
+        for (const auto& p : kv.second) section.set(p.first, valueToJson(p.second));
+        o.set(kv.first, std::move(section));
+    }
+    return o;
+}
+
+static void expectJson(const JsonValue& got, const std::string& want, const std::string& what)
+{
+    JsonValue w = parseJ(want);
+    if (!matchValue(got, w)) throw std::runtime_error(what + ": expected " + dump(w) + ", got " + dump(got));
+}
+
+static ScopeRegistry::SaveBlob blobOf(const std::string& json)
+{
+    ScopeRegistry::SaveBlob blob;
+    for (const auto& kv : parseJ(json).obj)
+    {
+        OrderedMap<std::string, PatterValue> section;
+        for (const auto& p : kv.second.obj) section.set(p.first, toValue(p.second));
+        blob.set(kv.first, std::move(section));
+    }
+    return blob;
+}
+
+static double numberAt(const PatterValue* v, const std::string& what)
+{
+    if (!v || !v->isNumber()) throw std::runtime_error(what + ": expected a number, got " + (v ? v->toDisplayString() : std::string("nothing")));
+    return v->n;
+}
+
+static void expectNumber(const PatterValue* v, double want, const std::string& what)
+{
+    const double got = numberAt(v, what);
+    if (got != want) throw std::runtime_error(what + ": expected " + PatterValue::JsNumber(want) + ", got " + PatterValue::JsNumber(got));
+}
+
+static void expectNumber(const std::optional<PatterValue>& v, double want, const std::string& what)
+{
+    expectNumber(v ? &*v : nullptr, want, what);
+}
+
+static void expectThrow(const std::function<void()>& body, const std::string& contains, const std::string& what)
+{
+    std::string message;
+    try { body(); }
+    catch (const std::exception& ex) { message = ex.what(); }
+    if (message.empty()) throw std::runtime_error(what + ": did not throw");
+    if (message.find(contains) == std::string::npos) throw std::runtime_error(what + ": threw \"" + message + "\", expected it to say \"" + contains + "\"");
+}
+
+static std::vector<std::string> sortedKeys(const JsonValue& o)
+{
+    std::vector<std::string> keys;
+    for (const auto& kv : o.obj) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
+
+static std::string joined(const std::vector<std::string>& v)
+{
+    std::string out;
+    for (const auto& s : v) out += (out.empty() ? "" : ", ") + s;
+    return "[" + out + "]";
+}
+
+static void playOut(Flow* flow)
+{
+    for (int i = 0; i < 10 && flow->advance().type != StepType::End; i++) { /* play to the end */ }
+}
+
+// one-registry.test.ts: `@fame` shared, `@mood` per flow; `@scene.count` per flow, `@scene.tally` the
+// scene's shared bag; a declared @world with `gold`. The snippet's exit bumps all five.
+static const Bundle& orBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"or","hash":"06croli","structureHash":"19cnayl"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"fame","type":"number","default":0,"shared":true},{"name":"mood","type":"number","default":0,"shared":false}],"scopeRegistry":{"version":1,"scopes":[{"token":"world","declarations":[{"name":"gold","type":"number","default":0}]}]},"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"count","type":"number","default":0},{"name":"tally","type":"number","default":0,"shared":true}],"blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"sn","type":"snippet","beats":[{"id":"L","kind":"text"}],"onExit":[{"kind":"set","target":"@fame","value":{"src":"@fame + 1","ast":["bin","+",["sv","patter","fame"],["n",1]]}},{"kind":"set","target":"@mood","value":{"src":"@mood + 2","ast":["bin","+",["sv","patter","mood"],["n",2]]}},{"kind":"set","target":"@scene.count","value":{"src":"@scene.count + 1","ast":["bin","+",["sv","scene","count"],["n",1]]}},{"kind":"set","target":"@scene.tally","value":{"src":"@scene.tally + 1","ast":["bin","+",["sv","scene","tally"],["n",1]]}},{"kind":"set","target":"@world.gold","value":{"src":"@world.gold + 5","ast":["bin","+",["sv","world","gold"],["n",5]]}}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L":"gold {@world.gold}"}}})JSON"));
+    return b;
+}
+
+// The same, reading `@story.act` (compiled against another engine's spec, which it does not declare
+// as its own) after a first snippet that makes the flow build its context.
+static const Bundle& withStoryBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"or","hash":"0oj4bfr","structureHash":"1cazdgj"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"fame","type":"number","default":0,"shared":true},{"name":"mood","type":"number","default":0,"shared":false}],"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"count","type":"number","default":0},{"name":"tally","type":"number","default":0,"shared":true}],"blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"intro","type":"snippet","condition":{"src":"@fame >= 0","ast":["bin",">=",["sv","patter","fame"],["n",0]]},"beats":[{"id":"I","kind":"text"}]},{"id":"yes","type":"snippet","condition":{"src":"@story.act >= 2","ast":["bin",">=",["sv","story","act"],["n",2]]},"beats":[{"id":"L","kind":"text"}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"I":"intro","L":"act two"}}})JSON"));
+    return b;
+}
+
+// combined-game.test.ts: the purchase needs gold AND the second act; on exit it spends shared gold and
+// bumps Patter's own shared `@patter.visits`.
+static const Bundle& combinedBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"p","hash":"0l7gt7r","structureHash":"0o6kky5"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"MERCHANT"}],"properties":[{"name":"visits","type":"number","shared":true,"default":0}],"scenes":{"shop":{"id":"shop","type":"scene","name":"Shop","blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"buy","type":"snippet","condition":{"src":"@world.gold >= 10 && @story.act >= 2","ast":["bin","and",["bin",">=",["sv","world","gold"],["n",10]],["bin",">=",["sv","story","act"],["n",2]]]},"beats":[{"id":"L","kind":"line","character":"MERCHANT"}],"onExit":[{"kind":"set","target":"@world.gold","value":{"src":"@world.gold - 10","ast":["bin","-",["sv","world","gold"],["n",10]]}},{"kind":"set","target":"@visits","value":{"src":"@visits + 1","ast":["bin","+",["sv","patter","visits"],["n",1]]}}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L":"A fine blade."}}})JSON"));
+    return b;
+}
+
+// save-envelope-shape.test.ts: `@gold` shared, `@scene.count` per flow, `@scene.tally` shared.
+static const Bundle& envelopeBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"p","hash":"1n4f73e","structureHash":"0g7bf8q"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"gold","type":"number","default":0,"shared":true}],"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"count","type":"number","default":0,"shared":false},{"name":"tally","type":"number","default":0,"shared":true}],"blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"sn","type":"snippet","beats":[{"id":"L","kind":"text"}],"onExit":[{"kind":"set","target":"@scene.count","value":{"src":"1","ast":["n",1]}},{"kind":"set","target":"@scene.tally","value":{"src":"2","ast":["n",2]}},{"kind":"set","target":"@gold","value":{"src":"7","ast":["n",7]}}],"jump":{"to":"END"}}]}]}},"strings":{"en":{"L":"hi"}}})JSON"));
+    return b;
+}
+
+static ScopeDeclaration numberDecl(const std::string& name, std::optional<double> def = std::nullopt)
+{
+    ScopeDeclaration d;
+    d.name = name;
+    d.type = "number";
+    if (def) d.defaultValue = PatterValue::Num(*def);
+    return d;
+}
+
+/** A game that owns its registry and registers `@world` itself, as a property the registry stores. */
+struct RegGame
+{
+    std::shared_ptr<ScopeRegistry> registry;
+    std::unique_ptr<Engine> patter;
+};
+
+static RegGame makeGame()
+{
+    RegGame g;
+    g.registry = std::make_shared<ScopeRegistry>();
+    OwnedScopeOptions world;
+    world.owner = "Game";
+    g.registry->defineOwned("world", { numberDecl("gold", 0) }, world);
     EngineOptions opts;
-    auto engine = std::make_shared<Engine>(b, opts);
-    Flow* flow = engine->openFlow("main", "s", "b");
-    for (int i = 0; i < 10; ++i) { StepResult r = flow->advance(); if (r.type == StepType::End) break; }
-    flow->setProperty("@scene.mood", PatterValue::Str("tense"));
+    opts.registry = g.registry;
+    opts.hasSeed = true; opts.seed = 1;
+    g.patter = std::make_unique<Engine>(orBundle(), opts);
+    return g;
+}
 
-    std::string json = serializeState(*engine);
-    // Flat: the values sit directly under the scene id, with no bag wrapper around them.
-    if (json.find("\"stageBags\":{\"s\":{\"alarm\":") == std::string::npos)
-        fail("save shape", "stage bag is flat", json);
-    if (json.find("\"sceneBags\":{\"s\":{\"mood\":\"tense\"}") == std::string::npos)
-        fail("save shape", "scene bag is flat", json);
+static std::unique_ptr<Engine> standalone(const Bundle& bundle, double seed)
+{
+    EngineOptions opts;
+    opts.hasSeed = true; opts.seed = seed;
+    return std::make_unique<Engine>(bundle, opts);
+}
 
-    // A save edited by hand, in the format on disk today, still loads.
-    std::string hand = json;
-    size_t at = hand.find("\"mood\":\"tense\"");
-    if (at != std::string::npos) hand.replace(at, std::string("\"mood\":\"tense\"").size(), "\"mood\":\"furious\"");
-    auto engine2 = std::make_shared<Engine>(b, opts);
-    deserializeState(*engine2, hand);
-    Flow* f2 = engine2->getFlow("main");
-    const PatterValue* got = f2 ? f2->getProperty("@scene.mood") : nullptr;
-    if (!got || got->s != "furious")
-        fail("save shape", "a hand-edited value loads", got ? got->toDisplayString() : "<null>");
+/** The registry keys a registry holds (registered and parked), sorted. */
+static std::vector<std::string> registryKeys(const ScopeRegistry& registry)
+{
+    std::vector<std::string> keys;
+    for (const auto& kv : registry.save()) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
+
+static void runOneRegistryCases()
+{
+    regCase("registers every bag in the game's registry, under Patter's keys and owner label", []
+    {
+        RegGame g = makeGame();
+        playOut(g.patter->openFlow("f", "s"));
+        expectJson(blobJson(g.registry->save()),
+            R"({"world":{"gold":5},"patter":{"fame":1},"patter/flow/f/patter":{"mood":2},"patter/flow/f/scene/s":{"count":1},"patter/scene/s":{"tally":1}})",
+            "registry values");
+        // Examiner rows keep the story's addresses; the scope column says which bag, the owner whose.
+        JsonValue rows = JsonValue::Arr();
+        for (const auto& r : g.registry->listProperties())
+        {
+            if (r.owner != std::optional<std::string>("Patter")) continue;
+            JsonValue row = JsonValue::Arr();
+            row.push(JsonValue::Str(r.scope)); row.push(JsonValue::Str(r.path)); row.push(valueToJson(r.value));
+            rows.push(std::move(row));
+        }
+        expectJson(rows, R"([["patter","@patter.fame",1],["patter/flow/f/patter","@patter.mood",2],["patter/flow/f/scene/s","@scene.count",1],["patter/scene/s","@scene.tally",1]])", "Patter's rows");
+    });
+
+    regCase("leaves the values out of saveGame when the game passed the registry", []
+    {
+        RegGame g = makeGame();
+        playOut(g.patter->openFlow("f", "s"));
+        need(!g.patter->saveGame().registry.has_value(), "the save carries registry values");
+        JsonValue save = parseJ(serializeState(*g.patter)).at("save");
+        need(!save.has("registry"), "the envelope carries registry values");
+        const auto keys = sortedKeys(save.at("flows").at("f"));
+        need(keys == std::vector<std::string>{ "cursor", "rngState", "visits" }, "a flow's snapshot holds " + joined(keys));
+    });
+
+    regCase("uses a @world the game registered, and self-backs nothing", []
+    {
+        RegGame g = makeGame();
+        std::optional<std::string> owner;
+        for (const auto& r : g.registry->listProperties()) if (r.scope == "world") owner = r.owner;
+        need(owner == std::optional<std::string>("Game"), "@world is not the game's");
+        playOut(g.patter->openFlow("f", "s"));
+        expectNumber(g.registry->get("world", "gold"), 5, "world.gold");
+    });
+
+    regCase("does not self-back a declared host scope in the game's registry: that token is the game's", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        EngineOptions opts; opts.registry = registry;
+        Engine engine(orBundle(), opts);
+        need(registry->has("patter"), "@patter is not registered");
+        need(!registry->has("world"), "the engine self-backed @world in the game's registry");
+    });
+
+    regCase("a standalone engine self-backs @world as a stored property, and saves it", []
+    {
+        auto patter = standalone(orBundle(), 1);
+        playOut(patter->openFlow("f", "s"));
+        const std::string json = serializeState(*patter);
+        expectJson(parseJ(json).at("save").at("registry").at("world"), R"({"gold":5})", "the saved @world");
+        auto restored = standalone(orBundle(), 1);
+        deserializeState(*restored, json);
+        expectNumber(restored->getProperty("@world.gold"), 5, "restored @world.gold");
+    });
+
+    // One save for the game, loaded in either order. Both halves as the JSON a game stores: the
+    // registry's through saveRegistry, Patter's through its own envelope.
+    struct GameSave { std::string registry; std::string patter; };
+    auto session1 = []
+    {
+        RegGame g = makeGame();
+        playOut(g.patter->openFlow("f", "s"));
+        g.patter->openFlow("g", "s"); // a second flow, still at its first beat
+        return GameSave{ saveRegistry(*g.registry), serializeState(*g.patter) };
+    };
+    auto check = [](RegGame& g)
+    {
+        expectNumber(g.patter->getProperty("@fame"), 1, "@fame");
+        expectNumber(g.patter->getProperty("@world.gold"), 5, "@world.gold");
+        need(g.patter->getFlow("f") && g.patter->getFlow("g"), "a saved flow did not come back");
+        expectNumber(g.patter->getFlow("f")->getProperty("@mood"), 2, "f @mood");
+        expectNumber(g.patter->getFlow("f")->getProperty("@scene.count"), 1, "f @scene.count");
+        expectNumber(g.patter->getFlow("g")->getProperty("@scene.count"), 0, "g @scene.count");
+        expectNumber(g.patter->getFlow("g")->getProperty("@scene.tally"), 1, "g @scene.tally");
+        // Play on: g's exit lands on the restored shared values.
+        playOut(g.patter->getFlow("g"));
+        expectNumber(g.patter->getProperty("@fame"), 2, "@fame after g plays");
+        expectNumber(g.registry->get("patter/scene/s", "tally"), 2, "the scene's shared tally after g plays");
+    };
+
+    regCase("one save for the game: registry first, then the engine", [&]
+    {
+        GameSave save = session1();
+        RegGame g = makeGame();
+        loadRegistry(*g.registry, save.registry);
+        deserializeState(*g.patter, save.patter);
+        check(g);
+    });
+
+    regCase("one save for the game: the engine first, then the registry", [&]
+    {
+        GameSave save = session1();
+        RegGame g = makeGame();
+        deserializeState(*g.patter, save.patter);
+        loadRegistry(*g.registry, save.registry);
+        check(g);
+    });
+
+    regCase("one save for the game: into a game already playing, live flows are replaced by the saved ones", [&]
+    {
+        GameSave save = session1();
+        RegGame g = makeGame();
+        playOut(g.patter->openFlow("f", "s"));
+        playOut(g.patter->openFlow("stray", "s")); // not in the save: its bags must not survive
+        loadRegistry(*g.registry, save.registry);
+        deserializeState(*g.patter, save.patter);
+        check(g);
+        for (const auto& k : registryKeys(*g.registry)) need(k.find("stray") == std::string::npos, "a stray flow's bag survived: " + k);
+    });
+
+    regCase("reads a scope another engine registered after the flow opened", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        EngineOptions opts; opts.registry = registry;
+        Engine patter(withStoryBundle(), opts);
+        Flow* flow = patter.openFlow("f", "s");
+        StepResult first = flow->advance();
+        need(first.type == StepType::Text && first.text == "intro", "expected the intro, got " + dump(normalize(first)));
+        OwnedScopeOptions other; other.owner = "Other engine";
+        registry->defineOwned("story", { numberDecl("act", 2) }, other);
+        StepResult second = flow->advance();
+        need(second.type == StepType::Text && second.text == "act two", "the flow did not read @story: got " + dump(normalize(second)));
+    });
+
+    regCase("refuses a token another engine holds, naming it, and leaves the registry as it was", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        EngineOptions opts; opts.registry = registry;
+        Engine first(orBundle(), opts);
+        expectThrow([&] { Engine second(orBundle(), opts); }, "scope '@patter' is already registered by Patter", "a second Patter");
+
+        auto withWorld = std::make_shared<ScopeRegistry>();
+        OwnedScopeOptions game; game.owner = "Game";
+        withWorld->defineOwned("world", {}, game);
+        EngineOptions bound; bound.registry = withWorld;
+        auto zero = std::make_shared<PatterValue>(PatterValue::Num(0));
+        HostScope scope; scope.get = [zero](const std::string&) { return zero.get(); };
+        bound.hostScopes["world"] = scope;
+        expectThrow([&] { Engine clash(orBundle(), bound); }, "scope '@world' is already registered by Game", "binding a @world the game holds");
+        need(!withWorld->has("patter"), "the half-built engine left @patter behind");
+    });
+
+    regCase("escapes a flow id in its keys, so no two flows' keys can meet", []
+    {
+        RegGame g = makeGame();
+        g.patter->openFlow("npc/bob", "s");
+        g.patter->openFlow("npc%2Fbob", "s");
+        std::vector<std::string> keys;
+        for (const auto& k : registryKeys(*g.registry)) if (k.rfind("patter/flow/", 0) == 0) keys.push_back(k);
+        need(keys == std::vector<std::string>{ "patter/flow/npc%252Fbob/patter", "patter/flow/npc%252Fbob/scene/s",
+            "patter/flow/npc%2Fbob/patter", "patter/flow/npc%2Fbob/scene/s" }, "keys " + joined(keys));
+    });
+
+    regCase("removes a flow's bags when it closes, and reopening a name starts it fresh", []
+    {
+        RegGame g = makeGame();
+        playOut(g.patter->openFlow("f", "s"));
+        g.patter->closeFlow("f");
+        for (const auto& k : registryKeys(*g.registry)) need(k.rfind("patter/flow/f/", 0) != 0, "a closed flow's bag stayed: " + k);
+        // Values a load left waiting for "f" belong to the saved flow, not to a new one of the same name.
+        ScopeRegistry::SaveBlob blob = g.registry->save();
+        for (const auto& kv : blobOf(R"({"patter/flow/f/scene/s":{"count":9}})")) blob.set(kv.first, kv.second);
+        g.registry->load(blob);
+        Flow* fresh = g.patter->openFlow("f", "s");
+        expectNumber(fresh->getProperty("@scene.count"), 0, "a fresh flow's @scene.count");
+    });
+
+    regCase("reset drops Patter's waiting values and no other engine's", []
+    {
+        RegGame g = makeGame();
+        ScopeRegistry::SaveBlob blob = g.registry->save();
+        for (const auto& kv : blobOf(R"({"patter/scene/elsewhere":{"tally":3},"other/deck/inn":{"drawn":1}})")) blob.set(kv.first, kv.second);
+        g.registry->load(blob);
+        g.patter->reset();
+        ScopeRegistry::SaveBlob saved = g.registry->save();
+        need(!saved.get("patter/scene/elsewhere"), "reset kept Patter's waiting values");
+        need(saved.get("other/deck/inn") != nullptr, "reset dropped another engine's waiting values");
+        expectJson(blobJson(saved).at("other/deck/inn"), R"({"drawn":1})", "the other engine's values");
+    });
+
+    regCase("hotSwap hands every bag to the replacement on the same registry", []
+    {
+        RegGame g = makeGame();
+        playOut(g.patter->openFlow("f", "s"));
+        std::shared_ptr<Flow> flow = g.patter->flowPtr("f");
+        std::unique_ptr<Engine> next = g.patter->hotSwap(orBundle());
+        need(flow->isClosed(), "the old engine's flow is still open");
+        expectNumber(next->getProperty("@fame"), 1, "@fame");
+        need(next->getFlow("f") != nullptr, "the flow did not carry over");
+        expectNumber(next->getFlow("f")->getProperty("@mood"), 2, "@mood");
+        expectNumber(next->getFlow("f")->getProperty("@scene.tally"), 1, "@scene.tally");
+        int patterRows = 0;
+        for (const auto& r : g.registry->listProperties()) if (r.scope == "patter") ++patterRows;
+        need(patterRows == 1, "@patter rows: " + std::to_string(patterRows));
+        need(!next->saveGame().registry.has_value(), "the replacement saves the game's registry");
+    });
+
+    regCase("a standalone engine's hotSwap keeps its self-backed @world and keeps saving it", []
+    {
+        auto patter = standalone(orBundle(), 1);
+        playOut(patter->openFlow("f", "s"));
+        std::unique_ptr<Engine> next = patter->hotSwap(orBundle());
+        expectNumber(next->getProperty("@world.gold"), 5, "@world.gold");
+        SaveGame save = next->saveGame();
+        need(save.registry.has_value() && save.registry->get("world"), "the replacement stopped saving @world");
+        expectJson(blobJson(*save.registry).at("world"), R"({"gold":5})", "the saved @world");
+    });
+
+    regCase("a host scope declared writable:false refuses the story, bound or self-backed, and not the game", []
+    {
+        // The scope-level flag, which the registry reads per scope for a bound (external) scope and the
+        // engine folds into each declaration for a self-backed one. A declaration's own flag wins.
+        static const Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"T":"hi"}},"properties":[],
+          "scopeRegistry":{"version":1,"scopes":[{"token":"rules","writable":false,"declarations":[{"name":"cap","type":"number","default":1},{"name":"open","type":"number","default":0,"writable":true}]}]},
+          "scenes":{"s":{"id":"s","gameId":"s","blocks":[{"id":"b","gameId":"b","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],
+            "onEnter":[{"kind":"set","target":"@rules.open","value":{"src":"5","ast":["n",5]}},{"kind":"set","target":"@rules.cap","value":{"src":"9","ast":["n",9]}}],
+            "jump":{"to":"END"}}]}]}}})JSON"));
+        for (int pass = 0; pass < 2; ++pass)
+        {
+            const bool bound = pass == 1;
+            const std::string label = bound ? "bound: " : "self-backed: ";
+            auto store = std::make_shared<std::map<std::string, PatterValue>>();
+            (*store)["cap"] = PatterValue::Num(1); (*store)["open"] = PatterValue::Num(0);
+            EngineOptions opts;
+            if (bound)
+            {
+                HostScope scope;
+                scope.get = [store](const std::string& n) -> const PatterValue* { auto it = store->find(n); return it == store->end() ? nullptr : &it->second; };
+                scope.set = [store](const std::string& n, const PatterValue& v) { (*store)[n] = v; };
+                opts.hostScopes["rules"] = scope;
+            }
+            Engine engine(bundle, opts);
+            expectThrow([&] { engine.openFlow("main", "s", "b"); }, "'@rules.cap' is read-only", label + "the story's write to a read-only scope");
+            expectNumber(engine.getProperty("@rules.open"), 5, label + "a declaration writable:true inside it");
+            expectNumber(engine.getProperty("@rules.cap"), 1, label + "@rules.cap after the refused write");
+            engine.setProperty("@rules.cap", PatterValue::Num(3)); // the game's own write
+            expectNumber(engine.getProperty("@rules.cap"), 3, label + "@rules.cap after the game's write");
+        }
+    });
+
+    regCase("refuses a save version it does not read, naming it", []
+    {
+        auto engine = standalone(envelopeBundle(), 0);
+        SaveGame save; save.version = 4;
+        expectThrow([&] { engine->loadGame(save); }, "unsupported save version: 4", "a version 4 save");
+    });
+}
+
+// combined-game.test.ts: ONE ScopeRegistry for the whole game, and one save. The game registers @world
+// itself (a property the registry stores); a stand-in for the Storylet Engine registers @story the way
+// an engine does (the real one is proven beside Patter in the storylets repo); Patter registers the rest.
+static void registerStoryStandIn(ScopeRegistry& registry)
+{
+    OwnedScopeOptions o;
+    o.normalise = [](const std::string& n) { return n; };
+    o.owner = "Storylet Engine";
+    registry.defineOwned("story", { numberDecl("act", 1) }, o);
+}
+
+static RegGame combinedGame()
+{
+    RegGame g;
+    g.registry = std::make_shared<ScopeRegistry>();
+    OwnedScopeOptions world; world.owner = "Game";
+    g.registry->defineOwned("world", { numberDecl("gold"), numberDecl("reputation") }, world);
+    registerStoryStandIn(*g.registry);
+    EngineOptions opts; opts.registry = g.registry;
+    g.patter = std::make_unique<Engine>(combinedBundle(), opts);
+    return g;
+}
+
+static void runCombinedGameCases()
+{
+    regCase("combined: both sides read and write one registry live, and each reads the other's scope", []
+    {
+        RegGame g = combinedGame();
+        g.registry->set("world", "gold", PatterValue::Num(25), /*host=*/true); // the game stocks the world
+        g.registry->set("story", "act", PatterValue::Num(2));                   // the storylet side moves the story on
+        Flow* flow = g.patter->openFlow("main", "shop");
+        expectNumber(g.patter->getProperty("@story.act"), 2, "@story.act");
+        StepResult line = flow->advance();
+        need(line.type == StepType::Line && line.id == "L" && line.character == "MERCHANT", "expected the merchant's line, got " + dump(normalize(line)));
+        need(flow->advance().type == StepType::End, "the flow did not end"); // onExit: spends gold, bumps visits
+        expectNumber(g.registry->get("world", "gold"), 15, "world.gold");
+        expectNumber(g.registry->get("patter", "visits"), 1, "patter.visits");
+    });
+
+    regCase("combined: saves the registry once, with every engine's properties, and Patter's save holds none", []
+    {
+        RegGame g = combinedGame();
+        g.registry->set("world", "gold", PatterValue::Num(25), true);
+        g.registry->set("world", "reputation", PatterValue::Num(3), true);
+        g.registry->set("story", "act", PatterValue::Num(2));
+        Flow* f = g.patter->openFlow("main", "shop");
+        f->advance(); f->advance();
+        JsonValue registry = blobJson(g.registry->save());
+        expectJson(registry.at("world"), R"({"gold":15,"reputation":3})", "world");
+        expectJson(registry.at("story"), R"({"act":2})", "story");
+        expectJson(registry.at("patter"), R"({"visits":1})", "patter");
+        need(!g.patter->saveGame().registry.has_value(), "Patter's save carries registry values");
+        need(serializeState(*g.patter).find("reputation") == std::string::npos, "Patter's save mentions a world property");
+    });
+
+    regCase("combined: resumes both sides from the one save, loading the registry first or last", []
+    {
+        RegGame g1 = combinedGame();
+        g1.registry->set("world", "gold", PatterValue::Num(25), true);
+        g1.registry->set("story", "act", PatterValue::Num(2));
+        Flow* f1 = g1.patter->openFlow("main", "shop");
+        f1->advance(); f1->advance();
+        g1.patter->openFlow("main", "shop"); // a fresh run at the gate, saved mid-flow
+        const std::string registrySave = saveRegistry(*g1.registry);
+        const std::string patterSave = serializeState(*g1.patter);
+
+        for (bool registryFirst : { true, false })
+        {
+            const std::string order = registryFirst ? "registry first: " : "registry last: ";
+            RegGame g2 = combinedGame();
+            if (registryFirst) loadRegistry(*g2.registry, registrySave);
+            deserializeState(*g2.patter, patterSave);
+            if (!registryFirst) loadRegistry(*g2.registry, registrySave);
+
+            expectNumber(g2.patter->getProperty("@world.gold"), 15, order + "@world.gold");
+            expectNumber(g2.patter->getProperty("@story.act"), 2, order + "@story.act");
+            expectNumber(g2.patter->getProperty("@visits"), 1, order + "@visits");
+            // gold(15) >= 10 and act 2: a second purchase proceeds on the restored state.
+            Flow* f2 = g2.patter->getFlow("main");
+            need(f2 != nullptr, order + "the flow did not come back");
+            StepResult line = f2->advance();
+            need(line.type == StepType::Line && line.id == "L", order + "expected the line, got " + dump(normalize(line)));
+            need(f2->advance().type == StepType::End, order + "the flow did not end");
+            expectNumber(g2.registry->get("world", "gold"), 5, order + "world.gold");
+            expectNumber(g2.registry->get("patter", "visits"), 2, order + "patter.visits");
+        }
+    });
+
+    regCase("combined: loads a save forward across content drift (lenient by design)", []
+    {
+        // A registry save from older content: a world property that no longer exists, none of the newer
+        // `reputation`, and a section for an engine this build no longer runs.
+        RegGame g = combinedGame();
+        g.registry->load(blobOf(R"({"world":{"gold":7,"retired_flag":1},"patter":{"visits":9},"story":{"act":3},"retired_engine":{"x":1}})"));
+        expectNumber(g.registry->get("world", "gold"), 7, "known -> restored");
+        expectNumber(g.registry->get("world", "reputation"), 0, "newer -> default");
+        expectNumber(g.registry->get("world", "retired_flag"), 1, "vanished -> kept as a stray");
+        expectNumber(g.patter->getProperty("@visits"), 9, "@visits");
+        need(g.registry->save().get("retired_engine") != nullptr, "an unclaimed section was dropped");
+        g.registry->discardParked();
+        need(g.registry->save().get("retired_engine") == nullptr, "discardParked kept an unclaimed section");
+    });
+
+    regCase("combined: a clash between engines fails as the game combines them, naming who holds the token", []
+    {
+        ScopeRegistry registry;
+        registerStoryStandIn(registry);
+        expectThrow([&] { registerStoryStandIn(registry); }, "scope '@story' is already registered by Storylet Engine", "a second @story");
+    });
+}
+
+// save-envelope-shape.test.ts: the save's SHAPE, checked rather than round-tripped. Property values are
+// plain name -> value sections keyed by registry key, and games have saves on disk written that way. A
+// round-trip cannot tell the difference (a bag that serialised itself would round-trip perfectly and
+// still break every save on disk), so this reads the JSON, and loads saves written out by hand, in
+// version 3 and in the version 2 games shipped before the registry held the properties.
+static std::unique_ptr<Engine> playedEnvelope()
+{
+    auto engine = standalone(envelopeBundle(), 0);
+    playOut(engine->openFlow("f", "s", "b"));
+    return engine;
+}
+
+static const char* kEnvelopeRegistry =
+    R"({"patter":{"gold":7},"patter/flow/f/patter":{},"patter/flow/f/scene/s":{"count":1},"patter/scene/s":{"tally":2}})";
+
+static void runSaveEnvelopeCases()
+{
+    regCase("save shape: writes every bag as a PLAIN record of bare scalars, under its registry key", []
+    {
+        JsonValue save = parseJ(serializeState(*playedEnvelope())).at("save");
+        // A standalone engine made its own registry, so its values ride in the save. Plain objects: no
+        // class, no wrapper, and nothing else beside the values.
+        need(save.at("version").num == 3, "version " + dump(save.at("version")));
+        expectJson(save.at("registry"), kEnvelopeRegistry, "registry");
+        // A flow's snapshot holds no properties: those are the registry's.
+        const auto flowKeys = sortedKeys(save.at("flows").at("f"));
+        need(flowKeys == std::vector<std::string>{ "cursor", "rngState", "visits" }, "flow keys " + joined(flowKeys));
+        const auto keys = sortedKeys(save);
+        need(keys == std::vector<std::string>{ "flows", "registry", "sharedSelectors", "sharedVisits", "version" }, "save keys " + joined(keys));
+    });
+
+    regCase("save shape: leaves the values out when the game passed the registry: the game saves it once", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        EngineOptions opts; opts.registry = registry; opts.hasSeed = true; opts.seed = 0;
+        Engine engine(envelopeBundle(), opts);
+        playOut(engine.openFlow("f", "s", "b"));
+        need(!parseJ(serializeState(engine)).at("save").has("registry"), "the envelope carries registry values");
+        expectJson(blobJson(registry->save()), dump(parseJ(serializeState(*playedEnvelope())).at("save").at("registry")), "the game's registry");
+    });
+
+    regCase("save shape: round-trips through JSON with the values intact", []
+    {
+        const std::string blob = serializeState(*playedEnvelope());
+        auto after = standalone(envelopeBundle(), 0);
+        deserializeState(*after, blob);
+        expectJson(parseJ(serializeState(*after)), dump(parseJ(blob)), "the re-saved envelope");
+    });
+
+    regCase("save shape: loads a save written by HAND in today's format (version 3)", []
+    {
+        // Written out here rather than produced by saveGame(), so a change that alters the writer and
+        // the reader together cannot satisfy it. This is what a player's save looks like on disk.
+        const std::string onDisk = std::string(R"({"schema":"patter/save@0","save":{"version":3,"registry":)") + kEnvelopeRegistry
+            + R"(,"sharedVisits":{"s":1,"b":1,"sn":1},"sharedSelectors":{},"flows":{"f":{"rngState":0,"visits":{"s":1,"b":1,"sn":1},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}}}})";
+        auto engine = standalone(envelopeBundle(), 0);
+        deserializeState(*engine, onDisk);
+        expectNumber(engine->getProperty("@gold"), 7, "@gold");
+        need(engine->getFlow("f") != nullptr, "the flow did not come back");
+        expectNumber(engine->getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
+        expectNumber(engine->getFlow("f")->getProperty("@scene.tally"), 2, "@scene.tally");
+        expectJson(parseJ(serializeState(*engine)), onDisk, "the re-saved envelope");
+    });
+
+    // The shape every runtime wrote before the registry held the properties. Players have these on
+    // disk; they must keep loading.
+    static const char* kV2 = R"({"version":2,"shared":{"patter":{"gold":7}},"sharedVisits":{"s":1,"b":1,"sn":1},"sharedSelectors":{},"stageBags":{"s":{"tally":2}},"flows":{"f":{"scopes":{"patter":{}},"sceneBags":{"s":{"count":1}},"rngState":0,"visits":{"s":1,"b":1,"sn":1},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}}})";
+
+    regCase("save shape: loads a version 2 save written by HAND, moving its values into the registry", []
+    {
+        auto engine = standalone(envelopeBundle(), 0);
+        deserializeState(*engine, std::string(R"({"schema":"patter/save@0","save":)") + kV2 + "}");
+        expectNumber(engine->getProperty("@gold"), 7, "@gold");
+        need(engine->getFlow("f") != nullptr, "the flow did not come back");
+        expectNumber(engine->getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
+        JsonValue back = parseJ(serializeState(*engine)).at("save");
+        need(back.at("version").num == 3, "re-saved as version " + dump(back.at("version")));
+        expectJson(back.at("registry"), kEnvelopeRegistry, "the re-saved registry");
+    });
+
+    regCase("save shape: moves a version 2 save into a registry the game supplied, beside values the game already loaded", []
+    {
+        auto registry = std::make_shared<ScopeRegistry>();
+        registry->load(blobOf(R"({"another-engine/deck/inn":{"drawn":3}})")); // the game's own load, waiting for its engine
+        EngineOptions opts; opts.registry = registry; opts.hasSeed = true; opts.seed = 0;
+        Engine engine(envelopeBundle(), opts);
+        deserializeState(engine, kV2);
+        need(engine.getFlow("f") != nullptr, "the flow did not come back");
+        expectNumber(engine.getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
+        expectJson(blobJson(registry->save()),
+            R"({"patter":{"gold":7},"patter/flow/f/patter":{},"patter/flow/f/scene/s":{"count":1},"patter/scene/s":{"tally":2},"another-engine/deck/inn":{"drawn":3}})",
+            "the game's registry");
+    });
+}
+
+static void runOneRegistry()
+{
+    runOneRegistryCases();
+    runCombinedGameCases();
+    runSaveEnvelopeCases();
+    std::cout << "  [one-registry] the game's registry, one save, loaded in either order: " << g_regPass << "/" << g_regTotal << "\n";
 }
 
 static void runInspectorSmoke()
@@ -1118,7 +1715,7 @@ int main(int argc, char** argv)
     std::cout << "  [saves] envelopes written by the JS reference, loaded here + continued: " << sv << "/" << savesArr->arr.size() << "\n";
     if (sv != static_cast<int>(savesArr->arr.size())) fail("saves", "section total", std::to_string(sv) + " of " + std::to_string(savesArr->arr.size()) + " passed");
     runInspectorSmoke();
-    runSaveShapeSmoke();
+    runOneRegistry();
     runHostScopeWritableSmoke();
     runTraceLogSmoke();
     runOutlineSmoke();
