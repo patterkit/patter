@@ -6,6 +6,29 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-24
+
+### Added
+
+- **World properties are pills in the condition and effects editors.** A property declared under Project
+  Settings > World properties (`@world.time_of_day`, or `@story.act` imported from the Storylet Engine's
+  published spec) is offered in the property picker and drawn as a pill, with its type, like any `@patter`
+  property. Before, the editors did not know those scopes at all: a condition naming one could not be
+  shown as pills, only as text.
+- **A line can name the Storylet Engine's shared properties with no setting.** `@story.act` in a
+  condition or an effect is accepted even when the project declares nothing for it, as every engine in
+  the family now accepts the others' game-wide scopes. Undeclared, it is drawn as an ordinary pill with a
+  tip saying another engine owns it and checks it.
+
+### Changed
+
+- **Patterplay 0.14.0 runs the play window**: one property registry per game, shared with the Storylet
+  Engine, and the new save format.
+- **The play window says why it cannot play a line that names `@story` undeclared, and how to fix it.**
+  It runs Patter on its own, so it cannot supply another engine's values; the engine now refuses such a
+  scene as it opens rather than quietly reading false. Declare `@story` under World properties, with the
+  properties you read, and the play window backs it with their defaults.
+
 ### Fixed
 
 - **The problems bar keeps clear of the live-link chip.** With a game connected, the chip in the bottom
