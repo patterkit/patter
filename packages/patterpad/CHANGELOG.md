@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-09-25
+
 ### Fixed
 
 - **Share Scopes with Other Tools joins a folder another tool made, instead of replacing its
