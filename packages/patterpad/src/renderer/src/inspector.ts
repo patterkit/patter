@@ -541,7 +541,9 @@ function addressRow(id: string | null, gameId: string | undefined, address: stri
   btn.type = "button";
   btn.textContent = address || "None";
   if (id) {
-    btn.dataset.tip = gameId ? "Edit the Game ID" : "Derived from the name. Click to pin a fixed Game ID."; btn.setAttribute("aria-label", gameId ? "Edit the Game ID" : "Derived from the name. Click to pin a fixed Game ID.");
+    // Publish Bundle pins every derived address (pin on publish), so "derived" lasts until then.
+    const tip = gameId ? "Edit the Game ID" : "Derived from the name until the bundle is first published. Click to pin a fixed Game ID.";
+    btn.dataset.tip = tip; btn.setAttribute("aria-label", tip);
     btn.addEventListener("click", () => edit(id, gameId ?? "", address, btn));
   } else btn.disabled = true;
   r.append(btn);

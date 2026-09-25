@@ -57,6 +57,9 @@ export { runResolve, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse,
 export type { ResolveEntry, SearchFocus } from "./resolve.js";
 export { runReplace } from "./replace.js";
 export type { ReplaceOptions, ReplaceHit, ReplacePlan } from "./replace.js";
+// Pin on publish: Build Bundle writes down every scene and block address still following its name
+export { planPins } from "./pin.js";
+export type { PinnedName, PinPlan } from "./pin.js";
 export { runPack, SHARD_EXTENSIONS } from "./pack.js";
 export type { DocumentManifest } from "./pack.js";
 export { runUnpack, runUnpackMerge, UnsafeEntryError, isUnsafeEntry } from "./unpack.js";

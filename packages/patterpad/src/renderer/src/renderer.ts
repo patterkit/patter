@@ -1736,6 +1736,21 @@ async function writeScene(): Promise<boolean> {
 /** Write now and wait. Every transition that must see current bytes calls this. */
 async function save(): Promise<void> { await saver.flush(); }
 
+/** Re-read the OPEN scene after main has rewritten its shards (a Replace, pin on publish). `loadScene`
+ *  skips the scene already open, and would save the stale surface over the rewrite on its way out, so the
+ *  surface is dropped WITHOUT saving: the caller had the editor flush before main wrote, so there is
+ *  nothing in it the files do not already hold. The caret comes back where it was. */
+async function reloadOpenScene(): Promise<void> {
+  const sceneId = currentSceneId;
+  if (!sceneId) return;
+  const caret = caretNodeId ?? undefined;
+  saver.cancel();
+  surface?.destroy();
+  surface = null;
+  currentSceneId = null;
+  await loadScene(sceneId, caret ? { restoreCaret: caret } : undefined);
+}
+
 async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
   if (!project || sceneId === currentSceneId) return;
   // Opening a scene is the one funnel every route into the editor goes through (the navigator, a
@@ -2265,15 +2280,20 @@ async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
   } else if (res.error) console.error("Export production info failed:", res.error);
 }
 
-/** Publish Bundle (Publish menu): compile + write the runtime `.patterc` to the configured output path. */
+/** Publish Bundle (Publish menu): compile + write the runtime `.patterc` to the configured output path.
+ *  It pins first (pin on publish): every scene and block address still following its name is written down,
+ *  and the toast says how many, once, so the diff that follows is not a surprise. */
 async function buildBundle(): Promise<void> {
   if (!project) return;
-  const res = await withJob("Publishing the bundle…", () => window.patter.buildBundle());
+  const res = await withJob("Publishing the bundle…", () => window.patter.buildBundle({ pin: true }));
+  // Main rewrote the pinned flow shards: re-read the open scene so its next save carries the pins.
+  if (res.pinned) await reloadOpenScene();
   if (res.ok) {
     // Show where it landed RELATIVE to the project root when it's inside (the common dist/ case), so the
     // toast reads cleanly; fall back to the absolute path for an output written elsewhere.
     const where = relToProject(res.path);
-    toast(`Bundle published\n${where}`, "ok");
+    const pinned = res.pinned ? `\nPinned ${plural(res.pinned, "Game ID")} that followed a name` : "";
+    toast(`Bundle published\n${where}${pinned}`, "ok");
   } else toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
@@ -2913,7 +2933,7 @@ window.patter.onPlayFollow((sceneId, beatId) => void jumpTo({ id: beatId, kind: 
 // rewrites the shards, then to reload once it's done.
 window.patter.onEditorFlush(() => void (async () => { await save(); window.patter.editorFlushed(); })());
 window.patter.onReplaceApplied(() => void (async () => {
-  if (currentSceneId) await loadScene(currentSceneId); // re-read the open scene with the replaced text
+  await reloadOpenScene(); // re-read the open scene with the replaced text (loadScene skips the open one)
   await refreshProblems();
   toast("Replaced across the project", "ok");
 })());

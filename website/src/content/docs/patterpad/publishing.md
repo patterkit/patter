@@ -18,6 +18,10 @@ output** path in your [project settings](/patterpad/projects-and-settings/), whi
 once at your game's assets folder. From then on, getting your latest changes into the game is
 one keystroke: publish, and the game picks up the new bundle on its next run.
 
+Publishing also pins each new scene's and block's [address](/patterpad/conditions-and-data/#addresses-game-ids),
+so renaming a scene afterwards can't change the name your game calls. The toast says how many it
+pinned. Auto Rebuild and Live Link don't pin anything.
+
 It can be even tighter than that: with [Live Link](/play/live-debug/) connected, **saving in
 Patterpad pushes the fresh bundle straight into the running game**. Reword a line, save, and
 hear it in context without anyone restarting anything. The full detail of what's in the

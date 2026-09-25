@@ -357,6 +357,8 @@ export interface ExportResult {
   path?: string;
   canceled?: boolean;
   error?: string;
+  /** Build Bundle only: how many scene and block addresses it pinned first (pin on publish). */
+  pinned?: number;
 }
 
 /** What a Merge Returned Patterpack did, per shard and in total, ready to render without further work.
@@ -769,7 +771,9 @@ export interface PatterApi {
   clearRecents(): Promise<RecentProject[]>;
   /** Build Bundle (Build menu): compile the project to its runtime `.patterc` and write it to the output
    *  path configured in Project Settings ▸ Build (else the dist/ default). Returns where it landed. */
-  buildBundle(): Promise<ExportResult>;
+  /** Publish Bundle. `pin` (the menu's) first writes down every scene and block address still following
+   *  its name, so a later rename cannot move a name the game may now rely on. */
+  buildBundle(opts?: { pin?: boolean }): Promise<ExportResult>;
   /** Toggle Auto Rebuild (Build menu checkbox): flip ProjectFile.autoRebuild, persist it, and return the
    *  new state. Mirrors the Project Settings ▸ General toggle. */
   toggleAutoRebuild(): Promise<boolean>;

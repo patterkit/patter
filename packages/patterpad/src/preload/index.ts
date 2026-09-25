@@ -74,7 +74,7 @@ const api: PatterApi = {
   cancelJob: (kind) => { void ipcRenderer.invoke("job:cancel", kind); },
   onJobProgress: (handler) => { ipcRenderer.on(JOB_PROGRESS, (_e, p: JobProgressDto) => handler(p)); },
   clearRecents: () => ipcRenderer.invoke("project:clearRecents"),
-  buildBundle: () => ipcRenderer.invoke("project:build"),
+  buildBundle: (opts) => ipcRenderer.invoke("project:build", opts),
   toggleAutoRebuild: () => ipcRenderer.invoke("project:toggleAutoRebuild"),
   buildAudioManifest: () => ipcRenderer.invoke("project:audioManifest"),
   exportVoiceScript: (everything) => ipcRenderer.invoke("project:exportVoiceScript", everything),

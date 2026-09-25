@@ -117,9 +117,11 @@ read tags too, see [Game Data & addressing](/format/gamedata-and-addressing/#tag
 ## Addresses (Game IDs)
 
 Scenes and blocks have a readable **address** your game uses to start them ("play this
-scene"). It follows the name to begin with, and stays muted until you pin it; pinning keeps
-the address steady even if you rename the scene later. Either way, renaming never breaks a
-jump inside the story. Edit it in the inspector at the scene or block level.
+scene"). It follows the name to begin with, and stays muted until it's pinned; pinning keeps
+the address steady even if you rename the scene later. **Publish Bundle** pins it for you the
+first time the scene goes out, since that's when your game can start relying on it, so until
+then you can rename freely. Either way, renaming never breaks a jump inside the story. Edit it
+in the inspector at the scene or block level.
 
 ## When something's off
 

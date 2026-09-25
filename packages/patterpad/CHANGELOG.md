@@ -6,6 +6,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Publish Bundle pins every Game ID that still follows its name.** A scene or block address comes from
+  its name until you pin one, so renaming a scene after the game started using it moved the name the game
+  calls. The first time a scene or block is published, its address is written down as it is, and a later
+  rename leaves it alone; the toast says how many were pinned. New scenes still follow their name until
+  they are published, so a scene can be called "New Scene" while you decide. Auto Rebuild, the live bundle
+  push and `patter export` never pin. Storyletter does the same for its cards, decks, hands and boxes, so a
+  card and the scene named after it stay paired.
+
+### Fixed
+
+- **Replace no longer loses its change in the scene you have open.** The open scene kept its old text after
+  a project-wide Replace, and the next edit to it saved the old text back over the replacement. It now
+  reloads with the replaced text.
+
 ## [0.19.1] - 2026-09-25
 
 ### Fixed

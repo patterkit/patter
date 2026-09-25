@@ -873,8 +873,11 @@ function registerIpc(): void {
   // Coverage "gated on @x" → open the Search window in property-usage mode, seeded with the ref.
   ipcMain.handle("covWin:findUsage", (_e, ref: string) => openSearchWindow("property", searchFocus, ref));
   ipcMain.handle("project:exportReport", () => publishJob(exportReport));
-  ipcMain.handle("project:build", () => publishJob(async () => {
-    const r = await project.buildBundle();
+  // Publish Bundle. The menu's pins first (pin on publish): the editor saves its open scene, so the pin is
+  // not lost under a later save of stale source, then main pins and the editor reloads the open scene.
+  ipcMain.handle("project:build", (_e, opts?: { pin?: boolean }) => publishJob(async () => {
+    if (opts?.pin) await flushEditorScene();
+    const r = await project.buildBundle(opts);
     if (r.ok) scheduleDebugPush(); // live bundle refresh: an explicit build also reaches a connected game
     return r;
   }));

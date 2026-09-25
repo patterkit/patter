@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
@@ -693,6 +693,7 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { count
     for (const ns of plan.shards) {
       const i = loaded.locales.findIndex((l) => l.scene === ns.scene && l.locale === ns.locale);
       if (i >= 0) loaded.locales[i] = ns;
+      sourceMirror.delete(ns.scene); // the mirror holds the pre-replace bytes: the reload must read the new ones
     }
     return { ok: true, count: plan.hits.length, scenes: plan.scenes };
   });
@@ -1525,11 +1526,31 @@ function buildExport(p: LoadedProject, buildBundle: string, localisation: "embed
 
 /** Build Bundle (Build menu): compile the whole project to its runtime `.patterc` and write it to the
  *  configured output path (Project Settings ▸ Build, else the dist/ default). Lock-aware - the bundle
- *  often lives inside the project's own repo. Returns where it landed, or an error to surface. */
-export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: string }> {
+ *  often lives inside the project's own repo. Returns where it landed, or an error to surface.
+ *
+ *  With `pin` (the menu's Publish, never Auto Rebuild) it first writes down every scene and block address
+ *  still following its name (ops `planPins`), so the bundle compiles from the pinned scenes. The caller has
+ *  flushed the open scene; the renderer reloads it after, as it does after Replace. */
+export function buildBundle(opts?: { pin?: boolean }): Promise<{ ok: boolean; path?: string; error?: string; pinned?: number }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // the bundle compiles every scene
+    let pinned = 0;
+    if (opts?.pin) {
+      const plan = planPins(loaded);
+      if (plan.writes.length) {
+        const res = await commitWrites(plan.writes);
+        if (!res.ok) return { ok: false, error: res.error };
+        // Swap the pinned scenes into the working copy (element swap, never in place), and drop their source
+        // mirror so the open scene's reload reads the pinned bytes from disk.
+        for (const next of plan.scenes) {
+          const i = loaded.scenes.findIndex((s) => s.id === next.id);
+          if (i >= 0) loaded.scenes[i] = next;
+          sourceMirror.delete(next.id);
+        }
+        pinned = plan.pinned.length;
+      }
+    }
     const path = resolveBundleOut(loaded);
     const writes: { path: string; content: string }[] = [];
     let builtHash: string | undefined;
@@ -1540,7 +1561,7 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
       builtHash = bundle.content.hash;
       writes.push({ path, content: canonicalStringify(bundle, { trailingComma: false }) });
       writes.push(...patterScopesWrites(loaded.project)); // a build brings the game's scopes folder up to date too
-    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e), ...(pinned ? { pinned } : {}) }; }
     // Audio Folders (#206): also emit the sidecar `patteraudio.json` next to the audio, so a game can resolve
     // each beat's winning clip without a folder search. Only when folder mode + a root are set and some audio
     // has been found (the indexer keeps a live snapshot). It's a sidecar - never inside the .patterc.
@@ -1551,7 +1572,8 @@ export function buildBundle(): Promise<{ ok: boolean; path?: string; error?: str
     }
     const res = await commitWrites(writes);
     if (res.ok) { lastBuiltHash = builtHash; notePatterScopesWritten(writes); } // prime the Auto-Rebuild dedup: no redundant auto-build after a manual one
-    return res.ok ? { ok: true, path } : { ok: false, error: res.error };
+    // `pinned` rides the failure too: the pins landed even if the bundle did not, and the editor must re-read.
+    return res.ok ? { ok: true, path, ...(pinned ? { pinned } : {}) } : { ok: false, error: res.error, ...(pinned ? { pinned } : {}) };
   });
 }
 
