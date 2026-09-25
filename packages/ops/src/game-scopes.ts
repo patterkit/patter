@@ -323,20 +323,31 @@ export function defaultGameScopesDir(root: string): string {
  * engine's, which is that engine's to declare). The project keeps its copy. When the walk-up from the
  * project would not find `dir`, the project names it (`gameScopes`), so it is found next time. Returns
  * the writes (the folder comes with the first), and the project as it should now be saved.
+ *
+ * A folder another tool already made is JOINED, never overwritten: an existing `game.scopes.json` keeps
+ * every scope it holds, and gains only the project's game scopes it doesn't declare yet (as the
+ * Storylet Engine's share adds `@world` only when the file has none). One that won't parse is an error,
+ * and nothing is written.
  */
-export function planShareScopes(root: string, project: ProjectFile, dir: string): { writes: PlannedWrite[]; project: ProjectFile } {
+export function planShareScopes(root: string, project: ProjectFile, dir: string): { writes: PlannedWrite[]; project: ProjectFile } | { error: string } {
   const target = resolve(dir);
-  const game: ScopesFile = {
-    version: 1, owner: GAME_SCOPES_OWNER,
-    scopes: (project.scopeRegistry?.scopes ?? []).filter((h) => isGameToken(h.token, undefined)).map((h) => ({
-      token: h.token,
-      ...(h.writable !== undefined ? { writable: h.writable } : {}),
-      ...(h.declarations ? { declarations: h.declarations.map((d) => ({ ...d })) } : {}),
-    })),
-  };
+  const gamePath = join(target, GAME_SCOPES_FILE);
+  let existing: ScopesFile = { version: 1, owner: GAME_SCOPES_OWNER, scopes: [] };
+  if (existsSync(gamePath)) {
+    const parsed = parseScopesFile(readFileSync(gamePath, "utf8"), GAME_SCOPES_FILE);
+    if (!parsed.file) return { error: `${GAME_SCOPES_FILE} in ${target} won't parse, so it was left alone: ${parsed.issues.map((i) => i.message).join("; ")}` };
+    existing = parsed.file;
+  }
+  const held = new Set(existing.scopes.map((s) => s.token));
+  const added = (project.scopeRegistry?.scopes ?? []).filter((h) => isGameToken(h.token, undefined) && !held.has(h.token)).map((h) => ({
+    token: h.token,
+    ...(h.writable !== undefined ? { writable: h.writable } : {}),
+    ...(h.declarations ? { declarations: h.declarations.map((d) => ({ ...d })) } : {}),
+  }));
+  const game: ScopesFile = { ...existing, scopes: [...existing.scopes, ...added] };
   const writes: PlannedWrite[] = [
     { path: join(target, PATTER_SCOPES_FILE), content: serialiseScopesFile(patterScopesFile(project)) },
-    { path: join(target, GAME_SCOPES_FILE), content: serialiseScopesFile(game) },
+    { path: gamePath, content: serialiseScopesFile(game) },
   ];
   // Would the walk-up land here? It visits the project folder and each one above, to the VCS root.
   let found = false;

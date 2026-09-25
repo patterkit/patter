@@ -243,6 +243,11 @@ describe("World properties where the game has a scopes folder", () => {
 });
 
 describe("sharing a project's scopes with the other tools", () => {
+  /** The plan, or the test fails with its error. */
+  const shared = <T,>(plan: T | { error: string }): T => {
+    if (plan && typeof plan === "object" && "error" in plan) throw new Error((plan as { error: string }).error);
+    return plan as T;
+  };
   it("suggests the version-control root, else beside the project", () => {
     const { gameDir, root } = gameWith({ files: {}, git: true });
     expect(defaultGameScopesDir(root)).toBe(join(gameDir, "game-scopes"));
@@ -258,7 +263,7 @@ describe("sharing a project's scopes with the other tools", () => {
     ] };
     editProject(root, (p) => ({ ...p, scopeRegistry }));
     const loaded = loadProject(root);
-    const plan = planShareScopes(root, loaded.project, join(gameDir, "game-scopes"));
+    const plan = shared(planShareScopes(root, loaded.project, join(gameDir, "game-scopes")));
     expect(plan.project.scopeRegistry).toEqual(scopeRegistry);
     expect(plan.project.gameScopes).toBeUndefined(); // the walk-up finds it
     applyWrites(plan.writes);
@@ -273,7 +278,38 @@ describe("sharing a project's scopes with the other tools", () => {
   it("names a folder the walk-up would not find in the project", () => {
     const { gameDir, root } = gameWith({ files: {} });
     const elsewhere = join(gameDir, "elsewhere", "game-scopes");
-    const plan = planShareScopes(root, loadProject(root).project, elsewhere);
+    const plan = shared(planShareScopes(root, loadProject(root).project, elsewhere));
     expect(plan.project.gameScopes).toBe(join("..", "elsewhere", "game-scopes"));
+  });
+
+  it("joins a folder another tool made: game.scopes.json keeps every scope it holds and gains only the missing ones", () => {
+    // A folder in another repository, which the walk-up from this project would never reach.
+    const { gameDir, root } = gameWith({ files: {} });
+    const theirs = join(gameDir, "other-repo", "game-scopes");
+    mkdirSync(theirs, { recursive: true });
+    const held = { version: 1, owner: "Game", scopes: [
+      { token: "world", declarations: [{ name: "alarm", type: "number", default: 0 }] },
+      { token: "player", declarations: [{ name: "hp", type: "number", default: 10 }] },
+    ] };
+    writeFileSync(join(theirs, "game.scopes.json"), JSON.stringify(held, null, 2));
+    editProject(root, (p) => ({ ...p, scopeRegistry: { version: 1, scopes: [
+      { token: "world", declarations: [{ name: "threat", type: "number" as const }] },
+      { token: "weather", declarations: [{ name: "rain", type: "boolean" as const }] },
+    ] } }));
+    const plan = shared(planShareScopes(root, loadProject(root).project, theirs));
+    applyWrites(plan.writes);
+    const after = JSON.parse(readFileSync(join(theirs, "game.scopes.json"), "utf8"));
+    expect(after.scopes.map((s: { token: string }) => s.token)).toEqual(["world", "player", "weather"]);
+    expect(after.scopes[0].declarations.map((d: { name: string }) => d.name)).toEqual(["alarm"]); // theirs, untouched
+  });
+
+  it("refuses to join a folder whose game.scopes.json won't parse, and writes nothing", () => {
+    const { gameDir, root } = gameWith({ files: {} });
+    const theirs = join(gameDir, "other-repo", "game-scopes");
+    mkdirSync(theirs, { recursive: true });
+    writeFileSync(join(theirs, "game.scopes.json"), "{ not json");
+    const plan = planShareScopes(root, loadProject(root).project, theirs);
+    expect("error" in plan && plan.error).toMatch(/game\.scopes\.json in .* won't parse, so it was left alone/);
+    expect(readFileSync(join(theirs, "game.scopes.json"), "utf8")).toBe("{ not json");
   });
 });

@@ -157,6 +157,17 @@ patter stats --xlsx report.xlsx
 patter report --json | jq '.totals'
 ```
 
+### `patter share-scopes [path] [--at <dir>]`
+
+Share the project's scopes with the game's other editing tools, as Patterpad's **File > Share Scopes
+with Other Tools** does: makes the game's `game-scopes/` folder (in `--at`, else at the
+version-control root above the project, else beside it) with `patter.scopes.json` and a
+`game.scopes.json` holding the project's own game scopes (its World properties), which the project
+keeps as its synced copy. A folder another tool already made is joined, not replaced: its
+`game.scopes.json` keeps every scope it holds and gains only the ones it lacks. When looking up from
+the project wouldn't find the folder, the project names it in `gameScopes`. A project that already
+shares its scopes is refused.
+
 ### `patter pack [path] -o <file.patterpack>`
 
 Pack a project (the `.patter` folder) into a single portable **`.patterpack`** - a

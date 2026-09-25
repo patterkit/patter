@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Share Scopes with Other Tools joins a folder another tool made, instead of replacing its
+  `game.scopes.json`.** Choosing an existing shared folder the project wouldn't find by looking up (in
+  another repository, say) rewrote that file with only this project's World properties, dropping every
+  scope the game had there. It now keeps them all and adds only the ones the file lacks, and leaves a
+  file it can't read alone.
+
 ## [0.19.0] - 2026-09-24
 
 ### Added

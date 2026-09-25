@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { parseArgs, main } from "../src/main.js";
@@ -452,5 +452,36 @@ describe("a game that shares its scopes", () => {
     expect(JSON.parse(readFileSync(join(scopes, "game.scopes.json"), "utf8")).scopes[0].declarations[0].default).toBe(7);
     expect(readFileSync(join(scopes, "storylets.scopes.json"), "utf8")).toBe(JSON.stringify(storylets));
     expect(existsSync(join(dir, "game-scopes"))).toBe(false);
+  });
+});
+
+// share-scopes: the CLI twin of Patterpad's File > Share Scopes with Other Tools, on the same plan.
+describe("share-scopes", () => {
+  const game = async (): Promise<{ gameDir: string; dir: string }> => {
+    const gameDir = mkdtempSync(join(tmpdir(), "patter-share-"));
+    mkdirSync(join(gameDir, ".git"));
+    const dir = join(gameDir, "story.patter");
+    expect(await main(["init", dir, "--name", "Story"])).toBe(0);
+    return { gameDir, dir };
+  };
+
+  it("makes game-scopes/ at the version-control root with Patter's file and the game's, and won't do it twice", async () => {
+    const { gameDir, dir } = await game();
+    expect(await main(["share-scopes", dir])).toBe(0);
+    expect(existsSync(join(gameDir, "game-scopes", "patter.scopes.json"))).toBe(true);
+    expect(existsSync(join(gameDir, "game-scopes", "game.scopes.json"))).toBe(true);
+    expect("gameScopes" in (parseSource(readFileSync(join(dir, "story.patterproj"), "utf8")) as object)).toBe(false);
+    expect(await main(["share-scopes", dir])).toBe(1);
+    expect(lastError()).toContain(`already shares its scopes through ${join(gameDir, "game-scopes")}`);
+  });
+
+  it("puts the folder where --at says, and names it in the project when looking up wouldn't find it", async () => {
+    const { gameDir, dir } = await game();
+    const shared = join(gameDir, "..", `${basename(gameDir)}-shared`);
+    expect(await main(["share-scopes", dir, "--at", shared])).toBe(0);
+    expect(existsSync(join(shared, "game-scopes", "patter.scopes.json"))).toBe(true);
+    const project = parseSource(readFileSync(join(dir, "story.patterproj"), "utf8")) as { gameScopes?: string };
+    expect(project.gameScopes).toBeDefined();
+    expect(await main(["validate", dir])).toBe(0);   // the project finds it through the name, and all is fresh
   });
 });

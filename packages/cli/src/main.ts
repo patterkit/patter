@@ -11,12 +11,14 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { join, resolve } from "node:path";
 import { canonicalStringify, parseSource } from "@patterkit/core";
 import {
   loadProject, runValidate, runExport, runExportHtml, bundleOutputPath, runFormat, runPlay, renderPlay, runCoverage, renderCoverageText, proposeCoverageDrivers, runInit, runResolve, runPropertyUsage,
   runReport, renderReportText, runReportXlsx, runPack, runUnpack, runUnpackMerge, runMerge, UnsupportedMergeError, SHARD_EXTENSIONS,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus, patterScopesWrite,
+  planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog } from "@patterkit/ops";
 
@@ -83,6 +85,10 @@ Usage:
                  dist/<name>.pdf. PDF uses built-in fonts (Latin); use .docx for full Unicode.
   patter voice-export [path] -o file.xlsx  Voice (VO) recording script (spec §16)
                  [--all]           Include every voiced line (else only "ready to record")
+  patter share-scopes [path]      Share the project's scopes with the game's other tools: make the game's
+                 [--at dir]        game-scopes/ folder (in --at, else the version-control root above the
+                                   project) with patter.scopes.json and game.scopes.json; joins a folder
+                                   that already exists, adding only the scopes it doesn't hold
   patter pack    [path] -o file   Pack a project (the .patter folder) into a portable .patterpack
   patter unpack  <file> -o dir    Explode a .patterpack into source shards under dir
                  [--merge --base sent.patterpack]  Merge a returned .patterpack into the project
@@ -108,6 +114,7 @@ const FLAGS: Record<string, { boolean: string[]; valued: string[] }> = {
   "loc-import": { boolean: [], valued: ["locale"] },
   "voice-export": { boolean: ["all"], valued: ["o"] },
   "export-script": { boolean: [], valued: ["o"] },
+  "share-scopes": { boolean: [], valued: ["at"] },
   pack: { boolean: [], valued: ["o"] },
   unpack: { boolean: ["merge"], valued: ["o", "base"] },
   merge: { boolean: ["json"], valued: ["o", "type"] },
@@ -460,6 +467,22 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
       if (writes.length === 0) { console.log("no translations to import"); return 0; }
       if (!commitWrites(writes)) return 1;
       console.log(`imported ${stats.updated} string(s) for ${locale} across ${stats.files} scene(s)`);
+      return 0;
+    }
+
+    case "share-scopes": {
+      // The CLI twin of Patterpad's File > Share Scopes with Other Tools (patterkit design/shared-scopes.md):
+      // the same plan, so the two can't disagree about what the folder holds.
+      const loaded = loadProject(positionals[0] ?? ".");
+      if (loaded.gameScopes) { console.error(`share-scopes: this project already shares its scopes through ${loaded.gameScopes.dir}`); return 1; }
+      const dir = typeof flags.at === "string" ? join(resolve(flags.at), GAME_SCOPES_DIR) : defaultGameScopesDir(loaded.root);
+      const plan = planShareScopes(loaded.root, loaded.project, dir);
+      if ("error" in plan) { console.error(`share-scopes: ${plan.error}`); return 1; }
+      const named = plan.project.gameScopes !== loaded.project.gameScopes;
+      const writes = [...plan.writes, ...(named ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];
+      if (!commitWrites(writes)) return 1;
+      for (const w of writes) console.log(`wrote ${w.path}`);
+      if (named) console.log(`the project names the folder (gameScopes: ${plan.project.gameScopes}), since looking up from the project wouldn't find it`);
       return 0;
     }
 

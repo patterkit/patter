@@ -2061,6 +2061,7 @@ export function shareScopes(dir: string): Promise<SaveResult & { dir?: string }>
     refreshGameScopes();
     if (loaded.gameScopes) return { ok: false, error: `this project already shares its scopes through ${loaded.gameScopes.dir}` };
     const plan = planShareScopes(loaded.root, loaded.project, dir);
+    if ("error" in plan) return { ok: false, error: plan.error };
     try { mkdirSync(dir, { recursive: true }); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
     const projectChanged = plan.project.gameScopes !== loaded.project.gameScopes;
     const writes = [...plan.writes, ...(projectChanged ? [{ path: loaded.projectFile, content: canonicalStringify(plan.project) }] : [])];

@@ -124,6 +124,15 @@ error. `--all` includes every voiced line (otherwise only those ready to record)
 
 ## Sharing & merging
 
+### `patter share-scopes [path] [--at dir]`
+Share the project's scopes with the game's other editing tools, as Patterpad's **File > Share Scopes
+with Other Tools** does: makes the game's `game-scopes/` folder (in `--at`, else at the
+version-control root above the project) with `patter.scopes.json` and a `game.scopes.json` holding
+the project's World properties, which the project keeps as its synced copy. A folder another tool
+already made is joined, not replaced: its `game.scopes.json` keeps every scope it holds and gains only
+the ones it lacks. When looking up from the project wouldn't find the folder, the project names it in
+`gameScopes`.
+
 ### `patter pack [path] -o file` / `patter unpack <file> -o dir`
 Pack a project into a portable `.patterpack`, or explode one back into source shards.
 `unpack --merge --base sent.patterpack` folds a returned pack's edits into the project
