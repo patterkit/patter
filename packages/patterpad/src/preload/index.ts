@@ -54,6 +54,7 @@ const api: PatterApi = {
   micAccess: () => ipcRenderer.invoke("audio:micAccess"),
   setRecordingMode: (on) => { void ipcRenderer.invoke("recording:setMode", on); },
   debugStart: () => ipcRenderer.invoke("debug:start"),
+  showInStoryletter: (sceneId) => ipcRenderer.invoke("storyletter:show", sceneId),
   debugStop: () => ipcRenderer.invoke("debug:stop"),
   debugStatus: () => ipcRenderer.invoke("debug:status"),
   debugFollow: (flowId) => { void ipcRenderer.invoke("debug:follow", flowId); },

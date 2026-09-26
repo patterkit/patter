@@ -2280,6 +2280,15 @@ async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
   } else if (res.error) console.error("Export production info failed:", res.error);
 }
 
+/** Edit > Show Card in Storyletter: the storylet card the open scene plays, in the paired project. */
+async function showInStoryletter(): Promise<void> {
+  if (!currentSceneId) { toast("Open a scene first: its card is the one named after it.", "error"); return; }
+  await save();
+  const r = await window.patter.showInStoryletter(currentSceneId);
+  if (r.ok) toast("Opening its card in Storyletter", "ok");
+  else if (!r.canceled) toast(r.error ?? "Couldn't open Storyletter", "error");
+}
+
 /** Publish Bundle (Publish menu): compile + write the runtime `.patterc` to the configured output path.
  *  It pins first (pin on publish): every scene and block address still following its name is written down,
  *  and the toast says how many, once, so the diff that follows is not a surprise. */
@@ -2845,6 +2854,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "play-from-start") void playFromStart();
   else if (cmd === "select-all") selectAllCommand();
   else if (cmd === "duplicate") surface?.duplicate();
+  else if (cmd === "show-in-storyletter") void showInStoryletter();
   else if (cmd === "undo") surface?.undo();
   else if (cmd === "redo") surface?.redo();
   else if (cmd === "toggle-nav") togglePane("nav");

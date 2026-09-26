@@ -13,7 +13,7 @@
 // through its own version-control layer, exactly as Patterpad's New Scene does.
 // ---------------------------------------------------------------------------
 
-import type { FlowFile, Group, LocaleFile, Scene, Snippet } from "@patterkit/model";
+import type { FlowFile, Group, LocaleFile, ProjectFile, Scene, Snippet } from "@patterkit/model";
 import { slug } from "./handle.js";
 import { newId } from "./ids.js";
 import { canonicalStringify } from "./serialize.js";
@@ -45,6 +45,23 @@ export interface ScenePlan {
 }
 
 const trimSlash = (p: string): string => p.replace(/\/+$/, "");
+
+/**
+ * Plan a new, empty Patter project for another tool to create beside its own (Storyletter's
+ * "Starter project with Patter"): the project file as Patter's own init writes it, named after
+ * the project, in one locale. Scenes are added with `planScene`. Returns the project file's path
+ * relative to the new project folder, and its canonical content.
+ */
+export function planProject(opts: { name: string; locale?: string }): { path: string; content: string } {
+  const locale = opts.locale ?? "en";
+  const project: ProjectFile = {
+    schema: "patter/project@0",
+    project: { id: newId("proj"), name: opts.name },
+    locales: { default: locale, all: [locale] },
+    voiced: true,
+  };
+  return { path: `${slug(opts.name) || "project"}.patterproj`, content: canonicalStringify(project) };
+}
 
 /** Plan a stub scene for a card. Pure: nothing is read or written. */
 export function planScene(target: ScenePlanTarget, scaffold: SceneScaffold): ScenePlan {

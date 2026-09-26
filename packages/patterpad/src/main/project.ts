@@ -14,7 +14,7 @@ import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runE
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
-import { walkNodes, effectiveGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
@@ -1117,6 +1117,15 @@ export function playCaptionsState(): boolean { return playCaptionsOn; }
 /** Toggle closed captions for the play window. Applies LIVE to the running engine (no restart), so the
  *  playthrough keeps its place; the persisted flag also seeds the next fresh run. */
 export function setPlayCaptions(on: boolean): void { playCaptionsOn = on; engine?.setClosedCaptions(on); }
+
+/** The name a storylet card pairs with this scene by (Show Card in Storyletter). A card finds its
+ *  scene by internal id first, then address, as the runtime resolves a reference: so a scene whose id
+ *  is itself a legal Game ID (a hand-written one) is named by its id, and any other by its address. */
+export function cardNameFor(sceneId: string): string | undefined {
+  const scene = loaded?.scenes.find((s) => s.id === sceneId);
+  if (!scene) return undefined;
+  return isValidGameId(scene.id) ? scene.id : effectiveGameId(scene);
+}
 
 /** The host-facing address a run starts from: `<scene>` or `<scene>.<block>` (effective Game IDs). */
 export function playAddress(sceneId: string, blockId?: string): string {

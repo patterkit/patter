@@ -55,6 +55,9 @@ interface AppSlice {
    *  A user preference rather than window geometry, so it lives in the app slice beside the theme.
    *  OFF by default: marking is the default behaviour and following is the author asking for it. */
   playFollow: boolean;
+  /** Where Storyletter is, when Patterpad couldn't find it and the author pointed at it (Show Card in
+   *  Storyletter). Per person: where an app is installed differs from one machine to the next. */
+  storyletterPath?: string;
 }
 
 /** The old hand-rolled file, kept only for the one-time fold-in below. */
@@ -89,6 +92,9 @@ export interface Store {
   setPanes(panes: PaneState): void;
   setTheme(theme: ThemePrefs): void;
   setPlayFollow(on: boolean): void;
+  /** Storyletter's location, as the author pointed at it (undefined = look for it). */
+  storyletterPath(): string | undefined;
+  setStoryletterPath(path: string): void;
   /** One helper window's remembered bounds + pin, read through the shell's `windowSlice`: the three
    *  helper windows float on top by default (the slice's own default), and nothing here flattens the
    *  shell's record back into named fields any more (ui-review-2026-09, finding 19). */
@@ -217,6 +223,12 @@ export function createStore(dir: string): Store {
     },
     setPlayFollow(on) {
       app.patchApp({ playFollow: on });
+    },
+    storyletterPath() {
+      return app.get().app.storyletterPath;
+    },
+    setStoryletterPath(path) {
+      app.patchApp({ storyletterPath: path });
     },
     window(name) {
       return windowSlice(app, name);

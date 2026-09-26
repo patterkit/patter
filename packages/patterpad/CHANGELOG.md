@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Edit ▸ Show Card in Storyletter.** When a Storyletter project nearby is paired with this Patter
+  project (it names it as its Patter project), the Edit menu offers the storylet card the open scene
+  belongs to, and opens Storyletter at it. The first time, if Patterpad can't find Storyletter, it
+  asks you to point to it once, and remembers.
+
 ### Fixed
 
 - **Opening a scene another tool has just added lands on it.** Storyletter can now write a stub scene

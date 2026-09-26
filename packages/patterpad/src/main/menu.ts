@@ -40,7 +40,9 @@ const linkItem = (item: NamedMenuItem): MenuItemConstructorOptions => ({
  *  mirrors the Dictionary settings tab). */
 export interface SpellingMenu { hasProject: boolean; enabled: boolean; language: string; dictionaries: Array<{ id: string; label: string }> }
 
-export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false, autoRebuild = false): void {
+export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false, autoRebuild = false,
+  /** A Storyletter project nearby is paired with this one, so Show Card in Storyletter has somewhere to go. */
+  storyletter = false): void {
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
 
@@ -141,6 +143,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
         // inside it - the copy takes fresh ids throughout, so it never aliases the original.
         { ...EDIT_MENU.duplicate, click: () => send("duplicate") },
+        // Storyletter's Edit Scene in Patterpad, the other way: the storylet card this scene plays. Only
+        // while a Storyletter project nearby names this one as its Patter project.
+        ...(storyletter ? [{ label: "Show Card in Storyletter", click: () => send("show-in-storyletter") }] : []),
         { type: "separator" },
         // Open the detached search window (#205) in the right mode. The accelerators ARE the shortcuts:
         // Find = Cmd/Ctrl+F; Replace = Cmd+Alt+F on macOS, Ctrl+H elsewhere (the platform conventions).

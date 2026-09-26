@@ -13,6 +13,6 @@ export { parseSource, canonicalStringify } from "./serialize.js";
 export type { StringifyOptions } from "./serialize.js";
 export { validateProject } from "./validate.js";
 // A stub scene another tool can hand a writer (Storyletter, for a card with no scene yet)
-export { planScene } from "./scene-scaffold.js";
+export { planProject, planScene } from "./scene-scaffold.js";
 export type { SceneScaffold, ScenePlanTarget, ScenePlan } from "./scene-scaffold.js";
 export type { ValidationIssue, ProjectInput } from "./validate.js";

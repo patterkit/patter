@@ -774,6 +774,8 @@ export interface PatterApi {
   /** Publish Bundle. `pin` (the menu's) first writes down every scene and block address still following
    *  its name, so a later rename cannot move a name the game may now rely on. */
   buildBundle(opts?: { pin?: boolean }): Promise<ExportResult>;
+  /** Show Card in Storyletter: open the paired Storyletter project at the card this scene plays. */
+  showInStoryletter(sceneId: string): Promise<{ ok: boolean; error?: string; canceled?: boolean }>;
   /** Toggle Auto Rebuild (Build menu checkbox): flip ProjectFile.autoRebuild, persist it, and return the
    *  new state. Mirrors the Project Settings ▸ General toggle. */
   toggleAutoRebuild(): Promise<boolean>;

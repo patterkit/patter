@@ -110,6 +110,22 @@ file and a `game.scopes.json` holding your World properties. An `@story` you imp
 properties before the folder existed is superseded once Storyletter writes its file there, and
 `validate` asks you to remove it.
 
+### Scenes that storylets play
+
+A common shape for a game is storylets choosing the beat and Patter performing it: the game deals
+a card, plays the scene named after it, and takes the outcome the scene ends on (see the
+Storylets site's *Working with Patter*). A Storyletter project can be paired with your Patter
+project, and then:
+
+- Storyletter checks every card against the scene of its name in your **published** bundle, so
+  publish after you change a scene's choices.
+- It can write a stub scene for a card that has none: named after the card, one option per
+  outcome. It lands in your project's `scenes/` folder, and Storyletter opens it here for you.
+- **Edit ▸ Show Card in Storyletter** opens the card the scene you're on belongs to. It appears
+  once Patterpad finds a Storyletter project nearby that is paired with this one.
+- Storyletter's Board plays your scenes as it deals. Turn on **Live Link** here and it connects
+  like a game: each save reaches it, and the playhead follows the line it's on.
+
 ## Game Data: what your game reads back
 
 Properties drive the *story*; **Game Data** hands cues to the *game*. In **Project

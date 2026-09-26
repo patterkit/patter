@@ -4,6 +4,7 @@
 // open-where-you-left-off / recents / identity store in store.ts.
 
 import { app, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, Menu } from "electron";
+import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -123,7 +124,7 @@ function refreshMenu(): void {
   // The "Live Link" checkbox is ticked while the localhost link is up (listening / connected).
   const dbg = debugServer?.status().state;
   const debugActive = dbg === "listening" || dbg === "connected";
-  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled());
+  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined);
 }
 
 // Ask the editor window to flush its open scene to disk, and resolve once it confirms (or after a short
@@ -170,6 +171,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     if (!project.isCurrent(ending)) return;
     project.closeProject();
     currentRoot = null;      // the second-instance jump-in-place guard must not point at a closed project
+    pairedStorylets = undefined;
     searchFocus = undefined; // and the search window's ranking anchor belongs to that project too
     lastCoverageResult = null;
   },
@@ -186,6 +188,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     try { proj = project.openProject(path, remembered); }
     catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
     currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
+    pairedStorylets = findPairedStorylets(proj.root); // Show Card in Storyletter, when a project there pairs with this one
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
     // otherwise (the project root / `.patter` package) fall back to where the author last left off.
     const launched = project.sceneForPath(path);
@@ -265,6 +268,8 @@ let pendingOpenAt: string | null = null;
 /** Root of the project currently shown in the window (set on every open, cleared back to welcome). Lets a
  *  second-instance launch tell "same project, jump in place" from "different project, load it". */
 let currentRoot: string | null = null;
+/** The Storyletter project paired with the open one, found when it opens (storyletter.ts). */
+let pairedStorylets: string | undefined;
 
 /** Two filesystem paths that resolve to the same location (used for the already-open project check). */
 const samePath = (a: string | null | undefined, b: string | null | undefined): boolean =>
@@ -1047,6 +1052,34 @@ function registerIpc(): void {
   // Live debug link (#181): a localhost WS server an external game streams its cursor into. Frames for the
   // followed flow reuse the SAME play:mark path the in-app Play window uses, so the editor follows the live
   // playhead. Observe-only; the editor never drives the game.
+  // Show Card in Storyletter: the storylet card the open scene plays, in the paired Storyletter project.
+  ipcMain.handle("storyletter:show", async (_e, sceneId: string): Promise<{ ok: boolean; error?: string; canceled?: boolean }> => {
+    if (!pairedStorylets) return { ok: false, error: "No Storyletter project nearby is paired with this one." };
+    const name = project.cardNameFor(sceneId);
+    if (!name) return { ok: false, error: "Open a scene first." };
+    let executable = findStoryletter(store.storyletterPath());
+    if (executable === undefined) {
+      const answer = await dialog.showMessageBox(win!, {
+        type: "question", message: "Patterpad can't find Storyletter.",
+        detail: "Point to it once and Patterpad will remember where it is.",
+        buttons: ["Locate Storyletter…", "Cancel"], defaultId: 0, cancelId: 1,
+      });
+      if (answer.response !== 0) return { ok: false, canceled: true };
+      const picked = await dialog.showOpenDialog(win!, {
+        title: "Locate Storyletter", message: "Choose the Storyletter app. Patterpad will remember where it is.",
+        buttonLabel: "Use Storyletter", properties: ["openFile"],
+        ...(process.platform === "darwin" ? { defaultPath: "/Applications", filters: [{ name: "Applications", extensions: ["app"] }] } : {}),
+        ...(process.platform === "win32" ? { filters: [{ name: "Storyletter", extensions: ["exe"] }] } : {}),
+      });
+      const chosen = picked.filePaths[0];
+      if (picked.canceled || chosen === undefined) return { ok: false, canceled: true };
+      executable = findStoryletter(chosen);
+      if (executable === undefined) return { ok: false, error: "That isn't Storyletter." };
+      store.setStoryletterPath(chosen);
+    }
+    try { launchStoryletter(executable, pairedStorylets, name); return { ok: true }; }
+    catch (e) { return { ok: false, error: `couldn't start Storyletter: ${e instanceof Error ? e.message : String(e)}` }; }
+  });
   ipcMain.handle("debug:start", () => { ensureDebugServer().start(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:status", () => ensureDebugServer().status());

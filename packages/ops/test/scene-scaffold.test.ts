@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { planScene, parseSource } from "@patterkit/core";
+import { planProject, planScene, parseSource } from "@patterkit/core";
 import type { FlowFile } from "@patterkit/model";
 import { Engine } from "@patterkit/runtime";
 import { loadProject, runExport } from "../src/index.js";
@@ -64,6 +64,20 @@ describe("planScene", () => {
     const { dir } = withScene([{ gameId: "continue" }]);
     const flow = new Engine(runExport(loadProject(dir))).openFlow("f", { scene: "the-moneylenders-men" });
     expect(flow.advance()).toMatchObject({ type: "text", text: 'Write the scene for "The Moneylender\'s Men" here.' });
+    expect(flow.advance()).toEqual({ type: "end" });
+  });
+
+  it("plans a new project another tool can create, which takes planned scenes and plays", () => {
+    const dir = mkdtempSync(join(tmpdir(), "planned-"));
+    const project = planProject({ name: "The Village" });
+    expect(project.path).toBe("the_village.patterproj");
+    writeFileSync(join(dir, project.path), project.content);
+    const plan = planScene({ locale: "en", takenStems: new Set() }, { name: "Arrive", gameId: "arrive", outcomes: [{ gameId: "go" }] });
+    for (const w of plan.writes) { mkdirSync(dirname(join(dir, w.path)), { recursive: true }); writeFileSync(join(dir, w.path), w.content); }
+    const loaded = loadProject(dir);
+    expect(loaded.project.project.name).toBe("The Village");
+    const flow = new Engine(runExport(loaded)).openFlow("f", { scene: "arrive" });
+    expect(flow.advance()).toMatchObject({ type: "text" });
     expect(flow.advance()).toEqual({ type: "end" });
   });
 
