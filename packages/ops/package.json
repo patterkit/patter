@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/ops",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "The shared operations layer: every project operation (load, validate, export, format, play, ...) as a pure function, consumed by the patter CLI and Patterpad alike.",
   "type": "module",
   "license": "MIT",
@@ -27,8 +27,8 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
-    "@patterkit/compiler": "0.4.0",
-    "@patterkit/core": "0.2.6",
+    "@patterkit/compiler": "0.4.1",
+    "@patterkit/core": "0.3.0",
     "@patterkit/model": "0.7.0",
     "@patterkit/runtime": "0.14.0",
     "@wildwinter/scoperegistry": "^0.8.0",
