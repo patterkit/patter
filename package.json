@@ -26,7 +26,7 @@
     "ship:cli": "node scripts/ship-cli.mjs",
     "ship:npm": "node scripts/ship-npm.mjs",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
     "release": "npm run typecheck && npm run build && npm test && changeset publish",
     "check:unity-editor": "./scripts/check-unity-editor.sh"
   },

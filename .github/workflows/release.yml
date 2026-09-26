@@ -52,6 +52,11 @@ jobs:
         uses: changesets/action@v1
         with:
           cwd: patter
+          # version-packages is `changeset version` and then `npm install --package-lock-only`:
+          # changeset version bumps each package.json but leaves the lockfile's workspace entries
+          # behind, so every release left main's lockfile stale until an app release swept it up
+          # by hand (found 2026-09-26, from the Storylets side). The action commits whatever the
+          # command changed, so the lockfile now rides in the version PR.
           version: npm run version-packages
           # `npm run release` is typecheck + build + test + `changeset publish`, in that order. The gate
           # lives in the script rather than in a `needs:` on CI, because CI on main runs in PARALLEL with
