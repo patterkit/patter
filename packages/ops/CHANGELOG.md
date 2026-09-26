@@ -1,5 +1,13 @@
 # @patterkit/ops
 
+## 0.10.1
+
+### Patch Changes
+
+- Updated dependencies [2984ec6]
+  - @patterkit/core@0.3.0
+  - @patterkit/compiler@0.4.1
+
 ## 0.10.0
 
 ### Minor Changes
