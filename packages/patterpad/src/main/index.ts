@@ -294,7 +294,18 @@ function openAt(path: string, at: string | null): OpenResult {
 function navigateInWindow(query: string): void {
   if (!win) return;
   const hit = project.resolveLaunchLocation(query);
-  if (!hit) { console.error(`--at: nothing in this project matches '${query}'`); return; }
+  if (!hit) {
+    // Not in the open copy, but on disk: another tool added it since the project was opened
+    // (Storyletter creates a card's stub scene, then asks for it here). Save the open scene, then
+    // reopen the project at it, so the jump lands and nothing typed is lost.
+    if (currentRoot && project.locationOnDisk(currentRoot, query)) {
+      const root = currentRoot;
+      void flushEditorScene().then(() => openInWindow(root, query));
+      return;
+    }
+    console.error(`--at: nothing in this project matches '${query}'`);
+    return;
+  }
   win.webContents.send("search:navigate", hit);
 }
 

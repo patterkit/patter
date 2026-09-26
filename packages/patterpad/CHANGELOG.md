@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Opening a scene another tool has just added lands on it.** Storyletter can now write a stub scene
+  for a card into your Patter project, then open Patterpad at it. When Patterpad already had the project
+  open, it looked for the scene in its open copy, didn't find it and stayed put. It now checks the
+  project on disk, saves the scene you have open, and reopens the project at the new one.
+
 ## [0.20.0] - 2026-09-26
 
 ### Changed

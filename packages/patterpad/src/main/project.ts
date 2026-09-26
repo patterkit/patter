@@ -636,6 +636,12 @@ export function resolveLaunchLocation(query: string): SearchEntry | null {
   return entry;
 }
 
+/** Does the project AS IT IS ON DISK have what `query` names? True for a scene another tool added
+ *  since this project was opened (Storyletter's stub scene for a card), which the open copy lacks. */
+export function locationOnDisk(root: string, query: string): boolean {
+  try { return runResolve(loadProject(root), query).length > 0; } catch { return false; }
+}
+
 /** Status browse (#205 / #206): every line (+ text, for writing) beat at `status` across the project
  *  (unset = lowest rung), the caret's scene first. `dimension` picks the writing or recording ladder. */
 export function linesByStatus(status: string, dimension: "writing" | "recording", focus?: SearchFocus): SearchEntry[] {
