@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-26
+
 ### Added
 
 - **Edit ▸ Show Card in Storyletter.** When a Storyletter project nearby is paired with this Patter
