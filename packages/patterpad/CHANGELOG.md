@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-26
+
 ### Changed
 
 - **Publish Bundle pins every Game ID that still follows its name.** A scene or block address comes from
