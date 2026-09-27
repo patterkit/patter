@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-09-27
+
 ### Changed
 
 - **`@wildwinter/scoperegistry` is a peer dependency.** Your game and every engine in it share one
