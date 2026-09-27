@@ -7,6 +7,11 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  the JS runtime's zip, whose module builds now work without npm. Nothing in this runtime changed.
+
 ## [0.14.2] - 2026-09-27
 
 ### Changed
