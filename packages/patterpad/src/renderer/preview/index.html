@@ -62,27 +62,7 @@
 
     <!-- The first-run / User Information ask is the shell's askIdentity (renderer.ts). -->
 
-    <!-- New-project dialog (placeholder: name only; settings fields land later). -->
-    <dialog id="create-project" class="identity create-dialog">
-      <form method="dialog" class="identity-form">
-        <h2 class="identity-title">New project</h2>
-        <p class="identity-sub">Name your story. Next, you'll choose where to keep it.</p>
-        <label class="identity-field">Project name<input id="create-name" type="text" placeholder="The Tavern" required /><small class="identity-hint">The project opens with a scene called <code>Start</code> and one line of narration in it. Replace that line with your own writing.</small></label>
-        <label class="identity-field">Version control<select id="create-vcs" class="insp-select">
-          <option value="git">Git</option>
-          <option value="perforce">Perforce</option>
-          <option value="plastic">Plastic SCM</option>
-          <option value="svn">Subversion (SVN)</option>
-          <option value="none" selected>None</option>
-        </select></label>
-        <label class="identity-field">Publish output<input id="create-build" type="text" spellcheck="false" placeholder="../patter-dist/your-project.patterc" /><small class="identity-hint">Where Publish ▸ Publish Bundle writes the <code>.patterc</code>. The default is a sibling <code>patter-dist/</code> folder.</small></label>
-        <p class="create-preview">Saved as <code id="create-preview-name">your-project.patter</code></p>
-        <div class="identity-actions">
-          <button type="button" id="create-cancel" class="btn" value="cancel">Cancel</button>
-          <button id="create-confirm" class="btn primary" value="create">Choose location…</button>
-        </div>
-      </form>
-    </dialog>
+    <!-- New Project is the shell's kit gallery (openKitGallery), built in renderer.ts. -->
 
     <!-- Project Settings (File > Project Settings…) is the shell's mountSettingsDialog, built in renderer.ts. -->
 

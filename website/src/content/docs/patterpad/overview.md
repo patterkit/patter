@@ -30,7 +30,10 @@ list. It is also the way back to the shipped **tour** once you have a project op
 
 ### Creating a project
 
-**File ▸ New Project…** (`⌘N` / `Ctrl+N`) opens a simple dialog:
+**File ▸ New Project…** (`⌘N` / `Ctrl+N`) shows the kits you can start from, with the
+one you pick described on the right: what you get, and what pressing Play shows. Today
+there's one, the **Starter project**: a scene called `Start` with one line of narration,
+so the project plays the moment it opens. Under the description you fill in:
 
 - **Project name**: shows a live preview of the `<name>.patter` folder you'll get.
 - **Version control**: git, Perforce, Plastic, SVN, or none. Patterpad sets up the
@@ -40,7 +43,7 @@ list. It is also the way back to the shipped **tour** once you have a project op
   sibling `../patter-dist/<name>.patterc` and leaves the name alone once you type
   your own path.
 
-Then you **Choose Location** for your Patter project.
+Then **Choose location…** asks where to keep your Patter project.
 
 A Patter project is a real folder of files (see [the format](/format/overview/)).
 On macOS the `.patter` folder opens with a double-click; on Windows and Linux it's an

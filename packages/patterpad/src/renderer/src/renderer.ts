@@ -19,6 +19,7 @@ import "@wildwinter/app-shell/confirm.css"; // what is the confirm's own: its wi
 import "@wildwinter/app-shell/identity.css"; // the identity ask's fields
 import "@wildwinter/app-shell/context-menu.css"; // the navigator's right-click menu
 import "@wildwinter/app-shell/welcome.css"; // the welcome screen (mountWelcome)
+import "@wildwinter/app-shell/kit-gallery.css"; // New Project (openKitGallery)
 import "@wildwinter/app-shell/link-status.css"; // the live-link chip (mountLinkStatus, via debug-panel.ts)
 import "@wildwinter/app-shell/updater.css"; // the updater prompt (showUpdaterDialog)
 import "@wildwinter/app-shell/job.css"; // the long-job strip the publish paths run under
@@ -61,7 +62,7 @@ import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way
 import { toast } from "@wildwinter/app-shell";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
-import { mountWelcome, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
+import { mountWelcome, openKitGallery, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
 // Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
@@ -183,7 +184,7 @@ const welcome = mountWelcome(welcomeEl, {
   sub: "Write the script. Play it in your game.",
   actions: [
     { label: "Open a project…", primary: true, onClick: () => void openDialog() },
-    { label: "New project…", onClick: () => void createDialog() },
+    { label: "New project…", onClick: () => createDialog() },
   ],
   recents: [],
   tourLine,
@@ -236,12 +237,6 @@ const overviewScenesEl = $("overview-scenes");
 const propsDocHostEl = $("props-doc-host");
 const propsDocWorldEl = $<HTMLButtonElement>("props-doc-world");
 propsDocWorldEl.addEventListener("click", () => void openProjectSettings("world"));
-const createDialogEl = $<HTMLDialogElement>("create-project");
-const createNameInput = $<HTMLInputElement>("create-name");
-const createVcsSel = $<HTMLSelectElement>("create-vcs");
-const createBuildInput = $<HTMLInputElement>("create-build");
-const createPreviewEl = $("create-preview-name");
-$<HTMLButtonElement>("create-cancel").addEventListener("click", () => createDialogEl.close("cancel"));
 const debugLink = mountDebugLink(); // live debug link control (#181): the bottom-right connect icon
 const scenePropsDialogEl = $<HTMLDialogElement>("scene-props");
 const spHost = $("sp-host");
@@ -2701,44 +2696,70 @@ const patterFolderPreview = (name: string): string =>
 const buildDefaultFor = (name: string): string =>
   `../patter-dist/${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "_"}.patterc`;
 
-/** The themed New-project dialog (placeholder: just the name for now). Resolves the chosen name, or
- *  null if cancelled / dismissed. The system folder picker (where to keep it) follows in createDialog. */
-function promptNewProjectName(): Promise<string | null> {
-  createNameInput.value = "";
-  createBuildInput.value = "";
-  // The Build output prefills (and tracks the name) until the author edits it themselves.
-  let buildTouched = false;
-  const onBuildInput = (): void => { buildTouched = true; };
-  const sync = (): void => {
-    createPreviewEl.textContent = patterFolderPreview(createNameInput.value);
-    if (!buildTouched) createBuildInput.value = buildDefaultFor(createNameInput.value);
-  };
-  sync();
-  return new Promise((resolve) => {
-    const onInput = (): void => sync();
-    const onClose = (): void => {
-      createNameInput.removeEventListener("input", onInput);
-      createBuildInput.removeEventListener("input", onBuildInput);
-      createDialogEl.removeEventListener("close", onClose);
-      const name = createNameInput.value.trim();
-      resolve(createDialogEl.returnValue === "create" && name ? name : null);
-    };
-    createNameInput.addEventListener("input", onInput);
-    createBuildInput.addEventListener("input", onBuildInput);
-    createDialogEl.addEventListener("close", onClose);
-    createDialogEl.showModal();
-    setTimeout(() => createNameInput.focus(), 0);
-  });
-}
+/** The project kits New Project offers. One today: what `patter init` writes (ops/src/init.ts),
+ *  said in the concrete. More arrive as the Patter side specifies them; inventing plausible ones
+ *  here would be putting content in front of a decision (the kit gallery brief, section 7). */
+const PROJECT_KITS = [
+  { id: "starter" as const, name: "Starter project",
+    blurb: "A scene called Start with one line of narration in it, so the project plays the moment it opens. Replace that line with your own writing.",
+    tile: "One scene, one line of narration, ready to play.",
+    play: "Press Play: the Start scene plays its line.",
+    lands: ["A scene called Start", "One line of narration in English, your default language"] },
+];
 
-async function createDialog(): Promise<void> {
-  const name = await promptNewProjectName();
-  if (!name) return;                                  // cancelled the name step
-  const vcs = createVcsSel.value as VcsKind;          // the chosen version-control system
-  const buildBundle = createBuildInput.value.trim() || undefined; // where Build Bundle will write
-  await leaveProject();
-  const r = await window.patter.createDialog(name, vcs, buildBundle); // pick a location, then scaffold <name>.patter
-  if (r) await showProject(r);
+/**
+ * New Project: the shell's kit gallery (app-shell kit-gallery.ts), the same moment Storyletter's New
+ * Project and New Box draw (storylet-studio/design/kit-gallery.md, section 7). The form this replaced
+ * was a name, version control and a publish path under a heading; those are now the gallery's
+ * details panel, beside the kit, so "what am I about to be given?" is answered before anything
+ * is asked (from-storylets/new-project-says-nothing). The system folder picker still follows.
+ */
+function createDialog(): void {
+  const vcs = el("select", "insp-select");
+  for (const [value, label] of [["git", "Git"], ["perforce", "Perforce"], ["plastic", "Plastic SCM"], ["svn", "Subversion (SVN)"], ["none", "None"]] as const) {
+    const o = el("option", undefined, label);
+    o.value = value;
+    o.selected = value === "none";
+    vcs.append(o);
+  }
+  const build = el("input", "field");
+  build.type = "text";
+  build.spellcheck = false;
+  build.placeholder = "../patter-dist/your-project.patterc";
+  const preview = el("code", undefined, "your-project.patter");
+  const saved = el("p", "create-preview", "Saved as ");
+  saved.append(preview);
+  const details = el("div", "create-details");
+  details.append(
+    el("label", "kit-gallery-label", "Version control"), vcs,
+    el("label", "kit-gallery-label", "Publish output"), build,
+    el("small", "identity-hint", "Where Publish \u25B8 Publish Bundle writes the .patterc. The default is a sibling patter-dist/ folder."),
+    saved);
+  // The publish path prefills (and tracks the name) until the author edits it themselves.
+  let buildTouched = false;
+  build.addEventListener("input", () => { buildTouched = true; });
+  openKitGallery({
+    title: "New project",
+    what: "A project is one story's worth of scenes: what is said, who says it, and the bundle your game plays.",
+    namePlaceholder: "The Tavern",
+    nameLabel: "Project name",
+    details,
+    onNameInput: (name) => {
+      preview.textContent = patterFolderPreview(name);
+      if (!buildTouched) build.value = buildDefaultFor(name);
+    },
+    sections: [{ caption: "Start from a kit", note: "A starting point you own, fully editable the moment it lands.", action: "Choose location\u2026", items: PROJECT_KITS }],
+    onPick: (_kit, { name }) => {
+      if (name === undefined) return;
+      const chosenVcs = vcs.value as VcsKind;
+      const buildBundle = build.value.trim() || undefined;
+      void (async () => {
+        await leaveProject();
+        const r = await window.patter.createDialog(name, chosenVcs, buildBundle); // pick a location, then scaffold <name>.patter
+        if (r) await showProject(r);
+      })();
+    },
+  });
 }
 
 // --- first run ---------------------------------------------------------------
@@ -2838,7 +2859,7 @@ projectNameEl.style.cursor = "pointer";
 
 // Native-menu commands (File / Run / Edit / View) relayed from the main process.
 window.patter.onMenu((cmd) => {
-  if (cmd === "new") void createDialog();
+  if (cmd === "new") createDialog();
   else if (cmd === "new-scene") newScenePrompt();
   else if (cmd === "delete-scene") void deleteScenePrompt();
   else if (cmd === "open") void openDialog();
