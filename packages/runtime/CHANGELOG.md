@@ -33,11 +33,13 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- **Requires `@wildwinter/scoperegistry` ^0.8.0.** That release adds a separate entry point for editing
-  tools (`@wildwinter/scoperegistry/scopes`, shared game scopes), which the runtime does not use; its
-  behaviour is unchanged.
+- **One copy of `@wildwinter/scoperegistry` again.** 0.14.0 asked for `^0.7.0` while
+  `@patterkit/dialect` 0.2.1 asks for `^0.8.0`, so an install got two copies, and a `ScopeRegistry`
+  your game made was not the one the runtime used. The runtime now accepts any version from 0.7.0 up
+  to 1.0, so it shares whichever copy the rest of your install has, and a later registry release
+  cannot split it again. The runtime's behaviour is unchanged.
 
 ## [0.14.0] - 2026-09-24
 

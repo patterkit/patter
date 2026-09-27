@@ -144,6 +144,11 @@ never published.)
 > twice, on the Version Packages PRs 42 and 50, unseen because bot-PR CI never ran; the caret on
 > dialect did it again on PR 76, for dialect 0.2.0). Any internal dependency the runtime gains
 > takes a wide range for the same reason: on a 0.x caret, every minor is out of range.
+> `@wildwinter/scoperegistry` takes one too (`>=0.7.0 <1.0.0`), for a different reason: a game
+> shares ONE registry between engines, so every package in an install must resolve to the same copy.
+> Runtime 0.14.0 shipped `^0.7.0` beside a dialect on `^0.8.0`, and every install got two copies, so a
+> game's `ScopeRegistry` was not the type the runtime used. A 0.x caret splits the copies on every
+> additive registry release.
 
 1. With each change touching a published package, add a changeset:
    ```sh

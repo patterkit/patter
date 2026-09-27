@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  the JS runtime's: it accepts any `@wildwinter/scoperegistry` from 0.7.0 up to 1.0, so an install no
+  longer ends up with two copies of the registry. Nothing in this runtime changed.
+
 ## [0.14.0] - 2026-09-24
 
 ### Changed
