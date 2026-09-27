@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-09-27
+
 ### Fixed
 
 - **One copy of `@wildwinter/scoperegistry` again.** 0.14.0 asked for `^0.7.0` while
