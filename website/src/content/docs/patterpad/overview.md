@@ -121,7 +121,11 @@ Below it, your list of scenes. The open scene unfolds to list its **blocks**. Th
 cursor is in stays marked, and clicking one jumps straight to it. **Drag** a scene to
 reorder the list; the order is saved with the project (it changes nothing about how the
 story plays). Add a scene with the **+ New Scene** row at the foot of the list (or
-**File ▸ New Scene…**, `⇧⌘N`). Delete one from its right-click menu (or
+**File ▸ New Scene…**, `⇧⌘N`). A new scene starts from a **scene kit**: **Blank**, a
+**Conversation with choices**, a **Hub conversation**, **Barks**, or a **Cutscene**. Each one
+plays the moment it lands, and the kit you pick is described before anything is made. A kit
+with lines asks who speaks them; if your cast is empty, the name you give is added to it.
+Delete a scene from its right-click menu (or
 **File ▸ Delete Scene…**), and if other scenes jump into it, the confirm names them, and the
 dangling jumps show as problems until you repoint them. Toggle the pane with
 **View ▸ Show Scenes** (`⌘1`).

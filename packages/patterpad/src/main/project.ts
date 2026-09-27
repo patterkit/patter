@@ -13,6 +13,7 @@ import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runE
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
+import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
@@ -1844,11 +1845,13 @@ export function setStart(start: { scene: string; block?: string }): Promise<Save
   });
 }
 
-/** Create a new scene: the same minimal playable scaffold `patter init` starts a project with
- *  (one block, one snippet, one text beat jumping to END), written as a fresh flow shard + its
- *  default-locale loc shard through the lock-aware path. The filename stem is the slugged name,
- *  de-collided (`-2`, `-3`, …) against existing shards. Returns the refreshed summary + the new id. */
-export function createScene(name: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }> {
+/** Create a new scene from a scene kit (scene-kits.ts; Blank is the minimal playable scaffold
+ *  `patter init` starts a project with), written as a fresh flow shard + its default-locale loc shard
+ *  through the lock-aware path. A kit with lines speaks as `speaker`, who is added to the project cast
+ *  in the same commit when new: the author named them in New Scene's panel, so this is their choice,
+ *  not the kit's. The filename stem is the slugged name, de-collided (`-2`, `-3`, …) against existing
+ *  shards. Returns the refreshed summary + the new id. */
+export function createScene(name: string, kit: SceneKit = "blank", speaker?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // the stem de-collides against ALL shards, not the landing-only view
@@ -1862,23 +1865,24 @@ export function createScene(name: string): Promise<SaveResult & { project?: Open
     const flowPath = join(loaded.root, layout.flow, `${stem}.patterflow`);
     const locPath = join(loaded.root, layout.strings, defaultLocale, `${stem}.patterloc`);
 
-    const sceneId = newId("scn");
-    const beatId = newId("T");
-    const scene: Scene = {
-      id: sceneId, type: "scene", name: trimmed,
-      blocks: [{
-        id: newId("blk"), type: "block", name: "Main",
-        children: [{ id: newId("sn"), type: "snippet", beats: [{ id: beatId, kind: "text" }], jump: { to: "END" } }],
-      }],
-    };
+    if (!SCENE_KITS.includes(kit)) return { ok: false, error: `no scene kit called "${kit}"` };
+    const who = speaker?.trim();
+    if (kitNeedsSpeaker(kit) && !who) return { ok: false, error: "this kit needs someone to speak its lines" };
+    const { scene, strings } = buildSceneKit(kit, trimmed, who);
+    const sceneId = scene.id;
     const flow: FlowFile = { schema: "patter/flow@0", scene };
-    const locale: LocaleFile = { schema: "patter/strings@0", scene: sceneId, locale: defaultLocale, default: true, strings: { [beatId]: "A new scene." } };
+    const locale: LocaleFile = { schema: "patter/strings@0", scene: sceneId, locale: defaultLocale, default: true, strings };
 
+    const cast = [...(loaded.project.cast ?? [])];
+    const addToCast = kitNeedsSpeaker(kit) && who !== undefined && !cast.some((c) => c.name === who);
+    if (addToCast) cast.push({ name: who });
     const res = await commitWrites([
       { path: flowPath, content: canonicalStringify(flow) },
       { path: locPath, content: canonicalStringify(locale) },
+      ...(addToCast ? [{ path: loaded.projectFile, content: canonicalStringify({ ...loaded.project, cast }) }] : []),
     ]);
     if (!res.ok) return res;
+    if (addToCast) loaded.project = { ...loaded.project, cast };
     loaded.scenes.push(scene);
     loaded.sceneFiles[sceneId] = flowPath;
     loaded.locales.push(locale);

@@ -27,6 +27,7 @@ import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
+import type { SceneKitId } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -929,7 +930,7 @@ function registerIpc(): void {
   });
   ipcMain.handle("project:setStart", (_e, start: { scene: string; block?: string }) => project.setStart(start));
   ipcMain.handle("project:reorderScenes", (_e, ids: string[]) => project.reorderScenes(ids));
-  ipcMain.handle("project:createScene", (_e, name: string) => project.createScene(name));
+  ipcMain.handle("project:createScene", (_e, name: string, kit?: SceneKitId, speaker?: string) => project.createScene(name, kit, speaker));
   ipcMain.handle("project:sceneDeleteInfo", (_e, sceneId: string) => project.sceneDeleteInfo(sceneId));
   ipcMain.handle("project:deleteScene", (_e, sceneId: string) => project.deleteScene(sceneId));
   ipcMain.handle("scene:read", (_e, id: string) => project.readScene(id));

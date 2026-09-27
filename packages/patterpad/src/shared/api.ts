@@ -12,6 +12,9 @@ export type { Comment, CommentMessage, Suggestion } from "@patterkit/model";
 
 /** One active piece of feedback for the Review Feedback walk: an unresolved comment thread or an open
  *  rewrite proposal, with where it lives (scene + anchored beat) and a one-line preview. */
+/** The scene kits New Scene offers (main/scene-kits.ts builds them; the renderer words them). */
+export type SceneKitId = "blank" | "conversation" | "hub" | "barks" | "cutscene";
+
 export interface ReviewItem {
   sceneId: string;
   sceneName: string;
@@ -798,7 +801,8 @@ export interface PatterApi {
   reorderScenes(ids: string[]): Promise<SaveResult & { project?: OpenedProject }>;
   /** Create a new scene (the minimal playable scaffold) as fresh flow + loc shards, lock-aware.
    *  Returns the refreshed summary and the new scene's id so the renderer can open it. */
-  createScene(name: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }>;
+  /** New Scene from a kit (main/scene-kits.ts); `speaker` for a kit with lines, added to the cast when new. */
+  createScene(name: string, kit?: SceneKitId, speaker?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }>;
   /** What deleting a scene would cost - drives the delete confirm's severity: untouched scaffolds
    *  delete silently, content asks, and inbound references list the referring scenes by name. */
   sceneDeleteInfo(sceneId: string): Promise<SceneDeleteInfo | null>;

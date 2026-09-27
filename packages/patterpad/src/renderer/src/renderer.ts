@@ -62,7 +62,7 @@ import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way
 import { toast } from "@wildwinter/app-shell";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
-import { mountWelcome, openKitGallery, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
+import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
 // Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
@@ -90,7 +90,7 @@ import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from 
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 import { openJumpPicker } from "./jump-picker.js";
-import type { SearchEntry, AudioEntry } from "../../shared/api.js";
+import type { SearchEntry, AudioEntry, SceneKitId } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
@@ -563,28 +563,69 @@ function renderNav(): void {
 
 // --- new scene (File > New Scene… / the nav's + row) --------------------------
 
-const newSceneDialogEl = $<HTMLDialogElement>("new-scene");
-const newSceneNameEl = $<HTMLInputElement>("new-scene-name");
-$<HTMLButtonElement>("new-scene-cancel").addEventListener("click", () => newSceneDialogEl.close("cancel"));
+/** The scene kits, worded for the gallery (storylet-studio design/kit-gallery.md, section 7a, approved
+ *  2026-09-27). What each one writes is main/scene-kits.ts; these lines are written from it. */
+const SCENE_KIT_ITEMS: KitGalleryItem<SceneKitId>[] = [
+  { id: "blank", name: "Blank", blurb: "A scene with one line of narration in it, ready to write into.",
+    play: "Press Play: the line, then the end." },
+  { id: "conversation", name: "Conversation with choices",
+    blurb: "Someone says something, the player answers, and both answers come back together.",
+    play: "Press Play: a line, two answers, and the talk carries on either way.",
+    shows: "lines and speakers, a choice, once-only and repeatable answers, gathering back." },
+  { id: "hub", name: "Hub conversation",
+    blurb: "Ask about several things in any order, then leave.",
+    play: "Press Play: a menu of topics that comes back after each one, until you say goodbye.",
+    shows: "jumps and loops, once-only topics, a way out that is always there." },
+  { id: "barks", name: "Barks",
+    blurb: "Short lines a character says in passing, never the same one twice in a row.",
+    play: "Press Play: one line, drawn at random from four.",
+    shows: "the sequence selector (shuffle, repeat), and a cursor shared between characters." },
+  { id: "cutscene", name: "Cutscene",
+    blurb: "A scripted exchange, with camera and animation cues for the game.",
+    play: "Press Play: the lines in order, with each cue listed as it fires.",
+    shows: "line, text and game event beats, a direction for the actor, Game Data." },
+];
 
-/** Name a new scene, scaffold it (main writes the shards, lock-aware), and open it to write. */
+/** New Scene: the shell's kit gallery, the moment Storyletter's New Box draws. A kit with lines needs a
+ *  speaker, chosen here from the cast; with nobody in the cast yet, the name typed is added to it. */
 function newScenePrompt(): void {
   if (!project) return;
-  newSceneNameEl.value = "";
-  const onClose = (): void => {
-    newSceneDialogEl.removeEventListener("close", onClose);
-    if (newSceneDialogEl.returnValue !== "create") return;
-    void (async () => {
-      const res = await window.patter.createScene(newSceneNameEl.value);
-      if (!res.ok || !res.project || !res.sceneId) return;
-      project = res.project;
-      renderNav();
-      await loadScene(res.sceneId);
-    })();
-  };
-  newSceneDialogEl.addEventListener("close", onClose);
-  newSceneDialogEl.showModal();
-  newSceneNameEl.focus();
+  const cast = project.cast;
+  const speaker: HTMLInputElement | HTMLSelectElement = cast.length > 0 ? el("select", "insp-select") : el("input", "field");
+  if (speaker instanceof HTMLSelectElement) {
+    for (const name of cast) { const o = el("option", undefined, name); o.value = name; speaker.append(o); }
+  } else {
+    speaker.type = "text";
+    speaker.placeholder = "Gareth";
+  }
+  const speakerRow = el("div", "create-details");
+  speakerRow.append(
+    el("label", "kit-gallery-label", "Speaker"), speaker,
+    el("small", "identity-hint", cast.length > 0
+      ? "Who says this scene's lines. Pick anyone from the cast."
+      : "Who says this scene's lines. Nobody is in the cast yet, so this name is added to it."));
+  const needsSpeaker = (kit: SceneKitId): boolean => kit !== "blank";
+  openKitGallery<SceneKitId>({
+    title: "New scene",
+    what: "A scene is one piece of the story: a conversation, a moment, a set of lines a character can say. A scene kit is a starting point you own, fully editable the moment it lands.",
+    namePlaceholder: "The Docks",
+    nameLabel: "Scene name",
+    details: speakerRow,
+    sections: [{ items: SCENE_KIT_ITEMS }],
+    onChoose: (kit) => { speakerRow.hidden = !needsSpeaker(kit); },
+    validate: (kit) => (needsSpeaker(kit) && speaker.value.trim() === "" ? speaker : null),
+    onPick: (kit, { name }) => {
+      if (name === undefined) return;
+      const who = needsSpeaker(kit) ? speaker.value.trim() : undefined;
+      void (async () => {
+        const res = await window.patter.createScene(name, kit, who);
+        if (!res.ok || !res.project || !res.sceneId) return;
+        project = res.project;
+        renderNav();
+        await loadScene(res.sceneId);
+      })();
+    },
+  });
 }
 
 // --- delete scene (File > Delete Scene… / right-click a nav row) --------------
