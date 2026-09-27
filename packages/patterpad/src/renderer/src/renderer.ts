@@ -564,26 +564,27 @@ function renderNav(): void {
 // --- new scene (File > New Scene… / the nav's + row) --------------------------
 
 /** The scene kits, worded for the gallery (storylet-studio design/kit-gallery.md, section 7a, approved
- *  2026-09-27). What each one writes is main/scene-kits.ts; these lines are written from it. */
+ *  2026-09-27). What each one writes is main/scene-kits.ts; these lines are written from it. A feature
+ *  pill names what the game has, as a player meets it, never a part of the model: the author's ruling. */
 const SCENE_KIT_ITEMS: KitGalleryItem<SceneKitId>[] = [
   { id: "blank", name: "Blank", blurb: "A scene with one line of narration in it, ready to write into.",
     play: "Press Play: the line, then the end." },
   { id: "conversation", name: "Conversation with choices",
     blurb: "Someone says something, the player answers, and both answers come back together.",
     play: "Press Play: a line, two answers, and the talk carries on either way.",
-    shows: "lines and speakers, a choice, once-only and repeatable answers, gathering back." },
+    features: ["Branching dialogue", "Player choices"] },
   { id: "hub", name: "Hub conversation",
     blurb: "Ask about several things in any order, then leave.",
     play: "Press Play: a menu of topics that comes back after each one, until you say goodbye.",
-    shows: "jumps and loops, once-only topics, a way out that is always there." },
+    features: ["Ask in any order", "Leave any time"] },
   { id: "barks", name: "Barks",
     blurb: "Short lines a character says in passing, never the same one twice in a row.",
     play: "Press Play: one line, drawn at random from four.",
-    shows: "the sequence selector (shuffle, repeat), and a cursor shared between characters." },
+    features: ["Ambient lines", "No back-to-back repeats"] },
   { id: "cutscene", name: "Cutscene",
     blurb: "A scripted exchange, with camera and animation cues for the game.",
     play: "Press Play: the lines in order, with each cue listed as it fires.",
-    shows: "line, text and game event beats, a direction for the actor, Game Data." },
+    features: ["Scripted scene", "Camera cues", "Animation cues"] },
 ];
 
 /** New Scene: the shell's kit gallery, the moment Storyletter's New Box draws. A kit with lines needs a
@@ -2744,6 +2745,7 @@ const PROJECT_KITS = [
   { id: "starter" as const, name: "Starter project",
     blurb: "A scene called Start with one line of narration in it, so the project plays the moment it opens. Replace that line with your own writing.",
     tile: "One scene, one line of narration, ready to play.",
+    features: ["A first scene", "Playable at once"],
     play: "Press Play: the Start scene plays its line.",
     lands: ["A scene called Start", "One line of narration in English, your default language"] },
 ];
