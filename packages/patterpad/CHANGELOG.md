@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-27
+
 ### Added
 
 - **New Scene starts from a scene kit.** **Blank**, **Conversation with choices**, **Hub
