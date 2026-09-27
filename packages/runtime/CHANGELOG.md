@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-09-27
+
 ### Fixed
 
 - **The JS zip's module builds work without npm.** The zip carried the npm package's module build,

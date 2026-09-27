@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-09-27
+
 ### Changed
 
 - Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
