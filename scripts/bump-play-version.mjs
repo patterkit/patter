@@ -14,13 +14,15 @@
 //        "## [<version>] - Unreleased" heading is dated in place; otherwise the
 //        "## [Unreleased]" section (which must have content) becomes "## [<version>] - <date>"
 //        and a fresh empty "## [Unreleased]" is inserted above it
-//   3. prints the tag commands that trigger the release pipelines
+//   3. writes a changeset for the published packages whose runtime pin it moved (play-helpers,
+//      ops), so they get a new version too
+//   4. prints the tag commands that trigger the release pipelines
 //
 // The release workflows refuse a tag whose version does not match the manifests, so this
 // script is the one route to a release.
 //
 // The JS runtime note: @patterkit/runtime is deliberately NOT versioned by Changesets - this
-// script is its version authority (its internal deps are caret ranges so dependency bumps
+// script is its version authority (its internal deps are wide ranges so dependency bumps
 // don't cascade into it). `changeset publish` still publishes it to npm, because it publishes
 // any public package whose local version is ahead of the registry. Never add a changeset that
 // names @patterkit/runtime (this script warns if one exists). See RELEASING.md.
@@ -73,6 +75,28 @@ for (const rel of [
   "packages/patterpad/package.json",
 ]) {
   edit(rel, (s) => s.replace(/"@patterkit\/runtime": "[^"]+"/, `"@patterkit/runtime": "${version}"`));
+}
+
+// Moving a published package's pin changes what installs under a version npm already has, so each
+// one needs a new version of its own: without it, npm goes on serving the old pin beside the new
+// runtime (2026-09-27: play-helpers 0.7.1 and ops 0.10.1 kept runtime 0.14.0, and with it a second
+// copy of the registry, after 0.14.1 shipped). The changeset gives them one; `npm run ship:npm`
+// then publishes them with the runtime. Patterpad is private and versioned by its own route.
+const repinned = [];
+for (const [rel, name] of [
+  ["packages/play-helpers/package.json", "@patterkit/play-helpers"],
+  ["packages/ops/package.json", "@patterkit/ops"],
+]) {
+  if (pending.some((p) => p.rel === rel)) repinned.push(name);
+}
+if (repinned.length) {
+  const rel = `.changeset/patterplay-${version.replace(/\./g, "-")}.md`;
+  pending.push({
+    path: resolve(root, rel),
+    rel,
+    after: `---\n${repinned.map((n) => `"${n}": patch`).join("\n")}\n---\n\n` +
+      `Uses \`@patterkit/runtime\` ${version}, the Patterplay ${version} release.\n`,
+  });
 }
 
 edit("ports/unity/Patterplay/package.json", (s) => {
@@ -146,8 +170,8 @@ for (const { path, rel, after } of pending) {
   console.log(`  updated ${rel}`);
 }
 console.log(`
-Next steps (review the diffs first):
-  git add <the files above>            # commit the bump
+Next steps (review the diffs first; \`npm run release:play\` does all of this):
+  git add <the files above>            # commit the bump, the changeset included
   git commit -m "Patterplay ${version}"
   git push
 
@@ -161,5 +185,6 @@ Next steps (review the diffs first):
   # up in one push, fired nothing, and the tag ruleset then forbade the delete that
   # would have let them be pushed again. Four correct tags, no release, and the
   # recovery needed a workflow_dispatch added to every pipeline.
-  # (npm publishes @patterkit/runtime on the next main release run.)
+  # npm publishes @patterkit/runtime, with the packages whose pin moved, when
+  # \`npm run ship:npm\` merges the Version Packages PR this changeset opens.
 `);

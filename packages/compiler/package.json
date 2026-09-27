@@ -37,7 +37,12 @@
     "@patterkit/model": "0.7.0",
     "@patterkit/core": "0.3.0",
     "@patterkit/dialect": "0.2.2",
-    "@wildwinter/expr": "^0.5.0",
+    "@wildwinter/expr": "^0.5.0"
+  },
+  "peerDependencies": {
+    "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0"
+  },
+  "devDependencies": {
     "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0"
   }
 }

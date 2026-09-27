@@ -69,7 +69,8 @@ if (target === "pad") {
   run(`git commit -m "Patterpad ${version}"`);
 } else if (target === "play") {
   run(`node scripts/bump-play-version.mjs ${version}`); // writes every runtime manifest + changelog, all-or-nothing
-  run("git add -u"); // tree was clean, so -u stages exactly the bump
+  run("git add -u"); // tree was clean, so -u stages exactly the bump...
+  run("git add .changeset"); // ...plus the changeset it writes for the packages it re-pinned
   run(`git commit -m "Patterplay ${version}"`);
 }
 // cli: no bump - the standalone binaries are built from HEAD at the tag; the version rides the tag name.
@@ -80,4 +81,9 @@ run("git push origin main");
 for (const t of tags) run(`git push origin refs/tags/${t}`); // one per push (see header)
 
 console.log(`\nrelease.mjs: done - pushed ${tags.join(", ")}.`);
+if (target === "play") {
+  // bump:play wrote a changeset for the packages that pin the runtime, so the Release run opens a
+  // Version Packages PR instead of publishing: the runtime reaches npm when that PR merges.
+  console.log("npm: run `npm run ship:npm` to publish @patterkit/runtime with the packages that pin it.");
+}
 console.log("Watch the pipeline(s): https://github.com/patterkit/patter/actions");

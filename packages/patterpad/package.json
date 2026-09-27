@@ -36,6 +36,7 @@
     "@patterkit/runtime": "0.14.1",
     "@wildwinter/app-shell": "^0.46.1",
     "@wildwinter/expr-editor": "^0.16.0",
+    "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0",
     "@wildwinter/simple-vc-lib": "^0.4.1",
     "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0",

@@ -19,7 +19,9 @@ Three equivalent channels - pick whichever fits how you work; **no npm is requir
   `@patterkit/play-helpers` under one global), the module builds under `dist/` (ESM + CJS +
   types, for vendoring into your own build), this README, the CHANGELOG, and two `demos/`
   (the zero-build drop-in page and the interactive tour).
-- **npm**: `npm install @patterkit/runtime` (same version as the zip).
+- **npm**: `npm install @patterkit/runtime` (same version as the zip). `@wildwinter/scoperegistry`
+  is a peer dependency, so a game holds one registry that every engine shares; npm installs it for
+  you, and a package manager that doesn't install peers needs `npm install @wildwinter/scoperegistry`.
 - **CDN**: `patterplay.min.js` via unpkg/jsDelivr from `@patterkit/play-helpers` (the package
   that builds it), or loose on the same Release.
 

@@ -108,6 +108,25 @@ git push --no-verify          # bypass, if you are certain
 `@patterkit/runtime` is the exception in both directions: it is versioned by `npm run bump:play`, so
 changing it needs no changeset, and a changeset that NAMES it is an error the guard reports.
 
+A manifest counts as a change when its **dependencies** move while its version does not: that edits
+what installs under a version npm already has. The guard asks for a changeset for an ordinary
+package, and for the runtime it notes that the runtime set needs releasing before the next library
+publish.
+
+## The publish check
+
+`npm run release`, which the Release workflow runs to publish, checks npm before `changeset
+publish` (`scripts/check-published-manifests.mjs`, shared with Storylets from `expr/tooling`). For
+every public package whose version is already on npm, it compares the dependency fields with the
+repo's, and refuses to publish anything while one differs: the fix is always a new version for that
+package. It exists because of 2026-09-27, when the runtime's range on `@wildwinter/scoperegistry`
+moved under 0.14.0, the dialect's moved and published, and npm served the two ranges side by side,
+so every install got two copies of the registry.
+
+```sh
+npm run check:published   # run it by hand
+```
+
 ## Tag scheme
 
 CI keys each pipeline off a tag prefix:
@@ -144,11 +163,14 @@ never published.)
 > twice, on the Version Packages PRs 42 and 50, unseen because bot-PR CI never ran; the caret on
 > dialect did it again on PR 76, for dialect 0.2.0). Any internal dependency the runtime gains
 > takes a wide range for the same reason: on a 0.x caret, every minor is out of range.
-> `@wildwinter/scoperegistry` takes one too (`>=0.7.0 <1.0.0`), for a different reason: a game
-> shares ONE registry between engines, so every package in an install must resolve to the same copy.
-> Runtime 0.14.0 shipped `^0.7.0` beside a dialect on `^0.8.0`, and every install got two copies, so a
-> game's `ScopeRegistry` was not the type the runtime used. A 0.x caret splits the copies on every
-> additive registry release.
+> `@wildwinter/scoperegistry` is different again: a game shares ONE registry between engines, so an
+> install must hold exactly one copy. Every public package that uses it takes it as a **peer
+> dependency** with a wide range (the runtime `>=0.7.0 <1.0.0`, the rest `>=0.8.0 <1.0.0`), and as a
+> dev dependency with the same range for building here. A peer is installed once for everything that
+> names it, and a conflict stops the install instead of quietly adding a second copy. Runtime 0.14.0
+> shipped it as a caret dependency (`^0.7.0`) beside a dialect on `^0.8.0`, and every install got
+> two copies, so a game's `ScopeRegistry` was not the type the runtime used. Never move it back to
+> `dependencies`, and never give it a caret.
 
 1. With each change touching a published package, add a changeset:
    ```sh
@@ -304,6 +326,13 @@ npm run release:play -- 1.0.0
 Unreal `.uplugin`, Godot `plugin.cfg`) and stamps the changelog sections with today's
 date, all-or-nothing. Each pipeline **refuses a tag whose version does not match the
 manifests / changelog**, so a release cannot ship out of sync.
+
+It also writes **a changeset for `@patterkit/play-helpers` and `@patterkit/ops`**, whose exact pin on
+the runtime it moves. Without one, npm goes on serving their old versions pinned to the old runtime
+(2026-09-27: play-helpers 0.7.1 and ops 0.10.1 kept runtime 0.14.0, and a second registry copy with
+it, after 0.14.1 shipped). Because that changeset is pending, the Release run on the bump opens a
+Version Packages PR instead of publishing, and the runtime reaches npm with them when
+`npm run ship:npm` merges it. `release:play` stages the changeset and says so.
 
 Two CI checks hold the set together on every PR, long before a tag exists:
 `scripts/check-runtime-lockstep.mjs` (all four manifests carry the same version) and

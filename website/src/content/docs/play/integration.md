@@ -65,6 +65,10 @@ Every property value lives in a **registry**, a `ScopeRegistry` from
 one, and it holds every property from every engine in the game, except values your game keeps
 itself and lends through a resolver. The registry is saved and loaded as one.
 
+Import it from the package itself. Every Patterkit package takes it as a peer dependency, so your
+game and each engine are on the same copy, and a registry your game makes is the one the engines
+use.
+
 An engine you build without one makes its own and acts as its own game, which is why the one-call
 save above needs no wiring. A game that runs more than one engine, or that wants to hold the
 properties itself, makes the registry and hands it to each engine:

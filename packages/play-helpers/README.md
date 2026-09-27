@@ -8,6 +8,10 @@ the host wiring most games end up writing anyway.
 npm install @patterkit/play-helpers
 ```
 
+`@wildwinter/scoperegistry` is a peer dependency, as it is of `@patterkit/runtime`: one copy for your
+whole game. npm installs it for you; with a package manager that doesn't install peers, add it
+yourself.
+
 ## Drop-in (`<script>`)
 
 This package also builds **`patterplay.min.js`**, the zero-build browser drop-in: one classic

@@ -7,6 +7,12 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Version bump only, to keep the four Patterplay runtimes in lockstep. The change in this release is
+  the JS runtime's: `@wildwinter/scoperegistry` is now a peer dependency, so a game's install holds
+  exactly one copy of the registry. Nothing in this runtime changed.
+
 ## [0.14.1] - 2026-09-27
 
 ### Changed

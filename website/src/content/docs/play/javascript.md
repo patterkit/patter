@@ -37,6 +37,19 @@ npm install @patterkit/runtime
 import { Engine } from "@patterkit/runtime";
 ```
 
+The runtime shares one property store with every other engine in your game, the registry from
+[`@wildwinter/scoperegistry`](https://www.npmjs.com/package/@wildwinter/scoperegistry) (see
+[One registry per game](/play/integration/#one-registry-per-game)). It's a peer dependency, so your
+install holds exactly one copy for every engine to share. npm installs it for you. With a package
+manager that doesn't install peer dependencies, add it yourself:
+
+```sh
+npm install @wildwinter/scoperegistry
+```
+
+If two packages in your game need registry versions that can't be the same copy, the install stops
+and says so, rather than quietly installing two.
+
 ## A complete drop-in player
 
 This is a full, runnable HTML page: load a bundle, render each beat, handle choices, and

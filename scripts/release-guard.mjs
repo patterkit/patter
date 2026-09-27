@@ -88,6 +88,32 @@ for (const f of changedFiles) {
   if (rest.startsWith("test/") || rest.includes(".test.")) continue;
   touched.add(dir);
 }
+
+/** A manifest edit is excluded above because a release commit edits manifests. But a manifest whose
+ *  DEPENDENCIES change while its version does not is not a release commit: it changes what installs
+ *  under a version npm already has (2026-09-27: the runtime's range on @wildwinter/scoperegistry moved
+ *  under 0.14.0, npm kept the old one, and every install got two copies of the registry). So that
+ *  counts as a change to the package, and needs covering like one. */
+const DEP_FIELDS = ["dependencies", "peerDependencies", "optionalDependencies"];
+const manifestAt = (ref, dir) => {
+  try {
+    return JSON.parse(out(`git show ${ref}:packages/${dir}/package.json 2>/dev/null`));
+  } catch {
+    return null; // the package did not exist at that ref
+  }
+};
+const depsChanged = new Set();
+for (const f of changedFiles) {
+  const m = /^packages\/([^/]+)\/package\.json$/.exec(f);
+  if (!m || !published.has(m[1])) continue;
+  const before = manifestAt(base, m[1]);
+  const after = manifestAt(head, m[1]);
+  if (!before || !after || before.version !== after.version) continue;
+  if (DEP_FIELDS.some((k) => JSON.stringify(before[k] ?? {}) !== JSON.stringify(after[k] ?? {}))) {
+    depsChanged.add(m[1]);
+    touched.add(m[1]);
+  }
+}
 if (touched.size === 0) process.exit(0);
 
 // --- what the pending changesets already cover ------------------------------
@@ -151,6 +177,14 @@ if ([...LOCKSTEP].some((n) => covered.has(n))) {
 if (lockstepChanged) {
   // Not a failure on its own: the lockstep release is a separate, deliberate act.
   console.error(`release-guard: note - ${LOCKSTEP_NAMES} source changed; ships via 'npm run bump:play' and its four tags, not a changeset.`);
+}
+const lockstepDeps = [...depsChanged].map((d) => published.get(d)).filter((n) => LOCKSTEP.has(n));
+if (lockstepDeps.length) {
+  // Still not a failure here, for the same reason; but the publish check (check-published-manifests,
+  // inside `npm run release`) will refuse every library publish until the runtime set is released.
+  console.error(`release-guard: note - ${lockstepDeps.join(" and ")} changed ${lockstepDeps.length > 1 ? "their" : "its"} DEPENDENCIES under a version npm already has.`);
+  console.error("  Release the runtime set before the next library publish: npm will not see the new ranges until then,");
+  console.error("  and the publish step refuses to ship other packages beside a stale one.");
 }
 
 if (problems.length === 0) process.exit(0);

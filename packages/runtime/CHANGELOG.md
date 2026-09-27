@@ -33,6 +33,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **`@wildwinter/scoperegistry` is a peer dependency.** Your game and every engine in it share one
+  registry, so there must be exactly one copy in the install. As a peer, npm installs it once for all
+  of them, and if two packages ever need versions that can't be one copy, the install stops and says
+  so instead of quietly adding a second. npm installs it for you; with a package manager that doesn't
+  install peer dependencies, add `@wildwinter/scoperegistry` yourself.
+
 ## [0.14.1] - 2026-09-27
 
 ### Fixed
