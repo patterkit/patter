@@ -1,5 +1,13 @@
 # @patterkit/ops
 
+## 0.10.2
+
+### Patch Changes
+
+- ba3d8ec: Accept any `@wildwinter/scoperegistry` from 0.8.0 up to 1.0, so an install keeps one copy of the registry that a game and every engine share, and a later registry release cannot split it into two. `@patterkit/play-helpers` and `@patterkit/ops` also move to `@patterkit/runtime` 0.14.1, which accepts the same range; with 0.14.0 an install held two copies.
+- Updated dependencies [ba3d8ec]
+  - @patterkit/compiler@0.4.2
+
 ## 0.10.1
 
 ### Patch Changes
