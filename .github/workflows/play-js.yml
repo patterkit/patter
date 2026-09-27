@@ -83,6 +83,7 @@ jobs:
           # dependencies inlined, under the package names play/javascript.md imports from: nothing in
           # the zip has npm behind it. (The npm packages carry dist/, which leaves them external.
           # Until 2026-09-27 the zip carried that, and its modules could not load without npm.)
+          mkdir -p "${out}"
           cp packages/play-helpers/dist/patterplay.min.js packages/play-helpers/dist/patterplay.min.js.map "${out}/"
           cp packages/runtime/README.md packages/runtime/CHANGELOG.md LICENSE "${out}/"
           for p in runtime play-helpers; do
