@@ -1,5 +1,12 @@
 # @patterkit/play-helpers
 
+## 0.7.4
+
+### Patch Changes
+
+- d899437: Uses `@patterkit/runtime` 0.14.3, the Patterplay 0.14.3 release.
+- e3c7063: The Patterplay JS zip now carries this package's module build too, with its dependencies inside it (except `@patterkit/runtime`, which the zip ships beside it), so it can be copied into a project and used without npm. The npm package is unchanged.
+
 ## 0.7.3
 
 ### Patch Changes
