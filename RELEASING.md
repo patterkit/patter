@@ -170,7 +170,9 @@ never published.)
 > names it, and a conflict stops the install instead of quietly adding a second copy. Runtime 0.14.0
 > shipped it as a caret dependency (`^0.7.0`) beside a dialect on `^0.8.0`, and every install got
 > two copies, so a game's `ScopeRegistry` was not the type the runtime used. Never move it back to
-> `dependencies`, and never give it a caret.
+> `dependencies`, and never give it a caret. The runtime and play-helpers also build a second
+> library, `dist-zip/`, with every dependency inlined, and the patterplay-js zip carries that, since
+> nothing in the zip has npm behind it (the Storylet Engine's zip is built the same way).
 
 1. With each change touching a published package, add a changeset:
    ```sh

@@ -33,6 +33,15 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Fixed
+
+- **The JS zip's module builds work without npm.** The zip carried the npm package's module build,
+  which imports five other packages the zip never included, so copying it into a project and
+  importing it failed until you installed them from npm. The zip now carries builds of the runtime
+  and of `@patterkit/play-helpers` with their dependencies inside them, under
+  `@patterkit/runtime/dist/` and `@patterkit/play-helpers/dist/`. They carry their own registry as a
+  result; to share one registry between engines, install from npm. The npm package is unchanged.
+
 ## [0.14.2] - 2026-09-27
 
 ### Changed

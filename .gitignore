@@ -42,3 +42,6 @@ ports/unreal/**/CMakeLists.txt
 .env.local
 .env.*.local
 *.tsbuildinfo
+
+# The zip-only library builds (packages/*/tsup.config.ts): dependencies inlined for the patterplay-js zip.
+dist-zip/

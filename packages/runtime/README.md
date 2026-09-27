@@ -16,9 +16,11 @@ Three equivalent channels - pick whichever fits how you work; **no npm is requir
   [`play-js-v*` GitHub Release](https://github.com/patterkit/patter/releases) - this
   runtime as a plain download, symmetric with the Unity / Unreal / Godot plugin zips.
   It carries `patterplay.min.js` (the `<script>` drop-in: this runtime plus
-  `@patterkit/play-helpers` under one global), the module builds under `dist/` (ESM + CJS +
-  types, for vendoring into your own build), this README, the CHANGELOG, and two `demos/`
-  (the zero-build drop-in page and the interactive tour).
+  `@patterkit/play-helpers` under one global), the module builds of both packages under
+  `@patterkit/runtime/dist/` and `@patterkit/play-helpers/dist/` (ESM + CJS + types, with their
+  dependencies inside them, so they need nothing installed), this README, the CHANGELOG, and two
+  `demos/` (the zero-build drop-in page and the interactive tour). The zip's builds carry their own
+  registry; to share one registry between engines, install from npm.
 - **npm**: `npm install @patterkit/runtime` (same version as the zip). `@wildwinter/scoperegistry`
   is a peer dependency, so a game holds one registry that every engine shares; npm installs it for
   you, and a package manager that doesn't install peers needs `npm install @wildwinter/scoperegistry`.

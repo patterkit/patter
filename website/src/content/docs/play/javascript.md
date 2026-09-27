@@ -23,9 +23,11 @@ self-contained file: no module loader, no bundler. It carries the runtime **and*
 `@patterkit/play-helpers` under the one `Patterplay` global, so `Patterplay.serializeState(engine)`
 writes the family's save text from a plain page (see [Helpers](#helpers-state-and-localisation)). The same release also carries
 **`patterplay-js-<version>.zip`**, the whole JS runtime as a plain download, symmetric with
-the Unity / Unreal / Godot plugin zips: the drop-in, the module builds (for vendoring into
-your own build), the changelog, and two bundled demos (a zero-build drop-in page and the
-interactive Patter tour). No npm needed anywhere.
+the Unity / Unreal / Godot plugin zips: the drop-in, the module builds of the runtime and the
+helpers (under `@patterkit/runtime/dist/` and `@patterkit/play-helpers/dist/`, to copy into your
+project and import from), the changelog, and two bundled demos (a zero-build drop-in page and the
+interactive Patter tour). The zip's builds carry everything they need inside them, so no npm is
+needed anywhere.
 
 **npm (for an app you bundle):**
 
@@ -49,6 +51,12 @@ npm install @wildwinter/scoperegistry
 
 If two packages in your game need registry versions that can't be the same copy, the install stops
 and says so, rather than quietly installing two.
+
+**npm or the zip.** The two are built differently for exactly this reason. From npm, the packages
+share the one registry in your install. The zip's builds and the drop-in carry their own registry
+inside them, because there is no install to share one from. A game with only Patter won't notice. A
+game that also runs another engine, such as the Storylet Engine, from its zip or its drop-in has one
+registry per engine, so for engines sharing one store, install them all from npm.
 
 ## A complete drop-in player
 

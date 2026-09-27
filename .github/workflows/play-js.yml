@@ -68,7 +68,7 @@ jobs:
         working-directory: patter
         run: npm test
 
-      - name: Build the patterplay.min.js drop-in (play-helpers builds it, runtime + helpers under one global)
+      - name: Build the runtime, the helpers and the patterplay.min.js drop-in (npm and zip builds)
         working-directory: patter
         run: npm run build -w @patterkit/runtime -w @patterkit/play-helpers
 
@@ -79,13 +79,20 @@ jobs:
           pkg="patterplay-js-${version}"
           out="/tmp/${pkg}"
 
-          # The runtime: the drop-in at the top, module builds under dist/.
-          mkdir -p "${out}/dist"
+          # The drop-in at the top. The module builds are the ZIP builds (dist-zip/), with their
+          # dependencies inlined, under the package names play/javascript.md imports from: nothing in
+          # the zip has npm behind it. (The npm packages carry dist/, which leaves them external.
+          # Until 2026-09-27 the zip carried that, and its modules could not load without npm.)
           cp packages/play-helpers/dist/patterplay.min.js packages/play-helpers/dist/patterplay.min.js.map "${out}/"
-          cp packages/runtime/dist/index.js packages/runtime/dist/index.js.map \
-             packages/runtime/dist/index.cjs packages/runtime/dist/index.cjs.map \
-             packages/runtime/dist/index.d.ts packages/runtime/dist/index.d.cts "${out}/dist/"
           cp packages/runtime/README.md packages/runtime/CHANGELOG.md LICENSE "${out}/"
+          for p in runtime play-helpers; do
+            mkdir -p "${out}/@patterkit/${p}/dist"
+            cp packages/${p}/dist-zip/index.js packages/${p}/dist-zip/index.js.map \
+               packages/${p}/dist-zip/index.cjs packages/${p}/dist-zip/index.cjs.map \
+               packages/${p}/dist-zip/index.d.ts packages/${p}/dist-zip/index.d.cts \
+               "${out}/@patterkit/${p}/dist/"
+            cp packages/${p}/package.json packages/${p}/README.md "${out}/@patterkit/${p}/"
+          done
 
           # Demo 1: the zero-build drop-in page (own runtime copy so it opens from anywhere).
           mkdir -p "${out}/demos/drop-in"
