@@ -6,6 +6,17 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **New Scene starts from a scene kit.** **Blank**, **Conversation with choices**, **Hub
+  conversation**, **Barks** or **Cutscene**, each playing the moment it lands. Pick a tile and the
+  panel says what the kit is for and what you'll see when you press Play. A kit with lines asks who
+  speaks them, from your cast; if the cast is empty, the name you give is added to it.
+- **New Project shows its kit as a gallery**, with what you get beside it, and the project name,
+  version control and publish output in the same panel.
+- **Kit tiles carry tags** naming what each kit's game has, such as *Ask in any order* or *Camera
+  cues*, so they compare at a glance.
+
 ## [0.21.0] - 2026-09-26
 
 ### Added
