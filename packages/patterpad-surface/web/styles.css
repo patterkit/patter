@@ -793,3 +793,8 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
 /* The tooltip bubble's styles travel with the controller now: it is the shell's
    (app-shell tooltip.css), imported where the controller is started. The rules
    were identical, which is what made the lift safe. */
+
+/* Never a window-drag region, even over one: in Electron a click inside a drag area (the topbar's
+   titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
+   layers (app-shell dialog.css has the whole story, 2026-09-28); these are ours. */
+.target-picker, .target-picker *, .action-submenu, .action-submenu * { -webkit-app-region: no-drag; }

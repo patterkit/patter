@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Buttons in a dialog over the welcome screen work.** On a first run, clicking Continue in the
+  "Welcome to Patterpad" step did nothing, and neither did Close in the About box; Enter and Escape
+  worked. The welcome screen lets you drag the window from anywhere on it, and those clicks were
+  being taken as the start of a drag. Dialogs, menus and popups are no longer part of that area,
+  wherever they open.
+
 ## [0.22.0] - 2026-09-27
 
 ### Added

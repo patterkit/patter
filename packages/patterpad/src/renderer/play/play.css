@@ -125,3 +125,8 @@ body.play {
 @media (prefers-reduced-motion: reduce) {
   .plive { animation: none; opacity: 1; }
 }
+
+/* Never a window-drag region, even over one: in Electron a click inside a drag area (the topbar's
+   titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
+   layers (app-shell dialog.css has the whole story, 2026-09-28); these are ours. */
+.plive, .plive * { -webkit-app-region: no-drag; }

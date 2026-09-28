@@ -34,7 +34,7 @@
     "@patterkit/ops": "0.10.4",
     "@patterkit/patterpad-surface": "0.0.0",
     "@patterkit/runtime": "0.14.3",
-    "@wildwinter/app-shell": "^0.46.1",
+    "@wildwinter/app-shell": "^0.46.2",
     "@wildwinter/expr-editor": "^0.16.0",
     "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0",
     "@wildwinter/simple-vc-lib": "^0.4.1",

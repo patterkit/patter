@@ -791,3 +791,8 @@ body.writing-view #hintbar { padding-right: 192px; }
 .world-at, .world-dot, .world-scope { color: var(--muted); font: 13.5px var(--font-mono); padding: 0 1.5px; }
 .world-token { width: 80px; flex: 0 0 auto; }
 .world-driver-actions { display: flex; gap: 8px; margin-top: 3px; }
+
+/* Never a window-drag region, even over one: in Electron a click inside a drag area (the topbar's
+   titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
+   layers (app-shell dialog.css has the whole story, 2026-09-28); these are ours. */
+.scratch-overlay, .scratch-overlay * { -webkit-app-region: no-drag; }
