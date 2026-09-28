@@ -16,6 +16,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   being taken as the start of a drag. Dialogs, menus and popups are no longer part of that area,
   wherever they open.
 
+  **Updating from an earlier version:** the prompt that brings you this release still has the
+  problem, if it opens over the welcome screen. If **Restart now** doesn't respond to a click, press
+  Enter, or just quit Patterpad: a downloaded update installs when you quit.
+
 ## [0.22.0] - 2026-09-27
 
 ### Added
