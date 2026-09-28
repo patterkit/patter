@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-09-28
+
 ### Fixed
 
 - **Buttons in a dialog over the welcome screen work.** On a first run, clicking Continue in the
