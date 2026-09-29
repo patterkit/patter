@@ -663,6 +663,7 @@
                   "id": "L_on8u43yq",
                   "kind": "text",
                 },
+                "sticky": true,
                 "type": "group",
               },
               {
@@ -691,6 +692,7 @@
                   "id": "L_2ndl4wd4",
                   "kind": "text",
                 },
+                "sticky": true,
                 "type": "group",
               },
             ],

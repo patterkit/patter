@@ -9,9 +9,9 @@
     }
   ],
   "content": {
-    "hash": "0vnq06k",
+    "hash": "0ort336",
     "project": "proj_sa3v44hd",
-    "structureHash": "0l2u4km"
+    "structureHash": "0jh01q2"
   },
   "locales": {
     "default": "en",
@@ -359,6 +359,7 @@
                     "id": "L_s3bqndtt",
                     "kind": "text"
                   },
+                  "sticky": true,
                   "type": "group"
                 },
                 {
@@ -380,6 +381,7 @@
                     "id": "L_639390f8",
                     "kind": "text"
                   },
+                  "sticky": true,
                   "type": "group"
                 }
               ],
@@ -837,6 +839,7 @@
                     "id": "L_on8u43yq",
                     "kind": "text"
                   },
+                  "sticky": true,
                   "type": "group"
                 },
                 {
@@ -871,6 +874,7 @@
                     "id": "L_2ndl4wd4",
                     "kind": "text"
                   },
+                  "sticky": true,
                   "type": "group"
                 }
               ],
@@ -1049,6 +1053,11 @@
                 },
                 {
                   "character": "GUIDE",
+                  "id": "L_y6cp8bjw",
+                  "kind": "line"
+                },
+                {
+                  "character": "GUIDE",
                   "id": "L_4gw5bkrh",
                   "kind": "line"
                 }
@@ -1107,7 +1116,7 @@
   "schema": "patter/bundle@0",
   "strings": {
     "en": {
-      "L_02irf71j": "Now go build something wonderful. I'll be right here if you replay.",
+      "L_02irf71j": "Now go and build something wonderful. ",
       "L_0vvvty20": "A choice hands control to the player. Pick one, then watch what happens next.",
       "L_2dmps0mq": "Branch: first matching condition wins",
       "L_2ec5fwcx": "Everything you're reading right now is a Patter story, the same kind your game would play.",
@@ -1125,7 +1134,7 @@
       "L_9lypohpy": "Some dialogue carries sounds rather than words.",
       "L_begzzbls": "You're playing it cautious, so you get THIS line instead of the line about being brave. That's a condition at work.",
       "L_ckfc2bb8": "Sequence: in order, then loop",
-      "L_dgowlmkp": "And whichever option you picked, we end up here - although you could have directed away to some other piece of the game.",
+      "L_dgowlmkp": "And whichever option you picked, we end up here - although you could have jumped away to a different part of the game.",
       "L_g0o5prlt": "Selectors: shuffle, sequence, branch",
       "L_g3i592c7": "Patter is built from just three kinds of beat.",
       "L_gdllz7g4": " Finish the tour",
@@ -1151,7 +1160,8 @@
       "L_t3xxeijy": "This is a  LINE: someone speaks, and their name sits beside the words.",
       "L_tuuanup5": "Play this again",
       "L_uk56f61b": "Hello! Welcome to Patter. I'm your guide for this little tour.",
-      "L_w7yp2n8k": "A lot of Patter's power never shows up in plain reading. Let me name a few hidden parts.",
+      "L_w7yp2n8k": "A lot of Patter's power doesn't show up in the script. Let's go through a few hidden parts.",
+      "L_y6cp8bjw": "Scratch audio! These lines were recorded by Ian at his desk through a headset, in about five minutes.",
       "L_yh2umlmo": "Memory: properties & conditions",
       "T_03dn26em": "A card turns over: the Fool.",
       "T_08w6wcpc": "🔥 The torch blazes. (Row 1 won: “fuel ≥ 3” is true.)",

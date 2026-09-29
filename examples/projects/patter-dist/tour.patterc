@@ -9,9 +9,9 @@
     }
   ],
   "content": {
-    "hash": "0wno2m6",
+    "hash": "0ort336",
     "project": "proj_sa3v44hd",
-    "structureHash": "0z6x4me"
+    "structureHash": "0jh01q2"
   },
   "locales": {
     "default": "en",
@@ -839,6 +839,7 @@
                     "id": "L_on8u43yq",
                     "kind": "text"
                   },
+                  "sticky": true,
                   "type": "group"
                 },
                 {
@@ -873,6 +874,7 @@
                     "id": "L_2ndl4wd4",
                     "kind": "text"
                   },
+                  "sticky": true,
                   "type": "group"
                 }
               ],
