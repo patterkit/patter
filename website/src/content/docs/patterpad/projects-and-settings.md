@@ -133,3 +133,12 @@ the details.
 
 Patterpad keeps itself up to date: **Help ▸ Check for Updates…** downloads the next
 version in the background, then asks to relaunch, taking care not to lose unsaved work.
+
+On a Mac, a small helper installs the update once Patterpad has closed. The first time that
+happens, macOS may show a notice that Patterpad is running in the background. Nothing of
+Patterpad keeps running. The helper replaces the app and quits within a few seconds, and only
+runs when an update is waiting.
+
+The helper is listed under **System Settings ▸ General ▸ Login Items & Extensions**, in
+**Allow in the Background**. If you switch it off, updates can't install when you quit, and
+you'll need to fetch new versions from the [download page](/download/) instead.
