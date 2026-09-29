@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-09-29
+
 ### Changed
 
 - **The Coverage window is easier to read, and leads with what it reached least.** The table's columns
