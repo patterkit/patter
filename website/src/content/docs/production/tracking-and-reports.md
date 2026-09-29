@@ -33,7 +33,7 @@ scenes sit at each stage, so you can see which are furthest from done.
 ## Coverage testing
 
 Rollups tell you how much is *written*; **coverage testing** tells you how much is *reachable*.
-**Review ▸ Run Coverage Test…** plays the story through many times, flags content no player can
+**Review ▸ Coverage Test…** plays the story through many times, flags content no player can
 reach and choices that run dry, and drives branches gated on values only your game sets. It has
 its own page: [Coverage testing](/production/coverage-testing/).
 

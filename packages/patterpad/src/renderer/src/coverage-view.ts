@@ -1,4 +1,4 @@
-// The narrative-coverage results view (Review ▸ Run Coverage Test). A read-only render of the
+// The narrative-coverage results view (Review ▸ Coverage Test…). A read-only render of the
 // CoverageReport the main process computes via runCoverageAsync (#159) - the SAME report the CLI's `coverage`
 // command prints. A summary header, then the beat table: least reached first by default, so the rows worth a
 // look lead, or in script order, scene by scene. Never-reached rows are flagged - a danger tint for

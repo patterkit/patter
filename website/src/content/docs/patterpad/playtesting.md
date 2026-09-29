@@ -93,5 +93,5 @@ developer to wire it in; it's a few lines, described in
 ## Testing every path, not just the one you took
 
 Playing walks *one* route at a time. To check that *every* line is reachable, and to catch
-choices that can silently run dry, use the **Coverage Test** (Review ▸ Run Coverage Test). See
+choices that can silently run dry, use the **Coverage Test** (Review ▸ Coverage Test…). See
 [Coverage testing](/production/coverage-testing/).

@@ -129,7 +129,7 @@ the editor does not let it hide:
 
 - Patterpad **warns** when a choice has no fallback and no unconditional option, since it can run dry if
   every condition happens to fail.
-- A **Coverage Test** (Review ▸ Run Coverage Test) **flags any choice it actually saw run dry**, with a
+- A **Coverage Test** (Review ▸ Coverage Test…) **flags any choice it actually saw run dry**, with a
   click-through to the offending choice.
 
 Give such a choice a fallback option, or one unconditional option, to guarantee the player a way through.

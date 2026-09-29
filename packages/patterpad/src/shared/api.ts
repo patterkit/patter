@@ -47,7 +47,7 @@ import type { ReportData, SearchFocus, CoverageReport } from "@patterkit/ops";
 export type { ReportData, SearchFocus, CoverageReport, CoverageBeat } from "@patterkit/ops";
 export type { CoverageDriver, HostScopeRegistry } from "@patterkit/model";
 
-/** Options for an in-app coverage run (Review ▸ Run Coverage Test). Drivers come from the project's saved
+/** Options for an in-app coverage run (Review ▸ Coverage Test…). Drivers come from the project's saved
  *  `coverageDrivers`; this just tunes the sweep. */
 export interface CoverageRunOptions {
   runs?: number;

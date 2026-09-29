@@ -88,7 +88,7 @@ runs that played it) and **played** (times it played in all runs), least reached
 script` lists them in the script's order instead, scene by scene. `--runs N` · `--max-steps M` ·
 `--seed S` · `--scene id` · `--block id`. `--json` for pipelines; `--fail-on-gap` exits **1** if any
 beat is never reached (a CI gate). `--propose` prints auto-proposed `@world` input drivers instead
-of running. The same check has a window in Patterpad (**Review ▸ Run Coverage Test…**); see
+of running. The same check has a window in Patterpad (**Review ▸ Coverage Test…**); see
 [Coverage testing](/production/coverage-testing/) for how to read it.
 
 ### `patter resolve <query> [path]`

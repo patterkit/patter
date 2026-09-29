@@ -2247,7 +2247,7 @@ async function openReport(): Promise<void> {
   updateReportScrollHints(); // measure only after showModal - a hidden dialog reads clientHeight 0
 }
 
-/** Review > Run Coverage Test: open the detached coverage window (prompting for a project start first if
+/** Review > Coverage Test…: open the detached coverage window (prompting for a project start first if
  *  it is unset). The window runs the sweep + keeps its results live while you edit. */
 async function openCoverage(): Promise<void> {
   if (!project) return;

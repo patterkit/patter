@@ -12,7 +12,7 @@ dead content before a player does.
 
 ## Running the test
 
-**Review ▸ Run Coverage Test…** opens a window that stays open while you edit, so you can act
+**Review ▸ Coverage Test…** (`Shift+Cmd+C`) opens a window that stays open while you edit, so you can act
 on what it finds. Up top: **Runs**, **Max steps**, **Seed** (the same seed replays the same
 run, for repeatable checks), and a **Start** scene. Press **Run test** for a table of every
 line, narration, and game event beat, showing how often each one came up.
@@ -25,6 +25,11 @@ Click any row to jump the editor straight to that beat. The window can **pin** i
 (on by default) and keeps your last results for the session.
 
 ## Reading the results
+
+<figure class="doc-shot">
+  <img src="/doc-images/Coverage.png" alt="The Coverage window after 5,000 runs of the interactive tour: Runs, Max steps, Seed and Start boxes with a Run test button; headline figures of 100% beats reached, 60 of 60 covered, 0 never reached and 0 rarely reached; a line reading 4,704 reached the end, 0 stalled at a choice, 296 hit the step limit; a switch set to Least reached first; and a table with Runs reached and Times played columns, led by Darkness at 9% and a card turns over at 16 to 17%." />
+  <figcaption>The Coverage window after 5,000 runs of the tour. Everything is reached, so the table leads with the least-reached beats: a branch's fallback at 9%, and each tarot card at around 16%, which is by design, since the test draws one card of several at random.</figcaption>
+</figure>
 
 **The four numbers at the top.** **Beats reached** is the share of all your beats that played at
 least once, and **Covered** is the same as a count. **Never reached** counts the beats no run ever
