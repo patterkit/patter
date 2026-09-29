@@ -40,8 +40,12 @@ const { kind = site.downloads.default } = Astro.props;
       : "";
     return `<p class="chrome-dl-meta">Version ${esc(ver)}${date ? ", released " + esc(date) : ""}. <a href="${esc(r.html_url)}">Release notes</a>.</p>`;
   };
+
+  let partial = false;
   const empty = (root: HTMLElement, what: string): void => {
-    root.innerHTML = `<p class="chrome-dl-empty">${esc(what)} will appear here once the first release ships. See <a href="${esc(cfg.releases)}">GitHub Releases</a>.</p>`;
+    root.innerHTML = partial
+      ? `<p class="chrome-dl-empty">${esc(what)} can't be listed here right now. See <a href="${esc(cfg.releases)}">GitHub Releases</a>.</p>`
+      : `<p class="chrome-dl-empty">${esc(what)} will appear here once the first release ships. See <a href="${esc(cfg.releases)}">GitHub Releases</a>.</p>`;
   };
 
   const linkRow = (spec: any): string => row(icon(spec.icon), spec.name, spec.sub, go(`${base}${spec.link}`, spec.label));
@@ -106,14 +110,36 @@ const { kind = site.downloads.default } = Astro.props;
     root.innerHTML = list(rows) + line;
   }
 
-  async function load(): Promise<void> {
-    if (!mounts.length) return;
-    try {
-      const res = await fetch(`https://api.github.com/repos/${cfg.repo}/releases?per_page=50`, {
+  const wanted = (): RegExp[] =>
+    mounts.flatMap((m) => {
+      const spec = cfg.sections[m.dataset.chromeDl!];
+      if (!spec) return [];
+      return spec.kind === "engines" ? spec.engines.map((e: any) => new RegExp(e.tag)) : [new RegExp(spec.tag)];
+    });
+
+  const PER_PAGE = 100;
+  const MAX_PAGES = 10;
+  async function fetchReleases(): Promise<Release[]> {
+    const need = wanted();
+    const all: Release[] = [];
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const res = await fetch(`https://api.github.com/repos/${cfg.repo}/releases?per_page=${PER_PAGE}&page=${page}`, {
         headers: { Accept: "application/vnd.github+json" },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const releases: Release[] = (await res.json()).filter((r: Release) => !r.draft);
+      const batch: Release[] = await res.json();
+      all.push(...batch.filter((r) => !r.draft));
+      if (batch.length < PER_PAGE) return all;
+      if (need.every((re) => all.some((r) => re.test(r.tag_name)))) return all;
+    }
+    partial = true;
+    return all;
+  }
+
+  async function load(): Promise<void> {
+    if (!mounts.length) return;
+    try {
+      const releases = await fetchReleases();
       for (const mount of mounts) {
         const spec = cfg.sections[mount.dataset.chromeDl!];
         if (!spec) continue;
