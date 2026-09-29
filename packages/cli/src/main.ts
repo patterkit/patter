@@ -69,6 +69,7 @@ Usage:
                  [--scene id] [--block id] [--choices a,b,c] [--seed N]
   patter coverage [path]          Narrative coverage: random playthroughs, find never-reached content
                  [--runs N] [--max-steps M] [--seed S] [--scene id] [--block id]
+                 [--order least|script]   (least reached first, the default, or the script's own order)
                  [--json] [--fail-on-gap]   (--fail-on-gap exits 1 if any beat is never reached)
                  [--propose]   (print auto-proposed @world input drivers instead of running)
   patter resolve <query> [path]   Find a line by id, Game ID, or name: shows where it lives + what it says
@@ -106,7 +107,7 @@ const FLAGS: Record<string, { boolean: string[]; valued: string[] }> = {
   export: { boolean: ["ids", "source-debug"], valued: ["o"] },
   "export-html": { boolean: [], valued: ["o"] },
   play: { boolean: [], valued: ["scene", "block", "choices", "seed"] },
-  coverage: { boolean: ["json", "fail-on-gap", "propose"], valued: ["runs", "max-steps", "seed", "scene", "block"] },
+  coverage: { boolean: ["json", "fail-on-gap", "propose"], valued: ["runs", "max-steps", "seed", "scene", "block", "order"] },
   resolve: { boolean: [], valued: [] },
   usage: { boolean: ["json"], valued: [] },
   report: { boolean: ["json"], valued: ["xlsx"] },
@@ -369,6 +370,8 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
         if (!Number.isFinite(n)) { console.error(`coverage: --${label} '${flags[flag]}' is not a number`); return 2; }
         numbers[flag] = n;
       }
+      const order = flags.order ?? "least";
+      if (order !== "least" && order !== "script") { console.error(`coverage: --order '${order}' is not least or script`); return 2; }
       const loaded = loadProject(positionals[0] ?? ".");
       // --propose: print auto-proposed @world input drivers (from the conditions) instead of running.
       // The author pastes the chosen ones into the project's `coverageDrivers`.
@@ -387,7 +390,7 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
       if (flags.json === true) console.log(JSON.stringify(report));
       else {
         const nameOf = (id: string): string => loaded.scenes.find((s) => s.id === id)?.name ?? id;
-        for (const line of renderCoverageText(report, nameOf)) console.log(line);
+        for (const line of renderCoverageText(report, nameOf, { order })) console.log(line);
       }
       // --fail-on-gap: a CI gate - any never-reached beat fails the command.
       return flags["fail-on-gap"] === true && report.totals.neverHit > 0 ? 1 : 0;

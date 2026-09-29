@@ -82,10 +82,14 @@ defaults; without the folder it is refused, since Patter is playing alone.
 
 ### `patter coverage [path]`
 Narrative coverage: play the story many times with random choices and tally how often each
-beat is reached, flagging never-reached content. `--runs N` · `--max-steps M` · `--seed S` ·
-`--scene id` · `--block id`. `--json` for pipelines; `--fail-on-gap` exits **1** if any beat
-is never reached (a CI gate). `--propose` prints auto-proposed `@world` input drivers instead
-of running. The same check has a window in Patterpad (**Review ▸ Run Coverage Test…**).
+beat is reached, flagging never-reached content (`‼`, or `?` when it may just need an input) and
+content reached in fewer than 5% of runs (`~`). The table lists each beat's **reached** (the share of
+runs that played it) and **played** (times it played in all runs), least reached first; `--order
+script` lists them in the script's order instead, scene by scene. `--runs N` · `--max-steps M` ·
+`--seed S` · `--scene id` · `--block id`. `--json` for pipelines; `--fail-on-gap` exits **1** if any
+beat is never reached (a CI gate). `--propose` prints auto-proposed `@world` input drivers instead
+of running. The same check has a window in Patterpad (**Review ▸ Run Coverage Test…**); see
+[Coverage testing](/production/coverage-testing/) for how to read it.
 
 ### `patter resolve <query> [path]`
 Find the line (or node) a query names and print where it lives + what it says. The query can be an

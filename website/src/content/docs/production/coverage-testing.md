@@ -14,8 +14,8 @@ dead content before a player does.
 
 **Review ▸ Run Coverage Test…** opens a window that stays open while you edit, so you can act
 on what it finds. Up top: **Runs**, **Max steps**, **Seed** (the same seed replays the same
-run, for repeatable checks), and a **Start** scene. Press **Run test** for a per-scene table of
-every line, narration, and game event beat with its **reached %** and hit count.
+run, for repeatable checks), and a **Start** scene. Press **Run test** for a table of every
+line, narration, and game event beat, showing how often each one came up.
 
 The story needs a **start point** for the test (and for **Play ▸ Play from Start**); if you
 haven't set one, you'll be asked to pick a scene, saved to **Project Settings ▸ General ▸
@@ -23,6 +23,34 @@ Start**.
 
 Click any row to jump the editor straight to that beat. The window can **pin** itself on top
 (on by default) and keeps your last results for the session.
+
+## Reading the results
+
+**The four numbers at the top.** **Beats reached** is the share of all your beats that played at
+least once, and **Covered** is the same as a count. **Never reached** counts the beats no run ever
+played, and **Rarely reached** the beats that did play, but in fewer than 5% of runs.
+
+**How the runs ended.** Under the numbers, one line says how many runs **reached the end**, how
+many **stalled at a choice** with nothing to pick, and how many **hit the step limit** (still going
+at **Max steps**, usually because the test kept wandering round a hub the player can return to).
+Runs that hit the step limit aren't a fault in themselves; a story with a loop always has some.
+
+**The table.** Each row is one beat: its kind, who says it, and the start of the line. Two
+numbers follow:
+
+- **Runs reached** is the share of runs that played the beat at least once.
+- **Times played** is how often it played across all the runs together. It can be more than the
+  number of runs, because a beat can play again in the same run, like a hub's "back where we
+  started" line.
+
+**Least reached first, or script order.** The table opens **least reached first**: the beats that
+never came up at the top, then the rarest, down to the ones every run plays. That puts the rows
+worth a look where you see them first. Switch to **Script order** for every beat in the order the
+script runs, scene by scene. The window remembers which you picked.
+
+The test chooses at random, so how often a beat comes up isn't how often a player will see it:
+real players choose on purpose. Read the numbers as "can this happen, and how easily", not as a
+forecast.
 
 ## What it flags
 
@@ -44,6 +72,14 @@ story writes always looks well fed.
 That last one is deliberately cautious. Where the test can't be sure a writer never ran (the effect
 sits on a beat-less snippet, or the property is assigned wholesale rather than a flag at a time), it
 says nothing at all rather than guess. A wrong *"this can never happen"* is worse than silence.
+
+### Rarely reached
+
+A beat tagged **Rare** did play, but in fewer than 5% of runs. It can happen, just not easily:
+usually it sits behind an unlikely run of choices, or a condition that's nearly always false. That
+can be exactly what you meant, like one card of many drawn at random, or a secret. It's worth a
+look when it isn't: a line most players should see that hides behind a condition you thought was
+common.
 
 ### Choices that ran dry
 

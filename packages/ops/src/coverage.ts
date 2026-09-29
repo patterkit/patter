@@ -70,6 +70,10 @@ export interface CoverageBeat {
   reachedRuns: number;
   /** reachedRuns / runs-executed * 100; 0 iff never reached. */
   reachPct: number;
+  /** Reached, but in fewer than {@link RARE_REACH_PCT}% of runs: content that CAN play but hangs on an
+   *  unlikely route or a condition that is nearly always false. Worth a look, not necessarily a fault
+   *  (one of several random picks is rare by design). Absent on a never-reached beat. */
+  rare?: true;
   /** Set on a never-reached beat that is gated on a host-scope ref (`@world.x`) nothing writes and no
    *  driver provides, i.e. it may just need an input, not be truly dead. Lists the offending refs. */
   needsInput?: string[];
@@ -109,7 +113,10 @@ export interface CoverageReport {
   seed: number;
   start: { scene?: string; block?: string };
   beats: CoverageBeat[];
-  totals: { beats: number; covered: number; neverHit: number; coveragePct: number };
+  /** `rare` counts beats reached in fewer than `rareThresholdPct`% of runs (and not never). */
+  totals: { beats: number; covered: number; neverHit: number; rare: number; coveragePct: number };
+  /** The reach % below which a reached beat counts as rare ({@link RARE_REACH_PCT}). */
+  rareThresholdPct: number;
   /** How each run ended, for the summary header. */
   termination: { ended: number; capped: number; stalled: number; evalError: number };
   /** The input drivers actually applied this run (empty when none). */
@@ -129,6 +136,22 @@ function mulberry32(seed: number): () => number {
   // repo. Same algorithm, same draws; it just lives in one place now.
   const prng = makePrng(seed);
   return () => prng.next();
+}
+
+/** Below this share of runs, a beat that WAS reached is flagged rare. Coverage used to flag only the never
+ *  reached, so a beat that played in 0.5% of runs looked as healthy as one that played in all of them. */
+export const RARE_REACH_PCT = 5;
+
+/**
+ * The beats least reached first: never-reached at the top, then by reach %, then by times played, with
+ * script order kept among equals. The order both Patterpad's Coverage window and `patter coverage` lead
+ * with, because the beats a sweep reaches least are the ones worth a look.
+ */
+export function leastReachedFirst(beats: readonly CoverageBeat[]): CoverageBeat[] {
+  return beats
+    .map((b, i) => ({ b, i }))
+    .sort((x, y) => x.b.reachPct - y.b.reachPct || x.b.hits - y.b.hits || x.i - y.i)
+    .map(({ b }) => b);
 }
 
 // ---------------------------------------------------------------------------
@@ -518,17 +541,20 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
       const blocked = blockedGates(id, analysis, drivenRefs, reachedRuns);
       if (blocked.length) blockedBy = blocked;
     }
+    const reachPct = executed ? (reached / executed) * 100 : 0;
     return {
       id, scene: m.scene, kind: m.kind, character: m.character, preview: m.preview,
       hits: hitCount.get(id)!,
       reachedRuns: reached,
-      reachPct: executed ? (reached / executed) * 100 : 0,
+      reachPct,
+      ...(reached > 0 && reachPct < RARE_REACH_PCT ? { rare: true as const } : {}),
       ...(needsInput ? { needsInput } : {}),
       ...(blockedBy ? { blockedBy } : {}),
     };
   });
   const neverHit = beats.filter((b) => b.reachedRuns === 0).length;
   const covered = beats.length - neverHit;
+  const rare = beats.filter((b) => b.rare).length;
 
   const dryChoices: DryChoice[] = [...dryRuns.entries()]
     .map(([id, r]) => ({ id, scene: choiceScene.get(id) ?? "", runs: r }))
@@ -536,7 +562,8 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
 
   return {
     runs: executed, maxSteps, seed, start, beats,
-    totals: { beats: beats.length, covered, neverHit, coveragePct: beats.length ? (covered / beats.length) * 100 : 100 },
+    totals: { beats: beats.length, covered, neverHit, rare, coveragePct: beats.length ? (covered / beats.length) * 100 : 100 },
+    rareThresholdPct: RARE_REACH_PCT,
     termination, drivers, unwrittenInputs: [...unwrittenInputs].sort(), dryChoices, cancelled,
   };
 }
@@ -584,16 +611,31 @@ export async function runCoverageAsync(
   return step.value;
 }
 
-/** Render a coverage report as the CLI's readable text: a summary, then a per-scene beat table with
- *  never-reached (0%) rows marked. */
-export function renderCoverageText(report: CoverageReport, sceneName: (id: string) => string = (id) => id): string[] {
+/** Which order the beat table is in: least reached first (the default: the rows worth a look lead), or
+ *  the script's own order, scene by scene. */
+export type CoverageOrder = "least" | "script";
+
+/** Render a coverage report as the CLI's readable text: a summary, then the beat table with never-reached
+ *  and rarely reached rows marked, least reached first unless `order` says script order. */
+export function renderCoverageText(
+  report: CoverageReport,
+  sceneName: (id: string) => string = (id) => id,
+  opts: { order?: CoverageOrder } = {},
+): string[] {
+  const order = opts.order ?? "least";
   const out: string[] = [];
   const t = report.totals;
   const pct = (n: number) => `${n.toFixed(0)}%`;
-  out.push(`coverage: ${t.covered}/${t.beats} beats reached (${pct(t.coveragePct)})${t.neverHit ? ` - ${t.neverHit} never reached` : ""}`);
+  const rareLimit = report.rareThresholdPct ?? RARE_REACH_PCT;
+  const rareCount = t.rare ?? report.beats.filter((b) => b.rare).length;
+  out.push(
+    `coverage: ${t.covered}/${t.beats} beats reached (${pct(t.coveragePct)})` +
+      (t.neverHit ? ` - ${t.neverHit} never reached` : "") +
+      (rareCount ? ` - ${rareCount} rarely reached (under ${rareLimit}% of runs)` : ""),
+  );
   out.push(`${report.runs} run(s) - ${report.maxSteps} max steps - seed ${report.seed}${report.cancelled ? " - CANCELLED" : ""}`);
   const term = report.termination;
-  out.push(`runs ended: ${term.ended} reached the end, ${term.stalled} stalled, ${term.capped} hit the step cap, ${term.evalError} errored`);
+  out.push(`runs ended: ${term.ended} reached the end, ${term.stalled} stalled at a choice with nothing to pick, ${term.capped} hit the step limit, ${term.evalError} errored`);
   if (report.drivers.length) out.push(`input drivers: ${report.drivers.map((d) => d.ref).join(", ")}`);
   if (report.unwrittenInputs.length) {
     out.push(`? = gated on an input nothing writes/drives: ${report.unwrittenInputs.join(", ")} (add a coverage driver?)`);
@@ -605,30 +647,52 @@ export function renderCoverageText(report: CoverageReport, sceneName: (id: strin
       out.push(`  ‼ ${String(d.runs).padStart(6)} run(s)  ${sceneName(d.scene)}  choice '${d.id}'`);
     }
   }
+  if (!report.beats.length) return out;
 
-  // Group beats by scene, preserving document order.
+  const clip = (s: string, n = 48) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+  const scenes = new Set(report.beats.map((b) => b.scene));
+  const heading = "     reached  played  beat";
+
+  const row = (b: CoverageBeat, withScene: boolean): void => {
+    // `‼` never reached and truly so; `?` never reached but may just need an input driver; `~` reached,
+    // but in fewer than the rare threshold's share of runs.
+    const mark = b.reachedRuns === 0 ? (b.needsInput || b.blockedBy ? "? " : "‼ ") : b.rare ? "~ " : "  ";
+    const label = b.character ? `${b.character}: ${clip(b.preview)}` : clip(b.preview || `(${b.kind})`);
+    const where = withScene ? `[${sceneName(b.scene)}] ` : "";
+    out.push(`  ${mark}${pct(b.reachPct).padStart(6)}  ${String(b.hits).padStart(6)}  ${where}${label}`);
+    // Dead at one remove: say which beat would have to play first, so the author chases one thing.
+    for (const bg of b.blockedBy ?? []) {
+      const names = bg.writers.map((w) => {
+        const target = report.beats.find((x) => x.id === w);
+        return target ? clip(target.preview || target.id, 28) : w;
+      });
+      out.push(`           gated on ${bg.ref}, written only by: ${names.join(", ")} (never played either)`);
+    }
+  };
+
+  out.push("");
+  out.push(`reached = share of runs that played the beat at least once; played = times it played in all runs`);
+  out.push(`‼ never reached   ? never reached, may need an input   ~ rarely reached (under ${rareLimit}% of runs)`);
+
+  if (order === "least") {
+    out.push("");
+    out.push(`least reached first${scenes.size > 1 ? ", every scene" : ""}`);
+    out.push(heading);
+    for (const b of leastReachedFirst(report.beats)) row(b, scenes.size > 1);
+    return out;
+  }
+
+  // Script order: grouped by scene, in document order.
   const byScene = new Map<string, CoverageBeat[]>();
   for (const b of report.beats) (byScene.get(b.scene) ?? byScene.set(b.scene, []).get(b.scene)!).push(b);
-  const clip = (s: string, n = 48) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-
   for (const [scene, beats] of byScene) {
     const dead = beats.filter((b) => b.reachedRuns === 0).length;
+    const rare = beats.filter((b) => b.rare).length;
+    const notes = [dead ? `${dead} never reached` : "", rare ? `${rare} rarely reached` : ""].filter(Boolean).join(", ");
     out.push("");
-    out.push(`${sceneName(scene)}${dead ? `  (${dead} never reached)` : ""}`);
-    for (const b of beats) {
-      // `?` = a never-reached beat that may just need an input driver; `‼` = never-reached and truly so.
-      const mark = b.reachedRuns === 0 ? (b.needsInput || b.blockedBy ? "? " : "‼ ") : "  ";
-      const label = b.character ? `${b.character}: ${clip(b.preview)}` : clip(b.preview || `(${b.kind})`);
-      out.push(`  ${mark}${b.reachPct.toFixed(0).padStart(3)}%  ${String(b.hits).padStart(6)}  ${label}`);
-      // Dead at one remove: say which beat would have to play first, so the author chases one thing.
-      for (const bg of b.blockedBy ?? []) {
-        const names = bg.writers.map((w) => {
-          const target = report.beats.find((x) => x.id === w);
-          return target ? clip(target.preview || target.id, 28) : w;
-        });
-        out.push(`         gated on ${bg.ref}, written only by: ${names.join(", ")} (never played either)`);
-      }
-    }
+    out.push(`${sceneName(scene)}${notes ? `  (${notes})` : ""}`);
+    out.push(heading);
+    for (const b of beats) row(b, false);
   }
   return out;
 }

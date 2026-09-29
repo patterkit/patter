@@ -65,7 +65,7 @@ describe("a result's location", () => {
 describe("the coverage meta line", () => {
   const report = (evalError: number): CoverageReport => ({
     runs: 6, maxSteps: 200, seed: 4, start: {}, beats: [],
-    totals: { beats: 10, covered: 8, neverHit: 2, coveragePct: 80 },
+    totals: { beats: 10, covered: 8, neverHit: 2, rare: 0, coveragePct: 80 }, rareThresholdPct: 5,
     termination: { ended: 4, capped: 1, stalled: 1, evalError },
     drivers: [], unwrittenInputs: [], dryChoices: [], cancelled: false,
   });
@@ -75,7 +75,7 @@ describe("the coverage meta line", () => {
     const lines = [...h.querySelectorAll(".cov-meta .shell-meta")];
     expect(lines.length).toBe(2);
     expect([...lines[0]!.querySelectorAll(".shell-meta-part")].map((p) => p.textContent)).toEqual(["6 runs", "200 max steps", "seed 4"]);
-    expect([...lines[1]!.querySelectorAll(".shell-meta-part")].map((p) => p.textContent)).toEqual(["4 ended", "1 stalled", "1 capped"]);
+    expect([...lines[1]!.querySelectorAll(".shell-meta-part")].map((p) => p.textContent)).toEqual(["4 reached the end", "1 stalled at a choice", "1 hit the step limit"]);
     expect(lines[1]?.classList.contains("cov-meta-ended")).toBe(true);
     expect(h.querySelector(".cov-meta")?.textContent).not.toMatch(TYPED);
   });
@@ -83,7 +83,7 @@ describe("the coverage meta line", () => {
     const h = document.createElement("div");
     renderCoverage(h, report(2), (id) => id, () => {});
     const parts = [...h.querySelectorAll(".cov-meta .shell-meta")[1]!.querySelectorAll(".shell-meta-part")].map((p) => p.textContent);
-    expect(parts).toEqual(["4 ended", "1 stalled", "1 capped", "2 errored"]);
+    expect(parts).toEqual(["4 reached the end", "1 stalled at a choice", "1 hit the step limit", "2 errored"]);
   });
 });
 

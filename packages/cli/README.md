@@ -128,6 +128,34 @@ patter play --scene scn_tavern --choices opt_work,opt_secret
 patter play --seed 42
 ```
 
+### `patter coverage [path]`
+
+Play the story many times with random choices and count how often each beat comes
+up, to find content no player can reach. The summary counts beats reached, never
+reached, and rarely reached (in fewer than 5% of runs), and says how the runs
+ended: reached the end, stalled at a choice with nothing to pick, or hit the step
+limit. The table gives each beat's **reached** (the share of runs that played it)
+and **played** (times it played in all runs), least reached first. Marks: `‼`
+never reached, `?` never reached but may just need an input driver, `~` rarely
+reached. Choices that ran dry (nothing to take and no fallback) are listed too.
+
+| Option | Values | Meaning |
+|--------|--------|---------|
+| `--runs <n>` | integer | How many playthroughs (default 5000). |
+| `--max-steps <n>` | integer | Steps before a run is stopped (default 200). |
+| `--seed <n>` | integer | The same seed gives the same result. |
+| `--scene <id>` / `--block <id>` | id | Start here instead of the project's start. |
+| `--order <o>` | `least` / `script` | Least reached first (default), or the script's order, scene by scene. |
+| `--fail-on-gap` | | Exit 1 if any beat is never reached (a CI gate). |
+| `--propose` | | Print suggested `@world` input drivers instead of running. |
+| `--json` | | The full report as JSON. |
+
+```sh
+patter coverage
+patter coverage --runs 10000 --seed 7 --order script
+patter coverage --fail-on-gap
+```
+
 ### `patter resolve <query> [path]`
 
 Look up an **id**, **handle**, or **name** and report what it is and where it

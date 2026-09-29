@@ -5,7 +5,7 @@
 // Properties (declare @world properties + edit the input drivers the sweep feeds them).
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
-import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are the family's `.btn`
+import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are the family's `.btn`, the order switch its `.seg`
 import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./coverage.css";
 import "@wildwinter/app-shell/job.css";
@@ -16,7 +16,7 @@ import { mountJobProgress, pinButton, toolWindowHead, toast, plural } from "@wil
 import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips } from "@wildwinter/app-shell";
-import { renderCoverage } from "../src/coverage-view.js";
+import { renderCoverage, type CoverageOrder } from "../src/coverage-view.js";
 import type { CoverageResult } from "../../shared/api.js";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
@@ -45,13 +45,24 @@ cov.onProgress((p) => { if (p.kind === "coverage") jobView.update(p.done, p.tota
 
 let sceneNames: Record<string, string> = {};
 
+// The table's order, remembered for this window between runs and sessions. A convenience only: storage can
+// be unavailable, and then it simply opens least reached first.
+const ORDER_KEY = "patterpad.coverage.order";
+const readOrder = (): CoverageOrder => {
+  try { return localStorage.getItem(ORDER_KEY) === "script" ? "script" : "least"; } catch { return "least"; }
+};
+const saveOrder = (order: CoverageOrder): void => {
+  try { localStorage.setItem(ORDER_KEY, order); } catch { /* not remembered; nothing else depends on it */ }
+};
+
 const numOr = (input: HTMLInputElement, fallback: number): number => {
   const n = Number(input.value); return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
 function showResult(result: CoverageResult): void {
   sceneNames = result.sceneNames;
-  renderCoverage(host, result.report, (id) => sceneNames[id] ?? id, (sceneId, beatId) => cov.reveal(sceneId, beatId), (ref) => cov.findUsage(ref));
+  renderCoverage(host, result.report, (id) => sceneNames[id] ?? id, (sceneId, beatId) => cov.reveal(sceneId, beatId), (ref) => cov.findUsage(ref),
+    { order: readOrder(), onOrderChange: saveOrder });
   host.hidden = false; host.scrollTop = 0;
 }
 

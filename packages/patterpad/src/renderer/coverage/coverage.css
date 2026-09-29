@@ -84,3 +84,17 @@ body.coverage-win {
 .cov-gate-blocked { color: var(--warn, var(--accent)); }
 .cov-n { text-align: right; font-variant-numeric: tabular-nums; }
 .cov-reach { font-weight: 600; }
+
+/* The order switch above the beat table (the family's .seg), and the table's column headings. */
+.cov-order { display: flex; align-items: center; gap: 9.5px; margin: 6px 0 0; }
+.cov-tables { display: flex; flex-direction: column; gap: 8px; }
+.cov-table thead th { padding: 4px 8px; border-bottom: 1px solid var(--line); font: 600 12px/1.2 var(--font-ui); color: var(--muted); text-align: left; cursor: default; }
+.cov-table thead th.cov-n { text-align: right; }
+.cov-table thead tr { cursor: default; }
+.cov-table thead tr:hover { background: none; }
+/* Reached, but rarely: a quiet tag and the faintest tint, well short of the never-reached warnings. */
+.cov-row-rare { background: color-mix(in oklab, var(--warn, var(--accent)) 4%, transparent); }
+.cov-rare { display: inline-block; margin-left: 8px; padding: 0 5px; border-radius: var(--radius-sm); font: 600 11px/1.5 var(--font-ui); color: var(--warn, var(--accent)); background: color-mix(in oklab, var(--warn, var(--accent)) 12%, transparent); }
+.cov-scene-rare { font: 600 12.5px/1.2 var(--font-ui); color: var(--warn, var(--accent)); }
+/* In the least-reached list, which scene a row belongs to (only when there are several). */
+.cov-row-scene { display: block; margin-top: 1.5px; font: 11.5px var(--font-ui); color: var(--muted); }

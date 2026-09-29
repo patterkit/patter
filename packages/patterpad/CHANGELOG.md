@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **The Coverage window is easier to read, and leads with what it reached least.** The table's columns
+  now have headings, **Runs reached** and **Times played**, and the line under the numbers says in words
+  how the runs ended. The table opens **least reached first**, so the beats worth a look come first; a
+  switch puts it back in script order, and the window remembers your choice. Beats that played, but in
+  fewer than 5% of runs, are tagged **Rare** and counted at the top.
+
 ## [0.22.1] - 2026-09-28
 
 ### Fixed
