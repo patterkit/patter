@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.11.0
+
+### Minor Changes
+
+- 72c625f: Coverage leads with what it reached least. A beat that played, but in fewer than 5% of runs, is now flagged as rarely reached (`rare` on the beat, `totals.rare` and `rareThresholdPct` on the report, `~` in the text), and `leastReachedFirst` gives the ordering. `patter coverage` now lists beats least reached first, with `--order script` for the script's order; its table labels its two columns (reached, played) and says in words how the runs ended.
+
 ## 0.10.4
 
 ### Patch Changes

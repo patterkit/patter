@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/cli",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "The `patter` CLI: validate, format, export, and play a Patter project.",
   "type": "module",
   "license": "MIT",
@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@patterkit/core": "0.3.0",
-    "@patterkit/ops": "0.10.4",
+    "@patterkit/ops": "0.11.0",
     "@wildwinter/simple-vc-lib": "^0.4.1"
   }
 }
