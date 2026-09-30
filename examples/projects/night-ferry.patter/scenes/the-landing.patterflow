@@ -1,0 +1,145 @@
+{
+  "scene": {
+    "blocks": [
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "id": "T_2lh602ae",
+                "kind": "text",
+              },
+              {
+                "character": "FERRYMAN",
+                "id": "L_x1ca8a0l",
+                "kind": "line",
+              },
+            ],
+            "id": "sn_xo3vk6yo",
+            "jump": {
+              "to": "blk_50h7mjpw",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_9t8t3kt9",
+        "name": "Jetty",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_oazonvt6",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_88hsh3go",
+                    "jump": {
+                      "to": "blk_50h7mjpw",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_kotj5d09",
+                "prompt": {
+                  "id": "C_nupu52e4",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "id": "T_g9yqituy",
+                        "kind": "text",
+                      },
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_eiumwuiw",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_ypuj5ps1",
+                    "jump": {
+                      "to": "scn_rgudy7nl",
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@paid",
+                        "value": "true",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_rq32qrwg",
+                "prompt": {
+                  "id": "C_4qtm8iyu",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "id": "T_j5w3728t",
+                        "kind": "text",
+                      },
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_5y9ypwto",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_azpqxwc5",
+                    "jump": {
+                      "to": "scn_rgudy7nl",
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@candour",
+                        "value": "@candour + 1",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_hvd1c4mh",
+                "prompt": {
+                  "id": "C_2rhyegrt",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+            ],
+            "id": "g_e0mb8my3",
+            "selector": "choice",
+            "type": "group",
+          },
+        ],
+        "id": "blk_50h7mjpw",
+        "name": "Fare",
+        "type": "block",
+      },
+    ],
+    "id": "scn_c0t349db",
+    "name": "The Landing",
+    "type": "scene",
+  },
+  "schema": "patter/flow@0",
+}

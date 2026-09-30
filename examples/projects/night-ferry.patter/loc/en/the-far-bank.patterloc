@@ -1,0 +1,21 @@
+{
+  "default": true,
+  "locale": "en",
+  "scene": "scn_f7tuxe2q",
+  "schema": "patter/strings@0",
+  "strings": {
+    "L_1q3cpq7l": "And the fare? Forget it. Somebody paid yours a long time ago.",
+    "L_7eiqb9df": "Come back this way some night. I'd like to know how it went.",
+    "L_bgh1ot6v": "Go on, then. The night's not getting any younger.",
+    "L_janw9btk": "You looked back. Good. Now you can stop.",
+    "L_ofvhwdrz": "Here's your side. Whatever you're over here for, I hope it's worth the cold.",
+    "L_qbsb9o8n": "You never looked back. Well. That one's yours to decide.",
+    "L_qgdpbcdu": "Up the stair and left at the chapel. Or right. It's your home, not mine.",
+    "L_vi9iq4ok": "I won't ask you to come back. I'll think of you, though, some nights, out here.",
+    "T_8tozqbdi": "A bell rings somewhere ahead, muffled by the fog, and then the keel scrapes on shingle. A second lamp, the twin of the first, burns at the top of a short stair.",
+    "T_hmnfirhh": "Behind you the oar dips, rises, drips, and is gone.",
+    "T_hocexfwp": "As you step out he lifts the lamp from the stern, and for a moment you see his face properly: older than his voice, and kinder.",
+    "T_s8yxey5z": "He nods once, and pushes off before your feet are dry.",
+    "T_yctvu6dt": "As you step out he lifts the lamp from the stern, and for a moment you see his face properly: older than his voice, and kinder.",
+  },
+}

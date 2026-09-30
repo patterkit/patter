@@ -138,6 +138,8 @@ CI keys each pipeline off a tag prefix:
 | `v*` (bare; Patterpad's alone) | the Patterpad desktop app | `.github/workflows/patterpad.yml` | manual tag |
 | `cli-v*` | standalone `patter` CLI binaries | `.github/workflows/cli.yml` | manual tag |
 | `play-js-v*` / `play-unity-v*` / `play-unreal-v*` / `play-godot-v*` | the Patterplay **runtime set** (JS drop-in + web demo / the three engine plugins), versioned in lockstep | `.github/workflows/play-js.yml` / `play-unity.yml` / `play-unreal.yml` / `play-godot.yml` | `npm run bump:play`, then manual tags |
+| `tour-v*` | the Interactive Tour as `tour.patterpack`, for the download page | `.github/workflows/example-tour.yml` | manual tag |
+| `night-ferry-v*` | The Night Ferry as `night-ferry.patterpack`, for the download page | `.github/workflows/example-night-ferry.yml` | manual tag |
 
 Changesets gives the **npm packages** their own per-package tags (including
 `@patterkit/cli`) - with one exception: **`@patterkit/runtime` is versioned by

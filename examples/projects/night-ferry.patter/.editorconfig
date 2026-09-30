@@ -1,0 +1,11 @@
+# Patter projects are UTF-8 + LF, always (spec - patter format enforces this).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.{patterflow,patterloc,patterx,patterproj}]
+indent_style = space
+indent_size = 2

@@ -26,7 +26,12 @@ or the File menu on Windows and Linux).
 From there you land on the **welcome screen**, where you can open a project, create
 one, or pick from your recent projects. **File ▸ Close Project** brings you back to it
 at any time. The window stays open, and the project you closed is top of the recents
-list. It is also the way back to the shipped **tour** once you have a project open.
+list.
+
+Under **Learn from a finished project**, the welcome screen offers the two worked examples
+Patterpad carries: the **Interactive Tour**, a playable project that teaches the format, and
+**The Night Ferry**, a short finished story. Each opens as your own copy, in a folder you
+choose. **Help ▸ Open an Example** reaches them from inside a project too.
 
 ### Creating a project
 

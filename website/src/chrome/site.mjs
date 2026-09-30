@@ -195,6 +195,22 @@ export default {
             "label": "Download the tour"
           }
         ]
+      },
+      "night-ferry": {
+        "kind": "release",
+        "tag": "^night-ferry-v\\d",
+        "strip": "^night-ferry-v",
+        "whenMissing": {
+          "message": "Coming with its first release. Patterpad already carries it, under Help ▸ Open an Example."
+        },
+        "rows": [
+          {
+            "name": "The Night Ferry",
+            "sub": "One <code>night-ferry.patterpack</code> file to open in Patterpad",
+            "asset": "\\.patterpack$",
+            "label": "Download the story"
+          }
+        ]
       }
     }
   }

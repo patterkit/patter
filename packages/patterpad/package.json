@@ -67,6 +67,14 @@
       {
         "from": "resources/dictionaries",
         "to": "dictionaries"
+      },
+      {
+        "from": "../../examples/projects/tour.patter",
+        "to": "examples/tour.patter"
+      },
+      {
+        "from": "../../examples/projects/night-ferry.patter",
+        "to": "examples/night-ferry.patter"
       }
     ],
     "directories": {

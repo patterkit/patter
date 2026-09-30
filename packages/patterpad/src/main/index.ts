@@ -7,7 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, 
 import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { cpSync, existsSync } from "node:fs";
 import { userInfo } from "node:os";
 import { currentUserAsync, writeBinaryFile, writeTextFile } from "@wildwinter/simple-vc-lib";
 import * as project from "./project.js";
@@ -26,6 +26,7 @@ import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-sh
 import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import { PROPERTIES_PLACE } from "../shared/api.js";
+import { EXAMPLES } from "../shared/examples.js";
 import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
 import type { SceneKitId } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
@@ -504,6 +505,58 @@ async function importDictionaryDialog(): Promise<{ ok: boolean; error?: string; 
   return dictionaries.importDictionary(aff, dic, id, base);
 }
 
+/**
+ * Where a shipped example lives: resources beside the app once packaged
+ * (`build.extraResources` in package.json copies each to `resources/examples/`),
+ * and the repo's own `examples/projects/` in development, found by walking up
+ * rather than counting directories, as Storyletter's `examplePath` does.
+ */
+function examplePath(file: string): string | undefined {
+  if (app.isPackaged) {
+    const packaged = join(process.resourcesPath, "examples", file);
+    return existsSync(packaged) ? packaged : undefined;
+  }
+  let dir = app.getAppPath();
+  for (let up = 0; up < 6; up++) {
+    const candidate = join(dir, "examples", "projects", file);
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return undefined;
+}
+
+/** Help ▸ Open an Example, and the welcome's tiles: a copy in a folder the writer chooses, opened.
+ *  Never in place, since the original is inside the installed app, which the next update replaces.
+ *  A copy that cannot be made is said here, in a message box, since the writer may be mid-project
+ *  with no welcome screen to carry it; null then, as for a cancelled picker. */
+async function openExample(file: string): Promise<OpenResult | null> {
+  if (!win) return null;
+  const refuse = async (message: string): Promise<null> => {
+    if (win) await dialog.showMessageBox(win, { type: "warning", message: "The example could not be opened.", detail: message });
+    return null;
+  };
+  const source = EXAMPLES.some((x) => x.file === file) ? examplePath(file) : undefined;
+  if (source === undefined) return refuse(`No example called "${file}" shipped with this build.`);
+  const picked = await dialog.showOpenDialog(win, {
+    title: "Where should your copy of the example go?",
+    message: `Choose a folder. A copy of "${basename(source)}" goes into it and opens, yours to change.`,
+    buttonLabel: "Copy Here",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  const parent = picked.filePaths[0];
+  if (picked.canceled || parent === undefined) return null;
+  const target = join(parent, basename(source));
+  if (existsSync(target)) return refuse(`There is already something called "${basename(source)}" in that folder.`);
+  try {
+    cpSync(source, target, { recursive: true });
+  } catch (e) {
+    return refuse(`It could not be copied: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return openAndRecord(target);
+}
+
 async function openDialog(): Promise<OpenResult | null> {
   if (!win) return null;
   // The picker stays native (familiar), but carries context: title (Win/Linux) + message (macOS).
@@ -833,6 +886,7 @@ function registerIpc(): void {
   ipcMain.handle("project:boot", (): BootState => boot());
   ipcMain.handle("project:hydrate", () => project.hydrate()); // finish the lazy open; returns the full scene list
   ipcMain.handle("project:openDialog", (): Promise<OpenResult | null> => openDialog());
+  ipcMain.handle("project:openExample", (_e, file: string) => openExample(file));
   ipcMain.handle("project:saveAs", (): Promise<OpenResult | null> => saveAsDialog());
   // Close Project (from-storylets/close-project): the shell runs the teardown order - close hook,
   // satellites, menu, and forgetting WHICH project was open while keeping it in recents. The tool

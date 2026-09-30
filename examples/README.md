@@ -11,7 +11,7 @@ Open one in Patterpad, or play it from the CLI.
 | Project | What it is |
 |---|---|
 | [`projects/tour.patter`](projects/tour.patter) | The **interactive feature tour**, authored *as* a playable Patter story. Walks through choices, selectors, properties, conditions, and closed captions. `patter play examples/projects/tour.patter` |
-| [`projects/tavern.patter`](projects/tavern.patter) | A small tavern project used as a demo / scratch project. |
+| [`projects/night-ferry.patter`](projects/night-ferry.patter) | **The Night Ferry**, a short finished story: one crossing of a dark river, in conversation with the ferryman. A hub, a secret option, and farewells that follow what you said. `patter play examples/projects/night-ferry.patter` |
 
 ## Host-integration samples
 

@@ -1,0 +1,49 @@
+name: Night Ferry example release
+
+# The Night Ferry as a standalone download, as the Interactive Tour is (example-tour.yml): the
+# `night-ferry.patter` SOURCE project packed into a single `night-ferry.patterpack` that anyone
+# with Patterpad can grab and open (File > Open Patterpack, or double-click). Tagging
+# `night-ferry-vX.Y.Z` packs it (source only, exactly what `pack` carries) and attaches it to the
+# matching GitHub Release. Patterpad also carries it, under Help > Open an Example; this is for
+# the download page. Its validity is covered by the main test suite.
+on:
+  push:
+    tags: ["night-ferry-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  night-ferry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Check it still validates before packing it
+        run: node packages/cli/dist/cli.js validate examples/projects/night-ferry.patter
+      - name: Pack the Night Ferry into a .patterpack (source only, no build artifacts)
+        run: node packages/cli/dist/cli.js pack examples/projects/night-ferry.patter -o "$GITHUB_WORKSPACE/night-ferry.patterpack"
+      - name: Attach it to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          make_latest: false  # never claim GitHubs Latest badge - that stays on Patterpad for the auto-updater
+          name: The Night Ferry ${{ github.ref_name }}
+          body: |
+            **The Night Ferry**: one crossing of a dark river, in conversation with the ferryman.
+            A short, finished Patter story, about five minutes of play, written to be read.
+
+            **`night-ferry.patterpack`** is the whole project in one file. In Patterpad, open it
+            with **File > Open Patterpack…** (or just double-click it); Patterpad asks where to
+            unpack the project, then opens it. Press **Play from Start**. Patterpad also carries
+            it, under **Help > Open an Example**.
+
+            New to Patter? Start at https://patterkit.dev/getting-started/
+          files: night-ferry.patterpack
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

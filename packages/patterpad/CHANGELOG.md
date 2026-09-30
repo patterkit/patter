@@ -6,6 +6,10 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Two worked examples ship inside Patterpad**: the Interactive Tour, and **The Night Ferry**, a new short story (one crossing of a dark river, in conversation with the ferryman). The welcome screen shows them as tiles under Learn from a finished project, New Project offers them as its second shelf, and **Help ▸ Open an Example**, first in Help, reaches them from inside a project. Each opens as your own copy, in a folder you choose, as Storyletter's examples do. The welcome's link to the download page for the Tour is gone, since the Tour is now in the app.
+
 ## [0.22.2] - 2026-09-29
 
 ### Changed

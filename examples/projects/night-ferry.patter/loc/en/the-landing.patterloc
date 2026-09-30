@@ -1,0 +1,18 @@
+{
+  "default": true,
+  "locale": "en",
+  "scene": "scn_c0t349db",
+  "schema": "patter/strings@0",
+  "strings": {
+    "C_2rhyegrt": "Tell him you can't pay",
+    "C_4qtm8iyu": "Hold out two coins",
+    "C_nupu52e4": "Ask what the fare is",
+    "L_5y9ypwto": "Then you'll owe me. People usually do, by the other side.",
+    "L_eiumwuiw": "Mind the step. She sits low.",
+    "L_oazonvt6": "Two coins. It was two coins when my father rowed it, and it'll be two when I've done.",
+    "L_x1ca8a0l": "Last crossing of the night. Either you're getting in, or you're going home.",
+    "T_2lh602ae": "The last lamp on the jetty gutters in the wind. Below it a flat black boat knocks against the posts, and a man in an oilskin coat sits in the stern as if he has been waiting a long time.",
+    "T_g9yqituy": "He takes them without looking, and they vanish into the coat.",
+    "T_j5w3728t": "He looks at you for a long moment, then shifts along the bench to make room.",
+  },
+}

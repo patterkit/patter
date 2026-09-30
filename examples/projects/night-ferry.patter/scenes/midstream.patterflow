@@ -1,0 +1,391 @@
+{
+  "scene": {
+    "blocks": [
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "id": "T_6r9kg1de",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_j2ggcr6m",
+            "type": "snippet",
+          },
+          {
+            "beats": [
+              {
+                "character": "FERRYMAN",
+                "id": "L_t10n62qy",
+                "kind": "line",
+              },
+            ],
+            "condition": "not @paid",
+            "id": "sn_k59h7hph",
+            "type": "snippet",
+          },
+          {
+            "id": "sn_ill7g02v",
+            "jump": {
+              "to": "blk_3uchyyct",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_du03x99k",
+        "name": "Pushing off",
+        "type": "block",
+      },
+      {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_a6bwx2xe",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_hr2s6n4t",
+                    "jump": {
+                      "to": "blk_3uchyyct",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_2avffiph",
+                "prompt": {
+                  "id": "C_sdy3i5y6",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_rmsqiq2n",
+                        "kind": "line",
+                      },
+                      {
+                        "id": "T_q9o7flul",
+                        "kind": "text",
+                      },
+                    ],
+                    "id": "sn_vvzcgpwg",
+                    "jump": {
+                      "to": "blk_3uchyyct",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_mmysihvb",
+                "prompt": {
+                  "id": "C_avxwmcp0",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "beats": [
+                              {
+                                "character": "FERRYMAN",
+                                "id": "L_djv7yus4",
+                                "kind": "line",
+                              },
+                            ],
+                            "id": "sn_0nyma1zf",
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@reason",
+                                "value": "\"home\"",
+                              },
+                              {
+                                "kind": "set",
+                                "target": "@candour",
+                                "value": "@candour + 1",
+                              },
+                            ],
+                            "type": "snippet",
+                          },
+                        ],
+                        "id": "opt_e7ybqur5",
+                        "prompt": {
+                          "id": "C_5y4fmqoe",
+                          "kind": "text",
+                        },
+                        "type": "group",
+                      },
+                      {
+                        "children": [
+                          {
+                            "beats": [
+                              {
+                                "character": "FERRYMAN",
+                                "id": "L_eiy2zzmk",
+                                "kind": "line",
+                              },
+                            ],
+                            "id": "sn_jhtbr5f2",
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@reason",
+                                "value": "\"away\"",
+                              },
+                              {
+                                "kind": "set",
+                                "target": "@candour",
+                                "value": "@candour + 1",
+                              },
+                            ],
+                            "type": "snippet",
+                          },
+                        ],
+                        "id": "opt_0tnzwal2",
+                        "prompt": {
+                          "id": "C_m5hfa5ti",
+                          "kind": "text",
+                        },
+                        "type": "group",
+                      },
+                      {
+                        "children": [
+                          {
+                            "beats": [
+                              {
+                                "character": "FERRYMAN",
+                                "id": "L_hsaygfo0",
+                                "kind": "line",
+                              },
+                            ],
+                            "id": "sn_jssg6hw9",
+                            "type": "snippet",
+                          },
+                        ],
+                        "id": "opt_8lgjuhe6",
+                        "prompt": {
+                          "id": "C_htpvtu2b",
+                          "kind": "text",
+                        },
+                        "type": "group",
+                      },
+                    ],
+                    "id": "g_7w7m3w2j",
+                    "selector": "choice",
+                    "type": "group",
+                  },
+                  {
+                    "id": "sn_ov2a5fh3",
+                    "jump": {
+                      "to": "blk_3uchyyct",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_2f1xs6k2",
+                "prompt": {
+                  "id": "C_7o7v5dyf",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_2yr65uio",
+                        "kind": "line",
+                      },
+                      {
+                        "id": "T_866scqn1",
+                        "kind": "text",
+                      },
+                    ],
+                    "id": "sn_30y6ra0d",
+                    "jump": {
+                      "to": "blk_3uchyyct",
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@candour",
+                        "value": "@candour + 1",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                ],
+                "condition": "@candour >= 1",
+                "id": "opt_io7wypa7",
+                "prompt": {
+                  "id": "C_hpgznd2n",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "id": "T_knljstb6",
+                        "kind": "text",
+                      },
+                      {
+                        "character": "FERRYMAN",
+                        "id": "L_dpswdpq3",
+                        "kind": "line",
+                      },
+                    ],
+                    "id": "sn_j4dcjphc",
+                    "jump": {
+                      "to": "blk_3uchyyct",
+                    },
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@looked_back",
+                        "value": "true",
+                      },
+                    ],
+                    "type": "snippet",
+                  },
+                ],
+                "condition": "@reason == \"away\"",
+                "id": "opt_m8kcb14i",
+                "prompt": {
+                  "id": "C_cfobbptu",
+                  "kind": "text",
+                },
+                "secretUntilEligible": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "beats": [
+                      {
+                        "id": "T_jp39lpe0",
+                        "kind": "text",
+                      },
+                    ],
+                    "id": "sn_8qx2emf5",
+                    "jump": {
+                      "to": "scn_f7tuxe2q",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_jelpzr4y",
+                "prompt": {
+                  "id": "C_djbk4f9k",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "beats": [
+                          {
+                            "id": "T_0xbabs79",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_jbxb25ch",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "character": "FERRYMAN",
+                            "id": "L_7q871vga",
+                            "kind": "line",
+                          },
+                        ],
+                        "id": "sn_1mkxlduu",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "id": "T_lt6lsktr",
+                            "kind": "text",
+                          },
+                        ],
+                        "id": "sn_j61jx5ve",
+                        "type": "snippet",
+                      },
+                      {
+                        "beats": [
+                          {
+                            "character": "FERRYMAN",
+                            "id": "L_d656xmon",
+                            "kind": "line",
+                          },
+                        ],
+                        "id": "sn_ecrxbsur",
+                        "type": "snippet",
+                      },
+                    ],
+                    "id": "g_b5pp0tb8",
+                    "options": {
+                      "exhaust": "repeat",
+                      "order": "shuffle",
+                    },
+                    "selector": "sequence",
+                    "type": "group",
+                  },
+                  {
+                    "id": "sn_lftgj663",
+                    "jump": {
+                      "to": "blk_3uchyyct",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "opt_1twpi7lg",
+                "prompt": {
+                  "id": "C_3xyl25ub",
+                  "kind": "text",
+                },
+                "sticky": true,
+                "type": "group",
+              },
+            ],
+            "id": "g_anvl6jaa",
+            "selector": "choice",
+            "type": "group",
+          },
+        ],
+        "id": "blk_3uchyyct",
+        "name": "Talk",
+        "type": "block",
+      },
+    ],
+    "id": "scn_rgudy7nl",
+    "name": "Midstream",
+    "type": "scene",
+  },
+  "schema": "patter/flow@0",
+}

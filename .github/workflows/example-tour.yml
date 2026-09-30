@@ -4,8 +4,9 @@ name: Tour example release
 # a single `tour.patterpack` file that anyone who just installed Patterpad can grab and open
 # (File > Open Patterpack, or double-click). Tagging `tour-vX.Y.Z` packs it (source only - no
 # audio, no build artifacts, exactly what `pack` carries) and attaches it to the matching GitHub
-# Release. Download-only; not bundled in the app. Packing needs the workspace built (the `patter`
-# CLI), unlike the old plain-zip step; the tour's validity is still covered by the main test suite.
+# Release. Patterpad also carries the tour (Help > Open an Example, 2026-09-30); this is the download
+# for the site. Packing needs the workspace built (the `patter` CLI), unlike the old plain-zip step;
+# the tour's validity is still covered by the main test suite.
 on:
   push:
     tags: ["tour-v*"]

@@ -62,6 +62,7 @@ import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way
 import { toast } from "@wildwinter/app-shell";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
+import { EXAMPLES } from "../../shared/examples.js";
 import { mountWelcome, openKitGallery, type KitGalleryItem, lockNotice, mountJobProgress, showUpdaterDialog, feedUpdaterDownloadProgress, plural, formatCount, debounce } from "@wildwinter/app-shell";
 import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in this file
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
@@ -173,12 +174,9 @@ frameHost.hidden = false;
 const welcomeEl = $("welcome");
 const hintbarEl = $("hintbar");
 // The welcome is the shell's `mountWelcome` (ui-review-2026-09, finding 10): title, one line, the two
-// actions, the teaching line and the recents. What is Patterpad's is the words and the tour door: the
-// tour is a download rather than something the app carries, so its line opens the page that offers it,
-// through the same allow-listed external route the About box uses.
-const tourBtn = el("button", "linklike", "Take the interactive tour"); tourBtn.type = "button";
-tourBtn.addEventListener("click", () => window.patter.openExternal("https://patterkit.dev/download/#something-to-open"));
-const tourLine = el("span"); tourLine.append("New to Patter? ", tourBtn);
+// actions, the shipped examples and the recents. The examples are tiles, as Storyletter's welcome draws
+// its own (2026-09-30): the Tour and the Night Ferry ship inside the app, so the teaching door that used
+// to open the download page is a tile now, and each opens as the writer's own copy.
 const welcome = mountWelcome(welcomeEl, {
   title: "Patterpad",
   sub: "Write the script. Play it in your game.",
@@ -187,7 +185,11 @@ const welcome = mountWelcome(welcomeEl, {
     { label: "New project…", onClick: () => createDialog() },
   ],
   recents: [],
-  tourLine,
+  // An example is never opened in place (it lives inside the installed app, which is read-only and
+  // replaced by the next update), so opening one asks for a folder. Say so BEFORE the click.
+  groups: [{ caption: "Learn from a finished project", note: "Each opens as your own copy, in a folder you choose.", tiles: true,
+    items: EXAMPLES.map((x) => ({ name: x.name, hint: x.tile ?? x.hint, ...(x.features ? { features: [...x.features] } : {}),
+      ...(x.badge !== undefined ? { badge: x.badge } : {}), onOpen: () => createDialog(`example:${x.file}`) })) }],
   maxRecents: 8, // the store keeps eight; the welcome shows what the menu shows
 });
 function setWelcomeRecents(recents: RecentProject[]): void {
@@ -2757,7 +2759,21 @@ const PROJECT_KITS = [
  * details panel, beside the kit, so "what am I about to be given?" is answered before anything
  * is asked (from-storylets/new-project-says-nothing). The system folder picker still follows.
  */
-function createDialog(): void {
+/** The shipped examples as gallery items, for New Project's second shelf and the welcome's tiles. */
+const EXAMPLE_KITS: KitGalleryItem<`example:${string}`>[] = EXAMPLES.map((x) => ({
+  id: `example:${x.file}` as const, name: x.name, blurb: x.hint,
+  ...(x.badge !== undefined ? { badge: x.badge } : {}), ...(x.tile !== undefined ? { tile: x.tile } : {}),
+  ...(x.features !== undefined ? { features: [...x.features] } : {}),
+}));
+
+/** Help ▸ Open an Example and the gallery's second shelf: main copies it to a folder the writer picks. */
+async function openExample(file: string): Promise<void> {
+  await leaveProject();
+  const r = await window.patter.openExample(file);
+  if (r) await showProject(r);
+}
+
+function createDialog(initial?: string): void {
   const vcs = el("select", "insp-select");
   for (const [value, label] of [["git", "Git"], ["perforce", "Perforce"], ["plastic", "Plastic SCM"], ["svn", "Subversion (SVN)"], ["none", "None"]] as const) {
     const o = el("option", undefined, label);
@@ -2791,8 +2807,16 @@ function createDialog(): void {
       preview.textContent = patterFolderPreview(name);
       if (!buildTouched) build.value = buildDefaultFor(name);
     },
-    sections: [{ caption: "Start from a kit", note: "A starting point you own, fully editable the moment it lands.", action: "Choose location\u2026", items: PROJECT_KITS }],
-    onPick: (_kit, { name }) => {
+    ...(initial !== undefined ? { initial } : {}),
+    // The worked examples as the second shelf, as Storyletter's New Project has them: opening one and
+    // making a project from a kit are the same act, your own copy in a folder you choose.
+    sections: [
+      { caption: "Start from a kit", note: "A starting point you own, fully editable the moment it lands.", action: "Choose location\u2026", items: PROJECT_KITS },
+      { caption: "Learn from a finished project", note: "Each opens as your own copy, in a folder you choose.",
+        action: "Open a Copy", usesDetails: false, items: EXAMPLE_KITS },
+    ],
+    onPick: (kit, { name }) => {
+      if (kit.startsWith("example:")) { void openExample(kit.slice("example:".length)); return; }
       if (name === undefined) return;
       const chosenVcs = vcs.value as VcsKind;
       const buildBundle = build.value.trim() || undefined;
@@ -2906,6 +2930,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "new-scene") newScenePrompt();
   else if (cmd === "delete-scene") void deleteScenePrompt();
   else if (cmd === "open") void openDialog();
+  else if (cmd.startsWith("open-example:")) void openExample(cmd.slice("open-example:".length));
   else if (cmd === "open-patterpack") void openPatterpack();
   else if (cmd === "save") void save();
   else if (cmd === "save-as") void saveAs();

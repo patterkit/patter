@@ -717,6 +717,9 @@ export interface PatterApi {
   saveAs(): Promise<OpenResult | null>;
   /** Open a known path (a recent). Records it in the session. */
   openPath(path: string): Promise<OpenResult>;
+  /** A shipped example (shared/examples.ts), copied to a folder the writer picks and opened; null when
+   *  they cancel, or when the copy cannot be made (main says why, in a message box). */
+  openExample(file: string): Promise<OpenResult | null>;
   /** Close the open project and return to the welcome screen (the window stays). */
   closeProject(): Promise<void>;
   /** Scaffold a new `<name>.patter` project: the renderer collects `name` (themed New-project dialog),

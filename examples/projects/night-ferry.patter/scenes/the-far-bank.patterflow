@@ -1,0 +1,167 @@
+{
+  "scene": {
+    "blocks": [
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "id": "T_8tozqbdi",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_0ep649em",
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "beats": [
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_qgdpbcdu",
+                    "kind": "line",
+                  },
+                ],
+                "condition": "@reason == \"home\"",
+                "id": "sn_snthsjba",
+                "type": "snippet",
+              },
+              {
+                "beats": [
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_janw9btk",
+                    "kind": "line",
+                  },
+                ],
+                "condition": "@reason == \"away\" && @looked_back",
+                "id": "sn_65d88m9b",
+                "type": "snippet",
+              },
+              {
+                "beats": [
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_qbsb9o8n",
+                    "kind": "line",
+                  },
+                ],
+                "condition": "@reason == \"away\"",
+                "id": "sn_k8wrm908",
+                "type": "snippet",
+              },
+              {
+                "beats": [
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_ofvhwdrz",
+                    "kind": "line",
+                  },
+                ],
+                "id": "sn_5cmm4t2l",
+                "type": "snippet",
+              },
+            ],
+            "id": "g_w50xdj76",
+            "selector": "branch",
+            "type": "group",
+          },
+          {
+            "children": [
+              {
+                "beats": [
+                  {
+                    "id": "T_hocexfwp",
+                    "kind": "text",
+                  },
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_vi9iq4ok",
+                    "kind": "line",
+                  },
+                ],
+                "condition": "@candour >= 2 && @reason == \"away\"",
+                "id": "sn_ezqqypon",
+                "type": "snippet",
+              },
+              {
+                "beats": [
+                  {
+                    "id": "T_yctvu6dt",
+                    "kind": "text",
+                  },
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_7eiqb9df",
+                    "kind": "line",
+                  },
+                ],
+                "condition": "@candour >= 2",
+                "id": "sn_hzu3code",
+                "type": "snippet",
+              },
+              {
+                "beats": [
+                  {
+                    "character": "FERRYMAN",
+                    "id": "L_bgh1ot6v",
+                    "kind": "line",
+                  },
+                ],
+                "condition": "@candour >= 1",
+                "id": "sn_b7i890hv",
+                "type": "snippet",
+              },
+              {
+                "beats": [
+                  {
+                    "id": "T_s8yxey5z",
+                    "kind": "text",
+                  },
+                ],
+                "id": "sn_h7r1vt8t",
+                "type": "snippet",
+              },
+            ],
+            "id": "g_nbze2vic",
+            "selector": "branch",
+            "type": "group",
+          },
+          {
+            "beats": [
+              {
+                "character": "FERRYMAN",
+                "id": "L_1q3cpq7l",
+                "kind": "line",
+              },
+            ],
+            "condition": "not @paid",
+            "id": "sn_o7etm9ba",
+            "type": "snippet",
+          },
+          {
+            "beats": [
+              {
+                "id": "T_hmnfirhh",
+                "kind": "text",
+              },
+            ],
+            "id": "sn_7wa06tmk",
+            "jump": {
+              "to": "END",
+            },
+            "type": "snippet",
+          },
+        ],
+        "id": "blk_uyz7efav",
+        "name": "Landing",
+        "type": "block",
+      },
+    ],
+    "id": "scn_f7tuxe2q",
+    "name": "The Far Bank",
+    "type": "scene",
+  },
+  "schema": "patter/flow@0",
+}

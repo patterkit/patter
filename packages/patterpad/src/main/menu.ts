@@ -12,6 +12,7 @@ import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 // below is only what is this app's alone (Patterpack, scenes, spelling, notes, fonts).
 import { EDIT_MENU, GO_MENU, HELP_MENU, APP_MENU, FILE_MENU, PLAY_MENU, PANE_MENU, REVIEW_MENU, PUBLISH_MENU, VIEW_MENU, namedMenuItems, recentsSubmenu } from "@wildwinter/app-shell/menu";
 import type { NamedMenuItem } from "@wildwinter/app-shell/menu";
+import { EXAMPLES } from "../shared/examples.js";
 
 // The family-standard named items (About / Documentation), so this app spells them the way
 // every app in the suite does. The URLs are Patterpad's; the labels are not.
@@ -323,6 +324,14 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
     {
       role: "help",
       submenu: [
+        // "How do I get to the demos?", answered where a lost writer looks, and from inside a project:
+        // the shipped examples (shared/examples.ts), first in Help, as Storyletter's Open an Example is.
+        // Each asks for a folder, so each carries the ellipsis.
+        {
+          label: "Open an Example",
+          submenu: EXAMPLES.map((x) => ({ label: `${x.name}\u2026`, click: () => send(`open-example:${x.file}`) })),
+        },
+        { type: "separator" },
         // The documentation site: the writers' guide first (the audience in this app), then the site home.
         linkItem(NAMED.docs),
         linkItem(NAMED.suiteDocs),

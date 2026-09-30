@@ -1,0 +1,56 @@
+{
+  "cast": [
+    {
+      "displayName": "The Ferryman",
+      "name": "FERRYMAN",
+    },
+  ],
+  "dictionary": {
+    "language": "en-GB",
+    "words": [
+      "rowlock",
+    ],
+  },
+  "locales": {
+    "all": [
+      "en",
+    ],
+    "default": "en",
+  },
+  "project": {
+    "id": "proj_jiag35t7",
+    "name": "The Night Ferry",
+  },
+  "properties": [
+    {
+      "default": false,
+      "name": "paid",
+      "type": "boolean",
+    },
+    {
+      "default": 0,
+      "name": "candour",
+      "type": "number",
+    },
+    {
+      "default": "unsaid",
+      "name": "reason",
+      "type": "enum",
+      "values": [
+        "unsaid",
+        "home",
+        "away",
+      ],
+    },
+    {
+      "default": false,
+      "name": "looked_back",
+      "type": "boolean",
+    },
+  ],
+  "schema": "patter/project@0",
+  "start": {
+    "scene": "scn_c0t349db",
+  },
+  "voiced": false,
+}
