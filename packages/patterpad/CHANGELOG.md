@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.22.3] - 2026-09-30
+
 ### Security
 
 - **Electron 42.11.10.** Patterpad runs on the latest Electron 42 release, which fixes several security
