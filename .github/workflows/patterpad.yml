@@ -84,6 +84,24 @@ jobs:
           [ "$manifest" = "$version" ] || { echo "package.json says $manifest but the tag says $version"; exit 1; }
           grep -q "^## \[${version}\] - [0-9]" packages/patterpad/CHANGELOG.md \
             || { echo "CHANGELOG.md has no dated ${version} section"; exit 1; }
+      # Apple's Developer ID G2 intermediate. A Developer ID certificate issued since Apple moved to its
+      # G2 authority chains through it (the one made in October 2026, valid to 2031, does), and a runner
+      # image need not carry it: without it codesign cannot build the chain back to Apple's root, as
+      # a Mac without it calls the certificate "not trusted". Pinned by fingerprint, so a changed
+      # download stops the build here rather than signing against something unexpected. Into the
+      # System keychain, because codesign searches it whoever made the signing keychain.
+      - name: Install Apple's Developer ID G2 intermediate (macOS only)
+        if: runner.os == 'macOS'
+        run: |
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o /tmp/DeveloperIDG2CA.cer
+          fp=$(openssl x509 -inform DER -in /tmp/DeveloperIDG2CA.cer -noout -fingerprint -sha256 | cut -d= -f2)
+          [ "$fp" = "F1:6C:D3:C5:4C:7F:83:CE:A4:BF:1A:3E:6A:08:19:C8:AA:A8:E4:A1:52:8F:D1:44:71:5F:35:06:43:D2:DF:3A" ] || { echo "unexpected Developer ID G2 certificate (SHA-256 $fp)"; exit 1; }
+          if security find-certificate -a -Z -c "Developer ID Certification Authority" /Library/Keychains/System.keychain | grep -q "F16CD3C54C7F83CEA4BF1A3E6A0819C8AAA8E4A1528FD144715F350643D2DF3A"; then
+            echo "Developer ID G2 intermediate already installed"
+          else
+            sudo security add-certificates -k /Library/Keychains/System.keychain /tmp/DeveloperIDG2CA.cer
+          fi
+          rm /tmp/DeveloperIDG2CA.cer
       # We import the Developer ID cert OURSELVES and hand electron-builder the keychain, rather
       # than giving it CSC_LINK and letting it do the import. Its own path is broken: it creates a
       # keychain with a random password (macCodeSign.createKeychain) and then calls
