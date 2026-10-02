@@ -6,6 +6,15 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Update prompts come to the front.** Check for Updates, and the prompt that says an update is ready,
+  opened in the main window even when the Play window or another pinned window was covering it, so the
+  editor dimmed behind a prompt you could not see. The main window now comes forward, above pinned
+  windows, until you answer, and the pins go back afterwards. A prompt that arrives while Patterpad is in the
+  background waits until you come back to it. The "Update ready to install" prompt starts on Later, so a
+  key pressed for the window it covered cannot restart Patterpad by accident.
+
 ## [0.22.4] - 2026-10-02
 
 ### Fixed
