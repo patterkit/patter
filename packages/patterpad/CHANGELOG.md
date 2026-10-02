@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.22.5] - 2026-10-02
+
 ### Fixed
 
 - **Update prompts come to the front.** Check for Updates, and the prompt that says an update is ready,
