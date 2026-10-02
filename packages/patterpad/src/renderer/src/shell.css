@@ -757,11 +757,11 @@ body.writing-view .note-icon { pointer-events: none; }
 /* In-line tints: the suggestion say-background and the comment range highlight (background + underline). */
 body.writing-view .beat.has-suggestion .zone.say,
 body.writing-view .comment-range { background: none; box-shadow: none; }
-/* The spell-check squiggle (a writing aid) and the inline validation wavy underlines ease away too: the
-   problems bar is already collapsed in Writing View, so leaving wavy lines painted under the words would be
-   inconsistent with the clean reading surface. The structural left-edge severity accents stay (quiet
-   structure, not text chrome). */
-body.writing-view .spell-error,
+/* The inline validation wavy underlines ease away: they are about the script's STRUCTURE, and the problems
+   bar that explains them is collapsed in Writing View. The structural left-edge severity accents stay (quiet
+   structure, not text chrome). The spell-check squiggle is NOT hidden here, on purpose: a misspelling is
+   about the words, which are exactly what an author in Writing View is working on. It used to ease away
+   with the rest, so a typo went unmarked until the author left Writing View. */
 body.writing-view .beat.problem-error .zone.say,
 body.writing-view .beat.problem-warning .zone.say { text-decoration: none; }
 

@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Spelling mistakes stay underlined in Writing View.** Writing View hid the spell-check squiggles along
+  with the rest of the editor's markings, so a typo went unmarked until you left it. Misspellings now show
+  in Writing View too; the structural problem markers still step aside with the problems bar.
+
 ## [0.22.3] - 2026-09-30
 
 ### Security
