@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.22.4] - 2026-10-02
+
 ### Fixed
 
 - **Spelling mistakes stay underlined in Writing View.** Writing View hid the spell-check squiggles along
