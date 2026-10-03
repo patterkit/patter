@@ -124,6 +124,8 @@ function addedFormatting(p: XElement): boolean {
   if (!DROPPED.has(name)) return false;
   const val = (attr(p, "val") ?? "").toLowerCase();
   if (val === "none" || val === "false" || val === "0") return false;
+  // Pages gives every run an underline colour with no underline (`<w:u w:color="…"/>`); a real one has a value.
+  if (name === "u" && !val) return false;
   if (name === "color") return !OWN_COLOURS.has(val || "auto");
   if (name === "shd") return !OWN_COLOURS.has((attr(p, "fill") ?? "auto").toLowerCase());
   if (name === "smallCaps" || name === "caps") return false; // the exporter's tags and cues use them

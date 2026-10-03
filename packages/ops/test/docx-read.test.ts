@@ -137,6 +137,13 @@ describe("readEditableDocx", () => {
     expect(highlighted.text.droppedFormatting).toBe(1);
   });
 
+  it("Pages' underline colour with no underline isn't counted; a real underline is", async () => {
+    const pages = box(await edited((x) => setWords(x, GREET, `<w:p>${r("What'll it be, stranger?", `<w:u w:color="5c554b"/>`)}</w:p>`)), GREET);
+    expect(pages.text.droppedFormatting).toBe(0);
+    const underlined = box(await edited((x) => setWords(x, GREET, `<w:p>${r("What'll it be, stranger?", `<w:u w:val="single"/>`)}</w:p>`)), GREET);
+    expect(underlined.text.droppedFormatting).toBe(1);
+  });
+
   it("an Enter inside a box joins with a space, and the paragraph count says it happened", async () => {
     const b = box(await edited((x) => setWords(x, GREET, `<w:p>${r("What'll it be,")}</w:p><w:p>${r("stranger?")}</w:p>`)), GREET);
     expect(b.text.proposed).toBe("What'll it be, stranger?");
