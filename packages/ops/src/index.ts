@@ -73,3 +73,6 @@ export {
   markerLength, issueMarkerCodes, formatMarker, readMarker, newHandoffId,
 } from "./handoff.js";
 export type { HandoffIssue, ReadMarker, Random } from "./handoff.js";
+// Deciding suggestions on the files (bulk review, the CLI), and the cut writer
+export { applySuggestionDecisions, setCut } from "./suggestions.js";
+export type { SuggestionDecision, DecisionResult, DecisionPlan } from "./suggestions.js";

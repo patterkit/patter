@@ -134,7 +134,7 @@ const layoutOf = (loaded: LoadedProject): { strings: string; authoring: string }
 });
 
 /** Path of the existing (scene, locale) loc shard, or null. */
-function existingLocPath(loaded: LoadedProject, scene: string, locale: string): string | null {
+export function existingLocPath(loaded: LoadedProject, scene: string, locale: string): string | null {
   for (let i = 0; i < loaded.locales.length; i++) {
     const l = loaded.locales[i]!;
     if (l.scene === scene && l.locale === locale) return loaded.localeFiles[i] ?? null;
@@ -160,7 +160,7 @@ function targetLocPath(loaded: LoadedProject, scene: string, locale: string, def
 }
 
 /** The authoring shard path for a scene (mirrors the flow stem), or `_project.patterx` for `@project`. */
-function authoringPath(loaded: LoadedProject, scene: string): string {
+export function authoringPath(loaded: LoadedProject, scene: string): string {
   const dir = join(loaded.root, layoutOf(loaded).authoring);
   if (scene === PROJECT_LOCALE_SCENE) return join(dir, "_project.patterx");
   const flow = loaded.sceneFiles[scene];
