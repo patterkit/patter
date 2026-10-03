@@ -3,8 +3,9 @@
 // every editable line's words in a shaded box, so a script editor outside the Patter world can change
 // them in Word, Google Docs, or OnlyOffice and send the file back.
 //
-// Each editable line (dialogue, narration, a choice option's prompt) is a one-row, three-cell table:
-//   lead cell    the cue and direction, or ◇ for an option (context, styled as the readable script)
+// Each editable line (dialogue, narration, a choice option's prompt) is a one-row table:
+//   lead cell    the cue and direction, or ◇ for an option (context, styled as the readable script);
+//                narration has none, so its words start flush left, apart from the dialogue
 //   text cell    the words, shaded with a hairline edge: the only thing meant to be edited
 //   margin cell  the option tag, the optional writing status, and the marker `[#K7Q2M]`
 // Everything else (headings, conditions, choice labels, jumps, game events, notes) is an ordinary
@@ -182,16 +183,19 @@ function box(el: Editable, code: string, status: string | undefined): Table {
   if (status) margin.push(new TextRun({ text: `${status}  `, font: SANS, smallCaps: true, size: S.tag, color: TOKENS.muted }));
   margin.push(new TextRun({ text: formatMarker(code), font: MONO, size: 14, color: MARKER_INK }));
 
+  // Narration has no speaker, so it has no lead cell: its box takes the cue column too and starts flush
+  // left, where dialogue is indented past its cue (a screenplay's action against its dialogue). An empty
+  // cue column read as the previous speaker carrying on.
+  const narration = el.kind === "narration";
+  const wordsW = narration ? LEAD + textW : textW;
+  const words = cell([new Paragraph({ children: bodyRuns(el.runs, ink) })], wordsW,
+    { shading: { type: ShadingType.CLEAR, fill: BOX_FILL, color: "auto" }, borders: { top: HAIR, bottom: HAIR, left: HAIR, right: HAIR } });
+  const marginCell = cell([new Paragraph({ alignment: AlignmentType.RIGHT, children: margin })], MARGIN);
   return new Table({
     layout: TableLayoutType.FIXED, indent: { size: ind, type: WidthType.DXA }, width: { size: LEAD + textW + MARGIN, type: WidthType.DXA },
-    columnWidths: [LEAD, textW, MARGIN],
+    columnWidths: narration ? [wordsW, MARGIN] : [LEAD, textW, MARGIN],
     borders: { top: NONE, bottom: NONE, left: NONE, right: NONE, insideHorizontal: NONE, insideVertical: NONE },
-    rows: [new TableRow({ cantSplit: true, children: [
-      cell([new Paragraph({ children: lead })], LEAD),
-      cell([new Paragraph({ children: bodyRuns(el.runs, ink) })], textW,
-        { shading: { type: ShadingType.CLEAR, fill: BOX_FILL, color: "auto" }, borders: { top: HAIR, bottom: HAIR, left: HAIR, right: HAIR } }),
-      cell([new Paragraph({ alignment: AlignmentType.RIGHT, children: margin })], MARGIN),
-    ] })],
+    rows: [new TableRow({ cantSplit: true, children: narration ? [words, marginCell] : [cell([new Paragraph({ children: lead })], LEAD), words, marginCell] })],
   });
 }
 
@@ -228,9 +232,12 @@ function jump(el: Extract<ScriptElement, { kind: "jump" }>, linked: boolean): Pa
 function frontPage(loaded: LoadedProject, handoff: HandoffFile, opts: EditableScriptOptions, now: string): Paragraph[] {
   const p = (text: string, o: { bold?: boolean; size?: number; color?: string; before?: number; after?: number } = {}): Paragraph =>
     new Paragraph({ spacing: { before: o.before ?? 0, after: o.after ?? 100 }, children: [new TextRun({ text, font: SERIF, size: o.size ?? 21, bold: o.bold, color: o.color ?? TOKENS.inkRead })] });
-  const item = (lead: string, text: string): Paragraph => new Paragraph({ spacing: { after: 80 }, indent: { left: 360, hanging: 360 }, children: [
-    new TextRun({ text: `${lead}\t`, font: SERIF, size: 21, color: TOKENS.accent }), new TextRun({ text, font: SERIF, size: 21, color: TOKENS.inkRead }),
-  ] });
+  // The lead (a number, or a key's label) is followed by two non-breaking spaces, not a tab: Google Docs drops
+  // tabs on import, even onto a declared tab stop, and ran every label into its text.
+  const item = (lead: string, text: string): Paragraph => new Paragraph({
+    spacing: { after: 80 },
+    children: [new TextRun({ text: `${lead}\u00a0\u00a0`, font: SERIF, size: 21, color: TOKENS.accent }), new TextRun({ text, font: SERIF, size: 21, color: TOKENS.inkRead })],
+  });
   const date = new Date(now).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
   const sentTo = handoff.recipient ? ` for ${handoff.recipient}` : "";
 

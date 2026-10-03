@@ -69,6 +69,12 @@ describe("exportEditableScript", async () => {
     expect(h).toMatchObject({ createdBy: "Ian", recipient: "Sam", createdAt: "2026-10-03T12:00:00Z", options: { notes: "editor", status: false, cast: false } });
   });
 
+  it("gives narration no speaker cell, so it starts flush left apart from the dialogue", () => {
+    const tables = body.split("<w:tbl>").slice(1);
+    const cellsOf = (t: string): number => (t.match(/<w:tc>/g) ?? []).length;
+    editable.forEach((el, i) => expect(cellsOf(tables[i]!), `${el.kind} ${el.id}`).toBe(el.kind === "narration" ? 2 : 3));
+  });
+
   it("separates consecutive boxes with a spacer paragraph, so they stay separate tables in Google Docs", () => {
     expect(body).not.toMatch(/<\/w:tbl>\s*<w:tbl>/);
   });

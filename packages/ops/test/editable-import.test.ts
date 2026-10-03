@@ -129,6 +129,14 @@ describe("planEditableImport: per line (§7.2, §6.1)", () => {
     expect(authoringOf(s.dir).suggestions).toHaveLength(1);
   });
 
+  it("a narration box (no speaker cell) is read and suggested like any other", async () => {
+    const s = await sent();
+    const plan = await bringBack(s, (x) => setCell(x, s.code("T_scene"), 0, p(r("The tavern is dim and loud."))));
+    expect(plan.suggestions).toHaveLength(1);
+    expect(plan.suggestions[0]).toMatchObject({ anchor: "T_scene", proposed: "The tavern is dim and loud." });
+    expect(plan.suggestions[0]!.proposedCharacter).toBeUndefined();
+  });
+
   it("an untracked change is credited to the 'Edits by' name, else the recipient", async () => {
     const s = await sent();
     const edit = (x: string) => setWords(x, s.code("L_greet"), p(r("What'll it be, love?")));
