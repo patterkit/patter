@@ -4,7 +4,8 @@
 // them in Word, Google Docs, or OnlyOffice and send the file back.
 //
 // Each editable line (dialogue, narration, a choice option's prompt) is a one-row table:
-//   lead cell    the cue and direction, or ◇ for an option (context, styled as the readable script);
+//   lead cell    the cue and direction, or ◇ for an option (context, styled as the readable script),
+//                set right so each sits against its box;
 //                narration has none, so its words start flush left, apart from the dialogue
 //   text cell    the words, shaded with a hairline edge: the only thing meant to be edited
 //   margin cell  the option tag, the optional writing status, and the marker `[#K7Q2M]`
@@ -195,7 +196,7 @@ function box(el: Editable, code: string, status: string | undefined): Table {
     layout: TableLayoutType.FIXED, indent: { size: ind, type: WidthType.DXA }, width: { size: LEAD + textW + MARGIN, type: WidthType.DXA },
     columnWidths: narration ? [wordsW, MARGIN] : [LEAD, textW, MARGIN],
     borders: { top: NONE, bottom: NONE, left: NONE, right: NONE, insideHorizontal: NONE, insideVertical: NONE },
-    rows: [new TableRow({ cantSplit: true, children: narration ? [words, marginCell] : [cell([new Paragraph({ children: lead })], LEAD), words, marginCell] })],
+    rows: [new TableRow({ cantSplit: true, children: narration ? [words, marginCell] : [cell([new Paragraph({ alignment: AlignmentType.RIGHT, children: lead })], LEAD), words, marginCell] })],
   });
 }
 
