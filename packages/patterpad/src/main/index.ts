@@ -1207,6 +1207,15 @@ function registerIpc(): void {
   ipcMain.handle("searchWin:byStatus", (_e, status: string, recording: boolean) => project.linesByStatus(status, recording ? "recording" : "writing", searchFocus));
   ipcMain.handle("searchWin:statuses", (_e, recording: boolean) => (recording ? project.recordingStatusLadder() : project.writingStatusLadder()));
   ipcMain.handle("searchWin:jump", (_e, entry: SearchEntry) => { win?.webContents.send("search:navigate", entry); });
+  // Bulk review (the Suggestions tab): the same list + decide as the editor's, and the editor reloads after.
+  ipcMain.handle("searchWin:suggestions", (_e, filter: { handoff?: string }) => project.listSuggestions(filter ?? {}));
+  ipcMain.handle("searchWin:handoffs", () => project.openHandoffs());
+  ipcMain.handle("searchWin:decide", async (_e, decisions: Array<{ id: string; accept: boolean }>) => {
+    await flushEditorScene();
+    const r = await project.decideSuggestions(decisions, authorName());
+    if (r.ok) win?.webContents.send("replace:applied");
+    return r;
+  });
   // Project-wide Replace (the Find counterpart). Preview is read-only; Apply flushes the editor's open scene
   // to disk first (so unsaved edits are included + not clobbered), commits the rewritten shards through VC,
   // then tells the editor to reload its open scene with the new text.

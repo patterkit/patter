@@ -27,6 +27,7 @@ export function modeHint(mode: SearchMode): HTMLElement[] {
     case "tag": return [lead("Pick a tag, then type to filter"), hintBar([MOVE, JUMP])];
     case "property": return [lead("Find where a property is used"), hintBar([MOVE, JUMP])];
     case "replace": return [lead("Replaces dialogue, narration and choice text across every scene. Review, then Replace all.")];
+    case "suggestions": return [lead("Pick a handoff, or All. Click a line to see it; out-of-date suggestions stay open.")];
     default: return [hintBar([MOVE, JUMP, CLOSE]), lead("Drag the bar to move this window")];
   }
 }

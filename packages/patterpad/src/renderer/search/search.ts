@@ -14,8 +14,9 @@ import "@fontsource-variable/inter";
 
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips } from "@wildwinter/app-shell";
-import type { SearchEntry, SearchMode, ReplaceHitDto } from "../../shared/api.js";
+import type { SearchEntry, SearchMode, ReplaceHitDto, OpenSuggestionDto } from "../../shared/api.js";
 import { confirmDialog } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/dialog.css"; // the modal frame the confirm sits on (without it, Replace all's confirm drew unstyled)
 import "@wildwinter/app-shell/confirm.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "@wildwinter/app-shell/tool-window.css"; // ...and the tool-window chrome (drag bar, pin, close)
 import "@wildwinter/app-shell/keys.css"; // ...and the keycaps of the hint line
@@ -35,6 +36,10 @@ const modeStatusBtn = document.getElementById("mode-status") as HTMLButtonElemen
 const modeRecordingBtn = document.getElementById("mode-recording") as HTMLButtonElement;
 const modePropertyBtn = document.getElementById("mode-property") as HTMLButtonElement;
 const modeTagBtn = document.getElementById("mode-tag") as HTMLButtonElement;
+const modeSuggestionsBtn = document.getElementById("mode-suggestions") as HTMLButtonElement;
+const suggRow = document.getElementById("swin-sugg-row")!;
+const suggSummary = document.getElementById("swin-sugg-summary")!;
+const acceptCleanBtn = document.getElementById("swin-accept-clean") as HTMLButtonElement;
 const replaceRow = document.getElementById("swin-replace-row")!;
 const replaceInput = document.getElementById("swin-replace") as HTMLInputElement;
 const replaceAllBtn = document.getElementById("swin-replace-all") as HTMLButtonElement;
@@ -44,7 +49,9 @@ const replaceAllBtn = document.getElementById("swin-replace-all") as HTMLButtonE
 const statusLike = (m: SearchMode): boolean => m === "status" || m === "recording";
 /** Modes that browse via CHIPS + a filter box (writing / recording status, or author tags) rather than a
  *  free-text query. They share the chip rail, the "filter these" input, and the pick-a-chip flow. */
-const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag";
+const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag" || m === "suggestions";
+/** The Suggestions tab's "every handoff" chip (also catches suggestions made by hand in the editor). */
+const ALL = "All";
 // The head is the shell's `toolWindowHead`: the drag bar, the pin, one "Close (Esc)" and Escape
 // closing the window are decided there for every tool window in the family. The mode tabs stand in
 // its title slot. The pin is BUILT, not marked up: it owns its own class, aria-pressed and the
@@ -72,6 +79,8 @@ let activeChip = "";
 let chipHits: SearchEntry[] = [];
 let results: SearchEntry[] = [];
 let replaceHits: ReplaceHitDto[] = []; // the previewed replacements (Replace mode)
+let suggHits: OpenSuggestionDto[] = []; // the open suggestions for the picked chip (Suggestions mode)
+let suggShown: OpenSuggestionDto[] = []; // ...after the box's filter
 let sel = 0;
 let token = 0; // guards against an out-of-order async response overwriting a newer query
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -164,6 +173,11 @@ const loadChip = async (name: string): Promise<void> => {
   activeChip = name;
   renderChips();
   const mine = ++token;
+  if (mode === "suggestions") {
+    const hits = await search.suggestions(name === ALL ? {} : { handoff: name });
+    if (mine !== token) return;
+    suggHits = hits; applyChipFilter(); return;
+  }
   const hits = mode === "tag" ? await search.tagUsage(name) : await search.linesByStatus(name, mode === "recording");
   if (mine !== token) return;
   chipHits = hits; applyChipFilter();
@@ -225,20 +239,106 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
 
 const applyChipFilter = (): void => {
   const q = input.value.trim().toLowerCase();
+  if (mode === "suggestions") {
+    suggShown = q ? suggHits.filter((s) => [s.baseline, s.proposed, s.author, s.sceneName ?? "", s.proposedCharacter ?? ""].some((t) => t.toLowerCase().includes(q))) : suggHits;
+    renderSuggestions(); return;
+  }
   results = q ? chipHits.filter((e) => (e.text ?? e.name ?? e.location.join(" ")).toLowerCase().includes(q)) : chipHits;
   sel = 0; renderResults();
 };
 
+// --- Suggestions mode (bulk review) -------------------------------------------
+
+/** The chips: every open suggestion, then each open handoff's, with counts. */
+const suggestionChips = async (): Promise<Array<{ name: string; count: number }>> => {
+  const [all, handoffs] = await Promise.all([search.suggestions({}), search.handoffs()]);
+  const count = (id: string): number => all.filter((s) => s.handoff === id).length;
+  return [{ name: ALL, count: all.length }, ...handoffs.map((h) => ({ name: h.id, count: count(h.id) })).filter((c) => c.count > 0)];
+};
+
+/** One suggestion as a row: what it changes, where, by whom, and Accept / Reject. Clicking the row (not a
+ *  button) shows the line in the editor. */
+const suggestionRow = (s: OpenSuggestionDto): HTMLElement => {
+  const r = document.createElement("div");
+  r.className = `swin-row swin-rrow swin-srow${s.stale.length ? " stale" : ""}`;
+  const what = document.createElement("span"); what.className = "swin-name swin-swhat";
+  const part = (cls: string, text: string): HTMLSpanElement => { const x = document.createElement("span"); x.className = cls; x.textContent = text; return x; };
+  const arrow = (): HTMLSpanElement => { const a = document.createElement("span"); a.className = "swin-arrow"; a.append(iconNode("arrowRight", 12)); return a; };
+  if (s.proposedCut) what.append(part("swin-slabel", "Cut"), part("swin-before swin-cut", s.baseline));
+  else if (s.proposed !== s.baseline) what.append(part("swin-before", s.baseline), arrow(), part("swin-after", s.proposed));
+  if (s.proposedCharacter !== undefined) what.append(part("swin-slabel", "Speaker"), part("swin-before", s.baselineCharacter || "(none)"), arrow(), part("swin-after", s.proposedCharacter));
+  if (s.proposedDirection !== undefined) what.append(part("swin-slabel", "Direction"), part("swin-before", s.baselineDirection || "(none)"), arrow(), part("swin-after", s.proposedDirection || "(none)"));
+  const meta = document.createElement("span"); meta.className = "swin-loc";
+  meta.append(locationCrumbs(s.sceneName ? [s.sceneName] : []), part("swin-sauthor", s.author));
+  if (s.stale.length) { const st = part("swin-stale", "Out of date"); st.dataset.tip = `${s.stale.join(" and ")} changed since this was suggested`; meta.append(st); }
+  const accept = document.createElement("button"); accept.type = "button"; accept.className = "swin-rone"; accept.textContent = "Accept";
+  accept.disabled = s.stale.length > 0;
+  if (accept.disabled) accept.dataset.tip = "Out of date: open the line and review it there";
+  const reject = document.createElement("button"); reject.type = "button"; reject.className = "swin-rone"; reject.textContent = "Reject";
+  accept.addEventListener("click", (ev) => { ev.stopPropagation(); void decide([{ id: s.id, accept: true }]); });
+  reject.addEventListener("click", (ev) => { ev.stopPropagation(); void decide([{ id: s.id, accept: false }]); });
+  r.append(what, meta, accept, reject);
+  r.addEventListener("click", () => {
+    if (!s.sceneId) return;
+    search.jump({ id: s.anchor, kind: "beat", location: s.sceneName ? [s.sceneName] : [], sceneId: s.sceneId });
+  });
+  return r;
+};
+
+const renderSuggestions = (): void => {
+  resultsEl.replaceChildren();
+  const clean = suggShown.filter((s) => !s.stale.length).length;
+  acceptCleanBtn.textContent = clean ? `Accept all clean (${clean})` : "Accept all clean";
+  acceptCleanBtn.disabled = clean === 0;
+  const stale = suggShown.length - clean;
+  suggSummary.textContent = suggShown.length ? `${plural(suggShown.length, "open suggestion")}${stale ? `, ${stale} out of date` : ""}` : "";
+  if (!suggShown.length) {
+    const empty = document.createElement("div"); empty.className = "swin-empty";
+    empty.textContent = input.value.trim() ? "No matches." : "No open suggestions.";
+    resultsEl.append(empty); return;
+  }
+  for (const sg of suggShown) resultsEl.append(suggestionRow(sg));
+};
+
+/** Accept or reject on the files, then refresh the chips and the list. */
+const decide = async (decisions: Array<{ id: string; accept: boolean }>): Promise<void> => {
+  const res = await search.decideSuggestions(decisions);
+  if (!res.ok) { toast(res.error ? `Couldn't apply: ${res.error}` : "Couldn't apply", "error"); return; }
+  const refused = (res.results ?? []).filter((r) => r.outcome === "stale" || r.outcome === "missing");
+  if (refused.length) toast(`${plural(refused.length, "suggestion")} not applied: ${refused[0]!.reason ?? "out of date"}`, "error");
+  chips = await suggestionChips();
+  if (!chips.some((c) => c.name === activeChip)) activeChip = ALL;
+  renderChips();
+  await loadChip(activeChip);
+};
+
+/** Accept every suggestion shown that still applies cleanly, after a count. */
+const acceptAllClean = async (): Promise<void> => {
+  const clean = suggShown.filter((s) => !s.stale.length);
+  if (!clean.length) return;
+  const stale = suggShown.length - clean.length;
+  const ok = await confirmDialog({
+    title: `Accept ${plural(clean.length, "suggestion")}?`,
+    body: `Every suggestion shown that still applies cleanly.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""}`,
+    confirmLabel: "Accept",
+  });
+  if (!ok) return;
+  await decide(clean.map((s) => ({ id: s.id, accept: true })));
+};
+acceptCleanBtn.addEventListener("click", () => void acceptAllClean());
+
 // --- mode switching ----------------------------------------------------------
 async function setMode(next: SearchMode): Promise<void> {
   mode = next;
-  for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeTagBtn, "tag"]] as const) {
+  for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeTagBtn, "tag"], [modeSuggestionsBtn, "suggestions"]] as const) {
     btn.classList.toggle("on", mode === m);
     btn.setAttribute("aria-selected", String(mode === m));
   }
   chipsEl.hidden = !chipMode(mode);
   replaceRow.hidden = mode !== "replace"; // the replacement field + Replace-all button
-  input.placeholder = mode === "tag" ? "Filter tagged nodes…"
+  suggRow.hidden = mode !== "suggestions"; // the summary + Accept all clean
+  input.placeholder = mode === "suggestions" ? "Filter suggestions…"
+    : mode === "tag" ? "Filter tagged nodes…"
     : statusLike(mode) ? "Filter these lines…"
     : mode === "property" ? "Property usage… (@gold, world.threat, faction rebels)"
     : mode === "replace" ? "Find text to replace…"
@@ -247,7 +347,7 @@ async function setMode(next: SearchMode): Promise<void> {
   results = []; replaceHits = []; sel = 0; renderResults();
   if (chipMode(mode)) {
     input.value = ""; // a chip mode's box is a post-filter; start empty so the full list for the picked chip shows
-    chips = mode === "tag" ? await search.tags() : await search.statuses(mode === "recording");
+    chips = mode === "suggestions" ? await suggestionChips() : mode === "tag" ? await search.tags() : await search.statuses(mode === "recording");
     if (!chips.length) {
       activeChip = ""; renderChips();
       resultsEl.replaceChildren();
@@ -292,7 +392,7 @@ window.addEventListener("focus", () => { if (hasProject) { if (chipMode(mode) &&
 
 document.addEventListener("keydown", (e) => {
   // Escape is the shell head's, from the box as well as outside it.
-  if (mode === "replace") { /* no list navigation in Replace mode (rows have their own buttons) */ }
+  if (mode === "replace" || mode === "suggestions") { /* no list navigation: the rows have their own buttons */ }
   else if (e.key === "ArrowDown") { e.preventDefault(); setSel(sel + 1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); setSel(sel - 1); }
   else if (e.key === "Enter") { e.preventDefault(); const e2 = results[sel]; if (e2) choose(e2); }
@@ -304,6 +404,7 @@ modeStatusBtn.addEventListener("click", () => void setMode("status"));
 modeRecordingBtn.addEventListener("click", () => void setMode("recording"));
 modePropertyBtn.addEventListener("click", () => void setMode("property"));
 modeTagBtn.addEventListener("click", () => void setMode("tag"));
+modeSuggestionsBtn.addEventListener("click", () => void setMode("suggestions"));
 
 
 // The Recording tab is voiced-only (#206): hide it for a text-only project, and never leave the window

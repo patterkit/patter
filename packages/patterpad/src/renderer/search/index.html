@@ -15,6 +15,7 @@
       <button id="mode-recording" class="seg-opt" type="button" role="tab">Recording</button>
       <button id="mode-property" class="seg-opt" type="button" role="tab">Property</button>
       <button id="mode-tag" class="seg-opt" type="button" role="tab">Tags</button>
+      <button id="mode-suggestions" class="seg-opt" type="button" role="tab">Suggestions</button>
     </div>
     <input id="swin-input" class="swin-input" type="text" spellcheck="false" />
     <!-- Replace mode only: the replacement text + the bulk apply button. -->
@@ -23,6 +24,11 @@
       <button id="swin-replace-all" class="swin-replace-all" type="button">Replace all</button>
     </div>
     <div id="swin-chips" class="swin-chips" hidden></div>
+    <!-- Suggestions mode only: accept every suggestion shown that still applies cleanly. -->
+    <div id="swin-sugg-row" class="swin-replace-row swin-sugg-row" hidden>
+      <span id="swin-sugg-summary" class="swin-sugg-summary"></span>
+      <button id="swin-accept-clean" class="swin-replace-all" type="button">Accept all clean</button>
+    </div>
     <div id="swin-results" class="swin-results"></div>
     <div id="swin-hint" class="swin-hint"></div>
     <script type="module" src="./search.ts"></script>

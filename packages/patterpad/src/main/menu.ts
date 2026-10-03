@@ -187,6 +187,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { ...REVIEW_MENU.findPropertyUsage, click: () => send("find-property") },
         // Browse every node carrying an author tag (#215) - the search palette in tag mode.
         { label: "Find by Tag…", click: () => send("find-by-tag") },
+        // Every open suggestion across the script (an editor's returned file lands here): the search
+        // palette's Suggestions tab, with Accept / Reject per line and Accept all clean.
+        { label: "Review Suggestions…", enabled: spelling?.hasProject ?? false, click: () => send("review-suggestions") },
         {
           // Which writing-status rungs show their per-beat gutter pill. Per-rung check/uncheck, plus
           // Show All / Show None; remembered in panes.lineStatusShown (default none). Empty when no

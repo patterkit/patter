@@ -113,3 +113,19 @@ body.swin {
 /* The hint line: a lead phrase and the shell's hint bar (keys.css), side by side, nothing typed between. */
 .swin-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; border-top: 1px solid var(--line); padding: 4px 9px; color: var(--muted); font: 11.5px var(--font-ui); background: var(--surface); }
 .swin-hint:empty { display: none; }
+
+/* Suggestions tab (bulk review): a row is what changes (text, speaker, direction, or a cut), where and by
+   whom, then Accept / Reject. Two buttons, so the grid gains a column; the row itself goes to the line. */
+.swin-sugg-row { justify-content: flex-end; }
+.swin-sugg-summary { flex: 1 1 auto; color: var(--muted); font: 12.5px var(--font-ui); }
+.swin-srow { grid-template-columns: minmax(0, 1fr) auto auto; cursor: pointer; }
+.swin-srow .swin-rone { grid-row: 1 / span 2; align-self: center; }
+.swin-srow .swin-rone:nth-of-type(1) { grid-column: 2; }
+.swin-srow .swin-rone:nth-of-type(2) { grid-column: 3; }
+.swin-srow .swin-rone:disabled { opacity: 0.45; cursor: default; border-color: var(--line); color: var(--muted); }
+.swin-slabel { margin-right: 5.5px; color: var(--muted); font: 600 11.5px var(--font-ui); }
+.swin-slabel:not(:first-child) { margin-left: 9.5px; }
+.swin-cut { text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--danger) 70%, transparent); }
+.swin-sauthor { margin-left: 8px; color: var(--muted); }
+.swin-stale { margin-left: 8px; padding: 0 6px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--warn) 18%, transparent); color: var(--ink); font: 600 11px var(--font-ui); }
+.swin-srow.stale .swin-after { color: var(--ink-soft); }

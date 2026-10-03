@@ -41,12 +41,14 @@ describe("the search window's hint line", () => {
     expect(typed(h)).not.toMatch(TYPED);
   });
   it("every mode is free of typed notation, and replace mode is a sentence with no keys", () => {
-    for (const mode of ["content", "replace", "status", "recording", "property", "tag"] as const) {
+    for (const mode of ["content", "replace", "status", "recording", "property", "tag", "suggestions"] as const) {
       const h = host(...modeHint(mode));
       expect(typed(h), mode).not.toMatch(TYPED);
       expect(h.textContent, mode).not.toContain(" / ");
     }
     expect(host(...modeHint("replace")).querySelector(".shell-hintbar")).toBeNull();
+    // The Suggestions tab is a sentence too: its rows have their own buttons, no keys drive it.
+    expect(host(...modeHint("suggestions")).querySelector(".shell-hintbar")).toBeNull();
   });
 });
 

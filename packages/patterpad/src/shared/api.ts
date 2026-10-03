@@ -596,7 +596,7 @@ export interface PatterPlayApi {
 
 /** The faces of the search tool window (#205): find by text / id, replace, browse by writing / recording
  *  status, find property usage, or browse by author tag (#215). */
-export type SearchMode = "content" | "replace" | "status" | "recording" | "property" | "tag";
+export type SearchMode = "content" | "replace" | "status" | "recording" | "property" | "tag" | "suggestions";
 
 /** Audio Folders index entry (#206): a dialogue beat's folder-derived recording status + the absolute path
  *  to the audio file that resolved it, plus (for scratch takes, #224) the text-hash stamped in the WAV so
@@ -638,6 +638,13 @@ export interface PatterSearchApi {
   replaceApply(opts: ReplaceQuery): Promise<{ ok: boolean; error?: string; count: number; scenes: number }>;
   /** The status ladder (name + palette colour) for the chips - recording-status when `recording`, else writing. */
   statuses(recording: boolean): Promise<Array<{ name: string; colour?: number }>>;
+  /** Open suggestions across the project (optionally one handoff's), each marked clean or out of date. */
+  suggestions(filter: { handoff?: string }): Promise<OpenSuggestionDto[]>;
+  /** The open handoffs, newest first (the Suggestions tab's chips). */
+  handoffs(): Promise<Array<{ id: string; recipient?: string; createdAt: string; createdBy: string }>>;
+  /** Accept or reject suggestions on the files, all or nothing: flushes the open scene first and reloads
+   *  the editor after. */
+  decideSuggestions(decisions: Array<{ id: string; accept: boolean }>): Promise<SaveResult & { results?: Array<{ id: string; outcome: string; reason?: string }> }>;
   /** Jump the editor window to a hit (the search window stays open + on top so you can keep exploring). */
   jump(entry: SearchEntry): void;
   /** Toggle this window's always-on-top pin (remembered). */

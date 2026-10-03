@@ -2982,6 +2982,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "share-scopes") void shareScopes();
   else if (cmd === "find") openSearch();
   else if (cmd === "replace") openSearch("replace");
+  else if (cmd === "review-suggestions") { if (project) void window.patter.openSearchWindow("suggestions"); }
   else if (cmd === "play") void play();
   else if (cmd === "play-from-start") void playFromStart();
   else if (cmd === "select-all") selectAllCommand();
