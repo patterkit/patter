@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.12.1
+
+### Patch Changes
+
+- 1224219: The same contents as 0.12.0 (the editable script round trip), whose publish to npm didn't complete.
+
 ## 0.12.0
 
 ### Minor Changes
