@@ -10,16 +10,19 @@
 // Consolas only arrive with Office). Structure is carried by colour, case, indent and space (this is paper,
 // not the editor UI). Word can't draw the PDF's per-snippet edge cheaply, so a snippet's rows are delimited
 // by a wider space BEFORE each snippet's first line, tight within - each beat is its own paragraph either way.
+//
+// The faces, sizes, and paragraph builder are exported for the editable script (editable-docx.ts), which
+// is this document with its editable lines boxed, so the two read alike.
 // ---------------------------------------------------------------------------
 
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun } from "docx";
 import { TOKENS, characterColour, textRuns, type ScriptDoc, type ScriptElement, type TextRun as Run } from "./script-doc.js";
 
-const SERIF = "Georgia";     // reading: dialogue, narration, headings
-const SANS = "Arial";        // chrome: character cues, group labels, option tags
-const MONO = "Courier New";  // machine text: conditions, {@property} values, game events
+export const SERIF = "Georgia";     // reading: dialogue, narration, headings
+export const SANS = "Arial";        // chrome: character cues, group labels, option tags
+export const MONO = "Courier New";  // machine text: conditions, {@property} values, game events
 
-const STEP = 360;            // twips (~0.25") per structural nesting level
+export const STEP = 360;            // twips (~0.25") per structural nesting level
 const SNIPPET_INSET = 220;   // twips a snippet's rows inset under their selector label
 const DIALOGUE_INDENT = 300; // twips a spoken line insets from prose (its cue column)
 const HANG = 340;            // twips the cue / option marker out-dents (hanging indent)
@@ -27,21 +30,21 @@ const RIGHT_TAB = 9020;      // twips - the usable text width (A4, default margi
 const SNIP_GAP = 170;        // twips before a snippet's FIRST row (delimits snippets); tight within
 const WITHIN = 30;           // twips before a within-snippet row
 
-const S = { h1: 32, h2: 26, body: 22, cue: 18, label: 16, tag: 15, mech: 18 }; // half-points
+export const S = { h1: 32, h2: 26, body: 22, cue: 18, label: 16, tag: 15, mech: 18 }; // half-points
 
 /** Body runs (dialogue / narration / option) as Word runs. `color` sets the prose ink; `{@property}` runs
  *  switch to accent mono; `<b>/<i>/<bi>` markup rides each run. `base` forces bold/italic over the whole. */
-function bodyRuns(runs: Run[], color: string, base: { bold?: boolean; italic?: boolean } = {}): TextRun[] {
+export function bodyRuns(runs: Run[], color: string, base: { bold?: boolean; italic?: boolean } = {}): TextRun[] {
   return runs.map((r) => r.code
     ? new TextRun({ text: r.text, font: MONO, color: TOKENS.accent, size: S.body - 2 })
     : new TextRun({ text: r.text, font: SERIF, color, size: S.body, bold: base.bold || r.bold || undefined, italics: base.italic || r.italic || undefined }));
 }
 
 /** Left indent (twips) for an element: its nesting depth, plus a small inset for a snippet's rows. */
-const leftOf = (el: ScriptElement): number => ("indent" in el ? el.indent * STEP : 0) + ("snippet" in el && el.snippet !== undefined ? SNIPPET_INSET : 0);
+export const leftOf = (el: ScriptElement): number => ("indent" in el ? el.indent * STEP : 0) + ("snippet" in el && el.snippet !== undefined ? SNIPPET_INSET : 0);
 
 /** One ScriptElement -> one Word paragraph. `prev` sets the space before: a wider gap starts a new snippet. */
-function paragraph(el: ScriptElement, prev: ScriptElement | undefined): Paragraph {
+export function paragraph(el: ScriptElement, prev: ScriptElement | undefined): Paragraph {
   const sid = "snippet" in el ? el.snippet : undefined;
   const startsSnippet = sid !== undefined && (!prev || !("snippet" in prev) || prev.snippet !== sid);
   const before = sid !== undefined ? (startsSnippet ? SNIP_GAP : WITHIN) : 100; // snippet rows vs top-level beats
