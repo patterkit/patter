@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig, configDefaults } from "vitest/config";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
@@ -32,6 +32,9 @@ export default defineConfig({
     },
   },
   test: {
+    // A session's git worktree under `.claude/worktrees/` is a whole second checkout, often at an older
+    // commit: collecting its tests ran every suite twice and failed on code main no longer has.
+    exclude: [...configDefaults.exclude, ".claude/**"],
     server: {
       deps: {
         // The updater lives in @wildwinter/app-shell now, and its watchdog test
