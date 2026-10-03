@@ -89,6 +89,7 @@ const stub = {
   forget: async () => ({ open: null, recents, identity }),
   readScene: async () => ({
     flowSource, locSource, sceneName: "The Tavern",
+    hostScopes: ["world"], // the project's host-scope tokens (ReadSceneResult.hostScopes)
     properties: [
       { scope: "patter", name: "gold", type: "number" },
       { scope: "patter", name: "met_anna", type: "boolean" },
