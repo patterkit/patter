@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-03
+
 ### Added
 
 - **Send the script to an editor who doesn't use Patter, and bring their changes back.**
