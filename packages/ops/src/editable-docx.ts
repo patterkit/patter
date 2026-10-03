@@ -243,8 +243,7 @@ function frontPage(loaded: LoadedProject, handoff: HandoffFile, opts: EditableSc
     item("1.", "Change the words inside the shaded boxes. That's all that can be edited."),
     item("2.", "Don't delete, copy, or move the boxes, or change the grey markers like [#K7Q2M] beside them. If you want a line cut, delete its words but leave the box, or leave a comment."),
     item("3.", "Everything outside the boxes (scene and block headings, speaker names, conditions, choices, jumps, and game events) is there to show you how the story flows. Comment on it rather than editing it."),
-    item("4.", "Please turn on Track Changes (Word) or Suggesting mode (Google Docs). Apple Pages can't track changes inside these boxes; if you use Pages, edit as normal, or use Google Docs or OnlyOffice (both free) to track your changes."),
-    item("5.", "Use comments freely. You can also type a note inside a box like [[this]]."),
+    item("4.", "Use comments freely. You can also type a note inside a box like [[this]]."),
 
     p("How to read the structure", { bold: true, size: 24, color: TOKENS.ink, before: 280, after: 120 }),
     item("CHOOSE", "The player picks one of the options marked ◇."),
