@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-03
+
 ### Added
 
 - **Scene and block gameData you can read at runtime.** `engine.game_data_for_scene(scene_ref)` and

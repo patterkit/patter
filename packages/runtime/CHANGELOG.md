@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-03
+
 ### Added
 
 - **Scene and block gameData you can read at runtime.** The bundle always carried a scene's and a
