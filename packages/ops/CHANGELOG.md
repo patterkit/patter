@@ -1,5 +1,32 @@
 # @patterkit/ops
 
+## 0.12.0
+
+### Minor Changes
+
+- 70727ec: `exportEditableScript` writes the editable script: the readable script with every editable line's words in a shaded box beside a `[#K7Q2M]` marker, a front page explaining how to edit it and read its structure, and the handoff id in the page header, plus the handoff record to commit. It opens and edits in Word, Google Docs, OnlyOffice, and Pages.
+- e7b78e9: Editable script handoff records, the file side. `handoffs/<id>.json` records are read (`readHandoffs`, `readHandoff`) and written (`handoffWrite`), with the markers that tie a returned document's lines back to them (`issueMarkerCodes`, `formatMarker`, `readMarker`: Crockford base32 with a check character, read leniently). A `.patterpack` now carries the project's open handoff records; unpacking writes them, and a merge-unpack adds the other side's reimports to a record the project already has.
+- ed6e4ec: `planEditableImport` brings a returned editable script back as Suggestions and Comments, checked against the handoff record: changed lines become suggestions credited to their tracked-change authors (a cut when a box was emptied, a speaker or direction change from the cue cell), the editor's comments and inline `[[notes]]` become comment threads on their line or node, and anything that can't be a suggestion (changed `{@…}` placeholders, a copied box, text typed outside the boxes, an edited context row) becomes a comment quoting the editor's words. Damaged markers are matched by position, moved lines are noted, a file with over a quarter of its lines missing is refused, a re-import replaces the handoff's still-open suggestions, and `direct` accepts the clean ones on the way in. Pure: it returns the writes and a report.
+- 8a8f4bd: `readEditableDocx` reads a returned editable script: every box by its marker (recovered from a tracked deletion if need be), each box's words with tracked changes both accepted and rejected (so a tracked edit is told from an untracked one, and every change keeps its author), bold and italic as markup, the comments with their authors and replies, and the handoff id from the page header. Boxes are still found when a tool has merged neighbouring tables. Adds `@xmldom/xmldom` as a dependency.
+- 3f0fd1c: `listOpenSuggestions` lists a project's open suggestions (optionally from one handoff), each with the parts that have changed since it was made, so a review can tell clean ones from out-of-date ones; `staleParts` is the same rule for one suggestion.
+- 20c4fca: `runScriptDoc` elements now carry the id of the scene, block, node, or beat they show (an option also its node, a jump its target), and the function takes options: `scenes` to export a range, and `notes` to include documentation notes for a channel, or all classed notes. The readable script asks for neither, so its output is unchanged.
+- 48a9a9e: `applySuggestionDecisions` accepts or rejects suggestions on the project's files, for reviewing many at once: an accept applies every part a suggestion carries (text, speaker, direction, cut) and stamps the line's edit time so its translations read as stale, and a suggestion whose text or speaker changed since it was made is refused as stale rather than applied over the newer work. `setCut` marks nodes or beats cut, or brings them back.
+
+### Patch Changes
+
+- 94903d5: In the editable script, speaker names and option marks sit right-aligned, against the box they belong to.
+- 29de2d9: The editable script's front page no longer asks the editor to turn on Track Changes: edits come back either way, since each line is compared with what was sent. Tracked changes still credit each change to its author.
+- 2284691: In the editable script, a narration line's box has no speaker cell, so it starts flush left and reads apart from dialogue rather than as the previous speaker carrying on. The front page's numbered rules and structure key no longer run each label into its text in Google Docs.
+- da2fa9d: Reading a returned editable script no longer reports "formatting was dropped" for the script's own colours and box fill, which Google Docs copies onto every run when it saves a document; a colour, highlight, or underline the editor added is still noticed.
+- fcdf695: Reimporting an editable script saved from Pages no longer reports dropped formatting on every line: the underline colour Pages writes on each run, with no underline, isn't counted.
+- 5cc052b: The inlined playable-runtime snapshot is refreshed for the scene and block gameData reads
+  (`gameDataForScene`, `gameDataForBlock`), so a playable HTML export ships a runtime that has them.
+- bc4e31e: The readable script (.docx) now sets its labels and cues in Arial and its conditions, properties and game events in Courier New, in place of Calibri and Consolas. All three of its fonts (with Georgia) ship with macOS and Windows and are offered by Google Docs and Word for the web, so Pages no longer warns about missing fonts.
+- Updated dependencies [6da8b0c]
+  - @patterkit/model@0.8.0
+  - @patterkit/compiler@0.4.4
+  - @patterkit/core@0.3.1
+
 ## 0.11.0
 
 ### Minor Changes

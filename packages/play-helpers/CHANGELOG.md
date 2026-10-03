@@ -1,5 +1,12 @@
 # @patterkit/play-helpers
 
+## 0.7.5
+
+### Patch Changes
+
+- Updated dependencies [6da8b0c]
+  - @patterkit/model@0.8.0
+
 ## 0.7.4
 
 ### Patch Changes

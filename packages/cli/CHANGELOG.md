@@ -1,5 +1,30 @@
 # @patterkit/cli
 
+## 0.7.0
+
+### Minor Changes
+
+- 3f0fd1c: Three commands for the editable script handoff. `patter export-editable` writes a `.docx` an editor outside Patter can change (with `--scene` repeatable, `--recipient`, `--status`, `--cast`, and `--all-notes`) and its handoff record. `patter import-editable` brings the file back as suggestions and comments, with `--dry-run`, `--direct` to accept clean changes, `--as` to credit untracked edits, and `--strict-quotes`; under lock-based version control it writes everything or nothing. `patter suggestions` lists open suggestions, clean or out of date, and `--accept-clean` accepts the clean ones.
+
+### Patch Changes
+
+- Updated dependencies [94903d5]
+- Updated dependencies [29de2d9]
+- Updated dependencies [2284691]
+- Updated dependencies [da2fa9d]
+- Updated dependencies [fcdf695]
+- Updated dependencies [70727ec]
+- Updated dependencies [e7b78e9]
+- Updated dependencies [ed6e4ec]
+- Updated dependencies [8a8f4bd]
+- Updated dependencies [3f0fd1c]
+- Updated dependencies [5cc052b]
+- Updated dependencies [20c4fca]
+- Updated dependencies [bc4e31e]
+- Updated dependencies [48a9a9e]
+  - @patterkit/ops@0.12.0
+  - @patterkit/core@0.3.1
+
 ## 0.6.0
 
 ### Minor Changes
