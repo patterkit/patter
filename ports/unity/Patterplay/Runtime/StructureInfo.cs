@@ -41,6 +41,7 @@ namespace Patterkit.Patterplay
         public string Id;
         public string GameId;
         public string Name;
+        public GameData GameData;      // the node's own author overrides (raw, not merged with defaults); null when empty
         public List<string> Tags;
         public List<OutlineNode> Children = new List<OutlineNode>();
     }
@@ -50,6 +51,7 @@ namespace Patterkit.Patterplay
         public string Id;
         public string GameId;
         public string Name;
+        public GameData GameData;      // the node's own author overrides (raw, not merged with defaults); null when empty
         public List<string> Tags;
         public List<OutlineBlock> Blocks = new List<OutlineBlock>();
     }

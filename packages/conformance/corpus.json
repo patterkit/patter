@@ -8880,6 +8880,294 @@
       ]
     },
     {
+      "name": "gameData: scene and block overrides read by address, raw and uninherited",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1iou3v8",
+          "structureHash": "02p1qhw"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "gameDataFields": {
+          "scene": [
+            {
+              "name": "music",
+              "type": "text",
+              "default": "calm"
+            },
+            {
+              "name": "chapter",
+              "type": "number",
+              "default": 1
+            }
+          ],
+          "block": [
+            {
+              "name": "lit",
+              "type": "boolean",
+              "default": true
+            }
+          ]
+        },
+        "scenes": {
+          "scn_tavern": {
+            "id": "scn_tavern",
+            "type": "scene",
+            "name": "Tavern",
+            "gameData": {
+              "music": "jig",
+              "chapter": 2,
+              "weather": "rain"
+            },
+            "blocks": [
+              {
+                "id": "b_cellar",
+                "type": "block",
+                "name": "Cellar",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "b_loft"
+                    }
+                  }
+                ],
+                "gameData": {
+                  "lit": false
+                }
+              },
+              {
+                "id": "b_yard",
+                "type": "block",
+                "name": "Yard",
+                "children": [
+                  {
+                    "id": "sn2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_loft",
+                "type": "block",
+                "name": "Hay Loft",
+                "children": [
+                  {
+                    "id": "sn3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ],
+                "gameData": {
+                  "lit": true,
+                  "volume": 0.5
+                }
+              }
+            ]
+          },
+          "scn_quiet": {
+            "id": "scn_quiet",
+            "type": "scene",
+            "name": "Quiet",
+            "blocks": [
+              {
+                "id": "b_only",
+                "type": "block",
+                "name": "Only",
+                "children": [
+                  {
+                    "id": "sn4",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T4",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "Damp stone.",
+            "T2": "Mud.",
+            "T3": "Straw.",
+            "T4": "Snow falls."
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "expectGameData",
+          "scene": "scn_tavern",
+          "expectResult": {
+            "music": "jig",
+            "chapter": 2,
+            "weather": "rain"
+          }
+        },
+        {
+          "op": "expectGameData",
+          "scene": "tavern",
+          "expectResult": {
+            "music": "jig",
+            "chapter": 2,
+            "weather": "rain"
+          }
+        },
+        {
+          "op": "expectGameData",
+          "scene": "scn_tavern",
+          "block": "b_cellar",
+          "expectResult": {
+            "lit": false
+          }
+        },
+        {
+          "op": "expectGameData",
+          "scene": "tavern",
+          "block": "cellar",
+          "expectResult": {
+            "lit": false
+          }
+        },
+        {
+          "op": "expectGameData",
+          "scene": "tavern",
+          "block": "hay-loft",
+          "expectResult": {
+            "lit": true,
+            "volume": 0.5
+          }
+        },
+        {
+          "op": "expectGameData",
+          "scene": "scn_tavern",
+          "block": "b_yard",
+          "expectResult": {}
+        },
+        {
+          "op": "expectGameData",
+          "scene": "quiet",
+          "expectResult": {}
+        },
+        {
+          "op": "expectGameData",
+          "scene": "quiet",
+          "block": "only",
+          "expectResult": {}
+        },
+        {
+          "op": "expectGameData",
+          "scene": "no-such-scene",
+          "expectResult": {}
+        },
+        {
+          "op": "expectGameData",
+          "scene": "scn_tavern",
+          "block": "no-such-block",
+          "expectResult": {}
+        },
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "tavern",
+          "block": "cellar"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "Damp stone."
+            }
+          ]
+        },
+        {
+          "op": "expectGameData",
+          "scene": "tavern",
+          "block": "cellar",
+          "expectResult": {
+            "lit": false
+          }
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "Straw."
+            }
+          ]
+        },
+        {
+          "op": "expectGameData",
+          "scene": "tavern",
+          "expectResult": {
+            "music": "jig",
+            "chapter": 2,
+            "weather": "rain"
+          }
+        },
+        {
+          "op": "expectGameData",
+          "scene": "tavern",
+          "block": "hay-loft",
+          "expectResult": {
+            "lit": true,
+            "volume": 0.5
+          }
+        }
+      ]
+    },
+    {
       "name": "quality: a stage inserted mid-production shifts nothing (save by name)",
       "bundle": {
         "schema": "patter/bundle@0",

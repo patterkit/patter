@@ -117,6 +117,12 @@ export type ScriptOp =
   // may be internal ids or gameId addresses. Spelled `expectResult`, like `goto`'s, because a runner
   // reads a bare `expect` as a TRANSCRIPT - this is a return value asserted directly instead.
   | { op: "expectCast"; scene?: string; block?: string; expectResult: string[] }
+  // Scene / block gameData: a STATIC read of the author's own overrides, so like `expectCast` it reads the
+  // same at any point and produces no transcript. `scene` alone = `gameDataForScene`, `scene` + `block` =
+  // `gameDataForBlock`. `expectResult` pins the RAW sparse overrides (the same rule as a beat's step):
+  // never merged with the project's declared defaults, never inherited from the scene by its blocks, and
+  // `{}` for a node with none or a ref that does not resolve. Key order is not part of the contract.
+  | { op: "expectGameData"; scene: string; block?: string; expectResult: GameData }
   | { op: "reset" };
 
 /** A compiled scripted case in the portable corpus. */

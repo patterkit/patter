@@ -26,6 +26,8 @@ Both hang off the engine (build one from your bundle, then call these, no flow n
 Each beat carries the same data a played step would: `id`, `kind` (line / text / gameEvent),
 `character` + resolved `characterName`, `direction`, the **source `text`** (un-interpolated), the
 author `gameData` overrides, and accumulated `tags`. Text and names are read at the source locale.
+Each outline scene and block carries its `id`, `gameId` address, `name`, its own author `gameData`
+overrides (left out when empty), and its `tags`.
 
 ## Per engine
 
@@ -124,7 +126,8 @@ through the active locale and follows [`setLocale`](/play/localisation/), which 
 
 These reads are read-only and static, so they reflect the compiled bundle, not a running flow.
 `gameData` is the author's raw overrides (the same the step carries); merge with your defaults if
-you want the full set.
+you want the full set. To read one scene's or block's without walking the outline, use
+[`gameDataForScene` / `gameDataForBlock`](/play/integration/#scene-and-block-game-data).
 
 Text comes from the source locale. `text` and `characterName` come from the source language, and an
 IDs-only bundle has no embedded text, so `text` is empty.

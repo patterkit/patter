@@ -18,7 +18,7 @@ operations you reach for most (see your engine's [guide](/play/overview/) for th
 | Advance the flow | `flow.advance()` | `flow.Advance()` | `Flow->Advance()` | `flow.advance()` |
 | Read a step's Game Data | `step.gameData` | `step.GameData` | `Step.GameData` | `step.get("gameData")` |
 | Get / set a property | `flow.getProperty` / `setProperty` | `flow.GetProperty` / `SetProperty` | `Engine->GetPropertyNumber` / `SetPropertyNumber` | `flow.get_property` / `set_property` |
-| Switch language live | `engine.setLocale("fr")` | `engine.SetLocale("fr")` | `Engine->Raw().setLocale("fr")` | `engine.set_locale("fr")` |
+| Switch language live | `engine.setLocale("fr")` | `engine.SetLocale("fr")` | `Engine->Raw()->setLocale("fr")` | `engine.set_locale("fr")` |
 
 Save/load differs per engine (see each engine guide's *Save and load*).
 
@@ -117,9 +117,9 @@ with an error that names who got there first. Rebuilding an engine on an edited 
 
 ## Reading Game Data
 
-In practice you read one field: **`step.gameData`** off each beat as it plays. The runtime has
-already merged the node's overrides onto the schema defaults, so it's a plain object of resolved
-values:
+In practice you read one field: **`step.gameData`** off each beat as it plays. It holds the
+author's **overrides** for that beat, exactly as stored: only the values set on the node, not the
+field defaults (it's absent when the beat sets none):
 
 ```ts
 if (step.type === "line" && step.gameData?.portrait) showPortrait(step.gameData.portrait);
@@ -129,16 +129,47 @@ The native ports carry the same field on their step: `step.GameData` (Unity), `S
 (Unreal, an array of name/type/value entries at the Blueprint boundary), `step.get("gameData")`
 (Godot).
 
-For tooling or an out-of-band lookup (a node you have but aren't currently playing), the
-bundle-walking helpers (also on the `window.Patterplay` drop-in) resolve values directly:
+When you want the defaults filled in, resolve the overrides against the project's field schema with
+the helpers (also on the `window.Patterplay` drop-in). They work on any node's overrides, whether
+from a step, the accessors below, or a node you are not currently playing:
 
 ```ts
 import { gameDataFields, gameDataValue, effectiveGameData } from "@patterkit/runtime";
 
 const fields = gameDataFields(bundle, "line");
-gameDataValue(fields, node, "portrait");   // this node's value, or the field default
-effectiveGameData(fields, node);           // every field resolved into one object
+gameDataValue(fields, step.gameData, "portrait"); // this node's value, or the field default
+effectiveGameData(fields, step.gameData);         // every field resolved into one object
 ```
+
+### Scene and block Game Data
+
+Scenes and blocks carry Game Data too (a scene's music, a block's location or lighting), but no
+step is delivered for a scene or a block, so the engine has accessors. Pass a scene or block by
+internal id or by its [Game ID address](/format/gamedata-and-addressing/#the-two-ids):
+
+```ts
+engine.gameDataForScene("the-tavern");           // { music: "jig" }
+engine.gameDataForBlock("the-tavern", "cellar"); // { lit: false }
+```
+
+They follow the same rule as `step.gameData`: the node's own overrides, raw, with no defaults merged
+in. A block does **not** inherit its scene's Game Data (unlike [tags](/play/tags/), which build up
+down the structure), so ask for each level you care about. A scene or block that sets nothing, or a
+ref that doesn't resolve, gives an empty object. Each call returns a fresh copy, so changing it can't
+touch the bundle. Merge defaults the same way as for a beat:
+
+```ts
+effectiveGameData(gameDataFields(bundle, "scene"), engine.gameDataForScene("the-tavern"));
+```
+
+A host typically reads them when it starts or `goto`s a flow at an address, or on a scene change.
+The same overrides appear as `gameData` on each scene and block of
+[`getOutline()`](/play/structure/) (left out when empty).
+
+| | JavaScript | Unity (C#) | Unreal (C++) | Godot (GDScript) |
+|---|---|---|---|---|
+| A scene's Game Data | `engine.gameDataForScene(scene)` | `engine.GameDataForScene(scene)` | `Engine->Raw()->gameDataForScene(scene)` | `engine.game_data_for_scene(scene)` |
+| A block's Game Data | `engine.gameDataForBlock(scene, block)` | `engine.GameDataForBlock(scene, block)` | `Engine->Raw()->gameDataForBlock(scene, block)` | `engine.game_data_for_block(scene, block)` |
 
 ## Host events
 

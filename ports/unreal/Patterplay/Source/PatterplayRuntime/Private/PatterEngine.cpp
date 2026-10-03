@@ -518,6 +518,7 @@ TArray<FPatterOutlineScene> UPatterEngine::GetOutline() const
 		Scene.Id = Ue(S.id);
 		Scene.GameId = Ue(S.gameId);
 		Scene.Name = Ue(S.name);
+		Scene.GameData = ConvertGameData(S.gameData);
 		for (const std::string& T : S.tags) Scene.Tags.Add(Ue(T));
 		for (const patter::OutlineBlock& B : S.blocks)
 		{
@@ -525,6 +526,7 @@ TArray<FPatterOutlineScene> UPatterEngine::GetOutline() const
 			Block.Id = Ue(B.id);
 			Block.GameId = Ue(B.gameId);
 			Block.Name = Ue(B.name);
+			Block.GameData = ConvertGameData(B.gameData);
 			for (const std::string& T : B.tags) Block.Tags.Add(Ue(T));
 			for (const patter::OutlineNode& N : B.children) Block.RootIndices.Add(FlattenNode(N, Block.Nodes));
 			Scene.Blocks.Add(Block);

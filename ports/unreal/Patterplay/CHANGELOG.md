@@ -7,6 +7,22 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Scene and block gameData you can read at runtime.** `gameDataForScene(sceneRef)` and
+  `gameDataForBlock(sceneRef, blockRef)` on the core `patter::Engine` (from a `UPatterEngine`, through
+  `Raw()`) return the author's own gameData on a scene or a block, by internal id or gameId address,
+  like `tagsForScene` and `tagsForBlock`. The answer is the RAW sparse override, the same rule a
+  beat's step follows: it is not merged with the project's declared field defaults (use
+  `patter::effectiveGameData(patter::gameDataFieldsFor(bundle, "scene"), ...)` for that), and a block
+  does not inherit its scene's. Each call returns a fresh `patter::GameData` copy, empty when the node
+  sets none or the ref does not resolve. Both bundle readers (the UE loader and the TestHost) now read
+  scene and block `gameData`, `listOutline()`'s `OutlineScene` and `OutlineBlock` carry it as
+  `gameData` (empty when the node sets none, like a beat's), and Blueprint's `GetOutline` mirrors it
+  as `GameData` on `FPatterOutlineScene` and `FPatterOutlineBlock`. The two accessors are not yet
+  surfaced to Blueprint, like the scene and block tag reads. Held across all four runtimes by the
+  conformance corpus.
+
 ## [0.14.3] - 2026-09-27
 
 ### Changed

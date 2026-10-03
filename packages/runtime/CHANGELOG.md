@@ -33,6 +33,17 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Scene and block gameData you can read at runtime.** The bundle always carried a scene's and a
+  block's gameData, but nothing handed it to the host. Two static reads now do, by internal id or
+  gameId address. They return the node's own overrides, raw, the same rule as a beat's
+  `step.gameData`: the project's field defaults are not merged in (resolve them with
+  `effectiveGameData`), and a block does not inherit its scene's. A node that sets none, or a ref
+  that does not resolve, gives an empty object. `getOutline()` carries the same overrides as
+  `gameData` on each scene and block, left out when empty. Held across all four runtimes by the
+  conformance corpus. `engine.gameDataForScene(sceneRef)`, `engine.gameDataForBlock(sceneRef, blockRef)`.
+
 ## [0.14.3] - 2026-09-27
 
 ### Fixed

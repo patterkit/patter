@@ -503,6 +503,22 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					ok = false
 					_fail("scripted", name, "expectCast: expected %s, got %s" % [JSON.stringify(want), JSON.stringify(got)])
 					break
+			"expectGameData":
+				# Static read of a scene's or block's OWN raw gameData overrides: no transcript, and
+				# expectResult pins the exact key set and values (key order not significant). Scene
+				# alone = the scene accessor, scene + block = the block accessor.
+				var gd: Dictionary
+				var scope: String = str(op["scene"])
+				if op.has("block"):
+					gd = holder["engine"].game_data_for_block(op["scene"], op["block"])
+					scope += "/" + str(op["block"])
+				else:
+					gd = holder["engine"].game_data_for_scene(op["scene"])
+				var want_gd: Dictionary = op["expectResult"]
+				if not _deep_equal(gd, want_gd):
+					ok = false
+					_fail("scripted", name, "expectGameData %s: expected %s, got %s" % [scope, JSON.stringify(want_gd), JSON.stringify(gd)])
+					break
 			"reset":
 				holder["engine"].reset()
 				current = ""

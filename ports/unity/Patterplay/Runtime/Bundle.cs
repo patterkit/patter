@@ -122,6 +122,7 @@ namespace Patterkit.Patterplay
         public List<Block> Blocks = new List<Block>();
         public List<PropertyDecl> SceneProps = new List<PropertyDecl>();
         public List<Effect> OnEntry = new List<Effect>();
+        public GameData GameData;    // author overrides (raw, sparse); null when none
         public List<string> Tags;    // author tags (#215)
     }
 
@@ -131,6 +132,7 @@ namespace Patterkit.Patterplay
         public string Name;
         public string GameId;
         public List<Node> Children = new List<Node>();
+        public GameData GameData;    // author overrides (raw, sparse); null when none
         public List<string> Tags;    // author tags (#215)
     }
 

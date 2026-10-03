@@ -340,6 +340,7 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("name"))) Scene.name = Std((*P)->AsString());
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameId"))) Scene.gameId = Std((*P)->AsString());
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("tags"))) Scene.tags = StrList(*P);   // author tags (#215)
+			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameData"))) Scene.gameData = ToGameData((*P)->AsObject());
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("sceneProps"))) for (const auto& Pr : (*P)->AsArray()) Scene.sceneProps.push_back(ToPropDecl(Pr->AsObject()));
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("onEntry"))) Scene.onEntry = ToEffects(*P);
 			for (const auto& Blk : ReqArray(O, TEXT("blocks")))
@@ -350,6 +351,7 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("name"))) Block.name = Std((*P)->AsString());
 				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("gameId"))) Block.gameId = Std((*P)->AsString());
 				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("tags"))) Block.tags = StrList(*P);   // author tags (#215)
+				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("gameData"))) Block.gameData = ToGameData((*P)->AsObject());
 				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("children"))) for (const auto& C : (*P)->AsArray()) Block.children.push_back(ToNode(C->AsObject()));
 				Scene.blocks.push_back(std::move(Block));
 			}

@@ -1422,6 +1422,68 @@ const scriptedCastAbsent = {
 } satisfies ScriptedFixture;
 
 
+// --- scene / block gameData ------------------------------------------------------
+//
+// The author's own gameData on a scene and on a block, read by address. The answer is the RAW sparse
+// override, the same rule a beat's step follows: the project declares defaults for both node types here,
+// and none of them may leak into the answer (a host merges them through the gameData helpers when it
+// wants them). A block never inherits its scene's gameData, a falsy value is still a value, an
+// undeclared (orphan) key rides along verbatim, and an unknown ref answers `{}` rather than throwing.
+const scriptedSceneBlockGameData = {
+  name: "gameData: scene and block overrides read by address, raw and uninherited",
+  project: project({ gameDataFields: {
+    scene: [{ name: "music", type: "text", default: "calm" }, { name: "chapter", type: "number", default: 1 }],
+    block: [{ name: "lit", type: "boolean", default: true }],
+  } }),
+  scenes: [
+    { id: "scn_tavern", type: "scene", name: "Tavern", gameData: { music: "jig", chapter: 2, weather: "rain" }, blocks: [
+      { id: "b_cellar", type: "block", name: "Cellar", gameData: { lit: false }, children: [
+        { id: "sn1", type: "snippet", beats: [{ id: "T1", kind: "text" }], jump: { to: "b_loft" } },
+      ] },
+      { id: "b_yard", type: "block", name: "Yard", children: [
+        { id: "sn2", type: "snippet", beats: [{ id: "T2", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "b_loft", type: "block", name: "Hay Loft", gameData: { lit: true, volume: 0.5 }, children: [
+        { id: "sn3", type: "snippet", beats: [{ id: "T3", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+    { id: "scn_quiet", type: "scene", name: "Quiet", blocks: [
+      { id: "b_only", type: "block", name: "Only", children: [
+        { id: "sn4", type: "snippet", beats: [{ id: "T4", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ],
+  locales: [loc("scn_tavern", { T1: "Damp stone.", T2: "Mud.", T3: "Straw." }), loc("scn_quiet", { T4: "Snow falls." })],
+  script: [
+    // A scene, by internal id and by its name-slug address: overrides only, the orphan kept.
+    { op: "expectGameData", scene: "scn_tavern", expectResult: { music: "jig", chapter: 2, weather: "rain" } },
+    { op: "expectGameData", scene: "tavern", expectResult: { music: "jig", chapter: 2, weather: "rain" } },
+
+    // Blocks: a falsy override, a multi-word name slug, a fractional number.
+    { op: "expectGameData", scene: "scn_tavern", block: "b_cellar", expectResult: { lit: false } },
+    { op: "expectGameData", scene: "tavern", block: "cellar", expectResult: { lit: false } },
+    { op: "expectGameData", scene: "tavern", block: "hay-loft", expectResult: { lit: true, volume: 0.5 } },
+
+    // Nothing set: no inheritance from the scene, and no declared defaults filled in.
+    { op: "expectGameData", scene: "scn_tavern", block: "b_yard", expectResult: {} },
+    { op: "expectGameData", scene: "quiet", expectResult: {} },
+    { op: "expectGameData", scene: "quiet", block: "only", expectResult: {} },
+
+    // Refs that do not resolve.
+    { op: "expectGameData", scene: "no-such-scene", expectResult: {} },
+    { op: "expectGameData", scene: "scn_tavern", block: "no-such-block", expectResult: {} },
+
+    // Static: playing through the scene, and a save round-trip, change none of it.
+    { op: "openFlow", flow: "f", scene: "tavern", block: "cellar" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "Damp stone." }] },
+    { op: "expectGameData", scene: "tavern", block: "cellar", expectResult: { lit: false } },
+    { op: "saveLoad" },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "Straw." }] },
+    { op: "expectGameData", scene: "tavern", expectResult: { music: "jig", chapter: 2, weather: "rain" } },
+    { op: "expectGameData", scene: "tavern", block: "hay-loft", expectResult: { lit: true, volume: 0.5 } },
+  ],
+} satisfies ScriptedFixture;
+
 // --- quality properties (expr 0.4.0) -----------------------------------------
 //
 // A story stage as an ORDERED ladder of named stage strings. The value is the stage NAME (a plain
@@ -1593,7 +1655,7 @@ export const cases: Fixtures = {
   scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
-    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedQualityInsertion],
+    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

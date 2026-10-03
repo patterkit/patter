@@ -598,6 +598,34 @@ namespace Patterkit.Patterplay
             return id != null && _host.TagIndex.TryGetValue(id, out var t) ? t : new List<string>();
         }
 
+        // -- scene / block gameData -------------------------------------------
+
+        /// <summary>A scene's own author gameData, by internal id or gameId address: the RAW sparse
+        /// overrides, exactly as a beat's step carries its own, NOT merged with the project's declared
+        /// field defaults (resolve those with GameDataHelpers.Effective(GameDataHelpers.FieldsFor(bundle,
+        /// "scene"), ...)). Not inherited by the scene's blocks. A fresh copy each call; empty (never null)
+        /// when the scene sets none or the ref is unknown.</summary>
+        public GameData GameDataForScene(string sceneRef)
+        {
+            var id = ResolveSceneRef(sceneRef);
+            var copy = new GameData();
+            if (id != null && _host.Bundle.Scenes.TryGetValue(id, out var scene) && scene.GameData != null)
+                foreach (var kv in scene.GameData) copy[kv.Key] = kv.Value;
+            return copy;
+        }
+
+        /// <summary>A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
+        /// GameDataForScene: not merged with the "block" defaults (see GameDataHelpers), and the scene's
+        /// gameData is not folded in. A fresh copy each call; empty (never null) when none or unknown.</summary>
+        public GameData GameDataForBlock(string sceneRef, string blockRef)
+        {
+            var id = ResolveBlockRef(ResolveSceneRef(sceneRef), blockRef);
+            var copy = new GameData();
+            if (id != null && _host.BlockById.TryGetValue(id, out var block) && block.GameData != null)
+                foreach (var kv in block.GameData) copy[kv.Key] = kv.Value;
+            return copy;
+        }
+
         // --- cast ------------------------------------------------------------
 
         /// <summary>Every cast member the PROJECT declares, in authored order - the same list
@@ -675,6 +703,7 @@ namespace Patterkit.Patterplay
                     Id = scene.Id,
                     GameId = EffectiveGameId(scene.GameId, scene.Name),
                     Name = scene.Name,
+                    GameData = GameDataOrNull(scene.GameData),
                     Tags = TagsOrNull(scene.Id),
                 };
                 foreach (var block in scene.Blocks)
@@ -684,6 +713,7 @@ namespace Patterkit.Patterplay
                         Id = block.Id,
                         GameId = EffectiveGameId(block.GameId, block.Name),
                         Name = block.Name,
+                        GameData = GameDataOrNull(block.GameData),
                         Tags = TagsOrNull(block.Id),
                     };
                     foreach (var n in block.Children) ob.Children.Add(OutlineNodeFor(n));
@@ -768,6 +798,9 @@ namespace Patterkit.Patterplay
 
         private List<string> TagsOrNull(string id)
             => _host.TagIndex.TryGetValue(id, out var t) && t.Count > 0 ? t : null;
+
+        /// <summary>An outline node's gameData, present only when it sets any (parity with BeatInfo's).</summary>
+        private static GameData GameDataOrNull(GameData gd) => gd != null && gd.Count > 0 ? gd : null;
 
         /// <summary>Reset the whole game to its initial state: drop every flow, re-seed the shared @patter
         /// globals to their declared defaults, and clear all shared state (shared @scene bags, world visit

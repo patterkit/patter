@@ -6,6 +6,17 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Scene and block gameData you can read at runtime.** `engine.game_data_for_scene(scene_ref)` and
+  `engine.game_data_for_block(scene_ref, block_ref)` return the author's own gameData on a scene or a
+  block, with refs resolved like the tag accessors (an internal id or a gameId address). The answer is
+  the RAW sparse overrides, the same rule a beat's step follows: the project's declared defaults are
+  not filled in (merge them with `PatterBundle.effective_game_data` when you want them), a block does
+  not inherit its scene's gameData, and an unknown ref or a node that sets none gives an empty
+  Dictionary. Each call returns a fresh copy. `get_outline()` scene and block entries carry the same
+  `gameData`, omitted when empty. Held across all four runtimes by the conformance corpus.
+
 ## [0.14.3] - 2026-09-27
 
 ### Changed

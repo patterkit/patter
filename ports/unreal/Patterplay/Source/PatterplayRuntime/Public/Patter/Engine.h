@@ -205,8 +205,20 @@ namespace patter
         std::vector<OutlineBeat> beats;
         std::string jumpTo, jumpMode;
     };
-    struct OutlineBlock { std::string id, gameId, name; std::vector<std::string> tags; std::vector<OutlineNode> children; };
-    struct OutlineScene { std::string id, gameId, name; std::vector<std::string> tags; std::vector<OutlineBlock> blocks; };
+    struct OutlineBlock
+    {
+        std::string id, gameId, name;
+        std::vector<std::pair<std::string, PatterValue>> gameData;   // the block's own overrides (raw, not merged)
+        std::vector<std::string> tags;
+        std::vector<OutlineNode> children;
+    };
+    struct OutlineScene
+    {
+        std::string id, gameId, name;
+        std::vector<std::pair<std::string, PatterValue>> gameData;   // the scene's own overrides (raw, not merged)
+        std::vector<std::string> tags;
+        std::vector<OutlineBlock> blocks;
+    };
     struct OutlineFlatBeat { std::string sceneId, blockId, snippetId; OutlineBeat beat; };
 
     inline std::string gameIdify(const std::string& text)
@@ -1882,6 +1894,24 @@ namespace patter
             return it != host_.tagIndex.end() ? it->second : std::vector<std::string>{};
         }
 
+        // A scene's own author gameData, by internal id or gameId address: the RAW sparse overrides, exactly
+        // as a beat's step carries its own. Not merged with the project's declared field defaults (resolve
+        // those with effectiveGameData(gameDataFieldsFor(bundle, "scene"), ...)), and not inherited by the
+        // scene's blocks. A fresh copy each call; empty when the scene sets none or the ref is unknown.
+        GameData gameDataForScene(const std::string& sceneRef)
+        {
+            auto it = host_.bundle->scenes.find(resolveSceneRef(sceneRef));
+            return it != host_.bundle->scenes.end() && it->second.gameData ? *it->second.gameData : GameData{};
+        }
+        // A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
+        // gameDataForScene (merge defaults with gameDataFieldsFor(bundle, "block")); the scene's gameData
+        // is not folded in. A fresh copy each call; empty when the block sets none or the ref is unknown.
+        GameData gameDataForBlock(const std::string& sceneRef, const std::string& blockRef)
+        {
+            auto it = host_.blockById.find(resolveBlockRef(resolveSceneRef(sceneRef), blockRef));
+            return it != host_.blockById.end() && it->second->gameData ? *it->second->gameData : GameData{};
+        }
+
         // Every cast member the PROJECT declares, in authored order - the same list describeBundle
         // counts. A superset of any scene's cast: a beat's character must be a declared member, so
         // castForScene / castForBlock only ever return names from here.
@@ -2021,6 +2051,7 @@ namespace patter
                 os.id = scene.id;
                 os.gameId = effectiveGameId(scene.gameId, scene.name);
                 os.name = scene.name;
+                if (scene.gameData) os.gameData.assign(scene.gameData->begin(), scene.gameData->end());
                 os.tags = tagsById(scene.id);
                 for (const Block& block : scene.blocks)
                 {
@@ -2028,6 +2059,7 @@ namespace patter
                     ob.id = block.id;
                     ob.gameId = effectiveGameId(block.gameId, block.name);
                     ob.name = block.name;
+                    if (block.gameData) ob.gameData.assign(block.gameData->begin(), block.gameData->end());
                     ob.tags = tagsById(block.id);
                     for (const NodePtr& n : block.children) ob.children.push_back(outlineNode(*n));
                     os.blocks.push_back(std::move(ob));

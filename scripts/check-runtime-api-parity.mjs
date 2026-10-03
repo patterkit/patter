@@ -99,6 +99,12 @@ const API = [
     why: "not yet surfaced to Blueprint" },
   { on: "Engine", js: "tagsForBlock", unity: "TagsForBlock", godot: "tags_for_block", unreal: "tagsForBlock", bp: null,
     why: "not yet surfaced to Blueprint" },
+  // Scene / block gameData: the node's own raw overrides by address, corpus-gated by the
+  // `expectGameData` script op.
+  { on: "Engine", js: "gameDataForScene", unity: "GameDataForScene", godot: "game_data_for_scene", unreal: "gameDataForScene", bp: null,
+    why: "not yet surfaced to Blueprint" },
+  { on: "Engine", js: "gameDataForBlock", unity: "GameDataForBlock", godot: "game_data_for_block", unreal: "gameDataForBlock", bp: null,
+    why: "not yet surfaced to Blueprint" },
 
   // Cast: who is declared, and who speaks in a scope. Static structure queries, corpus-gated by the
   // `expectCast` script op (declaration order for the project, first-appearance order for a scope).

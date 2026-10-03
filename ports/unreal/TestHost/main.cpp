@@ -216,6 +216,7 @@ static Bundle parseBundle(const JsonValue& b)
         if (const JsonValue* nm = sc.second.find("name")) scene.name = nm->str;
         if (const JsonValue* gi = sc.second.find("gameId")) scene.gameId = gi->str;
         if (const JsonValue* tg = sc.second.find("tags")) scene.tags = strList(*tg);
+        if (const JsonValue* gd = sc.second.find("gameData")) scene.gameData = parseGameData(*gd);
         if (const JsonValue* sp = sc.second.find("sceneProps")) for (const auto& p : sp->arr) scene.sceneProps.push_back(parsePropDecl(p));
         if (const JsonValue* oe = sc.second.find("onEntry")) scene.onEntry = parseEffects(*oe);
         for (const auto& blk : sc.second.at("blocks").arr)
@@ -224,6 +225,7 @@ static Bundle parseBundle(const JsonValue& b)
             if (const JsonValue* nm = blk.find("name")) block.name = nm->str;
             if (const JsonValue* gi = blk.find("gameId")) block.gameId = gi->str;
             if (const JsonValue* tg = blk.find("tags")) block.tags = strList(*tg);
+            if (const JsonValue* gd = blk.find("gameData")) block.gameData = parseGameData(*gd);
             if (const JsonValue* ch = blk.find("children")) for (const auto& c : ch->arr) block.children.push_back(parseNode(c));
             scene.blocks.push_back(std::move(block));
         }
@@ -494,6 +496,7 @@ static int runRuntime(const JsonValue& arr)
 }
 
 static int envelopeRoundTrips = 0;
+static int gameDataReads = 0;   // expectGameData ops that ran and matched
 
 // Run a script's ops against a LIVE engine, returning whether every op matched and the engine that
 // ends up live (saveLoad / hotSwap replace it). Shared by the scripted cases and the saves cases, whose
@@ -563,6 +566,24 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                         for (const auto& n : want) { if (!e.empty()) e += ", "; e += n; }
                         throw std::runtime_error("expectCast: expected [" + e + "], got [" + g + "]");
                     }
+                }
+                // Static scene / block gameData read: no transcript, expectResult pins the RAW overrides
+                // exactly (same key set, equal values; key order is not significant). Scene alone =
+                // gameDataForScene, scene + block = gameDataForBlock.
+                else if (kind == "expectGameData")
+                {
+                    const std::string scene = op.at("scene").str;
+                    const bool forBlock = op.has("block");
+                    GameData got = forBlock ? engine->gameDataForBlock(scene, op.at("block").str)
+                                            : engine->gameDataForScene(scene);
+                    JsonValue produced = gameDataToJson(got);
+                    const JsonValue& want = op.at("expectResult");
+                    if (!matchValue(produced, want))
+                    {
+                        const std::string scope = forBlock ? scene + "/" + op.at("block").str : scene;
+                        throw std::runtime_error("expectGameData " + scope + ": expected " + dump(want) + ", got " + dump(produced));
+                    }
+                    ++gameDataReads;
                 }
 
                 const JsonValue* expect = op.find("expect");
@@ -1802,7 +1823,9 @@ static void runOutlineSmoke()
     { Beat beat; beat.id = "E1"; beat.kind = "gameEvent"; sn->beats.push_back(beat); }
 
     Block block; block.id = "b1"; block.name = "Intro"; block.children = { group, sn };
+    block.gameData = std::make_shared<GameData>(GameData{ { "lit", PatterValue::Bool(false) } });
     Scene scene; scene.id = "s1"; scene.name = "Opening"; scene.blocks = { block };
+    scene.gameData = std::make_shared<GameData>(GameData{ { "music", PatterValue::Str("jig") } });
     b.scenes["s1"] = scene;
 
     EngineOptions opts;
@@ -1817,6 +1840,11 @@ static void runOutlineSmoke()
     if (line.id != "L1" || line.kind != "line" || line.characterName != "The Guard" || line.text != "Halt!")
         fail("outline", "beat data", "line beat data wrong: " + line.characterName + "/" + line.text);
     if (blk.children[1].type != "snippet" || blk.children[1].jumpTo != "" ) { /* sn has no jump -> empty */ }
+    // Scene / block gameData ride on the outline raw: the node's own overrides, no inheritance.
+    if (outline[0].gameData.size() != 1 || outline[0].gameData[0].first != "music" || outline[0].gameData[0].second.s != "jig")
+        fail("outline", "scene gameData", "scene gameData not carried raw");
+    if (blk.gameData.size() != 1 || blk.gameData[0].first != "lit" || blk.gameData[0].second.b != false)
+        fail("outline", "block gameData", "block gameData not carried raw (or the scene's leaked in)");
 
     auto seq = engine.beatSequence();
     std::vector<std::string> ids; for (const auto& f : seq) ids.push_back(f.beat.id);
@@ -1934,6 +1962,7 @@ int main(int argc, char** argv)
     runDescribeSmoke();
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
+    std::cout << "  [gameData] scripted scene / block gameData reads: " << gameDataReads << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
 
     // The expr parity corpus sits beside ours, vendored from ../expr. Absent is

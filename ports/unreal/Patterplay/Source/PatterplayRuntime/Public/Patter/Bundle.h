@@ -98,7 +98,13 @@ namespace patter
     };
     using NodePtr = std::shared_ptr<Node>;
 
-    struct Block { std::string id, name, gameId; std::vector<NodePtr> children; std::vector<std::string> tags; };
+    struct Block
+    {
+        std::string id, name, gameId;
+        std::vector<NodePtr> children;
+        std::vector<std::string> tags;
+        std::shared_ptr<GameData> gameData;             // author overrides (raw); null = none
+    };
     struct Scene
     {
         std::string id, name, gameId;
@@ -106,6 +112,7 @@ namespace patter
         std::vector<PropertyDecl> sceneProps;
         std::vector<Effect> onEntry;
         std::vector<std::string> tags;                  // author tags (#215)
+        std::shared_ptr<GameData> gameData;             // author overrides (raw); null = none
     };
 
     struct GameDataField

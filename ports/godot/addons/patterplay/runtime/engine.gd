@@ -724,6 +724,42 @@ func tags_for_block(scene_ref: String, block_ref: String) -> Array:
 	return _host["tag_index"].get(_resolve_block_ref(scene_id, block_ref), [])
 
 
+# -- scene / block gameData ----------------------------------------------------
+
+## A scene's own author gameData, by internal id or gameId address: the RAW sparse overrides, exactly
+## as a beat's step carries its own, NOT merged with the project's declared field defaults (resolve
+## those with PatterBundle.effective_game_data(PatterBundle.game_data_fields_for(bundle, "scene"), ...)).
+## Not inherited by the scene's blocks. A fresh Dictionary each call, its values normalised the way a
+## step's gameData is; empty when the scene sets none or the ref does not resolve.
+func game_data_for_scene(scene_ref: String) -> Dictionary:
+	var scene_id := _resolve_scene_ref(scene_ref)
+	if not _host["bundle"]["scenes"].has(scene_id):
+		return {}
+	return _own_game_data(_host["bundle"]["scenes"][scene_id])
+
+
+## A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
+## game_data_for_scene(): the scene's gameData is not folded in, and no declared defaults are filled
+## (see PatterBundle.effective_game_data for those). Empty when the block sets none or the ref does
+## not resolve.
+func game_data_for_block(scene_ref: String, block_ref: String) -> Dictionary:
+	var block_id := _resolve_block_ref(_resolve_scene_ref(scene_ref), block_ref)
+	if not _host["block_by_id"].has(block_id):
+		return {}
+	return _own_game_data(_host["block_by_id"][block_id])
+
+
+# A node's own gameData as a fresh, normalised copy (the same per-value rule as PatterFlow's step
+# gameData), or {} when it sets none.
+static func _own_game_data(node: Dictionary) -> Dictionary:
+	var out := {}
+	var gd = node.get("gameData", null)
+	if gd is Dictionary:
+		for k in gd.keys():
+			out[k] = PatterValues.to_value(gd[k])
+	return out
+
+
 # -- cast ----------------------------------------------------------------------
 
 # Every cast member the PROJECT declares, in authored order - the same list PatterDescribe counts.
@@ -802,6 +838,10 @@ func get_outline() -> Array:
 			"name": scene.get("name", ""),
 			"blocks": [],
 		}
+		# The node's own raw overrides, omitted when empty (parity with a beat's gameData).
+		var sgd := _own_game_data(scene)
+		if not sgd.is_empty():
+			os["gameData"] = sgd
 		var st: Array = _host["tag_index"].get(scene["id"], [])
 		if not st.is_empty():
 			os["tags"] = st
@@ -812,6 +852,9 @@ func get_outline() -> Array:
 				"name": block.get("name", ""),
 				"children": [],
 			}
+			var bgd := _own_game_data(block)
+			if not bgd.is_empty():
+				ob["gameData"] = bgd
 			var bt: Array = _host["tag_index"].get(block["id"], [])
 			if not bt.is_empty():
 				ob["tags"] = bt

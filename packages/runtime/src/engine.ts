@@ -137,6 +137,8 @@ export interface OutlineBlock {
   id: string;
   gameId?: string;
   name: string;
+  /** The block's own author gameData overrides (raw, not merged with defaults). Omitted when empty. */
+  gameData?: GameData;
   tags?: string[];
   children: OutlineNode[];
 }
@@ -146,6 +148,8 @@ export interface OutlineScene {
   id: string;
   gameId?: string;
   name: string;
+  /** The scene's own author gameData overrides (raw, not merged with defaults). Omitted when empty. */
+  gameData?: GameData;
   tags?: string[];
   blocks: OutlineBlock[];
 }
@@ -758,6 +762,25 @@ export class Engine {
   }
 
   /**
+   * A scene's own author gameData (by internal id or gameId address): the RAW sparse overrides, exactly
+   * as a beat's step carries its own, not merged with the project's declared field defaults (resolve
+   * those with `effectiveGameData(gameDataFields(bundle, "scene"), ...)`). Not inherited by its blocks.
+   * A fresh object each call; empty when the scene sets none or the ref is unknown.
+   */
+  gameDataForScene(sceneRef: string): GameData {
+    const id = this.resolveSceneRef(sceneRef);
+    const scene = id != null ? this.host.bundle.scenes[id] : undefined;
+    return { ...scene?.gameData };
+  }
+  /** A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
+   *  {@link gameDataForScene}; the scene's gameData is not folded in. Empty when none / unknown. */
+  gameDataForBlock(sceneRef: string, blockRef: string): GameData {
+    const id = this.resolveBlockRef(this.resolveSceneRef(sceneRef), blockRef);
+    const block = id != null ? this.host.blockById.get(id) : undefined;
+    return { ...block?.gameData };
+  }
+
+  /**
    * Every cast member the PROJECT declares, in authored order - the same list `describeBundle` counts.
    * A superset of any scene's cast: the validator holds a beat's `character` to a declared member, so
    * {@link castForScene} and {@link castForBlock} only ever return names that appear here.
@@ -808,11 +831,13 @@ export class Engine {
       id: scene.id,
       ...(effectiveGameId(scene) ? { gameId: effectiveGameId(scene) } : {}),
       name: scene.name,
+      ...gameDataField(scene.gameData),
       ...this.tagsField(scene.id),
       blocks: scene.blocks.map((block) => ({
         id: block.id,
         ...(effectiveGameId(block) ? { gameId: effectiveGameId(block) } : {}),
         name: block.name,
+        ...gameDataField(block.gameData),
         ...this.tagsField(block.id),
         children: block.children.map((n) => this.outlineNode(n)),
       })),
@@ -2173,6 +2198,11 @@ function collectCast(nodes: Array<CompiledGroup | CompiledSnippet>, out: Set<str
     }
     for (const beat of n.beats ?? []) if (beat.kind === "line" && beat.character) out.add(beat.character);
   });
+}
+
+/** A `{ gameData }` outline fragment, present only when the node sets any (parity with a beat's). */
+function gameDataField(gameData: GameData | undefined): { gameData?: GameData } {
+  return gameData && Object.keys(gameData).length ? { gameData } : {};
 }
 
 /** Serialise a `sequence` selector-cursor map to plain snapshots. */

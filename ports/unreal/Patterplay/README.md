@@ -85,6 +85,8 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   cursor to the editor; `ApplyLiveBundle` hot-reloads an edited bundle into the running
   engine. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Structure**: `GetOutline` / `GetBeatSequence` expose the authored tree (per-beat text,
-  character, gameData, tags) for tooling like Sequencer binding.
+  character, gameData, tags, plus each scene's and block's own gameData) for tooling like
+  Sequencer binding. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
+  a block's own gameData by address, raw (not merged with the declared defaults).
 
 Changes per release: [CHANGELOG.md](CHANGELOG.md).

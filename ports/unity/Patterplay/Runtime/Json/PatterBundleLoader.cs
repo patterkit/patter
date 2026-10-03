@@ -205,6 +205,7 @@ namespace Patterkit.Patterplay
             if (s["tags"] is JArray st) scene.Tags = ToStringList(st);
             if (s["sceneProps"] is JArray sp) foreach (var p in sp) scene.SceneProps.Add(PropDecl((JObject)p));
             if (s["onEntry"] is JArray oe) scene.OnEntry = Effects(oe);
+            if (s["gameData"] is JObject sgd) scene.GameData = ParseGameData(sgd);
             foreach (var blk in (JArray)s["blocks"]) scene.Blocks.Add(ParseBlock((JObject)blk));
             return scene;
         }
@@ -213,6 +214,7 @@ namespace Patterkit.Patterplay
         {
             var block = new Block { Id = (string)b["id"], Name = (string)b["name"] ?? "", GameId = (string)b["gameId"] };
             if (b["tags"] is JArray bt) block.Tags = ToStringList(bt);
+            if (b["gameData"] is JObject bgd) block.GameData = ParseGameData(bgd);
             if (b["children"] is JArray ch) foreach (var n in ch) block.Children.Add(ParseNode((JObject)n));
             return block;
         }

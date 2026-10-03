@@ -22,7 +22,9 @@ define up front.
 
 The runtime never looks inside Game Data: to Patter it's just opaque data, and it's
 entirely yours. Your host reads it off each beat to drive audio, camera, portraits,
-quest state, whatever you need.
+quest state, whatever you need, and reads a scene's or block's with
+`gameDataForScene(scene)` and `gameDataForBlock(scene, block)` (see
+[Scene and block Game Data](/play/integration/#scene-and-block-game-data)).
 
 ### Game Data is where host events live
 

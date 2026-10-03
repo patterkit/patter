@@ -145,6 +145,15 @@ export function runScript(
         }
         break;
       }
+      case "expectGameData": {
+        const got = op.block === undefined ? engine.gameDataForScene(op.scene) : engine.gameDataForBlock(op.scene, op.block);
+        const scope = op.block === undefined ? op.scene : `${op.scene}/${op.block}`;
+        const want = op.expectResult;
+        const same = Object.keys(got).length === Object.keys(want).length
+          && Object.entries(want).every(([k, v]) => Object.prototype.hasOwnProperty.call(got, k) && got[k] === v);
+        if (!same) throw new Error(`expectGameData ${scope}: expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+        break;
+      }
       case "reset":
         engine.reset();
         current = "";

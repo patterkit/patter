@@ -110,6 +110,11 @@ struct FPatterOutlineBlock
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Name;
 
+	/** The block's own author gameData overrides (raw, not merged with the declared defaults, and
+	    not inherited from its scene). Empty when the block sets none. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterGameDataEntry> GameData;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Tags;
 
@@ -136,6 +141,11 @@ struct FPatterOutlineScene
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Name;
+
+	/** The scene's own author gameData overrides (raw, not merged with the declared defaults).
+	    Empty when the scene sets none. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterGameDataEntry> GameData;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Tags;

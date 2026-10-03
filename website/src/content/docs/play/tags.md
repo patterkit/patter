@@ -23,3 +23,8 @@ engine.tagsForBlock("the-tavern", "cellar"); // scene + block accumulated
 ```
 
 The native ports expose the same three (`TagsForBeat` / `tags_for_beat`, etc.).
+
+A scene's or block's typed Game Data has matching accessors, `gameDataForScene(scene)` and
+`gameDataForBlock(scene, block)`. Unlike tags, Game Data does not build up down the structure: each
+returns only that node's own values. See
+[Scene and block Game Data](/play/integration/#scene-and-block-game-data).

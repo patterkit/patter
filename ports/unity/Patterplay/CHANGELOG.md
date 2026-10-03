@@ -6,6 +6,18 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Scene and block gameData you can read at runtime.** `engine.GameDataForScene(sceneRef)` and
+  `engine.GameDataForBlock(sceneRef, blockRef)` return the author's own gameData on a scene or a block,
+  by internal id or gameId address, like the tag and cast reads. The answer is the RAW sparse override,
+  the same rule a beat's step follows: it is not merged with the project's declared field defaults (use
+  `GameDataHelpers.Effective(GameDataHelpers.FieldsFor(bundle, "scene"), ...)` for that), and a block
+  does not inherit its scene's. Each call returns a fresh copy, empty when the node sets none or the ref
+  does not resolve. Both bundle loaders now read scene and block `gameData`, and `GetOutline()`'s
+  `OutlineScene` and `OutlineBlock` carry it as `GameData` (null when empty, like `BeatInfo.GameData`).
+  Held across all four runtimes by the conformance corpus.
+
 ## [0.14.3] - 2026-09-27
 
 ### Changed

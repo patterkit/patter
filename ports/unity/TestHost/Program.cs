@@ -836,6 +836,25 @@ namespace Patterkit.Patterplay.TestHost
                                     throw new Exception($"expectCast: expected [{string.Join(", ", want)}], got [{string.Join(", ", got)}]");
                                 break;
                             }
+                            case "expectGameData":
+                            {
+                                // Static read of a scene's / block's OWN raw gameData overrides: no transcript.
+                                // Same key set, values equal by kind and value (numbers as doubles, so 2 and 2.0
+                                // agree); key order is not part of the contract.
+                                string gs = op.GetProperty("scene").GetString();
+                                bool hasBlock = op.TryGetProperty("block", out var gb);
+                                var got = hasBlock ? engine.GameDataForBlock(gs, gb.GetString()) : engine.GameDataForScene(gs);
+                                var wantJson = op.GetProperty("expectResult");
+                                var want = ParseGameData(wantJson);
+                                bool same = got.Count == want.Count
+                                    && want.All(kv => got.TryGetValue(kv.Key, out var gv) && gv.ValueEquals(kv.Value));
+                                if (!same)
+                                {
+                                    string scope = hasBlock ? $"{gs}/{gb.GetString()}" : gs;
+                                    throw new Exception($"expectGameData {scope}: expected {wantJson.GetRawText()}, got {Dump(GameDataToObject(got))}");
+                                }
+                                break;
+                            }
                             case "reset":
                                 engine.Reset();
                                 current = "";
@@ -1270,6 +1289,7 @@ namespace Patterkit.Patterplay.TestHost
             if (s.TryGetProperty("tags", out var st)) scene.Tags = TagList(st);
             if (s.TryGetProperty("sceneProps", out var sp)) scene.SceneProps = sp.EnumerateArray().Select(ParsePropDecl).ToList();
             if (s.TryGetProperty("onEntry", out var oe)) scene.OnEntry = ParseEffects(oe);
+            if (s.TryGetProperty("gameData", out var sgd)) scene.GameData = ParseGameData(sgd);
             foreach (var blk in s.GetProperty("blocks").EnumerateArray()) scene.Blocks.Add(ParseBlock(blk));
             return scene;
         }
@@ -1283,6 +1303,7 @@ namespace Patterkit.Patterplay.TestHost
                 GameId = b.TryGetProperty("gameId", out var gi) ? gi.GetString() : null,
             };
             if (b.TryGetProperty("tags", out var bt)) block.Tags = TagList(bt);
+            if (b.TryGetProperty("gameData", out var bgd)) block.GameData = ParseGameData(bgd);
             if (b.TryGetProperty("children", out var ch)) foreach (var n in ch.EnumerateArray()) block.Children.Add(ParseNode(n));
             return block;
         }
