@@ -38,13 +38,13 @@ function strokes(buf: Buffer): Array<{ x0: number; y0: number; x1: number; y1: n
 /** A document long enough to cross several page turns, with enough rhythm variety (a wrapping body
  *  every fifth line, a fresh snippet every eighth) that some element starts near a page's foot. */
 function longDoc(): ScriptDoc {
-  const elements: ScriptElement[] = [{ kind: "scene", text: "The Long Scene" }, { kind: "block", text: "The Long Block" }];
+  const elements: ScriptElement[] = [{ kind: "scene", id: "s1", text: "The Long Scene" }, { kind: "block", id: "b1", text: "The Long Block" }];
   for (let i = 0; i < 120; i++) {
     const snippet = Math.floor(i / 8);
     const text = i % 5 === 4
       ? `Line ${i}, the long one, which runs on and on for quite a while so that it wraps onto a second printed line and now and then a third, exactly the shape that crosses a page.`
       : `Line ${i}. Short.`;
-    elements.push({ kind: "line", indent: 1, snippet, character: i % 2 ? "DAVE" : "MIRA", runs: textRuns(text) });
+    elements.push({ kind: "line", id: `L${i}`, indent: 1, snippet, character: i % 2 ? "DAVE" : "MIRA", runs: textRuns(text) });
   }
   return { project: "Pagination", elements };
 }

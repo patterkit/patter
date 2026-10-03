@@ -204,6 +204,10 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
           else draw(pieces, cx, { width: pageRight - cx });
           break;
         }
+        case "note":
+          // Only when the caller asked for notes; the readable script asks for none.
+          pdf.fontSize(9.5); draw(split(`Note: ${el.text}`, "Serif-Italic", MUTED), cx, { width: w, lineGap: LEAD });
+          break;
       }
     };
 

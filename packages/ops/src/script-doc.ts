@@ -10,9 +10,11 @@
 // script) and not an editable handoff (that's the .patterpack). Cut nodes are omitted.
 // ---------------------------------------------------------------------------
 
-import type { Block, GameEventBeat, Group, Scene, Snippet } from "@patterkit/model";
+import type { Block, DocLine, GameEventBeat, Group, Scene, Snippet } from "@patterkit/model";
+import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 import { humanizeNodeRefs } from "@patterkit/core";
 import { sourceStrings, mergeAuthoring } from "./loaded-helpers.js";
+import { classesForChannel } from "./documentation.js";
 import type { LoadedProject } from "./load.js";
 
 // ---------------------------------------------------------------------------
@@ -87,26 +89,45 @@ export function textRuns(text: string): TextRun[] {
  *  reader's structure cue. `snippet` is an id shared by every element of one snippet WHEN that snippet sits
  *  inside a selector (branch / sequence / choice); the renderers draw a light left edge spanning each such
  *  snippet, so rows that would otherwise blur (a sequence's steps) read as distinct beats. Absent = a
- *  top-level snippet (delimited by space alone). Headings carry no indent (they reset it). */
+ *  top-level snippet (delimited by space alone). Headings carry no indent (they reset it).
+ *
+ *  `id` is the scene, block, node, or beat the element shows, so an export that hands the script to someone
+ *  outside (the editable script) can tie each row back to the project. The readable script ignores it. */
 export type ScriptElement =
-  | { kind: "scene"; text: string }
-  | { kind: "block"; text: string }
+  | { kind: "scene"; id: string; text: string }
+  | { kind: "block"; id: string; text: string }
   /** A spoken line: SPEAKER cue (coloured, uppercase), an optional (direction), and the body runs. */
-  | { kind: "line"; indent: number; snippet?: number; character: string; direction?: string; runs: TextRun[] }
-  /** Prose narration / on-screen text (speaker-less), upright in a soft ink, flush left. */
-  | { kind: "narration"; indent: number; snippet?: number; runs: TextRun[] }
-  /** A gating condition, set in accent mono above the beat it controls: `‹ if @brave ›`. */
-  | { kind: "condition"; indent: number; snippet?: number; text: string }
+  | { kind: "line"; id: string; indent: number; snippet?: number; character: string; direction?: string; runs: TextRun[] }
+  /** Prose narration / on-screen text (speaker-less), upright in a soft ink, flush left. `id` is the beat. */
+  | { kind: "narration"; id: string; indent: number; snippet?: number; runs: TextRun[] }
+  /** A gating condition, set in accent mono above the beat it controls: `‹ if @brave ›`. `id` is the node
+   *  it gates. */
+  | { kind: "condition"; id: string; indent: number; snippet?: number; text: string }
   /** A selector group's label ("Choose", "One of · first match wins", "In sequence"). */
-  | { kind: "group"; indent: number; label: string }
-  /** A branch's catch-all row header ("else · catch-all"). */
-  | { kind: "else"; indent: number }
-  /** A choice option: a ◇-led prompt, plus a quiet small-caps flag tag (once only / repeatable). */
-  | { kind: "option"; indent: number; snippet?: number; runs: TextRun[]; tag?: string }
-  /** A jump, set apart right-aligned in accent: `↪ The Crossroads` (readable target, never the id). */
-  | { kind: "jump"; indent: number; snippet?: number; text: string }
-  /** A game event, set apart right-aligned in accent mono: `⚙ game event · door.open`. */
-  | { kind: "gameEvent"; indent: number; snippet?: number; text: string };
+  | { kind: "group"; id: string; indent: number; label: string }
+  /** A branch's catch-all row header ("else · catch-all"). `id` is the catch-all row's node. */
+  | { kind: "else"; id: string; indent: number }
+  /** A choice option: a ◇-led prompt, plus a quiet small-caps flag tag (once only / repeatable). `id` is the
+   *  prompt beat, `node` the option itself. */
+  | { kind: "option"; id: string; node: string; indent: number; snippet?: number; runs: TextRun[]; tag?: string }
+  /** A jump, set apart right-aligned in accent: `↪ The Crossroads` (readable target, never the id). `id` is
+   *  the snippet carrying it, `to` the target's id (or END). */
+  | { kind: "jump"; id: string; to: string; indent: number; snippet?: number; text: string }
+  /** A game event, set apart right-aligned in accent mono: `⚙ game event · door.open`. `id` is the beat. */
+  | { kind: "gameEvent"; id: string; indent: number; snippet?: number; text: string }
+  /** A documentation note on the element above, when the caller asked for notes (`ScriptDocOptions.notes`).
+   *  `id` is the node or beat the note is on. The readable script asks for none. */
+  | { kind: "note"; id: string; indent: number; snippet?: number; text: string; class?: string };
+
+/** What `runScriptDoc` includes beyond the readable script's defaults. */
+export interface ScriptDocOptions {
+  /** Only these scenes (by id), in project order. All scenes when absent. */
+  scenes?: string[];
+  /** Documentation notes to show under the node they're on: those delivered to a channel (`{ channel:
+   *  "editor" }`), or every classed note (`"all"`). Untyped notes are editor-only and never shown. Absent:
+   *  no notes, as the readable script has none. */
+  notes?: { channel: string } | "all";
+}
 
 export interface ScriptDoc {
   /** Project display name - the document title. */
@@ -158,10 +179,17 @@ function sequenceLabel(node: Group): string {
 }
 
 /** Compute the readable script document. Pure: data out, no I/O. */
-export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
+export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {}): ScriptDoc {
   const { project } = loaded;
   const source = sourceStrings(loaded);
-  const { cut } = mergeAuthoring(loaded);
+  const { cut, documentation } = mergeAuthoring(loaded);
+
+  // A node's OWN notes (not inherited: the reader sees the ancestor's note where the ancestor is).
+  const noteClasses = opts.notes === undefined || opts.notes === "all"
+    ? undefined
+    : classesForChannel(project.documentationClasses ?? DEFAULT_DOCUMENTATION_CLASSES, opts.notes.channel);
+  const ownNotes = (id: string): DocLine[] => opts.notes === undefined ? [] :
+    (documentation.get(id) ?? []).filter((l) => l.type !== undefined && (noteClasses === undefined || noteClasses.has(l.type)));
 
   // Build readable labels for every jump destination (scenes + blocks), so a jump reads by name.
   const sceneOf = new Map<string, string>();   // scene id -> scene name
@@ -176,6 +204,9 @@ export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
 
   const els: ScriptElement[] = [];
   const textOf = (id: string): string => source[id] ?? "";
+  const notes = (id: string, indent: number, sid: number | undefined): void => {
+    for (const l of ownNotes(id)) els.push({ kind: "note", id, indent, snippet: sid, text: l.text, class: l.type });
+  };
   const jumpText = (j: { to: string; mode?: string }): string => {
     const dest = targetLabel(j.to, sceneOf, blockTrail);
     return j.mode === "call" ? `${dest} (and return)` : dest;
@@ -190,11 +221,13 @@ export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
   const emitBeats = (node: Snippet, indent: number, sid: number | undefined): void => {
     for (const beat of node.beats ?? []) {
       if (cut.has(beat.id)) continue;
-      if (beat.kind === "line") els.push({ kind: "line", indent, snippet: sid, character: beat.character ?? "", direction: beat.direction, runs: textRuns(textOf(beat.id)) });
-      else if (beat.kind === "text") els.push({ kind: "narration", indent, snippet: sid, runs: textRuns(textOf(beat.id)) });
-      else if (beat.kind === "gameEvent") els.push({ kind: "gameEvent", indent, snippet: sid, text: gameEventLabel(beat) });
+      if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent, snippet: sid, character: beat.character ?? "", direction: beat.direction, runs: textRuns(textOf(beat.id)) });
+      else if (beat.kind === "text") els.push({ kind: "narration", id: beat.id, indent, snippet: sid, runs: textRuns(textOf(beat.id)) });
+      else if (beat.kind === "gameEvent") els.push({ kind: "gameEvent", id: beat.id, indent, snippet: sid, text: gameEventLabel(beat) });
+      else continue;
+      notes(beat.id, indent, sid);
     }
-    if (node.jump) els.push({ kind: "jump", indent, snippet: sid, text: jumpText(node.jump) });
+    if (node.jump) els.push({ kind: "jump", id: node.id, to: node.jump.to, indent, snippet: sid, text: jumpText(node.jump) });
   };
 
   // `sid` is the snippet id this node's elements belong to (a selector hands each child a fresh one; a
@@ -203,40 +236,51 @@ export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
     if (cut.has(node.id)) return; // a cut node (and its subtree) is excluded wholesale
 
     if (node.type === "snippet") {
-      if (node.condition) els.push({ kind: "condition", indent, snippet: sid, text: `if ${humanize(node.condition)}` });
+      if (node.condition) els.push({ kind: "condition", id: node.id, indent, snippet: sid, text: `if ${humanize(node.condition)}` });
+      notes(node.id, indent, sid);
       emitBeats(node, indent, sid);
       return;
     }
 
     // group
-    if (node.condition) els.push({ kind: "condition", indent, snippet: sid, text: `if ${humanize(node.condition)}` });
+    if (node.condition) els.push({ kind: "condition", id: node.id, indent, snippet: sid, text: `if ${humanize(node.condition)}` });
+    if (node.selector === "choice" || node.selector === "branch" || node.selector === "sequence") {
+      // A selector's notes come after its label (below); a plain run has no row of its own, so here.
+    } else notes(node.id, indent, sid);
 
     if (node.selector === "choice") {
-      els.push({ kind: "group", indent, label: "Choose" });
+      els.push({ kind: "group", id: node.id, indent, label: "Choose" });
+      notes(node.id, indent, sid);
       for (const child of node.children ?? []) {
         if (cut.has(child.id)) continue;
         const cid = nextSid(); // each option (with its consequence) is one edged snippet
         // An authored option is a group carrying `prompt`; tolerate the degenerate snippet-option (its
         // first line is the prompt, the rest is content).
         if (child.type === "group" && child.prompt) {
-          if (child.condition) els.push({ kind: "condition", indent, snippet: cid, text: `if ${humanize(child.condition)}` });
-          els.push({ kind: "option", indent, snippet: cid, runs: textRuns(textOf(child.prompt.id) || "(option)"), tag: optionTag(child) });
+          if (child.condition) els.push({ kind: "condition", id: child.id, indent, snippet: cid, text: `if ${humanize(child.condition)}` });
+          els.push({ kind: "option", id: child.prompt.id, node: child.id, indent, snippet: cid, runs: textRuns(textOf(child.prompt.id) || "(option)"), tag: optionTag(child) });
+          notes(child.id, indent, cid);
+          notes(child.prompt.id, indent, cid);
           for (const c of child.children ?? []) walk(c, indent + 1, cid);
         } else if (child.type === "snippet") {
           const beats = child.beats ?? [];
           const first = beats.find((b) => b.kind === "line" || b.kind === "text");
-          if (child.condition) els.push({ kind: "condition", indent, snippet: cid, text: `if ${humanize(child.condition)}` });
-          els.push({ kind: "option", indent, snippet: cid, runs: textRuns(first ? textOf(first.id) || "(option)" : "(option)"), tag: optionTag(child) });
+          if (child.condition) els.push({ kind: "condition", id: child.id, indent, snippet: cid, text: `if ${humanize(child.condition)}` });
+          els.push({ kind: "option", id: first?.id ?? child.id, node: child.id, indent, snippet: cid, runs: textRuns(first ? textOf(first.id) || "(option)" : "(option)"), tag: optionTag(child) });
+          notes(child.id, indent, cid);
+          if (first) notes(first.id, indent, cid);
           // content = the snippet minus its prompt beat, plus any jump (indented a level under the option)
           let seenPrompt = false;
           for (const beat of beats) {
             if (!seenPrompt && beat === first) { seenPrompt = true; continue; }
             if (cut.has(beat.id)) continue;
-            if (beat.kind === "line") els.push({ kind: "line", indent: indent + 1, snippet: cid, character: beat.character ?? "", direction: beat.direction, runs: textRuns(textOf(beat.id)) });
-            else if (beat.kind === "text") els.push({ kind: "narration", indent: indent + 1, snippet: cid, runs: textRuns(textOf(beat.id)) });
-            else if (beat.kind === "gameEvent") els.push({ kind: "gameEvent", indent: indent + 1, snippet: cid, text: gameEventLabel(beat) });
+            if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent: indent + 1, snippet: cid, character: beat.character ?? "", direction: beat.direction, runs: textRuns(textOf(beat.id)) });
+            else if (beat.kind === "text") els.push({ kind: "narration", id: beat.id, indent: indent + 1, snippet: cid, runs: textRuns(textOf(beat.id)) });
+            else if (beat.kind === "gameEvent") els.push({ kind: "gameEvent", id: beat.id, indent: indent + 1, snippet: cid, text: gameEventLabel(beat) });
+            else continue;
+            notes(beat.id, indent + 1, cid);
           }
-          if (child.jump) els.push({ kind: "jump", indent: indent + 1, snippet: cid, text: jumpText(child.jump) });
+          if (child.jump) els.push({ kind: "jump", id: child.id, to: child.jump.to, indent: indent + 1, snippet: cid, text: jumpText(child.jump) });
         } else {
           // a non-option group nested directly under a choice (unusual) - render its content
           walk(child, indent + 1, cid);
@@ -246,18 +290,20 @@ export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
     }
 
     if (node.selector === "branch") {
-      els.push({ kind: "group", indent, label: "One of · first match wins" });
+      els.push({ kind: "group", id: node.id, indent, label: "One of · first match wins" });
+      notes(node.id, indent, sid);
       const kids = (node.children ?? []).filter((c) => !cut.has(c.id));
       kids.forEach((child, i) => {
         const isCatchAll = i === kids.length - 1 && kids.length > 1 && !("condition" in child && child.condition);
-        if (isCatchAll) els.push({ kind: "else", indent });
+        if (isCatchAll) els.push({ kind: "else", id: child.id, indent });
         walk(child, indent, nextSid()); // each row is its own edged snippet
       });
       return;
     }
 
     if (node.selector === "sequence") {
-      els.push({ kind: "group", indent, label: sequenceLabel(node) });
+      els.push({ kind: "group", id: node.id, indent, label: sequenceLabel(node) });
+      notes(node.id, indent, sid);
       for (const child of node.children ?? []) walk(child, indent, nextSid()); // each step is its own edged snippet
       return;
     }
@@ -266,12 +312,15 @@ export function runScriptDoc(loaded: LoadedProject): ScriptDoc {
     for (const child of node.children ?? []) walk(child, indent, sid);
   };
 
+  const only = opts.scenes ? new Set(opts.scenes) : undefined;
   for (const scene of loaded.scenes as Scene[]) {
-    if (cut.has(scene.id)) continue;
-    els.push({ kind: "scene", text: scene.name });
+    if (cut.has(scene.id) || (only && !only.has(scene.id))) continue;
+    els.push({ kind: "scene", id: scene.id, text: scene.name });
+    notes(scene.id, 0, undefined);
     for (const block of scene.blocks as Block[]) {
       if (cut.has(block.id)) continue;
-      els.push({ kind: "block", text: block.name });
+      els.push({ kind: "block", id: block.id, text: block.name });
+      notes(block.id, 0, undefined);
       for (const child of block.children ?? []) walk(child, 0, undefined); // top-level snippets: no edge
     }
   }

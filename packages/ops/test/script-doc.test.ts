@@ -51,6 +51,14 @@ function makeProject(): string {
     T1: "The door creaks open.", L1: "What'll it be?", P1: "Order an ale", P2: "Ask about the back room",
     L2: "Coming right up.", L3: "You didn't see anything.", T2: "Shadows everywhere." } });
 
+  // Notes of every kind, for the notes options (the readable script shows none of them).
+  mkdirSync(join(dir, "authoring"), { recursive: true });
+  w("authoring/one.patterx", { schema: "patter/authoring@0", documentation: {
+    s1: [{ type: "editor", text: "Late night; the bar is nearly empty." }],
+    L1: [{ type: "editor", text: "He's tired, not rude." }, { type: "vo", text: "Low and slow." }, { text: "untyped: never shown" }],
+    o1: [{ type: "everyone", text: "The cheap option." }],
+  } });
+
   return dir;
 }
 
@@ -107,6 +115,49 @@ describe("runScriptDoc", () => {
   });
 });
 
+describe("runScriptDoc: ids, scene range, and notes (for the editable script)", () => {
+  const loaded = loadProject(makeProject());
+  const doc = runScriptDoc(loaded);
+  const of = <K extends ScriptElement["kind"]>(d: ScriptDoc, k: K) => d.elements.filter((e): e is Extract<ScriptElement, { kind: K }> => e.kind === k);
+
+  it("ties every element to the scene, block, node, or beat it shows", () => {
+    expect(doc.elements.every((e) => typeof e.id === "string" && e.id !== "")).toBe(true);
+    expect(of(doc, "scene").map((e) => e.id)).toEqual(["s1"]);
+    expect(of(doc, "line").map((e) => e.id)).toEqual(["L1", "L2", "L3"]);
+    expect(of(doc, "option").map((e) => [e.id, e.node])).toEqual([["P1", "o1"], ["P2", "o2"]]);
+    expect(of(doc, "condition").map((e) => e.id)).toEqual(["o1"]);
+    expect(of(doc, "jump").map((e) => [e.id, e.to])).toEqual([["n2", "b2"], ["n4", "END"]]);
+    expect(of(doc, "gameEvent").map((e) => e.id)).toEqual(["A1"]);
+  });
+
+  it("shows no notes unless asked, so the readable script is unchanged", () => {
+    expect(of(doc, "note")).toEqual([]);
+  });
+
+  it("notes for a channel: that channel's and everyone's, each under its own node, never untyped", () => {
+    const d = runScriptDoc(loaded, { notes: { channel: "editor" } });
+    expect(of(d, "note").map((n) => [n.id, n.text])).toEqual([
+      ["s1", "Late night; the bar is nearly empty."],
+      ["L1", "He's tired, not rude."],
+      ["o1", "The cheap option."],
+    ]);
+    // Each note sits straight after the element it belongs to (the scene note is NOT repeated on lines).
+    const i = d.elements.findIndex((e) => e.kind === "note" && e.id === "L1");
+    expect(d.elements[i - 1]).toMatchObject({ kind: "line", id: "L1" });
+  });
+
+  it("\"all\" notes: every classed note, still never untyped", () => {
+    const texts = of(runScriptDoc(loaded, { notes: "all" }), "note").map((n) => n.text);
+    expect(texts).toContain("Low and slow.");
+    expect(texts).not.toContain("untyped: never shown");
+  });
+
+  it("a scene range keeps only those scenes", () => {
+    expect(runScriptDoc(loaded, { scenes: [] }).elements).toEqual([]);
+    expect(of(runScriptDoc(loaded, { scenes: ["s1"] }), "scene")).toHaveLength(1);
+  });
+});
+
 describe("character cue colour", () => {
   it("hashes a name into the 12-slot palette (FNV-1a + fmix32), stable per name", () => {
     expect(colourIndex("GUIDE")).toBe(7); // worked example from the design handoff (blue)
@@ -133,7 +184,7 @@ describe("script renderers", () => {
 
   it("embeds the design faces + fallbacks so accents / arrows / maths / scripts / emoji render", async () => {
     const uni: ScriptDoc = { project: "Uni", elements: [
-      { kind: "line", indent: 0, character: "GUIDE", runs: textRuns("Maths 1 ≥ 0, arrow ←, café, привет, Ελλάς, torch 🔥.") },
+      { kind: "line", id: "L1", indent: 0, character: "GUIDE", runs: textRuns("Maths 1 ≥ 0, arrow ←, café, привет, Ελλάς, torch 🔥.") },
     ] };
     const buf = await scriptToPdf(uni);
     const raw = buf.toString("latin1");
@@ -178,7 +229,10 @@ describe("readable-script text handling: conditions, markup, interpolation", () 
     const doc = runScriptDoc(loadProject(dir));
     const conds = doc.elements.filter((e) => e.kind === "condition").map((e) => (e as { text: string }).text);
     expect(conds).toContain("if not seen(Intro)");
-    expect(JSON.stringify(doc.elements)).not.toContain("blk_lcd858q2");
+    // Nothing the reader SEES names the raw id. (Elements carry ids in their id / to fields for exports
+    // that tie rows back to the project; those aren't printed.)
+    const shown = doc.elements.map(({ id: _id, ...rest }) => ("to" in rest ? { ...rest, to: undefined } : rest));
+    expect(JSON.stringify(shown)).not.toContain("blk_lcd858q2");
   });
 
   it("textRuns splits the closed <b>/<i>/<bi> markup into formatting runs, literals verbatim", () => {

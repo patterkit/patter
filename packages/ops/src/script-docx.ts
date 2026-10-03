@@ -84,6 +84,9 @@ function paragraph(el: ScriptElement, prev: ScriptElement | undefined): Paragrap
       return new Paragraph({ keepLines: true, alignment: AlignmentType.RIGHT, spacing: { before: 40, after: 40 }, children: [new TextRun({ text: `↪  ${el.text}`, font: SANS, bold: true, color: TOKENS.accent, size: S.mech })] });
     case "gameEvent":
       return new Paragraph({ keepLines: true, alignment: AlignmentType.RIGHT, spacing: { before: 40, after: 40 }, children: [new TextRun({ text: `⚙  ${el.text}`, font: MONO, color: TOKENS.accent, size: S.mech - 2 })] });
+    case "note":
+      // Only when the caller asked for notes; the readable script asks for none.
+      return new Paragraph({ keepLines: true, spacing: { before: WITHIN, after: 20 }, indent: { left: leftOf(el) }, children: [new TextRun({ text: `Note: ${el.text}`, font: SERIF, italics: true, color: TOKENS.muted, size: S.cue })] });
   }
 }
 
