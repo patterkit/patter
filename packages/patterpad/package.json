@@ -37,7 +37,7 @@
     "@wildwinter/app-shell": "^0.46.3",
     "@wildwinter/expr-editor": "^0.16.0",
     "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0",
-    "@wildwinter/simple-vc-lib": "^0.4.1",
+    "@wildwinter/simple-vc-lib": "^0.5.0",
     "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0",
     "json5": "^2.2.3",

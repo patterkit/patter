@@ -74,8 +74,8 @@ export {
 } from "./handoff.js";
 export type { HandoffIssue, ReadMarker, Random } from "./handoff.js";
 // Deciding suggestions on the files (bulk review, the CLI), and the cut writer
-export { applySuggestionDecisions, setCut } from "./suggestions.js";
-export type { SuggestionDecision, DecisionResult, DecisionPlan } from "./suggestions.js";
+export { applySuggestionDecisions, setCut, listOpenSuggestions, staleParts } from "./suggestions.js";
+export type { SuggestionDecision, DecisionResult, DecisionPlan, OpenSuggestion } from "./suggestions.js";
 // The editable script: the readable script with its editable lines boxed, plus its handoff record
 export { exportEditableScript } from "./editable-docx.js";
 export type { EditableScriptOptions, EditableScript } from "./editable-docx.js";

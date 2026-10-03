@@ -16,10 +16,47 @@
 import { readFileSync } from "node:fs";
 import { canonicalStringify, parseSource } from "@patterkit/core";
 import { walkNodes } from "@patterkit/model";
-import type { AuthoringFile, Beat, FlowFile, Group, LocaleFile, Scene, Snippet } from "@patterkit/model";
+import type { AuthoringFile, Beat, FlowFile, Group, LineBeat, LocaleFile, Scene, Snippet, Suggestion } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
 import { authoringPath, existingLocPath } from "./localisation.js";
+import { sourceStrings } from "./loaded-helpers.js";
+
+/** Which parts of a suggestion no longer match the project (empty: it still applies cleanly). */
+export function staleParts(s: Suggestion, liveText: string, line: LineBeat | undefined): string[] {
+  const stale: string[] = [];
+  if (liveText !== s.baseline) stale.push("the text");
+  if (s.proposedCharacter !== undefined && (line?.character ?? "") !== (s.baselineCharacter ?? "")) stale.push("the speaker");
+  if (s.proposedDirection !== undefined && (line?.direction ?? "") !== (s.baselineDirection ?? "")) stale.push("the direction");
+  if ((s.proposedCharacter !== undefined || s.proposedDirection !== undefined) && !line) stale.push("the line (no longer a spoken line)");
+  return stale;
+}
+
+/** An open suggestion, where it is, and whether it still applies. */
+export interface OpenSuggestion {
+  suggestion: Suggestion;
+  sceneId?: string;
+  /** Parts that changed since it was made (empty: clean). */
+  stale: string[];
+}
+
+/** Every open (unresolved) suggestion in the project, optionally only those from one handoff, in scene
+ *  order then by time. One whose line is gone is listed as stale. */
+export function listOpenSuggestions(loaded: LoadedProject, filter: { handoff?: string } = {}): OpenSuggestion[] {
+  const places = indexPlaces(loaded);
+  const live = sourceStrings(loaded);
+  const sceneOrder = new Map(loaded.scenes.map((sc, i) => [sc.id, i]));
+  const out: OpenSuggestion[] = [];
+  for (const af of loaded.authoring) {
+    for (const s of af.suggestions ?? []) {
+      if (s.resolved || (filter.handoff && s.handoff?.id !== filter.handoff)) continue;
+      const place = places.get(s.anchor);
+      const line = place?.beat?.kind === "line" ? place.beat : undefined;
+      out.push({ suggestion: s, ...(place ? { sceneId: place.sceneId } : {}), stale: place ? staleParts(s, live[s.anchor] ?? "", line) : ["the line (no longer in the project)"] });
+    }
+  }
+  return out.sort((a, b) => (sceneOrder.get(a.sceneId ?? "") ?? 1e9) - (sceneOrder.get(b.sceneId ?? "") ?? 1e9) || a.suggestion.ts.localeCompare(b.suggestion.ts));
+}
 
 /** Accept or reject one suggestion. */
 export interface SuggestionDecision { id: string; accept: boolean }
@@ -168,11 +205,7 @@ export function applySuggestionDecisions(
 
     // Staleness, part by part: each part present must still match what it was suggested against.
     const liveText = loc?.file.strings[s.anchor] ?? "";
-    const stale: string[] = [];
-    if (liveText !== s.baseline) stale.push("the text");
-    if (s.proposedCharacter !== undefined && (line?.character ?? "") !== (s.baselineCharacter ?? "")) stale.push("the speaker");
-    if (s.proposedDirection !== undefined && (line?.direction ?? "") !== (s.baselineDirection ?? "")) stale.push("the direction");
-    if ((s.proposedCharacter !== undefined || s.proposedDirection !== undefined) && !line) stale.push("the line (no longer a spoken line)");
+    const stale = staleParts(s, liveText, line);
     if (stale.length) {
       results.push({ id: d.id, outcome: "stale", reason: `${stale.join(" and ")} changed since this was suggested` });
       continue;

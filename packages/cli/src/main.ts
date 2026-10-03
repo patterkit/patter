@@ -19,8 +19,10 @@ import {
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus, patterScopesWrite,
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
+  exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions,
 } from "@patterkit/ops";
-import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog } from "@patterkit/ops";
+import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog, ImportPlan, LoadedProject } from "@patterkit/ops";
+import { createHash } from "node:crypto";
 
 /** A file the structured merger handles (source shards only - not bundle / document). */
 const isPatterSource = (path: string): boolean => SHARD_EXTENSIONS.some((ext) => path.endsWith(ext));
@@ -44,7 +46,7 @@ function writeMergeResult(result: MergeResult, out: string, announce: boolean): 
   if (announce) console.log(`merged ${out} (${result.type}, no conflicts)`);
   return 0;
 }
-import { writeTextFiles, writeBinaryFile, deleteFile } from "@wildwinter/simple-vc-lib";
+import { writeTextFiles, writeBinaryFile, deleteFile, currentUser } from "@wildwinter/simple-vc-lib";
 // The number comes from the MANIFEST, inlined by both shipping paths (tsup and Bun --compile), rather
 // than a hand-kept constant. A release is tagged from the manifest, so a constant that drifts from it
 // drifts from the name of the file the user downloaded, which is the one thing they can still read.
@@ -86,6 +88,14 @@ Usage:
                  dist/<name>.pdf. PDF uses built-in fonts (Latin); use .docx for full Unicode.
   patter voice-export [path] -o file.xlsx  Voice (VO) recording script (spec §16)
                  [--all]           Include every voiced line (else only "ready to record")
+  patter export-editable [path] -o file.docx  An editable script to send to an editor outside Patter
+                 [--scene name]... (repeatable; default the whole project) [--recipient "Sam"]
+                 [--status] [--cast] [--all-notes] [--by name]   (writes a handoffs/<id>.json record too)
+  patter import-editable <file.docx> [path]  Bring an editor's file back as suggestions and comments
+                 [--dry-run] [--direct] [--as name] [--by name] [--strict-quotes]
+                 (--direct accepts clean changes; --as credits untracked edits; nothing half-written)
+  patter suggestions [path]       List open suggestions, clean or out of date
+                 [--handoff H-XXXX] [--accept-clean] [--json]
   patter share-scopes [path]      Share the project's scopes with the game's other tools: make the game's
                  [--at dir]        game-scopes/ folder (in --at, else the version-control root above the
                                    project) with patter.scopes.json and game.scopes.json; joins a folder
@@ -100,7 +110,7 @@ Usage:
 `;
 
 // Per-command flag declarations: anything else is an error.
-const FLAGS: Record<string, { boolean: string[]; valued: string[] }> = {
+const FLAGS: Record<string, { boolean: string[]; valued: string[]; repeatable?: string[] }> = {
   init: { boolean: [], valued: ["name", "vcs", "bundle"] },
   validate: { boolean: [], valued: [] },
   format: { boolean: ["check"], valued: [] },
@@ -115,6 +125,9 @@ const FLAGS: Record<string, { boolean: string[]; valued: string[] }> = {
   "loc-import": { boolean: [], valued: ["locale"] },
   "voice-export": { boolean: ["all"], valued: ["o"] },
   "export-script": { boolean: [], valued: ["o"] },
+  "export-editable": { boolean: ["status", "cast", "all-notes"], valued: ["o", "recipient", "by"], repeatable: ["scene"] },
+  "import-editable": { boolean: ["dry-run", "direct", "strict-quotes"], valued: ["as", "by"] },
+  suggestions: { boolean: ["accept-clean", "json"], valued: ["handoff"] },
   "share-scopes": { boolean: [], valued: ["at"] },
   pack: { boolean: [], valued: ["o"] },
   unpack: { boolean: ["merge"], valued: ["o", "base"] },
@@ -124,7 +137,8 @@ const FLAGS: Record<string, { boolean: string[]; valued: string[] }> = {
 
 export interface ParsedArgs {
   positionals: string[];
-  flags: Record<string, string | boolean>;
+  /** A repeatable flag (`--scene a --scene b`) collects its values in order. */
+  flags: Record<string, string | boolean | string[]>;
   /** Usage problems (unknown flag, missing value); non-empty means exit 2. */
   errors: string[];
 }
@@ -132,7 +146,7 @@ export interface ParsedArgs {
 export function parseArgs(command: string, args: string[]): ParsedArgs {
   const spec = FLAGS[command] ?? { boolean: [], valued: [] };
   const positionals: string[] = [];
-  const flags: Record<string, string | boolean> = {};
+  const flags: Record<string, string | boolean | string[]> = {};
   const errors: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
@@ -143,6 +157,10 @@ export function parseArgs(command: string, args: string[]): ParsedArgs {
     }
     if (spec.boolean.includes(key)) {
       flags[key] = true;
+    } else if (spec.repeatable?.includes(key)) {
+      const value = args[++i];
+      if (value === undefined || value === "") errors.push(`${a} needs a value`);
+      else flags[key] = [...((flags[key] as string[] | undefined) ?? []), value];
     } else if (spec.valued.includes(key)) {
       const value = args[++i];
       if (value === undefined || value === "") errors.push(`${a} needs a value`);
@@ -159,12 +177,12 @@ export function parseArgs(command: string, args: string[]): ParsedArgs {
  * @wildwinter/simple-vc-lib) and report every refusal with its why. On partial
  * failure, also says what DID land. Returns true when all writes landed.
  */
-function commitWrites(writes: PlannedWrite[]): boolean {
-  const batch = writeTextFiles(writes.map((w) => ({ filePath: w.path, content: w.content })));
+function commitWrites(writes: PlannedWrite[], opts: { allOrNothing?: boolean } = {}): boolean {
+  const batch = writeTextFiles(writes.map((w) => ({ filePath: w.path, content: w.content })), "utf8", { allOrNothing: opts.allOrNothing === true });
   const failures = batch.results.filter((r) => !r.success);
   for (const f of failures) console.error(`write failed [${f.status}]: ${f.message}`);
   if (!batch.success) {
-    console.error(`${batch.results.length - failures.length} of ${batch.results.length} file(s) written`);
+    console.error(opts.allOrNothing ? "nothing was written" : `${batch.results.length - failures.length} of ${batch.results.length} file(s) written`);
   }
   return batch.success;
 }
@@ -213,7 +231,7 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-async function run(cmd: string, positionals: string[], flags: Record<string, string | boolean>): Promise<number> {
+async function run(cmd: string, positionals: string[], flags: Record<string, string | boolean | string[]>): Promise<number> {
   switch (cmd) {
     case "init": {
       const vcs = typeof flags.vcs === "string" ? (flags.vcs as InitVcs) : undefined;
@@ -442,6 +460,62 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
       return 0;
     }
 
+    case "export-editable": {
+      if (typeof flags.o !== "string") { console.error("export-editable: -o <file.docx> is required"); return 2; }
+      if (!/\.docx$/i.test(flags.o)) { console.error("export-editable: -o must end in .docx"); return 2; }
+      const loaded = loadProject(positionals[0] ?? ".");
+      const scenes = Array.isArray(flags.scene) ? resolveScenes(loaded, flags.scene) : undefined;
+      if (scenes === null) return 2;
+      const out = await exportEditableScript(loaded, {
+        by: who(loaded, flags.by), ...(scenes ? { scenes } : {}),
+        ...(typeof flags.recipient === "string" ? { recipient: flags.recipient } : {}),
+        notes: flags["all-notes"] === true ? "all" : "editor", status: flags.status === true, cast: flags.cast === true,
+      });
+      if (!commitBinary(flags.o, out.docx)) return 1;
+      if (!commitWrites(out.writes)) return 1;
+      console.log(`wrote ${flags.o} - ${Object.keys(out.handoff.lines).length} line(s), handoff ${out.handoff.id}`);
+      return 0;
+    }
+
+    case "import-editable": {
+      const file = positionals[0];
+      if (!file) { console.error("import-editable: no file given"); return 2; }
+      const loaded = loadProject(positionals[1] ?? ".");
+      const bytes = readFileSync(file);
+      const plan = planEditableImport(loaded, await readEditableDocx(bytes), {
+        by: who(loaded, flags.by), fileHash: createHash("sha256").update(bytes).digest("hex"),
+        ...(typeof flags.as === "string" ? { as: flags.as } : {}),
+        strictQuotes: flags["strict-quotes"] === true, direct: flags.direct === true,
+      });
+      console.log(renderImportReport(plan));
+      if (plan.report.refused) return 1;
+      if (flags["dry-run"] === true) { console.log("dry run: nothing written"); return 0; }
+      // All or nothing: under lock-based version control, a file someone else holds means no file is written.
+      if (!commitWrites(plan.writes, { allOrNothing: true })) return 1;
+      console.log(`imported into ${plan.writes.length} file(s)`);
+      return 0;
+    }
+
+    case "suggestions": {
+      const loaded = loadProject(positionals[0] ?? ".");
+      const open = listOpenSuggestions(loaded, typeof flags.handoff === "string" ? { handoff: flags.handoff } : {});
+      if (flags.json === true && flags["accept-clean"] !== true) { console.log(JSON.stringify(open, null, 2)); return 0; }
+      if (flags["accept-clean"] === true) {
+        const clean = open.filter((o) => o.stale.length === 0);
+        if (!clean.length) { console.log("no clean suggestions to accept"); return 0; }
+        const plan = applySuggestionDecisions(loaded, clean.map((o) => ({ id: o.suggestion.id, accept: true })), { by: who(loaded, undefined) });
+        if (!commitWrites(plan.writes, { allOrNothing: true })) return 1;
+        const accepted = plan.results.filter((r) => r.outcome === "accepted").length;
+        console.log(`accepted ${accepted} suggestion(s)${open.length > clean.length ? `; ${open.length - clean.length} out of date, left open` : ""}`);
+        return 0;
+      }
+      if (!open.length) { console.log("no open suggestions"); return 0; }
+      for (const o of open) console.log(describeSuggestion(o));
+      const stale = open.filter((o) => o.stale.length).length;
+      console.log(`${open.length} open suggestion(s)${stale ? `, ${stale} out of date` : ""}`);
+      return 0;
+    }
+
     case "voice-export": {
       if (typeof flags.o !== "string") { console.error("voice-export: -o <file.xlsx> is required"); return 2; }
       const loaded = loadProject(positionals[0] ?? ".");
@@ -607,4 +681,52 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
       console.log(USAGE);
       return 2;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Editable script helpers
+// ---------------------------------------------------------------------------
+
+/** Who is doing this: --by, else the version-control user, else the OS user. */
+function who(loaded: LoadedProject, by: string | boolean | string[] | undefined): string {
+  if (typeof by === "string" && by.trim()) return by.trim();
+  try { const u = currentUser(loaded.root); if (u) return u; } catch { /* no VCS user */ }
+  return process.env["USER"] ?? process.env["USERNAME"] ?? "Patter";
+}
+
+/** --scene values (an id or a name, any case) to scene ids in project order; null after printing the miss. */
+function resolveScenes(loaded: LoadedProject, wanted: string[]): string[] | null {
+  const ids = new Set<string>();
+  for (const w of wanted) {
+    const scene = loaded.scenes.find((sc) => sc.id === w) ?? loaded.scenes.find((sc) => sc.name.toLowerCase() === w.toLowerCase());
+    if (!scene) { console.error(`export-editable: no scene called '${w}' (scenes: ${loaded.scenes.map((sc) => sc.name).join(", ")})`); return null; }
+    ids.add(scene.id);
+  }
+  return loaded.scenes.filter((sc) => ids.has(sc.id)).map((sc) => sc.id);
+}
+
+/** The import report, for a person reading a terminal. */
+export function renderImportReport(plan: ImportPlan): string {
+  const r = plan.report;
+  const out: string[] = [];
+  const h = plan.handoff;
+  out.push(h ? `handoff ${h.id}${h.recipient ? ` (sent to ${h.recipient})` : ""}, exported ${h.createdAt.slice(0, 10)} by ${h.createdBy}` : `handoff ${r.handoffId ?? "(none found)"}`);
+  if (r.refused) { out.push(`refused: ${r.refused}`); return out.join("\n"); }
+  const c = r.counts;
+  out.push(`${c.changed} suggestion(s), ${c.unchanged} unchanged, ${c.stale} out of date, ${c.comments} comment(s), ${c.problems} problem(s)`);
+  for (const p of r.problems) out.push(`  [${p.severity}] ${p.message}${p.anchor ? ` (${p.anchor})` : ""}`);
+  return out.join("\n");
+}
+
+/** One open suggestion on one line. */
+function describeSuggestion(o: ReturnType<typeof listOpenSuggestions>[number]): string {
+  const s = o.suggestion;
+  const parts: string[] = [];
+  if (s.proposedCut) parts.push("cut this line");
+  if (s.proposed !== s.baseline) parts.push(`"${s.baseline}" -> "${s.proposed}"`);
+  if (s.proposedCharacter !== undefined) parts.push(`speaker ${s.baselineCharacter || "(none)"} -> ${s.proposedCharacter}`);
+  if (s.proposedDirection !== undefined) parts.push(`direction "${s.baselineDirection ?? ""}" -> "${s.proposedDirection}"`);
+  const from = s.handoff ? ` [${s.handoff.id}]` : "";
+  const stale = o.stale.length ? ` OUT OF DATE (${o.stale.join(", ")})` : "";
+  return `${s.id} ${s.anchor} by ${s.author}${from}: ${parts.join("; ")}${stale}`;
 }

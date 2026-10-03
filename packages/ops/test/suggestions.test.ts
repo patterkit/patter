@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { canonicalStringify, parseSource } from "@patterkit/core";
 import type { AuthoringFile, FlowFile, LineBeat, LocaleFile, Suggestion } from "@patterkit/model";
-import { loadProject, applyWrites, applySuggestionDecisions, setCut, runScriptDoc } from "../src/index.js";
+import { loadProject, applyWrites, applySuggestionDecisions, setCut, runScriptDoc, listOpenSuggestions } from "../src/index.js";
 
 const fixture = fileURLToPath(new URL("../../../test-fixtures/tavern-example.patter", import.meta.url));
 const NOW = "2026-10-03T12:00:00.000Z";
@@ -101,6 +101,23 @@ describe("applySuggestionDecisions", () => {
     const plan = applySuggestionDecisions(loadProject(dir), [{ id: "nope", accept: true }, { id: "done", accept: true }, { id: "orphan", accept: true }]);
     expect(plan.results.map((r) => r.outcome)).toEqual(["missing", "resolved-already", "missing"]);
     expect(plan.writes).toEqual([]);
+  });
+});
+
+describe("listOpenSuggestions", () => {
+  it("lists the open ones, filtered by handoff, each marked clean or stale and why", () => {
+    const dir = tavernWith([
+      sugg("clean", { proposed: "New.", handoff: { id: "H-AAAA", marker: "K1" } }),
+      sugg("stale", { baseline: "Older.", proposed: "x", handoff: { id: "H-AAAA", marker: "K2" } }),
+      sugg("other", { proposed: "y", handoff: { id: "H-BBBB", marker: "K3" } }),
+      sugg("done", { proposed: "z", resolved: true, outcome: "accepted" }),
+      sugg("gone", { anchor: "L_gone" }),
+    ]);
+    const all = listOpenSuggestions(loadProject(dir));
+    expect(all.map((o) => o.suggestion.id).sort()).toEqual(["clean", "gone", "other", "stale"]);
+    const mine = listOpenSuggestions(loadProject(dir), { handoff: "H-AAAA" });
+    expect(mine.map((o) => [o.suggestion.id, o.stale])).toEqual([["clean", []], ["stale", ["the text"]]]);
+    expect(all.find((o) => o.suggestion.id === "gone")!.stale).toEqual(["the line (no longer in the project)"]);
   });
 });
 
