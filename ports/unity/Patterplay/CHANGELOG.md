@@ -18,6 +18,13 @@ same runtime behaviour.
   `OutlineScene` and `OutlineBlock` carry it as `GameData` (null when empty, like `BeatInfo.GameData`).
   Held across all four runtimes by the conformance corpus.
 
+### Changed
+
+- **`Flow.Snapshot()` and `Flow.Restore()` are public**, as `snapshot` and `restore` already are on the
+  JS, Godot, and Unreal runtimes. A host can copy one flow's position and memory and put it back
+  without saving the whole engine; Patterstage uses this to leave a running conversation's flow
+  untouched when a request turns out to have nothing to say.
+
 ## [0.14.3] - 2026-09-27
 
 ### Changed

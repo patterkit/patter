@@ -891,7 +891,7 @@ namespace Patterkit.Patterplay
         // -- save / restore -----------------------------------------------------
 
         /// <summary>Snapshot this flow's cursor, PRNG, and visits. Its properties are the registry's.</summary>
-        internal FlowSnapshot Snapshot()
+        public FlowSnapshot Snapshot()
         {
             return new FlowSnapshot
             {
@@ -917,7 +917,7 @@ namespace Patterkit.Patterplay
             };
         }
 
-        internal void Restore(FlowSnapshot snap)
+        public void Restore(FlowSnapshot snap)
         {
             _rngState = snap.RngState;
             _visitCounts = new Dictionary<string, int>(snap.Visits ?? new Dictionary<string, int>());

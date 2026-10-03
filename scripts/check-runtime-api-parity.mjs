@@ -67,6 +67,10 @@ const API = [
   // --- host navigation ------------------------------------------------------
   { on: "Flow", js: "goto", unity: "Goto", godot: "goto", unreal: "gotoAddress", bp: "Goto" },
   { on: "Flow", js: "close", unity: "Close", godot: "close", unreal: "close", bp: "Close" },
+  { on: "Flow", js: "snapshot", unity: "Snapshot", godot: "snapshot", unreal: "snapshot", bp: null,
+    why: "Blueprint saves the whole engine (SaveGame); a single flow's snapshot is for C++ hosts" },
+  { on: "Flow", js: "restore", unity: "Restore", godot: "restore", unreal: "restore", bp: null,
+    why: "Blueprint saves the whole engine (SaveGame); a single flow's snapshot is for C++ hosts" },
   { on: "Flow", js: "isClosed", unity: "IsClosed", godot: "is_closed", unreal: "isClosed", bp: "IsClosed" },
   { on: "Engine", js: "runFlow", unity: "RunFlow", godot: "run_flow", unreal: "runFlow", bp: "RunFlow" },
 
