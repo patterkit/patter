@@ -164,6 +164,10 @@
 .suggestion-popover .sg-stale { margin: 5.5px 0; padding: 4px 7px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent) 10%, transparent); color: var(--ink-soft); font: italic 11.5px var(--font-ui); }
 .suggestion-popover .sg-diff-label { margin-top: 6.5px; font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
 .suggestion-popover .sg-before { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--line); color: var(--muted); font: 13px var(--font-ui); white-space: pre-wrap; }
+.suggestion-popover .sg-source { font: 11px var(--font-ui); color: var(--muted); }
+.suggestion-popover .sg-cut { text-decoration: line-through; text-decoration-color: color-mix(in oklab, var(--danger) 70%, transparent); }
+.suggestion-popover .sg-part { display: flex; align-items: center; gap: 6px; margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); font: 600 12.5px var(--font-ui); color: var(--ink); }
+.suggestion-popover .sg-part svg { color: var(--muted); flex: 0 0 auto; }
 .suggestion-popover .sg-after { margin: 1.5px 0 0; padding: 3px 8px; border-left: 2px solid var(--accent); color: var(--ink); font: 13px var(--font-ui); white-space: pre-wrap; }
 
 /* The toast is the shell's now (@wildwinter/app-shell/toast.css). */
@@ -541,6 +545,32 @@ input::placeholder, textarea::placeholder {
 /* Localisation modal: format + language pickers side by side. */
 .loc-dialog { width: 92vw; max-width: 512px; }
 .vo-dialog { width: 92vw; max-width: 480px; }
+
+/* Editable script export + reimport (editable-dialogs.ts). The range choice leads, larger than the rest:
+   each half carries its line count under its label. */
+.editable-dialog { width: 92vw; max-width: 528px; }
+/* `hidden` must win over the flex / inline-flex these controls set (a refused file hides its options). */
+.editable-dialog [hidden] { display: none !important; }
+.editable-dialog .settings-toggle { margin-top: 2px; }
+.editable-range { display: flex; width: 100%; margin-bottom: 13px; }
+.editable-range .seg-opt { flex: 1 1 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9.5px 13px; text-align: left; min-width: 0; }
+.editable-range .seg-opt:disabled { opacity: .5; cursor: default; }
+.editable-range-label { font: 600 14px var(--font-ui); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editable-range-count { font: 12px var(--font-ui); color: var(--muted); }
+.editable-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 11px; }
+.editable-field-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
+.editable-field-hint { font: 12px var(--font-ui); color: var(--muted); }
+.editable-summary { margin-bottom: 13px; }
+.editable-summary-line { margin: 0 0 4.5px; font: 13.5px var(--font-ui); color: var(--ink); }
+.editable-counts { margin: 0 0 9.5px; font: 600 13.5px var(--font-ui); color: var(--ink); }
+.editable-refused { margin: 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: 13.5px var(--font-ui); color: var(--ink); }
+.editable-problems { list-style: none; margin: 0; padding: 0; max-height: 36vh; overflow: auto; border-top: 1px solid var(--line); }
+.editable-problem { display: flex; align-items: center; gap: 9px; padding: 6px 2px; border-bottom: 1px solid var(--line); font: 13px var(--font-ui); color: var(--ink); }
+.editable-problem.info { color: var(--muted); }
+.editable-problem.warning .editable-problem-text::before { content: ""; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 0; border-radius: 50%; background: var(--warn); }
+.editable-problem-text { flex: 1 1 auto; min-width: 0; }
+.editable-goto { flex: 0 0 auto; font: 12px var(--font-ui); padding: 2px 8px; }
+.editable-error { margin: 9.5px 0 0; padding: 6.5px 9.5px; border-left: 2px solid var(--danger); font: 13px var(--font-ui); color: var(--ink); }
 .loc-row { display: flex; gap: 16px; }
 .loc-row .identity-field { flex: 1; }
 

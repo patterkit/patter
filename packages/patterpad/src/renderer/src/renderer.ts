@@ -50,6 +50,7 @@ import { openEffectsEditor, renderEffectsPills } from "./effects-editor.js";
 // address content by them and none may depend on a UI kit. `id-parity.test.ts`
 // asserts our copy still matches the shell's default.
 import { el } from "./dom.js";
+import { openEditableExport, openEditableReimport, type EditableDialogContext } from "./editable-dialogs.js";
 import { applyTheme } from "./apply-theme.js";
 import { openGameIdEditor, closeAnchoredPanel, showAbout, createSaveController, saveIndicator, renderStepperBar,
   paintVcBadges, lockControls, createNavHistory, historyNav, mountPaneShell, mountSettingsDialog, revealRowWhenReady,
@@ -1568,14 +1569,31 @@ function openSuggestions(req: SuggestionOpenRequest): void {
   // Review: every proposal on this beat (open; + resolved when the toggle is on), re-diffed against the
   // CURRENT say text so a stale proposal shows what accepting it would actually do.
   const live = surface.sayText(req.nodeId) ?? "";
+  const liveSpeaker = surface.lines().find((l) => l.id === req.nodeId)?.character ?? "";
   const rows: SuggestionRow[] = suggestions
     .filter((s) => s.anchor === req.nodeId && (showResolvedSuggestions || !s.resolved))
-    .map((s) => ({ id: s.id, author: s.author, ts: s.ts, before: live, proposed: s.proposed, stale: live !== s.baseline, resolved: s.resolved, outcome: s.outcome }));
+    .map((s) => ({
+      id: s.id, author: s.author, ts: s.ts, before: live, proposed: s.proposed, resolved: s.resolved, outcome: s.outcome,
+      // Out of date: the text, or a proposed speaker's starting point, has moved on. (A direction is checked
+      // when it's accepted, on the files.)
+      stale: live !== s.baseline || (s.proposedCharacter !== undefined && liveSpeaker !== (s.baselineCharacter ?? "")),
+      textChanged: s.proposed !== s.baseline,
+      ...(s.proposedCharacter !== undefined ? { speaker: { from: s.baselineCharacter ?? "", to: s.proposedCharacter } } : {}),
+      ...(s.proposedDirection !== undefined ? { direction: { from: s.baselineDirection ?? "", to: s.proposedDirection } } : {}),
+      ...(s.proposedCut ? { cut: true } : {}),
+      ...(s.handoff ? { handoff: s.handoff.id } : {}),
+    }));
   if (!rows.length) return;
   openSuggestionReview({
     anchor: req.anchor, rows,
     onAccept: (id) => {
       const s = suggestions.find((x) => x.id === id); if (!s) return;
+      if (s.proposedCharacter !== undefined || s.proposedDirection !== undefined || s.proposedCut) {
+        // A speaker, direction, or cut lives outside the say text the surface edits: decide it on the files
+        // (main saves this scene first, applies every part, and reloads it).
+        void acceptOnFiles(s.id);
+        return;
+      }
       surface?.setSayText(s.anchor, s.proposed); // a real edit -> the flow saves on the normal dirty path
       s.resolved = true; s.outcome = "accepted";
       suggestionsDirty = true; pushSuggestionMarks(); void flushReview();
@@ -1586,6 +1604,16 @@ function openSuggestions(req: SuggestionOpenRequest): void {
       suggestionsDirty = true; pushSuggestionMarks(); void flushReview();
     },
   });
+}
+
+/** Accept a suggestion that changes more than the say text, on the files. Unsaved suggestion edits are
+ *  flushed first so main sees this one; an out-of-date part is refused there and said so here. */
+async function acceptOnFiles(id: string): Promise<void> {
+  await flushReview();
+  const res = await window.patter.decideSuggestions([{ id, accept: true }]);
+  const outcome = res.results?.find((r) => r.id === id);
+  if (!res.ok) toast(res.error ? `Couldn't accept: ${res.error}` : "Couldn't accept the suggestion", "error");
+  else if (outcome && outcome.outcome !== "accepted") toast(outcome.reason ? `Not accepted: ${outcome.reason}` : "Not accepted", "error");
 }
 
 /** View > Show Resolved Suggestions: reveal archived proposals (markers + review) or hide them. */
@@ -2366,6 +2394,21 @@ async function exportScript(): Promise<void> {
   } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
 }
 
+/** What the editable-script dialogs need from the editor. */
+function editableContext(): EditableDialogContext {
+  return {
+    sceneId: currentSceneId,
+    sceneName: project?.scenes.find((sc) => sc.id === currentSceneId)?.name,
+    withJob,
+    save: async () => { if (surface) await save(); },
+    goTo: async (sceneId, anchor) => {
+      if (sceneId !== currentSceneId) await loadScene(sceneId);
+      surface?.revealNode(anchor, { instant: true });
+    },
+    rel: (path) => relToProject(path),
+  };
+}
+
 /** File ▸ Export as Patterpack: flush pending edits (so the packed bytes are current), then ask main to zip
  *  the whole project into one `.patterpack` file the writer can send to someone. Native Save dialog in main. */
 async function exportPatterpack(): Promise<void> {
@@ -2988,6 +3031,8 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "voice-script") openVoiceScript();
   else if (cmd === "playable-html") void exportPlayableHtml();
   else if (cmd === "export-script") void exportScript();
+  else if (cmd === "export-editable") { if (project) void openEditableExport(editableContext()); }
+  else if (cmd === "import-editable") { if (project) void openEditableReimport(editableContext()); }
   else if (cmd.startsWith("theme:colour:")) setTheme({ colour: cmd.slice("theme:colour:".length) as ColourTheme });
   else if (cmd.startsWith("theme:font:")) setTheme({ font: cmd.slice("theme:font:".length) as FontTheme });
   else if (cmd.startsWith("open-recent:")) void openPath(cmd.slice("open-recent:".length));

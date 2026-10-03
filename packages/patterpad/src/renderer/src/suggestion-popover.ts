@@ -5,6 +5,7 @@
 //   - REVIEW: the beat's open proposals, each showing current -> proposed (re-diffed against the live text;
 //     a stale proposal - the line changed since it was made - is banner-flagged), with Accept / Reject.
 
+import { iconNode } from "@wildwinter/app-shell";
 import { el } from "./dom.js";
 import { openPanel } from "./panel.js";
 
@@ -51,6 +52,15 @@ export interface SuggestionRow {
   stale: boolean;
   resolved?: boolean;
   outcome?: "accepted" | "rejected";
+  /** Whether the text itself is part of the proposal (a speaker, direction, or cut suggestion may not be). */
+  textChanged?: boolean;
+  /** A proposed new speaker or direction (the editable-script handoff), shown from -> to. */
+  speaker?: { from: string; to: string };
+  direction?: { from: string; to: string };
+  /** A proposal to cut the line (an editor emptied it). */
+  cut?: boolean;
+  /** The handoff it arrived in ("H-7Q2K"). */
+  handoff?: string;
 }
 
 /** Review the beat's proposals: current -> proposed, Accept / Reject per row. */
@@ -61,7 +71,8 @@ export function openSuggestionReview(opts: {
   onReject: (id: string) => void;
   onClose?: () => void;
 }): void {
-  const panel = openPanel({ anchor: opts.anchor, className: "suggestion-popover", title: opts.rows.length > 1 ? `${opts.rows.length} suggested rewrites` : "Suggested rewrite", width: 340, onClose: opts.onClose });
+  const title = opts.rows.length > 1 ? `${opts.rows.length} suggestions` : opts.rows[0]?.cut ? "Suggested cut" : opts.rows[0]?.textChanged === false ? "Suggested change" : "Suggested rewrite";
+  const panel = openPanel({ anchor: opts.anchor, className: "suggestion-popover", title, width: 340, onClose: opts.onClose });
   if (!panel) return;
   const { body, close } = panel;
 
@@ -69,11 +80,25 @@ export function openSuggestionReview(opts: {
     const card = el("div", `sg-card${r.resolved ? " resolved" : ""}`);
     const head = el("div", "sg-head");
     head.append(el("span", "sg-author", r.author || "Someone"), el("span", "sg-ts", fmtTs(r.ts)));
+    if (r.handoff) head.append(el("span", "sg-source", `from ${r.handoff}`));
     if (r.resolved) head.append(el("span", "sg-outcome", r.outcome === "accepted" ? "Accepted" : "Rejected"));
     card.append(head);
     if (r.stale && !r.resolved) card.append(el("div", "sg-stale", "The line has changed since this was suggested. Review it against the current text."));
-    card.append(el("div", "sg-diff-label", "Current"), el("blockquote", "sg-before", r.before || "(empty)"));
-    card.append(el("div", "sg-diff-label", "Proposed"), el("blockquote", "sg-after", r.proposed));
+    if (r.cut) {
+      card.append(el("div", "sg-diff-label", "Cut this line"), el("blockquote", "sg-before sg-cut", r.before || "(empty)"));
+    } else if (r.textChanged !== false) {
+      card.append(el("div", "sg-diff-label", "Current"), el("blockquote", "sg-before", r.before || "(empty)"));
+      card.append(el("div", "sg-diff-label", "Proposed"), el("blockquote", "sg-after", r.proposed));
+    }
+    // From -> to, the arrow drawn rather than typed.
+    const change = (from: string, to: string): HTMLElement => {
+      const row = el("div", "sg-part");
+      row.append(el("span", undefined, from), iconNode("arrowRight", 12), el("span", undefined, to));
+      return row;
+    };
+    const paren = (d: string): string => (d ? `(${d})` : "(none)");
+    if (r.speaker) card.append(el("div", "sg-diff-label", "Speaker"), change(r.speaker.from || "(none)", r.speaker.to));
+    if (r.direction) card.append(el("div", "sg-diff-label", "Direction"), change(paren(r.direction.from), paren(r.direction.to)));
 
     if (!r.resolved) {
       const actions = el("div", "cmt-actions");
