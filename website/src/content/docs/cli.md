@@ -128,6 +128,22 @@ error. `--all` includes every voiced line (otherwise only those ready to record)
 
 ## Sharing & merging
 
+### `patter export-editable [path] -o file.docx`
+An [editable script](/production/editable-script/) to send to an editor outside Patter, plus its handoff
+record in `handoffs/`. `--scene name` (repeatable; a name or an id) limits it to those scenes;
+`--recipient "Sam"` names who it's for; `--status`, `--cast`, and `--all-notes` add writing status, a
+cast page, and every classed note; `--by` names who's exporting.
+
+### `patter import-editable <file.docx> [path]`
+Bring a returned editable script back as suggestions and comments, and print what it held. `--dry-run`
+writes nothing; `--direct` accepts the clean changes on the way in; `--as name` credits changes made
+without Track Changes; `--strict-quotes` counts quote style as an edit. Under lock-based version control it
+writes everything or nothing. A refused file exits 1.
+
+### `patter suggestions [path]`
+List the open suggestions, each marked clean or out of date. `--handoff H-7Q2K` keeps one handoff's;
+`--accept-clean` accepts every clean one; `--json` prints the list for a pipeline.
+
 ### `patter share-scopes [path] [--at dir]`
 Share the project's scopes with the game's other editing tools, as Patterpad's **File > Share Scopes
 with Other Tools** does: makes the game's `game-scopes/` folder (in `--at`, else at the

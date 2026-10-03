@@ -32,6 +32,13 @@ since, the suggestion is flagged **stale**. Bring archived proposals back with *
 Resolved Suggestions**. It's a script-editor's redline, an editor can float a better line
 without overwriting the writer's.
 
+Suggestions also arrive from outside: an editor who changed an
+[editable script](/production/editable-script/) in Word or Google Docs sends it back, and each change
+lands here. Those can propose a new speaker, a new direction, or cutting the line as well as new words,
+and say which handoff they came from. To review a whole file's worth at once, **Review ▸ Review
+Suggestions…** opens the search window's **Suggestions** tab: every open suggestion, **Accept** or
+**Reject** on each, and **Accept all clean** for the ones that still apply.
+
 ## Documentation notes
 
 Comments are for discussion; **documentation notes** explain the content itself: what a line

@@ -6,6 +6,27 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Send the script to an editor who doesn't use Patter, and bring their changes back.**
+  **Review ▸ Export Editable Script…** writes a Word document of one scene or the whole project that
+  reads like the readable script, with the words of every line in a shaded box. The editor changes the
+  words in Word, Google Docs, OnlyOffice, or Pages (with or without Track Changes) and leaves comments as they normally
+  would. **Review ▸ Reimport Editable Script…** shows what came back before writing anything, then brings
+  each change in as a suggestion (new words, a new speaker or direction, or a cut), credited to whoever
+  made it, and each comment as a comment on its line. Nothing in the script changes until you accept.
+  Anything that can't be a suggestion arrives as a comment quoting the editor's words, so nothing they
+  wrote is lost.
+- **Review suggestions in bulk.** **Review ▸ Review Suggestions…** opens a **Suggestions** tab in the
+  search window: every open suggestion, by handoff, with Accept and Reject on each and **Accept all clean**
+  for the ones that still apply.
+- **An Editors notes class**, for notes meant for whoever edits the script; they ride along in the
+  editable script.
+
+### Fixed
+
+- **Confirmations in the search window are styled.** Replace all's confirmation drew without its frame.
+
 ## [0.22.5] - 2026-10-02
 
 ### Fixed
