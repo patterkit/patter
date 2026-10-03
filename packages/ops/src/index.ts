@@ -82,3 +82,6 @@ export type { EditableScriptOptions, EditableScript } from "./editable-docx.js";
 // Reading a returned editable script
 export { readEditableDocx } from "./docx-read.js";
 export type { ReturnedDoc, ReadItem, ReadBox, ReadParagraph, ReadText, ReadComment, TrackedChange } from "./docx-read.js";
+// Bringing an editable script back: suggestions, comments, and a report, planned
+export { planEditableImport, REFUSE_MISSING_SHARE } from "./editable-import.js";
+export type { ImportOptions, ImportPlan, ImportReport, ImportProblem } from "./editable-import.js";

@@ -39,10 +39,10 @@ export interface DecisionPlan {
 }
 
 /** Where a node or beat lives. */
-interface Place { sceneId: string; beat?: Beat }
+export interface Place { sceneId: string; beat?: Beat }
 
 /** Every scene, block, node, beat, and option prompt id, to the scene it is in (and the beat, for beats). */
-function indexPlaces(loaded: LoadedProject): Map<string, Place> {
+export function indexPlaces(loaded: LoadedProject): Map<string, Place> {
   const places = new Map<string, Place>();
   for (const scene of loaded.scenes) {
     places.set(scene.id, { sceneId: scene.id });
