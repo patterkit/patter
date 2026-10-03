@@ -79,3 +79,6 @@ export type { SuggestionDecision, DecisionResult, DecisionPlan } from "./suggest
 // The editable script: the readable script with its editable lines boxed, plus its handoff record
 export { exportEditableScript } from "./editable-docx.js";
 export type { EditableScriptOptions, EditableScript } from "./editable-docx.js";
+// Reading a returned editable script
+export { readEditableDocx } from "./docx-read.js";
+export type { ReturnedDoc, ReadItem, ReadBox, ReadParagraph, ReadText, ReadComment, TrackedChange } from "./docx-read.js";

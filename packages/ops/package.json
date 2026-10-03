@@ -32,6 +32,7 @@
     "@patterkit/model": "0.7.0",
     "@patterkit/runtime": "0.14.3",
     "@wildwinter/toolkit": "^0.1.0",
+    "@xmldom/xmldom": "^0.8.15",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
