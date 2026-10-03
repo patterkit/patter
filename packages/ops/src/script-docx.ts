@@ -4,18 +4,20 @@
 // its own fonts), so any source language and emoji render.
 //
 // Word can't carry custom faces, so the design's three type roles map to faces present on every machine:
-// reading serif -> Georgia, UI sans (cues / labels / tags) -> Calibri, mono (conditions / {@property} /
-// game events) -> Consolas. Structure is carried by colour, case, indent and space (this is paper, not the
-// editor UI). Word can't draw the PDF's per-snippet edge cheaply, so a snippet's rows are delimited by a
-// wider space BEFORE each snippet's first line, tight within - each beat is its own paragraph either way.
+// reading serif -> Georgia, UI sans (cues / labels / tags) -> Arial, mono (conditions / {@property} /
+// game events) -> Courier New. All three ship with macOS and Windows and are offered by Google Docs and Word
+// for the web, so Pages and the browser editors open the file without a missing-font warning (Calibri and
+// Consolas only arrive with Office). Structure is carried by colour, case, indent and space (this is paper,
+// not the editor UI). Word can't draw the PDF's per-snippet edge cheaply, so a snippet's rows are delimited
+// by a wider space BEFORE each snippet's first line, tight within - each beat is its own paragraph either way.
 // ---------------------------------------------------------------------------
 
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun } from "docx";
 import { TOKENS, characterColour, textRuns, type ScriptDoc, type ScriptElement, type TextRun as Run } from "./script-doc.js";
 
 const SERIF = "Georgia";     // reading: dialogue, narration, headings
-const SANS = "Calibri";      // chrome: character cues, group labels, option tags
-const MONO = "Consolas";     // machine text: conditions, {@property} values, game events
+const SANS = "Arial";        // chrome: character cues, group labels, option tags
+const MONO = "Courier New";  // machine text: conditions, {@property} values, game events
 
 const STEP = 360;            // twips (~0.25") per structural nesting level
 const SNIPPET_INSET = 220;   // twips a snippet's rows inset under their selector label
