@@ -355,6 +355,60 @@ export interface VcStatusDto {
 
 /** The outcome of a file export through a native Save dialog. `canceled` (no error) when the author
  *  dismissed the picker; `path` is where the file landed on success. */
+/** What the editable-script export dialog chose. */
+export interface EditableExportRequest {
+  /** "scene": just `sceneId`; "project": everything. */
+  range: "scene" | "project";
+  sceneId?: string;
+  recipient?: string;
+  notes: "editor" | "all";
+  status: boolean;
+  cast: boolean;
+}
+
+/** The reimport dialog's options. */
+export interface EditableImportRequest {
+  /** Who untracked edits are credited to ("Edits by"); the handoff's recipient when blank. */
+  as?: string;
+  strictQuotes: boolean;
+  direct: boolean;
+}
+
+/** A planned reimport, for the summary dialog. */
+export interface EditableImportSummary {
+  /** Set when there is something to apply. */
+  planId?: string;
+  handoffId?: string;
+  recipient?: string;
+  sentAt?: string;
+  sentBy?: string;
+  refused?: string;
+  counts: { changed: number; unchanged: number; stale: number; comments: number; problems: number };
+  problems: Array<{ severity: "warning" | "info"; message: string; anchor?: string; sceneId?: string }>;
+  /** How many files the import would write. */
+  files: number;
+}
+
+/** An open suggestion, for the review list. */
+export interface OpenSuggestionDto {
+  id: string;
+  anchor: string;
+  sceneId?: string;
+  sceneName?: string;
+  author: string;
+  ts: string;
+  baseline: string;
+  proposed: string;
+  proposedCharacter?: string;
+  baselineCharacter?: string;
+  proposedDirection?: string;
+  baselineDirection?: string;
+  proposedCut?: boolean;
+  handoff?: string;
+  /** Parts changed since it was made; empty means it still applies cleanly. */
+  stale: string[];
+}
+
 export interface ExportResult {
   ok: boolean;
   path?: string;
@@ -742,6 +796,25 @@ export interface PatterApi {
   exportWeb(): Promise<ExportResult & { kept?: string[] }>;
   /** Export the readable screenplay (.pdf or .docx, chosen in the Save dialog) of the whole script + flow. */
   exportScript(): Promise<ExportResult>;
+  /** How many editable lines an editable-script export would hold: for one scene, and for the whole project
+   *  (the export dialog shows both beside its range choice). */
+  editableLineCounts(sceneId: string | null): Promise<{ scene: number; project: number }>;
+  /** Export the editable script (a native Save dialog picks the .docx) and commit its handoff record. */
+  exportEditable(opts: EditableExportRequest): Promise<ExportResult & { handoffId?: string }>;
+  /** Pick a returned editable script (.docx) to reimport. Null if the picker is dismissed. */
+  pickEditableReturn(): Promise<string | null>;
+  /** Plan bringing a returned editable script back (reads the file; writes nothing). Re-plan when the
+   *  dialog's options change; apply by plan id. */
+  planEditableImport(path: string, opts: EditableImportRequest): Promise<EditableImportSummary>;
+  /** Commit a planned import, all or nothing: under lock-based version control, a file someone else holds
+   *  means nothing is written. The open scene reloads afterwards. */
+  applyEditableImport(planId: string): Promise<SaveResult>;
+  /** Open suggestions across the project, optionally from one handoff, each marked clean or out of date. */
+  listSuggestions(filter: { handoff?: string }): Promise<OpenSuggestionDto[]>;
+  /** Accept or reject suggestions on the files (all or nothing); the open scene reloads afterwards. */
+  decideSuggestions(decisions: Array<{ id: string; accept: boolean }>): Promise<SaveResult & { results?: Array<{ id: string; outcome: string; reason?: string }> }>;
+  /** The project's handoffs that are still open, newest first (the review filter's choices). */
+  openHandoffs(): Promise<Array<{ id: string; recipient?: string; createdAt: string; createdBy: string }>>;
   /** Export as Patterpack: bundle the whole project into one `.patterpack` file to send to someone (source
    *  only, no audio / build output). Opens a native Save dialog; `canceled` when the picker is dismissed. */
   exportPatterpack(): Promise<ExportResult>;

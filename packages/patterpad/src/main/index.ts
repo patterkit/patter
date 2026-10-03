@@ -27,7 +27,7 @@ import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
-import type { SearchEntry, SearchFocus, SearchMode } from "../shared/api.js";
+import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
 import type { SceneKitId } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
@@ -402,6 +402,30 @@ async function exportScript(): Promise<ExportResult> {
   const buffer = await project.scriptDocument(/\.docx$/i.test(r.filePath) ? "docx" : "pdf");
   if (!buffer) return { ok: false, error: "no project open" };
   return writeExport(r.filePath, buffer);
+}
+
+/** The name the edit trail and handoffs are signed with: the identity, else the OS user. */
+function authorName(): string {
+  return store.read().identity?.name?.trim() || defaultUserName();
+}
+
+/** Export the editable script: a native Save dialog for the .docx, then its handoff record, committed only
+ *  once the document is safely saved (a record for a file nobody has would mislead a later reimport). */
+async function exportEditable(req: EditableExportRequest): Promise<ExportResult & { handoffId?: string }> {
+  if (!win) return { ok: false, error: "no window" };
+  const out = await project.editableScript(req, authorName());
+  if (!out) return { ok: false, error: "no project open" };
+  const r = await dialog.showSaveDialog(win, {
+    title: "Export editable script", defaultPath: out.defaultName,
+    message: "Save a script an editor can change in Word, Google Docs, or OnlyOffice, and send back.", buttonLabel: "Export",
+    filters: [{ name: "Word document", extensions: ["docx"] }],
+  });
+  if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+  const saved = writeExport(r.filePath, out.docx);
+  if (!saved.ok) return saved;
+  const committed = await project.commitHandoff(out.writes);
+  if (!committed.ok) return { ok: false, path: r.filePath, error: `The document was saved, but its handoff record wasn't: ${committed.error ?? "write failed"}` };
+  return { ...saved, handoffId: out.handoffId };
 }
 
 /** Export a single self-contained, playable HTML file of the whole story through a native Save dialog -
@@ -958,6 +982,35 @@ function registerIpc(): void {
   ipcMain.handle("project:exportPlayableHtml", () => publishJob(exportPlayableHtml));
   ipcMain.handle("project:exportWeb", () => publishJob(exportWeb));
   ipcMain.handle("project:exportScript", () => publishJob(exportScript));
+  // The editable script handoff (patterkit/design/proposals/editable-script-handoff.md).
+  ipcMain.handle("editable:lineCounts", (_e, sceneId: string | null) => project.editableLineCounts(sceneId));
+  ipcMain.handle("editable:export", (_e, req: EditableExportRequest) => publishJob(() => exportEditable(req)));
+  ipcMain.handle("editable:pick", async () => {
+    if (!win) return null;
+    const r = await dialog.showOpenDialog(win, {
+      title: "Reimport editable script", message: "Choose the editable script the editor sent back.", buttonLabel: "Reimport",
+      properties: ["openFile"], filters: [{ name: "Word document", extensions: ["docx"] }],
+    });
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+  });
+  ipcMain.handle("editable:plan", async (_e, path: string, req: EditableImportRequest) => {
+    await flushEditorScene(); // the open scene's unsaved edits are part of "what the project says now"
+    return project.planEditableImportFile(path, req, authorName());
+  });
+  ipcMain.handle("editable:apply", async (_e, planId: string) => {
+    await flushEditorScene();
+    const r = await project.applyEditableImport(planId);
+    if (r.ok) win?.webContents.send("replace:applied"); // the open scene reloads its text and feedback
+    return r;
+  });
+  ipcMain.handle("suggestions:list", (_e, filter: { handoff?: string }) => project.listSuggestions(filter ?? {}));
+  ipcMain.handle("suggestions:decide", async (_e, decisions: Array<{ id: string; accept: boolean }>) => {
+    await flushEditorScene();
+    const r = await project.decideSuggestions(decisions, authorName());
+    if (r.ok) win?.webContents.send("replace:applied");
+    return r;
+  });
+  ipcMain.handle("handoffs:open", () => project.openHandoffs());
   ipcMain.handle("patterpack:export", (): Promise<ExportResult> => publishJob(exportPatterpack));
   ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
   ipcMain.handle("patterpack:merge", () => publishJob(mergePatterpack));

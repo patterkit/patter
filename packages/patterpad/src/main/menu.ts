@@ -249,6 +249,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { ...PUBLISH_MENU.playableHtml, click: () => send("playable-html") },
         { label: "Publish for Web…", click: () => send("publish-web") },
         { label: "Publish Readable Script…", click: () => send("export-script") },
+        // The editable script handoff: send the script to an editor outside Patter, and bring it back.
+        { label: "Export Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("export-editable") },
+        { label: "Reimport Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("import-editable") },
         { type: "separator" },
         { ...PUBLISH_MENU.bundle, click: () => send("build-bundle") },
         // Auto Rebuild: recompile the bundle after edits (debounced + deduped). Mirrors the same project

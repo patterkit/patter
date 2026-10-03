@@ -8,6 +8,7 @@ import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "nod
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
+  exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
   patterScopesWrite, previewRegistry, GAME_SCOPES_DIR, GAME_SCOPES_FILE, PATTER_SCOPES_FILE,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
@@ -21,6 +22,9 @@ import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
 import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
+import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
+import type { ImportPlan } from "@patterkit/ops";
+import { createHash, randomUUID } from "node:crypto";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
 import { editorScopes } from "../shared/host-scopes.js";
@@ -266,16 +270,23 @@ function enqueueWrite<T>(op: () => Promise<T>): Promise<T> {
 
 // Land a batch of writes through the VC layer OFF the main thread (lock-aware checkout-on-write); fall back
 // to a direct write when no VC tooling is present. Always called from inside an enqueueWrite section.
-async function commitWrites(writes: { path: string; content: string }[]): Promise<SaveResult> {
+async function commitWrites(writes: { path: string; content: string }[], opts: { allOrNothing?: boolean } = {}): Promise<SaveResult> {
   for (const w of writes) authoringCache.delete(w.path); // a shard we just wrote must be re-read, not served stale
   vcShardsMemo = null; // a write may have CREATED a shard (first loc / authoring write) - re-collect paths next poll
   const ok = (): SaveResult => { maybeScheduleAutoRebuild(writes); return { ok: true }; };
   try {
-    const batch = await writeTextFilesAsync(writes.map((w) => ({ filePath: w.path, content: w.content })));
+    const batch = await writeTextFilesAsync(writes.map((w) => ({ filePath: w.path, content: w.content })), "utf8", { allOrNothing: opts.allOrNothing === true });
     if (batch.success) return ok();
-    const failed = batch.results.filter((r) => !r.success).map((r) => r.message ?? r.status).join("; ");
-    return { ok: false, error: failed || "write failed" };
+    const failed = batch.results.filter((r) => !r.success).map((r) => r.message ?? r.status);
+    // All or nothing: name the files that refused (who holds them), not every "not prepared" bystander.
+    const why = opts.allOrNothing ? batch.results.filter((r) => r.status === "locked" || r.status === "outOfDate").map((r) => r.message) : [];
+    return { ok: false, error: (why.length ? `Nothing was written. ${why.join("; ")}` : failed.join("; ")) || "write failed" };
   } catch {
+    if (opts.allOrNothing) {
+      // No VC layer: an ordinary write is all-or-nothing enough here (no locks to refuse it).
+      try { applyWrites(writes); return ok(); }
+      catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+    }
     try { applyWrites(writes); return ok(); } // VC layer unavailable -> direct write
     catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
   }
@@ -928,9 +939,10 @@ export function readSceneSuggestions(sceneId: string): Suggestion[] {
 }
 
 /** Persist a scene's suggestions, MERGING over the rest of the shard. Proposals with no proposed text are
- *  pruned, so a cancelled "Suggest rewrite" leaves the file clean. */
+ *  pruned, so a cancelled "Suggest rewrite" leaves the file clean; one that proposes a cut, a speaker, or a
+ *  direction (an editable-script import) is kept whatever its text. */
 export function saveSceneSuggestions(sceneId: string, suggestions: Suggestion[]): Promise<SaveResult> {
-  const kept = suggestions.filter((sg) => sg.proposed.trim());
+  const kept = suggestions.filter((sg) => sg.proposed.trim() || sg.proposedCut || sg.proposedCharacter !== undefined || sg.proposedDirection !== undefined);
   return saveAuthoringField(sceneId, (af) => { af.suggestions = kept.length ? kept : undefined; });
 }
 
@@ -954,6 +966,136 @@ export function reviewFeedback(scope?: { resolvedComments?: boolean; resolvedSug
     }
   }
   return out;
+}
+
+// --- editable script handoff (patterkit/design/proposals/editable-script-handoff.md) -----------------------
+
+/** Re-read the whole project from disk after a write that touched many shards (an import, a bulk accept),
+ *  rather than patching each into the working copy. Drops every cache that holds pre-write bytes. */
+function reloadFromDisk(): void {
+  if (!loaded) return;
+  loaded = loadProject(loaded.root);
+  shards = buildShards(loaded); // also clears the source mirror
+  authoringCache.clear();
+  hydrated = true;
+}
+
+/** Editable lines (dialogue, narration, option prompts) an export of one scene, and of the project, holds. */
+export function editableLineCounts(sceneId: string | null): { scene: number; project: number } {
+  if (!loaded) return { scene: 0, project: 0 };
+  ensureHydrated();
+  const count = (scenes?: string[]): number => runScriptDoc(loaded!, scenes ? { scenes } : {}).elements
+    .filter((e) => e.kind === "line" || e.kind === "narration" || e.kind === "option").length;
+  return { scene: sceneId ? count([sceneId]) : 0, project: count() };
+}
+
+/** Build the editable script for the dialog's choices: the .docx, its handoff record's writes, and a name. */
+export async function editableScript(req: EditableExportRequest, by: string): Promise<{ docx: Buffer; handoffId: string; writes: PlannedWrite[]; defaultName: string } | null> {
+  if (!loaded) return null;
+  ensureHydrated();
+  const scenes = req.range === "scene" && req.sceneId ? [req.sceneId] : undefined;
+  const out = await exportEditableScript(loaded, {
+    by, ...(scenes ? { scenes } : {}), ...(req.recipient?.trim() ? { recipient: req.recipient.trim() } : {}),
+    notes: req.notes, status: req.status, cast: req.cast,
+  });
+  const sceneName = scenes ? loaded.scenes.find((sc) => sc.id === scenes[0])?.name : undefined;
+  const stem = scriptStem() ?? "script";
+  const fileSafe = (n: string): string => n.replace(/[/\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+  const defaultName = `${stem}${sceneName ? ` - ${fileSafe(sceneName)}` : ""} (editable).docx`;
+  return { docx: out.docx, handoffId: out.handoff.id, writes: out.writes, defaultName };
+}
+
+/** Commit a handoff record (after its .docx has been saved). */
+export function commitHandoff(writes: PlannedWrite[]): Promise<SaveResult> {
+  return enqueueWrite(() => commitWrites(writes));
+}
+
+// Planned imports awaiting Apply, by id. Only the latest few are worth keeping (the dialog re-plans as its
+// options change), so older ones are dropped.
+const importPlans = new Map<string, ImportPlan>();
+
+/** Plan a reimport of a returned editable script: reads the file and the project, writes nothing. */
+export async function planEditableImportFile(path: string, req: EditableImportRequest, by: string): Promise<EditableImportSummary> {
+  const empty = { counts: { changed: 0, unchanged: 0, stale: 0, comments: 0, problems: 0 }, problems: [], files: 0 };
+  if (!loaded) return { ...empty, refused: "No project is open." };
+  ensureHydrated();
+  let plan: ImportPlan;
+  try {
+    const bytes = readFileSync(path);
+    plan = planEditableImport(loaded, await readEditableDocx(bytes), {
+      by, fileHash: createHash("sha256").update(bytes).digest("hex"),
+      ...(req.as?.trim() ? { as: req.as.trim() } : {}), strictQuotes: req.strictQuotes, direct: req.direct,
+    });
+  } catch (e) {
+    return { ...empty, refused: `This file couldn't be read as an editable script: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  const sceneOf = new Map<string, string>();
+  for (const sc of loaded.scenes) {
+    sceneOf.set(sc.id, sc.id);
+    for (const b of sc.blocks) { sceneOf.set(b.id, sc.id); walkNodes<Group | Snippet>(b.children, (n) => { sceneOf.set(n.id, sc.id); if (n.type === "group") { if (n.prompt) sceneOf.set(n.prompt.id, sc.id); } else for (const bt of n.beats ?? []) sceneOf.set(bt.id, sc.id); }); }
+  }
+  let planId: string | undefined;
+  if (!plan.report.refused && plan.writes.length) {
+    planId = randomUUID();
+    importPlans.set(planId, plan);
+    while (importPlans.size > 4) importPlans.delete(importPlans.keys().next().value!);
+  }
+  const h = plan.handoff;
+  return {
+    ...(planId ? { planId } : {}),
+    ...(plan.report.handoffId ? { handoffId: plan.report.handoffId } : {}),
+    ...(h?.recipient ? { recipient: h.recipient } : {}), ...(h ? { sentAt: h.createdAt, sentBy: h.createdBy } : {}),
+    ...(plan.report.refused ? { refused: plan.report.refused } : {}),
+    counts: plan.report.counts,
+    problems: plan.report.problems.map((p) => ({ severity: p.severity, message: p.message, ...(p.anchor ? { anchor: p.anchor, ...(sceneOf.has(p.anchor) ? { sceneId: sceneOf.get(p.anchor)! } : {}) } : {}) })),
+    files: plan.writes.length,
+  };
+}
+
+/** Commit a planned import, all or nothing, then reload the project from disk. */
+export function applyEditableImport(planId: string): Promise<SaveResult> {
+  return enqueueWrite(async () => {
+    const plan = importPlans.get(planId);
+    if (!plan) return { ok: false, error: "That import plan has expired; choose the file again." };
+    const res = await commitWrites(plan.writes, { allOrNothing: true });
+    if (res.ok) { importPlans.delete(planId); reloadFromDisk(); }
+    return res;
+  });
+}
+
+/** Open suggestions across the project (optionally one handoff's), for the review list. */
+export function listSuggestions(filter: { handoff?: string }): OpenSuggestionDto[] {
+  if (!loaded) return [];
+  ensureHydrated();
+  const names = new Map(loaded.scenes.map((sc) => [sc.id, sc.name]));
+  return listOpenSuggestions(loaded, filter).map(({ suggestion: s, sceneId, stale }) => ({
+    id: s.id, anchor: s.anchor, author: s.author, ts: s.ts, baseline: s.baseline, proposed: s.proposed, stale,
+    ...(sceneId ? { sceneId, sceneName: names.get(sceneId) ?? sceneId } : {}),
+    ...(s.proposedCharacter !== undefined ? { proposedCharacter: s.proposedCharacter, baselineCharacter: s.baselineCharacter ?? "" } : {}),
+    ...(s.proposedDirection !== undefined ? { proposedDirection: s.proposedDirection, baselineDirection: s.baselineDirection ?? "" } : {}),
+    ...(s.proposedCut ? { proposedCut: true } : {}),
+    ...(s.handoff ? { handoff: s.handoff.id } : {}),
+  }));
+}
+
+/** Accept or reject suggestions on the files, all or nothing, then reload the project from disk. */
+export function decideSuggestions(decisions: Array<{ id: string; accept: boolean }>, by: string): Promise<SaveResult & { results?: Array<{ id: string; outcome: string; reason?: string }> }> {
+  return enqueueWrite(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    ensureHydrated();
+    const plan = applySuggestionDecisions(loaded, decisions, { by });
+    if (!plan.writes.length) return { ok: true, results: plan.results };
+    const res = await commitWrites(plan.writes, { allOrNothing: true });
+    if (res.ok) reloadFromDisk();
+    return { ...res, results: plan.results };
+  });
+}
+
+/** The handoffs still open, newest first. */
+export function openHandoffs(): Array<{ id: string; recipient?: string; createdAt: string; createdBy: string }> {
+  if (!loaded) return [];
+  return readHandoffs(loaded.root).handoffs.filter((h) => !h.closed).reverse()
+    .map((h) => ({ id: h.id, createdAt: h.createdAt, createdBy: h.createdBy, ...(h.recipient ? { recipient: h.recipient } : {}) }));
 }
 
 // --- interactive play session (the play window walks the script) --------------
