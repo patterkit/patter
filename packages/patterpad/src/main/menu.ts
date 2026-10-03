@@ -178,6 +178,13 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Narrative coverage (#159): random playthroughs find never-reached / needs-input content.
         { ...REVIEW_MENU.coverageTest, click: () => send("coverage-test") },
         { type: "separator" },
+        // The editable script handoff: send the script to an editor outside Patter, bring their edits
+        // back as suggestions, then work through every open suggestion (the search palette's Suggestions
+        // tab, with Accept / Reject per line and Accept all clean).
+        { label: "Export Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("export-editable") },
+        { label: "Reimport Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("import-editable") },
+        { label: "Review Suggestions…", enabled: spelling?.hasProject ?? false, click: () => send("review-suggestions") },
+        { type: "separator" },
         // Browse every line at a writing status (#205) - the search palette in status mode.
         { label: "Find Lines by Writing Status…", accelerator: "CmdOrCtrl+Shift+L", click: () => send("find-by-status") },
         // Browse every dialogue line at a recording status (#206) - the search palette in recording mode.
@@ -187,9 +194,6 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { ...REVIEW_MENU.findPropertyUsage, click: () => send("find-property") },
         // Browse every node carrying an author tag (#215) - the search palette in tag mode.
         { label: "Find by Tag…", click: () => send("find-by-tag") },
-        // Every open suggestion across the script (an editor's returned file lands here): the search
-        // palette's Suggestions tab, with Accept / Reject per line and Accept all clean.
-        { label: "Review Suggestions…", enabled: spelling?.hasProject ?? false, click: () => send("review-suggestions") },
         {
           // Which writing-status rungs show their per-beat gutter pill. Per-rung check/uncheck, plus
           // Show All / Show None; remembered in panes.lineStatusShown (default none). Empty when no
@@ -252,9 +256,6 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { ...PUBLISH_MENU.playableHtml, click: () => send("playable-html") },
         { label: "Publish for Web…", click: () => send("publish-web") },
         { label: "Publish Readable Script…", click: () => send("export-script") },
-        // The editable script handoff: send the script to an editor outside Patter, and bring it back.
-        { label: "Export Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("export-editable") },
-        { label: "Reimport Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("import-editable") },
         { type: "separator" },
         { ...PUBLISH_MENU.bundle, click: () => send("build-bundle") },
         // Auto Rebuild: recompile the bundle after edits (debounced + deduped). Mirrors the same project

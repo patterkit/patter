@@ -1,5 +1,5 @@
-// The editable script dialogs (patterkit/design/proposals/editable-script-handoff.md §9): Publish ▸ Export
-// Editable Script… and Publish ▸ Reimport Editable Script…. Built on the shell's dialog frame in code, so
+// The editable script dialogs (patterkit/design/proposals/editable-script-handoff.md §9): Review ▸ Export
+// Editable Script… and Review ▸ Reimport Editable Script…. Built on the shell's dialog frame in code, so
 // there is no static markup for the preview harness to mirror.
 //
 // Export opens on its one big choice, This scene or Whole project, each with its line count, and remembers
@@ -42,7 +42,7 @@ function toggleRow(label: string, hint: string, checked = false): { row: HTMLLab
   return { row, input };
 }
 
-/** Publish ▸ Export Editable Script…: choose the range and options, then save the .docx in main. */
+/** Review ▸ Export Editable Script…: choose the range and options, then save the .docx in main. */
 export async function openEditableExport(ctx: EditableDialogContext): Promise<void> {
   await ctx.save();
   const counts = await window.patter.editableLineCounts(ctx.sceneId);
@@ -104,7 +104,7 @@ export async function openEditableExport(ctx: EditableDialogContext): Promise<vo
   (range === "scene" ? sceneBtn : projectBtn).focus();
 }
 
-/** Publish ▸ Reimport Editable Script…: pick the file, show what it holds, and import it as chosen. */
+/** Review ▸ Reimport Editable Script…: pick the file, show what it holds, and import it as chosen. */
 export async function openEditableReimport(ctx: EditableDialogContext): Promise<void> {
   const path = await window.patter.pickEditableReturn();
   if (!path) return;
