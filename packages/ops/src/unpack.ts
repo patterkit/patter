@@ -17,6 +17,10 @@
 // MERGE never writes it anywhere, since the sender's folder is the truth. A World edit the recipient
 // made comes back in the project file instead, and MERGE takes it to `game.scopes.json`.
 //
+// A pack's open handoff records (`handoffs/<id>.json`, see pack.ts) are project files: EXTRACT writes
+// them with the shards, and MERGE takes one the project lacks as it is, and for one it has, keeps ours and
+// adds any reimports logged on their side (a record is otherwise fixed once written).
+//
 // A document may arrive from an untrusted external author, so entry paths are
 // validated twice: a screen on the entry NAME (no absolute paths, no `..`), and
 // containment of the resolved WRITE PATH inside the target, which is the one
@@ -36,6 +40,8 @@ import { escapesTarget, isUnsafeEntry } from "@wildwinter/toolkit/archive";
 import type { ProjectFile } from "@patterkit/model";
 import { discoverGameScopes, planReturnedWorld, GAME_SCOPES_DIR, GAME_SCOPES_FILE } from "./game-scopes.js";
 import { SCOPES_FILE_SUFFIX } from "@wildwinter/scoperegistry/scopes";
+import { HANDOFF_DIR, parseHandoff, serialiseHandoff } from "./handoff.js";
+import type { HandoffFile, HandoffImport } from "@patterkit/model";
 
 const MANIFEST = "patter.manifest.json";
 
@@ -44,6 +50,12 @@ const MANIFEST = "patter.manifest.json";
 const isScopesEntry = (name: string): boolean => {
   const rest = name.startsWith(`${GAME_SCOPES_DIR}/`) ? name.slice(GAME_SCOPES_DIR.length + 1) : undefined;
   return rest !== undefined && !rest.includes("/") && rest.endsWith(SCOPES_FILE_SUFFIX);
+};
+
+/** A handoff record entry: a `.json` directly in `handoffs/`, which is all a pack writes there. */
+const isHandoffEntry = (name: string): boolean => {
+  const rest = name.startsWith(`${HANDOFF_DIR}/`) ? name.slice(HANDOFF_DIR.length + 1) : undefined;
+  return rest !== undefined && !rest.includes("/") && rest.endsWith(".json");
 };
 
 /** A document entry whose path escapes the target dir (rejected). */
@@ -55,6 +67,7 @@ export class UnsafeEntryError extends Error {}
 interface DocContents {
   shards: Map<string, string>;
   scopes: Map<string, string>;
+  handoffs: Map<string, string>;
   manifest?: DocumentManifest;
 }
 
@@ -62,6 +75,7 @@ async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
   const zip = await JSZip.loadAsync(bytes);
   const shards = new Map<string, string>();
   const scopes = new Map<string, string>();
+  const handoffs = new Map<string, string>();
   let manifest: DocumentManifest | undefined;
   for (const [name, entry] of Object.entries(zip.files)) {
     if (entry.dir) continue;
@@ -72,15 +86,15 @@ async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
       continue;
     }
     if (isUnsafeEntry(name)) throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
-    (isScopesEntry(name) ? scopes : shards).set(name, await entry.async("string"));
+    (isScopesEntry(name) ? scopes : isHandoffEntry(name) ? handoffs : shards).set(name, await entry.async("string"));
   }
-  return { shards, scopes, ...(manifest ? { manifest } : {}) };
+  return { shards, scopes, handoffs, ...(manifest ? { manifest } : {}) };
 }
 
 /** What unpacking a document plans: its shards, and its game scopes snapshot (empty for a pack with none,
  *  which is every pack from before packs carried one). */
 export interface UnpackResult {
-  /** The shards, under `targetDir`. */
+  /** The shards, under `targetDir`, with any open handoff records the pack carries (`handoffs/`). */
   shards: PlannedWrite[];
   /** The game's scopes files, in `<targetDir>/game-scopes/`, where the new project finds them first. */
   scopes: PlannedWrite[];
@@ -92,7 +106,7 @@ export async function runUnpack(bytes: Buffer | Uint8Array, targetDir: string): 
   const plan = (entries: Map<string, string>): PlannedWrite[] => [...entries.entries()]
     .map(([name, content]) => ({ path: containedWrite(targetDir, name), content }))
     .sort((a, b) => a.path.localeCompare(b.path));
-  return { shards: plan(doc.shards), scopes: plan(doc.scopes) };
+  return { shards: plan(new Map([...doc.shards, ...doc.handoffs])), scopes: plan(doc.scopes) };
 }
 
 /** One shard's outcome in a merge-unpack. */
@@ -168,6 +182,9 @@ export interface UnpackMergeResult {
    *  folder: `path` is its `game.scopes.json`, which `writes` brings up to date, or, with `error`, the
    *  file that won't parse and so was left alone. Absent otherwise. */
   gameScopes?: { path: string; error?: string };
+  /** Handoff records the pack brought (relative paths): added, or with reimports from their side added to
+   *  ours. Their writes are in `writes`. Absent when the pack carried none that changed anything. */
+  handoffs?: string[];
 }
 
 /**
@@ -242,7 +259,32 @@ export async function runUnpackMerge(
     else if (world.error) gameScopes = { path: join(local.dir, GAME_SCOPES_FILE), error: world.error };
   }
 
-  return { shards, writes, sidecars, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}) };
+  // Handoff records: theirs taken whole when we have none by that name, else ours with their reimports.
+  const handoffs: string[] = [];
+  for (const [rel, theirText] of [...returnedDoc.handoffs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const outPath = containedWrite(projectDir, rel);
+    if (!existsSync(outPath)) {
+      writes.push({ path: outPath, content: theirText });
+      handoffs.push(rel);
+      continue;
+    }
+    const merged = mergeHandoff(parseHandoff(readFileSync(outPath, "utf8")), parseHandoff(theirText));
+    if (merged) { writes.push({ path: outPath, content: serialiseHandoff(merged) }); handoffs.push(rel); }
+  }
+
+  return { shards, writes, sidecars, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}), ...(handoffs.length ? { handoffs } : {}) };
+}
+
+/** Our handoff record with any reimports their side logged that ours lacks, and closed if either side
+ *  closed it. Undefined when that changes nothing. Everything else about a record is fixed at export. */
+function mergeHandoff(ours: HandoffFile, theirs: HandoffFile): HandoffFile | undefined {
+  const key = (i: HandoffImport): string => `${i.at}|${i.fileHash}`;
+  const known = new Set((ours.imports ?? []).map(key));
+  const added = (theirs.imports ?? []).filter((i) => !known.has(key(i)));
+  const closed = ours.closed === true || theirs.closed === true;
+  if (added.length === 0 && closed === (ours.closed === true)) return undefined;
+  const imports = [...(ours.imports ?? []), ...added].sort((a, b) => a.at.localeCompare(b.at));
+  return { ...ours, ...(imports.length ? { imports } : {}), ...(closed ? { closed: true } : {}) };
 }
 
 /** A document's project file: the one `.patterproj` at its root, or undefined when there isn't exactly one. */

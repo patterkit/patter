@@ -13,17 +13,21 @@
 // Where the project has a game scopes folder (patterkit/design/shared-scopes.md), the pack carries a
 // read-only snapshot of it too, as `game-scopes/<file>` entries, so the recipient's checks, pickers, and
 // previews know the other tools' scopes. A project with no folder packs exactly as it always did.
+//
+// Open editable-script handoff records (`handoffs/<id>.json`, handoff.ts) ride along as they are, so
+// whoever opens the pack can reimport the editor's file. Closed ones stay home.
 // ---------------------------------------------------------------------------
 
 import JSZip from "jszip";
 import { readFileSync } from "node:fs";
-import { dirname, relative, sep } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile } from "@patterkit/model";
 import { findProjectFile, walkFiles } from "./load.js";
 import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { ARCHIVE_ENTRY_OPTS } from "@wildwinter/toolkit/archive";
 import { gameScopesSnapshot, GAME_SCOPES_DIR } from "./game-scopes.js";
+import { HANDOFF_DIR, parseHandoff } from "./handoff.js";
 
 /** The source-shard extensions a document carries (the merge-friendly truth). */
 export const SHARD_EXTENSIONS = [".patterflow", ".patterloc", ".patterx", ".patterproj"] as const;
@@ -37,6 +41,9 @@ export interface DocumentManifest {
   /** The game scopes files the pack carries as `game-scopes/<name>` entries, by name, sorted. Absent
    *  when the project has no game scopes folder (or it holds none). */
   gameScopes?: string[];
+  /** The open handoff records the pack carries as `handoffs/<id>.json` entries, by entry name, sorted.
+   *  Absent when there are none. */
+  handoffs?: string[];
 }
 
 // A fixed timestamp keeps the zip byte-reproducible (no wall-clock mtimes), so
@@ -74,17 +81,25 @@ export async function runPack(startPath: string): Promise<Buffer> {
   // The game's scopes, found as the loader finds them: a snapshot the recipient reads and never sends back.
   const scopes = gameScopesSnapshot(root, project);
 
+  // Open handoff records, raw. One that won't parse can't say whether it is open, so it stays home too;
+  // the project's own checks report it.
+  const handoffs = walkFiles(join(root, HANDOFF_DIR), ".json")
+    .map((abs) => ({ rel: relative(root, abs).split(sep).join("/"), text: readFileSync(abs, "utf8") }))
+    .filter((f) => { try { return !parseHandoff(f.text).closed; } catch { return false; } });
+
   const manifest: DocumentManifest = {
     schema: "patter/document@0",
     project: { id: project.project.id, name: project.project.name },
     files: files.map((f) => f.rel),
     ...(scopes.length ? { gameScopes: scopes.map((f) => f.fileName) } : {}),
+    ...(handoffs.length ? { handoffs: handoffs.map((f) => f.rel) } : {}),
   };
 
   const zip = new JSZip();
   zip.file("patter.manifest.json", JSON.stringify(manifest, null, 2) + "\n", ENTRY_OPTS);
   for (const f of files) zip.file(f.rel, readFileSync(f.abs, "utf8"), ENTRY_OPTS);
   for (const f of scopes) zip.file(`${GAME_SCOPES_DIR}/${f.fileName}`, f.text, ENTRY_OPTS);
+  for (const f of handoffs) zip.file(f.rel, f.text, ENTRY_OPTS);
 
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", streamFiles: false });
 }

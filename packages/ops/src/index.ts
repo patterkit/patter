@@ -67,3 +67,9 @@ export type { UnpackResult, UnpackMergeResult, MergedShard, ProvenanceCheck } fr
 export { resolveDocumentation, classesForChannel } from "./documentation.js";
 export { runMerge, detectMergeType, UnsupportedMergeError, sidecarIssues, CONFLICT_SIDECAR, AUTHORING_HANDLED } from "./merge.js";
 export type { MergeResult, MergeFileType, Conflict, ConflictKind } from "./merge.js";
+// Editable-script handoff records and markers (patterkit/design/proposals/editable-script-handoff.md)
+export {
+  HANDOFF_DIR, handoffPath, handoffWrite, serialiseHandoff, parseHandoff, readHandoffs, readHandoff,
+  markerLength, issueMarkerCodes, formatMarker, readMarker, newHandoffId,
+} from "./handoff.js";
+export type { HandoffIssue, ReadMarker, Random } from "./handoff.js";
