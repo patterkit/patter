@@ -16,6 +16,8 @@
 import JSZip from "jszip";
 import { DOMParser } from "@xmldom/xmldom";
 import { readMarker } from "./handoff.js";
+import { TOKENS, CHAR_PALETTE } from "./script-doc.js";
+import { BOX_FILL, MARKER_INK } from "./editable-docx.js";
 import type { ReadMarker } from "./handoff.js";
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -113,6 +115,20 @@ const on = (rPr: XElement | undefined, name: string): boolean => {
 };
 /** Run properties that ARE formatting the import drops (anything beyond bold, italic, and the font). */
 const DROPPED = new Set(["color", "highlight", "u", "strike", "dstrike", "shd", "caps", "smallCaps", "vertAlign"]);
+/** Colours and fills the exporter itself writes (the script's inks, the box's fill). Google Docs copies them
+ *  onto every run it saves, so they're no sign of an editor's formatting. Lower-case hex. */
+const OWN_COLOURS = new Set([...Object.values(TOKENS), ...CHAR_PALETTE, MARKER_INK, BOX_FILL, "000000", "auto"].map((c) => c.toLowerCase()));
+/** Is this run property formatting an editor added (not "off", not one of the exporter's own colours)? */
+function addedFormatting(p: XElement): boolean {
+  const name = local(p);
+  if (!DROPPED.has(name)) return false;
+  const val = (attr(p, "val") ?? "").toLowerCase();
+  if (val === "none" || val === "false" || val === "0") return false;
+  if (name === "color") return !OWN_COLOURS.has(val || "auto");
+  if (name === "shd") return !OWN_COLOURS.has((attr(p, "fill") ?? "auto").toLowerCase());
+  if (name === "smallCaps" || name === "caps") return false; // the exporter's tags and cues use them
+  return true;
+}
 
 /** Which view a stretch of the document belongs to. */
 type View = "both" | "proposed" | "original";
@@ -150,7 +166,7 @@ class Collector {
   private run(r: XElement, view: View, change?: TrackedChange): void {
     const rPr = child(r, "rPr");
     const bold = on(rPr, "b"), italic = on(rPr, "i");
-    if (rPr) for (const p of kids(rPr)) if (DROPPED.has(local(p)) && attr(p, "val") !== "none" && attr(p, "val") !== "auto") { this.dropped++; break; }
+    if (rPr && kids(rPr).some(addedFormatting)) this.dropped++;
     for (const e of kids(r)) {
       const name = local(e);
       let text: string | undefined;

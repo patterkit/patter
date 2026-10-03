@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import JSZip from "jszip";
 import { loadProject, exportEditableScript, readEditableDocx } from "../src/index.js";
 import type { ReadBox, ReturnedDoc } from "../src/index.js";
@@ -128,6 +129,14 @@ describe("readEditableDocx", () => {
     expect(b.text.droppedFormatting).toBe(1);
   });
 
+  it("the exporter's own colours and box fill, which Google Docs copies onto every run, aren't counted as an editor's", async () => {
+    const own = `<w:color w:val="3A352D"/><w:shd w:fill="f7f2e8" w:val="clear"/><w:u w:val="none"/>`;
+    const b = box(await edited((x) => setWords(x, GREET, `<w:p>${r("What'll it be, stranger?", own)}</w:p>`)), GREET);
+    expect(b.text.droppedFormatting).toBe(0);
+    const highlighted = box(await edited((x) => setWords(x, GREET, `<w:p>${r("What'll it be, stranger?", `<w:highlight w:val="yellow"/>`)}</w:p>`)), GREET);
+    expect(highlighted.text.droppedFormatting).toBe(1);
+  });
+
   it("an Enter inside a box joins with a space, and the paragraph count says it happened", async () => {
     const b = box(await edited((x) => setWords(x, GREET, `<w:p>${r("What'll it be,")}</w:p><w:p>${r("stranger?")}</w:p>`)), GREET);
     expect(b.text.proposed).toBe("What'll it be, stranger?");
@@ -162,6 +171,19 @@ describe("readEditableDocx", () => {
       { id: "2", author: "Sam", text: "Cheap?", replies: [] },
     ]);
     expect(box(doc, GREET).text.comments).toEqual(["0"]);
+  });
+
+  it("reads a real export that went through Google Docs (uploaded, converted, downloaded as .docx)", async () => {
+    // The tour example's editable script (76 lines, handoff H-KGBY), converted by Google Docs and saved back
+    // out; Google's embedded fonts were stripped to keep the fixture small. Google rewrites every run and
+    // bookmark, merges nothing here (the spacers hold), and copies the script's own inks onto each run.
+    const doc = await readEditableDocx(readFileSync(fileURLToPath(new URL("./fixture/editable/tour-from-google-docs.docx", import.meta.url))));
+    expect(doc.handoffId).toBe("H-KGBY");
+    const boxes = doc.items.filter((i): i is ReadBox => i.kind === "box");
+    expect(boxes).toHaveLength(76);
+    expect(boxes.every((b) => b.marker?.valid && !b.marker.recovered)).toBe(true);
+    expect(boxes.every((b) => b.text.proposed === b.text.original && b.text.changes.length === 0)).toBe(true);
+    expect(boxes.reduce((n, b) => n + b.text.droppedFormatting, 0)).toBe(0);
   });
 
   it("refuses something that isn't a Word document", async () => {

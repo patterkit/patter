@@ -65,9 +65,9 @@ const FULL = 9020;
 const LEAD = 1700;   // the cue column
 const MARGIN = 1500; // the tag and marker column
 const MIN_TEXT = 3000;
-const BOX_FILL = "f7f2e8";
+export const BOX_FILL = "f7f2e8";
 const BOX_EDGE = "d9cfbd";
-const MARKER_INK = "a8a196";
+export const MARKER_INK = "a8a196";
 const NONE = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
 const HAIR = { style: BorderStyle.SINGLE, size: 4, color: BOX_EDGE } as const;
 
