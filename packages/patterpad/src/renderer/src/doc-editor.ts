@@ -7,11 +7,12 @@ import type { DocLine, DocumentationClass } from "@patterkit/model";
 import { el } from "./dom.js";
 
 const UNTYPED = "__untyped"; // sentinel for the editor-only (no-class) bucket in the add menu
-const CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers" };
+const CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers", editor: "Editors" };
 const label = (key: string): string => CLASS_LABEL[key] ?? (key ? key[0]!.toUpperCase() + key.slice(1) : "Note (editor-only)");
 const placeholder = (key: string): string =>
   key === "vo" ? "Direction for the voice actor or director"
   : key === "loc" ? "Context for translators"
+  : key === "editor" ? "Context for an outside editor"
   : key === "" ? "An internal note, never exported"
   : "Why this is here";
 

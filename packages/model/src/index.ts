@@ -592,8 +592,9 @@ export interface DocumentationClass {
   /**
    * Export channels this class flows to: a list of channel names, or `"*"` for
    * all. Omitted/empty = editor-only (e.g. "writing"). Built-in channels: `vo`
-   * (voice-recording scripts), `loc` (localisation handoff); studios add their
-   * own (e.g. `sfx`, `art`), carried now and picked up when that export exists.
+   * (voice-recording scripts), `loc` (localisation handoff), `editor` (the editable
+   * script handed to an outside editor); studios add their own (e.g. `sfx`, `art`),
+   * carried now and picked up when that export exists.
    */
   deliver?: string[] | "*";
 }
@@ -607,6 +608,7 @@ export const DEFAULT_DOCUMENTATION_CLASSES: DocumentationClass[] = [
   { name: "everyone", deliver: "*" }, // every export, and (like all) the editor
   { name: "vo", deliver: ["vo"] },    // voice-recording scripts
   { name: "loc", deliver: ["loc"] },  // localisation handoff
+  { name: "editor", deliver: ["editor"] }, // the editable script handed to an outside editor
 ];
 // (An editor-only note still exists: leave a note UNTYPED - it surfaces in the editor but no export.)
 
@@ -833,12 +835,18 @@ export interface Comment {
   messages: CommentMessage[];
 }
 
-/** A "suggest a rewrite" proposal for a single say/prose beat (review flow, design/proposals/
- *  suggest-rewrite.md). Whole-beat anchored: `baseline` is the say text WHEN suggested (the "before" +
- *  the drift detector - if it no longer matches the live text, the line changed since and the suggestion
- *  is shown stale), `proposed` is the replacement. Accept overwrites the beat's say text; both accept and
- *  reject set `resolved` (archived) + `outcome` (a light audit trail). Stored in the authoring shard,
- *  never in the flow text, so downstream tools ignore it. */
+/** A "suggest a rewrite" proposal for a single say/prose beat or option prompt (review flow,
+ *  design/proposals/suggest-rewrite.md). Whole-beat anchored: `baseline` is the say text WHEN suggested
+ *  (the "before" + the drift detector - if it no longer matches the live text, the line changed since and
+ *  the suggestion is shown stale), `proposed` is the replacement. Accept overwrites the beat's say text;
+ *  both accept and reject set `resolved` (archived) + `outcome` (a light audit trail). Stored in the
+ *  authoring shard, never in the flow text, so downstream tools ignore it.
+ *
+ *  Beyond the text, a suggestion may also propose a new speaker, a new direction, or cutting the beat
+ *  (the editable-script handoff, design/proposals/editable-script-handoff.md). Each such part carries its
+ *  own baseline, so each is stale-checked on its own; accept applies whichever parts are present. A
+ *  suggestion that only changes the speaker or direction, or only cuts, keeps `proposed` equal to
+ *  `baseline`. */
 export interface Suggestion {
   id: string;
   /** The say/prose beat's stable id. */
@@ -847,11 +855,36 @@ export interface Suggestion {
   baseline: string;
   /** The proposed replacement say text. */
   proposed: string;
+  /** The primary author: with several (`authors`), the one with the most changes. */
   author: string;
+  /** Everyone whose changes this suggestion carries, when there is more than one (an editor's file with
+   *  several people's tracked changes on one line). `author` stays the primary, so a reader that only
+   *  knows `author` keeps working. */
+  authors?: string[];
   ts: string;
+  /** A proposed new speaker (a known cast member's name), and the speaker when suggested. */
+  proposedCharacter?: string;
+  baselineCharacter?: string;
+  /** A proposed new direction (the parenthetical), and the direction when suggested ("" for none). */
+  proposedDirection?: string;
+  baselineDirection?: string;
+  /** A proposal to cut the beat (an editor emptied its line). Accept marks it cut. */
+  proposedCut?: boolean;
+  /** Where the suggestion came from, when it arrived in an editable-script handoff: the handoff and the
+   *  line's marker in it. Drives the review's "from handoff" filter, and lets a re-import of the same
+   *  handoff replace its still-open suggestions instead of stacking duplicates. */
+  handoff?: SuggestionSource;
   /** Accepted or rejected -> archived (hidden unless "show resolved suggestions" is on). */
   resolved?: boolean;
   outcome?: "accepted" | "rejected";
+}
+
+/** The handoff a suggestion arrived in (see `Suggestion.handoff`). */
+export interface SuggestionSource {
+  /** The handoff's id ("H-7Q2K"). */
+  id: string;
+  /** The line's marker code in that handoff ("K7Q2M"). */
+  marker: string;
 }
 
 export interface EditRecord {
@@ -903,6 +936,73 @@ export interface AuthoringFile {
    * Authoring-only; never compiled into a bundle.
    */
   rerecord?: Record<string, boolean>;
+}
+
+// ---------------------------------------------------------------------------
+// Editable-script handoff record (design/proposals/editable-script-handoff.md §5.2).
+// One per export, at `handoffs/<id>.json` in the project: what was sent, to whom,
+// when, and each editable line's text AS SENT, which every check on reimport
+// compares against. Authoring-only; never compiled into a bundle.
+// ---------------------------------------------------------------------------
+
+export const HANDOFF_SCHEMA = "patter/handoff@0";
+
+export interface HandoffFile {
+  schema: typeof HANDOFF_SCHEMA;
+  /** "H-7Q2K": shown in the document's page header, so a returned file finds its record. */
+  id: string;
+  createdAt: string;
+  createdBy: string;
+  /** The file format sent. */
+  format: "docx";
+  /** Who it went to, as typed at export (optional). */
+  recipient?: string;
+  /** The scene ids exported, in document order. */
+  range: { scenes: string[] };
+  options: {
+    /** Which notes rode along: a documentation channel name ("editor"), or "all". */
+    notes: string;
+    /** Each line's writing status shown as a tag. */
+    status: boolean;
+    /** A cast page before the script. */
+    cast: boolean;
+  };
+  /** Every editable line, keyed by its marker code ("K7Q2M"). */
+  lines: Record<string, HandoffLine>;
+  /** The whole document in order: context rows tied to the node they describe, and each editable line
+   *  by marker. Lets the importer align what came back with what was sent, and anchor a comment made on
+   *  a context row to its node. */
+  skeleton: HandoffRow[];
+  /** One entry per reimport, appended. */
+  imports?: HandoffImport[];
+  /** Set when the handoff is finished with; a closed handoff no longer appears in review filters. */
+  closed?: boolean;
+}
+
+/** An editable line as sent. */
+export interface HandoffLine {
+  /** The beat id (a line, a narration beat, or an option prompt). */
+  id: string;
+  kind: "line" | "narration" | "option";
+  /** The speaker and direction as sent (spoken lines only). */
+  character?: string;
+  direction?: string;
+  /** The text as sent: the baseline for every comparison on reimport. */
+  baseline: string;
+}
+
+/** One row of the sent document, in order. */
+export type HandoffRow =
+  | { kind: "box"; marker: string }
+  | { kind: "scene" | "block" | "condition" | "group" | "else" | "jump" | "gameEvent" | "note"; node: string; text: string };
+
+/** A record of one reimport. */
+export interface HandoffImport {
+  at: string;
+  by: string;
+  /** SHA-256 of the returned file, so a second import of the same file is recognisable. */
+  fileHash: string;
+  counts: { changed: number; unchanged: number; stale: number; comments: number; problems: number };
 }
 
 // ---------------------------------------------------------------------------

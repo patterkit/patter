@@ -265,6 +265,26 @@ describe("an authoring merge carries every field the model has", () => {
     expect(runMerge(base, ours, theirs).conflicts).toHaveLength(1); // accepted vs rejected is a real disagreement
   });
 
+  it("carries a handoff suggestion's extra parts through a merge, and 3-ways them", () => {
+    // The editable-script handoff widens a suggestion: several authors, a speaker or direction change,
+    // a cut, and where it came from. A merge must lose none of them, and an accept on one side must
+    // still land against an untouched other side.
+    const s = {
+      id: "s1", anchor: "L1", baseline: "a", proposed: "a", author: "Sam", authors: ["Sam", "Jo"], ts: "2026-01-01",
+      proposedCharacter: "Mara", baselineCharacter: "Ned", proposedDirection: "quietly", baselineDirection: "",
+      proposedCut: true, handoff: { id: "H-7Q2K", marker: "K7Q2M" },
+    };
+    const base = authoring({ suggestions: [] });
+    const merged = runMerge(base, authoring({ suggestions: [s] }), base).merged["suggestions"] as unknown[];
+    expect(merged).toEqual([s]);
+
+    const sent = authoring({ suggestions: [s] });
+    const accepted = authoring({ suggestions: [{ ...s, resolved: true, outcome: "accepted" }] });
+    const r = runMerge(sent, accepted, sent);
+    expect(r.merged["suggestions"]).toEqual([{ ...s, resolved: true, outcome: "accepted" }]);
+    expect(r.conflicts).toHaveLength(0);
+  });
+
   it("keeps both sides' re-record flags", () => {
     const r = runMerge(
       authoring({ rerecord: {} }),

@@ -28,7 +28,7 @@ const isMac = process.platform === "darwin";
 
 const COLOURS: Array<[ThemePrefs["colour"], string]> = [["system", "Follow System"], ["paper", "Paper"], ["mist", "Mist"], ["slate", "Slate"], ["night", "Night"]];
 const FONTS: Array<[ThemePrefs["font"], string]> = [["newsreader", "Newsreader"], ["literata", "Literata"], ["source", "Source Serif"], ["script", "Courier (script)"]];
-const DOC_CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers" };
+const DOC_CLASS_LABEL: Record<string, string> = { everyone: "Everyone", vo: "Voice (VO)", loc: "Localisers", editor: "Editors" };
 
 /** A named documentation item, rendered disabled rather than dead when the app supplied no URL: the
  *  shell's `ready` flag carries that, so no non-null assertion on `url` is needed here. */

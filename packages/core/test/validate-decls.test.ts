@@ -205,6 +205,10 @@ describe("documentation classes (spec §18)", () => {
     expect(issues[0]!.message).toContain("bogus");
   });
 
+  it("'editor' is a default class (notes for the editable-script handoff)", () => {
+    expect(docCodes(base(), { T: [{ type: "editor", text: "Mara lies here; keep it light." }] })).toEqual([]);
+  });
+
   it("a project's custom documentationClasses replace the defaults", () => {
     const p: ProjectFile = { ...base(), documentationClasses: [{ name: "sfx", deliver: ["sfx"] }] };
     expect(docCodes(p, { T: [{ type: "sfx", text: "boom" }] })).toEqual([]); // declared

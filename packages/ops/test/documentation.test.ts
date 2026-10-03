@@ -42,6 +42,7 @@ describe("classesForChannel", () => {
   it("routes by deliver; '*' matches every channel", () => {
     expect(classesForChannel(DEFAULT_DOCUMENTATION_CLASSES, "vo")).toEqual(new Set(["everyone", "vo"]));
     expect(classesForChannel(DEFAULT_DOCUMENTATION_CLASSES, "loc")).toEqual(new Set(["everyone", "loc"]));
+    expect(classesForChannel(DEFAULT_DOCUMENTATION_CLASSES, "editor")).toEqual(new Set(["everyone", "editor"]));
     expect(classesForChannel([{ name: "art", deliver: ["art"] }], "art")).toEqual(new Set(["art"]));
   });
 });

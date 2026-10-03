@@ -70,7 +70,7 @@ describe("an authoring merge covers every field the model declares", () => {
     const sample: Record<string, unknown> = {
       schema: "patter/authoring@0",
       comments: [{ id: "c1", anchor: "L1", messages: [{ author: "a", ts: "2026-01-01", body: "hi" }] }],
-      suggestions: [{ id: "s1", anchor: "L1", baseline: "a", proposed: "b", author: "a", ts: "2026-01-01" }],
+      suggestions: [{ id: "s1", anchor: "L1", baseline: "a", proposed: "b", author: "a", authors: ["a", "b"], ts: "2026-01-01", proposedCut: true, handoff: { id: "H-1", marker: "K1" } }],
       edits: { L1: { modifiedAt: "2026-01-01" } },
       writing: { L1: "draft 1" },
       recording: { L1: "scratch" },
