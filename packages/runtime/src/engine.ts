@@ -339,6 +339,26 @@ interface SelectorState {
   last?: string;           // last child id picked (no-immediate-repeat across reshuffles)
 }
 
+/** What an open checkpoint records: how to undo each change, newest last. Each piece of state records
+ *  itself when it changes (a value, a count, a cursor), never a copy of everything, so a checkpoint costs
+ *  what the steps inside it do, however much history the game has built up. */
+export interface Journal {
+  undo: Array<() => void>;
+  /** Flows already snapshotted (or opened inside the checkpoint, so closed on rollback). */
+  flows: Set<Flow>;
+  /** Flows opened inside the checkpoint. */
+  opened: Set<Flow>;
+  /** Selector cursors already copied: shared ones by group id, a flow's own in `flowSelectors`. */
+  selectors: Set<string>;
+  flowSelectors: Map<Flow, Set<string>>;
+}
+
+/** An open checkpoint, from {@link Engine.checkpoint}. Opaque: hand it back to `rollback` or `commit`. */
+export class Checkpoint {
+  /** @internal */
+  constructor(readonly journal: Journal) {}
+}
+
 /** Shared, read-mostly context the engine hands to every flow it owns. */
 interface FlowHost {
   /** True when the run asked for a log; flows skip building entries otherwise. */
@@ -388,6 +408,8 @@ interface FlowHost {
   /** Per-scene SHARED scene props, each registered under `keys.stage(sceneId)`. Made the first time any
    *  flow needs the scene, so a bag loaded before then waits in the registry and is claimed here. */
   stageBags: Map<string, PropertyBag>;
+  /** The open checkpoint's undo journal, or null when none is open (see {@link Engine.checkpoint}). */
+  journal: Journal | null;
   customRng?: () => number;
   /** Play a chosen option's prompt as its first beat (spec §5); default false. */
   replayPromptOnChoose?: boolean;
@@ -541,6 +563,7 @@ export class Engine {
       sharedVisits: new Map(),
       sharedSelectors: new Map(),
       stageBags: new Map(),
+      journal: null,
       customRng: options.rng,
       onDryChoice: options.onDryChoice,
       replayPromptOnChoose: options.replayPromptOnChoose ?? false,
@@ -603,6 +626,7 @@ export class Engine {
    * top of the scene it was in; the shared properties carry over.
    */
   hotSwap(bundle: Bundle): Engine {
+    this.refuseInCheckpoint("hotSwap");
     const snapshot = this.saveGame();
     const carryOver = (next: Engine): Engine => {
       next.setLocale(this.currentLocale);
@@ -663,8 +687,20 @@ export class Engine {
     this.assertExternalScopes();
     const sceneId = this.resolveSceneRef(opts.scene);
     const blockId = this.resolveBlockRef(sceneId, opts.block);
-    this.flowsById.get(id)?.close(); // finish the flow this name used to mean
+    const prior = this.flowsById.get(id);
+    const journal = this.host.journal;
+    if (journal && prior && !prior.isClosed) throw new Error(`openFlow would replace the open flow '${id}', which can't be undone while a checkpoint is open`);
+    prior?.close(); // finish the flow this name used to mean
     const flow = new Flow(id, this.host, opts.seed ?? this.defaultSeed);
+    if (journal) {
+      // Opened inside the checkpoint: rolling back closes it and puts back whatever the name meant.
+      journal.flows.add(flow);
+      journal.opened.add(flow);
+      journal.undo.push(() => {
+        flow.close();
+        if (prior) this.flowsById.set(id, prior); else this.flowsById.delete(id);
+      });
+    }
     this.flowsById.set(id, flow);
     flow.start(sceneId, blockId);
     return flow;
@@ -939,9 +975,69 @@ export class Engine {
     return mounts;
   }
 
+  /**
+   * Open a checkpoint: from here until `rollback` or `commit`, the engine keeps what it needs to undo
+   * every change the story makes. `rollback` puts the game back exactly as it was at the checkpoint:
+   * property values (every scope, including a host's `@world`, which is written back through the
+   * game), visit counts, shuffle and sequence positions, `@scene` bags made since, every flow's cursor
+   * and PRNG, and any flow opened since (closed and forgotten). `commit` keeps everything and stops
+   * recording.
+   *
+   * The use is asking "would this say anything?" without consequences: move a flow to an address,
+   * advance it, and roll back if it had nothing to give, so its scene's `onEntry` effects, its visits,
+   * and its shuffle draws never happened.
+   *
+   * One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags wholesale
+   * (`reset`, `loadGame`, `hotSwap`, `closeFlow`, `openFlow` on the name of an open flow, and a flow's own
+   * `start`, `reset`, and `restore`) throw. Not undone:
+   * trace and log events already emitted, and draws from a custom `rng` the game supplied.
+   */
+  checkpoint(): Checkpoint {
+    if (this.host.journal) throw new Error("a checkpoint is already open: roll it back or commit it first");
+    const journal: Journal = { undo: [], flows: new Set(), opened: new Set(), selectors: new Set(), flowSelectors: new Map() };
+    this.host.journal = journal;
+    return new Checkpoint(journal);
+  }
+
+  /** Undo everything since `checkpoint` (see there), and close it. */
+  rollback(checkpoint: Checkpoint): void {
+    this.endCheckpoint(checkpoint);
+    const undo = checkpoint.journal.undo;
+    for (let i = undo.length - 1; i >= 0; i--) undo[i]!();
+    Engine.forget(checkpoint.journal);
+  }
+
+  /** Keep everything since `checkpoint`, and close it. */
+  commit(checkpoint: Checkpoint): void {
+    this.endCheckpoint(checkpoint);
+    Engine.forget(checkpoint.journal);
+  }
+
+  /** True while a checkpoint is open. */
+  get inCheckpoint(): boolean { return this.host.journal !== null; }
+
+  private endCheckpoint(checkpoint: Checkpoint): void {
+    if (this.host.journal !== checkpoint.journal) throw new Error("that checkpoint is not the open one");
+    this.host.journal = null;
+  }
+
+  /** Let go of what a closed checkpoint recorded, so a handle the game keeps holds nothing. */
+  private static forget(journal: Journal): void {
+    journal.undo = [];
+    journal.flows.clear();
+    journal.opened.clear();
+    journal.selectors.clear();
+    journal.flowSelectors.clear();
+  }
+
+  private refuseInCheckpoint(what: string): void {
+    if (this.host.journal) throw new Error(`${what} can't be undone, so it isn't allowed while a checkpoint is open`);
+  }
+
   /** Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
    *  holding it cannot keep advancing it into the shared world (see {@link Flow.close}). */
   closeFlow(id: string): void {
+    this.refuseInCheckpoint("closeFlow");
     this.flowsById.get(id)?.close();
     this.flowsById.delete(id);
   }
@@ -953,6 +1049,7 @@ export class Engine {
    * After reset, open fresh flows with `openFlow`.
    */
   reset(): void {
+    this.refuseInCheckpoint("reset");
     for (const flow of this.flowsById.values()) flow.close(); // finish them, don't just forget them
     this.flowsById.clear();
     this.host.patterBag.reseed(this.host.patterSharedDecls);
@@ -992,7 +1089,9 @@ export class Engine {
    *  were each refused the one property they existed to move.) */
   setProperty(ref: string, value: ScalarValue): void {
     const { scope, name } = this.splitShared(ref);
+    const prev = this.host.journal ? this.host.registry.get(scope, name) : undefined;
     this.host.registry.set(scope, name, value, { host: true });
+    if (this.host.journal && prev !== undefined) this.host.journal.undo.push(() => this.host.registry.set(scope, name, prev, { host: true }));
   }
 
   /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
@@ -1089,6 +1188,7 @@ export class Engine {
    * to the registry (values kept) and the restored flows claim them as they register.
    */
   loadGame(save: SaveGame | SaveGameV2): void {
+    this.refuseInCheckpoint("loadGame");
     const version: unknown = (save as { version?: unknown }).version;
     if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported save version: ${String(version)}`);
     this.assertExternalScopes();
@@ -1264,6 +1364,9 @@ export class Flow {
 
   /** Begin this flow at a scene (and optionally a specific block within it). */
   start(sceneId?: string, blockId?: string): void {
+    // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
+    // inside the checkpoint may start in one.
+    if (this.host.journal && !this.host.journal.opened.has(this)) throw new Error("a flow can't be started or reset while a checkpoint is open");
     // A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
     this.releaseBags(false);
     this.host.registry.discardParked(keys.flow(this.id));
@@ -1324,6 +1427,7 @@ export class Flow {
    */
   goto(scene: string, block?: string): boolean {
     if (this.closed) return false; // closed is terminal: unlike "ended", a goto cannot revive it
+    this.touch();
     if (scene === "END") {
       this.started = true; this.pendingChoice = null; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null;
       this.activeSnippet = null; this.beatIndex = 0;
@@ -1372,6 +1476,20 @@ export class Flow {
     this.pendingPromptOwnerId = null;
   }
 
+  /** Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a rollback can
+   *  put them back: a handful of fields and a copy of the call stack (a few frames), never its history.
+   *  Its visits, selector cursors, and property values are recorded change by change as they happen. */
+  private touch(): void {
+    const journal = this.host.journal;
+    if (!journal || journal.flows.has(this)) return;
+    journal.flows.add(this);
+    const { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPromptBeat, pendingPromptOwnerId } = this;
+    const stack = this.stack.map((f) => ({ ...f })); // frames advance in place, so copy them
+    journal.undo.push(() => {
+      Object.assign(this, { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPromptBeat, pendingPromptOwnerId, stack });
+    });
+  }
+
   /** True once the engine has closed this flow (closed, dropped by `reset()`, or replaced by name). */
   get isClosed(): boolean { return this.closed; }
 
@@ -1384,6 +1502,7 @@ export class Flow {
   advance(): StepResult {
     if (this.closed) return { type: "end" }; // a stale reference to a closed flow drives nothing
     if (!this.started) throw new Error("flow has not been started");
+    this.touch();
     // A replayed prompt (replayPromptOnChoose) is delivered first, before the option's content.
     if (this.pendingPromptBeat) { const b = this.pendingPromptBeat; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null; return this.beatResult(b); }
     this.settle();
@@ -1504,6 +1623,7 @@ export class Flow {
     const option = choice.options.find((o) => o.id === id);
     if (!option) throw new Error(`unknown choice option: ${id}`);
     if (!option.eligible) throw new Error(`choice option is not eligible: ${id}`);
+    this.touch();
     const node = choice.byId.get(id)!;
     this.emit({ type: "chose", group: choice.groupId, option: id });
     this.pendingChoice = null;
@@ -1538,15 +1658,32 @@ export class Flow {
    *  about: the story is refused, the game is not. */
   private writeProperty(ref: string, value: ScalarValue, host: boolean): void {
     const { scope, name } = this.splitRef(ref);
+    const journal = this.host.journal;
     if (scope === "patter") {
+      // Inside a checkpoint, each write records how to put the old value back, against the bag it
+      // actually landed in (a `@scene` write's bag depends on the scene the flow is in at the time).
+      if (journal) {
+        const shared = this.host.patterSharedNames.has(name);
+        const prev = shared ? this.host.patterBag.get(name) : this.local.get(name);
+        const bag = this.local;
+        if (prev !== undefined) journal.undo.push(shared ? () => this.host.registry.set("patter", name, prev) : () => bag.set(name, prev));
+      }
       this.patterResolver.set!(name, value);
     } else if (scope === "scene") {
       // The resolver stays graceful for expression evaluation, but a host write
       // with nowhere to land must error, not silently vanish.
       if (this.currentSceneId === null) throw new Error(`'${ref}': the flow has not entered a scene yet`);
+      if (journal) {
+        const bag = this.sceneBagFor(this.currentSceneId, name);
+        const prev = bag?.get(name);
+        if (bag && prev !== undefined) journal.undo.push(() => bag.set(name, prev));
+      }
       this.sceneResolver.set!(name, value);
     } else {
+      const prev = journal ? this.host.registry.get(scope, name) : undefined;
       this.host.registry.set(scope, name, value, host ? { host: true } : undefined); // host / other scopes
+      // Recorded after the write: one a read-only host scope refused never happened, so has nothing to undo.
+      if (journal && prev !== undefined) journal.undo.push(() => this.host.registry.set(scope, name, prev, { host: true }));
     }
   }
 
@@ -1578,8 +1715,25 @@ export class Flow {
     };
   }
 
-  /** @internal Restore this flow from a snapshot. */
+  /** @internal Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its
+   *  property values are the registry's and stay as they are (a load puts the saved ones there first). */
   restore(snap: FlowSnapshot): void {
+    if (this.host.journal) throw new Error("a flow can't be restored while a checkpoint is open");
+    this.restoreCursor(snap);
+    // Register this flow's bags: each claims the values the registry holds for it (loaded by the game, by
+    // loadGame from the save, or handed back by the engine this one replaces), laid over fresh defaults.
+    // Released KEEPING their values, so a live flow restored in place keeps its property values (a fresh
+    // one, made by a load, is claiming the loaded values either way). The scenes the cursor stands in are
+    // registered now; any other scene's bag is claimed on entry.
+    this.releaseBags(true);
+    this.mountLocal();
+    for (const s of new Set([this.currentSceneId, ...this.stack.map((f) => f.sceneId)])) {
+      if (s !== null && this.host.bundle.scenes[s]) this.ensureSceneBags(s);
+    }
+  }
+
+  /** The cursor half of `restore`, without touching the bags (a rollback has already put those back). */
+  private restoreCursor(snap: FlowSnapshot): void {
     this.rngState = toUint32(snap.rngState);
     this.visitCounts = new Map(Object.entries(snap.visits ?? {}));
     const c = snap.cursor;
@@ -1598,15 +1752,6 @@ export class Flow {
       }
       return { ...frame };
     });
-
-    // Register this flow's bags: each claims the values the registry holds for it (loaded by the game, by
-    // loadGame from the save, or handed back by the engine this one replaces), laid over fresh defaults.
-    // The scenes the cursor stands in are registered now; any other scene's bag is claimed on entry.
-    this.releaseBags(false);
-    this.mountLocal();
-    for (const s of new Set([c.currentSceneId, ...this.stack.map((f) => f.sceneId)])) {
-      if (s !== null && this.host.bundle.scenes[s]) this.ensureSceneBags(s);
-    }
 
     // Content-drift policy (§9.8): if a saved position points at content deleted
     // since the save, resume best-effort rather than throwing - the missing
@@ -1931,6 +2076,19 @@ export class Flow {
   /** A selector's cursor state - shared across flows (`group.shared`) or this flow's own. */
   private selectorState(group: CompiledGroup): SelectorState {
     const map = group.shared ? this.host.sharedSelectors : this.selectors;
+    // A cursor is copied the first time a checkpoint sees it (shared ones once for every flow).
+    const journal = this.host.journal;
+    let seen: Set<string> | undefined;
+    if (journal) {
+      seen = group.shared ? journal.selectors : journal.flowSelectors.get(this);
+      if (!seen) { seen = new Set(); journal.flowSelectors.set(this, seen); }
+    }
+    if (journal && seen && !seen.has(group.id)) {
+      seen.add(group.id);
+      const was = map.get(group.id);
+      const copy = was ? { ...was, ...(was.bag ? { bag: [...was.bag] } : {}) } : undefined;
+      journal.undo.push(() => { if (copy) map.set(group.id, copy); else map.delete(group.id); });
+    }
     let st = map.get(group.id);
     if (!st) { st = {}; map.set(group.id, st); }
     return st;
@@ -1969,8 +2127,16 @@ export class Flow {
 
   /** Record an entry of a node (entered-only; spec §7): bumps the flow + world counts. */
   private enter(id: string): void {
-    this.visitCounts.set(id, (this.visitCounts.get(id) ?? 0) + 1);
-    this.host.sharedVisits.set(id, (this.host.sharedVisits.get(id) ?? 0) + 1);
+    const own = this.visitCounts;
+    const ownBefore = own.get(id);
+    own.set(id, (ownBefore ?? 0) + 1);
+    const shared = this.host.sharedVisits;
+    const before = shared.get(id);
+    shared.set(id, (before ?? 0) + 1);
+    if (this.host.journal) this.host.journal.undo.push(() => {
+      if (ownBefore === undefined) own.delete(id); else own.set(id, ownBefore);
+      if (before === undefined) shared.delete(id); else shared.set(id, before);
+    });
   }
 
   /** Next float in [0, 1): the shared custom PRNG, or this flow's serialisable mulberry32.
@@ -2147,17 +2313,30 @@ export class Flow {
     // The bag's constructor seeds each declared default (the type's when none), normalises the name,
     // and clones the default so two bags from one declaration set never share a mutable flags array.
     const props = this.host.bundle.scenes[s]?.sceneProps ?? [];
+    const journal = this.host.journal;
     if (!this.sceneBags.has(s)) {
       const bag = new PropertyBag(props.filter((d) => !shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
       const key = keys.flowScene(this.id, s);
       this.host.registry.mountOwned(key, bag, { owner: OWNER });
       this.registered.add(key);
       this.sceneBags.set(s, bag);
+      // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry.
+      if (journal) journal.undo.push(() => {
+        if (this.sceneBags.get(s) !== bag) return; // already released with the flow
+        this.host.registry.remove(key);
+        this.registered.delete(key);
+        this.sceneBags.delete(s);
+      });
     }
     if (!this.host.stageBags.has(s)) {
       const bag = new PropertyBag(props.filter((d) => shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
       this.host.registry.mountOwned(keys.stage(s), bag, { owner: OWNER });
       this.host.stageBags.set(s, bag);
+      if (journal) journal.undo.push(() => {
+        if (this.host.stageBags.get(s) !== bag) return;
+        this.host.registry.remove(keys.stage(s));
+        this.host.stageBags.delete(s);
+      });
     }
   }
 
@@ -2178,7 +2357,10 @@ export class Flow {
       if (!decl.temporary) continue;
       const name = decl.name.toLowerCase();
       const bag = shared.has(name) ? this.host.stageBags.get(scene.id) : this.sceneBags.get(scene.id);
-      if (bag) bag.set(name, defaultFor(decl));
+      if (!bag) continue;
+      const prev = this.host.journal ? bag.get(name) : undefined;
+      if (prev !== undefined) this.host.journal!.undo.push(() => bag.set(name, prev));
+      bag.set(name, defaultFor(decl));
     }
   }
 }

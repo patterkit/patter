@@ -79,6 +79,12 @@ const API = [
   { on: "Engine", js: "getFlow", unity: "GetFlow", godot: "get_flow", unreal: "getFlow", bp: "GetFlow" },
   { on: "Engine", js: "closeFlow", unity: "CloseFlow", godot: "close_flow", unreal: "closeFlow", bp: "CloseFlow" },
   { on: "Engine", js: "reset", unity: "Reset", godot: "reset", unreal: "reset", bp: "Reset" },
+  // Checkpoints: try something, then undo everything the story changed (or keep it). The Blueprint
+  // wrapper holds the one open checkpoint itself, so its calls take no handle.
+  { on: "Engine", js: "checkpoint", unity: "Checkpoint", godot: "checkpoint", unreal: "checkpoint", bp: "Checkpoint" },
+  { on: "Engine", js: "rollback", unity: "Rollback", godot: "rollback", unreal: "rollback", bp: "Rollback" },
+  { on: "Engine", js: "commit", unity: "Commit", godot: "commit", unreal: "commit", bp: "Commit" },
+  { on: "Engine", js: "inCheckpoint", unity: "InCheckpoint", godot: "in_checkpoint", unreal: "inCheckpoint", bp: "IsInCheckpoint" },
 
   // --- state ----------------------------------------------------------------
   { on: "Engine", js: "getProperty", unity: "GetProperty", godot: "get_property", unreal: "getProperty", bp: null,

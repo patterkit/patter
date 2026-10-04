@@ -13,6 +13,7 @@
 #include <sstream>
 #include <iostream>
 #include <queue>
+#include <chrono>
 #include "Json.h"
 #include "Patter/Save.h"
 #include "Patter/Describe.h"
@@ -505,6 +506,7 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
     const EngineOptions& opts, const JsonValue& script, const std::string& name, std::string current)
 {
     bool ok = true;
+    patter::Checkpoint checkpoint;
             for (const auto& op : script.arr)
             {
                 JsonValue chunk = JsonValue::Arr();
@@ -550,6 +552,10 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 else if (kind == "setLocale") engine->setLocale(op.at("locale").str);
                 else if (kind == "setClosedCaptions") engine->setClosedCaptions(op.at("on").b);
                 else if (kind == "reset") { engine->reset(); current.clear(); }
+                // Checkpoints: none produces a transcript; the advances after them show the state they left.
+                else if (kind == "checkpoint") checkpoint = engine->checkpoint();
+                else if (kind == "rollback") { engine->rollback(checkpoint); checkpoint = patter::Checkpoint(); }
+                else if (kind == "commit") { engine->commit(checkpoint); checkpoint = patter::Checkpoint(); }
                 // Static structure query: no transcript, expectResult pins the exact list INCLUDING
                 // order. No scene = the declared project cast.
                 else if (kind == "expectCast")
@@ -1747,6 +1753,62 @@ static void runInspectorSmoke()
 // describeBundle: the bundle inspector's runtime half. Not a corpus case - this adds no runtime
 // behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference or two
 // inspectors describe the same asset differently. The fixture mirrors the one in the JS tests.
+// Checkpoint cost against a long-lived flow (informational, never a failure): one scene of 10,000
+// one-beat blocks, every one visited first, so the flow carries a big visit history. Then the same
+// goto + advance timed bare and inside checkpoint + rollback. A checkpoint records changes as they
+// happen, so its overhead should not grow with the history; snapshot() is timed beside it for scale,
+// as the cost a whole-flow copy per checkpoint would pay.
+static void runCheckpointTiming()
+{
+    const int blocks = 10000;
+    std::string json = R"({"schema":"patter/bundle@0","content":{"project":"t","hash":"t","structureHash":"t"},"voiced":false,)"
+        R"("locales":{"default":"en","included":["en"]},"properties":[],"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","blocks":[)";
+    for (int i = 0; i < blocks; ++i)
+    {
+        const std::string n = std::to_string(i);
+        if (i) json += ",";
+        json += R"({"id":"b)" + n + R"(","type":"block","name":"B)" + n + R"(","children":[{"id":"sn)" + n
+            + R"(","type":"snippet","beats":[{"id":"T)" + n + R"(","kind":"text"}],"jump":{"to":"END"}}]})";
+    }
+    json += R"(]}},"strings":{"en":{}}})";
+    const Bundle bundle = parseBundle(JsonParser(json).parse());
+    EngineOptions opts; opts.hasSeed = true; opts.seed = 1;
+    Engine engine(bundle, opts);
+    Flow* flow = engine.openFlow("f", "s");
+    for (int i = 0; i < blocks; ++i) { flow->gotoAddress("s", "b" + std::to_string(i)); flow->advance(); }
+
+    using clock = std::chrono::steady_clock;
+    const int reps = 10000;
+    auto micros = [](clock::duration d) { return std::chrono::duration<double, std::micro>(d).count(); };
+    auto t0 = clock::now();
+    for (int i = 0; i < reps; ++i) { flow->gotoAddress("s", "b" + std::to_string(i % blocks)); flow->advance(); }
+    const double bare = micros(clock::now() - t0) / reps;
+    t0 = clock::now();
+    for (int i = 0; i < reps; ++i)
+    {
+        Checkpoint cp = engine.checkpoint();
+        flow->gotoAddress("s", "b" + std::to_string(i % blocks)); flow->advance();
+        engine.rollback(cp);
+    }
+    const double rolled = micros(clock::now() - t0) / reps;
+    t0 = clock::now();
+    for (int i = 0; i < reps; ++i)
+    {
+        Checkpoint cp = engine.checkpoint();
+        flow->gotoAddress("s", "b" + std::to_string(i % blocks)); flow->advance();
+        engine.commit(cp);
+    }
+    const double committed = micros(clock::now() - t0) / reps;
+    const int snaps = 100;
+    t0 = clock::now();
+    for (int i = 0; i < snaps; ++i) { FlowSnapshot snap = flow->snapshot(); (void)snap; }
+    const double snapshot = micros(clock::now() - t0) / snaps;
+    char line[256];
+    std::snprintf(line, sizeof line, "  [timing] %d visited blocks, per goto+advance: bare %.2f us, checkpoint+rollback %.2f us, "
+        "checkpoint+commit %.2f us (a whole-flow snapshot: %.1f us)\n", blocks, bare, rolled, committed, snapshot);
+    std::cout << line;
+}
+
 static void runDescribeSmoke()
 {
     Bundle b;
@@ -1960,6 +2022,7 @@ int main(int argc, char** argv)
     runTraceLogSmoke();
     runOutlineSmoke();
     runDescribeSmoke();
+    runCheckpointTiming();
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "  [gameData] scripted scene / block gameData reads: " << gameDataReads << "\n";

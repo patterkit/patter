@@ -127,6 +127,59 @@ In C++ the method is `gotoAddress` on the underlying engine core, because `goto`
 The Blueprint-facing name is `Goto`, like everywhere else.
 :::
 
+## Trying an address without consequences
+
+Finding out whether an address has anything to say means going there, and going there counts. The
+scene's on-entry effects run, the visit counts, and a shuffle draws. If it turns out there was nothing
+to say, all of that has still happened.
+
+A **checkpoint** lets you look without touching. Take one, try the address, and roll back if you
+don't want the result:
+
+```js
+const cp = engine.checkpoint();
+flow.goto("npc-barks", "rumour");
+const step = flow.advance();
+if (step.type === "end") engine.rollback(cp);   // nothing to say: as if you never asked
+else engine.commit(cp);                          // keep it, and play the line
+```
+
+A rollback puts back everything the story changed since the checkpoint:
+- every property, including your game's `@world` values, which are written back through your game;
+- visit counts;
+- where each shuffle and sequence had reached;
+- each flow's position and random state.
+
+A flow opened since the checkpoint is closed, and its name is free again. A commit keeps everything.
+
+A checkpoint is cheap enough to take for every lookahead. Nothing is copied when it opens: each
+change records how to undo itself as it happens, so the cost depends on what the steps inside it do,
+not on how long the game has been running. The record is let go as soon as you roll back or commit.
+
+One checkpoint is open at a time. While it is, the calls that would replace or drop flows wholesale
+are refused, because a rollback couldn't undo them: resetting the engine, loading a save, closing a
+flow, opening a flow over one that's still open, and restarting or restoring a flow. Two things a
+rollback doesn't undo: log and trace events already sent, and draws from a random number generator
+your game supplied.
+
+```csharp
+// Unity
+Checkpoint cp = engine.Checkpoint();
+engine.Rollback(cp);   // or engine.Commit(cp)
+```
+
+```gdscript
+# Godot
+var cp = engine.checkpoint()
+engine.rollback(cp)    # or engine.commit(cp)
+```
+
+```cpp
+// Unreal (Blueprint or C++): the engine holds the open checkpoint for you.
+Engine->Checkpoint();
+Engine->Rollback();    // or Engine->Commit()
+```
+
 ## Finished flows
 
 Closing a flow (with `closeFlow`, by resetting the engine, or by replacing its name) **finishes**

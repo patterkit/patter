@@ -17,7 +17,7 @@ class UPatterBundle;
 class UPatterEngine;
 class UPatterWorld;
 
-namespace patter { class Engine; class Flow; }
+namespace patter { class Engine; class Flow; class Checkpoint; }
 
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterFlow : public UObject
@@ -303,9 +303,35 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void Reset();
 
+	// Open a checkpoint: from here until Rollback or Commit, the engine keeps what it needs to undo every
+	// change the story makes. The use is asking "would this say anything?" without consequences: Goto an
+	// address, Advance, and Rollback if it had nothing to give, so its scene's onEntry effects, its visits,
+	// and its shuffle draws never happened. One at a time, held here, so there is no handle to keep.
+	// While one is open, the calls that replace or drop flows wholesale (Reset, CloseFlow, OpenFlow on the
+	// name of an open flow, HotSwap, and loading a save) are refused and logged, as is a second Checkpoint.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void Checkpoint();
+
+	// Put the game back exactly as it was at Checkpoint: every property (a bound @world is written back
+	// through it), visit count, shuffle and sequence position, and every flow's cursor and PRNG. A flow
+	// opened since is closed and forgotten, and its wrapper reads as closed. Logged if none is open.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void Rollback();
+
+	// Keep everything since Checkpoint, and stop recording. Logged if none is open.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void Commit();
+
+	// True while a checkpoint is open.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool IsInCheckpoint() const;
+
 private:
 	static UPatterEngine* Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry);
 
 	// SHARED rather than a pimpl: HotSwap takes the replacement core the engine hands back.
 	std::shared_ptr<patter::Engine> Engine;
+
+	// The open checkpoint, or null when none is. Shared so the core type can stay declared only here.
+	std::shared_ptr<patter::Checkpoint> OpenCheckpoint;
 };

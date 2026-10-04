@@ -79,6 +79,7 @@ namespace Patterkit.Patterplay.TestHost
             RunSaveShapeCheck();
             RunHostScopeWritableCheck();
             RunOneRegistryChecks();
+            RunCheckpointChecks();
 
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
@@ -735,6 +736,7 @@ namespace Patterkit.Patterplay.TestHost
         private static (bool ok, Engine engine) RunScript(Engine engine, Bundle bundle, Bundle bundleB, EngineOptions opts, JsonElement script, string name, string current)
         {
             bool ok = true;
+            Checkpoint checkpoint = null;
                     foreach (var op in script.EnumerateArray())
                     {
                         var chunk = new List<object>();
@@ -858,6 +860,18 @@ namespace Patterkit.Patterplay.TestHost
                             case "reset":
                                 engine.Reset();
                                 current = "";
+                                break;
+                            // Checkpoints: no transcript; the advances after them show the state they left.
+                            case "checkpoint":
+                                checkpoint = engine.Checkpoint();
+                                break;
+                            case "rollback":
+                                engine.Rollback(checkpoint);
+                                checkpoint = null;
+                                break;
+                            case "commit":
+                                engine.Commit(checkpoint);
+                                checkpoint = null;
                                 break;
                         }
                         var expectChunk = op.TryGetProperty("expect", out var ex) ? ex : default;

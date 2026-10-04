@@ -5613,8 +5613,8 @@
         "schema": "patter/bundle@0",
         "content": {
           "project": "conf",
-          "hash": "107i1kb",
-          "structureHash": "07rwf2u"
+          "hash": "0a2vyax",
+          "structureHash": "06vylr0"
         },
         "voiced": false,
         "locales": {
@@ -5645,7 +5645,8 @@
               {
                 "name": "mine",
                 "type": "number",
-                "default": 0
+                "default": 0,
+                "shared": false
               },
               {
                 "name": "tally",
@@ -6086,8 +6087,8 @@
         "schema": "patter/bundle@0",
         "content": {
           "project": "conf",
-          "hash": "107i1kb",
-          "structureHash": "07rwf2u"
+          "hash": "0a2vyax",
+          "structureHash": "06vylr0"
         },
         "voiced": false,
         "locales": {
@@ -6118,7 +6119,8 @@
               {
                 "name": "mine",
                 "type": "number",
-                "default": 0
+                "default": 0,
+                "shared": false
               },
               {
                 "name": "tally",
@@ -9486,6 +9488,1923 @@
           "expect": [
             {
               "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkpoint: rollback undoes a step's every change, commit keeps them",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tepqtj",
+          "structureHash": "1lcgh14"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "entered",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          },
+          {
+            "name": "mine",
+            "type": "number",
+            "default": 0,
+            "shared": false
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "declarations": [
+                {
+                  "name": "alarms",
+                  "type": "number",
+                  "default": 0
+                }
+              ]
+            }
+          ]
+        },
+        "scenes": {
+          "scn_hub": {
+            "id": "scn_hub",
+            "type": "scene",
+            "name": "Hub",
+            "blocks": [
+              {
+                "id": "b_main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "sn_1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_check",
+                "type": "block",
+                "name": "Check",
+                "children": [
+                  {
+                    "id": "g_check",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_seen",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "patter_visits('b_talk') > 0",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "call",
+                              "patter_visits",
+                              [
+                                "s",
+                                "b_talk"
+                              ]
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_seen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_unseen",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_unseen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_own",
+                "type": "block",
+                "name": "Own",
+                "children": [
+                  {
+                    "id": "g_own",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_o1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O1",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_o2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O2",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_owncheck",
+                "type": "block",
+                "name": "Own Check",
+                "children": [
+                  {
+                    "id": "g_owncheck",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_been",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "visits('b_own') > 0",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "call",
+                              "visits",
+                              [
+                                "s",
+                                "b_own"
+                              ]
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_been",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_notbeen",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_notbeen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_side": {
+            "id": "scn_side",
+            "type": "scene",
+            "name": "Side Room",
+            "onEntry": [
+              {
+                "kind": "set",
+                "target": "@entered",
+                "value": {
+                  "src": "@entered + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "patter",
+                      "entered"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              },
+              {
+                "kind": "set",
+                "target": "@scene.tally",
+                "value": {
+                  "src": "@scene.tally + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "scene",
+                      "tally"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              },
+              {
+                "kind": "set",
+                "target": "@world.alarms",
+                "value": {
+                  "src": "@world.alarms + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "world",
+                      "alarms"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              }
+            ],
+            "sceneProps": [
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b_talk",
+                "type": "block",
+                "name": "Talk",
+                "children": [
+                  {
+                    "id": "g_bag",
+                    "type": "group",
+                    "selector": "sequence",
+                    "shared": true,
+                    "options": {
+                      "order": "shuffle",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_s1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S1",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_s2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S2",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_s3",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S3",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_quiet",
+                "type": "block",
+                "name": "Quiet",
+                "children": [
+                  {
+                    "id": "sn_q",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@mine > 5",
+                      "ast": [
+                        "bin",
+                        ">",
+                        [
+                          "sv",
+                          "patter",
+                          "mine"
+                        ],
+                        [
+                          "n",
+                          5
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "Q",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one {@entered} {@mine}",
+            "T2": "two {@entered} {@mine}",
+            "T3": "three {@entered} {@mine}",
+            "T_seen": "seen",
+            "T_unseen": "unseen",
+            "O1": "o1",
+            "O2": "o2",
+            "T_been": "been",
+            "T_notbeen": "not been",
+            "S1": "s1 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "S2": "s2 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "S3": "s3 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "Q": "q"
+          }
+        }
+      },
+      "seed": 7,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "hub"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one 0 0"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "goto",
+          "scene": "side-room",
+          "block": "talk",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "S1",
+              "text": "s1 1 1 1 1"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two 0 0"
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "probe",
+          "scene": "hub",
+          "block": "check"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_unseen",
+              "text": "unseen"
+            }
+          ]
+        },
+        {
+          "op": "useFlow",
+          "flow": "f"
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "goto",
+          "scene": "side-room",
+          "block": "quiet",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "three 0 0"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "goto",
+          "scene": "side-room",
+          "block": "talk",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "S1",
+              "text": "s1 1 1 1 1"
+            }
+          ]
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "probe2",
+          "scene": "hub",
+          "block": "check"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_seen",
+              "text": "seen"
+            }
+          ]
+        },
+        {
+          "op": "useFlow",
+          "flow": "f"
+        },
+        {
+          "op": "goto",
+          "scene": "side-room",
+          "block": "talk",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "S2",
+              "text": "s2 1 2 1 1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkpoint: rollback puts back a flow's own visits, sequence positions, and place in a block",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tepqtj",
+          "structureHash": "1lcgh14"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "entered",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          },
+          {
+            "name": "mine",
+            "type": "number",
+            "default": 0,
+            "shared": false
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "declarations": [
+                {
+                  "name": "alarms",
+                  "type": "number",
+                  "default": 0
+                }
+              ]
+            }
+          ]
+        },
+        "scenes": {
+          "scn_hub": {
+            "id": "scn_hub",
+            "type": "scene",
+            "name": "Hub",
+            "blocks": [
+              {
+                "id": "b_main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "sn_1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_check",
+                "type": "block",
+                "name": "Check",
+                "children": [
+                  {
+                    "id": "g_check",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_seen",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "patter_visits('b_talk') > 0",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "call",
+                              "patter_visits",
+                              [
+                                "s",
+                                "b_talk"
+                              ]
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_seen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_unseen",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_unseen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_own",
+                "type": "block",
+                "name": "Own",
+                "children": [
+                  {
+                    "id": "g_own",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_o1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O1",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_o2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O2",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_owncheck",
+                "type": "block",
+                "name": "Own Check",
+                "children": [
+                  {
+                    "id": "g_owncheck",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_been",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "visits('b_own') > 0",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "call",
+                              "visits",
+                              [
+                                "s",
+                                "b_own"
+                              ]
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_been",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_notbeen",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_notbeen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_side": {
+            "id": "scn_side",
+            "type": "scene",
+            "name": "Side Room",
+            "onEntry": [
+              {
+                "kind": "set",
+                "target": "@entered",
+                "value": {
+                  "src": "@entered + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "patter",
+                      "entered"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              },
+              {
+                "kind": "set",
+                "target": "@scene.tally",
+                "value": {
+                  "src": "@scene.tally + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "scene",
+                      "tally"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              },
+              {
+                "kind": "set",
+                "target": "@world.alarms",
+                "value": {
+                  "src": "@world.alarms + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "world",
+                      "alarms"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              }
+            ],
+            "sceneProps": [
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b_talk",
+                "type": "block",
+                "name": "Talk",
+                "children": [
+                  {
+                    "id": "g_bag",
+                    "type": "group",
+                    "selector": "sequence",
+                    "shared": true,
+                    "options": {
+                      "order": "shuffle",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_s1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S1",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_s2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S2",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_s3",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S3",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_quiet",
+                "type": "block",
+                "name": "Quiet",
+                "children": [
+                  {
+                    "id": "sn_q",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@mine > 5",
+                      "ast": [
+                        "bin",
+                        ">",
+                        [
+                          "sv",
+                          "patter",
+                          "mine"
+                        ],
+                        [
+                          "n",
+                          5
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "Q",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one {@entered} {@mine}",
+            "T2": "two {@entered} {@mine}",
+            "T3": "three {@entered} {@mine}",
+            "T_seen": "seen",
+            "T_unseen": "unseen",
+            "O1": "o1",
+            "O2": "o2",
+            "T_been": "been",
+            "T_notbeen": "not been",
+            "S1": "s1 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "S2": "s2 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "S3": "s3 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "Q": "q"
+          }
+        }
+      },
+      "seed": 7,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "hub",
+          "block": "own-check"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_notbeen",
+              "text": "not been"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "own",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "O1",
+              "text": "o1"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "own-check",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_notbeen",
+              "text": "not been"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "own",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "O1",
+              "text": "o1"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "hub",
+          "block": "own",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "O2",
+              "text": "o2"
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "h",
+          "scene": "hub"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one 0 0"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two 0 0"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two 0 0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkpoint: a flow opened inside one is closed and forgotten by rollback",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tepqtj",
+          "structureHash": "1lcgh14"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "entered",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          },
+          {
+            "name": "mine",
+            "type": "number",
+            "default": 0,
+            "shared": false
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "declarations": [
+                {
+                  "name": "alarms",
+                  "type": "number",
+                  "default": 0
+                }
+              ]
+            }
+          ]
+        },
+        "scenes": {
+          "scn_hub": {
+            "id": "scn_hub",
+            "type": "scene",
+            "name": "Hub",
+            "blocks": [
+              {
+                "id": "b_main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "sn_1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_check",
+                "type": "block",
+                "name": "Check",
+                "children": [
+                  {
+                    "id": "g_check",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_seen",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "patter_visits('b_talk') > 0",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "call",
+                              "patter_visits",
+                              [
+                                "s",
+                                "b_talk"
+                              ]
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_seen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_unseen",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_unseen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_own",
+                "type": "block",
+                "name": "Own",
+                "children": [
+                  {
+                    "id": "g_own",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "once"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_o1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O1",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_o2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "O2",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_owncheck",
+                "type": "block",
+                "name": "Own Check",
+                "children": [
+                  {
+                    "id": "g_owncheck",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_been",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "visits('b_own') > 0",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "call",
+                              "visits",
+                              [
+                                "s",
+                                "b_own"
+                              ]
+                            ],
+                            [
+                              "n",
+                              0
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_been",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_notbeen",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_notbeen",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_side": {
+            "id": "scn_side",
+            "type": "scene",
+            "name": "Side Room",
+            "onEntry": [
+              {
+                "kind": "set",
+                "target": "@entered",
+                "value": {
+                  "src": "@entered + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "patter",
+                      "entered"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              },
+              {
+                "kind": "set",
+                "target": "@scene.tally",
+                "value": {
+                  "src": "@scene.tally + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "scene",
+                      "tally"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              },
+              {
+                "kind": "set",
+                "target": "@world.alarms",
+                "value": {
+                  "src": "@world.alarms + 1",
+                  "ast": [
+                    "bin",
+                    "+",
+                    [
+                      "sv",
+                      "world",
+                      "alarms"
+                    ],
+                    [
+                      "n",
+                      1
+                    ]
+                  ]
+                }
+              }
+            ],
+            "sceneProps": [
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b_talk",
+                "type": "block",
+                "name": "Talk",
+                "children": [
+                  {
+                    "id": "g_bag",
+                    "type": "group",
+                    "selector": "sequence",
+                    "shared": true,
+                    "options": {
+                      "order": "shuffle",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_s1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S1",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_s2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S2",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_s3",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "S3",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@mine",
+                            "value": {
+                              "src": "@mine + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "mine"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "b_quiet",
+                "type": "block",
+                "name": "Quiet",
+                "children": [
+                  {
+                    "id": "sn_q",
+                    "type": "snippet",
+                    "condition": {
+                      "src": "@mine > 5",
+                      "ast": [
+                        "bin",
+                        ">",
+                        [
+                          "sv",
+                          "patter",
+                          "mine"
+                        ],
+                        [
+                          "n",
+                          5
+                        ]
+                      ]
+                    },
+                    "beats": [
+                      {
+                        "id": "Q",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one {@entered} {@mine}",
+            "T2": "two {@entered} {@mine}",
+            "T3": "three {@entered} {@mine}",
+            "T_seen": "seen",
+            "T_unseen": "unseen",
+            "O1": "o1",
+            "O2": "o2",
+            "T_been": "been",
+            "T_notbeen": "not been",
+            "S1": "s1 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "S2": "s2 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "S3": "s3 {@entered} {@mine} {@scene.tally} {@world.alarms}",
+            "Q": "q"
+          }
+        }
+      },
+      "seed": 7,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "hub"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one 0 0"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "openFlow",
+          "flow": "g",
+          "scene": "side-room",
+          "block": "talk"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "S1",
+              "text": "s1 1 1 1 1"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "openFlow",
+          "flow": "g",
+          "scene": "side-room",
+          "block": "talk"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "S1",
+              "text": "s1 1 1 1 1"
+            }
+          ]
+        },
+        {
+          "op": "useFlow",
+          "flow": "f"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two 1 0"
             }
           ]
         }

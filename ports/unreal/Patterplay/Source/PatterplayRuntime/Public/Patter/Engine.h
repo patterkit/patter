@@ -396,6 +396,38 @@ namespace patter
         std::map<std::string, std::map<std::string, PatterValue>> stageBags;
     };
 
+    // ----- checkpoints -------------------------------------------------------------
+
+    class Flow;
+
+    // What an open checkpoint records: how to undo each change, newest last. Each piece of state records
+    // itself when it changes (a value, a count, a cursor), never a copy of everything, so a checkpoint
+    // costs what the steps inside it do, however much history the game has built up. An undo that names
+    // a flow or a bag holds it by shared_ptr, so it outlives whatever a rollback replaces.
+    struct Journal
+    {
+        std::vector<std::function<void()>> undo;
+        /** Flows whose cursor is already recorded (or opened inside the checkpoint, so closed on rollback). */
+        std::set<const Flow*> flows;
+        /** Flows opened inside the checkpoint. */
+        std::set<const Flow*> opened;
+        /** Selector cursors already copied: shared ones by group id, a flow's own in `flowSelectors`. */
+        std::set<std::string> selectors;
+        std::map<const Flow*, std::set<std::string>> flowSelectors;
+    };
+
+    // An open checkpoint, from Engine::checkpoint(). Opaque: hand it back to rollback() or commit(). A
+    // default-constructed one is empty, and is never the open one.
+    class Checkpoint
+    {
+    public:
+        Checkpoint() = default;
+    private:
+        friend class Engine;
+        explicit Checkpoint(std::shared_ptr<Journal> journal) : journal_(std::move(journal)) {}
+        std::shared_ptr<Journal> journal_;
+    };
+
     // ----- the shared host context the Engine hands to every flow --------------
 
     /// One retained decision: what the engine CHOSE, not what it produced. `type` is
@@ -468,6 +500,8 @@ namespace patter
          *  first time any flow needs the scene, so a bag loaded before then waits in the registry and
          *  is claimed here. */
         std::map<std::string, std::shared_ptr<PropertyBag>> stageBags;
+        /** The open checkpoint's undo journal, or null when none is open (see Engine::checkpoint). */
+        std::shared_ptr<Journal> journal;
         /** Memoised splitRef results (ref -> {scope, name}). The split depends only on the registry's
          *  set of scopes, so the memo is dropped whenever that moves (refSplitRevision). */
         mutable std::map<std::string, std::pair<std::string, std::string>> refSplitCache;
@@ -545,7 +579,7 @@ namespace patter
         StepResult stop;
     };
 
-    class Flow
+    class Flow : public std::enable_shared_from_this<Flow>
     {
     public:
         Flow(std::string id, FlowHost* host, double seed) : id_(std::move(id)), host_(host)
@@ -649,6 +683,7 @@ namespace patter
         bool gotoAddress(const std::string& scene, const std::string& block = "")
         {
             if (closed_) return false; // closed is terminal: unlike "ended", a goto cannot revive it
+            touch();
             if (scene == "END")
             {
                 started_ = true; clearPending(); pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear();
@@ -710,6 +745,10 @@ namespace patter
 
         void start(const std::string& sceneId, const std::string& blockId)
         {
+            // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
+            // inside the checkpoint may start in one.
+            if (host_->journal && !host_->journal->opened.count(this))
+                throw std::runtime_error("a flow can't be started or reset while a checkpoint is open");
             // A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
             releaseBags(false);
             host_->registry->discardParked(registrykeys::flow(id_));
@@ -753,6 +792,7 @@ namespace patter
         {
             if (closed_) { StepResult r; r.type = StepType::End; return r; } // a stale reference drives nothing
             if (!started_) throw std::runtime_error("flow has not been started");
+            touch();
             if (pendingPromptBeat_) { const Beat* b = pendingPromptBeat_; pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear(); return beatResult(*b); }
             settle();
             if (flowEnded_) return StepResult::End();
@@ -798,6 +838,7 @@ namespace patter
             for (auto& o : pendingOptions_) if (o.id == id) { option = &o; break; }
             if (!option) throw std::runtime_error("unknown choice option: " + id);
             if (!option->eligible) throw std::runtime_error("choice option is not eligible: " + id);
+            touch();
             const Node* node = pendingById_[id];
             { LogEntry e; e.type = "chose"; e.subject = pendingGroupId_; e.picked = id; emit(std::move(e)); }
             const Node* picked = node;
@@ -832,13 +873,55 @@ namespace patter
             kernelCall([&]
             {
                 auto sp = splitHostRef(*host_, ref);
-                if (sp.first == "patter") patterSet(sp.second, value);
+                const std::string& name = sp.second;
+                Journal* journal = host_->journal.get();
+                if (sp.first == "patter")
+                {
+                    // Inside a checkpoint, each write records how to put the old value back, against the bag
+                    // it actually landed in (a `@scene` write's bag depends on the scene the flow is in).
+                    if (journal)
+                    {
+                        const bool shared = host_->patterSharedNames.count(name) > 0;
+                        std::optional<PatterValue> prev = shared ? host_->patterBag->get(name) : local_->get(name);
+                        if (prev)
+                        {
+                            if (shared)
+                            {
+                                std::shared_ptr<ScopeRegistry> reg = host_->registry;
+                                journal->undo.push_back([reg, name, was = *prev] { reg->set("patter", name, was); });
+                            }
+                            else
+                            {
+                                std::shared_ptr<PropertyBag> bag = local_;
+                                journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
+                            }
+                        }
+                    }
+                    patterSet(name, value);
+                }
                 else if (sp.first == "scene")
                 {
                     if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
-                    sceneSet(sp.second, value);
+                    if (journal)
+                    {
+                        std::shared_ptr<PropertyBag> bag = sceneBagShared(name);
+                        std::optional<PatterValue> prev = bag ? bag->get(name) : std::nullopt;
+                        if (bag && prev) journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
+                    }
+                    sceneSet(name, value);
                 }
-                else host_->registry->set(sp.first, sp.second, value, host); // host scopes, other engines' scopes
+                else
+                {
+                    std::optional<PatterValue> prev = journal ? host_->registry->get(sp.first, name) : std::nullopt;
+                    host_->registry->set(sp.first, name, value, host); // host scopes, other engines' scopes
+                    // Recorded after the write: one a read-only host scope refused never happened, so has
+                    // nothing to undo.
+                    if (journal && prev)
+                    {
+                        std::shared_ptr<ScopeRegistry> reg = host_->registry;
+                        journal->undo.push_back([reg, scope = sp.first, name, was = *prev] { reg->set(scope, name, was, /*host=*/true); });
+                    }
+                }
             });
         }
 
@@ -890,7 +973,35 @@ namespace patter
             return s;
         }
 
+        /** @internal Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors.
+         *  Its property values are the registry's and stay as they are (a load puts the saved ones there
+         *  first). */
         void restore(const FlowSnapshot& snap)
+        {
+            if (host_->journal) throw std::runtime_error("a flow can't be restored while a checkpoint is open");
+            restoreCursor(snap);
+            // Register this flow's bags: each claims the values the registry holds for it (loaded by the
+            // game, by loadGame from the save, or handed back by the engine this one replaces), laid over
+            // fresh defaults. Released KEEPING their values, so a live flow restored in place keeps its
+            // property values (a fresh one, made by a load, is claiming the loaded values either way). The
+            // scenes the cursor stands in are registered now; any other scene's bag is claimed on entry.
+            releaseBags(true);
+            mountLocal();
+            {
+                std::vector<std::string> scenes;
+                auto note = [&scenes](const std::string& s)
+                {
+                    if (!s.empty() && std::find(scenes.begin(), scenes.end(), s) == scenes.end()) scenes.push_back(s);
+                };
+                note(currentSceneId_);
+                for (const auto& frame : stack_) note(frame.sceneId);
+                for (const auto& s : scenes) if (host_->bundle->scenes.count(s)) ensureSceneBags(s);
+            }
+        }
+
+    private:
+        /** The cursor half of restore(), without touching the bags. */
+        void restoreCursor(const FlowSnapshot& snap)
         {
             rngState_ = snap.rngState;
             visitCounts_ = snap.visits;
@@ -912,22 +1023,6 @@ namespace patter
                             if ((*children)[i]->id == frame.nextId) { frame.index = static_cast<int>(i); break; }
                 }
                 frame.nextId.clear(); // live frames never carry it
-            }
-            // Register this flow's bags: each claims the values the registry holds for it (loaded by the
-            // game, by loadGame from the save, or handed back by the engine this one replaces), laid over
-            // fresh defaults. The scenes the cursor stands in are registered now; any other scene's bag
-            // is claimed on entry.
-            releaseBags(false);
-            mountLocal();
-            {
-                std::vector<std::string> scenes;
-                auto note = [&scenes](const std::string& s)
-                {
-                    if (!s.empty() && std::find(scenes.begin(), scenes.end(), s) == scenes.end()) scenes.push_back(s);
-                };
-                note(currentSceneId_);
-                for (const auto& frame : stack_) note(frame.sceneId);
-                for (const auto& s : scenes) if (host_->bundle->scenes.count(s)) ensureSceneBags(s);
             }
 
             activeSnippet_ = nullptr;
@@ -965,6 +1060,41 @@ namespace patter
             if (!pendingPromptBeat_) pendingPromptOwnerId_.clear();
         }
 
+        /** Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a rollback
+         *  can put them back: a handful of fields and a copy of the call stack (a few frames), never its
+         *  history. Its visits, selector cursors, and property values are recorded change by change as
+         *  they happen. */
+        void touch()
+        {
+            Journal* journal = host_->journal.get();
+            if (!journal || journal->flows.count(this)) return;
+            journal->flows.insert(this);
+            struct Cursor
+            {
+                uint32_t rngState; bool started, flowEnded; std::string currentSceneId;
+                const Node* activeSnippet; int beatIndex;
+                bool hasPendingChoice; std::string pendingGroupId; std::vector<ChoiceOption> pendingOptions;
+                std::map<std::string, const Node*> pendingById;
+                const Beat* pendingPromptBeat; std::string pendingPromptOwnerId;
+                std::vector<StackFrame> stack;   // a copy of the frames: they advance in place (index++)
+            };
+            Cursor c{ rngState_, started_, flowEnded_, currentSceneId_, activeSnippet_, beatIndex_,
+                      hasPendingChoice_, pendingGroupId_, pendingOptions_, pendingById_,
+                      pendingPromptBeat_, pendingPromptOwnerId_, stack_ };
+            std::shared_ptr<Flow> self = shared_from_this();
+            journal->undo.push_back([self, c = std::move(c)]
+            {
+                Flow& f = *self;
+                f.rngState_ = c.rngState; f.started_ = c.started; f.flowEnded_ = c.flowEnded;
+                f.currentSceneId_ = c.currentSceneId; f.activeSnippet_ = c.activeSnippet; f.beatIndex_ = c.beatIndex;
+                f.hasPendingChoice_ = c.hasPendingChoice; f.pendingGroupId_ = c.pendingGroupId;
+                f.pendingOptions_ = c.pendingOptions; f.pendingById_ = c.pendingById;
+                f.pendingPromptBeat_ = c.pendingPromptBeat; f.pendingPromptOwnerId_ = c.pendingPromptOwnerId;
+                f.stack_ = c.stack;
+            });
+        }
+
+    public:
         /** @internal Remove every bag this flow registered; with `keep`, their values wait in the
          *  registry for the flow that replaces this one. Engine-driven (close, loadGame, hotSwap). */
         void releaseBags(bool keep)
@@ -1031,14 +1161,16 @@ namespace patter
         }
         // The bag a @scene property of the current scene lives in (stage or this flow's), made if
         // missing. A closed flow makes nothing: it must not register bags after it has let them go.
-        PropertyBag* sceneBagFor(const std::string& n)
+        PropertyBag* sceneBagFor(const std::string& n) { return sceneBagShared(n).get(); }
+        // The same bag as an owning handle, for a checkpoint's undo to hold.
+        std::shared_ptr<PropertyBag> sceneBagShared(const std::string& n)
         {
             if (currentSceneId_.empty()) return nullptr;
             if (!closed_ && host_->bundle->scenes.count(currentSceneId_)) ensureSceneBags(currentSceneId_);
             auto sn = host_->sceneSharedNames.find(currentSceneId_);
             bool shared = sn != host_->sceneSharedNames.end() && sn->second.count(n);
-            if (shared) { auto it = host_->stageBags.find(currentSceneId_); return it != host_->stageBags.end() ? it->second.get() : nullptr; }
-            auto it = sceneBags_.find(currentSceneId_); return it != sceneBags_.end() ? it->second.get() : nullptr;
+            if (shared) { auto it = host_->stageBags.find(currentSceneId_); return it != host_->stageBags.end() ? it->second : nullptr; }
+            auto it = sceneBags_.find(currentSceneId_); return it != sceneBags_.end() ? it->second : nullptr;
         }
 
         // The eval context, its scopes refreshed if the registry's set of scopes has moved since it was
@@ -1095,6 +1227,7 @@ namespace patter
             const std::set<std::string>* shared = nullptr;
             auto sn = host_->sceneSharedNames.find(s);
             if (sn != host_->sceneSharedNames.end()) shared = &sn->second;
+            Journal* journal = host_->journal.get();
             if (!sceneBags_.count(s))
             {
                 std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, false);
@@ -1102,14 +1235,41 @@ namespace patter
                 const std::string key = registrykeys::flowScene(id_, s);
                 mount(key, bag);
                 registered_.push_back(key);
-                sceneBags_.emplace(s, std::move(bag));
+                sceneBags_.emplace(s, bag);
+                // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next
+                // real entry.
+                if (journal)
+                {
+                    std::shared_ptr<Flow> self = shared_from_this();
+                    journal->undo.push_back([self, s, key, bag]
+                    {
+                        auto it = self->sceneBags_.find(s);
+                        if (it == self->sceneBags_.end() || it->second != bag) return; // already released with the flow
+                        ScopeRegistry& reg = *self->host_->registry;
+                        if (reg.has(key)) reg.remove(key);
+                        self->registered_.erase(std::remove(self->registered_.begin(), self->registered_.end(), key), self->registered_.end());
+                        self->sceneBags_.erase(it);
+                    });
+                }
             }
             if (!host_->stageBags.count(s))
             {
                 std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, true);
                 auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
                 mount(registrykeys::stage(s), bag);
-                host_->stageBags.emplace(s, std::move(bag));
+                host_->stageBags.emplace(s, bag);
+                if (journal)
+                {
+                    FlowHost* host = host_;
+                    journal->undo.push_back([host, s, bag]
+                    {
+                        auto it = host->stageBags.find(s);
+                        if (it == host->stageBags.end() || it->second != bag) return;
+                        const std::string key = registrykeys::stage(s);
+                        if (host->registry->has(key)) host->registry->remove(key);
+                        host->stageBags.erase(it);
+                    });
+                }
             }
         }
         const PatterValue* sceneGet(const std::string& n) const
@@ -1419,6 +1579,26 @@ namespace patter
         SelectorState& selectorStateFor(const Node* group)
         {
             auto& map = group->shared ? host_->sharedSelectors : selectors_;
+            // A cursor is copied the first time a checkpoint sees it (shared ones once for every flow).
+            Journal* journal = host_->journal.get();
+            if (journal)
+            {
+                std::set<std::string>& seen = group->shared ? journal->selectors : journal->flowSelectors[this];
+                if (seen.insert(group->id).second)
+                {
+                    auto was = map.find(group->id);
+                    const bool had = was != map.end();
+                    SelectorState copy = had ? was->second : SelectorState{};   // a value copy: the bag vector too
+                    // The map by its owner, never by address alone: the flow's own lives as long as the flow.
+                    std::shared_ptr<Flow> self = group->shared ? nullptr : shared_from_this();
+                    FlowHost* host = host_;
+                    journal->undo.push_back([host, self, id = group->id, had, copy]
+                    {
+                        auto& m = self ? self->selectors_ : host->sharedSelectors;
+                        if (had) m[id] = copy; else m.erase(id);
+                    });
+                }
+            }
             return map[group->id];
         }
 
@@ -1448,8 +1628,25 @@ namespace patter
         }
         void enter(const std::string& id)
         {
-            visitCounts_[id] = visitCounts_.count(id) ? visitCounts_[id] + 1 : 1;
-            host_->sharedVisits[id] = host_->sharedVisits.count(id) ? host_->sharedVisits[id] + 1 : 1;
+            auto ownBefore = visitCounts_.find(id);
+            const bool ownHad = ownBefore != visitCounts_.end();
+            const int ownWas = ownHad ? ownBefore->second : 0;
+            visitCounts_[id] = ownWas + 1;
+            auto before = host_->sharedVisits.find(id);
+            const bool had = before != host_->sharedVisits.end();
+            const int was = had ? before->second : 0;
+            host_->sharedVisits[id] = was + 1;
+            // Inside a checkpoint, one undo puts both counts back: the flow's own and the world's.
+            if (host_->journal)
+            {
+                std::shared_ptr<Flow> self = shared_from_this();
+                host_->journal->undo.push_back([self, id, ownHad, ownWas, had, was]
+                {
+                    if (ownHad) self->visitCounts_[id] = ownWas; else self->visitCounts_.erase(id);
+                    std::map<std::string, int>& shared = self->host_->sharedVisits;
+                    if (had) shared[id] = was; else shared.erase(id);
+                });
+            }
         }
         double rng()
         {
@@ -1574,7 +1771,13 @@ namespace patter
             {
                 if (!decl.temporary) continue;
                 std::string name = toLower(decl.name);
-                PropertyBag* bag = isShared(name) ? host_->stageBags[scene.id].get() : sceneBags_[scene.id].get();
+                std::shared_ptr<PropertyBag> bag = isShared(name) ? host_->stageBags[scene.id] : sceneBags_[scene.id];
+                if (!bag) continue;
+                if (host_->journal)
+                {
+                    std::optional<PatterValue> prev = bag->get(name);
+                    if (prev) host_->journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
+                }
                 // Through set, so the reset is audited: a temporary snapping back to its
                 // default is a state change, and a log that omits it is wrong.
                 bag->set(name, propDefault(decl));
@@ -1736,6 +1939,7 @@ namespace patter
         // properties carry over.
         std::unique_ptr<Engine> hotSwap(const Bundle& bundle)
         {
+            refuseInCheckpoint("hotSwap");
             SaveGame snapshot = saveGame();
             // The replacement registers on the SAME registry, and a standalone engine's replacement is
             // still its own game (so its saveGame keeps carrying the registry's values).
@@ -1790,9 +1994,25 @@ namespace patter
             std::string blockId = resolveBlockRef(sceneId, block);
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
             // driving the shared world. Replacing is a reset - contrast runFlow, which reuses.
-            { auto prev = flows_.find(id); if (prev != flows_.end()) prev->second->close(); }
+            std::shared_ptr<Flow> prior;
+            { auto prev = flows_.find(id); if (prev != flows_.end()) prior = prev->second; }
+            std::shared_ptr<Journal> journal = host_.journal;
+            if (journal && prior && !prior->isClosed())
+                throw std::runtime_error("openFlow would replace the open flow '" + id + "', which can't be undone while a checkpoint is open");
+            if (prior) prior->close(); // finish the flow this name used to mean
             auto flow = std::make_shared<Flow>(id, &host_, seed ? *seed : static_cast<int64_t>(defaultSeed_));
             Flow* raw = flow.get();
+            if (journal)
+            {
+                // Opened inside the checkpoint: rolling back closes it and puts back whatever the name meant.
+                journal->flows.insert(raw);
+                journal->opened.insert(raw);
+                journal->undo.push_back([this, id, flow, prior]
+                {
+                    flow->close();
+                    if (prior) flows_[id] = prior; else flows_.erase(id);
+                });
+            }
             flows_[id] = std::move(flow);
             raw->start(sceneId, blockId);
             return raw;
@@ -1837,6 +2057,7 @@ namespace patter
         // holding it cannot keep advancing it into the shared world.
         void closeFlow(const std::string& id)
         {
+            refuseInCheckpoint("closeFlow");
             auto it = flows_.find(id);
             if (it != flows_.end()) it->second->close();
             flows_.erase(id);
@@ -1973,6 +2194,7 @@ namespace patter
 
         void reset()
         {
+            refuseInCheckpoint("reset");
             for (auto& kv : flows_) kv.second->close(); // finish them, don't just forget them
             flows_.clear();
             std::vector<ScopeDeclaration> decls;
@@ -2009,8 +2231,59 @@ namespace patter
         {
             auto sp = splitHostRef(host_, ref);
             if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            std::optional<PatterValue> prev = host_.journal ? host_.registry->get(sp.first, sp.second) : std::nullopt;
             kernelCall([&] { host_.registry->set(sp.first, sp.second, value, /*host=*/true); });
+            if (host_.journal && prev)
+            {
+                std::shared_ptr<ScopeRegistry> reg = host_.registry;
+                host_.journal->undo.push_back([reg, scope = sp.first, name = sp.second, was = *prev]
+                {
+                    reg->set(scope, name, was, /*host=*/true);
+                });
+            }
         }
+
+        // Open a checkpoint: from here until rollback() or commit(), the engine keeps what it needs to undo
+        // every change the story makes. rollback() puts the game back exactly as it was at the checkpoint:
+        // property values (every scope, including a host's `@world`, which is written back through the
+        // game), visit counts, shuffle and sequence positions, `@scene` bags made since, every flow's cursor
+        // and PRNG, and any flow opened since (closed and forgotten). commit() keeps everything and stops
+        // recording.
+        //
+        // The use is asking "would this say anything?" without consequences: move a flow to an address,
+        // advance it, and roll back if it had nothing to give, so its scene's onEntry effects, its visits,
+        // and its shuffle draws never happened.
+        //
+        // One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags wholesale
+        // (reset, loadGame, hotSwap, closeFlow, openFlow on the name of an open flow, and a flow's own start
+        // and restore) throw. Not undone: log entries already recorded, and draws from a custom `rng` the
+        // game supplied.
+        Checkpoint checkpoint()
+        {
+            if (host_.journal) throw std::runtime_error("a checkpoint is already open: roll it back or commit it first");
+            host_.journal = std::make_shared<Journal>();
+            return Checkpoint(host_.journal);
+        }
+
+        // Undo everything since checkpoint() (see there), and close it.
+        void rollback(const Checkpoint& cp)
+        {
+            endCheckpoint(cp);
+            // Taken out first, so the journal lets go of the flows and bags its undos hold once they've run.
+            std::vector<std::function<void()>> undo = std::move(cp.journal_->undo);
+            *cp.journal_ = Journal();
+            for (auto it = undo.rbegin(); it != undo.rend(); ++it) (*it)();
+        }
+
+        // Keep everything since checkpoint(), and close it.
+        void commit(const Checkpoint& cp)
+        {
+            endCheckpoint(cp);
+            *cp.journal_ = Journal(); // nothing left to undo: let go of what the undos held
+        }
+
+        // True while a checkpoint is open.
+        bool inCheckpoint() const { return host_.journal != nullptr; }
 
         // The shared @patter properties for a live state inspector: each with its ref, type, current
         // value, declared default, and enum options. Per-flow (@local) properties are excluded, matching
@@ -2169,6 +2442,7 @@ namespace patter
         // register.
         void loadGame(const SaveGame& save)
         {
+            refuseInCheckpoint("loadGame");
             if (save.version != 2 && save.version != SAVE_VERSION)
                 throw std::runtime_error("unsupported save version: " + std::to_string(save.version));
             assertExternalScopes();
@@ -2204,6 +2478,17 @@ namespace patter
         }
 
     private:
+        void endCheckpoint(const Checkpoint& cp)
+        {
+            if (!host_.journal || host_.journal != cp.journal_) throw std::runtime_error("that checkpoint is not the open one");
+            host_.journal.reset();
+        }
+
+        void refuseInCheckpoint(const std::string& what) const
+        {
+            if (host_.journal) throw std::runtime_error(what + " can't be undone, so it isn't allowed while a checkpoint is open");
+        }
+
         // Content that names another engine's scope (`@story.act`) runs only where that engine is on this
         // registry: without it every read would answer false and every write fail, so the flow is refused
         // as it opens (or the save as it loads), before anything changes. By then a game has built all of

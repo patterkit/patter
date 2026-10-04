@@ -18,6 +18,8 @@
     <Compile Include="Program.cs" />
     <!-- The one-registry checks: the game's registry, from the game's side (ports of the JS tests). -->
     <Compile Include="OneRegistry.cs" />
+    <!-- Checkpoints from the host's side: refusals, @world written back, live Restore (ports of the JS tests). -->
+    <Compile Include="Checkpoints.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

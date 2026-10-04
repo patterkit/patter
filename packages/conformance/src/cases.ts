@@ -722,7 +722,7 @@ const hiddenOption = {
 const sharedStateScenes: Scene[] = [{
   id: "s", type: "scene", name: "S",
   sceneProps: [
-    { name: "mine", type: "number", default: 0 },
+    { name: "mine", type: "number", default: 0, shared: false },
     { name: "tally", type: "number", default: 0, shared: true },
   ],
   blocks: [{ id: "b", type: "block", name: "B", children: [
@@ -808,6 +808,153 @@ const scriptedGoto = {
     { op: "advance", expect: [{ type: "end" }] },
     { op: "goto", scene: "hub", block: "var", expectResult: true },
     { op: "advance", expect: [{ type: "text", id: "V2", text: "v2" }] }, // resumes: a reset would replay v1
+  ],
+} satisfies ScriptedFixture;
+
+// Checkpoints: asking "would this say anything?" without consequences. The side room changes every kind
+// of state a step can: its onEntry moves a shared global and a host-scope (`@world`) property, and seeds
+// (then bumps) a shared scene prop, the
+// talk block draws from a SHARED shuffle with the flow's PRNG and counts world visits, and each pick's
+// onEnter bumps a per-flow global. A rollback must put all of it back, and the flow's cursor with it.
+const checkpointProject = project({ properties: [
+  { name: "entered", type: "number", shared: true, default: 0 },
+  { name: "mine", type: "number", default: 0, shared: false },
+], scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [{ name: "alarms", type: "number", default: 0 }] }] } });
+const checkpointPick = (n: number) => ({
+  id: `sn_s${n}`, type: "snippet" as const,
+  onEnter: [{ kind: "set" as const, target: "@mine", value: "@mine + 1" }],
+  beats: [{ id: `S${n}`, kind: "text" as const }], jump: { to: "END" },
+});
+const checkpointScenes: Scene[] = [
+  { id: "scn_hub", type: "scene", name: "Hub", blocks: [
+    { id: "b_main", type: "block", name: "Main", children: [
+      { id: "sn_1", type: "snippet", beats: [{ id: "T1", kind: "text" }] },
+      { id: "sn_2", type: "snippet", beats: [{ id: "T2", kind: "text" }] },
+      { id: "sn_3", type: "snippet", beats: [{ id: "T3", kind: "text" }], jump: { to: "END" } },
+    ] },
+    { id: "b_check", type: "block", name: "Check", children: [
+      { id: "g_check", type: "group", selector: "branch", children: [
+        { id: "sn_seen", type: "snippet", condition: "patter_visits('b_talk') > 0", beats: [{ id: "T_seen", kind: "text" }], jump: { to: "END" } },
+        { id: "sn_unseen", type: "snippet", beats: [{ id: "T_unseen", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+    // A flow's OWN memory: a per-flow once-each sequence, and a check on this flow's visits.
+    { id: "b_own", type: "block", name: "Own", children: [
+      { id: "g_own", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "once" }, children: [
+        { id: "sn_o1", type: "snippet", beats: [{ id: "O1", kind: "text" }], jump: { to: "END" } },
+        { id: "sn_o2", type: "snippet", beats: [{ id: "O2", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+    { id: "b_owncheck", type: "block", name: "Own Check", children: [
+      { id: "g_owncheck", type: "group", selector: "branch", children: [
+        { id: "sn_been", type: "snippet", condition: "visits('b_own') > 0", beats: [{ id: "T_been", kind: "text" }], jump: { to: "END" } },
+        { id: "sn_notbeen", type: "snippet", beats: [{ id: "T_notbeen", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ] },
+  { id: "scn_side", type: "scene", name: "Side Room",
+    sceneProps: [{ name: "tally", type: "number", default: 0, shared: true }],
+    onEntry: [
+      { kind: "set", target: "@entered", value: "@entered + 1" },
+      { kind: "set", target: "@scene.tally", value: "@scene.tally + 1" },
+      { kind: "set", target: "@world.alarms", value: "@world.alarms + 1" },
+    ],
+    blocks: [
+      { id: "b_talk", type: "block", name: "Talk", children: [
+        { id: "g_bag", type: "group", selector: "sequence", shared: true, options: { order: "shuffle", exhaust: "repeat" },
+          children: [checkpointPick(1), checkpointPick(2), checkpointPick(3)] },
+      ] },
+      { id: "b_quiet", type: "block", name: "Quiet", children: [
+        { id: "sn_q", type: "snippet", condition: "@mine > 5", beats: [{ id: "Q", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+];
+const checkpointLoc = [
+  loc("scn_hub", { T1: "one {@entered} {@mine}", T2: "two {@entered} {@mine}", T3: "three {@entered} {@mine}", T_seen: "seen", T_unseen: "unseen", O1: "o1", O2: "o2", T_been: "been", T_notbeen: "not been" }),
+  loc("scn_side", { S1: "s1 {@entered} {@mine} {@scene.tally} {@world.alarms}", S2: "s2 {@entered} {@mine} {@scene.tally} {@world.alarms}", S3: "s3 {@entered} {@mine} {@scene.tally} {@world.alarms}", Q: "q" }),
+];
+
+const scriptedCheckpoint = {
+  name: "checkpoint: rollback undoes a step's every change, commit keeps them",
+  project: checkpointProject, scenes: checkpointScenes, locales: checkpointLoc, seed: 7,
+  script: [
+    { op: "openFlow", flow: "f", scene: "hub" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one 0 0" }] },
+
+    // A step that says something, rolled back: the cursor returns to after T1, and nothing it changed stays.
+    { op: "checkpoint" },
+    { op: "goto", scene: "side-room", block: "talk", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "S1", text: "s1 1 1 1 1" }] },
+    { op: "rollback" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two 0 0" }] },
+    { op: "openFlow", flow: "probe", scene: "hub", block: "check" },
+    { op: "advance", expect: [{ type: "text", id: "T_unseen", text: "unseen" }] }, // the world visit is gone too
+
+    // The pattern this exists for: an address with nothing to say, found out and forgotten.
+    { op: "useFlow", flow: "f" },
+    { op: "checkpoint" },
+    { op: "goto", scene: "side-room", block: "quiet", expectResult: true },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "rollback" },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "three 0 0" }] },
+
+    // The same step again draws the same pick (the PRNG and the shared bag came back), and this time it's
+    // committed: the scene prop seeds afresh at 1, and everything it changed stays.
+    { op: "checkpoint" },
+    { op: "goto", scene: "side-room", block: "talk", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "S1", text: "s1 1 1 1 1" }] },
+    { op: "commit" },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "openFlow", flow: "probe2", scene: "hub", block: "check" },
+    { op: "advance", expect: [{ type: "text", id: "T_seen", text: "seen" }] },
+    { op: "useFlow", flow: "f" },
+    { op: "goto", scene: "side-room", block: "talk", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "S2", text: "s2 1 2 1 1" }] }, // the bag carried on (no repeat); same scene, so no onEntry
+  ],
+} satisfies ScriptedFixture;
+
+const scriptedCheckpointOwnMemory = {
+  name: "checkpoint: rollback puts back a flow's own visits, sequence positions, and place in a block",
+  project: checkpointProject, scenes: checkpointScenes, locales: checkpointLoc, seed: 7,
+  script: [
+    { op: "openFlow", flow: "f", scene: "hub", block: "own-check" },
+    { op: "advance", expect: [{ type: "text", id: "T_notbeen", text: "not been" }] },
+    { op: "checkpoint" },
+    { op: "goto", scene: "hub", block: "own", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "O1", text: "o1" }] },
+    { op: "rollback" },
+    { op: "goto", scene: "hub", block: "own-check", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_notbeen", text: "not been" }] }, // this flow's visit is gone
+    { op: "goto", scene: "hub", block: "own", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "O1", text: "o1" }] },             // and its sequence is back at the start
+    { op: "goto", scene: "hub", block: "own", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "O2", text: "o2" }] },
+
+    // A plain advance, rolled back: the block's position moves in place, and comes back.
+    { op: "openFlow", flow: "h", scene: "hub" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one 0 0" }] },
+    { op: "checkpoint" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two 0 0" }] },
+    { op: "rollback" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two 0 0" }] },
+  ],
+} satisfies ScriptedFixture;
+
+const scriptedCheckpointNewFlow = {
+  name: "checkpoint: a flow opened inside one is closed and forgotten by rollback",
+  project: checkpointProject, scenes: checkpointScenes, locales: checkpointLoc, seed: 7,
+  script: [
+    { op: "openFlow", flow: "f", scene: "hub" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one 0 0" }] },
+    { op: "checkpoint" },
+    { op: "openFlow", flow: "g", scene: "side-room", block: "talk" },
+    { op: "advance", expect: [{ type: "text", id: "S1", text: "s1 1 1 1 1" }] },
+    { op: "rollback" },
+    // The name is free again: opening it afresh plays the same pick, from the same untouched world.
+    { op: "openFlow", flow: "g", scene: "side-room", block: "talk" },
+    { op: "advance", expect: [{ type: "text", id: "S1", text: "s1 1 1 1 1" }] },
+    { op: "useFlow", flow: "f" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two 1 0" }] }, // g's committed entry counts once; @mine is per-flow
   ],
 } satisfies ScriptedFixture;
 
@@ -1655,7 +1802,8 @@ export const cases: Fixtures = {
   scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
-    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion],
+    scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
+    scriptedCheckpoint, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

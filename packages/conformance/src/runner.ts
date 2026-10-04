@@ -18,7 +18,7 @@ import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
-import type { StepResult } from "@patterkit/runtime";
+import type { Checkpoint, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
 import type { ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptStep } from "./types.js";
@@ -91,6 +91,7 @@ export function runScript(
   engine: Engine, ops: ScriptOp[], ctx: { bundle: Bundle; bundleB?: Bundle; options: { seed?: number } }, current = "",
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
+  let checkpoint: Checkpoint | undefined;
   for (const op of ops) {
     const chunk: TranscriptStep[] = [];
     switch (op.op) {
@@ -157,6 +158,17 @@ export function runScript(
       case "reset":
         engine.reset();
         current = "";
+        break;
+      case "checkpoint":
+        checkpoint = engine.checkpoint();
+        break;
+      case "rollback":
+        engine.rollback(checkpoint!);
+        checkpoint = undefined;
+        break;
+      case "commit":
+        engine.commit(checkpoint!);
+        checkpoint = undefined;
         break;
     }
     chunks.push(chunk);

@@ -447,6 +447,7 @@ func _run_scripted(arr: Array) -> int:
 ## engine arrives already loaded from an envelope another runtime wrote.
 func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: Dictionary, options: Dictionary, name: String) -> bool:
 	var current := ""
+	var cp = null   # the open checkpoint, between a "checkpoint" op and its "rollback" / "commit"
 	var ok := true
 	for op in ops:
 		var chunk: Array = []
@@ -522,6 +523,15 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 			"reset":
 				holder["engine"].reset()
 				current = ""
+			"checkpoint":
+				# Checkpoints: no transcript of their own; the advances after them show the state left.
+				cp = holder["engine"].checkpoint()
+			"rollback":
+				holder["engine"].rollback(cp)
+				cp = null
+			"commit":
+				holder["engine"].commit(cp)
+				cp = null
 		var expected = op.get("expect", null)
 		var matched := _deep_equal(chunk, expected) if expected != null else chunk.is_empty()
 		if not matched:

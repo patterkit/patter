@@ -123,7 +123,14 @@ export type ScriptOp =
   // never merged with the project's declared defaults, never inherited from the scene by its blocks, and
   // `{}` for a node with none or a ref that does not resolve. Key order is not part of the contract.
   | { op: "expectGameData"; scene: string; block?: string; expectResult: GameData }
-  | { op: "reset" };
+  | { op: "reset" }
+  // Checkpoints: `checkpoint` opens one (the engine's `checkpoint()`); `rollback` puts the whole game back
+  // as it was then (every property, visit count, shuffle and sequence position, every flow's cursor and
+  // PRNG; a flow opened since is closed and forgotten); `commit` keeps everything. None produces a
+  // transcript: the advances after them show the state they left. One checkpoint at a time.
+  | { op: "checkpoint" }
+  | { op: "rollback" }
+  | { op: "commit" };
 
 /** A compiled scripted case in the portable corpus. */
 export interface ScriptedCase {

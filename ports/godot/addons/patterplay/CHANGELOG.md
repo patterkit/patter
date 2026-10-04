@@ -6,6 +6,26 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Checkpoints: try something, then undo it.** `engine.checkpoint()` opens a checkpoint; `engine.rollback(checkpoint)` puts the game back exactly
+  as it was then, and `engine.commit(checkpoint)` keeps everything. A rollback undoes every change the story made in between:
+  property values in every scope (a game's own `@world` store is written back through the game), visit
+  counts, shuffle and sequence positions, `@scene` bags made since, and every flow's position and random
+  state; a flow opened since is closed, and its name is free again. `engine.in_checkpoint()` says whether one is open.
+  The use is asking "would this say anything?" without consequences: move a flow to an address, step
+  it, and roll back if it had nothing to give, so the scene's on-entry effects, the visits, and the
+  shuffle draws never happened. Each change records how to undo itself as it happens, so a checkpoint
+  costs what the steps inside it do, not what the game has built up, and the record is let go when it
+  closes. One is open at a time; while it is, the calls a rollback couldn't undo are refused
+  (`reset`, `load_game`, `hot_swap`, `close_flow`, `open_flow` over an open flow, and a flow's own `start` and `restore`, each reported with `push_error`). Held across all four runtimes by the conformance corpus.
+
+### Fixed
+
+- **`flow.restore()` on a running flow keeps that flow's own property values.** It used to drop them back to
+  their defaults, since a snapshot holds a flow's position and memory, not its property values. Loading
+  a save is unchanged.
+
 ## [0.15.0] - 2026-10-03
 
 ### Added

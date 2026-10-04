@@ -159,6 +159,7 @@ namespace Patterkit.Patterplay
         public bool Goto(string scene, string block = null)
         {
             if (_closed) return false; // closed is terminal: unlike "ended", a goto cannot revive it
+            Touch();
             if (scene == "END")
             {
                 _started = true; _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptOwnerId = null;
@@ -201,6 +202,28 @@ namespace Patterkit.Patterplay
             _pendingChoice = null;
             _pendingPromptBeat = null;
             _pendingPromptOwnerId = null;
+        }
+
+        /// <summary>Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a
+        /// rollback can put them back: a handful of fields and a copy of the call stack (a few frames), never
+        /// its history. Its visits, selector cursors, and property values are recorded change by change as
+        /// they happen.</summary>
+        private void Touch()
+        {
+            var journal = _host.Journal;
+            if (journal == null || journal.Flows.Contains(this)) return;
+            journal.Flows.Add(this);
+            var rngState = _rngState; var started = _started; var flowEnded = _flowEnded;
+            var currentSceneId = _currentSceneId; var activeSnippet = _activeSnippet; var beatIndex = _beatIndex;
+            var pendingChoice = _pendingChoice; var pendingPromptBeat = _pendingPromptBeat; var pendingPromptOwnerId = _pendingPromptOwnerId;
+            var stack = _stack.Select(f => f.Clone()).ToList(); // frames advance in place, so copy them
+            journal.Undo.Add(() =>
+            {
+                _rngState = rngState; _started = started; _flowEnded = flowEnded;
+                _currentSceneId = currentSceneId; _activeSnippet = activeSnippet; _beatIndex = beatIndex;
+                _pendingChoice = pendingChoice; _pendingPromptBeat = pendingPromptBeat; _pendingPromptOwnerId = pendingPromptOwnerId;
+                _stack = stack;
+            });
         }
 
         /// <summary>True once the engine has closed this flow.</summary>
@@ -257,6 +280,10 @@ namespace Patterkit.Patterplay
 
         public void Start(string sceneId, string blockId)
         {
+            // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
+            // inside the checkpoint may start in one.
+            if (_host.Journal != null && !_host.Journal.Opened.Contains(this))
+                throw new Exception("a flow can't be started or reset while a checkpoint is open");
             // A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
             ReleaseBags(false);
             _host.Registry.DiscardParked(PatterKeys.Flow(Id));
@@ -296,6 +323,7 @@ namespace Patterkit.Patterplay
         {
             if (_closed) return new StepResult { Type = StepType.End }; // a stale reference drives nothing
             if (!_started) throw new Exception("flow has not been started");
+            Touch();
             if (_pendingPromptBeat != null) { var b = _pendingPromptBeat; _pendingPromptBeat = null; _pendingPromptOwnerId = null; return BeatResult(b); }
             Settle();
             if (_flowEnded) return StepResult.End();
@@ -338,6 +366,7 @@ namespace Patterkit.Patterplay
             var option = choice.Options.FirstOrDefault(o => o.Id == id);
             if (option == null) throw new Exception($"unknown choice option: {id}");
             if (!option.Eligible) throw new Exception($"choice option is not eligible: {id}");
+            Touch();
             var node = choice.ById[id];
             Emit(new LogEntry { Type = "chose", Subject = choice.GroupId, Picked = id });
             _pendingChoice = null;
@@ -371,19 +400,42 @@ namespace Patterkit.Patterplay
         private void WritePropertyTo(string refStr, ExprValue value, bool host)
         {
             var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
-            if (scope == "patter") PatterSet(name, value);
+            var journal = _host.Journal;
+            if (scope == "patter")
+            {
+                // Inside a checkpoint, each write records how to put the old value back, against the bag it
+                // actually landed in (a @scene write's bag depends on the scene the flow is in at the time).
+                if (journal != null)
+                {
+                    bool shared = _host.PatterSharedNames.Contains(name);
+                    var prev = shared ? _host.SharedPatter.Get(name) : _local.Get(name);
+                    var bag = _local;
+                    if (prev != null)
+                        journal.Undo.Add(shared ? (Action)(() => _host.Registry.Set("patter", name, prev)) : () => bag.Set(name, prev));
+                }
+                PatterSet(name, value);
+            }
             else if (scope == "scene")
             {
                 // The resolver stays graceful for expression evaluation, but a host write with nowhere to
                 // land must error, not silently vanish.
                 if (_currentSceneId == null) throw new Exception($"'{refStr}': the flow has not entered a scene yet");
+                if (journal != null)
+                {
+                    var bag = SceneBagFor(name);
+                    var prev = bag?.Get(name);
+                    if (bag != null && prev != null) journal.Undo.Add(() => bag.Set(name, prev));
+                }
                 SceneSet(name, value);
             }
             else
             {
                 // Host scopes and other engines' scopes. The registry refuses a STORY write to a
                 // `writable: false` declaration, bound or self-backed, and never the game's.
+                var prev = journal != null ? _host.Registry.Get(scope, name) : null;
                 _host.Registry.Set(scope, name, value, host);
+                // Recorded after the write: one a read-only host scope refused never happened, so has nothing to undo.
+                if (journal != null && prev != null) journal.Undo.Add(() => _host.Registry.Set(scope, name, prev, host: true));
             }
         }
 
@@ -662,6 +714,19 @@ namespace Patterkit.Patterplay
         private SelectorState SelectorStateFor(Node group)
         {
             var map = group.Shared ? _host.SharedSelectors : _selectors;
+            // A cursor is copied the first time a checkpoint sees it (shared ones once for every flow).
+            var journal = _host.Journal;
+            HashSet<string> seen = null;
+            if (journal != null)
+            {
+                if (group.Shared) seen = journal.Selectors;
+                else if (!journal.FlowSelectors.TryGetValue(this, out seen)) { seen = new HashSet<string>(); journal.FlowSelectors[this] = seen; }
+            }
+            if (seen != null && seen.Add(group.Id))
+            {
+                var copy = map.TryGetValue(group.Id, out var was) ? was.Clone() : null;
+                journal.Undo.Add(() => { if (copy != null) map[group.Id] = copy; else map.Remove(group.Id); });
+            }
             if (!map.TryGetValue(group.Id, out var st)) { st = new SelectorState(); map[group.Id] = st; }
             return st;
         }
@@ -695,8 +760,18 @@ namespace Patterkit.Patterplay
 
         private void Enter(string id)
         {
-            _visitCounts[id] = (_visitCounts.TryGetValue(id, out var v) ? v : 0) + 1;
-            _host.SharedVisits[id] = (_host.SharedVisits.TryGetValue(id, out var sv) ? sv : 0) + 1;
+            var own = _visitCounts;
+            bool ownHad = own.TryGetValue(id, out var ownBefore);
+            own[id] = ownBefore + 1;
+            var shared = _host.SharedVisits;
+            bool had = shared.TryGetValue(id, out var before);
+            shared[id] = before + 1;
+            if (_host.Journal != null)
+                _host.Journal.Undo.Add(() =>
+                {
+                    if (ownHad) own[id] = ownBefore; else own.Remove(id);
+                    if (had) shared[id] = before; else shared.Remove(id);
+                });
         }
 
         private double Rng()
@@ -828,7 +903,10 @@ namespace Patterkit.Patterplay
                                                 : (_sceneBags.TryGetValue(scene.Id, out var fb) ? fb : null);
                 // Through Set, so the reset is audited: a temporary snapping back to its default is
                 // a state change, and a log that omits it is wrong.
-                if (bag != null) bag.Set(name, Engine.PropDefault(decl));
+                if (bag == null) continue;
+                var prev = _host.Journal != null ? bag.Get(name) : null;
+                if (prev != null) _host.Journal.Undo.Add(() => bag.Set(name, prev));
+                bag.Set(name, Engine.PropDefault(decl));
             }
         }
 
@@ -840,6 +918,7 @@ namespace Patterkit.Patterplay
         {
             if (!_host.Bundle.Scenes.TryGetValue(s, out var scene)) return;
             var shared = _host.SceneSharedNames.TryGetValue(s, out var names) ? names : new HashSet<string>();
+            var journal = _host.Journal;
             if (!_sceneBags.ContainsKey(s))
             {
                 var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, false), null, "@scene.");
@@ -847,12 +926,27 @@ namespace Patterkit.Patterplay
                 Mount(key, bag);
                 _registered.Add(key);
                 _sceneBags[s] = bag;
+                // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry.
+                if (journal != null) journal.Undo.Add(() =>
+                {
+                    if (!_sceneBags.TryGetValue(s, out var now) || now != bag) return; // already released with the flow
+                    _host.Registry.Remove(key);
+                    _registered.Remove(key);
+                    _sceneBags.Remove(s);
+                });
             }
             if (!_host.StageBags.ContainsKey(s))
             {
                 var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, true), null, "@scene.");
-                Mount(PatterKeys.Stage(s), bag);
+                var key = PatterKeys.Stage(s);
+                Mount(key, bag);
                 _host.StageBags[s] = bag;
+                if (journal != null) journal.Undo.Add(() =>
+                {
+                    if (!_host.StageBags.TryGetValue(s, out var now) || now != bag) return;
+                    _host.Registry.Remove(key);
+                    _host.StageBags.Remove(s);
+                });
             }
         }
 
@@ -917,7 +1011,27 @@ namespace Patterkit.Patterplay
             };
         }
 
+        /// <summary>Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its
+        /// property values are the registry's and stay as they are (a load puts the saved ones there first).</summary>
         public void Restore(FlowSnapshot snap)
+        {
+            if (_host.Journal != null) throw new Exception("a flow can't be restored while a checkpoint is open");
+            RestoreCursor(snap);
+            // Register this flow's bags: each claims the values the registry holds for it (loaded by the
+            // game, by LoadGame from the save, or handed back by the engine this one replaces), laid over
+            // fresh defaults. Released KEEPING their values, so a live flow restored in place keeps its
+            // property values (a fresh one, made by a load, is claiming the loaded values either way). The
+            // scenes the cursor stands in are registered now; any other scene's bag is claimed on entry.
+            ReleaseBags(true);
+            MountLocal();
+            var standing = new List<string>();
+            if (_currentSceneId != null) standing.Add(_currentSceneId);
+            foreach (var f in _stack) if (f.SceneId != null && !standing.Contains(f.SceneId)) standing.Add(f.SceneId);
+            foreach (var s in standing) EnsureSceneBags(s);
+        }
+
+        /// <summary>The cursor half of Restore, without touching the bags (a rollback has already put those back).</summary>
+        private void RestoreCursor(FlowSnapshot snap)
         {
             _rngState = snap.RngState;
             _visitCounts = new Dictionary<string, int>(snap.Visits ?? new Dictionary<string, int>());
@@ -940,17 +1054,6 @@ namespace Patterkit.Patterplay
                 }
                 return frame;
             }).ToList();
-
-            // Register this flow's bags: each claims the values the registry holds for it (loaded by the
-            // game, by LoadGame from the save, or handed back by the engine this one replaces), laid over
-            // fresh defaults. The scenes the cursor stands in are registered now; any other scene's bag is
-            // claimed on entry.
-            ReleaseBags(false);
-            MountLocal();
-            var standing = new List<string>();
-            if (_currentSceneId != null) standing.Add(_currentSceneId);
-            foreach (var f in _stack) if (f.SceneId != null && !standing.Contains(f.SceneId)) standing.Add(f.SceneId);
-            foreach (var s in standing) EnsureSceneBags(s);
 
             _activeSnippet = null;
             if (snap.ActiveSnippetId != null && _host.NodeIndex.TryGetValue(snap.ActiveSnippetId, out var node) && node.IsSnippet)

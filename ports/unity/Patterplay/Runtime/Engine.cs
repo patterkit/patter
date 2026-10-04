@@ -164,6 +164,30 @@ namespace Patterkit.Patterplay
         public string Detail;
     }
 
+    /// <summary>What an open checkpoint records: how to undo each change, newest last. Each piece of state
+    /// records itself when it changes (a value, a count, a cursor), never a copy of everything, so a
+    /// checkpoint costs what the steps inside it do, however much history the game has built up. Mirrors
+    /// the JS runtime's Journal.</summary>
+    internal sealed class Journal
+    {
+        public List<Action> Undo = new List<Action>();
+        /// <summary>Flows already snapshotted (or opened inside the checkpoint, so closed on rollback).</summary>
+        public readonly HashSet<Flow> Flows = new HashSet<Flow>();
+        /// <summary>Flows opened inside the checkpoint.</summary>
+        public readonly HashSet<Flow> Opened = new HashSet<Flow>();
+        /// <summary>Selector cursors already copied: shared ones by group id, a flow's own in FlowSelectors.</summary>
+        public readonly HashSet<string> Selectors = new HashSet<string>();
+        public readonly Dictionary<Flow, HashSet<string>> FlowSelectors = new Dictionary<Flow, HashSet<string>>();
+    }
+
+    /// <summary>An open checkpoint, from <see cref="Engine.Checkpoint()"/>. Opaque: hand it back to
+    /// <see cref="Engine.Rollback"/> or <see cref="Engine.Commit"/>.</summary>
+    public sealed class Checkpoint
+    {
+        internal readonly Journal Journal;
+        internal Checkpoint(Journal journal) { Journal = journal; }
+    }
+
     internal sealed class FlowHost
     {
         /// <summary>True when the run asked for a log; flows skip building entries otherwise.</summary>
@@ -211,6 +235,8 @@ namespace Patterkit.Patterplay
         /// first time any flow needs the scene, so a bag loaded before then waits in the registry and is
         /// claimed here.</summary>
         public Dictionary<string, PropertyBag> StageBags = new Dictionary<string, PropertyBag>();
+        /// <summary>The open checkpoint's undo journal, or null when none is open (see Engine.Checkpoint).</summary>
+        public Journal Journal;
         public Func<double> CustomRng;
         public bool ReplayPromptOnChoose;
         // Closed captions (#214): CaptionsOn shows caption cues in dialogue lines (default true); when
@@ -441,6 +467,7 @@ namespace Patterkit.Patterplay
         /// </summary>
         public Engine HotSwap(Bundle bundle)
         {
+            RefuseInCheckpoint("HotSwap");
             var snapshot = SaveGame();
             Engine CarryOver(Engine next)
             {
@@ -496,8 +523,23 @@ namespace Patterkit.Patterplay
             string blockId = ResolveBlockRef(sceneId, block);
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
             // driving the shared world. Replacing is a reset - contrast RunFlow, which reuses.
-            if (_flows.TryGetValue(id, out var previous)) previous.Close();
+            _flows.TryGetValue(id, out var prior);
+            var journal = _host.Journal;
+            if (journal != null && prior != null && !prior.IsClosed)
+                throw new Exception($"OpenFlow would replace the open flow '{id}', which can't be undone while a checkpoint is open");
+            prior?.Close();
             var flow = new Flow(id, _host, seed ?? _defaultSeed);
+            if (journal != null)
+            {
+                // Opened inside the checkpoint: rolling back closes it and puts back whatever the name meant.
+                journal.Flows.Add(flow);
+                journal.Opened.Add(flow);
+                journal.Undo.Add(() =>
+                {
+                    flow.Close();
+                    if (prior != null) _flows[id] = prior; else _flows.Remove(id);
+                });
+            }
             _flows[id] = flow;
             flow.Start(sceneId, blockId);
             return flow;
@@ -544,6 +586,7 @@ namespace Patterkit.Patterplay
         /// host still holding it cannot keep advancing it into the shared world.</summary>
         public void CloseFlow(string id)
         {
+            RefuseInCheckpoint("CloseFlow");
             if (_flows.TryGetValue(id, out var f)) f.Close();
             _flows.Remove(id);
         }
@@ -807,6 +850,7 @@ namespace Patterkit.Patterplay
         /// counts). Host scopes are untouched. After a reset, open fresh flows with OpenFlow.</summary>
         public void Reset()
         {
+            RefuseInCheckpoint("Reset");
             foreach (var f in _flows.Values) f.Close(); // finish them, don't just forget them
             _flows.Clear();
             _host.SharedPatter.Reseed(_host.PatterSharedDecls.Select(ToScopeDecl));
@@ -859,8 +903,11 @@ namespace Patterkit.Patterplay
         public void SetProperty(string refStr, ExprValue value)
         {
             var (scope, name) = SplitShared(refStr);
+            var journal = _host.Journal;
+            var prev = journal != null ? _host.Registry.Get(scope, name) : null;
             try { _host.Registry.Set(scope, name, value, host: true); }
             catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+            if (journal != null && prev != null) journal.Undo.Add(() => _host.Registry.Set(scope, name, prev, host: true));
         }
 
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
@@ -891,6 +938,73 @@ namespace Patterkit.Patterplay
                 });
             }
             return rows;
+        }
+
+        // -- checkpoints --------------------------------------------------------
+
+        /// <summary>
+        /// Open a checkpoint: from here until <see cref="Rollback"/> or <see cref="Commit"/>, the engine keeps
+        /// what it needs to undo every change the story makes. Rollback puts the game back exactly as it was
+        /// at the checkpoint: property values (every scope, including a host's `@world`, which is written
+        /// back through the game), visit counts, shuffle and sequence positions, `@scene` bags made since,
+        /// every flow's cursor and PRNG, and any flow opened since (closed and forgotten). Commit keeps
+        /// everything and stops recording.
+        ///
+        /// The use is asking "would this say anything?" without consequences: move a flow to an address,
+        /// advance it, and roll back if it had nothing to give, so its scene's onEntry effects, its visits,
+        /// and its shuffle draws never happened.
+        ///
+        /// One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags
+        /// wholesale (Reset, LoadGame, HotSwap, CloseFlow, OpenFlow on the name of an open flow, and a
+        /// flow's own Start, Reset, and Restore) throw. Not undone: log entries already recorded, and draws
+        /// from a custom Rng the game supplied.
+        /// </summary>
+        public Checkpoint Checkpoint()
+        {
+            if (_host.Journal != null) throw new Exception("a checkpoint is already open: roll it back or commit it first");
+            var journal = new Journal();
+            _host.Journal = journal;
+            return new Checkpoint(journal);
+        }
+
+        /// <summary>Undo everything since <see cref="Checkpoint()"/> (see there), and close it.</summary>
+        public void Rollback(Checkpoint checkpoint)
+        {
+            EndCheckpoint(checkpoint);
+            var undo = checkpoint.Journal.Undo;
+            for (int i = undo.Count - 1; i >= 0; i--) undo[i]();
+            Forget(checkpoint.Journal);
+        }
+
+        /// <summary>Keep everything since <see cref="Checkpoint()"/>, and close it.</summary>
+        public void Commit(Checkpoint checkpoint)
+        {
+            EndCheckpoint(checkpoint);
+            Forget(checkpoint.Journal);
+        }
+
+        /// <summary>True while a checkpoint is open.</summary>
+        public bool InCheckpoint => _host.Journal != null;
+
+        private void EndCheckpoint(Checkpoint checkpoint)
+        {
+            if (checkpoint == null || _host.Journal != checkpoint.Journal) throw new Exception("that checkpoint is not the open one");
+            _host.Journal = null;
+        }
+
+        /// <summary>Let go of what a closed checkpoint recorded, so a handle the game keeps holds nothing.</summary>
+        private static void Forget(Journal journal)
+        {
+            journal.Undo = new List<Action>();
+            journal.Flows.Clear();
+            journal.Opened.Clear();
+            journal.Selectors.Clear();
+            journal.FlowSelectors.Clear();
+        }
+
+        private void RefuseInCheckpoint(string what)
+        {
+            if (_host.Journal != null) throw new Exception($"{what} can't be undone, so it isn't allowed while a checkpoint is open");
         }
 
         // -- save / load --------------------------------------------------------
@@ -924,6 +1038,7 @@ namespace Patterkit.Patterplay
         /// are handed back to the registry (values kept) and the restored flows claim them as they register.</summary>
         public void LoadGame(SaveGame save)
         {
+            RefuseInCheckpoint("LoadGame");
             if (save.Version != 2 && save.Version != SaveVersion) throw new Exception($"unsupported save version: {save.Version}");
             AssertExternalScopes();
             var reg = _host.Registry;

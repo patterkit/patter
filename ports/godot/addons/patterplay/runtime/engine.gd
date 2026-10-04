@@ -36,6 +36,15 @@ var _creation_options: Dictionary = {}
 var _engine_log: Array = []
 
 
+## An open checkpoint, from checkpoint(). Opaque: hand it back to rollback() or commit().
+class Checkpoint extends RefCounted:
+	## The undo journal it opened (see PatterEngine.checkpoint); internal.
+	var journal: Dictionary
+
+	func _init(j: Dictionary) -> void:
+		journal = j
+
+
 func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	_creation_options = options
 	var locale: String = options.get("locale", "")
@@ -103,6 +112,12 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		# first time any flow needs the scene, so a bag loaded before then waits in the registry and
 		# is claimed there.
 		"stage_bags": {},
+		# The open checkpoint's undo journal, or null when none is open (see checkpoint()):
+		# { "undo": [Callable, ...] run newest first, "flows": {PatterFlow: true} whose cursor is already
+		# recorded (or opened inside the checkpoint), "opened": {PatterFlow: true} opened inside it,
+		# "selectors": {group id: true} shared selector cursors already copied, "flow_selectors":
+		# {PatterFlow: {group id: true}} each flow's own selector cursors already copied }.
+		"journal": null,
 		"custom_rng": options.get("rng"),
 		"replay_prompt_on_choose": options.get("replay_prompt_on_choose", false),
 		# Closed captions (#214): captions_on shows cues in dialogue lines (default true); when false the
@@ -312,16 +327,26 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 		return null
 	var scene_id := _resolve_scene_ref(scene)
 	var block_id := _resolve_block_ref(scene_id, block)
+	var prior: PatterFlow = _flows.get(id)
+	var journal = _host["journal"]
+	if journal != null and prior != null and not prior.is_closed():
+		push_error("open_flow would replace the open flow '%s', which can't be undone while a checkpoint is open" % id)
+		return null
 	# Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep driving
 	# the shared world. Replacing is a reset - contrast run_flow(), which reuses.
-	if _flows.has(id):
-		_flows[id].close()
+	if prior != null:
+		prior.close()
 	var flow := PatterFlow.new(_host, float(seed_value) if seed_value != null else float(_default_seed))
 	# The flow knows its own name. `id` was declared on PatterFlow and never assigned, so it
 	# read "" for the life of the port; the JS runtime takes it in the constructor. The trace
 	# log needs it (every engine entry names the flow it happened in) and a host reading
 	# flow.id was getting nothing.
 	flow.id = id
+	if journal != null:
+		# Opened inside the checkpoint: rolling back closes it and puts back whatever the name meant.
+		journal["flows"][flow] = true
+		journal["opened"][flow] = true
+		journal["undo"].append(_undo_open_flow.bind(id, flow, prior))
 	_flows[id] = flow
 	flow.start(scene_id, block_id)
 	return flow
@@ -363,7 +388,89 @@ func block_address(block_id: String) -> String:
 	return PatterBundle.effective_game_id(blocks[block_id]) if blocks.has(block_id) else ""
 
 
+## The undo of an open_flow made inside a checkpoint: close the new flow and give the name back to
+## whatever it meant before (the prior flow, or nothing).
+func _undo_open_flow(id: String, flow: PatterFlow, prior: PatterFlow) -> void:
+	flow.close()
+	if prior != null:
+		_flows[id] = prior
+	else:
+		_flows.erase(id)
+
+
+## Open a checkpoint: from here until rollback() or commit(), the engine keeps what it needs to undo
+## every change the story makes. rollback() puts the game back exactly as it was at the checkpoint:
+## property values (every scope, including a host's `@world`, which is written back through the
+## game), visit counts, shuffle and sequence positions, `@scene` bags made since, every flow's cursor
+## and PRNG, and any flow opened since (closed and forgotten). commit() keeps everything and stops
+## recording.
+##
+## The use is asking "would this say anything?" without consequences: move a flow to an address,
+## advance it, and roll back if it had nothing to give, so its scene's onEntry effects, its visits,
+## and its shuffle draws never happened.
+##
+## One checkpoint at a time: a second is refused (push_error, returns null). Inside one, the calls
+## that replace or drop flows or their bags wholesale (reset, load_game, hot_swap, close_flow,
+## open_flow on the name of an open flow, and a flow's own start and restore) are refused the same
+## way. Not undone: trace and log events already emitted, and draws from a custom "rng" the game
+## supplied.
+func checkpoint() -> Checkpoint:
+	if _host["journal"] != null:
+		push_error("a checkpoint is already open: roll it back or commit it first")
+		return null
+	var journal := {"undo": [], "flows": {}, "opened": {}, "selectors": {}, "flow_selectors": {}}
+	_host["journal"] = journal
+	return Checkpoint.new(journal)
+
+
+## Undo everything since checkpoint() (see there), and close it.
+func rollback(cp: Checkpoint) -> void:
+	if not _end_checkpoint(cp):
+		return
+	var undo: Array = cp.journal["undo"]
+	for i in range(undo.size() - 1, -1, -1):
+		var c: Callable = undo[i]
+		if c.is_valid():   # invalid only when the flow that recorded it is gone, and its state with it
+			c.call()
+	_clear_journal(cp.journal)
+
+
+## Keep everything since checkpoint(), and close it.
+func commit(cp: Checkpoint) -> void:
+	if _end_checkpoint(cp):
+		_clear_journal(cp.journal)
+
+
+## True while a checkpoint is open.
+func in_checkpoint() -> bool:
+	return _host["journal"] != null
+
+
+## Empty a finished journal, so a checkpoint handle a game keeps holds nothing.
+static func _clear_journal(journal: Dictionary) -> void:
+	for k in ["undo", "flows", "opened", "selectors", "flow_selectors"]:
+		journal[k].clear()
+
+
+func _end_checkpoint(cp: Checkpoint) -> bool:
+	if cp == null or _host["journal"] == null or not is_same(_host["journal"], cp.journal):
+		push_error("that checkpoint is not the open one")
+		return false
+	_host["journal"] = null
+	return true
+
+
+## True (with push_error) when a checkpoint is open, refusing `what`, which can't be undone.
+func _refused_in_checkpoint(what: String) -> bool:
+	if _host["journal"] == null:
+		return false
+	push_error("%s can't be undone, so it isn't allowed while a checkpoint is open" % what)
+	return true
+
+
 func close_flow(id: String) -> void:
+	if _refused_in_checkpoint("close_flow"):
+		return
 	# The flow object is FINISHED, not merely unregistered, so a host still holding it cannot keep
 	# advancing it into the shared world.
 	if _flows.has(id):
@@ -389,6 +496,8 @@ func run_flow(flow_name: String, scene: String, block: String = "") -> Array:
 
 
 func reset() -> void:
+	if _refused_in_checkpoint("reset"):
+		return
 	for fid in _flows:
 		_flows[fid].close()  # finish them, don't just forget them; a close removes the flow's bags
 	_flows = {}
@@ -476,6 +585,8 @@ func replace_strings(bundle: Dictionary) -> void:
 # fresh engine with each saved flow restarted from the top of the scene it was in; the shared
 # properties carry over.
 func hot_swap(bundle: Dictionary) -> PatterEngine:
+	if _refused_in_checkpoint("hot_swap"):
+		return self   # refused: this engine carries on, unchanged
 	var snapshot := save_game()
 	# The replacement registers on the SAME registry, and a standalone engine's replacement is still
 	# its own game (so its save_game keeps carrying the registry's values).
@@ -585,7 +696,11 @@ func set_property(ref: String, value) -> void:
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return
 	# A refusal (an unknown scope, or a resolver with no setter) is push_error'd by the registry.
-	_host["registry"].set_value(sp[0], sp[1], value, {"host": true})
+	var journal = _host["journal"]
+	var prev = _host["registry"].get_value(sp[0], sp[1]) if journal != null else null
+	var refused: String = _host["registry"].set_value(sp[0], sp[1], value, {"host": true})
+	if journal != null and refused == "" and prev != null:
+		journal["undo"].append(Callable(_host["registry"], "set_value").bind(sp[0], sp[1], prev, {"host": true}))
 
 
 # -- save / load ---------------------------------------------------------------
@@ -639,6 +754,8 @@ func save_game() -> Dictionary:
 ## Returns false (with push_error, and nothing changed) for a save version this engine cannot read,
 ## or when the content names another engine's scope that nothing on this registry registered.
 func load_game(save: Dictionary) -> bool:
+	if _refused_in_checkpoint("load_game"):
+		return false
 	var version = save.get("version")
 	var v := float(version) if (version is int or version is float) else -1.0
 	if v != 2.0 and v != float(SAVE_VERSION):

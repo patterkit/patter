@@ -377,7 +377,8 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 	{
 		// The core falls back on a fresh engine itself when the restore fails, so reaching here means no
 		// replacement could be built at all. The old core has already released its flows: re-bind, and
-		// every wrapper reads as closed rather than dangling.
+		// every wrapper reads as closed rather than dangling. (A swap refused because a checkpoint is open
+		// lands here too, before anything changed: the re-bind then finds every flow where it was.)
 		UE_LOG(LogTemp, Error, TEXT("Patterplay: hot swap failed - %s"), UTF8_TO_TCHAR(Ex.what()));
 		RebindFlows();
 		return false;
@@ -404,16 +405,51 @@ UPatterFlow* UPatterEngine::GetFlow(const FString& FlowName)
 void UPatterEngine::CloseFlow(const FString& FlowName)
 {
 	if (!Engine) return;
-	Engine->closeFlow(Std(FlowName));
+	try { Engine->closeFlow(Std(FlowName)); } // refused while a checkpoint is open
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
 	RebindFlows(); // the flow is gone; its wrapper must stop pointing at a map entry that is not there
 }
 
 void UPatterEngine::Reset()
 {
 	if (!Engine) return;
-	Engine->reset();
+	try { Engine->reset(); } // refused while a checkpoint is open
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
 	RebindFlows(); // every flow went with it
 }
+
+void UPatterEngine::Checkpoint()
+{
+	if (!Engine) return;
+	try { OpenCheckpoint = std::make_shared<patter::Checkpoint>(Engine->checkpoint()); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
+void UPatterEngine::Rollback()
+{
+	if (!Engine) return;
+	try
+	{
+		// With none held, the core is handed an empty checkpoint, which it refuses as not the open one.
+		Engine->rollback(OpenCheckpoint ? *OpenCheckpoint : patter::Checkpoint());
+		OpenCheckpoint.reset();
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
+	RebindFlows(); // a flow opened inside the checkpoint is closed and gone: its wrapper reads as closed
+}
+
+void UPatterEngine::Commit()
+{
+	if (!Engine) return;
+	try
+	{
+		Engine->commit(OpenCheckpoint ? *OpenCheckpoint : patter::Checkpoint());
+		OpenCheckpoint.reset();
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
+bool UPatterEngine::IsInCheckpoint() const { return Engine && Engine->inCheckpoint(); }
 
 void UPatterEngine::RebindFlows()
 {

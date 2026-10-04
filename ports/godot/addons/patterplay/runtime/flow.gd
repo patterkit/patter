@@ -138,6 +138,7 @@ func advance_to_stop() -> Dictionary:
 func goto(scene: String, block: String = "") -> bool:
 	if _closed:
 		return false  # closed is terminal: unlike "ended", a goto cannot revive it
+	_touch()
 	if scene == "END":
 		_started = true
 		_pending = null
@@ -167,6 +168,8 @@ func goto(scene: String, block: String = "") -> bool:
 		if block_id == "":
 			return false  # a block address is scene-scoped: unknown HERE is unknown
 	if not _started:
+		if _start_refused():
+			return false
 		start(scene_id, block_id)
 		return true
 
@@ -200,6 +203,45 @@ func close() -> void:
 # True once the engine has closed this flow.
 func is_closed() -> bool:
 	return _closed
+
+
+## Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a rollback can
+## put them back: a handful of fields and a copy of the call stack (a few frames), never its history.
+## Its visits, selector cursors, and property values are recorded change by change as they happen.
+func _touch() -> void:
+	var journal = _host["journal"]
+	if journal == null or journal["flows"].has(self):
+		return
+	journal["flows"][self] = true
+	var frames: Array = []
+	for f in _stack:
+		frames.append((f as Dictionary).duplicate())   # frames advance in place (index += 1), so copy them
+	journal["undo"].append(_put_cursor_back.bind([_prng.a, _started, _flow_ended, _current_scene_id,
+		_active_snippet, _beat_index, _pending, _pending_prompt_beat, _pending_prompt_owner, frames]))
+
+
+## The undo of _touch(): the cursor fields and the stack as they were when the checkpoint first saw this flow.
+func _put_cursor_back(c: Array) -> void:
+	_prng.a = c[0]
+	_started = c[1]
+	_flow_ended = c[2]
+	_current_scene_id = c[3]
+	_active_snippet = c[4]
+	_beat_index = c[5]
+	_pending = c[6]
+	_pending_prompt_beat = c[7]
+	_pending_prompt_owner = c[8]
+	_stack = c[9]
+
+
+## Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
+## inside the checkpoint may start in one. True (with push_error) when this start is refused.
+func _start_refused() -> bool:
+	var journal = _host["journal"]
+	if journal == null or journal["opened"].has(self):
+		return false
+	push_error("a flow can't be started or reset while a checkpoint is open")
+	return true
 
 
 # The options of the choice currently waiting for the player, or [] when none is pending. The same
@@ -249,6 +291,8 @@ func is_ended() -> bool:
 # -- host API ------------------------------------------------------------------
 
 func start(scene_id: String, block_id: String) -> void:
+	if _start_refused():
+		return
 	# A start is a reset: this flow's bags go, and so does anything a load left waiting for them.
 	_release_bags(false)
 	_host["registry"].discard_parked(key_flow(id))
@@ -293,6 +337,7 @@ func advance() -> Dictionary:
 	if not _started:
 		push_error("flow has not been started")
 		return {"type": "end"}
+	_touch()
 	if _pending_prompt_beat != null:
 		var b = _pending_prompt_beat
 		_pending_prompt_beat = null
@@ -318,6 +363,7 @@ func choose(option_id: String) -> void:
 	if not _pending["by_id"].has(option_id):
 		push_error("unknown choice option: " + option_id)
 		return
+	_touch()
 	var node = _pending["by_id"][option_id]
 	_emit({"type": "chose", "group": _pending["group_id"], "option": option_id})
 	_pending = null
@@ -345,17 +391,57 @@ func set_property(ref: String, value) -> void:
 ## The write itself. `host` says WHO is writing, which is all "writable": false cares about.
 func _write_property(ref: String, value, host: bool) -> void:
 	var sp := split_host_ref(_host, ref)
+	var journal = _host["journal"]
 	if sp[0] == "patter":
+		# Inside a checkpoint, each write records how to put the old value back, against the bag it
+		# actually landed in (a `@scene` write's bag depends on the scene the flow is in at the time).
+		if journal != null:
+			var shared: bool = _host["patter_shared_names"].has(sp[1])
+			var prev = _host["shared_patter"].get_value(sp[1]) if shared else _local.get_value(sp[1])
+			if prev != null:
+				if shared:
+					journal["undo"].append(Callable(_host["registry"], "set_value").bind("patter", sp[1], prev))
+				else:
+					journal["undo"].append(PatterFlow._undo_bag_set.bind(_local, sp[1], prev))
 		_patter_set(sp[1], value)
 	elif sp[0] == "scene":
 		if _current_scene_id == "":
 			push_error("'%s': the flow has not entered a scene yet" % ref)
 			return
+		if journal != null:
+			var bag = _scene_bag_for(sp[1])
+			var prev = bag.get_value(sp[1]) if bag != null else null
+			if prev != null:
+				journal["undo"].append(PatterFlow._undo_bag_set.bind(bag, sp[1], prev))
 		_scene_set(sp[1], value)
 	else:
 		# Host scopes and other engines' scopes. "writable": false is the STORY's promise, so the
 		# registry refuses a story write (push_error, no write) and lets the game's own through.
-		_host["registry"].set_value(sp[0], sp[1], value, {"host": true} if host else {})
+		var prev = _host["registry"].get_value(sp[0], sp[1]) if journal != null else null
+		var refused: String = _host["registry"].set_value(sp[0], sp[1], value, {"host": true} if host else {})
+		# Recorded after the write: one a read-only host scope refused never happened, so has nothing to undo.
+		if journal != null and refused == "" and prev != null:
+			journal["undo"].append(Callable(_host["registry"], "set_value").bind(sp[0], sp[1], prev, {"host": true}))
+
+
+## Undo helpers for a checkpoint's journal. Static, with what they act on bound in, so an undo never
+## depends on the flow that recorded it still being alive.
+static func _undo_bag_set(bag, name: String, prev) -> void:
+	bag.set_value(name, prev)
+
+
+## The undo of an entry: this flow's own visit count and the world's, each put back.
+static func _put_back_visits(own: Dictionary, shared: Dictionary, key, own_was, was) -> void:
+	_put_back(own, key, own_was)
+	_put_back(shared, key, was)
+
+
+## Put `key` in `map` back to `was`, or remove it when it was absent (null).
+static func _put_back(map: Dictionary, key, was) -> void:
+	if was == null:
+		map.erase(key)
+	else:
+		map[key] = was
 
 
 # -- scope resolvers -----------------------------------------------------------
@@ -753,7 +839,22 @@ func _fill_ids(eligible: Array, stick: bool, ln: int) -> Array:
 
 
 func _selector_state_for(group: Dictionary) -> Dictionary:
-	var map: Dictionary = _host["shared_selectors"] if group.get("shared", false) else _selectors
+	var shared: bool = group.get("shared", false)
+	var map: Dictionary = _host["shared_selectors"] if shared else _selectors
+	# A cursor is copied the first time a checkpoint sees it (shared ones once for every flow).
+	var journal = _host["journal"]
+	var seen = null
+	if journal != null:
+		if shared:
+			seen = journal["selectors"]
+		else:
+			if not journal["flow_selectors"].has(self):
+				journal["flow_selectors"][self] = {}
+			seen = journal["flow_selectors"][self]
+	if seen != null and not seen.has(group["id"]):
+		seen[group["id"]] = true
+		var was = (map[group["id"]] as Dictionary).duplicate(true) if map.has(group["id"]) else null
+		journal["undo"].append(PatterFlow._put_back.bind(map, group["id"], was))
 	if not map.has(group["id"]):
 		map[group["id"]] = {}
 	return map[group["id"]]
@@ -799,8 +900,14 @@ func _eval_expr(expr: Dictionary):
 
 
 func _enter(nid: String) -> void:
-	_visit_counts[nid] = _visit_counts.get(nid, 0) + 1
-	_host["shared_visits"][nid] = _host["shared_visits"].get(nid, 0) + 1
+	var own: Dictionary = _visit_counts
+	var own_before = own.get(nid)
+	own[nid] = (own_before if own_before != null else 0) + 1
+	var shared: Dictionary = _host["shared_visits"]
+	var before = shared.get(nid)
+	shared[nid] = (before if before != null else 0) + 1
+	if _host["journal"] != null:
+		_host["journal"]["undo"].append(PatterFlow._put_back_visits.bind(own, shared, nid, own_before, before))
 
 
 func _rng() -> float:
@@ -951,6 +1058,9 @@ func _seed_scene(scene: Dictionary) -> void:
 			continue
 		var tnm: String = str(decl["name"]).to_lower()
 		var target_bag = _host["stage_bags"][scene["id"]] if shared.has(tnm) else _scene_bags[scene["id"]]
+		var prev = target_bag.get_value(tnm) if _host["journal"] != null else null
+		if prev != null:
+			_host["journal"]["undo"].append(PatterFlow._undo_bag_set.bind(target_bag, tnm, prev))
 		# Through set_value, so the reset is audited: a temporary snapping back to its
 		# default is a state change, and a log that omits it is wrong.
 		target_bag.set_value(tnm, PatterBundle.prop_default(decl))
@@ -976,16 +1086,42 @@ static func _props_for(props: Array, shared: Dictionary, want_shared: bool) -> A
 func _ensure_scene_bags(s: String) -> void:
 	var shared: Dictionary = _host["scene_shared_names"].get(s, {})
 	var props: Array = _host["bundle"]["scenes"].get(s, {}).get("sceneProps", [])
+	var journal = _host["journal"]
 	if not _scene_bags.has(s):
 		var bag = PatterPropertyBag.new(_props_for(props, shared, false), {"path_prefix": "@scene."})
 		var key := key_flow_scene(id, s)
 		if _host["registry"].mount_owned(key, bag, {"owner": OWNER}) == "":
 			_registered[key] = true
 		_scene_bags[s] = bag
+		# Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry.
+		if journal != null:
+			journal["undo"].append(_unmake_scene_bag.bind(s, bag, key))
 	if not _host["stage_bags"].has(s):
 		var bag = PatterPropertyBag.new(_props_for(props, shared, true), {"path_prefix": "@scene."})
 		_host["registry"].mount_owned(key_stage(s), bag, {"owner": OWNER})
 		_host["stage_bags"][s] = bag
+		if journal != null:
+			journal["undo"].append(PatterFlow._unmake_stage_bag.bind(_host, s, bag))
+
+
+## The undo of a flow scene bag made inside a checkpoint.
+func _unmake_scene_bag(s: String, bag, key: String) -> void:
+	if not is_same(_scene_bags.get(s), bag):
+		return   # already released with the flow
+	if _host["registry"].has(key):
+		_host["registry"].remove(key)
+	_registered.erase(key)
+	_scene_bags.erase(s)
+
+
+## The undo of a scene's stage bag made inside a checkpoint.
+static func _unmake_stage_bag(host: Dictionary, s: String, bag) -> void:
+	if not is_same(host["stage_bags"].get(s), bag):
+		return   # already gone
+	var key := key_stage(s)
+	if host["registry"].has(key):
+		host["registry"].remove(key)
+	host["stage_bags"].erase(s)
 
 
 func _fresh_local():
@@ -1211,7 +1347,34 @@ func snapshot() -> Dictionary:
 	}
 
 
+## Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its property
+## values are the registry's and stay as they are (a load puts the saved ones there first). Refused
+## (push_error, nothing changed) while a checkpoint is open.
 func restore(snap: Dictionary) -> void:
+	if _host["journal"] != null:
+		push_error("a flow can't be restored while a checkpoint is open")
+		return
+	_restore_cursor(snap)
+	# Register this flow's bags: each claims the values the registry holds for it (loaded by the game,
+	# by load_game from the save, or handed back by the engine this one replaces), laid over fresh
+	# defaults. Released KEEPING their values, so a live flow restored in place keeps its property
+	# values (a fresh one, made by a load, is claiming the loaded values either way). The scenes the
+	# cursor stands in are registered now; any other scene's bag is claimed on entry. A version 2
+	# snapshot's own "scopes" / "sceneBags" were moved into the registry by load_game before this ran.
+	_release_bags(true)
+	_mount_local()
+	var here := {}
+	if _current_scene_id != "":
+		here[_current_scene_id] = true
+	for f in _stack:
+		here[f["scene"]] = true
+	for s in here:
+		if _host["bundle"]["scenes"].has(s):
+			_ensure_scene_bags(s)
+
+
+## The cursor half of restore(): cursor, PRNG, visits, and selector cursors, without touching the bags.
+func _restore_cursor(snap: Dictionary) -> void:
 	# The family's shape, or the snake_case flat shape this addon wrote before 0.11.0 (`cursor` absent).
 	var legacy := not snap.has("cursor")
 	var c: Dictionary = snap if legacy else snap["cursor"]
@@ -1242,21 +1405,6 @@ func restore(snap: Dictionary) -> void:
 						f["index"] = i
 						break
 		_stack.append(f)
-	# Register this flow's bags: each claims the values the registry holds for it (loaded by the game,
-	# by load_game from the save, or handed back by the engine this one replaces), laid over fresh
-	# defaults. The scenes the cursor stands in are registered now; any other scene's bag is claimed
-	# on entry. A version 2 snapshot's own "scopes" / "sceneBags" were moved into the registry by
-	# load_game before this ran.
-	_release_bags(false)
-	_mount_local()
-	var here := {}
-	if _current_scene_id != "":
-		here[_current_scene_id] = true
-	for f in _stack:
-		here[f["scene"]] = true
-	for s in here:
-		if _host["bundle"]["scenes"].has(s):
-			_ensure_scene_bags(s)
 	_active_snippet = null
 	var asid = _k(c, "activeSnippetId", "active_snippet_id")
 	if asid != null and str(asid) != "" and _host["node_index"].has(str(asid)):

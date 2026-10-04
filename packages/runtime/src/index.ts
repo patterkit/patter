@@ -8,7 +8,7 @@
 // state, each with its own per-flow half + cursor + PRNG.
 // ---------------------------------------------------------------------------
 
-export { Engine, Flow } from "./engine.js";
+export { Engine, Flow, Checkpoint } from "./engine.js";
 // The compiled-bundle type the Engine constructor consumes (from the shared model), so hosts can
 // type a parsed .patterc without depending on @patterkit/model directly.
 export type { Bundle } from "@patterkit/model";
