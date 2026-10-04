@@ -3077,10 +3077,10 @@ window.patter.onPlayFollow((sceneId, beatId) => void jumpTo({ id: beatId, kind: 
 // Project-wide Replace (driven from the search window): main asks us to flush the open scene before it
 // rewrites the shards, then to reload once it's done.
 window.patter.onEditorFlush(() => void (async () => { await save(); window.patter.editorFlushed(); })());
-window.patter.onReplaceApplied(() => void (async () => {
+window.patter.onReplaceApplied((announce) => void (async () => {
   await reloadOpenScene(); // re-read the open scene with the replaced text (loadScene skips the open one)
   await refreshProblems();
-  toast("Replaced across the project", "ok");
+  if (announce) toast("Replaced across the project", "ok"); // imports and suggestion decisions say their own
 })());
 // Coverage window (#159): a clicked result row jumps the editor; the "World Properties…" button opens settings.
 window.patter.onCoverageNavigate((sceneId, beatId) => void (async () => {

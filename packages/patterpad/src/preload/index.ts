@@ -118,7 +118,7 @@ const api: PatterApi = {
   // tells it to reload after. (The Replace UI itself lives in the search window: see searchApi below.)
   onEditorFlush: (handler) => { ipcRenderer.on("editor:flush", () => handler()); },
   editorFlushed: () => { void ipcRenderer.invoke("editor:flushed"); },
-  onReplaceApplied: (handler) => { ipcRenderer.on("replace:applied", () => handler()); },
+  onReplaceApplied: (handler) => { ipcRenderer.on("replace:applied", (_e, announce?: boolean) => handler(announce === true)); },
   openCoverageWindow: () => ipcRenderer.invoke("coverage:open"),
   onCoverageNavigate: (handler) => { ipcRenderer.on("coverage:navigate", (_e, sceneId: string, beatId: string) => handler(sceneId, beatId)); },
   onOpenWorldSettings: (handler) => { ipcRenderer.on("coverage:open-world", () => handler()); },

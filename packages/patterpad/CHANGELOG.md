@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **No stray "Replaced across the project".** Reimporting an editable script, and accepting or rejecting
+  suggestions, also showed the message that belongs to Replace. Now only Replace says it.
+
 ## [0.24.1] - 2026-10-04
 
 ### Fixed

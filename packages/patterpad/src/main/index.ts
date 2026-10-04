@@ -1224,7 +1224,7 @@ function registerIpc(): void {
   ipcMain.handle("searchWin:replaceApply", async (_e, opts: import("@patterkit/ops").ReplaceOptions) => {
     await flushEditorScene();
     const r = await project.applyReplace(opts);
-    if (r.ok && r.count > 0) win?.webContents.send("replace:applied");
+    if (r.ok && r.count > 0) win?.webContents.send("replace:applied", true);
     return r;
   });
   ipcMain.handle("searchWin:setPin", (_e, on: boolean) => {

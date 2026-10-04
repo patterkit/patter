@@ -1003,7 +1003,8 @@ export interface PatterApi {
    *  flush its open scene before applying (reply with `editorFlushed`), and to reload it after. */
   onEditorFlush(handler: () => void): void;
   editorFlushed(): void;
-  onReplaceApplied(handler: () => void): void;
+  /** `announce` is true only for Replace itself; an import or a suggestion decision reloads quietly. */
+  onReplaceApplied(handler: (announce: boolean) => void): void;
   /** Open (or focus) the detached COVERAGE results window (#159). */
   openCoverageWindow(): Promise<void>;
   /** A row was clicked in the coverage window: jump the editor to that beat (loadScene + reveal). */
