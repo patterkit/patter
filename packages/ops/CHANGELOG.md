@@ -1,5 +1,12 @@
 # @patterkit/ops
 
+## 0.12.3
+
+### Patch Changes
+
+- 808e57c: The runtime inlined into playable HTML exports is refreshed to the current engine (checkpoints, and a live flow restore that keeps the flow's own property values).
+- 65c1fe4: Uses `@patterkit/runtime` 0.16.0, the Patterplay 0.16.0 release.
+
 ## 0.12.2
 
 ### Patch Changes
