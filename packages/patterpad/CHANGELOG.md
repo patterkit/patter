@@ -6,6 +6,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Opening a scene no longer pops up the character picker.** When a scene, or a block or bubble picked
+  from the navigator, began with a dialogue line, the caret landed on the speaker's name and the cast
+  picker opened at once, which got in the way of simply reading through a project. The caret now rests
+  at the start of that line's spoken text, and the picker opens only when you go to the name.
+
 ## [0.24.0] - 2026-10-03
 
 ### Added

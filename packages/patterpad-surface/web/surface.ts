@@ -31,7 +31,7 @@ import { setSnippetJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
 import { setPlayBlockHandler } from "./actionmenu.js";
 import { confirmDialog } from "./confirm.js";
-import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf } from "../src/zoneutil.js";
+import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf, offCue } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
 import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu } from "./views.js";
 import { problemsPlugin, setProblemMarks, type ProblemMark } from "./problems.js";
@@ -588,6 +588,9 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     handleScrollToSelection: (v) => recenterCaret(v),
     state: EditorState.create({
       doc: opened.doc,
+      // The scene opens with the caret at its first spot, but never on a speaker: a scene starting with a
+      // dialogue line would otherwise select the name and raise the cast picker as soon as it had focus.
+      selection: offCue(opened.doc, Selection.atStart(opened.doc)),
       plugins: [
         history(),
         keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo }),
@@ -855,7 +858,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         // "one step beyond the actual problem" reveal - so if it escapes this node's range, select the
         // node itself (which also highlights the empty container, exactly what a jump-to-problem wants).
         const node = view.state.doc.nodeAt(at);
-        const near = Selection.near(view.state.doc.resolve(at + 1));
+        // A block or bubble whose first line is dialogue starts with that line's cue: land in its say text.
+        const near = offCue(view.state.doc, Selection.near(view.state.doc.resolve(at + 1)));
         sel = node && (near.from <= at || near.from >= at + node.nodeSize)
           ? NodeSelection.create(view.state.doc, at)
           : near;

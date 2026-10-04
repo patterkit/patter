@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Node as PMNode } from "prosemirror-model";
+import { TextSelection, type Selection } from "prosemirror-state";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 
@@ -61,6 +62,22 @@ export function zoneContentStart(beat: PMNode, beatPos: number, role: string): n
   let p = -1;
   beat.forEach((child, offset) => { if (child.type.name === role) p = beatPos + 1 + offset + 1; });
   return p;
+}
+
+/**
+ * Where a caret the EDITOR places should rest: never on a line's speaker. Opening a scene, or jumping to a
+ * block or bubble from the navigator, puts the caret at the first spot inside it, and when that is a
+ * dialogue line the spot is its cue. A caret in a cue selects the speaker name and raises the cast picker,
+ * so browsing scenes whose first line was dialogue popped the picker on every arrival. An empty caret in a
+ * cue moves to the start of that line's spoken text; anything else comes back unchanged.
+ */
+export function offCue(doc: PMNode, sel: Selection): Selection {
+  const $h = sel.$head;
+  if (!sel.empty || $h.parent.type.name !== "cue" || $h.depth < 2) return sel;
+  const beatPos = $h.before($h.depth - 1);
+  const beat = doc.nodeAt(beatPos);
+  const say = beat ? zoneContentStart(beat, beatPos, "say") : -1;
+  return say >= 0 ? TextSelection.create(doc, say) : sel;
 }
 
 /** Content-end position of a named zone within a beat at `beatPos`, or -1. */
