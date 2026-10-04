@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-10-04
+
 ### Fixed
 
 - **Opening a scene no longer pops up the character picker.** When a scene, or a block or bubble picked
