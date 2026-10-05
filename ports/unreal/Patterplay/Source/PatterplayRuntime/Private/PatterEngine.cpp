@@ -108,6 +108,7 @@ namespace
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);
 		if (S.hasTags) for (const std::string& T : S.tags) Out.Tags.Add(Ue(T));
+		if (S.type == patter::StepType::Choice) Out.GroupId = Ue(S.groupId);
 		for (const patter::ChoiceOption& O : S.options)
 		{
 			FPatterOption Opt;
@@ -116,6 +117,7 @@ namespace
 			if (O.gameData) Opt.GameData = ConvertGameData(*O.gameData);
 			if (O.prompt)
 			{
+				Opt.PromptKind = O.prompt->kind == "line" ? EPatterPromptKind::Line : EPatterPromptKind::Text;
 				Opt.Text = Ue(O.prompt->text);
 				Opt.Character = Ue(O.prompt->character);
 				Opt.CharacterName = Ue(O.prompt->characterName);

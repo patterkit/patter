@@ -315,8 +315,10 @@ func clear_log() -> void:
 
 
 ## Open (and start) a named flow; re-opening a name replaces it. Returns null (with push_error, and
-## nothing changed) when this engine was refused its registration, or when the content names another
-## engine's scope that nothing on this registry registered.
+## nothing changed) when this engine was refused its registration, when the content names another
+## engine's scope that nothing on this registry registered, or when the address does not resolve: an
+## unknown scene, or a block that is not in the named scene. A refused open leaves any flow already
+## open under that name exactly as it was.
 func open_flow(id: String, scene: String = "", block: String = "", seed_value = null) -> PatterFlow:
 	if _init_error != "":
 		push_error("open_flow: this engine was refused its registration (%s)" % _init_error)
@@ -325,8 +327,14 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	if unregistered != "":
 		push_error("open_flow: " + unregistered)
 		return null
-	var scene_id := _resolve_scene_ref(scene)
-	var block_id := _resolve_block_ref(scene_id, block)
+	# The address resolves before anything changes: a bad one opens nothing, and a flow already open
+	# under this name carries on untouched.
+	var address := _resolve_open_address(scene, block)
+	if address.has("error"):
+		push_error("open_flow: " + address["error"])
+		return null
+	var scene_id: String = address["scene"]
+	var block_id: String = address["block"]
 	var prior: PatterFlow = _flows.get(id)
 	var journal = _host["journal"]
 	if journal != null and prior != null and not prior.is_closed():
@@ -350,6 +358,34 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	_flows[id] = flow
 	flow.start(scene_id, block_id)
 	return flow
+
+
+## open_flow's address as internal ids: {"scene": id or "", "block": id or ""}, or {"error": message}
+## when it does not resolve. With a scene, the block is scene-scoped, exactly as goto() resolves it (a
+## gameId address in that scene, or the internal id of a block in that scene); a block from another
+## scene does not resolve. With no scene, the block is an internal id from any scene. Neither: the
+## first scene. The same rule on every runtime.
+func _resolve_open_address(scene: String, block: String) -> Dictionary:
+	var scenes: Dictionary = _host["bundle"]["scenes"]
+	if scene != "":
+		var scene_id := _resolve_scene_ref(scene)
+		if not scenes.has(scene_id):
+			return {"error": "unknown scene: " + scene}
+		if block == "":
+			return {"scene": scene_id, "block": ""}
+		var addrs: Dictionary = _block_gameid_to_id.get(scene_id, {})
+		if addrs.has(block):
+			return {"scene": scene_id, "block": addrs[block]}
+		if _host["block_to_scene"].get(block, "") == scene_id:
+			return {"scene": scene_id, "block": block}
+		return {"error": "unknown block: " + block}
+	if block != "":
+		if not _host["block_to_scene"].has(block):
+			return {"error": "unknown block: " + block}
+		return {"scene": "", "block": block}
+	if scenes.is_empty():
+		return {"error": "no scenes in bundle"}
+	return {"scene": "", "block": ""}
 
 
 ## Other engines' scopes the content names (the bundle's externalScopes) must all be registered
@@ -492,6 +528,8 @@ func run_flow(flow_name: String, scene: String, block: String = "") -> Array:
 			return []
 	else:
 		f = open_flow(flow_name, scene, block)
+		if f == null:
+			return []   # open_flow has reported the bad address
 	return f.advance_to_stop()["played"]
 
 

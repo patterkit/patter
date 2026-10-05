@@ -6,6 +6,24 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **A choice step carries its `groupId`, and each option a structured `prompt`.** The same shape the
+  other three runtimes give: `prompt` is `{ "kind": "line" | "text", "text": ... }`, and a line prompt
+  also carries `character`, `characterName`, and `direction` when set. The flat `"text"` on an option
+  is gone, so read `option["prompt"]["text"]` instead. A save from an earlier version that is waiting
+  at a choice still loads, its options in the new shape. Held across all four runtimes by the
+  conformance corpus.
+
+### Fixed
+
+- **`open_flow` at an address that does not resolve opens nothing.** It reported the error and opened
+  the flow anyway, closing any flow already open under that name. It now returns null (with
+  `push_error`) before anything changes. The block must be in the scene you named, as `goto` has
+  always required.
+- **A flow you let go of is freed.** Every flow ever opened stayed in memory with its property bags,
+  closed or not, and Godot reported leaked instances at exit for each one.
+
 ## [0.16.0] - 2026-10-04
 
 ### Added

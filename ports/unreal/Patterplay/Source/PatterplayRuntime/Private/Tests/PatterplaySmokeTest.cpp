@@ -151,6 +151,11 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("and it is still the same flow"), Flow->GetFlowId(), FString(TEXT("f")));
 			const FPatterStep After = Flow->Advance();
 			TestEqual(TEXT("and it advances into the restored story"), static_cast<uint8>(After.Type), static_cast<uint8>(EPatterStepType::Choice));
+			// A choice step names its group, and each option says what kind of prompt it has (a bare snippet
+			// option's prompt is its first beat, here a text beat).
+			TestEqual(TEXT("the choice step names its group"), After.GroupId, FString(TEXT("g1")));
+			if (TestEqual(TEXT("the choice has its one option"), After.Options.Num(), 1))
+				TestEqual(TEXT("and the option's prompt is text"), static_cast<uint8>(After.Options[0].PromptKind), static_cast<uint8>(EPatterPromptKind::Text));
 		}
 	}
 

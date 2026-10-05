@@ -20,16 +20,42 @@ export type ScopeBag = Record<string, ScalarValue>;
 
 /**
  * A normalised transcript entry: the step results the engine yields (`line` /
- * `text` / `action` / `choice` / `end`). `gameData` is included when a beat /
+ * `text` / `gameEvent` / `choice` / `end`). `gameData` is included when a beat /
  * option carries it (host-facing payload is part of the contract) - and is where
  * host event emission lives now (effects are set-only, spec §15).
+ *
+ * A `choice` is pinned WHOLE, as the host receives it: the choice group's `groupId`, and each option's
+ * structured `prompt` exactly as the runtime's ChoiceOption carries it (kind, text, and for a line the
+ * speaker, their resolved name, and the direction). Until 2026-10 the transcript flattened an option to
+ * its prompt's text and dropped the group id, so a runtime could omit both and still pass; one did.
+ * There is no flat `text` on an option: it would only repeat `prompt.text`.
  */
 export type TranscriptStep =
   | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; gameData?: GameData; tags?: string[] }
   | { type: "text"; id: string; text: string; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
-  | { type: "choice"; options: { id: string; text?: string; eligible: boolean; gameData?: GameData }[] }
+  | { type: "choice"; groupId: string; options: TranscriptOption[] }
   | { type: "end" };
+
+/** One option of a transcript `choice`: the runtime's ChoiceOption, keys absent when unset. */
+export interface TranscriptOption {
+  id: string;
+  /** Absent only when the option has no prompt beat and no content line to stand in for one. */
+  prompt?: TranscriptPrompt;
+  eligible: boolean;
+  gameData?: GameData;
+}
+
+/** An option's prompt: the runtime's ChoicePrompt. `character`, `characterName`, and `direction` appear
+ *  only on a `line` prompt, and only when set (`characterName` is absent when the cast gives none, and
+ *  always in an IDs-only bundle). */
+export interface TranscriptPrompt {
+  kind: "line" | "text";
+  text: string;
+  character?: string;
+  characterName?: string;
+  direction?: string;
+}
 
 /** A compiled expression case in the portable corpus. */
 export interface ExpressionCase {
@@ -90,7 +116,14 @@ export interface RuntimeCase {
  * an op without `expect` must produce NO transcript output.
  */
 export type ScriptOp =
-  | { op: "openFlow"; flow: string; scene: string; block?: string; seed?: number; expect?: TranscriptStep[] }
+  // Open (and start) a named flow, replacing any flow of that name. `expectResult` pins whether the open
+  // SUCCEEDS, asserted directly like `goto`'s. `false` = the address does not resolve (an unknown scene, or
+  // a block that is not in the named scene, a real block of ANOTHER scene included), and then the open
+  // must change nothing: no flow is opened, a flow already open under the name is neither closed nor
+  // replaced, and the current flow stays as it was. A runtime that throws refuses by throwing; one that
+  // reports and returns null (Godot) refuses that way. The runner checks the name still means the same
+  // flow; the script's following `advance` shows that flow carrying on.
+  | { op: "openFlow"; flow: string; scene: string; block?: string; seed?: number; expect?: TranscriptStep[]; expectResult?: boolean }
   | { op: "useFlow"; flow: string }
   | { op: "advance"; expect: TranscriptStep[] }
   | { op: "choose"; id: string; expect?: TranscriptStep[] }

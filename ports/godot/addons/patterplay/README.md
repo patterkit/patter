@@ -34,7 +34,8 @@ while true:
 ```
 
 Render each step into your own dialogue UI; on a `"choice"`, present `step["options"]` (each
-has prompt text and an `eligible` flag) and call `flow.choose(id)` with the player's pick.
+has a `prompt` whose `"text"` is the label, and an `eligible` flag) and call `flow.choose(id)`
+with the player's pick.
 
 ## Demos
 

@@ -34,7 +34,7 @@ var _beat_index := 0
 ## This flow's decision trace; see log(). `_seq` is monotonic and survives clear_log().
 var _log: Array = []
 var _seq := 0
-var _pending = null                   # { "group_id":, "options":[normalised], "by_id":{id:node} } or null
+var _pending = null                   # { "group_id":, "options":[step options], "by_id":{id:node} } or null
 var _pending_prompt_beat = null       # beat Dictionary or null
 var _pending_prompt_owner: String = "" # chosen option owning _pending_prompt_beat, re-derivable across a save in the choose->advance window
 var _selectors: Dictionary = {}
@@ -47,14 +47,17 @@ func _init(host: Dictionary, seed_value: float) -> void:
 	_host = host
 	_prng = PatterMulberry32.new(seed_value)
 	_local = _fresh_local()   # registered by start() / restore()
+	# Every entry is a METHOD Callable, never a lambda. A lambda that reads a member holds this flow
+	# strongly, and the flow holds the context, so a flow that built one was never freed, closed or
+	# not. A method Callable names the flow without keeping it alive.
 	_eval_ctx = {
 		"scopes": {},   # filled from the registry by _context()
-		"next_random": func(): return _rng(),
-		"visits": func(nid): return _visit_counts.get(nid, 0),
-		"patter_visits": func(nid): return _host["shared_visits"].get(nid, 0),
+		"next_random": _rng,
+		"visits": _own_visits,
+		"patter_visits": _shared_visits,
 		# The quality channel: a property's stage ladder, from wherever the declaration lives -
 		# @patter decls, the CURRENT scene's decls (they move with the flow), or the registry.
-		"qualities": func(scope, name): return _stages_for(scope, name),
+		"qualities": _stages_for,
 	}
 
 
@@ -71,12 +74,20 @@ func _context() -> Dictionary:
 	if reg.revision != _ctx_revision:
 		var base: Dictionary = reg.to_eval_context()
 		var scopes: Dictionary = (base.get("scopes", {}) as Dictionary).duplicate()
-		scopes["patter"] = func(n): return _patter_get(n)
-		scopes["scene"] = func(n): return _scene_get(n)
+		scopes["patter"] = _patter_get   # method Callables, not lambdas: see _init
+		scopes["scene"] = _scene_get
 		_eval_ctx["scopes"] = scopes
 		_registry_qualities = base.get("qualities")
 		_ctx_revision = reg.revision
 	return _eval_ctx
+
+
+func _own_visits(nid):
+	return _visit_counts.get(nid, 0)
+
+
+func _shared_visits(nid):
+	return _host["shared_visits"].get(nid, 0)
 
 
 func current_scene() -> String:
@@ -347,7 +358,7 @@ func advance() -> Dictionary:
 	if _flow_ended:
 		return {"type": "end"}
 	if _pending != null:
-		return {"type": "choice", "options": _pending["options"]}
+		return {"type": "choice", "groupId": _pending["group_id"], "options": _pending["options"]}
 	if _active_snippet == null:
 		_flow_ended = true
 		return {"type": "end"}
@@ -599,9 +610,9 @@ func _setup_choice(group: Dictionary) -> void:
 		if not elig and child.get("secretUntilEligible", false):
 			continue
 		var opt := {"id": child["id"], "eligible": elig}
-		var text = _prompt_text(child)
-		if text != null:
-			opt["text"] = text
+		var prompt = _prompt_for(child)
+		if prompt != null:
+			opt["prompt"] = prompt
 		if child.has("gameData"):
 			opt["gameData"] = _norm_gamedata(child["gameData"])
 		options.append(opt)
@@ -991,13 +1002,26 @@ func interpolate(text: String) -> String:
 	return _interp(text)
 
 
-func _prompt_text(node: Dictionary):
+# An option's prompt (spec 5): its prompt beat, resolved and interpolated, as
+# {"kind": "line" | "text", "text": ..., and for a line "character" / "characterName" / "direction"
+# when set}. The same shape every runtime's choice option carries. null when there is no prompt beat.
+func _prompt_for(node: Dictionary):
 	var beat = _prompt_beat_of(node)
 	if beat == null:
 		return null
 	var text := _interp(_resolve_string(beat["id"]))
+	if beat["kind"] != "line":
+		return {"kind": "text", "text": text}
 	# A line-kind prompt is dialogue, so captions apply; a text-kind prompt is left as-is (#214).
-	return _caption_line(text) if beat["kind"] == "line" else text
+	var p := {"kind": "line", "text": _caption_line(text)}
+	if beat.has("character"):
+		p["character"] = beat["character"]
+	var cn = _resolve_character_name(beat.get("character", ""))
+	if cn != null:
+		p["characterName"] = cn
+	if beat.has("direction"):
+		p["direction"] = beat["direction"]
+	return p
 
 
 func _prompt_beat_of(node: Dictionary):
@@ -1431,8 +1455,19 @@ func _restore_cursor(snap: Dictionary) -> void:
 		for o in saved_options:
 			if not _host["node_index"].has(o["id"]):
 				continue
-			by_id[o["id"]] = _host["node_index"][o["id"]]
-			options.append((o as Dictionary).duplicate(true))
+			var node: Dictionary = _host["node_index"][o["id"]]
+			by_id[o["id"]] = node
+			var opt: Dictionary = (o as Dictionary).duplicate(true)
+			# A save from an older version of this addon carries a flat "text" where the family's
+			# shape has a "prompt". Re-derive the prompt from the bundle, so a loaded choice reads
+			# the same as a live one.
+			if opt.has("text") and not opt.has("prompt"):
+				var prompt = _prompt_for(node)
+				if prompt == null:
+					prompt = {"kind": "text", "text": str(opt["text"])}
+				opt["prompt"] = prompt
+			opt.erase("text")
+			options.append(opt)
 		if not options.is_empty():
 			_pending = {"group_id": group_id, "options": options, "by_id": by_id}
 

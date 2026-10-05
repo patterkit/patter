@@ -21,7 +21,9 @@ import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
-import type { ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptStep } from "./types.js";
+import type {
+  ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
+} from "./types.js";
 
 /** Evaluate one expression case; returns the actual value to compare with `expected`. */
 export function runExpressionCase(c: ExpressionCase): ScalarValue {
@@ -95,10 +97,26 @@ export function runScript(
   for (const op of ops) {
     const chunk: TranscriptStep[] = [];
     switch (op.op) {
-      case "openFlow":
-        engine.openFlow(op.flow, { scene: op.scene, block: op.block, seed: op.seed });
-        current = op.flow;
+      case "openFlow": {
+        // A refused open (expectResult false) must leave everything as it was: the name still means the
+        // same flow (or none), that flow is not closed, and the current flow does not move.
+        const before = engine.getFlow(op.flow);
+        let opened = true;
+        try {
+          engine.openFlow(op.flow, { scene: op.scene, block: op.block, seed: op.seed });
+        } catch (e) {
+          if (op.expectResult !== false) throw e;
+          opened = false;
+        }
+        const where = `${op.scene}${op.block === undefined ? "" : `/${op.block}`}`;
+        if (op.expectResult !== undefined && opened !== op.expectResult) {
+          throw new Error(`openFlow ${op.flow} at ${where}: expected ${op.expectResult}, got ${opened}`);
+        }
+        if (opened) { current = op.flow; break; }
+        if (engine.getFlow(op.flow) !== before) throw new Error(`openFlow ${op.flow} at ${where}: a refused open changed what the name means`);
+        if (before?.isClosed) throw new Error(`openFlow ${op.flow} at ${where}: a refused open closed the flow already open`);
         break;
+      }
       case "useFlow":
         current = op.flow;
         break;
@@ -247,11 +265,16 @@ export function normaliseStep(r: StepResult): TranscriptStep {
       return s;
     }
     case "choice":
-      return { type: "choice", options: r.options.map((o) => {
-        const opt: { id: string; text?: string; eligible: boolean; gameData?: typeof o.gameData } =
-          { id: o.id, eligible: o.eligible };
-        if (o.prompt !== undefined) opt.text = o.prompt.text; // conformance transcript keeps the flat label
-
+      // The whole choice as the host receives it: the group id, and each option's structured prompt.
+      return { type: "choice", groupId: r.groupId, options: r.options.map((o) => {
+        const opt: TranscriptOption = { id: o.id, eligible: o.eligible };
+        if (o.prompt !== undefined) {
+          const p: TranscriptPrompt = { kind: o.prompt.kind, text: o.prompt.text };
+          if (o.prompt.character !== undefined) p.character = o.prompt.character;
+          if (o.prompt.characterName !== undefined) p.characterName = o.prompt.characterName;
+          if (o.prompt.direction !== undefined) p.direction = o.prompt.direction;
+          opt.prompt = p;
+        }
         if (o.gameData !== undefined) opt.gameData = o.gameData;
         return opt;
       }) };

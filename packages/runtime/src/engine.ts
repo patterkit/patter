@@ -682,11 +682,14 @@ export class Engine {
    *
    * Contrast {@link runFlow}, which REUSES a flow of the same name instead of replacing it - that is the
    * call to reach for when you want a speaker's variation state to carry on.
+   *
+   * THROWS on an address that does not resolve (an unknown scene, or a block that is not in the named
+   * scene), before anything changes: nothing is opened, and a flow already open under `id` carries on
+   * exactly as it was.
    */
   openFlow(id: string, opts: OpenFlowOptions = {}): Flow {
     this.assertExternalScopes();
-    const sceneId = this.resolveSceneRef(opts.scene);
-    const blockId = this.resolveBlockRef(sceneId, opts.block);
+    const { sceneId, blockId } = this.resolveOpenAddress(opts.scene, opts.block);
     const prior = this.flowsById.get(id);
     const journal = this.host.journal;
     if (journal && prior && !prior.isClosed) throw new Error(`openFlow would replace the open flow '${id}', which can't be undone while a checkpoint is open`);
@@ -731,7 +734,7 @@ export class Engine {
    */
   runFlow(flow: string, scene: string, block?: string): AdvanceToStopResult["played"] {
     const existing = this.flowsById.get(flow);
-    if (!existing) return this.openFlow(flow, { scene, block }).advanceToStop().played; // start() reports a bad address
+    if (!existing) return this.openFlow(flow, { scene, block }).advanceToStop().played; // openFlow throws on a bad address
     if (!existing.goto(scene, block)) {
       throw new Error(`runFlow: address not found: ${scene}${block === undefined ? "" : ` / ${block}`}`);
     }
@@ -751,11 +754,35 @@ export class Engine {
     }
   }
 
+  /**
+   * `openFlow`'s address as internal ids, or a throw when it does not resolve. With a scene, the block is
+   * scene-scoped exactly as {@link Flow.goto} resolves it (a gameId address in that scene, or the internal
+   * id of a block in that scene), so a block from another scene does not resolve. With no scene, the block
+   * is an internal id from any scene. Neither: the bundle's first scene. The same rule on every runtime.
+   */
+  private resolveOpenAddress(scene?: string, block?: string): { sceneId?: string; blockId?: string } {
+    if (scene !== undefined) {
+      const sceneId = this.resolveSceneRef(scene)!;
+      if (!this.host.bundle.scenes[sceneId]) throw new Error(`unknown scene: ${scene}`);
+      if (block === undefined) return { sceneId };
+      const blockId = this.blockGameIdToId.get(sceneId)?.get(block)
+        ?? (this.host.blockIndex.get(block)?.sceneId === sceneId ? block : undefined);
+      if (blockId === undefined) throw new Error(`unknown block: ${block}`);
+      return { sceneId, blockId };
+    }
+    if (block !== undefined) {
+      if (!this.host.blockIndex.has(block)) throw new Error(`unknown block: ${block}`);
+      return { blockId: block };
+    }
+    if (Object.keys(this.host.bundle.scenes).length === 0) throw new Error("no scenes in bundle");
+    return {};
+  }
+
   /** Resolve a scene reference (a gameId address OR an internal id) to its internal id. */
   private resolveSceneRef(ref?: string): string | undefined {
     if (ref == null) return undefined;
     if (this.host.bundle.scenes[ref]) return ref;          // already an internal id
-    return this.sceneGameIdToId.get(ref) ?? ref;           // a gameId, else pass through (start reports)
+    return this.sceneGameIdToId.get(ref) ?? ref;           // a gameId, else pass through (the caller checks)
   }
 
   /** Resolve a block reference (a scene-scoped gameId OR an internal id) to its internal id. */
@@ -763,7 +790,7 @@ export class Engine {
     if (ref == null) return undefined;
     if (this.host.blockById.has(ref)) return ref;          // already an internal id
     if (sceneId != null) { const id = this.blockGameIdToId.get(sceneId)?.get(ref); if (id) return id; }
-    return ref;                                            // pass through (start reports an unknown block)
+    return ref;                                            // pass through (the caller checks)
   }
 
   /** The host-facing address (gameId) of a scene / block by internal id, or undefined if unknown.

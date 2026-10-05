@@ -54,8 +54,10 @@ engine.openFlow(id, { scene?, block?, seed? })
 ```
 
 `scene` and `block` accept either a host-facing **gameId/address** or an internal id;
-both default sensibly (first scene, first block). Re-opening an existing id replaces
-it. Other engine methods: `getFlow(id)`, `flows()`, `closeFlow(id)`, and `reset()`
+both default sensibly (first scene, first block). The block is **scene-scoped**, as for
+`goto`: it must be in the scene you named. Re-opening an existing id replaces it. An
+address that does not resolve throws before anything changes, so nothing opens and a flow
+already open under that id carries on. Other engine methods: `getFlow(id)`, `flows()`, `closeFlow(id)`, and `reset()`
 (drop all flows and re-seed shared state).
 
 Dropping a flow **finishes** it: after `closeFlow(id)`, a `reset()`, or having its name

@@ -285,13 +285,25 @@ static JsonValue normalize(const StepResult& s)
             break;
         case StepType::Choice:
         {
+            // The whole choice as the host receives it: the group id, and each option's structured prompt.
+            // The C++ prompt holds an absent field as an empty string, so empty is written as absent.
             o.set("type", JsonValue::Str("choice"));
+            o.set("groupId", JsonValue::Str(s.groupId));
             JsonValue opts = JsonValue::Arr();
             for (const auto& opt : s.options)
             {
                 JsonValue od = JsonValue::Obj();
                 od.set("id", JsonValue::Str(opt.id));
-                if (opt.prompt) od.set("text", JsonValue::Str(opt.prompt->text));
+                if (opt.prompt)
+                {
+                    JsonValue p = JsonValue::Obj();
+                    p.set("kind", JsonValue::Str(opt.prompt->kind));
+                    p.set("text", JsonValue::Str(opt.prompt->text));
+                    if (!opt.prompt->character.empty()) p.set("character", JsonValue::Str(opt.prompt->character));
+                    if (!opt.prompt->characterName.empty()) p.set("characterName", JsonValue::Str(opt.prompt->characterName));
+                    if (!opt.prompt->direction.empty()) p.set("direction", JsonValue::Str(opt.prompt->direction));
+                    od.set("prompt", std::move(p));
+                }
                 od.set("eligible", JsonValue::Boolean(opt.eligible));
                 if (opt.gameData) od.set("gameData", gameDataToJson(*opt.gameData));
                 opts.push(std::move(od));
@@ -513,12 +525,30 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 std::string kind = op.at("op").str;
                 if (kind == "openFlow")
                 {
+                    // A refused open (expectResult false) must leave everything as it was: the name still
+                    // means the same flow (or none), that flow is not closed, and the current flow does not move.
+                    const std::string flowId = op.at("flow").str;
                     std::string sc = op.has("scene") ? op.at("scene").str : "";
                     std::string bl = op.has("block") ? op.at("block").str : "";
+                    const std::string where = sc + (bl.empty() ? "" : "/" + bl);
+                    const bool hasWant = op.has("expectResult");
+                    const bool want = hasWant && op.at("expectResult").b;
                     int64_t seed = 0; const int64_t* seedP = nullptr;
                     if (const JsonValue* s = op.find("seed")) { seed = static_cast<int64_t>(s->num); seedP = &seed; }
-                    engine->openFlow(op.at("flow").str, sc, bl, seedP);
-                    current = op.at("flow").str;
+                    Flow* before = engine->getFlow(flowId);
+                    bool opened = true;
+                    try { engine->openFlow(flowId, sc, bl, seedP); }
+                    catch (const std::exception&) { if (!hasWant || want) throw; opened = false; }
+                    if (hasWant && opened != want)
+                        throw std::runtime_error("openFlow " + flowId + " at " + where + ": expected " + (want ? "true" : "false") + ", got " + (opened ? "true" : "false"));
+                    if (opened) current = flowId;
+                    else
+                    {
+                        if (engine->getFlow(flowId) != before)
+                            throw std::runtime_error("openFlow " + flowId + " at " + where + ": a refused open changed what the name means");
+                        if (before && before->isClosed())
+                            throw std::runtime_error("openFlow " + flowId + " at " + where + ": a refused open closed the flow already open");
+                    }
                 }
                 else if (kind == "useFlow") current = op.at("flow").str;
                 else if (kind == "advance") chunk.push(normalize(engine->getFlow(current)->advance()));

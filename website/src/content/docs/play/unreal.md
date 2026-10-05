@@ -40,7 +40,7 @@ UPatterFlow*   Flow   = Engine->OpenFlow(TEXT("main"), TEXT("intro"));
 
 FPatterStep Step = Flow->Advance();   // Step.Type, Step.Text, Step.Character, Step.Options
 // Render Step by its kind (line / text / game event / choice / end). On a choice,
-// present Step.Options (each has prompt text + an eligibility flag), then:
+// present Step.Options (each has prompt text, its PromptKind, and an eligibility flag), then:
 Flow->Choose(Step.Options[0].Id);     // your UI chooses; here, the first option
 ```
 

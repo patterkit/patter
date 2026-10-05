@@ -516,11 +516,15 @@ namespace Patterkit.Patterplay
         /// </summary>
         public void SetClosedCaptions(bool on) => _host.CaptionsOn = on;
 
+        /// <summary>Open (and start) a named flow; re-opening a name replaces it. Throws on an address that
+        /// does not resolve (an unknown scene, or a block that is not in the named scene), before anything
+        /// changes: nothing is opened, and a flow already open under <paramref name="id"/> carries on.</summary>
         public Flow OpenFlow(string id, string scene = null, string block = null, double? seed = null)
         {
             AssertExternalScopes();
-            string sceneId = ResolveSceneRef(scene);
-            string blockId = ResolveBlockRef(sceneId, block);
+            // The address resolves before anything changes: a bad one throws, opening nothing, and a
+            // flow already open under this name carries on untouched.
+            var (sceneId, blockId) = ResolveOpenAddress(scene, block);
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
             // driving the shared world. Replacing is a reset - contrast RunFlow, which reuses.
             _flows.TryGetValue(id, out var prior);
@@ -1089,6 +1093,31 @@ namespace Patterkit.Patterplay
         }
 
         // -- ref resolution -----------------------------------------------------
+
+        /// <summary>OpenFlow's address as internal ids, or a throw when it does not resolve. With a scene,
+        /// the block is scene-scoped exactly as Flow.Goto resolves it (a gameId address in that scene, or
+        /// the internal id of a block in that scene), so a block from another scene does not resolve. With
+        /// no scene, the block is an internal id from any scene. Neither: the first scene. The same rule
+        /// on every runtime.</summary>
+        private (string sceneId, string blockId) ResolveOpenAddress(string scene, string block)
+        {
+            if (scene != null)
+            {
+                string sceneId = ResolveSceneRef(scene);
+                if (!_host.Bundle.Scenes.ContainsKey(sceneId)) throw new Exception($"unknown scene: {scene}");
+                if (block == null) return (sceneId, null);
+                if (_blockGameIdToId.TryGetValue(sceneId, out var addrs) && addrs.TryGetValue(block, out var bid)) return (sceneId, bid);
+                if (_host.BlockToScene.TryGetValue(block, out var owner) && owner == sceneId) return (sceneId, block);
+                throw new Exception($"unknown block: {block}");
+            }
+            if (block != null)
+            {
+                if (!_host.BlockToScene.ContainsKey(block)) throw new Exception($"unknown block: {block}");
+                return (null, block);
+            }
+            if (_host.Bundle.Scenes.Count == 0) throw new Exception("no scenes in bundle");
+            return (null, null);
+        }
 
         private string ResolveSceneRef(string r)
         {

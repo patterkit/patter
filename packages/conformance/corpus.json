@@ -1211,15 +1211,22 @@
       "expectedTranscript": [
         {
           "type": "choice",
+          "groupId": "g",
           "options": [
             {
               "id": "yes",
-              "text": "Continue",
+              "prompt": {
+                "kind": "text",
+                "text": "Continue"
+              },
               "eligible": true
             },
             {
               "id": "locked",
-              "text": "[locked]",
+              "prompt": {
+                "kind": "text",
+                "text": "[locked]"
+              },
               "eligible": false
             }
           ]
@@ -4026,15 +4033,22 @@
       "expectedTranscript": [
         {
           "type": "choice",
+          "groupId": "g",
           "options": [
             {
               "id": "go",
-              "text": "Go",
+              "prompt": {
+                "kind": "text",
+                "text": "Go"
+              },
               "eligible": true
             },
             {
               "id": "greyed",
-              "text": "Locked",
+              "prompt": {
+                "kind": "text",
+                "text": "Locked"
+              },
               "eligible": false
             }
           ]
@@ -4431,6 +4445,350 @@
             "chapter1",
             "hub",
             "combat"
+          ]
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "a choice carries its group id and each option's structured prompt",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1etl9ao",
+          "structureHash": "12cy43i"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          },
+          {
+            "name": "BO"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_door",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "gameData": {
+                          "icon": "ear"
+                        },
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_shout",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "shout_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_shout",
+                          "kind": "line",
+                          "character": "BO"
+                        }
+                      },
+                      {
+                        "id": "o_pay",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "pay_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_pay",
+                          "kind": "text"
+                        }
+                      },
+                      {
+                        "id": "o_bare",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "L_bare",
+                            "kind": "line",
+                            "character": "ANNA"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "o_mute",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "mute_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there?",
+            "P_shout": "Open up!",
+            "P_pay": "Pay {@coins} coins",
+            "L_bare": "Hello?",
+            "T_ask": "No answer."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_ask"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "groupId": "g_door",
+          "options": [
+            {
+              "id": "o_ask",
+              "prompt": {
+                "kind": "line",
+                "text": "Who's there?",
+                "character": "ANNA",
+                "characterName": "Anna",
+                "direction": "quietly"
+              },
+              "eligible": true,
+              "gameData": {
+                "icon": "ear"
+              }
+            },
+            {
+              "id": "o_shout",
+              "prompt": {
+                "kind": "line",
+                "text": "Open up!",
+                "character": "BO"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_pay",
+              "prompt": {
+                "kind": "text",
+                "text": "Pay 3 coins"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_bare",
+              "prompt": {
+                "kind": "line",
+                "text": "Hello?",
+                "character": "ANNA",
+                "characterName": "Anna"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_mute",
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "T_ask",
+          "text": "No answer."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "IDs-only build: a prompt's text is its beat id and carries no character name",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1tl2mrc",
+          "structureHash": "12aboqi"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_ids",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_line",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "line_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_line",
+                          "kind": "line",
+                          "character": "ANNA"
+                        }
+                      },
+                      {
+                        "id": "o_text",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "text_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_text",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {},
+        "localisation": {
+          "mode": "ids"
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_text"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "groupId": "g_ids",
+          "options": [
+            {
+              "id": "o_line",
+              "prompt": {
+                "kind": "line",
+                "text": "P_line",
+                "character": "ANNA"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_text",
+              "prompt": {
+                "kind": "text",
+                "text": "P_text"
+              },
+              "eligible": true
+            }
           ]
         },
         {
@@ -6549,15 +6907,22 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "left",
-                  "text": "Left",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Left"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "right",
-                  "text": "Right",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Right"
+                  },
                   "eligible": true
                 }
               ]
@@ -6566,6 +6931,33 @@
         },
         {
           "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "left",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Left"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "right",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Right"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
         },
         {
           "op": "choose",
@@ -6892,10 +7284,14 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "opt",
-                  "text": "Hello?",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Hello?"
+                  },
                   "eligible": true
                 }
               ]
@@ -7085,15 +7481,22 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "talk",
-                  "text": "Talk",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Talk"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "leave",
-                  "text": "Leave",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
                   "eligible": true
                 }
               ]
@@ -7274,20 +7677,30 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "once",
-                  "text": "Once",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Once"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "keep",
-                  "text": "Keep",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Keep"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "leave",
-                  "text": "Leave",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
                   "eligible": true
                 }
               ]
@@ -7313,15 +7726,22 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "keep",
-                  "text": "Keep",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Keep"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "leave",
-                  "text": "Leave",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
                   "eligible": true
                 }
               ]
@@ -7347,15 +7767,22 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "keep",
-                  "text": "Keep",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Keep"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "leave",
-                  "text": "Leave",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
                   "eligible": true
                 }
               ]
@@ -7487,10 +7914,14 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "real",
-                  "text": "Real",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Real"
+                  },
                   "eligible": true
                 }
               ]
@@ -8212,15 +8643,22 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "left",
-                  "text": "Left",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Left"
+                  },
                   "eligible": true
                 },
                 {
                   "id": "right",
-                  "text": "Right",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Right"
+                  },
                   "eligible": true
                 }
               ]
@@ -8235,10 +8673,14 @@
           "expect": [
             {
               "type": "choice",
+              "groupId": "g",
               "options": [
                 {
                   "id": "left",
-                  "text": "Left",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Left"
+                  },
                   "eligible": true
                 }
               ]
@@ -11409,6 +11851,234 @@
           ]
         }
       ]
+    },
+    {
+      "name": "openFlow at an address that does not resolve opens nothing and leaves the open flow alone",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0wqap7p",
+          "structureHash": "0eqaf8w"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s_harbour": {
+            "id": "s_harbour",
+            "type": "scene",
+            "name": "Harbour",
+            "blocks": [
+              {
+                "id": "b_quay",
+                "type": "block",
+                "name": "Quay",
+                "children": [
+                  {
+                    "id": "sn_quay",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_q1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T_q2",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T_q3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "b_pier",
+                "type": "block",
+                "name": "Pier",
+                "children": [
+                  {
+                    "id": "sn_pier",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_pier",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "s_market": {
+            "id": "s_market",
+            "type": "scene",
+            "name": "Market",
+            "blocks": [
+              {
+                "id": "b_stalls",
+                "type": "block",
+                "name": "Stalls",
+                "children": [
+                  {
+                    "id": "sn_stalls",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_stalls",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_q1": "Gulls.",
+            "T_q2": "Rope.",
+            "T_q3": "Tide.",
+            "T_pier": "The pier.",
+            "T_stalls": "Stalls."
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "harbour"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_q1",
+              "text": "Gulls."
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "nowhere",
+          "expectResult": false
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "harbour",
+          "block": "b_stalls",
+          "expectResult": false
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "harbour",
+          "block": "stalls",
+          "expectResult": false
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "harbour",
+          "block": "no-such-block",
+          "expectResult": false
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_q2",
+              "text": "Rope."
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "other",
+          "scene": "nowhere",
+          "expectResult": false
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_q3",
+              "text": "Tide."
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "other",
+          "scene": "market",
+          "block": "b_stalls",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_stalls",
+              "text": "Stalls."
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "harbour",
+          "block": "pier",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_pier",
+              "text": "The pier."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [
@@ -12038,6 +12708,33 @@
         {
           "op": "useFlow",
           "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "left",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Left"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "right",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Right"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
         },
         {
           "op": "choose",

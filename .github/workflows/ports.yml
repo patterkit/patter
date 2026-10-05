@@ -68,6 +68,10 @@ jobs:
         run: ./godot --headless --path ports/godot --script res://test/test_one_registry.gd
       - name: The save's shape
         run: ./godot --headless --path ports/godot --script res://test/test_save_shape.gd
+      # Flows and their bags are RefCounted, so a reference cycle among them is never collected: every
+      # flow ever opened leaked until 2026-10. A dropped flow must be freed, and so must its bags.
+      - name: A flow the game lets go of is freed
+        run: ./godot --headless --path ports/godot --script res://test/test_flow_lifetime.gd
 
   # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
   # makes that hard: an installed, activated Unity compiles from the command line, and

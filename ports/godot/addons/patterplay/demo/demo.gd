@@ -23,7 +23,7 @@ func _initialize() -> void:
 				print(step["text"])
 			"choice":
 				if not step["options"].is_empty():
-					print("> %s" % step["options"][0].get("text", ""))
+					print("> %s" % step["options"][0].get("prompt", {}).get("text", ""))
 					flow.choose(step["options"][0]["id"])
 			"end":
 				print("[end]  @gold = %s" % str(engine.get_property("@gold")))

@@ -61,9 +61,9 @@ const choicePick = {
   locales: [loc("s", { C_yes: "Continue", C_locked: "[locked]", L_done: "Done." })],
   choices: ["yes"],
   expectedTranscript: [
-    { type: "choice", options: [
-      { id: "yes", text: "Continue", eligible: true },
-      { id: "locked", text: "[locked]", eligible: false },
+    { type: "choice", groupId: "g", options: [
+      { id: "yes", prompt: { kind: "text", text: "Continue" }, eligible: true },
+      { id: "locked", prompt: { kind: "text", text: "[locked]" }, eligible: false },
     ] },
     { type: "line", id: "L_done", text: "Done.", character: "NPC" },
     { type: "end" },
@@ -703,9 +703,77 @@ const hiddenOption = {
   locales: [loc("s", { C_go: "Go", C_hidden: "Secret", C_greyed: "Locked" })],
   choices: ["go"],
   expectedTranscript: [
-    { type: "choice", options: [
-      { id: "go", text: "Go", eligible: true },
-      { id: "greyed", text: "Locked", eligible: false }, // "hidden" is absent entirely
+    { type: "choice", groupId: "g", options: [
+      { id: "go", prompt: { kind: "text", text: "Go" }, eligible: true },
+      { id: "greyed", prompt: { kind: "text", text: "Locked" }, eligible: false }, // "hidden" is absent entirely
+    ] },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// --- a choice as the host receives it: the group id and each option's structured prompt -----------
+// Every shape a prompt takes: a line with a speaker who has a display name and a direction, a line whose
+// speaker has no display name (so no characterName), a text prompt that interpolates, a bare-snippet
+// option whose first content line stands in for its prompt, and an option with no prompt beat and no
+// content line at all (so no prompt). The group is not called "g", so a runtime that invents the id fails.
+const choicePrompts = {
+  name: "a choice carries its group id and each option's structured prompt",
+  project: project({
+    cast: [{ name: "ANNA", displayName: "Anna" }, { name: "BO" }],
+    properties: [{ name: "coins", type: "number", shared: true, default: 3 }],
+  }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g_door", type: "group", selector: "choice", children: [
+      { id: "o_ask", type: "group", gameData: { icon: "ear" }, prompt: { id: "P_ask", kind: "line", character: "ANNA", direction: "quietly" }, children: [
+        { id: "ask_c", type: "snippet", beats: [{ id: "T_ask", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "o_shout", type: "group", prompt: { id: "P_shout", kind: "line", character: "BO" }, children: [
+        { id: "shout_c", type: "snippet", jump: { to: "END" } },
+      ] },
+      { id: "o_pay", type: "group", prompt: { id: "P_pay", kind: "text" }, children: [
+        { id: "pay_c", type: "snippet", jump: { to: "END" } },
+      ] },
+      { id: "o_bare", type: "snippet", beats: [{ id: "L_bare", kind: "line", character: "ANNA" }], jump: { to: "END" } },
+      { id: "o_mute", type: "group", children: [{ id: "mute_c", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { P_ask: "Who's there?", P_shout: "Open up!", P_pay: "Pay {@coins} coins", L_bare: "Hello?", T_ask: "No answer." })],
+  choices: ["o_ask"],
+  expectedTranscript: [
+    { type: "choice", groupId: "g_door", options: [
+      { id: "o_ask", prompt: { kind: "line", text: "Who's there?", character: "ANNA", characterName: "Anna", direction: "quietly" }, eligible: true, gameData: { icon: "ear" } },
+      { id: "o_shout", prompt: { kind: "line", text: "Open up!", character: "BO" }, eligible: true },  // no display name -> no characterName
+      { id: "o_pay", prompt: { kind: "text", text: "Pay 3 coins" }, eligible: true },                  // a text prompt interpolates
+      { id: "o_bare", prompt: { kind: "line", text: "Hello?", character: "ANNA", characterName: "Anna" }, eligible: true }, // first content line
+      { id: "o_mute", eligible: true },                                                                 // nothing to show: no prompt
+    ] },
+    { type: "text", id: "T_ask", text: "No answer." },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// The same in an IDs-only build: a prompt's text is its beat id and no characterName is resolved, exactly
+// as for a line beat (the game localises both).
+const choicePromptsIds = {
+  name: "IDs-only build: a prompt's text is its beat id and carries no character name",
+  project: project({ cast: [{ name: "ANNA", displayName: "Anna" }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g_ids", type: "group", selector: "choice", children: [
+      { id: "o_line", type: "group", prompt: { id: "P_line", kind: "line", character: "ANNA" }, children: [
+        { id: "line_c", type: "snippet", jump: { to: "END" } },
+      ] },
+      { id: "o_text", type: "group", prompt: { id: "P_text", kind: "text" }, children: [
+        { id: "text_c", type: "snippet", jump: { to: "END" } },
+      ] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { P_line: "Hi", P_text: "Leave" })], // stripped by idsOnly
+  idsOnly: true,
+  choices: ["o_text"],
+  expectedTranscript: [
+    { type: "choice", groupId: "g_ids", options: [
+      { id: "o_line", prompt: { kind: "line", text: "P_line", character: "ANNA" }, eligible: true },
+      { id: "o_text", prompt: { kind: "text", text: "P_text" }, eligible: true },
     ] },
     { type: "end" },
   ],
@@ -1012,11 +1080,15 @@ const scriptedSaveLoadChoice = {
   locales: [loc("s", { C_l: "Left", C_r: "Right", TR: "went right" })],
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "left", text: "Left", eligible: true },
-      { id: "right", text: "Right", eligible: true },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "left", prompt: { kind: "text", text: "Left" }, eligible: true },
+      { id: "right", prompt: { kind: "text", text: "Right" }, eligible: true },
     ] }] },
     { op: "saveLoad" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [ // replayed whole: group id and prompts
+      { id: "left", prompt: { kind: "text", text: "Left" }, eligible: true },
+      { id: "right", prompt: { kind: "text", text: "Right" }, eligible: true },
+    ] }] },
     { op: "choose", id: "right" }, // the REPLAYED choice is fully usable
     { op: "advance", expect: [{ type: "text", id: "TR", text: "went right" }] },
     { op: "advance", expect: [{ type: "end" }] },
@@ -1093,7 +1165,7 @@ const scriptedClosedCaptions = {
     { op: "setClosedCaptions", on: false },
     { op: "advance", expect: [{ type: "text", id: "T1", text: "A door slams. (off-screen)" }] }, // narration kept
     { op: "advance", expect: [{ type: "line", id: "L2", text: "Wait. Listen." }] },              // dialogue stripped
-    { op: "advance", expect: [{ type: "choice", options: [{ id: "opt", text: "Hello?", eligible: true }] }] }, // line prompt stripped
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [{ id: "opt", prompt: { kind: "line", text: "Hello?" }, eligible: true }] }] }, // line prompt stripped
     { op: "choose", id: "opt" },
     { op: "advance", expect: [{ type: "line", id: "L3", text: "Coming." }] },                    // still off
     { op: "advance", expect: [{ type: "line", id: "L5", text: "" }] },                           // whole line was a cue -> SILENT (fires, no text, no speaker)
@@ -1127,9 +1199,9 @@ const scriptedOptionGroup = {
   locales: [loc("s", { C_talk: "Talk", C_leave: "Leave", T1: "hello", T2: "there", TA: "gathered" })],
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "talk", text: "Talk", eligible: true },
-      { id: "leave", text: "Leave", eligible: true },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "talk", prompt: { kind: "text", text: "Talk" }, eligible: true },
+      { id: "leave", prompt: { kind: "text", text: "Leave" }, eligible: true },
     ] }] },
     { op: "choose", id: "talk" },
     { op: "advance", expect: [{ type: "text", id: "T1", text: "hello" }] },
@@ -1160,22 +1232,22 @@ const scriptedStickyOnce = {
   locales: [loc("s", { C_once: "Once", C_keep: "Keep", C_leave: "Leave", T_once: "played once", T_keep: "played keep" })],
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "once", text: "Once", eligible: true },
-      { id: "keep", text: "Keep", eligible: true },
-      { id: "leave", text: "Leave", eligible: true },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "once", prompt: { kind: "text", text: "Once" }, eligible: true },
+      { id: "keep", prompt: { kind: "text", text: "Keep" }, eligible: true },
+      { id: "leave", prompt: { kind: "text", text: "Leave" }, eligible: true },
     ] }] },
     { op: "choose", id: "once" },
     { op: "advance", expect: [{ type: "text", id: "T_once", text: "played once" }] },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "keep", text: "Keep", eligible: true },   // 'once' is consumed - absent entirely
-      { id: "leave", text: "Leave", eligible: true },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "keep", prompt: { kind: "text", text: "Keep" }, eligible: true },   // 'once' is consumed - absent entirely
+      { id: "leave", prompt: { kind: "text", text: "Leave" }, eligible: true },
     ] }] },
     { op: "choose", id: "keep" },
     { op: "advance", expect: [{ type: "text", id: "T_keep", text: "played keep" }] },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "keep", text: "Keep", eligible: true },   // sticky: still here after being followed
-      { id: "leave", text: "Leave", eligible: true },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "keep", prompt: { kind: "text", text: "Keep" }, eligible: true },   // sticky: still here after being followed
+      { id: "leave", prompt: { kind: "text", text: "Leave" }, eligible: true },
     ] }] },
     { op: "choose", id: "leave" },
     { op: "advance", expect: [{ type: "end" }] },
@@ -1200,8 +1272,8 @@ const scriptedFallback = {
   locales: [loc("s", { C_real: "Real", C_fb: "Fallback", T_real: "did real", T_fb: "fallback fired" })],
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "real", text: "Real", eligible: true },   // the fallback is NOT in the option set
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "real", prompt: { kind: "text", text: "Real" }, eligible: true },   // the fallback is NOT in the option set
     ] }] },
     { op: "choose", id: "real" },
     { op: "advance", expect: [{ type: "text", id: "T_real", text: "did real" }] },
@@ -1430,13 +1502,13 @@ const scriptedHotSwapDropOption = {
   ] }] }],
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "left", text: "Left", eligible: true },
-      { id: "right", text: "Right", eligible: true },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "left", prompt: { kind: "text", text: "Left" }, eligible: true },
+      { id: "right", prompt: { kind: "text", text: "Right" }, eligible: true },
     ] }] },
     { op: "hotSwap" },
-    { op: "advance", expect: [{ type: "choice", options: [
-      { id: "left", text: "Left", eligible: true }, // `right` drifted out: dropped, never re-derived
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "left", prompt: { kind: "text", text: "Left" }, eligible: true }, // `right` drifted out: dropped, never re-derived
     ] }] },
     { op: "choose", id: "left" },
     { op: "advance", expect: [{ type: "text", id: "TL", text: "went left" }] },
@@ -1467,6 +1539,53 @@ const scriptedHotSwapEmptiedBlock = {
     { op: "advance", expect: [{ type: "text", id: "T1", text: "intro" }] },
     { op: "advance", expect: [{ type: "text", id: "T2a", text: "deep a" }] }, // now inside b2
     { op: "hotSwap" }, // active snippet + every sibling gone: nothing left to run
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// --- openFlow at an address that does not resolve -------------------------------------------------
+// A refused open changes NOTHING: no flow is opened, a flow already open under the name is neither closed
+// nor replaced, and the current flow does not move. The address resolves as goto's does, so a block is
+// scene-scoped: a real block of ANOTHER scene does not resolve, by internal id or by address. The runner
+// checks the name still means the same flow; the advances show it carrying on from where it was.
+const scriptedOpenFlowRefused = {
+  name: "openFlow at an address that does not resolve opens nothing and leaves the open flow alone",
+  project: project(),
+  scenes: [
+    { id: "s_harbour", type: "scene", name: "Harbour", blocks: [
+      { id: "b_quay", type: "block", name: "Quay", children: [
+        { id: "sn_quay", type: "snippet", beats: [
+          { id: "T_q1", kind: "text" }, { id: "T_q2", kind: "text" }, { id: "T_q3", kind: "text" },
+        ], jump: { to: "END" } },
+      ] },
+      { id: "b_pier", type: "block", name: "Pier", children: [
+        { id: "sn_pier", type: "snippet", beats: [{ id: "T_pier", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+    { id: "s_market", type: "scene", name: "Market", blocks: [
+      { id: "b_stalls", type: "block", name: "Stalls", children: [
+        { id: "sn_stalls", type: "snippet", beats: [{ id: "T_stalls", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ],
+  locales: [
+    loc("s_harbour", { T_q1: "Gulls.", T_q2: "Rope.", T_q3: "Tide.", T_pier: "The pier." }),
+    loc("s_market", { T_stalls: "Stalls." }),
+  ],
+  script: [
+    { op: "openFlow", flow: "main", scene: "harbour" },
+    { op: "advance", expect: [{ type: "text", id: "T_q1", text: "Gulls." }] },
+    { op: "openFlow", flow: "main", scene: "nowhere", expectResult: false },                    // unknown scene
+    { op: "openFlow", flow: "main", scene: "harbour", block: "b_stalls", expectResult: false }, // a real block of ANOTHER scene
+    { op: "openFlow", flow: "main", scene: "harbour", block: "stalls", expectResult: false },   // ...by its address too
+    { op: "openFlow", flow: "main", scene: "harbour", block: "no-such-block", expectResult: false },
+    { op: "advance", expect: [{ type: "text", id: "T_q2", text: "Rope." }] },   // the open flow carried on, untouched
+    { op: "openFlow", flow: "other", scene: "nowhere", expectResult: false },  // a new name: nothing is opened
+    { op: "advance", expect: [{ type: "text", id: "T_q3", text: "Tide." }] },   // ...and the current flow is still main
+    { op: "openFlow", flow: "other", scene: "market", block: "b_stalls", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_stalls", text: "Stalls." }] },
+    { op: "openFlow", flow: "main", scene: "harbour", block: "pier", expectResult: true }, // a good open still replaces
+    { op: "advance", expect: [{ type: "text", id: "T_pier", text: "The pier." }] },
     { op: "advance", expect: [{ type: "end" }] },
   ],
 } satisfies ScriptedFixture;
@@ -1796,14 +1915,14 @@ export const cases: Fixtures = {
     crossScene, cycle, once, voiced, escaped, shuffle, sequence,
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
-    characterName, localeActive, idsMode, tagsAccumulate, qualityGates, qualityAdvance,
+    characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ],
   scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
-    scriptedCheckpoint, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow],
+    scriptedCheckpoint, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

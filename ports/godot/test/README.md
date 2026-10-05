@@ -53,6 +53,16 @@ Headless checks for the Godot addon. **Not part of the shipped addon zip** (only
   Both print `ALL PASS` (exit 0) or `N FAILED` (exit 1). A script that fails to PARSE exits 0 without
   printing either, so read for the verdict line.
 
+- `test_flow_lifetime.gd` - a flow the game has let go of is FREED, with every bag it made: closed,
+  replaced, dropped with its engine, opened inside a checkpoint, carried over by a load or a hot swap,
+  or run by `run_flow`. Flows, engines, and bags are RefCounted, so a reference cycle among them is
+  never collected; the check is a weakref per object, and the object count returning to where it
+  started (what Godot's "ObjectDB instances leaked at exit" counts).
+
+  ```sh
+  godot --headless --path ports/godot --script res://test/test_flow_lifetime.gd
+  ```
+
 - `tour_check.gd` - a smoke check that the bundled tour demo loads and steps:
 
   ```sh

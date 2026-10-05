@@ -15,6 +15,15 @@ enum class EPatterStepType : uint8
 	End
 };
 
+/** What a choice option's prompt is: a line someone speaks, plain text, or none at all. */
+UENUM(BlueprintType)
+enum class EPatterPromptKind : uint8
+{
+	None,
+	Line,
+	Text,
+};
+
 UENUM(BlueprintType)
 enum class EPatterPropertyType : uint8
 {
@@ -90,6 +99,11 @@ struct FPatterOption
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Text;
+
+	/** The prompt's kind: a Line (Character, CharacterName, and Direction may be set), Text, or None when the
+	 *  option has no prompt (then Text is empty). */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	EPatterPromptKind PromptKind = EPatterPromptKind::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bEligible = false;
@@ -246,6 +260,10 @@ struct FPatterStep
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterOption> Options;
+
+	/** A Choice step's choice group id (empty on every other step). */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString GroupId;
 
 	// The beat's author Game Data (raw overrides). Host events ride on this: a game-event beat's
 	// cue lives here for your game to act on. Read a field's full effective value (override merged

@@ -33,6 +33,15 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Fixed
+
+- **`openFlow` at an address that does not resolve changes nothing.** It threw, but only after closing
+  any flow already open under that name and putting a broken one in its place. It now throws before
+  anything changes. The block must be in the scene you named, as `goto` has always required: a block
+  from another scene used to open there, and now throws. Held across all four runtimes by the
+  conformance corpus, which now also pins a choice step whole (its `groupId` and each option's
+  `prompt`), as this runtime already gave it.
+
 ## [0.16.0] - 2026-10-04
 
 ### Added

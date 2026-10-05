@@ -129,7 +129,8 @@ func _show_choices(options: Array) -> void:
 	var buttons: Array = []
 	for o in options:
 		var opt: Dictionary = o
-		var label: String = _plain(opt.get("text", "(choice)"))
+		var prompt: Dictionary = opt.get("prompt", {})
+		var label: String = _plain(prompt.get("text", "(choice)"))
 		var b := _button(label, func() -> void:
 			_flow.choose(opt["id"])
 			_step())

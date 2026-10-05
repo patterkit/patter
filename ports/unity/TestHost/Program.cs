@@ -744,12 +744,33 @@ namespace Patterkit.Patterplay.TestHost
                         switch (kind)
                         {
                             case "openFlow":
-                                engine.OpenFlow(op.GetProperty("flow").GetString(),
-                                    op.TryGetProperty("scene", out var os) ? os.GetString() : null,
-                                    op.TryGetProperty("block", out var ob) ? ob.GetString() : null,
-                                    op.TryGetProperty("seed", out var osd) ? osd.GetInt64() : (long?)null);
-                                current = op.GetProperty("flow").GetString();
+                            {
+                                // A refused open (expectResult false) must leave everything as it was: the
+                                // name still means the same flow (or none), that flow is not closed, and the
+                                // current flow does not move.
+                                string flowId = op.GetProperty("flow").GetString();
+                                string where = (op.TryGetProperty("scene", out var wsc) ? wsc.GetString() : "")
+                                    + (op.TryGetProperty("block", out var wbl) ? "/" + wbl.GetString() : "");
+                                bool? want = op.TryGetProperty("expectResult", out var oer) ? oer.GetBoolean() : (bool?)null;
+                                var before = engine.GetFlow(flowId);
+                                bool opened = true;
+                                try
+                                {
+                                    engine.OpenFlow(flowId,
+                                        op.TryGetProperty("scene", out var os) ? os.GetString() : null,
+                                        op.TryGetProperty("block", out var ob) ? ob.GetString() : null,
+                                        op.TryGetProperty("seed", out var osd) ? osd.GetInt64() : (long?)null);
+                                }
+                                catch (Exception) when (want == false) { opened = false; }
+                                if (want != null && opened != want)
+                                    throw new Exception($"openFlow {flowId} at {where}: expected {want}, got {opened}");
+                                if (opened) { current = flowId; break; }
+                                if (!ReferenceEquals(engine.GetFlow(flowId), before))
+                                    throw new Exception($"openFlow {flowId} at {where}: a refused open changed what the name means");
+                                if (before != null && before.IsClosed)
+                                    throw new Exception($"openFlow {flowId} at {where}: a refused open closed the flow already open");
                                 break;
+                            }
                             case "useFlow":
                                 current = op.GetProperty("flow").GetString();
                                 break;
@@ -1022,16 +1043,18 @@ namespace Patterkit.Patterplay.TestHost
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
                 case StepType.Choice:
+                    // The whole choice as the host receives it: the group id, and each option's
+                    // structured prompt (keys present only when set, as runner.ts normaliseStep writes).
                     o["type"] = "choice";
+                    o["groupId"] = s.GroupId;
                     o["options"] = s.Options.Select(opt =>
                     {
-                        var od = new Dictionary<string, object> { ["id"] = opt.Id, ["eligible"] = opt.Eligible };
-                        if (opt.Prompt != null) od["text"] = opt.Prompt.Text;
+                        var od = new Dictionary<string, object> { ["id"] = opt.Id };
+                        if (opt.Prompt != null) od["prompt"] = NormalizePrompt(opt.Prompt);
+                        od["eligible"] = opt.Eligible;
                         if (opt.GameData != null) od["gameData"] = GameDataToObject(opt.GameData);
                         return (object)od;
                     }).ToList();
-                    // runner keeps option key order { id, text, eligible, gameData } - reorder to match.
-                    o["options"] = ((List<object>)o["options"]).Select(ReorderOption).ToList();
                     break;
                 case StepType.End:
                     o["type"] = "end";
@@ -1040,14 +1063,13 @@ namespace Patterkit.Patterplay.TestHost
             return o;
         }
 
-        private static object ReorderOption(object opt)
+        private static Dictionary<string, object> NormalizePrompt(ChoicePrompt p)
         {
-            var d = (Dictionary<string, object>)opt;
-            var ordered = new Dictionary<string, object> { ["id"] = d["id"] };
-            if (d.ContainsKey("text")) ordered["text"] = d["text"];
-            ordered["eligible"] = d["eligible"];
-            if (d.ContainsKey("gameData")) ordered["gameData"] = d["gameData"];
-            return ordered;
+            var o = new Dictionary<string, object> { ["kind"] = p.Kind, ["text"] = p.Text };
+            if (p.Character != null) o["character"] = p.Character;
+            if (p.CharacterName != null) o["characterName"] = p.CharacterName;
+            if (p.Direction != null) o["direction"] = p.Direction;
+            return o;
         }
 
         private static Dictionary<string, object> GameDataToObject(GameData gd)

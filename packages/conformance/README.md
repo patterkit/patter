@@ -37,7 +37,15 @@ parser or compiler. Four case kinds, each with a reference runner in
 
 A `TranscriptStep` is a normalised step result: `line` / `text` / `gameEvent` /
 `choice` / `end`, pinning the fields the contract fixes - including a line's
-`character` / `characterName` and any beat/option `gameData`.
+`character` / `characterName` and any beat/option `gameData`. A `choice` is pinned
+whole: its `groupId`, and each option as `{ id, prompt?, eligible, gameData? }`, where
+`prompt` is `{ kind, text, character?, characterName?, direction? }` (the speaker fields
+on a `line` prompt only, each only when set). There is no flat `text` on an option.
+
+An `openFlow` op may carry `expectResult`: `false` means the address must not resolve
+(an unknown scene, or a block that is not in the named scene), and the refused open
+must change nothing - no flow opened, a flow already open under that name neither
+closed nor replaced, and the current flow unmoved.
 
 ### Locale resolution
 

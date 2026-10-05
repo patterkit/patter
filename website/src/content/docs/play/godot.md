@@ -40,8 +40,16 @@ while true:
         "end":    break
 ```
 
-Render each `step` into your own dialogue UI. On a `"choice"`, present `step["options"]` (each
-has prompt text and an `eligible` flag) and call `flow.choose(id)` with the player's pick.
+Render each `step` into your own dialogue UI. A `"choice"` step carries the choice's `groupId` and
+its `options`, each `{ "id", "prompt", "eligible", "gameData" }` (`prompt` and `gameData` only when
+set): present each option's `prompt["text"]`, greyed when `eligible` is false, and call
+`flow.choose(id)` with the player's pick. The `prompt` is `{ "kind": "line" | "text", "text" }`, and a
+`"line"` prompt also carries the speaker's `character`, `characterName`, and `direction` when set,
+the same shape every Patterplay runtime gives.
+
+`open_flow` returns null, with `push_error`, when the address does not resolve: an unknown scene, or
+a block that is not in the scene you named. Nothing opens, and a flow already open under that name
+carries on as it was.
 
 Two demos ship **inside the addon**, under `addons/patterplay/demo/` (delete the folder freely):
 a headless **play-through demo** (`demo.gd`, the smallest possible integration) and the **Tour

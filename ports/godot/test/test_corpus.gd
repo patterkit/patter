@@ -454,8 +454,25 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 		var kind: String = op["op"]
 		match kind:
 			"openFlow":
-				holder["engine"].open_flow(op["flow"], op.get("scene", ""), op.get("block", ""), op.get("seed"))
-				current = op["flow"]
+				# A refused open (expectResult false) must leave everything as it was: the name still
+				# means the same flow (or none), that flow is not closed, and the current flow does not
+				# move. This addon refuses with push_error and null, so the refusal is the null.
+				var flow_id: String = op["flow"]
+				var where := "%s%s" % [op.get("scene", ""), ("/" + str(op["block"])) if op.has("block") else ""]
+				var before = holder["engine"].get_flow(flow_id)
+				var opened: bool = holder["engine"].open_flow(flow_id, op.get("scene", ""), op.get("block", ""), op.get("seed")) != null
+				if op.has("expectResult") and opened != bool(op["expectResult"]):
+					_fail("scripted", name, "openFlow %s at %s: expected %s, got %s" % [flow_id, where, op["expectResult"], opened])
+					return false
+				if opened:
+					current = flow_id
+				else:
+					if holder["engine"].get_flow(flow_id) != before:
+						_fail("scripted", name, "openFlow %s at %s: a refused open changed what the name means" % [flow_id, where])
+						return false
+					if before != null and before.is_closed():
+						_fail("scripted", name, "openFlow %s at %s: a refused open closed the flow already open" % [flow_id, where])
+						return false
 			"useFlow":
 				current = op["flow"]
 			"advance":

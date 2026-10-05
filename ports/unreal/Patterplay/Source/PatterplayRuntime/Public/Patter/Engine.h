@@ -1987,11 +1987,14 @@ namespace patter
         /// clear still agree about what came first.
         void clearLog() { engineLog_.clear(); }
 
+        // Open (and start) a named flow; re-opening a name replaces it. Throws on an address that does not
+        // resolve (an unknown scene, or a block that is not in the named scene), before anything changes:
+        // nothing is opened, and a flow already open under `id` carries on exactly as it was.
         Flow* openFlow(const std::string& id, const std::string& scene = "", const std::string& block = "", const int64_t* seed = nullptr)
         {
             assertExternalScopes();
-            std::string sceneId = resolveSceneRef(scene);
-            std::string blockId = resolveBlockRef(sceneId, block);
+            std::string sceneId, blockId;
+            resolveOpenAddress(scene, block, sceneId, blockId);
             // Re-opening a name REPLACES it: finish the old flow so a host still holding it cannot keep
             // driving the shared world. Replacing is a reset - contrast runFlow, which reuses.
             std::shared_ptr<Flow> prior;
@@ -2622,6 +2625,33 @@ namespace patter
         EngineOptions creationOptions_; // reused by hotSwap, on the same registry
         bool sourceDebug_ = false; // source-only DEBUG build: strings are the source language, not shippable
 
+        // openFlow's address as internal ids, or a throw when it does not resolve. With a scene, the block is
+        // scene-scoped exactly as Flow::gotoAddress resolves it (a gameId address in that scene, or the
+        // internal id of a block in that scene), so a block from another scene does not resolve. With no
+        // scene, the block is an internal id from any scene. Neither: the first scene. The same rule on
+        // every runtime.
+        void resolveOpenAddress(const std::string& scene, const std::string& block, std::string& sceneId, std::string& blockId)
+        {
+            sceneId.clear(); blockId.clear();
+            if (!scene.empty())
+            {
+                sceneId = resolveSceneRef(scene);
+                if (!host_.bundle->scenes.count(sceneId)) throw std::runtime_error("unknown scene: " + scene);
+                if (block.empty()) return;
+                auto m = blockGameIdToId_.find(sceneId);
+                if (m != blockGameIdToId_.end()) { auto it = m->second.find(block); if (it != m->second.end()) { blockId = it->second; return; } }
+                auto owner = host_.blockToScene.find(block);
+                if (owner != host_.blockToScene.end() && owner->second == sceneId) { blockId = block; return; }
+                throw std::runtime_error("unknown block: " + block);
+            }
+            if (!block.empty())
+            {
+                if (!host_.blockToScene.count(block)) throw std::runtime_error("unknown block: " + block);
+                blockId = block;
+                return;
+            }
+            if (host_.bundle->scenes.empty()) throw std::runtime_error("no scenes in bundle");
+        }
         std::string resolveSceneRef(const std::string& r)
         {
             if (r.empty()) return "";
