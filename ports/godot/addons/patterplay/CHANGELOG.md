@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-05
+
 ### Changed
 
 - **The `replay_prompt_on_choose` engine option speaks back only an authored prompt, and exactly what the choice showed.** A game that

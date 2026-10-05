@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-05
+
 ### Changed
 
 - **`EngineOptions::replayPromptOnChoose` speaks back only an authored prompt, and exactly what the choice showed.** A game that

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-05
+
 ### Changed
 
 - **`replayPromptOnChoose` speaks back only an authored prompt, and exactly what the choice showed.** A game that
