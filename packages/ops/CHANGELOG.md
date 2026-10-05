@@ -1,5 +1,16 @@
 # @patterkit/ops
 
+## 0.12.5
+
+### Patch Changes
+
+- c062a42: Uses `@patterkit/runtime` 0.18.0, the Patterplay 0.18.0 release.
+- 5ac9fb2: The save shape gains an optional `FlowCursor.pendingPrompt`: the prompt `replayPromptOnChoose` is still to speak back, as the choice showed it. The runtime inlined into playable HTML exports is refreshed to the current engine (only an authored prompt is replayed, exactly as shown).
+- Updated dependencies [5ac9fb2]
+  - @patterkit/model@0.9.0
+  - @patterkit/compiler@0.4.5
+  - @patterkit/core@0.3.2
+
 ## 0.12.4
 
 ### Patch Changes

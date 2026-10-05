@@ -1,5 +1,11 @@
 # @patterkit/model
 
+## 0.9.0
+
+### Minor Changes
+
+- 5ac9fb2: The save shape gains an optional `FlowCursor.pendingPrompt`: the prompt `replayPromptOnChoose` is still to speak back, as the choice showed it. The runtime inlined into playable HTML exports is refreshed to the current engine (only an authored prompt is replayed, exactly as shown).
+
 ## 0.8.0
 
 ### Minor Changes
