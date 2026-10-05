@@ -1,5 +1,12 @@
 # @patterkit/ops
 
+## 0.12.4
+
+### Patch Changes
+
+- 05e5456: The runtime inlined into playable HTML exports is refreshed to the current engine (opening a flow at an address that doesn't resolve now changes nothing).
+- 7ea470f: Uses `@patterkit/runtime` 0.17.0, the Patterplay 0.17.0 release.
+
 ## 0.12.3
 
 ### Patch Changes
