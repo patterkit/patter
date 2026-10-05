@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-05
+
 ### Added
 
 - **Blueprint sees a choice whole.** `FPatterStep.GroupId` names a choice step's group, and

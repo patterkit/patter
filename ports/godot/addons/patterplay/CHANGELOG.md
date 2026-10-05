@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-05
+
 ### Changed
 
 - **A choice step carries its `groupId`, and each option a structured `prompt`.** The same shape the

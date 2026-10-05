@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-05
+
 ### Fixed
 
 - **`openFlow` at an address that does not resolve changes nothing.** It threw, but only after closing
