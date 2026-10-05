@@ -16,13 +16,14 @@ parser or compiler. Four case kinds, each with a reference runner in
   `ast` against `scopes` (a `scope -> name -> value` map), seeding the PRNG from
   `seed` when present, and compare the result to `expected`. `src` is
   informational only.
-- **`runtime[]`** - `{ name, bundle, seed?, locale?, start?, choices?, expectedTranscript }`.
+- **`runtime[]`** - `{ name, bundle, seed?, locale?, engineOptions?, start?, choices?, expectedTranscript }`.
   Load `bundle`, start at `start` (or the first scene), play it - consuming
   `choices` in order at each choice point - and compare the emitted step sequence
   to `expectedTranscript`. When `locale` is set, resolve strings + character names
   in that locale; an **IDs-only** bundle (`bundle.localisation.mode === "ids"`)
   ships no strings, so the engine must emit beat IDs and omit character names.
-- **`scripted[]`** - `{ name, bundle, bundleB?, seed?, script }`. Execute the `script`
+  `engineOptions` (see below) sets the engine's construction options.
+- **`scripted[]`** - `{ name, bundle, bundleB?, seed?, engineOptions?, script }`. Execute the `script`
   ops (`openFlow` / `useFlow` / `advance` / `choose` / `saveLoad` / `setLocale` /
   `setClosedCaptions` / `hotSwap` / `reset`) against your engine; each op carrying
   `expect` must produce exactly that transcript chunk, ops without it none.
@@ -41,6 +42,23 @@ A `TranscriptStep` is a normalised step result: `line` / `text` / `gameEvent` /
 whole: its `groupId`, and each option as `{ id, prompt?, eligible, gameData? }`, where
 `prompt` is `{ kind, text, character?, characterName?, direction? }` (the speaker fields
 on a `line` prompt only, each only when set). There is no flat `text` on an option.
+
+A speaker field (`character`, `characterName`, `direction`) on a line or a line prompt
+is absent only when unset: one set to `""` is written as `""`, never dropped.
+
+A `runtime`, `scripted`, or `saves` case may carry `engineOptions`:
+`{ replayPromptOnChoose?, closedCaptions? }`, the engine's construction options of the
+same names. Construct the case's engine with them, and every engine a `saveLoad` or
+`hotSwap` makes in the case; a key left out keeps the engine's default. With
+`replayPromptOnChoose`, `choose` delivers the chosen option's AUTHORED prompt (an Option
+group's own prompt beat) as the first beat of its content, with the text and speaker fields
+the choice showed, not re-resolved. A prompt borrowed from the option's own first content
+line is not replayed. A save taken between `choose` and the next advance still delivers it
+as shown: the save carries it as the flow cursor's `pendingPrompt`.
+
+A `saves` case may stand for a save an older runtime wrote, with a field it did not have
+yet left out of its `envelope`; its `keyPaths` are that envelope's, so writing the loaded
+state back must not invent the field either.
 
 An `openFlow` op may carry `expectResult`: `false` means the address must not resolve
 (an unknown scene, or a block that is not in the named scene), and the refused open

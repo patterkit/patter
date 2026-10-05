@@ -119,9 +119,9 @@ namespace
 			{
 				Opt.PromptKind = O.prompt->kind == "line" ? EPatterPromptKind::Line : EPatterPromptKind::Text;
 				Opt.Text = Ue(O.prompt->text);
-				Opt.Character = Ue(O.prompt->character);
-				Opt.CharacterName = Ue(O.prompt->characterName);
-				Opt.Direction = Ue(O.prompt->direction);
+				if (O.prompt->hasCharacter) Opt.Character = Ue(O.prompt->character);
+				if (O.prompt->hasCharacterName) Opt.CharacterName = Ue(O.prompt->characterName);
+				if (O.prompt->hasDirection) Opt.Direction = Ue(O.prompt->direction);
 			}
 			Out.Options.Add(Opt);
 		}

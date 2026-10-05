@@ -132,7 +132,7 @@ namespace Patterkit.Patterplay
                 foreach (var o in f.PendingOptions) options.Add(OptionToken(o));
                 pending = new JObject { ["groupId"] = f.PendingGroupId, ["options"] = options };
             }
-            return new JObject
+            var flow = new JObject
             {
                 ["rngState"] = f.RngState,
                 ["visits"] = IntMap(f.Visits),
@@ -149,20 +149,31 @@ namespace Patterkit.Patterplay
                     ["selectors"] = SelectorMap(f.Selectors),
                 },
             };
+            // The prompt still to replay, as the choice showed it: written only in the choose->advance window.
+            if (f.PendingPrompt != null) ((JObject)flow["cursor"]).Add("pendingPrompt", PromptToken(f.PendingPrompt));
+            return flow;
         }
+
+        private static JObject PromptToken(ChoicePrompt prompt)
+        {
+            // Optional prompt fields are absent, not empty, when the prompt has none (the JS shape).
+            var p = new JObject { ["kind"] = prompt.Kind, ["text"] = prompt.Text ?? "" };
+            if (prompt.Character != null) p["character"] = prompt.Character;
+            if (prompt.CharacterName != null) p["characterName"] = prompt.CharacterName;
+            if (prompt.Direction != null) p["direction"] = prompt.Direction;
+            return p;
+        }
+
+        private static ChoicePrompt ReadPrompt(JObject p) => new ChoicePrompt
+        {
+            Kind = StrOrNull(p, "kind"), Text = StrOrNull(p, "text"), Character = StrOrNull(p, "character"),
+            CharacterName = StrOrNull(p, "characterName"), Direction = StrOrNull(p, "direction"),
+        };
 
         private static JObject OptionToken(ChoiceOption o)
         {
             var t = new JObject { ["id"] = o.Id };
-            if (o.Prompt != null)
-            {
-                // Optional prompt fields are absent, not empty, when the option has none (the JS shape).
-                var p = new JObject { ["kind"] = o.Prompt.Kind, ["text"] = o.Prompt.Text ?? "" };
-                if (o.Prompt.Character != null) p["character"] = o.Prompt.Character;
-                if (o.Prompt.CharacterName != null) p["characterName"] = o.Prompt.CharacterName;
-                if (o.Prompt.Direction != null) p["direction"] = o.Prompt.Direction;
-                t["prompt"] = p;
-            }
+            if (o.Prompt != null) t["prompt"] = PromptToken(o.Prompt);
             t["eligible"] = o.Eligible;
             if (o.GameData != null) t["gameData"] = ValueMap(o.GameData);
             return t;
@@ -315,6 +326,7 @@ namespace Patterkit.Patterplay
                 PendingOptions = pendingOptions,
                 PendingGroupId = pendingGroupId,
                 PendingPromptOwnerId = StrOrNull(c, "pendingPromptOwnerId"),
+                PendingPrompt = Obj(c, "pendingPrompt") is JObject pp ? ReadPrompt(pp) : null,
                 Selectors = ReadSelectorMap(Obj(c, "selectors")),
             };
 #pragma warning disable CS0618 // version 2's property sections
@@ -332,12 +344,7 @@ namespace Patterkit.Patterplay
             {
                 if (!(e is JObject o)) continue;
                 var opt = new ChoiceOption { Id = StrOrNull(o, "id"), Eligible = (bool?)Get(o, "eligible") ?? false };
-                if (Obj(o, "prompt") is JObject p)
-                    opt.Prompt = new ChoicePrompt
-                    {
-                        Kind = StrOrNull(p, "kind"), Text = StrOrNull(p, "text"), Character = StrOrNull(p, "character"),
-                        CharacterName = StrOrNull(p, "characterName"), Direction = StrOrNull(p, "direction"),
-                    };
+                if (Obj(o, "prompt") is JObject p) opt.Prompt = ReadPrompt(p);
                 if (Obj(o, "gameData") is JObject gd)
                 {
                     opt.GameData = new GameData();

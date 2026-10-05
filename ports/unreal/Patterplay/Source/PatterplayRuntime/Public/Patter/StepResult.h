@@ -15,9 +15,10 @@ namespace patter
     {
         std::string kind;            // line | text
         std::string text;
-        std::string character;       // line only
-        std::string characterName;   // line only
-        std::string direction;       // line only
+        // Line only, and only when set: a field set to "" is kept (has = true), as on StepResult.
+        bool hasCharacter = false; std::string character;
+        bool hasCharacterName = false; std::string characterName;
+        bool hasDirection = false; std::string direction;
     };
 
     struct ChoiceOption

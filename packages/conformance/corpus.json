@@ -5148,6 +5148,1139 @@
       ]
     },
     {
+      "name": "replayPromptOnChoose: a chosen option's authored prompt is spoken back as the choice showed it",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0nh85wa",
+          "structureHash": "1892csu"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_door",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_pay",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_pay",
+                        "type": "group",
+                        "selector": "sequence",
+                        "children": [
+                          {
+                            "id": "pay_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_paid",
+                                "kind": "text"
+                              }
+                            ],
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@coins",
+                                "value": {
+                                  "src": "0",
+                                  "ast": [
+                                    "n",
+                                    0
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_pay",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_end",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there?",
+            "P_go": "Leave",
+            "T_ask": "No answer.",
+            "P_pay": "Pay {@coins} coins",
+            "T_paid": "Paid. {@coins} left.",
+            "T_end": "Done."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_ask",
+        "o_pay"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "groupId": "g_door",
+          "options": [
+            {
+              "id": "o_ask",
+              "prompt": {
+                "kind": "line",
+                "text": "Who's there?",
+                "character": "ANNA",
+                "characterName": "Anna",
+                "direction": "quietly"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_go",
+              "prompt": {
+                "kind": "text",
+                "text": "Leave"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "P_ask",
+          "text": "Who's there?",
+          "character": "ANNA",
+          "characterName": "Anna",
+          "direction": "quietly"
+        },
+        {
+          "type": "text",
+          "id": "T_ask",
+          "text": "No answer."
+        },
+        {
+          "type": "choice",
+          "groupId": "g_pay",
+          "options": [
+            {
+              "id": "o_pay",
+              "prompt": {
+                "kind": "text",
+                "text": "Pay 3 coins"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "P_pay",
+          "text": "Pay 3 coins"
+        },
+        {
+          "type": "text",
+          "id": "T_paid",
+          "text": "Paid. 0 left."
+        },
+        {
+          "type": "text",
+          "id": "T_end",
+          "text": "Done."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "replayPromptOnChoose off: a chosen option plays only its content",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0nh85wa",
+          "structureHash": "1892csu"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_door",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_pay",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_pay",
+                        "type": "group",
+                        "selector": "sequence",
+                        "children": [
+                          {
+                            "id": "pay_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_paid",
+                                "kind": "text"
+                              }
+                            ],
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@coins",
+                                "value": {
+                                  "src": "0",
+                                  "ast": [
+                                    "n",
+                                    0
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_pay",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_end",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there?",
+            "P_go": "Leave",
+            "T_ask": "No answer.",
+            "P_pay": "Pay {@coins} coins",
+            "T_paid": "Paid. {@coins} left.",
+            "T_end": "Done."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": false
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_ask",
+        "o_pay"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "groupId": "g_door",
+          "options": [
+            {
+              "id": "o_ask",
+              "prompt": {
+                "kind": "line",
+                "text": "Who's there?",
+                "character": "ANNA",
+                "characterName": "Anna",
+                "direction": "quietly"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_go",
+              "prompt": {
+                "kind": "text",
+                "text": "Leave"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "T_ask",
+          "text": "No answer."
+        },
+        {
+          "type": "choice",
+          "groupId": "g_pay",
+          "options": [
+            {
+              "id": "o_pay",
+              "prompt": {
+                "kind": "text",
+                "text": "Pay 3 coins"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "T_paid",
+          "text": "Paid. 0 left."
+        },
+        {
+          "type": "text",
+          "id": "T_end",
+          "text": "Done."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "replayPromptOnChoose: a prompt borrowed from the option's own content is not spoken back",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0zah8zs",
+          "structureHash": "0jlesx4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 1
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_bare",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_bare",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "L_bare",
+                            "kind": "line",
+                            "character": "ANNA"
+                          },
+                          {
+                            "id": "T_more",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@coins",
+                            "value": {
+                              "src": "@coins + 1",
+                              "ast": [
+                                "bin",
+                                "+",
+                                [
+                                  "sv",
+                                  "patter",
+                                  "coins"
+                                ],
+                                [
+                                  "n",
+                                  1
+                                ]
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_fall",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_fall",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "fall_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_fall",
+                                "kind": "text"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_quiet",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_quiet",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "quiet_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "E_quiet",
+                                "kind": "gameEvent"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_bare": "I have {@coins}.",
+            "T_more": "More.",
+            "T_fall": "Falling back."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "groupId": "g_bare",
+          "options": [
+            {
+              "id": "o_bare",
+              "prompt": {
+                "kind": "line",
+                "text": "I have 1.",
+                "character": "ANNA",
+                "characterName": "Anna"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "L_bare",
+          "text": "I have 2.",
+          "character": "ANNA",
+          "characterName": "Anna"
+        },
+        {
+          "type": "text",
+          "id": "T_more",
+          "text": "More."
+        },
+        {
+          "type": "choice",
+          "groupId": "g_fall",
+          "options": [
+            {
+              "id": "o_fall",
+              "prompt": {
+                "kind": "text",
+                "text": "Falling back."
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "T_fall",
+          "text": "Falling back."
+        },
+        {
+          "type": "choice",
+          "groupId": "g_quiet",
+          "options": [
+            {
+              "id": "o_quiet",
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "gameEvent",
+          "id": "E_quiet"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "closedCaptions off at construction strips cues from lines, line prompts, and a replayed line prompt",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0q4o6h9",
+          "structureHash": "0wot30k"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_open",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_open",
+                        "kind": "line",
+                        "character": "ANNA"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_sigh",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sigh_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_sigh",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_sigh",
+                          "kind": "line",
+                          "character": "ANNA"
+                        }
+                      },
+                      {
+                        "id": "o_note",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "note_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_note",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_open": "Oh dear. [sigh] What now?",
+            "P_sigh": "Fine. [groans]",
+            "P_note": "Read [the note]",
+            "T_sigh": "[A door creaks.]"
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true,
+        "closedCaptions": false
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_sigh"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_open",
+          "text": "Oh dear. What now?",
+          "character": "ANNA",
+          "characterName": "Anna"
+        },
+        {
+          "type": "choice",
+          "groupId": "g",
+          "options": [
+            {
+              "id": "o_sigh",
+              "prompt": {
+                "kind": "line",
+                "text": "Fine.",
+                "character": "ANNA",
+                "characterName": "Anna"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_note",
+              "prompt": {
+                "kind": "text",
+                "text": "Read [the note]"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "P_sigh",
+          "text": "Fine.",
+          "character": "ANNA",
+          "characterName": "Anna"
+        },
+        {
+          "type": "text",
+          "id": "T_sigh",
+          "text": "[A door creaks.]"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "a speaker field set to the empty string is kept, on a line and on a line prompt",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "07me90q",
+          "structureHash": "0voa8ah"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": ""
+          },
+          {
+            "name": "BO",
+            "displayName": "Bo"
+          },
+          {
+            "name": "CY",
+            "displayName": "Cy"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_a",
+                        "kind": "line",
+                        "character": "ANNA",
+                        "direction": ""
+                      },
+                      {
+                        "id": "L_b",
+                        "kind": "line",
+                        "character": "BO"
+                      },
+                      {
+                        "id": "L_c",
+                        "kind": "line",
+                        "character": "CY"
+                      },
+                      {
+                        "id": "L_n",
+                        "kind": "line",
+                        "character": ""
+                      },
+                      {
+                        "id": "L_x",
+                        "kind": "line",
+                        "direction": ""
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_e",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_a",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "a_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_a",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": ""
+                        }
+                      },
+                      {
+                        "id": "o_b",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "b_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_b",
+                          "kind": "line",
+                          "character": "BO"
+                        }
+                      },
+                      {
+                        "id": "o_n",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "n_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_n",
+                          "kind": "line",
+                          "character": ""
+                        }
+                      },
+                      {
+                        "id": "o_x",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "x_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_x",
+                          "kind": "line"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_a": "A",
+            "L_b": "B",
+            "L_c": "C",
+            "L_n": "N",
+            "L_x": "X",
+            "P_a": "Pa",
+            "P_b": "Pb",
+            "P_n": "Pn",
+            "P_x": "Px",
+            "cast:CY": ""
+          },
+          "fr": {
+            "L_a": "A",
+            "L_b": "B",
+            "L_c": "C",
+            "L_n": "N",
+            "L_x": "X",
+            "P_a": "Pa",
+            "P_b": "Pb",
+            "P_n": "Pn",
+            "P_x": "Px",
+            "cast:BO": "",
+            "cast:": "Someone"
+          }
+        }
+      },
+      "locale": "fr",
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_x"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_a",
+          "text": "A",
+          "character": "ANNA",
+          "direction": ""
+        },
+        {
+          "type": "line",
+          "id": "L_b",
+          "text": "B",
+          "character": "BO",
+          "characterName": ""
+        },
+        {
+          "type": "line",
+          "id": "L_c",
+          "text": "C",
+          "character": "CY",
+          "characterName": ""
+        },
+        {
+          "type": "line",
+          "id": "L_n",
+          "text": "N",
+          "character": "",
+          "characterName": "Someone"
+        },
+        {
+          "type": "line",
+          "id": "L_x",
+          "text": "X",
+          "direction": ""
+        },
+        {
+          "type": "choice",
+          "groupId": "g_e",
+          "options": [
+            {
+              "id": "o_a",
+              "prompt": {
+                "kind": "line",
+                "text": "Pa",
+                "character": "ANNA",
+                "direction": ""
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_b",
+              "prompt": {
+                "kind": "line",
+                "text": "Pb",
+                "character": "BO",
+                "characterName": ""
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_n",
+              "prompt": {
+                "kind": "line",
+                "text": "Pn",
+                "character": "",
+                "characterName": "Someone"
+              },
+              "eligible": true
+            },
+            {
+              "id": "o_x",
+              "prompt": {
+                "kind": "line",
+                "text": "Px"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
       "name": "specificity prefers the more specific line (AND sums)",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -12079,6 +13212,652 @@
           ]
         }
       ]
+    },
+    {
+      "name": "replayPromptOnChoose: a save between choose and the next advance still speaks the prompt as shown",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "15nzomp",
+          "structureHash": "1fm4mu4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "selector": "sequence",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ],
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@coins",
+                                "value": {
+                                  "src": "0",
+                                  "ast": [
+                                    "n",
+                                    0
+                                  ]
+                                }
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there? I have {@coins}.",
+            "P_go": "Leave",
+            "T_ask": "No answer. {@coins} left."
+          },
+          "fr": {
+            "P_ask": "Qui est la ? J'ai {@coins}.",
+            "P_go": "Partir",
+            "T_ask": "Pas de reponse. Il reste {@coins}.",
+            "cast:ANNA": "Annette"
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_ask",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Who's there? I have 3.",
+                    "character": "ANNA",
+                    "characterName": "Anna",
+                    "direction": "quietly"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_ask"
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_ask",
+              "text": "Who's there? I have 3.",
+              "character": "ANNA",
+              "characterName": "Anna",
+              "direction": "quietly"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_ask",
+              "text": "Pas de reponse. Il reste 0."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "replayPromptOnChoose: the replay is the prompt as shown, though the language changed after choosing",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "15nzomp",
+          "structureHash": "1fm4mu4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "selector": "sequence",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ],
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@coins",
+                                "value": {
+                                  "src": "0",
+                                  "ast": [
+                                    "n",
+                                    0
+                                  ]
+                                }
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there? I have {@coins}.",
+            "P_go": "Leave",
+            "T_ask": "No answer. {@coins} left."
+          },
+          "fr": {
+            "P_ask": "Qui est la ? J'ai {@coins}.",
+            "P_go": "Partir",
+            "T_ask": "Pas de reponse. Il reste {@coins}.",
+            "cast:ANNA": "Annette"
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_ask",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Who's there? I have 3.",
+                    "character": "ANNA",
+                    "characterName": "Anna",
+                    "direction": "quietly"
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Leave"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_ask"
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_ask",
+              "text": "Who's there? I have 3.",
+              "character": "ANNA",
+              "characterName": "Anna",
+              "direction": "quietly"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_ask",
+              "text": "Pas de reponse. Il reste 0."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a pending choice's empty speaker fields survive save and load",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0lq02db",
+          "structureHash": "0loen7i"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          },
+          {
+            "name": "BO",
+            "displayName": "Bo"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_a",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "a_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_a",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_a",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": ""
+                        }
+                      },
+                      {
+                        "id": "o_b",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "b_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_b",
+                          "kind": "line",
+                          "character": "BO"
+                        }
+                      },
+                      {
+                        "id": "o_n",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "n_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_n",
+                          "kind": "line",
+                          "character": ""
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_a": "Pa",
+            "P_b": "Pb",
+            "P_n": "Pn",
+            "T_a": "Gone.",
+            "cast:BO": ""
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_a",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pa",
+                    "character": "ANNA",
+                    "characterName": "Anna",
+                    "direction": ""
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_b",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pb",
+                    "character": "BO",
+                    "characterName": ""
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_n",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pn",
+                    "character": ""
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_a",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pa",
+                    "character": "ANNA",
+                    "characterName": "Anna",
+                    "direction": ""
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_b",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pb",
+                    "character": "BO",
+                    "characterName": ""
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_n",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pn",
+                    "character": ""
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_a"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_a",
+              "text": "Gone."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [
@@ -12747,6 +14526,878 @@
               "type": "text",
               "id": "TR",
               "text": "went right"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a save written by the JS reference between choose and advance speaks the prompt back as shown",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "15nzomp",
+          "structureHash": "1fm4mu4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "selector": "sequence",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ],
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@coins",
+                                "value": {
+                                  "src": "0",
+                                  "ast": [
+                                    "n",
+                                    0
+                                  ]
+                                }
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there? I have {@coins}.",
+            "P_go": "Leave",
+            "T_ask": "No answer. {@coins} left."
+          },
+          "fr": {
+            "P_ask": "Qui est la ? J'ai {@coins}.",
+            "P_go": "Partir",
+            "T_ask": "Pas de reponse. Il reste {@coins}.",
+            "cast:ANNA": "Annette"
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {
+              "coins": 0
+            },
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "g": 1,
+            "o_ask": 1,
+            "ask_c": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "g": 1,
+                "o_ask": 1,
+                "ask_c": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": "ask_c",
+                "beatIndex": 0,
+                "pendingChoice": null,
+                "pendingPromptOwnerId": "o_ask",
+                "pendingPrompt": {
+                  "kind": "line",
+                  "text": "Who's there? I have 3.",
+                  "character": "ANNA",
+                  "characterName": "Anna",
+                  "direction": "quietly"
+                },
+                "selectors": {
+                  "o_ask": {
+                    "seq": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingPrompt",
+        "save/flows/main/cursor/pendingPrompt/character",
+        "save/flows/main/cursor/pendingPrompt/characterName",
+        "save/flows/main/cursor/pendingPrompt/direction",
+        "save/flows/main/cursor/pendingPrompt/kind",
+        "save/flows/main/cursor/pendingPrompt/text",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/selectors/o_ask",
+        "save/flows/main/cursor/selectors/o_ask/seq",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/ask_c",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g",
+        "save/flows/main/visits/o_ask",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/coins",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/ask_c",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g",
+        "save/sharedVisits/o_ask",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_ask",
+              "text": "Who's there? I have 3.",
+              "character": "ANNA",
+              "characterName": "Anna",
+              "direction": "quietly"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_ask",
+              "text": "Pas de reponse. Il reste 0."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a save written before saves carried the shown prompt resolves the prompt when it is delivered",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "15nzomp",
+          "structureHash": "1fm4mu4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          }
+        ],
+        "properties": [
+          {
+            "name": "coins",
+            "type": "number",
+            "shared": true,
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "selector": "sequence",
+                        "children": [
+                          {
+                            "id": "ask_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_ask",
+                                "kind": "text"
+                              }
+                            ],
+                            "onEnter": [
+                              {
+                                "kind": "set",
+                                "target": "@coins",
+                                "value": {
+                                  "src": "0",
+                                  "ast": [
+                                    "n",
+                                    0
+                                  ]
+                                }
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": "quietly"
+                        }
+                      },
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Who's there? I have {@coins}.",
+            "P_go": "Leave",
+            "T_ask": "No answer. {@coins} left."
+          },
+          "fr": {
+            "P_ask": "Qui est la ? J'ai {@coins}.",
+            "P_go": "Partir",
+            "T_ask": "Pas de reponse. Il reste {@coins}.",
+            "cast:ANNA": "Annette"
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {
+              "coins": 0
+            },
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "g": 1,
+            "o_ask": 1,
+            "ask_c": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "g": 1,
+                "o_ask": 1,
+                "ask_c": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": "ask_c",
+                "beatIndex": 0,
+                "pendingChoice": null,
+                "pendingPromptOwnerId": "o_ask",
+                "selectors": {
+                  "o_ask": {
+                    "seq": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/selectors/o_ask",
+        "save/flows/main/cursor/selectors/o_ask/seq",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/ask_c",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g",
+        "save/flows/main/visits/o_ask",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/coins",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/ask_c",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g",
+        "save/sharedVisits/o_ask",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_ask",
+              "text": "Qui est la ? J'ai 0.",
+              "character": "ANNA",
+              "characterName": "Annette",
+              "direction": "quietly"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_ask",
+              "text": "Pas de reponse. Il reste 0."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a save written by the JS reference keeps a pending choice's empty speaker fields",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0lq02db",
+          "structureHash": "0loen7i"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA",
+            "displayName": "Anna"
+          },
+          {
+            "name": "BO",
+            "displayName": "Bo"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_a",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "a_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_a",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_a",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "direction": ""
+                        }
+                      },
+                      {
+                        "id": "o_b",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "b_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_b",
+                          "kind": "line",
+                          "character": "BO"
+                        }
+                      },
+                      {
+                        "id": "o_n",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "n_c",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_n",
+                          "kind": "line",
+                          "character": ""
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_a": "Pa",
+            "P_b": "Pb",
+            "P_n": "Pn",
+            "T_a": "Gone.",
+            "cast:BO": ""
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {},
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "g": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "g": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1
+                  }
+                ],
+                "activeSnippetId": null,
+                "beatIndex": 0,
+                "pendingChoice": {
+                  "groupId": "g",
+                  "options": [
+                    {
+                      "id": "o_a",
+                      "prompt": {
+                        "kind": "line",
+                        "text": "Pa",
+                        "character": "ANNA",
+                        "characterName": "Anna",
+                        "direction": ""
+                      },
+                      "eligible": true
+                    },
+                    {
+                      "id": "o_b",
+                      "prompt": {
+                        "kind": "line",
+                        "text": "Pb",
+                        "character": "BO",
+                        "characterName": ""
+                      },
+                      "eligible": true
+                    },
+                    {
+                      "id": "o_n",
+                      "prompt": {
+                        "kind": "line",
+                        "text": "Pn",
+                        "character": ""
+                      },
+                      "eligible": true
+                    }
+                  ]
+                },
+                "pendingPromptOwnerId": null,
+                "selectors": {}
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingChoice/groupId",
+        "save/flows/main/cursor/pendingChoice/options",
+        "save/flows/main/cursor/pendingChoice/options[0]",
+        "save/flows/main/cursor/pendingChoice/options[0]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[0]/id",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/character",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/characterName",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/direction",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
+        "save/flows/main/cursor/pendingChoice/options[1]",
+        "save/flows/main/cursor/pendingChoice/options[1]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[1]/id",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/character",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/characterName",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
+        "save/flows/main/cursor/pendingChoice/options[2]",
+        "save/flows/main/cursor/pendingChoice/options[2]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[2]/id",
+        "save/flows/main/cursor/pendingChoice/options[2]/prompt",
+        "save/flows/main/cursor/pendingChoice/options[2]/prompt/character",
+        "save/flows/main/cursor/pendingChoice/options[2]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[2]/prompt/text",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_a",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pa",
+                    "character": "ANNA",
+                    "characterName": "Anna",
+                    "direction": ""
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_b",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pb",
+                    "character": "BO",
+                    "characterName": ""
+                  },
+                  "eligible": true
+                },
+                {
+                  "id": "o_n",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Pn",
+                    "character": ""
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_a"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_a",
+              "text": "Gone."
             }
           ]
         },

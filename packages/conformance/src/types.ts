@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ScalarValue, AstNode } from "@wildwinter/expr";
-import type { Bundle, ProjectFile, Scene, LocaleFile, GameData, GameDataNodeKind, SaveEnvelope } from "@patterkit/model";
+import type { Bundle, ProjectFile, Scene, LocaleFile, GameData, GameDataNodeKind, SaveEnvelope, SaveGame } from "@patterkit/model";
 
 export type ScopeBag = Record<string, ScalarValue>;
 
@@ -57,6 +57,20 @@ export interface TranscriptPrompt {
   direction?: string;
 }
 
+/**
+ * Engine construction options a case plays under. A runner passes them to its engine's constructor, and to
+ * every engine a `saveLoad` or `hotSwap` makes in the case, exactly as a game constructs each of its engines
+ * the same way. Absent (or a key absent) = the engine's default. Only options every runtime takes at
+ * construction belong here; the PRNG seed and the locale keep their own fields.
+ */
+export interface CaseEngineOptions {
+  /** `replayPromptOnChoose`: on `choose`, the chosen option's prompt beat is delivered as the first beat of
+   *  its content (the choice "spoken back"). Default `false`. */
+  replayPromptOnChoose?: boolean;
+  /** `closedCaptions`: whether the engine starts with caption cues shown (`true`, the default) or stripped. */
+  closedCaptions?: boolean;
+}
+
 /** A compiled expression case in the portable corpus. */
 export interface ExpressionCase {
   name: string;
@@ -96,6 +110,8 @@ export interface RuntimeCase {
    *  missing in the active locale falls back to the default locale (part of the contract). Ignored by an
    *  IDs-only bundle (`bundle.localisation.mode === "ids"`), which emits beat IDs the host localises. */
   locale?: string;
+  /** Engine construction options (omit for the defaults). */
+  engineOptions?: CaseEngineOptions;
   start?: { scene?: string; block?: string };
   /**
    * Eligible option ids consumed in order at each choice point. CONTRACT: when
@@ -173,6 +189,8 @@ export interface ScriptedCase {
   bundleB?: Bundle;
   /** Seeds each flow's built-in serialisable PRNG (survives saveLoad). */
   seed?: number;
+  /** Engine construction options, for this engine and every engine `saveLoad` / `hotSwap` makes. */
+  engineOptions?: CaseEngineOptions;
   script: ScriptOp[];
 }
 
@@ -206,6 +224,9 @@ export interface SaveCase {
   name: string;
   bundle: Bundle;
   seed?: number;
+  /** Engine construction options, for the engine that loads the envelope (the reference wrote it under the
+   *  same) and every engine the script's `saveLoad` makes. */
+  engineOptions?: CaseEngineOptions;
   /** `{ schema: "patter/save@0", save }` exactly as `@patterkit/play-helpers` serializeState writes it. */
   envelope: SaveEnvelope;
   /** Every key path in `envelope`, sorted (`save/flows/main/cursor/stack[0]/sceneId`); containers included. */
@@ -254,6 +275,7 @@ export interface RuntimeFixture {
   /** Build an IDs-only bundle: buildCorpus strips the strings + sets `localisation.mode = "ids"`, so the
    *  engine emits beat IDs and omits character names (the game localises them). */
   idsOnly?: boolean;
+  engineOptions?: CaseEngineOptions;
   start?: { scene?: string; block?: string };
   choices?: string[];
   expectedTranscript: TranscriptStep[];
@@ -280,6 +302,7 @@ export interface ScriptedFixture {
   localesB?: LocaleFile[];
   projectB?: ProjectFile;
   seed?: number;
+  engineOptions?: CaseEngineOptions;
   script: ScriptOp[];
 }
 
@@ -289,8 +312,13 @@ export interface SaveFixture {
   scenes: Scene[];
   locales?: LocaleFile[];
   seed?: number;
+  engineOptions?: CaseEngineOptions;
   /** Played by the reference engine at corpus-build time; the envelope is what it saves afterwards. */
   setup: ScriptOp[];
+  /** Edits the reference's save before it becomes the envelope: to stand for a save an older runtime
+   *  wrote (a field it did not have yet). The case's `keyPaths` are the edited envelope's, so a runtime
+   *  must write back exactly what it loaded. */
+  editSave?: (save: SaveGame) => void;
   /** What every runtime must reproduce having loaded that envelope. */
   script: ScriptOp[];
 }

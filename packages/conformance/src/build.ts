@@ -43,6 +43,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
       bundle,
       ...(f.seed !== undefined ? { seed: f.seed } : {}),
       ...(f.locale !== undefined ? { locale: f.locale } : {}),
+      ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
       // The start scene is always RESOLVED into the case: a port parsing
       // `bundle.scenes` into an unordered map cannot rely on key order to find
       // the default entry scene.
@@ -59,6 +60,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     // edited scenes/strings.
     ...(f.scenesB ? { bundleB: exportBundle({ project: f.projectB ?? f.project, scenes: f.scenesB, locales: f.localesB ?? f.locales }) } : {}),
     ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
     script: f.script,
   }));
 
@@ -76,13 +78,15 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
   // document another runtime wrote - the one thing a self round-trip can never check.
   const saves: SaveCase[] = fixtures.saves.map((f) => {
     const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
-    const options = f.seed !== undefined ? { seed: f.seed } : {};
+    const options = { ...(f.seed !== undefined ? { seed: f.seed } : {}), ...f.engineOptions };
     const { engine } = runScript(new Engine(bundle, options), f.setup, { bundle, options });
     const envelope: SaveEnvelope = { schema: SAVE_SCHEMA, save: JSON.parse(JSON.stringify(engine.saveGame())) };
+    f.editSave?.(envelope.save); // a save as an older runtime wrote it
     return {
       name: f.name,
       bundle,
       ...(f.seed !== undefined ? { seed: f.seed } : {}),
+      ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
       envelope,
       keyPaths: envelopeKeyPaths(envelope),
       script: f.script,

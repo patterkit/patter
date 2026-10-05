@@ -6,7 +6,7 @@
 // import the corpus JSON and re-implement the two runners in its own language.
 
 export type {
-  Corpus, ExpressionCase, SpecificityCase, RuntimeCase, ScriptedCase, GameDataCase, SaveCase, ScriptOp, TranscriptStep, TranscriptOption, TranscriptPrompt, ScopeBag,
+  Corpus, ExpressionCase, SpecificityCase, RuntimeCase, ScriptedCase, GameDataCase, SaveCase, ScriptOp, CaseEngineOptions, TranscriptStep, TranscriptOption, TranscriptPrompt, ScopeBag,
   ExpressionFixture, SpecificityFixture, RuntimeFixture, ScriptedFixture, GameDataFixture, SaveFixture, Fixtures,
 } from "./types.js";
 export { buildCorpus } from "./build.js";

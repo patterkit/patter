@@ -172,8 +172,9 @@ namespace
 		patter::Beat B;
 		B.id = Std(O->Values.FindRef(TEXT("id"))->AsString());
 		B.kind = Std(O->Values.FindRef(TEXT("kind"))->AsString());
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("character"))) B.character = Std((*P)->AsString());
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("direction"))) B.direction = Std((*P)->AsString());
+		// Set (even to "") or absent: a step keeps a "" speaker field, as every runtime does.
+		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("character"))) { B.hasCharacter = true; B.character = Std((*P)->AsString()); }
+		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("direction"))) { B.hasDirection = true; B.direction = Std((*P)->AsString()); }
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameData"))) B.gameData = ToGameData((*P)->AsObject());
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("tags"))) B.tags = StrList(*P);   // author tags (#215)
 		return B;

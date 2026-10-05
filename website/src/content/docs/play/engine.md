@@ -42,8 +42,10 @@ new Engine(bundle, options?)
 ```
 
 `options` (all optional): `seed` (the default per-flow PRNG seed), `locale` (the active
-locale; defaults to the bundle's default), `replayPromptOnChoose` (replay a chosen
-option's prompt as its first beat), and `foreignScopes` (host-owned property scopes).
+locale; defaults to the bundle's default), `replayPromptOnChoose` (speak a chosen option's
+authored prompt back as its first beat, exactly as the choice showed it; a prompt the choice
+borrowed from the option's own first line is not repeated, since that line plays anyway), and
+`foreignScopes` (host-owned property scopes).
 There's also an `rng` override, but for resumable, save-safe runs use the built-in
 seeded PRNG.
 

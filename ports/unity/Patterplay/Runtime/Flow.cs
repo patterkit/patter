@@ -38,9 +38,14 @@ namespace Patterkit.Patterplay
         private Node _activeSnippet;
         private int _beatIndex;
         private ChoiceStateInternal _pendingChoice;
+        // When ReplayPromptOnChoose: the chosen option's AUTHORED prompt beat (id, gameData, tags), delivered
+        // before its content, and the prompt exactly as the choice showed it (text and speaker fields).
+        // _pendingPromptShown is null only after loading a save written before saves carried it: the beat
+        // is then resolved when it is delivered, as it always was.
         private Beat _pendingPromptBeat;
+        private ChoicePrompt _pendingPromptShown;
         // The chosen option owning _pendingPromptBeat, so a save taken between Choose() and the next
-        // Advance() can re-derive the prompt on load (the beat isn't otherwise reachable by id).
+        // Advance() can find the prompt beat again on load (it isn't otherwise reachable by id).
         private string _pendingPromptOwnerId;
         private Dictionary<string, SelectorState> _selectors = new Dictionary<string, SelectorState>();
         private Dictionary<string, int> _visitCounts = new Dictionary<string, int>();
@@ -162,7 +167,7 @@ namespace Patterkit.Patterplay
             Touch();
             if (scene == "END")
             {
-                _started = true; _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptOwnerId = null;
+                _started = true; _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptShown = null; _pendingPromptOwnerId = null;
                 _activeSnippet = null; _beatIndex = 0;
                 _flowEnded = true; _stack = new List<StackFrame>();
                 return true;
@@ -180,7 +185,7 @@ namespace Patterkit.Patterplay
             }
             if (!_started) { Start(sceneId, blockId); return true; }
 
-            _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptOwnerId = null;
+            _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptShown = null; _pendingPromptOwnerId = null;
             _activeSnippet = null; _beatIndex = 0; // abandon the rest of the snippet being delivered
             _flowEnded = false;                    // an ended flow resumes at the target
             EnterTarget(blockId ?? sceneId, "jump"); // "jump" = replace the stack, exactly like an authored goto
@@ -201,6 +206,7 @@ namespace Patterkit.Patterplay
             _beatIndex = 0;
             _pendingChoice = null;
             _pendingPromptBeat = null;
+            _pendingPromptShown = null;
             _pendingPromptOwnerId = null;
         }
 
@@ -215,13 +221,13 @@ namespace Patterkit.Patterplay
             journal.Flows.Add(this);
             var rngState = _rngState; var started = _started; var flowEnded = _flowEnded;
             var currentSceneId = _currentSceneId; var activeSnippet = _activeSnippet; var beatIndex = _beatIndex;
-            var pendingChoice = _pendingChoice; var pendingPromptBeat = _pendingPromptBeat; var pendingPromptOwnerId = _pendingPromptOwnerId;
+            var pendingChoice = _pendingChoice; var pendingPromptBeat = _pendingPromptBeat; var pendingPromptShown = _pendingPromptShown; var pendingPromptOwnerId = _pendingPromptOwnerId;
             var stack = _stack.Select(f => f.Clone()).ToList(); // frames advance in place, so copy them
             journal.Undo.Add(() =>
             {
                 _rngState = rngState; _started = started; _flowEnded = flowEnded;
                 _currentSceneId = currentSceneId; _activeSnippet = activeSnippet; _beatIndex = beatIndex;
-                _pendingChoice = pendingChoice; _pendingPromptBeat = pendingPromptBeat; _pendingPromptOwnerId = pendingPromptOwnerId;
+                _pendingChoice = pendingChoice; _pendingPromptBeat = pendingPromptBeat; _pendingPromptShown = pendingPromptShown; _pendingPromptOwnerId = pendingPromptOwnerId;
                 _stack = stack;
             });
         }
@@ -324,7 +330,12 @@ namespace Patterkit.Patterplay
             if (_closed) return new StepResult { Type = StepType.End }; // a stale reference drives nothing
             if (!_started) throw new Exception("flow has not been started");
             Touch();
-            if (_pendingPromptBeat != null) { var b = _pendingPromptBeat; _pendingPromptBeat = null; _pendingPromptOwnerId = null; return BeatResult(b); }
+            if (_pendingPromptBeat != null)
+            {
+                var b = _pendingPromptBeat; var shown = _pendingPromptShown;
+                _pendingPromptBeat = null; _pendingPromptShown = null; _pendingPromptOwnerId = null;
+                return shown != null ? PromptResult(b, shown) : BeatResult(b);
+            }
             Settle();
             if (_flowEnded) return StepResult.End();
             if (_pendingChoice != null) return new StepResult { Type = StepType.Choice, GroupId = _pendingChoice.GroupId, Options = _pendingChoice.Options };
@@ -370,7 +381,12 @@ namespace Patterkit.Patterplay
             var node = choice.ById[id];
             Emit(new LogEntry { Type = "chose", Subject = choice.GroupId, Picked = id });
             _pendingChoice = null;
-            _pendingPromptBeat = _host.ReplayPromptOnChoose ? PromptBeatOf(node) : null;
+            // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
+            // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
+            // not replayed, since that line is about to play as content anyway.
+            var authored = _host.ReplayPromptOnChoose ? AuthoredPromptOf(node) : null;
+            _pendingPromptBeat = authored != null && option.Prompt != null ? authored : null;
+            _pendingPromptShown = _pendingPromptBeat != null ? ClonePrompt(option.Prompt) : null;
             _pendingPromptOwnerId = _pendingPromptBeat != null ? node.Id : null;
             EnterChild(node);
         }
@@ -851,6 +867,24 @@ namespace Patterkit.Patterplay
                 : new ChoicePrompt { Kind = "text", Text = text };
         }
 
+        /// <summary>An option's AUTHORED prompt beat: an Option group's own prompt. The only prompt a replay speaks.</summary>
+        private static Beat AuthoredPromptOf(Node node) => node.IsGroup ? node.Prompt : null;
+
+        /// <summary>A replayed prompt as a step: the beat's id, gameData, and tags, and the text and speaker
+        /// fields the choice showed.</summary>
+        private StepResult PromptResult(Beat beat, ChoicePrompt shown)
+        {
+            var tags = _host.TagIndex.TryGetValue(beat.Id, out var t) && t.Count > 0 ? t : null;
+            if (shown.Kind == "text")
+                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, GameData = beat.GameData, Tags = tags };
+            return new StepResult
+            {
+                Type = StepType.Line, Id = beat.Id, Text = shown.Text,
+                Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
+                GameData = beat.GameData, Tags = tags,
+            };
+        }
+
         private Beat PromptBeatOf(Node node)
         {
             if (node.IsGroup && node.Prompt != null) return node.Prompt;
@@ -1007,6 +1041,7 @@ namespace Patterkit.Patterplay
                 PendingOptions = _pendingChoice?.Options.Select(CloneOption).ToList(),
                 PendingGroupId = _pendingChoice?.GroupId,
                 PendingPromptOwnerId = _pendingPromptOwnerId,
+                PendingPrompt = ClonePrompt(_pendingPromptShown),
                 Selectors = Engine.CloneSelectors(_selectors),
             };
         }
@@ -1076,14 +1111,24 @@ namespace Patterkit.Patterplay
                 if (options.Count > 0) _pendingChoice = new ChoiceStateInternal { GroupId = snap.PendingGroupId, Options = options, ById = byId };
             }
 
-            // A save taken between Choose() and the next Advance() left a prompt still to be replayed;
-            // re-derive it from the chosen option (dropped if that option drifted out of the bundle).
+            // A save taken between Choose() and the next Advance() left a prompt still to be replayed: the
+            // chosen option's authored prompt beat, found again by its owner, and the prompt as the choice
+            // showed it, carried by the save. A save from before PendingPrompt existed has only the owner, and
+            // its beat is resolved when delivered, as it was then. Dropped if the option drifted out of the
+            // bundle or has no authored prompt (spec 9.8): the live Choose() would replay nothing.
             _pendingPromptBeat = null;
+            _pendingPromptShown = null;
             _pendingPromptOwnerId = snap.PendingPromptOwnerId;
             if (_pendingPromptOwnerId != null && _host.NodeIndex.TryGetValue(_pendingPromptOwnerId, out var owner))
-                _pendingPromptBeat = PromptBeatOf(owner);
+                _pendingPromptBeat = AuthoredPromptOf(owner);
             if (_pendingPromptBeat == null) _pendingPromptOwnerId = null;
+            else _pendingPromptShown = ClonePrompt(snap.PendingPrompt);
         }
+
+        private static ChoicePrompt ClonePrompt(ChoicePrompt p) => p == null ? null : new ChoicePrompt
+        {
+            Kind = p.Kind, Text = p.Text, Character = p.Character, CharacterName = p.CharacterName, Direction = p.Direction,
+        };
 
         private static ChoiceOption CloneOption(ChoiceOption o)
             => new ChoiceOption { Id = o.Id, Prompt = o.Prompt, Eligible = o.Eligible, GameData = o.GameData };

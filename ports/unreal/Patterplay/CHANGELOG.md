@@ -7,6 +7,35 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **`EngineOptions::replayPromptOnChoose` speaks back only an authored prompt, and exactly what the choice showed.** A game that
+  turns the option on will see the difference, which is why this is a minor release rather than a patch:
+  - An option whose prompt the choice borrowed from its own first content line (a bare-snippet option,
+    or an Option group with no prompt of its own) is no longer spoken back. That line used to play twice
+    in a row, once as the replay and once as content. It now plays once.
+  - The replayed prompt carries the text, `character`, `characterName`, and `direction` the choice
+    displayed, instead of resolving the prompt again when it is delivered. So if choosing runs effects
+    first (an Option group that picks a snippet runs its onEnter at once), or the language changes
+    between `choose()` and the next `advance()`, the replay still says what the player saw. In a voiced
+    project a replayed line prompt is now interpolated, as the choice showed it.
+  - A save taken between `choose()` and the next `advance()` carries that prompt as shown, in a new
+    optional `pendingPrompt` on the flow's cursor, so the replay after a load is the same. Every
+    Patterplay runtime writes and reads it. A save from an earlier version, without it, still loads and
+    resolves the prompt when it is delivered, as before. `patter::FlowSnapshot::pendingPrompt` holds it in memory.
+
+### Fixed
+
+- **A speaker field set to an empty string is kept, as on the other runtimes.** A line beat's
+  `character` or `direction` set to `""` in the bundle came through the C++ core as absent, and so did
+  an option prompt's `characterName` when the cast-name string it resolved to was `""`. The core now
+  tells an empty value from an unset one: `patter::Beat` has `hasCharacter` and `hasDirection`, and
+  `patter::ChoicePrompt` has `hasCharacter`, `hasCharacterName`, and `hasDirection`, like `StepResult`.
+  A save waiting at a choice keeps the empty fields, and loads them from a save another runtime wrote.
+  Blueprint's `FPatterStep` and `FPatterOption` are unchanged: an unset field there is still an empty
+  string. Held across all four runtimes by the conformance corpus, which now also plays cases with
+  `replayPromptOnChoose` and `closedCaptions` set at construction.
+
 ## [0.17.0] - 2026-10-05
 
 ### Added

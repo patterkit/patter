@@ -673,6 +673,7 @@ namespace Patterkit.Patterplay.TestHost
                     var opts = new EngineOptions();
                     if (c.TryGetProperty("seed", out var seed)) opts.Rng = new Mulberry32(seed.GetInt64()).Next;
                     if (c.TryGetProperty("locale", out var loc)) opts.Locale = loc.GetString();
+                    ApplyEngineOptions(c, opts);
 
                     var engine = new Engine(bundle, opts);
                     string startScene = null, startBlock = null;
@@ -707,6 +708,15 @@ namespace Patterkit.Patterplay.TestHost
             return pass;
         }
 
+        /// <summary>A case's `engineOptions`: the construction options it plays under, for its engine and every
+        /// engine a saveLoad / hotSwap makes (they share `opts`). An absent key keeps the engine's default.</summary>
+        private static void ApplyEngineOptions(JsonElement c, EngineOptions opts)
+        {
+            if (!c.TryGetProperty("engineOptions", out var eo)) return;
+            if (eo.TryGetProperty("replayPromptOnChoose", out var rp)) opts.ReplayPromptOnChoose = rp.GetBoolean();
+            if (eo.TryGetProperty("closedCaptions", out var cc)) opts.ClosedCaptions = cc.GetBoolean();
+        }
+
         // -- scripted -----------------------------------------------------------
 
         private static int RunScripted(JsonElement arr)
@@ -722,6 +732,7 @@ namespace Patterkit.Patterplay.TestHost
                     var bundleB = c.TryGetProperty("bundleB", out var bb) ? _loader(bb) : null;
                     long? seed = c.TryGetProperty("seed", out var sd) ? sd.GetInt64() : (long?)null;
                     var opts = new EngineOptions { Seed = seed };
+                    ApplyEngineOptions(c, opts);
                     var (ok, _) = RunScript(new Engine(bundle, opts), bundle, bundleB, opts, c.GetProperty("script"), name, "");
                     if (ok) pass++;
                 }
@@ -915,6 +926,7 @@ namespace Patterkit.Patterplay.TestHost
                     var bundle = _loader(c.GetProperty("bundle"));
                     long? seed = c.TryGetProperty("seed", out var sd) ? sd.GetInt64() : (long?)null;
                     var opts = new EngineOptions { Seed = seed };
+                    ApplyEngineOptions(c, opts);
                     var engine = new Engine(bundle, opts);
                     // Writer and reader are different runtimes here, which no self round-trip can test.
                     // Then the package must write the loaded state back in the same shape (key paths)

@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { Fixtures, GameDataFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture } from "./types.js";
+import type { Fixtures, GameDataFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
 import { castStringKey } from "@patterkit/model";
 
@@ -1590,6 +1590,303 @@ const scriptedOpenFlowRefused = {
   ],
 } satisfies ScriptedFixture;
 
+// --- replayPromptOnChoose: the chosen option's authored prompt spoken back -------------------------------
+// With the engine option on, `choose` delivers the chosen option's AUTHORED prompt (an Option group's own
+// prompt beat) as the FIRST beat of its content, as an ordinary step with the beat's id: a line prompt
+// comes back as a line step with its speaker, their resolved name, and the direction; a text prompt as a
+// text step. It says exactly what the choice showed, text and speaker fields as resolved when the choice
+// was presented. So when choosing runs effects before the replay is delivered (an Option group whose
+// selector picks a snippet runs that snippet's onEnter at once), the replay still reads the shown value.
+const replayPromptProject = project({
+  cast: [{ name: "ANNA", displayName: "Anna" }],
+  properties: [{ name: "coins", type: "number", shared: true, default: 3 }],
+});
+const replayPromptScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "g_door", type: "group", selector: "choice", children: [
+    { id: "o_ask", type: "group", prompt: { id: "P_ask", kind: "line", character: "ANNA", direction: "quietly" }, children: [
+      { id: "ask_c", type: "snippet", beats: [{ id: "T_ask", kind: "text" }] },
+    ] },
+    { id: "o_go", type: "group", prompt: { id: "P_go", kind: "text" }, children: [{ id: "go_c", type: "snippet", jump: { to: "END" } }] },
+  ] },
+  { id: "g_pay", type: "group", selector: "choice", children: [
+    { id: "o_pay", type: "group", selector: "sequence", prompt: { id: "P_pay", kind: "text" }, children: [
+      { id: "pay_c", type: "snippet", onEnter: [{ kind: "set", target: "@coins", value: "0" }], beats: [{ id: "T_paid", kind: "text" }] },
+    ] },
+  ] },
+  { id: "sn_end", type: "snippet", beats: [{ id: "T_end", kind: "text" }], jump: { to: "END" } },
+] }] }];
+const replayPromptLocales = [loc("s", {
+  P_ask: "Who's there?", P_go: "Leave", T_ask: "No answer.", P_pay: "Pay {@coins} coins", T_paid: "Paid. {@coins} left.", T_end: "Done.",
+})];
+const replayPromptChoices = {
+  door: { type: "choice", groupId: "g_door", options: [
+    { id: "o_ask", prompt: { kind: "line", text: "Who's there?", character: "ANNA", characterName: "Anna", direction: "quietly" }, eligible: true },
+    { id: "o_go", prompt: { kind: "text", text: "Leave" }, eligible: true },
+  ] },
+  pay: { type: "choice", groupId: "g_pay", options: [{ id: "o_pay", prompt: { kind: "text", text: "Pay 3 coins" }, eligible: true }] },
+} satisfies Record<string, TranscriptStep>;
+const replayPrompt = {
+  name: "replayPromptOnChoose: a chosen option's authored prompt is spoken back as the choice showed it",
+  project: replayPromptProject,
+  scenes: replayPromptScenes,
+  locales: replayPromptLocales,
+  engineOptions: { replayPromptOnChoose: true },
+  choices: ["o_ask", "o_pay"],
+  expectedTranscript: [
+    replayPromptChoices.door,
+    { type: "line", id: "P_ask", text: "Who's there?", character: "ANNA", characterName: "Anna", direction: "quietly" }, // spoken back
+    { type: "text", id: "T_ask", text: "No answer." },
+    replayPromptChoices.pay,
+    { type: "text", id: "P_pay", text: "Pay 3 coins" }, // as shown, though pay_c's onEnter has already spent the coins
+    { type: "text", id: "T_paid", text: "Paid. 0 left." },
+    { type: "text", id: "T_end", text: "Done." },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+const replayOff = {
+  name: "replayPromptOnChoose off: a chosen option plays only its content",
+  project: replayPromptProject,
+  scenes: replayPromptScenes,
+  locales: replayPromptLocales,
+  engineOptions: { replayPromptOnChoose: false },
+  choices: ["o_ask", "o_pay"],
+  expectedTranscript: [
+    replayPromptChoices.door,
+    { type: "text", id: "T_ask", text: "No answer." },
+    replayPromptChoices.pay,
+    { type: "text", id: "T_paid", text: "Paid. 0 left." },
+    { type: "text", id: "T_end", text: "Done." },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// Only an AUTHORED prompt is replayed. An option without one borrows its own first content line as the
+// prompt the choice shows (a bare-snippet option, or an Option group authored without a prompt), and that
+// borrowed prompt is NOT spoken back: the line plays once, as content, after any onEnter of its snippet.
+// An option with no line or text in its content at all has no prompt, and nothing is replayed either.
+const replayBorrowed = {
+  name: "replayPromptOnChoose: a prompt borrowed from the option's own content is not spoken back",
+  project: project({
+    cast: [{ name: "ANNA", displayName: "Anna" }],
+    properties: [{ name: "coins", type: "number", shared: true, default: 1 }],
+  }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g_bare", type: "group", selector: "choice", children: [
+      { id: "o_bare", type: "snippet", onEnter: [{ kind: "set", target: "@coins", value: "@coins + 1" }],
+        beats: [{ id: "L_bare", kind: "line", character: "ANNA" }, { id: "T_more", kind: "text" }] },
+    ] },
+    { id: "g_fall", type: "group", selector: "choice", children: [
+      { id: "o_fall", type: "group", children: [{ id: "fall_c", type: "snippet", beats: [{ id: "T_fall", kind: "text" }] }] },
+    ] },
+    { id: "g_quiet", type: "group", selector: "choice", children: [
+      { id: "o_quiet", type: "group", children: [{ id: "quiet_c", type: "snippet", beats: [{ id: "E_quiet", kind: "gameEvent" }] }] },
+    ] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { L_bare: "I have {@coins}.", T_more: "More.", T_fall: "Falling back." })],
+  engineOptions: { replayPromptOnChoose: true },
+  expectedTranscript: [
+    { type: "choice", groupId: "g_bare", options: [
+      { id: "o_bare", prompt: { kind: "line", text: "I have 1.", character: "ANNA", characterName: "Anna" }, eligible: true },
+    ] },
+    { type: "line", id: "L_bare", text: "I have 2.", character: "ANNA", characterName: "Anna" }, // once, as content (after onEnter)
+    { type: "text", id: "T_more", text: "More." },
+    { type: "choice", groupId: "g_fall", options: [{ id: "o_fall", prompt: { kind: "text", text: "Falling back." }, eligible: true }] },
+    { type: "text", id: "T_fall", text: "Falling back." },                                         // once
+    { type: "choice", groupId: "g_quiet", options: [{ id: "o_quiet", eligible: true }] },
+    { type: "gameEvent", id: "E_quiet" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// Closed captions off from construction (the `closedCaptions` engine option), with the replay on: a line
+// and a line prompt lose their cues in the choice, when spoken back, and as content; a text prompt keeps
+// its brackets, since captions apply to dialogue only.
+const replayCaptionsOff = {
+  name: "closedCaptions off at construction strips cues from lines, line prompts, and a replayed line prompt",
+  project: project({ cast: [{ name: "ANNA", displayName: "Anna" }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn_open", type: "snippet", beats: [{ id: "L_open", kind: "line", character: "ANNA" }] },
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_sigh", type: "group", prompt: { id: "P_sigh", kind: "line", character: "ANNA" }, children: [
+        { id: "sigh_c", type: "snippet", beats: [{ id: "T_sigh", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "o_note", type: "group", prompt: { id: "P_note", kind: "text" }, children: [{ id: "note_c", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { L_open: "Oh dear. [sigh] What now?", P_sigh: "Fine. [groans]", P_note: "Read [the note]", T_sigh: "[A door creaks.]" })],
+  engineOptions: { replayPromptOnChoose: true, closedCaptions: false },
+  choices: ["o_sigh"],
+  expectedTranscript: [
+    { type: "line", id: "L_open", text: "Oh dear. What now?", character: "ANNA", characterName: "Anna" },
+    { type: "choice", groupId: "g", options: [
+      { id: "o_sigh", prompt: { kind: "line", text: "Fine.", character: "ANNA", characterName: "Anna" }, eligible: true },
+      { id: "o_note", prompt: { kind: "text", text: "Read [the note]" }, eligible: true },
+    ] },
+    { type: "line", id: "P_sigh", text: "Fine.", character: "ANNA", characterName: "Anna" },
+    { type: "text", id: "T_sigh", text: "[A door creaks.]" }, // narration keeps its brackets
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// A save taken between `choose` and the next advance holds the prompt still to be spoken back: its owner
+// (pendingPromptOwnerId) and the prompt as the choice showed it (pendingPrompt). Loaded into a fresh
+// engine, the next advance says what was shown: not the value the option's onEnter has since changed, and
+// not the language switched to after the load.
+const scriptedReplaySaveLoadProject = project({
+  cast: [{ name: "ANNA", displayName: "Anna" }],
+  locales: { default: "en", all: ["en", "fr"] },
+  properties: [{ name: "coins", type: "number", shared: true, default: 3 }],
+});
+const scriptedReplaySaveLoadScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "g", type: "group", selector: "choice", children: [
+    { id: "o_ask", type: "group", selector: "sequence", prompt: { id: "P_ask", kind: "line", character: "ANNA", direction: "quietly" }, children: [
+      { id: "ask_c", type: "snippet", onEnter: [{ kind: "set", target: "@coins", value: "0" }], beats: [{ id: "T_ask", kind: "text" }], jump: { to: "END" } },
+    ] },
+    { id: "o_go", type: "group", prompt: { id: "P_go", kind: "text" }, children: [{ id: "go_c", type: "snippet", jump: { to: "END" } }] },
+  ] },
+] }] }];
+const scriptedReplaySaveLoadLocales = [
+  loc("s", { P_ask: "Who's there? I have {@coins}.", P_go: "Leave", T_ask: "No answer. {@coins} left." }),
+  loc("s", { P_ask: "Qui est la ? J'ai {@coins}.", P_go: "Partir", T_ask: "Pas de reponse. Il reste {@coins}." }, "fr"),
+  loc("@project", { [castStringKey("ANNA")]: "Annette" }, "fr"),
+];
+const scriptedReplaySaveLoad = {
+  name: "replayPromptOnChoose: a save between choose and the next advance still speaks the prompt as shown",
+  project: scriptedReplaySaveLoadProject,
+  scenes: scriptedReplaySaveLoadScenes,
+  locales: scriptedReplaySaveLoadLocales,
+  engineOptions: { replayPromptOnChoose: true },
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_ask", prompt: { kind: "line", text: "Who's there? I have 3.", character: "ANNA", characterName: "Anna", direction: "quietly" }, eligible: true },
+      { id: "o_go", prompt: { kind: "text", text: "Leave" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_ask" }, // ask_c's onEnter spends the coins now
+    { op: "saveLoad" },            // the prompt is still to be spoken back, as shown
+    { op: "setLocale", locale: "fr" },
+    { op: "advance", expect: [{ type: "line", id: "P_ask", text: "Who's there? I have 3.", character: "ANNA", characterName: "Anna", direction: "quietly" }] },
+    { op: "advance", expect: [{ type: "text", id: "T_ask", text: "Pas de reponse. Il reste 0." }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// The same with no save in between, the language switched between choose and the replay: the replay is
+// what the choice showed, in the language it was shown in.
+const scriptedReplayShown = {
+  name: "replayPromptOnChoose: the replay is the prompt as shown, though the language changed after choosing",
+  project: scriptedReplaySaveLoadProject,
+  scenes: scriptedReplaySaveLoadScenes,
+  locales: scriptedReplaySaveLoadLocales,
+  engineOptions: { replayPromptOnChoose: true },
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_ask", prompt: { kind: "line", text: "Who's there? I have 3.", character: "ANNA", characterName: "Anna", direction: "quietly" }, eligible: true },
+      { id: "o_go", prompt: { kind: "text", text: "Leave" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_ask" },
+    { op: "setLocale", locale: "fr" },
+    { op: "advance", expect: [{ type: "line", id: "P_ask", text: "Who's there? I have 3.", character: "ANNA", characterName: "Anna", direction: "quietly" }] },
+    { op: "advance", expect: [{ type: "text", id: "T_ask", text: "Pas de reponse. Il reste 0." }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// --- speaker fields set to the empty string ------------------------------------------------------------
+// A line's and a line prompt's `character`, `characterName`, and `direction` are kept when they are set to
+// "" and absent only when unset: an empty value is a value. `direction: ""` and `character: ""` on a beat
+// come through as "". A display name resolves through the cast strings (active locale, then default
+// locale) and then the cast's `displayName`, and the first that EXISTS wins, so an empty cast string
+// gives `characterName: ""` rather than falling through to the next. An empty `displayName` is not a name,
+// though: it gives no `characterName`. A `character: ""` is a speaker token like any other, so its name
+// resolves through `cast:` the same way. A line with no character has no speaker fields unless set.
+const emptySpeakerProject = project({
+  cast: [{ name: "ANNA", displayName: "" }, { name: "BO", displayName: "Bo" }, { name: "CY", displayName: "Cy" }],
+  locales: { default: "en", all: ["en", "fr"] },
+});
+const emptySpeakerStrings = { L_a: "A", L_b: "B", L_c: "C", L_n: "N", L_x: "X", P_a: "Pa", P_b: "Pb", P_n: "Pn", P_x: "Px" };
+const emptySpeakerFields = {
+  name: "a speaker field set to the empty string is kept, on a line and on a line prompt",
+  project: emptySpeakerProject,
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [
+      { id: "L_a", kind: "line", character: "ANNA", direction: "" },
+      { id: "L_b", kind: "line", character: "BO" },
+      { id: "L_c", kind: "line", character: "CY" },
+      { id: "L_n", kind: "line", character: "" },
+      { id: "L_x", kind: "line", direction: "" },
+    ] },
+    { id: "g_e", type: "group", selector: "choice", children: [
+      { id: "o_a", type: "group", prompt: { id: "P_a", kind: "line", character: "ANNA", direction: "" }, children: [{ id: "a_c", type: "snippet", jump: { to: "END" } }] },
+      { id: "o_b", type: "group", prompt: { id: "P_b", kind: "line", character: "BO" }, children: [{ id: "b_c", type: "snippet", jump: { to: "END" } }] },
+      { id: "o_n", type: "group", prompt: { id: "P_n", kind: "line", character: "" }, children: [{ id: "n_c", type: "snippet", jump: { to: "END" } }] },
+      { id: "o_x", type: "group", prompt: { id: "P_x", kind: "line" }, children: [{ id: "x_c", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [
+    loc("s", emptySpeakerStrings),
+    loc("s", emptySpeakerStrings, "fr"),
+    loc("@project", { [castStringKey("CY")]: "" }),       // en (default): CY's name translated as ""
+    loc("@project", { [castStringKey("BO")]: "", [castStringKey("")]: "Someone" }, "fr"), // fr (active): BO's name is "", and the "" speaker's
+  ],
+  locale: "fr",
+  choices: ["o_x"],
+  expectedTranscript: [
+    { type: "line", id: "L_a", text: "A", character: "ANNA", direction: "" }, // empty displayName: no name
+    { type: "line", id: "L_b", text: "B", character: "BO", characterName: "" }, // fr "" wins over "Bo"
+    { type: "line", id: "L_c", text: "C", character: "CY", characterName: "" }, // fr has none, en "" wins over "Cy"
+    { type: "line", id: "L_n", text: "N", character: "", characterName: "Someone" }, // the "" token's cast string
+    { type: "line", id: "L_x", text: "X", direction: "" },
+    { type: "choice", groupId: "g_e", options: [
+      { id: "o_a", prompt: { kind: "line", text: "Pa", character: "ANNA", direction: "" }, eligible: true },
+      { id: "o_b", prompt: { kind: "line", text: "Pb", character: "BO", characterName: "" }, eligible: true },
+      { id: "o_n", prompt: { kind: "line", text: "Pn", character: "", characterName: "Someone" }, eligible: true },
+      { id: "o_x", prompt: { kind: "line", text: "Px" }, eligible: true }, // a line prompt with no speaker
+    ] },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// The same empty fields on a pending choice carried through a save: each comes back as "" and none is
+// dropped. As a save case, a save written by the reference carries them, and a runtime that loads it must
+// write them back (its key paths) and offer them again.
+const scriptedEmptySpeakerSaveLoad = {
+  name: "a pending choice's empty speaker fields survive save and load",
+  project: project({ cast: [{ name: "ANNA", displayName: "Anna" }, { name: "BO", displayName: "Bo" }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o_a", type: "group", prompt: { id: "P_a", kind: "line", character: "ANNA", direction: "" }, children: [
+        { id: "a_c", type: "snippet", beats: [{ id: "T_a", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "o_b", type: "group", prompt: { id: "P_b", kind: "line", character: "BO" }, children: [{ id: "b_c", type: "snippet", jump: { to: "END" } }] },
+      { id: "o_n", type: "group", prompt: { id: "P_n", kind: "line", character: "" }, children: [{ id: "n_c", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [
+    loc("s", { P_a: "Pa", P_b: "Pb", P_n: "Pn", T_a: "Gone." }),
+    loc("@project", { [castStringKey("BO")]: "" }),
+  ],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_a", prompt: { kind: "line", text: "Pa", character: "ANNA", characterName: "Anna", direction: "" }, eligible: true },
+      { id: "o_b", prompt: { kind: "line", text: "Pb", character: "BO", characterName: "" }, eligible: true },
+      { id: "o_n", prompt: { kind: "line", text: "Pn", character: "" }, eligible: true },
+    ] }] },
+    { op: "saveLoad" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_a", prompt: { kind: "line", text: "Pa", character: "ANNA", characterName: "Anna", direction: "" }, eligible: true },
+      { id: "o_b", prompt: { kind: "line", text: "Pb", character: "BO", characterName: "" }, eligible: true },
+      { id: "o_n", prompt: { kind: "line", text: "Pn", character: "" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_a" },
+    { op: "advance", expect: [{ type: "text", id: "T_a", text: "Gone." }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // --- cast introspection ------------------------------------------------------
 //
 // Who speaks, at three scopes. The project's list is what the author DECLARED (MAYOR is in it and never
@@ -1864,6 +2161,7 @@ const asSaveFixture = (f: ScriptedFixture, name: string): SaveFixture => {
     name, project: f.project, scenes: f.scenes,
     ...(f.locales ? { locales: f.locales } : {}),
     ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    ...(f.engineOptions !== undefined ? { engineOptions: f.engineOptions } : {}),
     setup: f.script.slice(0, at),
     script: [{ op: "useFlow", flow: opened.flow }, ...f.script.slice(at + 1)],
   };
@@ -1916,16 +2214,34 @@ export const cases: Fixtures = {
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
     characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
+    replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ],
   scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
-    scriptedCheckpoint, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused],
+    scriptedCheckpoint, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
+    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
     asSaveFixture(scriptedSaveLoadChoice, "a save written by the JS reference loads elsewhere at a pending choice, options replayed"),
+    asSaveFixture(scriptedReplaySaveLoad, "a save written by the JS reference between choose and advance speaks the prompt back as shown"),
+    // The same save as written before saves carried the shown prompt: only its owner. A runtime loading it
+    // resolves the prompt beat when the replay is delivered, as runtimes did then (here after the switch
+    // to fr, and after the onEnter), and writes the save back without a `pendingPrompt` it never had.
+    {
+      ...asSaveFixture(scriptedReplaySaveLoad, "a save written before saves carried the shown prompt resolves the prompt when it is delivered"),
+      editSave: (save) => { for (const f of Object.values(save.flows)) delete f.cursor.pendingPrompt; },
+      script: [
+        { op: "useFlow", flow: "main" },
+        { op: "setLocale", locale: "fr" },
+        { op: "advance", expect: [{ type: "line", id: "P_ask", text: "Qui est la ? J'ai 0.", character: "ANNA", characterName: "Annette", direction: "quietly" }] },
+        { op: "advance", expect: [{ type: "text", id: "T_ask", text: "Pas de reponse. Il reste 0." }] },
+        { op: "advance", expect: [{ type: "end" }] },
+      ],
+    },
+    asSaveFixture(scriptedEmptySpeakerSaveLoad, "a save written by the JS reference keeps a pending choice's empty speaker fields"),
   ],
 };

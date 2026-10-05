@@ -35,8 +35,9 @@ var _beat_index := 0
 var _log: Array = []
 var _seq := 0
 var _pending = null                   # { "group_id":, "options":[step options], "by_id":{id:node} } or null
-var _pending_prompt_beat = null       # beat Dictionary or null
-var _pending_prompt_owner: String = "" # chosen option owning _pending_prompt_beat, re-derivable across a save in the choose->advance window
+var _pending_prompt_beat = null       # replay_prompt_on_choose: the chosen option's authored prompt beat Dictionary, or null
+var _pending_prompt_shown = null      # ...that prompt as the choice showed it; null only after loading a save that did not carry it
+var _pending_prompt_owner: String = "" # chosen option owning _pending_prompt_beat, found again across a save in the choose->advance window
 var _selectors: Dictionary = {}
 var _visit_counts: Dictionary = {}
 var _eval_ctx: Dictionary
@@ -154,6 +155,7 @@ func goto(scene: String, block: String = "") -> bool:
 		_started = true
 		_pending = null
 		_pending_prompt_beat = null
+		_pending_prompt_shown = null
 		_pending_prompt_owner = ""
 		_active_snippet = null
 		_beat_index = 0
@@ -186,6 +188,7 @@ func goto(scene: String, block: String = "") -> bool:
 
 	_pending = null
 	_pending_prompt_beat = null
+	_pending_prompt_shown = null
 	_pending_prompt_owner = ""
 	_active_snippet = null
 	_beat_index = 0        # abandon the rest of the snippet being delivered
@@ -208,6 +211,7 @@ func close() -> void:
 	_beat_index = 0
 	_pending = null
 	_pending_prompt_beat = null
+	_pending_prompt_shown = null
 	_pending_prompt_owner = ""
 
 
@@ -228,7 +232,7 @@ func _touch() -> void:
 	for f in _stack:
 		frames.append((f as Dictionary).duplicate())   # frames advance in place (index += 1), so copy them
 	journal["undo"].append(_put_cursor_back.bind([_prng.a, _started, _flow_ended, _current_scene_id,
-		_active_snippet, _beat_index, _pending, _pending_prompt_beat, _pending_prompt_owner, frames]))
+		_active_snippet, _beat_index, _pending, _pending_prompt_beat, _pending_prompt_owner, frames, _pending_prompt_shown]))
 
 
 ## The undo of _touch(): the cursor fields and the stack as they were when the checkpoint first saw this flow.
@@ -243,6 +247,7 @@ func _put_cursor_back(c: Array) -> void:
 	_pending_prompt_beat = c[7]
 	_pending_prompt_owner = c[8]
 	_stack = c[9]
+	_pending_prompt_shown = c[10]
 
 
 ## Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
@@ -351,9 +356,11 @@ func advance() -> Dictionary:
 	_touch()
 	if _pending_prompt_beat != null:
 		var b = _pending_prompt_beat
+		var shown = _pending_prompt_shown
 		_pending_prompt_beat = null
+		_pending_prompt_shown = null
 		_pending_prompt_owner = ""
-		return _beat_result(b)
+		return _prompt_result(b, shown) if shown != null else _beat_result(b)
 	_settle()
 	if _flow_ended:
 		return {"type": "end"}
@@ -376,9 +383,18 @@ func choose(option_id: String) -> void:
 		return
 	_touch()
 	var node = _pending["by_id"][option_id]
+	var shown = null
+	for o in _pending["options"]:
+		if o["id"] == option_id and o.has("prompt"):
+			shown = (o["prompt"] as Dictionary).duplicate()
 	_emit({"type": "chose", "group": _pending["group_id"], "option": option_id})
 	_pending = null
-	_pending_prompt_beat = _prompt_beat_of(node) if _host["replay_prompt_on_choose"] else null
+	# Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and exactly
+	# as the choice showed it. A prompt borrowed from the option's own first content line is not replayed,
+	# since that line is about to play as content anyway.
+	var authored = _authored_prompt_of(node) if _host["replay_prompt_on_choose"] else null
+	_pending_prompt_beat = authored if authored != null and shown != null else null
+	_pending_prompt_shown = shown if _pending_prompt_beat != null else null
 	_pending_prompt_owner = node["id"] if _pending_prompt_beat != null else ""
 	_enter_child(node)
 
@@ -962,7 +978,7 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 	if not silent:
 		if beat.has("character"):
 			r["character"] = beat["character"]
-		var cn = _resolve_character_name(beat.get("character", ""))
+		var cn = _resolve_character_name(beat)
 		if cn != null:
 			r["characterName"] = cn
 		if beat.has("direction"):
@@ -1016,12 +1032,35 @@ func _prompt_for(node: Dictionary):
 	var p := {"kind": "line", "text": _caption_line(text)}
 	if beat.has("character"):
 		p["character"] = beat["character"]
-	var cn = _resolve_character_name(beat.get("character", ""))
+	var cn = _resolve_character_name(beat)
 	if cn != null:
 		p["characterName"] = cn
 	if beat.has("direction"):
 		p["direction"] = beat["direction"]
 	return p
+
+
+# An option's AUTHORED prompt beat: an Option group's own prompt. The only prompt a replay speaks.
+func _authored_prompt_of(node: Dictionary):
+	if node.get("type", "") == "group" and node.has("prompt"):
+		return node["prompt"]
+	return null
+
+
+# A replayed prompt as a step: the beat's id, gameData, and tags, and the text and speaker fields the
+# choice showed.
+func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
+	var tags: Array = _host["tag_index"].get(beat["id"], [])
+	var r := {"type": "text" if shown.get("kind", "") == "text" else "line", "id": beat["id"], "text": str(shown.get("text", ""))}
+	if r["type"] == "line":
+		for k in ["character", "characterName", "direction"]:
+			if shown.has(k):
+				r[k] = str(shown[k])
+	if beat.has("gameData"):
+		r["gameData"] = _norm_gamedata(beat["gameData"])
+	if not tags.is_empty():
+		r["tags"] = tags
+	return r
 
 
 func _prompt_beat_of(node: Dictionary):
@@ -1059,11 +1098,15 @@ func _resolve_string(sid: String) -> String:
 	return sid
 
 
-func _resolve_character_name(character: String):
-	if character == "":
+# A line beat's resolved speaker name: the first of the active cast string, the default one, and the cast's
+# displayName that exists (an empty string included). null when the beat has no character at all; a
+# character set to "" is a token like any other.
+func _resolve_character_name(beat: Dictionary):
+	if not beat.has("character"):
 		return null
 	if _host["emit_ids"]:
 		return null  # IDs-only: omit the display name; the game maps the `character` token
+	var character := str(beat["character"])
 	var key := "cast:" + character
 	if _host["strings"].has(key):
 		return _host["strings"][key]
@@ -1355,7 +1398,7 @@ func snapshot() -> Dictionary:
 	if _pending != null:
 		pending = {"groupId": _pending["group_id"], "options": (_pending["options"] as Array).duplicate(true)}
 	# The cursor, PRNG and visits. This flow's properties are the registry's, saved with it.
-	return {
+	var out := {
 		"rngState": _prng.a,
 		"visits": _visit_counts.duplicate(true),
 		"cursor": {
@@ -1369,6 +1412,10 @@ func snapshot() -> Dictionary:
 			"selectors": _save_selectors(_selectors),
 		},
 	}
+	# The prompt still to replay, as the choice showed it: written only in the choose->advance window.
+	if _pending_prompt_shown != null:
+		out["cursor"]["pendingPrompt"] = (_pending_prompt_shown as Dictionary).duplicate()
+	return out
 
 
 ## Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its property
@@ -1471,12 +1518,18 @@ func _restore_cursor(snap: Dictionary) -> void:
 		if not options.is_empty():
 			_pending = {"group_id": group_id, "options": options, "by_id": by_id}
 
-	# A save taken between choose() and the next advance() left a prompt still to be replayed;
-	# re-derive it from the chosen option (dropped if that option drifted out of the bundle).
+	# A save taken between choose() and the next advance() left a prompt still to be replayed: the chosen
+	# option's authored prompt beat, found again by its owner, and the prompt as the choice showed it,
+	# carried by the save. A save from before pendingPrompt existed has only the owner, and its beat is
+	# resolved when delivered, as it was then. Dropped if the option drifted out of the bundle or has no
+	# authored prompt (spec 9.8): the live choose() would replay nothing.
 	_pending_prompt_beat = null
+	_pending_prompt_shown = null
 	var ppo = _k(c, "pendingPromptOwnerId", "pending_prompt_owner")
 	_pending_prompt_owner = str(ppo) if ppo != null else ""
 	if _pending_prompt_owner != "" and _host["node_index"].has(_pending_prompt_owner):
-		_pending_prompt_beat = _prompt_beat_of(_host["node_index"][_pending_prompt_owner])
+		_pending_prompt_beat = _authored_prompt_of(_host["node_index"][_pending_prompt_owner])
 	if _pending_prompt_beat == null:
 		_pending_prompt_owner = ""
+	elif c.get("pendingPrompt", null) is Dictionary:
+		_pending_prompt_shown = (c["pendingPrompt"] as Dictionary).duplicate()

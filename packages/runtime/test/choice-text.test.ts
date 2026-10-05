@@ -3,7 +3,7 @@
 // derivation, no look-ahead. A `line` prompt carries character / direction; a
 // bare-snippet option (runtime tolerance) takes its first content line; nothing
 // derivable => `prompt` undefined (a raw node id is never leaked). The engine
-// flag `replayPromptOnChoose` optionally plays the prompt as the first beat.
+// flag `replayPromptOnChoose` optionally plays an option's AUTHORED prompt as its first beat.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
@@ -68,7 +68,7 @@ describe("choice text is the option's prompt (spec §5)", () => {
 
   it("still replays the prompt when a save is taken BETWEEN choose() and the next advance()", () => {
     // The pending replayed prompt lives only in the cursor until the next advance(); a save in that
-    // window must carry it (re-derived from the chosen option on load), or the prompt is silently lost.
+    // window must carry it (its owner, and the prompt as the choice showed it), or the prompt is silently lost.
     const bundle = exportBundle({ project, scenes: [scene], locales });
     const a = new Engine(bundle, { replayPromptOnChoose: true });
     const fa = a.openFlow("f", { scene: "s" });

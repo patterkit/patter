@@ -41,7 +41,7 @@ import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, 
 import { buildTagIndex } from "./tags.js";
 import { SAVE_VERSION } from "@patterkit/model";
 import type {
-  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, FlowSnapshot, SaveGame, SaveGameV2,
+  EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoicePrompt, FlowSnapshot, SaveGame, SaveGameV2,
   Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet,
   CompiledEffect, Beat, LineBeat, TextBeat, GameData, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
 } from "@patterkit/model";
@@ -1272,10 +1272,13 @@ export class Flow {
   private activeSnippet: CompiledSnippet | null = null;
   private beatIndex = 0;
   private pendingChoice: ChoiceState | null = null;
-  /** When `replayPromptOnChoose`, the chosen option's prompt beat to deliver before its content. */
-  private pendingPromptBeat: LineBeat | TextBeat | null = null;
-  /** The chosen option that owns `pendingPromptBeat`, so a save taken between choose() and the next
-   *  advance() can re-derive the prompt on load (the beat isn't otherwise reachable by id). */
+  /** When `replayPromptOnChoose`, the chosen option's AUTHORED prompt to deliver before its content: its
+   *  beat (id, gameData, tags) and the prompt exactly as the choice showed it (text and speaker fields).
+   *  `shown` is missing only after loading a save written before saves carried it: the beat is then
+   *  resolved when it is delivered, as it always was. */
+  private pendingPrompt: { beat: LineBeat | TextBeat; shown?: ChoicePrompt } | null = null;
+  /** The chosen option that owns `pendingPrompt`, so a save taken between choose() and the next
+   *  advance() can find the prompt beat again on load (it isn't otherwise reachable by id). */
   private pendingPromptOwnerId: string | null = null;
   private selectors = new Map<string, SelectorState>();
   /** Per-node entry counts for this flow (node id -> times entered). */
@@ -1456,7 +1459,7 @@ export class Flow {
     if (this.closed) return false; // closed is terminal: unlike "ended", a goto cannot revive it
     this.touch();
     if (scene === "END") {
-      this.started = true; this.pendingChoice = null; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null;
+      this.started = true; this.pendingChoice = null; this.pendingPrompt = null; this.pendingPromptOwnerId = null;
       this.activeSnippet = null; this.beatIndex = 0;
       this.flowEnded = true; this.stack = [];
       return true;
@@ -1473,7 +1476,7 @@ export class Flow {
     // Never started: start() does the same landing plus the one-time per-flow setup.
     if (!this.started) { this.start(sceneId, blockId); return true; }
 
-    this.pendingChoice = null; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null;
+    this.pendingChoice = null; this.pendingPrompt = null; this.pendingPromptOwnerId = null;
     this.activeSnippet = null; this.beatIndex = 0; // abandon the rest of the snippet being delivered
     this.flowEnded = false;                        // an ended flow resumes at the target
     this.enterTarget(blockId ?? sceneId, "jump");  // "jump" = replace the stack, exactly like an authored goto
@@ -1499,7 +1502,7 @@ export class Flow {
     this.activeSnippet = null;
     this.beatIndex = 0;
     this.pendingChoice = null;
-    this.pendingPromptBeat = null;
+    this.pendingPrompt = null;
     this.pendingPromptOwnerId = null;
   }
 
@@ -1510,10 +1513,10 @@ export class Flow {
     const journal = this.host.journal;
     if (!journal || journal.flows.has(this)) return;
     journal.flows.add(this);
-    const { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPromptBeat, pendingPromptOwnerId } = this;
+    const { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPrompt, pendingPromptOwnerId } = this;
     const stack = this.stack.map((f) => ({ ...f })); // frames advance in place, so copy them
     journal.undo.push(() => {
-      Object.assign(this, { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPromptBeat, pendingPromptOwnerId, stack });
+      Object.assign(this, { rngState, started, flowEnded, currentSceneId, activeSnippet, beatIndex, pendingChoice, pendingPrompt, pendingPromptOwnerId, stack });
     });
   }
 
@@ -1531,7 +1534,7 @@ export class Flow {
     if (!this.started) throw new Error("flow has not been started");
     this.touch();
     // A replayed prompt (replayPromptOnChoose) is delivered first, before the option's content.
-    if (this.pendingPromptBeat) { const b = this.pendingPromptBeat; this.pendingPromptBeat = null; this.pendingPromptOwnerId = null; return this.beatResult(b); }
+    if (this.pendingPrompt) { const p = this.pendingPrompt; this.pendingPrompt = null; this.pendingPromptOwnerId = null; return p.shown ? this.promptResult(p.beat, p.shown) : this.beatResult(p.beat); }
     this.settle();
     if (this.flowEnded) return { type: "end" };
     if (this.pendingChoice) return { type: "choice", groupId: this.pendingChoice.groupId, options: this.pendingChoice.options };
@@ -1654,9 +1657,12 @@ export class Flow {
     const node = choice.byId.get(id)!;
     this.emit({ type: "chose", group: choice.groupId, option: id });
     this.pendingChoice = null;
-    // Optionally speak the chosen option's prompt back as its first beat (spec §5).
-    this.pendingPromptBeat = this.host.replayPromptOnChoose ? this.promptBeatOf(node) ?? null : null;
-    this.pendingPromptOwnerId = this.pendingPromptBeat ? node.id : null;
+    // Optionally speak the chosen option's prompt back as its first beat (spec §5): only an AUTHORED
+    // prompt, and exactly as the choice showed it. A prompt borrowed from the option's own first content
+    // line is not replayed, since that line is about to play as content anyway.
+    const authored = this.host.replayPromptOnChoose ? this.authoredPromptOf(node) : undefined;
+    this.pendingPrompt = authored && option.prompt ? { beat: authored, shown: { ...option.prompt } } : null;
+    this.pendingPromptOwnerId = this.pendingPrompt ? node.id : null;
     // The block frame is already advanced past the choice group (the gather point),
     // so when the chosen option finishes without a jump, the flow continues there.
     this.enterChild(node);
@@ -1737,6 +1743,8 @@ export class Flow {
           ? { groupId: this.pendingChoice.groupId, options: this.pendingChoice.options.map((o) => ({ ...o })) }
           : null,
         pendingPromptOwnerId: this.pendingPromptOwnerId,
+        // The prompt still to be replayed, as the choice showed it: present only in the choose -> advance window.
+        ...(this.pendingPrompt?.shown ? { pendingPrompt: savedPrompt(this.pendingPrompt.shown) } : {}),
         selectors: serialiseSelectors(this.selectors),
       },
     };
@@ -1809,14 +1817,17 @@ export class Flow {
     }
 
     // A save taken between choose() and the next advance() left a prompt still to be replayed
-    // (replayPromptOnChoose). Re-derive it from the chosen option - dropped if that option drifted out
-    // of the bundle (§9.8), exactly as the live choose() would have produced nothing.
-    this.pendingPromptBeat = null;
+    // (replayPromptOnChoose): the chosen option's authored prompt beat, found again by its owner, and the
+    // prompt as the choice showed it, carried by the save. A save from before `pendingPrompt` existed has
+    // only the owner, and its beat is resolved when delivered, as it was then. Dropped if the option
+    // drifted out of the bundle or has no authored prompt (§9.8): the live choose() would replay nothing.
+    this.pendingPrompt = null;
     this.pendingPromptOwnerId = c.pendingPromptOwnerId ?? null;
     if (this.pendingPromptOwnerId) {
       const owner = this.host.nodeIndex.get(this.pendingPromptOwnerId);
-      this.pendingPromptBeat = owner ? this.promptBeatOf(owner) ?? null : null;
-      if (!this.pendingPromptBeat) this.pendingPromptOwnerId = null;
+      const beat = owner ? this.authoredPromptOf(owner) : undefined;
+      if (beat) this.pendingPrompt = { beat, ...(c.pendingPrompt ? { shown: { ...c.pendingPrompt } } : {}) };
+      else this.pendingPromptOwnerId = null;
     }
   }
 
@@ -2261,6 +2272,24 @@ export class Flow {
       : { kind: "text", text };
   }
 
+  /** An option's AUTHORED prompt beat: an Option group's own `prompt`. The only prompt a replay speaks. */
+  private authoredPromptOf(node: SelectableNode): LineBeat | TextBeat | undefined {
+    return node.type === "group" ? node.prompt : undefined;
+  }
+
+  /** A replayed prompt as a step: the beat's id, gameData, and tags, and the text and speaker fields the
+   *  choice showed. */
+  private promptResult(beat: LineBeat | TextBeat, shown: ChoicePrompt): StepResult {
+    const tags = this.host.tagIndex.get(beat.id);
+    const withTags = tags && tags.length ? { tags } : {};
+    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, gameData: beat.gameData, ...withTags };
+    return {
+      type: "line", id: beat.id, text: shown.text,
+      character: shown.character, characterName: shown.characterName, direction: shown.direction,
+      gameData: beat.gameData, ...withTags,
+    };
+  }
+
   /** The prompt BEAT of an option: the Option group's `prompt`, else (tolerance) its first content line. */
   private promptBeatOf(node: SelectableNode): LineBeat | TextBeat | undefined {
     if (node.type === "group" && node.prompt) return node.prompt;
@@ -2415,6 +2444,15 @@ function gameDataField(gameData: GameData | undefined): { gameData?: GameData } 
 }
 
 /** Serialise a `sequence` selector-cursor map to plain snapshots. */
+/** A prompt as a save carries it: the set fields only (a field set to "" included), never an `undefined`. */
+function savedPrompt(p: ChoicePrompt): SavedChoicePrompt {
+  const out: SavedChoicePrompt = { kind: p.kind, text: p.text };
+  if (p.character !== undefined) out.character = p.character;
+  if (p.characterName !== undefined) out.characterName = p.characterName;
+  if (p.direction !== undefined) out.direction = p.direction;
+  return out;
+}
+
 function serialiseSelectors(map: Map<string, SelectorState>): Record<string, SelectorSnapshot> {
   const out: Record<string, SelectorSnapshot> = {};
   for (const [id, st] of map) {

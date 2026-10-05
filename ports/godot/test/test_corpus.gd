@@ -389,6 +389,16 @@ func _run_specificity(arr: Array) -> int:
 
 # -- runtime -------------------------------------------------------------------
 
+# A case's engineOptions: the construction options it plays under, for its engine and every engine a
+# saveLoad / hotSwap makes (they share `options`). An absent key keeps the engine's default.
+func _apply_engine_options(c: Dictionary, options: Dictionary) -> void:
+	var eo: Dictionary = c.get("engineOptions", {})
+	if eo.has("replayPromptOnChoose"):
+		options["replay_prompt_on_choose"] = bool(eo["replayPromptOnChoose"])
+	if eo.has("closedCaptions"):
+		options["closed_captions"] = bool(eo["closedCaptions"])
+
+
 func _run_runtime(arr: Array) -> int:
 	var pass_count := 0
 	for c in arr:
@@ -399,6 +409,7 @@ func _run_runtime(arr: Array) -> int:
 			options["rng"] = func(): return rng.next()
 		if c.has("locale"):
 			options["locale"] = c["locale"]
+		_apply_engine_options(c, options)
 		var engine := PatterEngine.new(c["bundle"], options)
 		var start: Dictionary = c.get("start", {})
 		var flow := engine.open_flow("main", start.get("scene", ""), start.get("block", ""))
@@ -437,6 +448,7 @@ func _run_scripted(arr: Array) -> int:
 		var options := {}
 		if c.has("seed"):
 			options["seed"] = int(c["seed"])
+		_apply_engine_options(c, options)
 		var holder := {"engine": PatterEngine.new(c["bundle"], options)}
 		if _run_script(holder, c["script"], c["bundle"], c.get("bundleB", {}), options, name):
 			pass_count += 1
@@ -567,6 +579,7 @@ func _run_saves(arr: Array) -> int:
 		var options := {}
 		if c.has("seed"):
 			options["seed"] = int(c["seed"])
+		_apply_engine_options(c, options)
 		var holder := {"engine": PatterEngine.new(c["bundle"], options)}
 		# Writer and reader are different runtimes here, which no self round-trip can test. Then the
 		# addon must write the loaded state back in the same shape (key paths) before continuing.

@@ -104,8 +104,8 @@ static Beat parseBeat(const JsonValue& b)
 {
     Beat beat;
     beat.id = b.at("id").str; beat.kind = b.at("kind").str;
-    if (const JsonValue* c = b.find("character")) beat.character = c->str;
-    if (const JsonValue* dr = b.find("direction")) beat.direction = dr->str;
+    if (const JsonValue* c = b.find("character")) { beat.hasCharacter = true; beat.character = c->str; }
+    if (const JsonValue* dr = b.find("direction")) { beat.hasDirection = true; beat.direction = dr->str; }
     if (const JsonValue* gd = b.find("gameData")) beat.gameData = parseGameData(*gd);
     if (const JsonValue* tg = b.find("tags")) beat.tags = strList(*tg);
     return beat;
@@ -286,7 +286,7 @@ static JsonValue normalize(const StepResult& s)
         case StepType::Choice:
         {
             // The whole choice as the host receives it: the group id, and each option's structured prompt.
-            // The C++ prompt holds an absent field as an empty string, so empty is written as absent.
+            // A prompt's speaker fields are written when set, an empty string included, as on a line step.
             o.set("type", JsonValue::Str("choice"));
             o.set("groupId", JsonValue::Str(s.groupId));
             JsonValue opts = JsonValue::Arr();
@@ -299,9 +299,9 @@ static JsonValue normalize(const StepResult& s)
                     JsonValue p = JsonValue::Obj();
                     p.set("kind", JsonValue::Str(opt.prompt->kind));
                     p.set("text", JsonValue::Str(opt.prompt->text));
-                    if (!opt.prompt->character.empty()) p.set("character", JsonValue::Str(opt.prompt->character));
-                    if (!opt.prompt->characterName.empty()) p.set("characterName", JsonValue::Str(opt.prompt->characterName));
-                    if (!opt.prompt->direction.empty()) p.set("direction", JsonValue::Str(opt.prompt->direction));
+                    if (opt.prompt->hasCharacter) p.set("character", JsonValue::Str(opt.prompt->character));
+                    if (opt.prompt->hasCharacterName) p.set("characterName", JsonValue::Str(opt.prompt->characterName));
+                    if (opt.prompt->hasDirection) p.set("direction", JsonValue::Str(opt.prompt->direction));
                     od.set("prompt", std::move(p));
                 }
                 od.set("eligible", JsonValue::Boolean(opt.eligible));
@@ -463,6 +463,16 @@ static int runSpecificity(const JsonValue& arr)
     return pass;
 }
 
+// A case's `engineOptions`: the construction options it plays under, for its engine and every engine a
+// saveLoad / hotSwap makes (they share `opts`). An absent key keeps the engine's default.
+static void applyEngineOptions(const JsonValue& c, EngineOptions& opts)
+{
+    const JsonValue* eo = c.find("engineOptions");
+    if (!eo) return;
+    if (const JsonValue* rp = eo->find("replayPromptOnChoose")) opts.replayPromptOnChoose = rp->b;
+    if (const JsonValue* cc = eo->find("closedCaptions")) opts.closedCaptions = cc->b;
+}
+
 static int runRuntime(const JsonValue& arr)
 {
     int pass = 0;
@@ -476,6 +486,7 @@ static int runRuntime(const JsonValue& arr)
             std::shared_ptr<Mulberry32> rng;
             if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(seed->num); opts.rng = [rng]() { return rng->next(); }; }
             if (const JsonValue* loc = c.find("locale")) opts.locale = loc->str;
+            applyEngineOptions(c, opts);
 
             Engine engine(bundle, opts);
             std::string startScene, startBlock;
@@ -688,6 +699,7 @@ static int runSaves(const JsonValue& arr)
             Bundle bundle = parseBundle(c.at("bundle"));
             EngineOptions opts;
             if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
+            applyEngineOptions(c, opts);
             auto engine = std::make_shared<Engine>(bundle, opts);
             // Writer and reader are different runtimes here, which no self round-trip can test. Then the
             // core must write the loaded state back in the same shape (key paths) before continuing:
@@ -724,6 +736,7 @@ int runScripted(const JsonValue& arr)
             if (const JsonValue* bb = c.find("bundleB")) bundleB = parseBundle(*bb);
             EngineOptions opts;
             if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
+            applyEngineOptions(c, opts);
             auto engine = std::make_shared<Engine>(bundle, opts);
             if (runScript(engine, bundle, bundleB, opts, c.at("script"), name, "").first) ++pass;
         }
@@ -1905,7 +1918,7 @@ static void runOutlineSmoke()
     b.strings["en"]["T1"] = "The gate creaks.";
 
     auto opt1 = std::make_shared<Node>(); opt1->type = "snippet"; opt1->id = "opt1";
-    { Beat beat; beat.id = "L1"; beat.kind = "line"; beat.character = "GUARD"; opt1->beats.push_back(beat); }
+    { Beat beat; beat.id = "L1"; beat.kind = "line"; beat.hasCharacter = true; beat.character = "GUARD"; opt1->beats.push_back(beat); }
     opt1->jump = std::make_shared<Jump>(); opt1->jump->to = "END";
     auto opt2 = std::make_shared<Node>(); opt2->type = "snippet"; opt2->id = "opt2";
     { Beat beat; beat.id = "T1"; beat.kind = "text"; opt2->beats.push_back(beat); }

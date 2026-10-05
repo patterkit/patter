@@ -370,6 +370,7 @@ namespace patter
         std::string pendingGroupId;
         std::vector<ChoiceOption> pendingOptions;                                   // empty = no pending choice
         std::string pendingPromptOwnerId;                                           // chosen option owning a prompt still to replay (save in the choose->advance window)
+        std::shared_ptr<ChoicePrompt> pendingPrompt;                                // that prompt as the choice showed it; null when none, or in a save written before it was carried
         std::map<std::string, SelectorState> selectors;
     };
 
@@ -686,7 +687,7 @@ namespace patter
             touch();
             if (scene == "END")
             {
-                started_ = true; clearPending(); pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear();
+                started_ = true; clearPending(); pendingPromptBeat_ = nullptr; pendingPromptShown_.reset(); pendingPromptOwnerId_.clear();
                 activeSnippet_ = nullptr; beatIndex_ = 0;
                 flowEnded_ = true; stack_.clear();
                 return true;
@@ -716,7 +717,7 @@ namespace patter
             }
             if (!started_) { start(sceneId, blockId); return true; }
 
-            clearPending(); pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear();
+            clearPending(); pendingPromptBeat_ = nullptr; pendingPromptShown_.reset(); pendingPromptOwnerId_.clear();
             activeSnippet_ = nullptr; beatIndex_ = 0; // abandon the rest of the snippet being delivered
             flowEnded_ = false;                       // an ended flow resumes at the target
             enterTarget(blockId.empty() ? sceneId : blockId, "jump"); // replace the stack, like an authored goto
@@ -793,7 +794,12 @@ namespace patter
             if (closed_) { StepResult r; r.type = StepType::End; return r; } // a stale reference drives nothing
             if (!started_) throw std::runtime_error("flow has not been started");
             touch();
-            if (pendingPromptBeat_) { const Beat* b = pendingPromptBeat_; pendingPromptBeat_ = nullptr; pendingPromptOwnerId_.clear(); return beatResult(*b); }
+            if (pendingPromptBeat_)
+            {
+                const Beat* b = pendingPromptBeat_; std::shared_ptr<ChoicePrompt> shown = pendingPromptShown_;
+                pendingPromptBeat_ = nullptr; pendingPromptShown_.reset(); pendingPromptOwnerId_.clear();
+                return shown ? promptResult(*b, *shown) : beatResult(*b);
+            }
             settle();
             if (flowEnded_) return StepResult::End();
             if (hasPendingChoice_)
@@ -842,8 +848,15 @@ namespace patter
             const Node* node = pendingById_[id];
             { LogEntry e; e.type = "chose"; e.subject = pendingGroupId_; e.picked = id; emit(std::move(e)); }
             const Node* picked = node;
+            std::shared_ptr<ChoicePrompt> shownPrompt = option->prompt ? std::make_shared<ChoicePrompt>(*option->prompt) : nullptr;
             clearPending();
-            pendingPromptBeat_ = host_->replayPromptOnChoose ? promptBeatOf(picked) : nullptr;
+            // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
+            // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
+            // not replayed, since that line is about to play as content anyway. (clearPending() dropped the
+            // options, so the shown prompt is copied out first.)
+            pendingPromptBeat_ = nullptr; pendingPromptShown_.reset();
+            if (host_->replayPromptOnChoose && shownPrompt)
+                if (const Beat* authored = authoredPromptOf(picked)) { pendingPromptBeat_ = authored; pendingPromptShown_ = shownPrompt; }
             pendingPromptOwnerId_ = pendingPromptBeat_ ? picked->id : "";
             enterChild(picked);
         }
@@ -969,6 +982,7 @@ namespace patter
             s.beatIndex = beatIndex_;
             if (hasPendingChoice_) { s.pendingGroupId = pendingGroupId_; s.pendingOptions = pendingOptions_; }
             s.pendingPromptOwnerId = pendingPromptOwnerId_;
+            if (pendingPromptShown_) s.pendingPrompt = std::make_shared<ChoicePrompt>(*pendingPromptShown_);
             s.selectors = selectors_;
             return s;
         }
@@ -1048,16 +1062,21 @@ namespace patter
                 if (!options.empty()) { hasPendingChoice_ = true; pendingGroupId_ = snap.pendingGroupId; pendingOptions_ = options; pendingById_ = byId; }
             }
 
-            // A save taken between choose() and the next advance() left a prompt still to be replayed;
-            // re-derive it from the chosen option (dropped if that option drifted out of the bundle).
+            // A save taken between choose() and the next advance() left a prompt still to be replayed: the
+            // chosen option's authored prompt beat, found again by its owner, and the prompt as the choice
+            // showed it, carried by the save. A save from before pendingPrompt existed has only the owner, and
+            // its beat is resolved when delivered, as it was then. Dropped if the option drifted out of the
+            // bundle or has no authored prompt (spec 9.8): the live choose() would replay nothing.
             pendingPromptBeat_ = nullptr;
+            pendingPromptShown_.reset();
             pendingPromptOwnerId_ = snap.pendingPromptOwnerId;
             if (!pendingPromptOwnerId_.empty())
             {
                 auto it = host_->nodeIndex.find(pendingPromptOwnerId_);
-                if (it != host_->nodeIndex.end()) pendingPromptBeat_ = promptBeatOf(it->second);
+                if (it != host_->nodeIndex.end()) pendingPromptBeat_ = authoredPromptOf(it->second);
             }
             if (!pendingPromptBeat_) pendingPromptOwnerId_.clear();
+            else if (snap.pendingPrompt) pendingPromptShown_ = std::make_shared<ChoicePrompt>(*snap.pendingPrompt);
         }
 
         /** Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a rollback
@@ -1075,12 +1094,12 @@ namespace patter
                 const Node* activeSnippet; int beatIndex;
                 bool hasPendingChoice; std::string pendingGroupId; std::vector<ChoiceOption> pendingOptions;
                 std::map<std::string, const Node*> pendingById;
-                const Beat* pendingPromptBeat; std::string pendingPromptOwnerId;
+                const Beat* pendingPromptBeat; std::shared_ptr<ChoicePrompt> pendingPromptShown; std::string pendingPromptOwnerId;
                 std::vector<StackFrame> stack;   // a copy of the frames: they advance in place (index++)
             };
             Cursor c{ rngState_, started_, flowEnded_, currentSceneId_, activeSnippet_, beatIndex_,
                       hasPendingChoice_, pendingGroupId_, pendingOptions_, pendingById_,
-                      pendingPromptBeat_, pendingPromptOwnerId_, stack_ };
+                      pendingPromptBeat_, pendingPromptShown_, pendingPromptOwnerId_, stack_ };
             std::shared_ptr<Flow> self = shared_from_this();
             journal->undo.push_back([self, c = std::move(c)]
             {
@@ -1089,7 +1108,7 @@ namespace patter
                 f.currentSceneId_ = c.currentSceneId; f.activeSnippet_ = c.activeSnippet; f.beatIndex_ = c.beatIndex;
                 f.hasPendingChoice_ = c.hasPendingChoice; f.pendingGroupId_ = c.pendingGroupId;
                 f.pendingOptions_ = c.pendingOptions; f.pendingById_ = c.pendingById;
-                f.pendingPromptBeat_ = c.pendingPromptBeat; f.pendingPromptOwnerId_ = c.pendingPromptOwnerId;
+                f.pendingPromptBeat_ = c.pendingPromptBeat; f.pendingPromptShown_ = c.pendingPromptShown; f.pendingPromptOwnerId_ = c.pendingPromptOwnerId;
                 f.stack_ = c.stack;
             });
         }
@@ -1136,8 +1155,9 @@ namespace patter
         std::string pendingGroupId_;
         std::vector<ChoiceOption> pendingOptions_;
         std::map<std::string, const Node*> pendingById_;
-        const Beat* pendingPromptBeat_ = nullptr;
-        std::string pendingPromptOwnerId_;                                          // owner of pendingPromptBeat_, re-derivable across a save in the choose->advance window
+        const Beat* pendingPromptBeat_ = nullptr;                                   // replayPromptOnChoose: the chosen option's authored prompt beat
+        std::shared_ptr<ChoicePrompt> pendingPromptShown_;                          // ...as the choice showed it; null only after loading a save that did not carry it
+        std::string pendingPromptOwnerId_;                                          // owner of pendingPromptBeat_, found again across a save in the choose->advance window
         std::map<std::string, SelectorState> selectors_;
         std::map<std::string, int> visitCounts_;
         EvalContext evalCtx_;
@@ -1685,9 +1705,10 @@ namespace patter
             bool silent = ccOff && text.empty();
             if (!silent)
             {
-                if (!beat.character.empty()) { r.hasCharacter = true; r.character = beat.character; }
-                std::string cn; if (resolveCharacterName(beat.character, cn)) { r.hasCharacterName = true; r.characterName = cn; }
-                if (!beat.direction.empty()) { r.hasDirection = true; r.direction = beat.direction; }
+                // Each field as the beat sets it: a "" is kept, only an unset field is absent.
+                if (beat.hasCharacter) { r.hasCharacter = true; r.character = beat.character; }
+                std::string cn; if (resolveCharacterName(beat, cn)) { r.hasCharacterName = true; r.characterName = cn; }
+                if (beat.hasDirection) { r.hasDirection = true; r.direction = beat.direction; }
             }
             r.gameData = beat.gameData;
             applyTags(r);
@@ -1715,12 +1736,33 @@ namespace patter
             if (beat->kind == "line")
             {
                 // A line-kind prompt is dialogue, so captions apply.
-                p->kind = "line"; p->text = captionLine(text); p->character = beat->character;
-                std::string cn; if (resolveCharacterName(beat->character, cn)) p->characterName = cn;
-                p->direction = beat->direction;
+                p->kind = "line"; p->text = captionLine(text);
+                if (beat->hasCharacter) { p->hasCharacter = true; p->character = beat->character; }
+                std::string cn; if (resolveCharacterName(*beat, cn)) { p->hasCharacterName = true; p->characterName = cn; }
+                if (beat->hasDirection) { p->hasDirection = true; p->direction = beat->direction; }
             }
             else { p->kind = "text"; p->text = text; }
             return p;
+        }
+        // An option's AUTHORED prompt beat: an Option group's own prompt. The only prompt a replay speaks.
+        static const Beat* authoredPromptOf(const Node* node)
+        {
+            return node->isGroup() && node->prompt ? node->prompt.get() : nullptr;
+        }
+        // A replayed prompt as a step: the beat's id, gameData, and tags, and the text and speaker fields
+        // the choice showed.
+        StepResult promptResult(const Beat& beat, const ChoicePrompt& shown)
+        {
+            StepResult r;
+            r.id = beat.id; r.text = shown.text; r.gameData = beat.gameData;
+            auto it = host_->tagIndex.find(beat.id);
+            if (it != host_->tagIndex.end() && !it->second.empty()) { r.hasTags = true; r.tags = it->second; }
+            if (shown.kind == "text") { r.type = StepType::Text; return r; }
+            r.type = StepType::Line;
+            if (shown.hasCharacter) { r.hasCharacter = true; r.character = shown.character; }
+            if (shown.hasCharacterName) { r.hasCharacterName = true; r.characterName = shown.characterName; }
+            if (shown.hasDirection) { r.hasDirection = true; r.direction = shown.direction; }
+            return r;
         }
         const Beat* promptBeatOf(const Node* node)
         {
@@ -1748,10 +1790,13 @@ namespace patter
             if (d != host_->defaultStrings.end()) return "<Untranslated: " + id + "> " + d->second;
             return id;
         }
-        bool resolveCharacterName(const std::string& character, std::string& out)
+        // A speaker's resolved name: the first of the active cast string, the default one, and the cast's
+        // displayName that exists (an empty string included). False when the beat has no character at all.
+        bool resolveCharacterName(const Beat& beat, std::string& out)
         {
-            if (character.empty()) return false;
+            if (!beat.hasCharacter) return false;
             if (host_->emitIds) return false; // IDs-only: omit the display name; the game maps the `character` token
+            const std::string& character = beat.character;
             std::string key = "cast:" + character;
             auto a = host_->strings.find(key); if (a != host_->strings.end()) { out = a->second; return true; }
             auto d = host_->defaultStrings.find(key); if (d != host_->defaultStrings.end()) { out = d->second; return true; }

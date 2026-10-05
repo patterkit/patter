@@ -67,6 +67,7 @@ namespace patter
     struct Beat
     {
         std::string id, kind, character, direction;
+        bool hasCharacter = false, hasDirection = false; // set, even to "" (absent = unset): a "" is a value
         std::shared_ptr<GameData> gameData;             // null = none
         std::vector<std::string> tags;                  // author tags (#215)
     };

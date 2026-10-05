@@ -99,18 +99,20 @@ namespace patter
             return out + "}";
         }
 
+        inline std::string promptJson(const ChoicePrompt& p)
+        {
+            // Optional prompt fields are absent when unset and kept when set, even to "" (the JS shape).
+            std::string out = "{\"kind\":" + jsonQuote(p.kind) + ",\"text\":" + jsonQuote(p.text);
+            if (p.hasCharacter) out += ",\"character\":" + jsonQuote(p.character);
+            if (p.hasCharacterName) out += ",\"characterName\":" + jsonQuote(p.characterName);
+            if (p.hasDirection) out += ",\"direction\":" + jsonQuote(p.direction);
+            return out + "}";
+        }
+
         inline std::string optionJson(const ChoiceOption& o)
         {
             std::string out = "{\"id\":" + jsonQuote(o.id) + ",\"eligible\":" + (o.eligible ? "true" : "false");
-            if (o.prompt)
-            {
-                // Optional prompt fields are absent, not empty, when the option has none (the JS shape).
-                out += ",\"prompt\":{\"kind\":" + jsonQuote(o.prompt->kind) + ",\"text\":" + jsonQuote(o.prompt->text);
-                if (!o.prompt->character.empty()) out += ",\"character\":" + jsonQuote(o.prompt->character);
-                if (!o.prompt->characterName.empty()) out += ",\"characterName\":" + jsonQuote(o.prompt->characterName);
-                if (!o.prompt->direction.empty()) out += ",\"direction\":" + jsonQuote(o.prompt->direction);
-                out += "}";
-            }
+            if (o.prompt) out += ",\"prompt\":" + promptJson(*o.prompt);
             if (o.gameData) out += ",\"gameData\":" + valueMapJson(*o.gameData);
             return out + "}";
         }
@@ -147,6 +149,8 @@ namespace patter
                 out += "]}";
             }
             out += ",\"pendingPromptOwnerId\":" + nullableJson(f.pendingPromptOwnerId);
+            // The prompt still to replay, as the choice showed it: written only in the choose->advance window.
+            if (f.pendingPrompt) out += ",\"pendingPrompt\":" + promptJson(*f.pendingPrompt);
             out += ",\"selectors\":" + selectorMapJson(f.selectors);
             return out + "}}";
         }
@@ -372,18 +376,21 @@ namespace patter
             return m;
         }
 
+        inline std::shared_ptr<ChoicePrompt> toPrompt(const JV& p)
+        {
+            auto prompt = std::make_shared<ChoicePrompt>();
+            prompt->kind = p.str("kind"); prompt->text = p.str("text");
+            if (const JV* v = p.get("character")) { prompt->hasCharacter = true; prompt->character = v->t == JV::T::Str ? v->s : ""; }
+            if (const JV* v = p.get("characterName")) { prompt->hasCharacterName = true; prompt->characterName = v->t == JV::T::Str ? v->s : ""; }
+            if (const JV* v = p.get("direction")) { prompt->hasDirection = true; prompt->direction = v->t == JV::T::Str ? v->s : ""; }
+            return prompt;
+        }
+
         inline ChoiceOption toOption(const JV& e)
         {
             ChoiceOption o;
             o.id = e.str("id"); o.eligible = e.boolean("eligible");
-            if (const JV* p = e.get("prompt"))
-            {
-                auto prompt = std::make_shared<ChoicePrompt>();
-                prompt->kind = p->str("kind"); prompt->text = p->str("text");
-                prompt->character = p->str("character"); prompt->characterName = p->str("characterName");
-                prompt->direction = p->str("direction");
-                o.prompt = prompt;
-            }
+            if (const JV* p = e.get("prompt")) o.prompt = toPrompt(*p);
             if (const JV* gd = e.get("gameData")) o.gameData = std::make_shared<GameData>(toValueMap(gd));
             return o;
         }
@@ -444,6 +451,7 @@ namespace patter
                 if (const JV* opts = c.get("pendingOptions")) for (const auto& e : opts->arr) f.pendingOptions.push_back(toOption(e));
             }
             f.pendingPromptOwnerId = c.str("pendingPromptOwnerId");
+            if (const JV* pp = c.get("pendingPrompt")) if (pp->t == JV::T::Obj) f.pendingPrompt = toPrompt(*pp);
             f.selectors = toSelectorMap(c.get("selectors"));
             return f;
         }

@@ -1311,6 +1311,7 @@ namespace Patterkit.Patterplay
         public List<ChoiceOption> PendingOptions;  // null = no pending choice
         public string PendingGroupId;
         public string PendingPromptOwnerId;        // chosen option owning a prompt still to replay (save in the choose->advance window)
+        public ChoicePrompt PendingPrompt;         // that prompt as the choice showed it; null when none, or in a save written before it was carried
         public Dictionary<string, SelectorState> Selectors;
     }
 }

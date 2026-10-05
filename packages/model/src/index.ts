@@ -1234,6 +1234,12 @@ export interface FlowCursor {
   /** The chosen option owning a prompt still to be replayed (a save taken between choose + advance).
    *  Optional / null in older saves -> no pending prompt. */
   pendingPromptOwnerId?: string | null;
+  /** The prompt still to be replayed, exactly as the choice SHOWED it (text and speaker fields, the same
+   *  shape as a saved option's `prompt`), so the replay after a load says what the player saw. Written only
+   *  alongside a `pendingPromptOwnerId` (the choose -> advance window, with `replayPromptOnChoose`), and
+   *  absent otherwise. A save without it (written before Patterplay 0.18.0) resolves the owner's prompt beat
+   *  when it is delivered, as before. */
+  pendingPrompt?: SavedChoicePrompt;
   /** This flow's (non-shared) selector cursors, keyed by group id. */
   selectors: Record<string, SelectorSnapshot>;
 }

@@ -6,6 +6,31 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The `replay_prompt_on_choose` engine option speaks back only an authored prompt, and exactly what the choice showed.** A game that
+  turns the option on will see the difference, which is why this is a minor release rather than a patch:
+  - An option whose prompt the choice borrowed from its own first content line (a bare-snippet option,
+    or an Option group with no prompt of its own) is no longer spoken back. That line used to play twice
+    in a row, once as the replay and once as content. It now plays once.
+  - The replayed prompt carries the text, `character`, `characterName`, and `direction` the choice
+    displayed, instead of resolving the prompt again when it is delivered. So if choosing runs effects
+    first (an Option group that picks a snippet runs its onEnter at once), or the language changes
+    between `choose()` and the next `advance()`, the replay still says what the player saw. In a voiced
+    project a replayed line prompt is now interpolated, as the choice showed it.
+  - A save taken between `choose()` and the next `advance()` carries that prompt as shown, in a new
+    optional `pendingPrompt` on the flow's cursor, so the replay after a load is the same. Every
+    Patterplay runtime writes and reads it. A save from an earlier version, without it, still loads and
+    resolves the prompt when it is delivered, as before.
+
+### Fixed
+
+- **A line whose `character` is set to `""` resolves the speaker's name like any other.** Its
+  `characterName` comes from the `cast:` string for that token (active locale, then default), as on the
+  other runtimes; it was always left out. Held across all four runtimes by the conformance corpus, which
+  now also pins empty speaker fields on lines and option prompts, and plays cases with
+  `replay_prompt_on_choose` and `closed_captions` set at construction.
+
 ## [0.17.0] - 2026-10-05
 
 ### Changed

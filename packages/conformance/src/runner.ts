@@ -18,7 +18,7 @@ import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
-import type { Checkpoint, StepResult } from "@patterkit/runtime";
+import type { Checkpoint, EngineOptions, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
@@ -59,6 +59,7 @@ export function runRuntimeCase(c: RuntimeCase, maxSteps = 1000): TranscriptStep[
   const engine = new Engine(c.bundle, {
     ...(c.seed !== undefined ? { rng: mulberry32(c.seed) } : {}),
     ...(c.locale !== undefined ? { locale: c.locale } : {}),
+    ...c.engineOptions, // replayPromptOnChoose / closedCaptions, as the case sets them
   });
 
   const flow = engine.openFlow("main", { scene: c.start?.scene, block: c.start?.block });
@@ -90,7 +91,7 @@ export function runRuntimeCase(c: RuntimeCase, maxSteps = 1000): TranscriptStep[
  * save written elsewhere); a port's runner has the same split.
  */
 export function runScript(
-  engine: Engine, ops: ScriptOp[], ctx: { bundle: Bundle; bundleB?: Bundle; options: { seed?: number } }, current = "",
+  engine: Engine, ops: ScriptOp[], ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions }, current = "",
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
   let checkpoint: Checkpoint | undefined;
@@ -194,8 +195,13 @@ export function runScript(
   return { chunks, engine };
 }
 
+/** The options a scripted or save case constructs every engine with: its seed and its engine options. */
+function caseOptions(c: { seed?: number; engineOptions?: ScriptedCase["engineOptions"] }): EngineOptions {
+  return { ...(c.seed !== undefined ? { seed: c.seed } : {}), ...c.engineOptions };
+}
+
 export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
-  const options = c.seed !== undefined ? { seed: c.seed } : {};
+  const options = caseOptions(c);
   return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options }).chunks;
 }
 
@@ -206,7 +212,7 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
  * writes a different shape has not adopted the contract, it has merely tolerated it.
  */
 export function runSaveCase(c: SaveCase): TranscriptStep[][] {
-  const options = c.seed !== undefined ? { seed: c.seed } : {};
+  const options = caseOptions(c);
   const engine = new Engine(c.bundle, options);
   if (c.envelope.schema !== SAVE_SCHEMA) throw new Error(`not a ${SAVE_SCHEMA} envelope`);
   engine.loadGame(JSON.parse(JSON.stringify(c.envelope.save)));
