@@ -79,17 +79,18 @@ export function renderCoverage(
   // a finished one and a thin sample gets trusted like a thick one.
   if (report.cancelled) meta.append(el("span", "cov-stopped", "Stopped early"));
   // Two drawn metadata lines (the shell's metaLine, a disc between parts): the run parameters, then how the
-  // runs ended, in words that say what each count means. The `errored` part is passed as undefined when
-  // there were none, and the line skips it.
+  // runs ended, in words that say what each count means. The `stalled` and `errored` parts are passed as
+  // undefined when there were none, and the line skips them. A stall can no longer happen (a choice with
+  // nothing to pick runs dry and play moves on), so "0 stalled" only named a way runs don't end.
   meta.append(metaLine([`${num(report.runs)} run${report.runs === 1 ? "" : "s"}`, `${report.maxSteps} max steps`, `seed ${report.seed}`]));
   const ended = metaLine([
     `${num(term.ended)} reached the end`,
-    `${num(term.stalled)} stalled at a choice`,
+    term.stalled ? `${num(term.stalled)} stalled at a choice` : undefined,
     `${num(term.capped)} hit the step limit`,
     term.evalError ? `${num(term.evalError)} errored` : undefined,
   ]);
   ended.classList.add("cov-meta-ended");
-  ended.dataset.tip = "How the runs finished. Stalled: stopped at a choice with nothing to pick. Hit the step limit: still going at Max steps, usually looping round a hub.";
+  ended.dataset.tip = "How the runs finished. Hit the step limit: still going at Max steps, usually looping round a hub.";
   meta.append(ended);
   host.append(meta);
 

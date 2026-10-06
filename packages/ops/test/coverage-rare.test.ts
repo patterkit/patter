@@ -104,9 +104,9 @@ describe("the CLI's coverage text", () => {
     expect(text).toMatch(/reached = share of runs that played the beat at least once; played = times it played in all runs/);
   });
 
-  it("says in words how the runs ended", () => {
-    expect(text).toMatch(/stalled at a choice with nothing to pick/);
+  it("says in words how the runs ended, and leaves out a stall that can't happen", () => {
     expect(text).toMatch(/hit the step limit/);
+    expect(text).not.toMatch(/stalled/);
   });
 
   it("leads with the least reached by default: the dead line first, marked, then rare lines marked ~", () => {

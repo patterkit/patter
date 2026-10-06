@@ -87,6 +87,12 @@ describe("the coverage meta line", () => {
     const parts = [...h.querySelectorAll(".cov-meta .shell-meta")[1]!.querySelectorAll(".shell-meta-part")].map((p) => p.textContent);
     expect(parts).toEqual(["4 reached the end", "1 stalled at a choice", "1 hit the step limit", "2 errored"]);
   });
+  it("leaves out stalled when no run stalled, which is every run now", () => {
+    const h = document.createElement("div");
+    renderCoverage(h, { ...report(0), termination: { ended: 5, capped: 1, stalled: 0, evalError: 0 } }, (id) => id, () => {});
+    const parts = [...h.querySelectorAll(".cov-meta .shell-meta")[1]!.querySelectorAll(".shell-meta-part")].map((p) => p.textContent);
+    expect(parts).toEqual(["5 reached the end", "1 hit the step limit"]);
+  });
 });
 
 describe("the problems bar's copy", () => {

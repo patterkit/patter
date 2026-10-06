@@ -23,6 +23,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **"+ Add group" asks for the group's first two conditions.** It used to insert a group starting with a
+  condition you hadn't chosen and an empty second half, which the problems list then flagged. Now you pick
+  both conditions through the usual condition menu, and the group is added only once both are chosen.
+- **The Play button stays in the title bar after the Properties page.** Opening a scene from the navigator
+  while the Properties page was showing left the title bar without Play or the problems count until the
+  project was reopened.
+- **The Coverage window no longer reports "0 stalled at a choice".** A run can't stall any more, since a choice
+  with nothing to pick now runs dry and play moves on, so the count is shown only if one ever does.
 - **No stray "Replaced across the project".** Reimporting an editable script, and accepting or rejecting
   suggestions, also showed the message that belongs to Replace. Now only Replace says it.
 - **The inspector's Jump row names the destination.** Right after opening a project, a jump to another scene

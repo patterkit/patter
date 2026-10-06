@@ -670,7 +670,9 @@ export function renderCoverageText(
   );
   out.push(`${report.runs} run(s) - ${report.maxSteps} max steps - seed ${report.seed}${report.cancelled ? " - CANCELLED" : ""}`);
   const term = report.termination;
-  out.push(`runs ended: ${term.ended} reached the end, ${term.stalled} stalled at a choice with nothing to pick, ${term.capped} hit the step limit, ${term.evalError} errored`);
+  // A stall can no longer happen (a choice with nothing to pick runs dry and play moves on), so it is named
+  // only if one ever does.
+  out.push(`runs ended: ${term.ended} reached the end, ${term.stalled ? `${term.stalled} stalled at a choice with nothing to pick, ` : ""}${term.capped} hit the step limit, ${term.evalError} errored`);
   if (report.drivers.length) out.push(`input drivers: ${report.drivers.map((d) => d.ref).join(", ")}`);
   if (report.unwrittenInputs.length) {
     out.push(`? = gated on an input nothing writes/drives: ${report.unwrittenInputs.join(", ")} (add a coverage driver?)`);
