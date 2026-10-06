@@ -1,6 +1,7 @@
 // Parse a compiled .patterc JSON string into the engine's patter::Bundle, using UE's
-// FJsonObject (the standalone TestHost uses its own tiny parser instead). The engine stays
-// parser-agnostic; this is the UE-side loader.
+// FJsonValue. The reading itself is Patter/BundleJson.h, shared with the standalone TestHost,
+// which reads the same way through its own tiny parser; this supplies only the FJsonValue
+// accessors and turns a throw into OutError.
 #pragma once
 
 #include "CoreMinimal.h"

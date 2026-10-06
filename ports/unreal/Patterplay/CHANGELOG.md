@@ -7,6 +7,15 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The plugin and its test host now read a bundle through one parser, so the conformance corpus checks the
+  parser games use.** The plugin's loader and the corpus test host each had their own, and they drifted: a
+  field one read, the other could miss, and the corpus only ever saw the test host's. Both now call the same
+  reader (`Patter/BundleJson.h`) and supply only how to read their JSON library. Along the way, a malformed
+  bundle the plugin used to crash on (a cast, property, or effect without its name or target, say) now fails
+  to load with an error naming the field, and a JSON `null` anywhere reads as an absent field.
+
 ## [0.19.0] - 2026-10-06
 
 ### Added

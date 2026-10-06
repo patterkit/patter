@@ -20,6 +20,8 @@
 #include "Patter/StateLogger.h"
 #include "Patter/Engine.h"
 #include "Patter/Mulberry32.h"
+#include "Patter/BundleJson.h"
+#include "../Patterplay/Source/PatterplayRuntime/Private/Tests/PatterBundleReaderCase.h"   // shared with the plugin's test
 #include "RegistryCorpus.h"   // the shared registry corpus runner, vendored from ../expr
 
 using namespace patter;
@@ -33,6 +35,8 @@ static void fail(const std::string& section, const std::string& name, const std:
 
 // ----- JSON -> model ----------------------------------------------------------
 
+// The corpus's own inputs (scope values, expected results, gameData overrides, save blobs), not a
+// bundle's: strict, so a corpus case written wrong fails loudly instead of reading as false.
 static PatterValue toValue(const JsonValue& e)
 {
     switch (e.type)
@@ -63,185 +67,26 @@ static std::shared_ptr<GameData> parseGameData(const JsonValue& e)
 // checks the UE loader had and this one did not.
 static AstPtr parseAst(const JsonValue& e) { return DeserialiseAstFrom<JsonValue>(e); }
 
-static Expression parseExpr(const JsonValue& e)
+// The bundle itself is read by the plugin's own reader (Patter/BundleJson.h), so the corpus checks the
+// parser games use rather than a second one beside it. This host only says how to read its JsonValue's
+// objects; the scalar and array accessors are AstJson's defaults, which already fit it.
+namespace patter
 {
-    Expression x;
-    x.ast = parseAst(e.at("ast"));
-    if (const JsonValue* src = e.find("src")) if (src->type == JsonValue::String) x.src = src->str;
-    return x;
-}
-
-static std::vector<Effect> parseEffects(const JsonValue& e)
-{
-    std::vector<Effect> out;
-    for (const auto& x : e.arr) { Effect ef; ef.target = x.at("target").str; ef.value = parseExpr(x.at("value")); out.push_back(ef); }
-    return out;
-}
-
-static std::vector<std::string> strList(const JsonValue& a)
-{
-    std::vector<std::string> v; for (const auto& x : a.arr) v.push_back(x.str); return v;
-}
-
-static PropertyDecl parsePropDecl(const JsonValue& p)
-{
-    PropertyDecl d;
-    d.name = p.at("name").str; d.type = p.at("type").str;
-    if (const JsonValue* sh = p.find("shared")) { d.hasShared = true; d.shared = sh->b; }
-    if (const JsonValue* tp = p.find("temporary")) d.temporary = tp->b;
-    if (const JsonValue* df = p.find("default")) { d.hasDefault = true; d.def = toValue(*df); }
-    if (const JsonValue* vs = p.find("values")) d.values = strList(*vs);
-    if (const JsonValue* st = p.find("stages")) d.stages = strList(*st);
-    return d;
-}
-
-static HostScopeDecl parseHostDecl(const JsonValue& d)
-{
-    HostScopeDecl h;
-    h.name = d.at("name").str; h.type = d.at("type").str;
-    if (const JsonValue* vs = d.find("values")) h.values = strList(*vs);
-    if (const JsonValue* st = d.find("stages")) h.stages = strList(*st);
-    if (const JsonValue* df = d.find("default")) { h.hasDefault = true; h.def = toValue(*df); }
-    if (const JsonValue* w = d.find("writable")) { h.hasWritable = true; h.writable = w->b; }
-    return h;
-}
-
-static Beat parseBeat(const JsonValue& b)
-{
-    Beat beat;
-    beat.id = b.at("id").str; beat.kind = b.at("kind").str;
-    if (const JsonValue* c = b.find("character")) { beat.hasCharacter = true; beat.character = c->str; }
-    if (const JsonValue* dr = b.find("direction")) { beat.hasDirection = true; beat.direction = dr->str; }
-    if (const JsonValue* gd = b.find("gameData")) beat.gameData = parseGameData(*gd);
-    if (const JsonValue* tg = b.find("tags")) beat.tags = strList(*tg);
-    return beat;
-}
-
-static NodePtr parseNode(const JsonValue& n)
-{
-    auto node = std::make_shared<Node>();
-    node->id = n.at("id").str; node->type = n.at("type").str;
-    if (const JsonValue* c = n.find("condition")) node->condition = std::make_shared<Expression>(parseExpr(*c));
-    if (const JsonValue* oe = n.find("onEnter")) node->onEnter = parseEffects(*oe);
-    if (const JsonValue* ox = n.find("onExit")) node->onExit = parseEffects(*ox);
-    if (const JsonValue* gd = n.find("gameData")) node->gameData = parseGameData(*gd);
-    if (const JsonValue* tg = n.find("tags")) node->tags = strList(*tg);
-    // Option-position flags, on a bare snippet option as on an Option group.
-    if (const JsonValue* st = n.find("sticky")) node->sticky = st->b;
-    if (const JsonValue* fb = n.find("fallback")) node->fallback = fb->b;
-    if (const JsonValue* su = n.find("secretUntilEligible")) node->secretUntilEligible = su->b;
-
-    if (node->isGroup())
+    template <>
+    struct BundleJson<JsonValue>
     {
-        if (const JsonValue* sel = n.find("selector")) node->selector = sel->str;
-        if (const JsonValue* ch = n.find("children")) for (const auto& c : ch->arr) node->children.push_back(parseNode(c));
-        if (const JsonValue* pr = n.find("prompt")) node->prompt = std::make_shared<Beat>(parseBeat(*pr));
-        if (const JsonValue* sh = n.find("shared")) node->shared = sh->b;
-        if (const JsonValue* op = n.find("options"))
-        {
-            node->options = std::make_shared<SelectorOptions>();
-            if (const JsonValue* o = op->find("order")) node->options->order = o->str;
-            if (const JsonValue* x = op->find("exhaust")) node->options->exhaust = x->str;
-        }
-    }
-    else
-    {
-        if (const JsonValue* bts = n.find("beats")) for (const auto& bt : bts->arr) node->beats.push_back(parseBeat(bt));
-        if (const JsonValue* jp = n.find("jump")) { node->jump = std::make_shared<Jump>(); node->jump->to = jp->at("to").str; if (const JsonValue* md = jp->find("mode")) node->jump->mode = md->str; }
-    }
-    return node;
+        static bool isObject(const JsonValue& v) { return v.isObject(); }
+        static bool isNull(const JsonValue& v) { return v.isNull(); }
+        static bool isNumber(const JsonValue& v) { return v.isNumber(); }
+        static bool isBool(const JsonValue& v) { return v.isBool(); }
+        static const JsonValue* find(const JsonValue& o, const char* key) { return o.isObject() ? o.find(key) : nullptr; }
+        // JsonValue keeps an object's fields in a vector, in document order.
+        template <typename Fn>
+        static void forEachField(const JsonValue& o, Fn&& fn) { for (const auto& kv : o.obj) fn(kv.first, kv.second); }
+    };
 }
 
-static std::map<std::string, std::map<std::string, std::string>> parseStrings(const JsonValue& e)
-{
-    std::map<std::string, std::map<std::string, std::string>> out;
-    for (const auto& loc : e.obj) { std::map<std::string, std::string> t; for (const auto& kv : loc.second.obj) t[kv.first] = kv.second.str; out[loc.first] = t; }
-    return out;
-}
-
-static Bundle parseBundle(const JsonValue& b)
-{
-    Bundle bundle;
-    if (const JsonValue* sc = b.find("schema")) bundle.schema = sc->str;
-    if (const JsonValue* v = b.find("voiced")) bundle.voiced = v->b;
-    if (const JsonValue* ct = b.find("content")) {
-        if (const JsonValue* h = ct->find("hash")) bundle.contentHash = h->str;
-        if (const JsonValue* sh = ct->find("structureHash")) bundle.structureHash = sh->str;
-        if (const JsonValue* pr = ct->find("project")) bundle.contentProject = pr->str;
-        if (const JsonValue* ver = ct->find("version")) bundle.contentVersion = ver->str;
-    }
-    if (const JsonValue* lz = b.find("localisation")) {
-        if (const JsonValue* m = lz->find("mode")) bundle.localisation.mode = m->str;
-        if (const JsonValue* sd = lz->find("sourceDebug")) bundle.localisation.sourceDebug = sd->b;
-    }
-    if (const JsonValue* cc = b.find("closedCaptions")) {
-        bundle.closedCaptions.present = true;
-        bundle.closedCaptions.open = cc->at("open").str;
-        bundle.closedCaptions.close = cc->at("close").str;
-        if (const JsonValue* ch = cc->find("character")) bundle.closedCaptions.character = ch->str;
-    }
-    const JsonValue& loc = b.at("locales");
-    bundle.locales.defaultLocale = loc.at("default").str;
-    if (const JsonValue* inc = loc.find("included")) bundle.locales.included = strList(*inc);
-    if (const JsonValue* cast = b.find("cast")) for (const auto& c : cast->arr) { Cast cc; cc.name = c.at("name").str; if (const JsonValue* dn = c.find("displayName")) cc.displayName = dn->str; bundle.cast.push_back(cc); }
-    if (const JsonValue* props = b.find("properties")) for (const auto& p : props->arr) bundle.properties.push_back(parsePropDecl(p));
-    if (const JsonValue* reg = b.find("scopeRegistry"))
-    {
-        bundle.scopeRegistry.present = true;
-        if (const JsonValue* v = reg->find("version")) bundle.scopeRegistry.version = static_cast<int>(v->num);
-        if (const JsonValue* scopes = reg->find("scopes"))
-            for (const auto& sc : scopes->arr)
-            {
-                HostScopeSpec spec;
-                spec.token = sc.at("token").str;
-                if (const JsonValue* w = sc.find("writable")) { spec.hasWritable = true; spec.writable = w->b; }
-                if (const JsonValue* decls = sc.find("declarations"))
-                {
-                    spec.hasDeclarations = true;
-                    for (const auto& d : decls->arr) spec.declarations.push_back(parseHostDecl(d));
-                }
-                bundle.scopeRegistry.scopes.push_back(spec);
-            }
-    }
-    if (const JsonValue* ext = b.find("externalScopes")) bundle.externalScopes = strList(*ext);
-    if (const JsonValue* strs = b.find("strings")) bundle.strings = parseStrings(*strs);
-    if (const JsonValue* gdf = b.find("gameDataFields"))
-        for (const auto& kind : gdf->obj)
-        {
-            std::vector<GameDataField> fields;
-            for (const auto& f : kind.second.arr)
-            {
-                GameDataField gf; gf.name = f.at("name").str; if (const JsonValue* t = f.find("type")) gf.type = t->str;
-                if (const JsonValue* df = f.find("default")) { gf.hasDefault = true; gf.def = toValue(*df); }
-                if (const JsonValue* vs = f.find("values")) gf.values = strList(*vs);
-                fields.push_back(gf);
-            }
-            bundle.gameDataFields[kind.first] = fields;
-        }
-    for (const auto& sc : b.at("scenes").obj)
-    {
-        Scene scene; scene.id = sc.second.at("id").str;
-        if (const JsonValue* nm = sc.second.find("name")) scene.name = nm->str;
-        if (const JsonValue* gi = sc.second.find("gameId")) scene.gameId = gi->str;
-        if (const JsonValue* tg = sc.second.find("tags")) scene.tags = strList(*tg);
-        if (const JsonValue* gd = sc.second.find("gameData")) scene.gameData = parseGameData(*gd);
-        if (const JsonValue* sp = sc.second.find("sceneProps")) for (const auto& p : sp->arr) scene.sceneProps.push_back(parsePropDecl(p));
-        if (const JsonValue* oe = sc.second.find("onEntry")) scene.onEntry = parseEffects(*oe);
-        for (const auto& blk : sc.second.at("blocks").arr)
-        {
-            Block block; block.id = blk.at("id").str;
-            if (const JsonValue* nm = blk.find("name")) block.name = nm->str;
-            if (const JsonValue* gi = blk.find("gameId")) block.gameId = gi->str;
-            if (const JsonValue* tg = blk.find("tags")) block.tags = strList(*tg);
-            if (const JsonValue* gd = blk.find("gameData")) block.gameData = parseGameData(*gd);
-            if (const JsonValue* ch = blk.find("children")) for (const auto& c : ch->arr) block.children.push_back(parseNode(c));
-            scene.blocks.push_back(std::move(block));
-        }
-        if (!bundle.scenes.count(sc.first)) bundle.sceneOrder.push_back(sc.first);
-        bundle.scenes[sc.first] = std::move(scene);
-    }
-    return bundle;
-}
+static Bundle parseBundle(const JsonValue& b) { return ParseBundle(b); }
 
 // ----- normalised step -> JsonValue (mirror normaliseStep) --------------------
 
@@ -856,6 +701,21 @@ static void runTraceLogSmoke()
     if (restarted) fail("trace", "seq after clearLog", "the engine's seq restarted after a clear");
 
     std::cout << "  [trace] decisions logged: " << flow->log().size() << ", with the dropped sibling named\n";
+}
+
+// The bundle reader's shared case (PatterBundleReaderCase.h), read through this host's JsonValue. The
+// plugin's automation test Patterplay.BundleReader reads the same JSON through FJsonValue and checks the
+// same facts, so the two hosts' accessors cannot drift apart unseen.
+static void runBundleReaderCase()
+{
+    namespace rc = patter::bundlereadercase;
+    for (const std::string& what : rc::Check(parseBundle(JsonParser(rc::Json()).parse())))
+        fail("bundle-reader", what, "read differently from the plugin's expectation");
+    std::string error;
+    try { parseBundle(JsonParser(rc::MissingFieldJson()).parse()); }
+    catch (const std::exception& ex) { error = ex.what(); }
+    if (error != rc::MissingFieldError()) fail("bundle-reader", "missing field", "expected \"" + std::string(rc::MissingFieldError()) + "\", got \"" + error + "\"");
+    std::cout << "  [bundle-reader] the plugin's reader, through this host's JSON: the shared case\n";
 }
 
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
@@ -2337,6 +2197,7 @@ int main(int argc, char** argv)
     runInspectorSmoke();
     runOneRegistry();
     runKernelErrorCases();
+    runBundleReaderCase();
     runHostScopeWritableSmoke();
     runPlayErrorCases();
     runAddressLookupCases();

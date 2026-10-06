@@ -3,7 +3,8 @@
 // JSON string -> UPatterBundle -> UPatterEngine -> flow -> property -> the bundle description.
 //
 // Why it exists, and it is not hypothetical. The plugin's own JSON loader (PatterBundleLoader.cpp)
-// is compiled ONLY by Unreal: the TestHost ships a separate parser, and .github/workflows/
+// is compiled ONLY by Unreal: the TestHost shipped a separate parser (since 2026-10 both share the
+// reader in Patter/BundleJson.h, but the FJsonValue half is still Unreal's alone), and .github/workflows/
 // play-unreal.yml gates releases on that TestHost alone, on a plain ubuntu runner with no engine.
 // So every UE-facing file here - this loader, the UObject wrappers, the editor module - had NO gate
 // of any kind, and on 2026-08-19 scopeRegistry parsing was added to that loader, passed every green

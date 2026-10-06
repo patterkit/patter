@@ -1,19 +1,25 @@
 // The plugin's own path, from a bundle's JSON to played steps. Runs via
 //   -ExecCmds="Automation RunTests Patterplay.PluginPath"
 //
-// The clang TestHost runs the corpus through ITS OWN bundle parser, so the corpus cannot see what the
-// plugin's loader (PatterBundleLoader.cpp) reads or misses. Two things it missed, both found in a
-// 2026-10 review: the project's closed-caption settings were never read, so a game always fell back to
-// [ ] and SFX; and scenes were played in id order rather than authored order, so a flow opened with no
+// The clang TestHost ran the corpus through ITS OWN bundle parser until 2026-10, so the corpus could not
+// see what the plugin's loader (PatterBundleLoader.cpp) read or missed. Two things it missed, both found
+// in a 2026-10 review: the project's closed-caption settings were never read, so a game always fell back
+// to [ ] and SFX; and scenes were played in id order rather than authored order, so a flow opened with no
 // scene started on whichever scene id sorted first. Beside them, what CreateWithOptions sets, and a
 // number property that round-trips through Blueprint as a double.
+//
+// Both hosts now read through one reader (Patter/BundleJson.h). Patterplay.BundleReader, below, checks
+// that the plugin's FJsonValue accessors give it what the TestHost's give it, from the same JSON.
 
 #include "Misc/AutomationTest.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "PatterBundle.h"
+#include "PatterBundleLoader.h"
 #include "PatterEngine.h"
+#include "Patter/Bundle.h"
+#include "PatterBundleReaderCase.h"
 
 namespace
 {
@@ -112,6 +118,35 @@ bool FPatterplayPluginPathTest::RunTest(const FString& Parameters)
 		Flow->Advance();
 		Flow->Advance();
 		TestEqual(TEXT("and interpolates as 0.1, not 0.10000000149011612"), Flow->Advance().Text, FString(TEXT("x=0.1")));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPatterplayBundleReaderTest,
+	"Patterplay.BundleReader",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+// The shared case (PatterBundleReaderCase.h), read through the plugin's loader. The corpus TestHost
+// reads the same JSON through its own JsonValue and checks the same facts.
+bool FPatterplayBundleReaderTest::RunTest(const FString& Parameters)
+{
+	namespace rc = patter::bundlereadercase;
+	{
+		patter::Bundle Bundle;
+		FString Error;
+		if (!TestTrue(TEXT("the shared case loads"), PatterLoadBundle(FString(UTF8_TO_TCHAR(rc::Json())), Bundle, Error)))
+		{
+			AddError(Error);
+			return false;
+		}
+		for (const std::string& What : rc::Check(Bundle))
+			AddError(FString::Printf(TEXT("read differently from the TestHost's expectation: %s"), UTF8_TO_TCHAR(What.c_str())));
+	}
+	{
+		patter::Bundle Bundle;
+		FString Error;
+		TestFalse(TEXT("a missing required field fails the load"), PatterLoadBundle(FString(UTF8_TO_TCHAR(rc::MissingFieldJson())), Bundle, Error));
+		TestEqual(TEXT("and names the field, as the TestHost's throw does"), Error, FString(UTF8_TO_TCHAR(rc::MissingFieldError())));
 	}
 	return true;
 }

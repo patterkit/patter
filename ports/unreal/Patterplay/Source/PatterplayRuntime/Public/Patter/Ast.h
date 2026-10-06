@@ -2,9 +2,9 @@
 //
 // The node struct is the SHARED source, vendored from expr/ports/unreal/Ast.h
 // to Expr/Ast.h beside this, so Patterplay and the Storylet Engine walk the
-// same shape. Deserialising into it is NOT shared: that needs a JSON type and
-// each plugin ships its own (Patterplay's is parseAst, in the bundle loader
-// and the corpus TestHost).
+// same shape. Deserialising into it is shared too (DeserialiseAstFrom, over a
+// host's AstJson accessors); Patterplay's bundle reader, BundleJson.h, calls it
+// for every expression.
 //
 //   ["b",v] ["n",v] ["s",v] ["sv",scope,name] ["u",op,operand]
 //   ["bin",op,left,right] ["call",name,...args] ["fd",sign,name]

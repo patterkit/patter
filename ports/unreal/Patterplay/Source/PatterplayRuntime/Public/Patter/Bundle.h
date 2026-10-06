@@ -1,6 +1,6 @@
-// The compiled-bundle model (a parsed .patterc). Plain structs; any JSON library can
-// populate them (the standalone TestHost uses a tiny parser, the UE plugin uses
-// FJsonObject) - the engine stays parser-agnostic. Mirrors @patterkit/model's shapes.
+// The compiled-bundle model (a parsed .patterc). Plain structs, filled by the one reader in
+// BundleJson.h from any JSON library (the standalone TestHost uses a tiny parser, the UE plugin
+// uses FJsonValue) - the engine stays parser-agnostic. Mirrors @patterkit/model's shapes.
 #pragma once
 
 #include <algorithm>

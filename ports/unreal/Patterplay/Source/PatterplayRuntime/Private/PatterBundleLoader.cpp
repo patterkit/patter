@@ -1,82 +1,15 @@
 #include "PatterBundleLoader.h"
 #include "Patter/Bundle.h"
+#include "Patter/BundleJson.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include <stdexcept>
 
-using patter::Bundle;
-using patter::PatterValue;
-
 namespace
 {
 	std::string Std(const FString& S) { return std::string(TCHAR_TO_UTF8(*S)); }
-
-	const TSharedPtr<FJsonValue>* Field(const TSharedPtr<FJsonObject>& O, const TCHAR* Key)
-	{
-		return O->Values.Find(Key);
-	}
-
-	// Required-field accessors: a malformed / forward-version bundle throws std::runtime_error (caught by
-	// PatterLoadBundle's try/catch -> a clean Error) instead of dereferencing a null TSharedPtr, which in
-	// UE is a fatal check() the catch can't recover from.
-	[[noreturn]] void Missing(const TCHAR* Key) { throw std::runtime_error(std::string("bundle: missing/invalid field '") + TCHAR_TO_UTF8(Key) + "'"); }
-
-	TSharedPtr<FJsonObject> ReqObject(const TSharedPtr<FJsonObject>& O, const TCHAR* Key)
-	{
-		const TSharedPtr<FJsonValue>* P = O->Values.Find(Key);
-		if (!P || !P->IsValid()) Missing(Key);
-		TSharedPtr<FJsonObject> Obj = (*P)->AsObject();
-		if (!Obj.IsValid()) Missing(Key);
-		return Obj;
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>& ReqArray(const TSharedPtr<FJsonObject>& O, const TCHAR* Key)
-	{
-		const TSharedPtr<FJsonValue>* P = O->Values.Find(Key);
-		if (!P || !P->IsValid() || (*P)->Type != EJson::Array) Missing(Key);
-		return (*P)->AsArray();
-	}
-
-	std::string ReqString(const TSharedPtr<FJsonObject>& O, const TCHAR* Key)
-	{
-		const TSharedPtr<FJsonValue>* P = O->Values.Find(Key);
-		if (!P || !P->IsValid()) Missing(Key);
-		return std::string(TCHAR_TO_UTF8(*(*P)->AsString()));
-	}
-
-	PatterValue ToValue(const TSharedPtr<FJsonValue>& V)
-	{
-		switch (V->Type)
-		{
-			case EJson::Boolean: return PatterValue::Bool(V->AsBool());
-			case EJson::Number: return PatterValue::Num(V->AsNumber());
-			case EJson::String: return PatterValue::Str(Std(V->AsString()));
-			case EJson::Array:
-			{
-				std::vector<std::string> F;
-				for (const TSharedPtr<FJsonValue>& X : V->AsArray()) F.push_back(Std(X->AsString()));
-				return PatterValue::Flags(F);
-			}
-			default: return PatterValue::Bool(false);
-		}
-	}
-
-	std::shared_ptr<patter::GameData> ToGameData(const TSharedPtr<FJsonObject>& O)
-	{
-		auto Gd = std::make_shared<patter::GameData>();
-		for (const auto& KV : O->Values) (*Gd)[Std(KV.Key)] = ToValue(KV.Value);
-		return Gd;
-	}
-
-	std::vector<std::string> StrList(const TSharedPtr<FJsonValue>& V)
-	{
-		std::vector<std::string> Out;
-		for (const TSharedPtr<FJsonValue>& X : V->AsArray()) Out.push_back(Std(X->AsString()));
-		return Out;
-	}
-
 }
 
 // The kernel's own namespace, since a template is specialised where it lives (the kernel is
@@ -109,143 +42,35 @@ namespace wildwinter { namespace expr
 	};
 }}
 
-namespace
+// The bundle reader (Patter/BundleJson.h) is the one the corpus TestHost runs, so all this loader
+// supplies is the object half of reading an FJsonValue; the AstJson specialisation above covers the
+// rest. Patterplay's own namespace, so unlike AstJson's this is no type another plugin shares.
+namespace patter
 {
-
-	// The tag dispatch is the SHARED deserialiser (Patter/Expr/Ast.h). All this
-	// layer supplies is how to READ an Unreal FJsonValue, which is the only part
-	// that was ever library-specific. The per-tag arity checks that used to live
-	// here moved into the shared source, so every host in both families now has
-	// them; this loader was the only one of six that did.
-	patter::AstPtr ToAst(const TSharedPtr<FJsonValue>& V)
+	template <>
+	struct BundleJson<TSharedPtr<FJsonValue>>
 	{
-		return patter::DeserialiseAstFrom<TSharedPtr<FJsonValue>>(V);
-	}
-
-	patter::Expression ToExpr(const TSharedPtr<FJsonObject>& O)
-	{
-		patter::Expression E;
-		E.ast = ToAst(O->Values.FindRef(TEXT("ast")));
-		FString Src;
-		if (O->TryGetStringField(TEXT("src"), Src)) E.src = Std(Src); // the source text, for an error report
-		return E;
-	}
-
-	std::vector<patter::Effect> ToEffects(const TSharedPtr<FJsonValue>& V)
-	{
-		std::vector<patter::Effect> Out;
-		for (const TSharedPtr<FJsonValue>& X : V->AsArray())
+		using J = TSharedPtr<FJsonValue>;
+		static bool isObject(const J& v) { return v.IsValid() && v->Type == EJson::Object; }
+		static bool isNull(const J& v) { return !v.IsValid() || v->Type == EJson::Null; }
+		static bool isNumber(const J& v) { return v.IsValid() && v->Type == EJson::Number; }
+		static bool isBool(const J& v) { return v.IsValid() && v->Type == EJson::Boolean; }
+		static const J* find(const J& o, const char* key)
 		{
-			TSharedPtr<FJsonObject> O = X->AsObject();
-			patter::Effect E; E.target = Std(O->Values.FindRef(TEXT("target"))->AsString()); E.value = ToExpr(O->Values.FindRef(TEXT("value"))->AsObject());
-			Out.push_back(E);
+			return isObject(o) ? o->AsObject()->Values.Find(FString(UTF8_TO_TCHAR(key))) : nullptr;
 		}
-		return Out;
-	}
-
-	patter::HostScopeDecl ToHostDecl(const TSharedPtr<FJsonObject>& O)
-	{
-		patter::HostScopeDecl D;
-		D.name = Std(O->Values.FindRef(TEXT("name"))->AsString());
-		D.type = Std(O->Values.FindRef(TEXT("type"))->AsString());
-		const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
-		if (O->TryGetArrayField(TEXT("values"), Values))
-			for (const TSharedPtr<FJsonValue>& V : *Values) D.values.push_back(TCHAR_TO_UTF8(*V->AsString()));
-		const TArray<TSharedPtr<FJsonValue>>* Stages = nullptr;
-		if (O->TryGetArrayField(TEXT("stages"), Stages))
-			for (const TSharedPtr<FJsonValue>& V : *Stages) D.stages.push_back(TCHAR_TO_UTF8(*V->AsString()));
-		const TSharedPtr<FJsonValue> Def = O->TryGetField(TEXT("default"));
-		if (Def.IsValid() && Def->Type != EJson::Null) { D.hasDefault = true; D.def = ToValue(Def); }
-		bool W = false;
-		if (O->TryGetBoolField(TEXT("writable"), W)) { D.hasWritable = true; D.writable = W; }
-		return D;
-	}
-
-	patter::PropertyDecl ToPropDecl(const TSharedPtr<FJsonObject>& O)
-	{
-		patter::PropertyDecl D;
-		D.name = Std(O->Values.FindRef(TEXT("name"))->AsString());
-		D.type = Std(O->Values.FindRef(TEXT("type"))->AsString());
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("shared"))) { D.hasShared = true; D.shared = (*P)->AsBool(); }
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("temporary"))) D.temporary = (*P)->AsBool();
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("default"))) { D.hasDefault = true; D.def = ToValue(*P); }
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("values"))) D.values = StrList(*P);
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("stages"))) D.stages = StrList(*P);
-		return D;
-	}
-
-	patter::Beat ToBeat(const TSharedPtr<FJsonObject>& O)
-	{
-		patter::Beat B;
-		B.id = Std(O->Values.FindRef(TEXT("id"))->AsString());
-		B.kind = Std(O->Values.FindRef(TEXT("kind"))->AsString());
-		// Set (even to "") or absent: a step keeps a "" speaker field, as every runtime does.
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("character"))) { B.hasCharacter = true; B.character = Std((*P)->AsString()); }
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("direction"))) { B.hasDirection = true; B.direction = Std((*P)->AsString()); }
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameData"))) B.gameData = ToGameData((*P)->AsObject());
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("tags"))) B.tags = StrList(*P);   // author tags (#215)
-		return B;
-	}
-
-	patter::NodePtr ToNode(const TSharedPtr<FJsonObject>& O)
-	{
-		auto N = std::make_shared<patter::Node>();
-		N->id = Std(O->Values.FindRef(TEXT("id"))->AsString());
-		N->type = Std(O->Values.FindRef(TEXT("type"))->AsString());
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("condition"))) N->condition = std::make_shared<patter::Expression>(ToExpr((*P)->AsObject()));
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("onEnter"))) N->onEnter = ToEffects(*P);
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("onExit"))) N->onExit = ToEffects(*P);
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameData"))) N->gameData = ToGameData((*P)->AsObject());
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("tags"))) N->tags = StrList(*P);   // author tags (#215)
-		// Option-position flags, on a bare snippet option as on an Option group.
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("sticky"))) N->sticky = (*P)->AsBool();
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("fallback"))) N->fallback = (*P)->AsBool();
-		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("secretUntilEligible"))) N->secretUntilEligible = (*P)->AsBool();
-
-		if (N->isGroup())
+		// FJsonObject keeps its fields in document order, which is the authored scene order.
+		template <typename Fn>
+		static void forEachField(const J& o, Fn&& fn)
 		{
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("selector"))) N->selector = Std((*P)->AsString());
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("children"))) for (const auto& C : (*P)->AsArray()) N->children.push_back(ToNode(C->AsObject()));
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("prompt"))) N->prompt = std::make_shared<patter::Beat>(ToBeat((*P)->AsObject()));
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("shared"))) N->shared = (*P)->AsBool();
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("options")))
-			{
-				TSharedPtr<FJsonObject> Op = (*P)->AsObject();
-				N->options = std::make_shared<patter::SelectorOptions>();
-				if (const TSharedPtr<FJsonValue>* Q = Field(Op, TEXT("order"))) N->options->order = Std((*Q)->AsString());
-				if (const TSharedPtr<FJsonValue>* Q = Field(Op, TEXT("exhaust"))) N->options->exhaust = Std((*Q)->AsString());
-			}
+			for (const auto& KV : o->AsObject()->Values) fn(Std(KV.Key), KV.Value);
 		}
-		else
-		{
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("beats"))) for (const auto& Bt : (*P)->AsArray()) N->beats.push_back(ToBeat(Bt->AsObject()));
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("jump")))
-			{
-				TSharedPtr<FJsonObject> J = (*P)->AsObject();
-				N->jump = std::make_shared<patter::Jump>();
-				N->jump->to = Std(J->Values.FindRef(TEXT("to"))->AsString());
-				if (const TSharedPtr<FJsonValue>* Q = Field(J, TEXT("mode"))) N->jump->mode = Std((*Q)->AsString());
-			}
-		}
-		return N;
-	}
-
-	std::map<std::string, std::map<std::string, std::string>> ToStrings(const TSharedPtr<FJsonObject>& O)
-	{
-		std::map<std::string, std::map<std::string, std::string>> Out;
-		for (const auto& Loc : O->Values)
-		{
-			std::map<std::string, std::string> T;
-			for (const auto& KV : Loc.Value->AsObject()->Values) T[Std(KV.Key)] = Std(KV.Value->AsString());
-			Out[Std(Loc.Key)] = T;
-		}
-		return Out;
-	}
+	};
 }
 
-bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
+bool PatterLoadBundle(const FString& Json, patter::Bundle& Out, FString& Error)
 {
-	TSharedPtr<FJsonObject> Root;
+	TSharedPtr<FJsonValue> Root;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Json);
 	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
 	{
@@ -253,132 +78,12 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 		return false;
 	}
 
+	// A malformed or forward-version bundle throws (a missing required field, or a bad expression) and
+	// becomes a clean Error here, rather than dereferencing a null TSharedPtr, which in UE is a fatal
+	// check() no catch can recover from.
 	try
 	{
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("schema"))) Out.schema = Std((*P)->AsString());
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("voiced"))) Out.voiced = (*P)->AsBool();
-			if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("content")))
-			{
-				const TSharedPtr<FJsonObject> Ct = (*P)->AsObject();
-				if (Ct.IsValid())
-				{
-					if (const TSharedPtr<FJsonValue>* H = Field(Ct, TEXT("hash"))) Out.contentHash = Std((*H)->AsString());
-					if (const TSharedPtr<FJsonValue>* Sh = Field(Ct, TEXT("structureHash"))) Out.structureHash = Std((*Sh)->AsString());
-					if (const TSharedPtr<FJsonValue>* Pr = Field(Ct, TEXT("project"))) Out.contentProject = Std((*Pr)->AsString());
-					if (const TSharedPtr<FJsonValue>* Ve = Field(Ct, TEXT("version"))) Out.contentVersion = Std((*Ve)->AsString());
-				}
-			}
-			if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("localisation")))
-			{
-				const TSharedPtr<FJsonObject> Lz = (*P)->AsObject();
-				if (const TSharedPtr<FJsonValue>* M = Field(Lz, TEXT("mode"))) Out.localisation.mode = Std((*M)->AsString());
-				if (const TSharedPtr<FJsonValue>* SD = Field(Lz, TEXT("sourceDebug"))) Out.localisation.sourceDebug = (*SD)->AsBool();
-			}
-			// The project's own caption delimiters and caption character (#214). This loader never read
-			// them, while the corpus TestHost's parser did, so the corpus passed and a real game always
-			// fell back to [ ] and SFX.
-			if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("closedCaptions")))
-			{
-				const TSharedPtr<FJsonObject> Cc = (*P)->AsObject();
-				Out.closedCaptions.present = true;
-				Out.closedCaptions.open = ReqString(Cc, TEXT("open"));
-				Out.closedCaptions.close = ReqString(Cc, TEXT("close"));
-				if (const TSharedPtr<FJsonValue>* Ch = Field(Cc, TEXT("character"))) Out.closedCaptions.character = Std((*Ch)->AsString());
-			}
-
-		TSharedPtr<FJsonObject> Loc = ReqObject(Root, TEXT("locales"));
-		Out.locales.defaultLocale = ReqString(Loc, TEXT("default"));
-		if (const TSharedPtr<FJsonValue>* P = Field(Loc, TEXT("included"))) Out.locales.included = StrList(*P);
-
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("cast")))
-			for (const auto& C : (*P)->AsArray())
-			{
-				TSharedPtr<FJsonObject> O = C->AsObject();
-				patter::Cast Cc; Cc.name = Std(O->Values.FindRef(TEXT("name"))->AsString());
-				if (const TSharedPtr<FJsonValue>* Q = Field(O, TEXT("displayName"))) Cc.displayName = Std((*Q)->AsString());
-				Out.cast.push_back(Cc);
-			}
-
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("properties")))
-			for (const auto& Pr : (*P)->AsArray()) Out.properties.push_back(ToPropDecl(Pr->AsObject()));
-
-		// Declared host scopes (@world). Skipping this is not a missing feature but a silently
-		// different story: the reference reads as a graceful false and the gated branch never runs.
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("scopeRegistry")))
-		{
-			const TSharedPtr<FJsonObject> Reg = (*P)->AsObject();
-			Out.scopeRegistry.present = true;
-			double Ver = 1.0;
-			if (Reg->TryGetNumberField(TEXT("version"), Ver)) Out.scopeRegistry.version = static_cast<int>(Ver);
-			const TArray<TSharedPtr<FJsonValue>>* Scopes = nullptr;
-			if (Reg->TryGetArrayField(TEXT("scopes"), Scopes))
-				for (const TSharedPtr<FJsonValue>& S : *Scopes)
-				{
-					const TSharedPtr<FJsonObject> O = S->AsObject();
-					patter::HostScopeSpec Spec;
-					Spec.token = Std(O->Values.FindRef(TEXT("token"))->AsString());
-					bool W = false;
-					if (O->TryGetBoolField(TEXT("writable"), W)) { Spec.hasWritable = true; Spec.writable = W; }
-					const TArray<TSharedPtr<FJsonValue>>* Decls = nullptr;
-					if (O->TryGetArrayField(TEXT("declarations"), Decls))
-					{
-						// Present-but-empty is a declared scope with nothing in it; ABSENT is opaque.
-						Spec.hasDeclarations = true;
-						for (const TSharedPtr<FJsonValue>& D : *Decls) Spec.declarations.push_back(ToHostDecl(D->AsObject()));
-					}
-					Out.scopeRegistry.scopes.push_back(Spec);
-				}
-		}
-
-		// Other engines' scopes the content names (`story`). Skipped, a write to one would land in
-		// @patter under a dotted name, and a game that never registered it would hear nothing.
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("externalScopes"))) Out.externalScopes = StrList(*P);
-
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("strings"))) Out.strings = ToStrings((*P)->AsObject());
-
-		if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("gameDataFields")))
-			for (const auto& Kind : (*P)->AsObject()->Values)
-			{
-				std::vector<patter::GameDataField> Fields;
-				for (const auto& F : Kind.Value->AsArray())
-				{
-					TSharedPtr<FJsonObject> O = F->AsObject();
-					patter::GameDataField Gf; Gf.name = Std(O->Values.FindRef(TEXT("name"))->AsString());
-					if (const TSharedPtr<FJsonValue>* Q = Field(O, TEXT("type"))) Gf.type = Std((*Q)->AsString());
-					if (const TSharedPtr<FJsonValue>* Q = Field(O, TEXT("default"))) { Gf.hasDefault = true; Gf.def = ToValue(*Q); }
-					if (const TSharedPtr<FJsonValue>* Q = Field(O, TEXT("values"))) Gf.values = StrList(*Q);
-					Fields.push_back(Gf);
-				}
-				Out.gameDataFields[Std(Kind.Key)] = Fields;
-			}
-
-		for (const auto& Sc : ReqObject(Root, TEXT("scenes"))->Values)
-		{
-			TSharedPtr<FJsonObject> O = Sc.Value->AsObject();
-			if (!O.IsValid()) Missing(TEXT("scene"));
-			patter::Scene Scene; Scene.id = ReqString(O, TEXT("id"));
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("name"))) Scene.name = Std((*P)->AsString());
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameId"))) Scene.gameId = Std((*P)->AsString());
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("tags"))) Scene.tags = StrList(*P);   // author tags (#215)
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameData"))) Scene.gameData = ToGameData((*P)->AsObject());
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("sceneProps"))) for (const auto& Pr : (*P)->AsArray()) Scene.sceneProps.push_back(ToPropDecl(Pr->AsObject()));
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("onEntry"))) Scene.onEntry = ToEffects(*P);
-			for (const auto& Blk : ReqArray(O, TEXT("blocks")))
-			{
-				TSharedPtr<FJsonObject> Bo = Blk->AsObject();
-				if (!Bo.IsValid()) Missing(TEXT("block"));
-				patter::Block Block; Block.id = ReqString(Bo, TEXT("id"));
-				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("name"))) Block.name = Std((*P)->AsString());
-				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("gameId"))) Block.gameId = Std((*P)->AsString());
-				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("tags"))) Block.tags = StrList(*P);   // author tags (#215)
-				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("gameData"))) Block.gameData = ToGameData((*P)->AsObject());
-				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("children"))) for (const auto& C : (*P)->AsArray()) Block.children.push_back(ToNode(C->AsObject()));
-				Scene.blocks.push_back(std::move(Block));
-			}
-			// FJsonObject keeps its fields in document order, which is the authored scene order.
-			if (!Out.scenes.count(Std(Sc.Key))) Out.sceneOrder.push_back(Std(Sc.Key));
-			Out.scenes[Std(Sc.Key)] = std::move(Scene);
-		}
+		Out = patter::ParseBundle(Root);
 	}
 	catch (const std::exception& Ex)
 	{
