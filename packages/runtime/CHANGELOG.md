@@ -33,6 +33,13 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Fixed
+
+- **`reset()` no longer replays a prompt from the run it abandoned.** With prompt replay on, `choose()` leaves
+  the chosen option's prompt waiting for the next `advance()`. `reset()` in between cleared only the choice, so
+  the old prompt played as the restarted run's first beat. Every move that leaves the flow's place (`reset()`,
+  `goto`, `close`) now drops both, through one helper.
+
 ## [0.19.0] - 2026-10-06
 
 ### Added

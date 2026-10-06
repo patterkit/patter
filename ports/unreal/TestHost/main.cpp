@@ -718,6 +718,36 @@ static void runBundleReaderCase()
     std::cout << "  [bundle-reader] the plugin's reader, through this host's JSON: the shared case\n";
 }
 
+// Moving a flow drops everything waiting to be delivered. With replayPromptOnChoose, choose() leaves the
+// chosen option's prompt waiting to be spoken back by the next advance(). A restart (start) between the two
+// used to clear only the choice, so the abandoned run's prompt played as the restarted run's first beat; and
+// close() left the shown prompt behind. All now share one clearPending, as on the other three runtimes.
+static void runPendingClearedCheck()
+{
+    const char* json = R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},
+      "scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","blocks":[{"id":"b","type":"block","name":"B","gameId":"b","children":[
+        {"id":"sn_open","type":"snippet","beats":[{"id":"OPEN","kind":"text"}]},
+        {"id":"g","type":"group","selector":"choice","children":[
+          {"id":"o","type":"group","prompt":{"id":"P","kind":"line","character":"PC"},"children":[
+            {"id":"sn_ans","type":"snippet","beats":[{"id":"ANS","kind":"text"}],"jump":{"to":"END"}}]}]}]}]}},
+      "strings":{"en":{"OPEN":"opening","P":"Ask","ANS":"answer"}}})JSON";
+    const Bundle bundle = parseBundle(JsonParser(json).parse());
+    EngineOptions opts; opts.replayPromptOnChoose = true;
+    auto toChosen = [&](Engine& engine) {
+        Flow* flow = engine.openFlow("f", "s");
+        flow->advance();
+        flow->advance();
+        flow->choose("o");
+        return flow;
+    };
+    { Engine e(bundle, opts); if (toChosen(e)->advance().id != "P") fail("pending", "replay", "the chosen prompt was not spoken back"); }
+    { Engine e(bundle, opts); Flow* f = toChosen(e); f->start("s", ""); const auto r = f->advance();
+      if (r.id != "OPEN") fail("pending", "start", "a restart replayed the abandoned run's prompt (got " + r.id + ")"); }
+    { Engine e(bundle, opts); Flow* f = toChosen(e); f->gotoAddress("s", ""); const auto r = f->advance();
+      if (r.id != "OPEN") fail("pending", "goto", "a goto replayed the abandoned run's prompt (got " + r.id + ")"); }
+    std::cout << "  [pending] a restart or a goto drops a chosen prompt still waiting to be replayed\n";
+}
+
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
 // the shared corpus, so exercise it directly - only shared @patter decls, each with type / value /
 // default / enum values, and a live setProperty reflected on the next read.
@@ -2198,6 +2228,7 @@ int main(int argc, char** argv)
     runOneRegistry();
     runKernelErrorCases();
     runBundleReaderCase();
+    runPendingClearedCheck();
     runHostScopeWritableSmoke();
     runPlayErrorCases();
     runAddressLookupCases();

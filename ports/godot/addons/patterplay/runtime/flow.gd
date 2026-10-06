@@ -156,10 +156,7 @@ func goto(scene: String, block: String = "") -> bool:
 	_touch()
 	if scene == "END":
 		_started = true
-		_pending = null
-		_pending_prompt_beat = null
-		_pending_prompt_shown = null
-		_pending_prompt_owner = ""
+		_clear_pending()
 		_active_snippet = null
 		_beat_index = 0
 		_flow_ended = true
@@ -180,10 +177,7 @@ func goto(scene: String, block: String = "") -> bool:
 		start(scene_id, block_id)
 		return true
 
-	_pending = null
-	_pending_prompt_beat = null
-	_pending_prompt_shown = null
-	_pending_prompt_owner = ""
+	_clear_pending()
 	_active_snippet = null
 	_beat_index = 0        # abandon the rest of the snippet being delivered
 	_flow_ended = false    # an ended flow resumes at the target
@@ -203,6 +197,14 @@ func close() -> void:
 	_stack = []
 	_active_snippet = null
 	_beat_index = 0
+	_clear_pending()
+
+
+## Drop everything waiting to be delivered: an open choice, and a chosen option's prompt still to be
+## replayed. Every move that abandons the flow's place (start, goto, close) does this, so none leaves a
+## stale prompt behind. start() cleared only the choice, so a restart between choose() and the next
+## advance() replayed the abandoned run's prompt as the new run's first beat.
+func _clear_pending() -> void:
 	_pending = null
 	_pending_prompt_beat = null
 	_pending_prompt_shown = null
@@ -315,7 +317,7 @@ func start(scene_id: String, block_id: String) -> void:
 	_flow_ended = false
 	_active_snippet = null
 	_beat_index = 0
-	_pending = null
+	_clear_pending()
 	_started = true
 
 	var bundle: Dictionary = _host.bundle

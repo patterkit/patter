@@ -12,6 +12,13 @@ same runtime behaviour.
   runtime's, so a change there ports across line for line, and each one has a type, which the busiest paths now
   use. Nothing a game sees changes.
 
+### Fixed
+
+- **A restart (`start`) no longer replays a prompt from the run it abandoned.** With prompt replay on,
+  `choose()` leaves the chosen option's prompt waiting for the next `advance()`. A restart (`start`) in between
+  cleared only the choice, so the old prompt played as the restarted run's first beat. Every move that leaves
+  the flow's place (a restart, `goto`, `close`) now drops both, through one helper.
+
 ## [0.19.0] - 2026-10-06
 
 ### Added

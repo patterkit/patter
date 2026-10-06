@@ -87,6 +87,7 @@ namespace Patterkit.Patterplay.TestHost
             RunOneRegistryChecks();
             RunCheckpointChecks();
             RunStaleShuffleCheck();
+            RunPendingClearedCheck();
             RunPlayErrorChecks();
             RunOldSaveRuleChecks();
 

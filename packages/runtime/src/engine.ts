@@ -1442,7 +1442,7 @@ export class Flow {
     this.flowEnded = false;
     this.activeSnippet = null;
     this.beatIndex = 0;
-    this.pendingChoice = null;
+    this.clearPending();
     this.started = true;
 
     if (blockId) {
@@ -1493,7 +1493,7 @@ export class Flow {
     if (this.closed) return false; // closed is terminal: unlike "ended", a goto cannot revive it
     this.touch();
     if (scene === "END") {
-      this.started = true; this.pendingChoice = null; this.pendingPrompt = null; this.pendingPromptOwnerId = null;
+      this.started = true; this.clearPending();
       this.activeSnippet = null; this.beatIndex = 0;
       this.flowEnded = true; this.stack = [];
       return true;
@@ -1509,7 +1509,7 @@ export class Flow {
     // Never started: start() does the same landing plus the one-time per-flow setup.
     if (!this.started) { this.start(sceneId, blockId); return true; }
 
-    this.pendingChoice = null; this.pendingPrompt = null; this.pendingPromptOwnerId = null;
+    this.clearPending();
     this.activeSnippet = null; this.beatIndex = 0; // abandon the rest of the snippet being delivered
     this.flowEnded = false;                        // an ended flow resumes at the target
     this.enterTarget(blockId ?? sceneId, "jump");  // "jump" = replace the stack, exactly like an authored goto
@@ -1534,6 +1534,16 @@ export class Flow {
     this.stack = [];
     this.activeSnippet = null;
     this.beatIndex = 0;
+    this.clearPending();
+  }
+
+  /**
+   * Drop everything waiting to be delivered: an open choice, and a chosen option's prompt still to be
+   * replayed. Every move that abandons the flow's place (start and reset, goto, close) does this, so none
+   * leaves a stale prompt behind. start() cleared only the choice, so a reset between choose() and the
+   * next advance() replayed the abandoned run's prompt as the new run's first beat.
+   */
+  private clearPending(): void {
     this.pendingChoice = null;
     this.pendingPrompt = null;
     this.pendingPromptOwnerId = null;

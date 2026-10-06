@@ -16,6 +16,13 @@ runtime behaviour.
   bundle the plugin used to crash on (a cast, property, or effect without its name or target, say) now fails
   to load with an error naming the field, and a JSON `null` anywhere reads as an absent field.
 
+### Fixed
+
+- **A restart no longer replays a prompt from the run it abandoned.** With prompt replay on, `choose` leaves the
+  chosen option's prompt waiting for the next `advance`. A restart in between cleared only the choice, so the
+  old prompt played as the restarted run's first beat. Every move that leaves the flow's place (a restart,
+  `goto`, `close`) now drops both, through one helper.
+
 ## [0.19.0] - 2026-10-06
 
 ### Added

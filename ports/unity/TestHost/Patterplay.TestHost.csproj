@@ -22,6 +22,8 @@
     <Compile Include="Checkpoints.cs" />
     <!-- A shuffle never draws a bag member gone ineligible, and never throws. -->
     <Compile Include="ShuffleChecks.cs" />
+    <!-- A Reset, Goto or Close drops a chosen prompt still waiting to be replayed. -->
+    <Compile Include="PendingChecks.cs" />
     <!-- Content errors play through and are reported (OnError, the log's diagnostic entry); a bare
          snapshot and a save with no flows are refused before anything changes. -->
     <Compile Include="PlayErrorChecks.cs" />

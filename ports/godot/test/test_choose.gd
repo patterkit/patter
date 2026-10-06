@@ -1,6 +1,7 @@
-# Choosing from a choice, headless: a greyed (ineligible) option is shown but cannot be taken. JS,
-# Unity and Unreal refuse it with "choice option is not eligible"; Godot used to accept it, play its
-# content and spend it. A refused choose leaves the choice pending, so the player can still pick.
+# Choosing from a choice, headless. A greyed (ineligible) option is shown but cannot be taken: JS, Unity
+# and Unreal refuse it with "choice option is not eligible"; Godot used to accept it, play its content and
+# spend it. A refused choose leaves the choice pending, so the player can still pick. And a chosen prompt
+# still waiting to be replayed does not survive a restart or a goto.
 #
 #   godot --headless --path ports/godot --script res://test/test_choose.gd
 extends SceneTree
@@ -44,8 +45,44 @@ func _initialize() -> void:
 	step = flow.advance()
 	_expect(step["type"] == "text" and step["text"] == "asked", "the eligible option still plays: " + str(step))
 
+	_check_pending_cleared()
+
 	print("test_choose: ALL PASS" if _fails == 0 else "test_choose: %d FAILED" % _fails)
 	quit(1 if _fails > 0 else 0)
+
+
+# Moving a flow drops everything waiting to be delivered. With replay_prompt_on_choose, choose() leaves the
+# chosen option's prompt waiting to be spoken back by the next advance(). A restart (start) between the two
+# used to clear only the choice, so the abandoned run's prompt played as the restarted run's first beat.
+func _check_pending_cleared() -> void:
+	var bundle := {
+		"schema": "patter/bundle@0",
+		"locales": {"default": "en", "included": ["en"]},
+		"strings": {"en": {"OPEN": "opening", "P": "Ask", "ANS": "answer"}},
+		"scenes": {"s": {"id": "s", "gameId": "s", "blocks": [{"id": "b", "gameId": "b", "children": [
+			{"id": "sn_open", "type": "snippet", "beats": [{"id": "OPEN", "kind": "text"}]},
+			{"id": "g", "type": "group", "selector": "choice", "children": [
+				{"id": "o", "type": "group", "prompt": {"id": "P", "kind": "line", "character": "PC"}, "children": [
+					{"id": "sn_ans", "type": "snippet", "beats": [{"id": "ANS", "kind": "text"}], "jump": {"to": "END"}}]},
+			]},
+		]}]}},
+	}
+	var to_chosen := func() -> PatterFlow:
+		var flow: PatterFlow = PatterEngine.new(bundle, {"replay_prompt_on_choose": true}).open_flow("f", "s")
+		flow.advance()
+		flow.advance()
+		flow.choose("o")
+		return flow
+	var replayed: Dictionary = to_chosen.call().advance()
+	_expect(replayed["id"] == "P", "a chosen prompt is spoken back by the next advance: " + str(replayed))
+	var restarted: PatterFlow = to_chosen.call()
+	restarted.start("s", "")
+	var after_start: Dictionary = restarted.advance()
+	_expect(after_start["id"] == "OPEN", "a restart drops the waiting prompt: " + str(after_start))
+	var moved: PatterFlow = to_chosen.call()
+	moved.goto("s")
+	var after_goto: Dictionary = moved.advance()
+	_expect(after_goto["id"] == "OPEN", "a goto drops it too: " + str(after_goto))
 
 
 func _expect(ok: bool, what: String) -> void:

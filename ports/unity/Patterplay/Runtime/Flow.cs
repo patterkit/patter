@@ -167,7 +167,7 @@ namespace Patterkit.Patterplay
             Touch();
             if (scene == "END")
             {
-                _started = true; _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptShown = null; _pendingPromptOwnerId = null;
+                _started = true; ClearPending();
                 _activeSnippet = null; _beatIndex = 0;
                 _flowEnded = true; _stack = new List<StackFrame>();
                 return true;
@@ -183,7 +183,7 @@ namespace Patterkit.Patterplay
             }
             if (!_started) { Start(sceneId, blockId); return true; }
 
-            _pendingChoice = null; _pendingPromptBeat = null; _pendingPromptShown = null; _pendingPromptOwnerId = null;
+            ClearPending();
             _activeSnippet = null; _beatIndex = 0; // abandon the rest of the snippet being delivered
             _flowEnded = false;                    // an ended flow resumes at the target
             EnterTarget(blockId ?? sceneId, "jump"); // "jump" = replace the stack, exactly like an authored goto
@@ -202,6 +202,15 @@ namespace Patterkit.Patterplay
             _stack = new List<StackFrame>();
             _activeSnippet = null;
             _beatIndex = 0;
+            ClearPending();
+        }
+
+        /// <summary>Drop everything waiting to be delivered: an open choice, and a chosen option's prompt still
+        /// to be replayed. Every move that abandons the flow's place (Start and Reset, Goto, Close) does this, so
+        /// none leaves a stale prompt behind. Start cleared only the choice, so a Reset between Choose and the
+        /// next Advance replayed the abandoned run's prompt as the new run's first beat.</summary>
+        private void ClearPending()
+        {
             _pendingChoice = null;
             _pendingPromptBeat = null;
             _pendingPromptShown = null;
@@ -299,7 +308,7 @@ namespace Patterkit.Patterplay
             _flowEnded = false;
             _activeSnippet = null;
             _beatIndex = 0;
-            _pendingChoice = null;
+            ClearPending();
             _started = true;
 
             if (blockId != null)

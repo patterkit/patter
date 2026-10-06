@@ -757,7 +757,7 @@ namespace patter
             touch();
             if (scene == "END")
             {
-                started_ = true; clearPending(); pendingPromptBeat_ = nullptr; pendingPromptShown_.reset(); pendingPromptOwnerId_.clear();
+                started_ = true; clearPending();
                 activeSnippet_ = nullptr; beatIndex_ = 0;
                 flowEnded_ = true; stack_.clear();
                 return true;
@@ -774,7 +774,7 @@ namespace patter
             }
             if (!started_) { start(sceneId, blockId); return true; }
 
-            clearPending(); pendingPromptBeat_ = nullptr; pendingPromptShown_.reset(); pendingPromptOwnerId_.clear();
+            clearPending();
             activeSnippet_ = nullptr; beatIndex_ = 0; // abandon the rest of the snippet being delivered
             flowEnded_ = false;                       // an ended flow resumes at the target
             enterTarget(blockId.empty() ? sceneId : blockId, "jump"); // replace the stack, like an authored goto
@@ -794,8 +794,6 @@ namespace patter
             activeSnippet_ = nullptr;
             beatIndex_ = 0;
             clearPending();
-            pendingPromptBeat_ = nullptr;
-            pendingPromptOwnerId_.clear();
         }
 
         bool isClosed() const { return closed_; }
@@ -906,10 +904,10 @@ namespace patter
             { LogEntry e; e.type = "chose"; e.subject = pendingGroupId_; e.picked = id; emit(std::move(e)); }
             const Node* picked = node;
             std::shared_ptr<ChoicePrompt> shownPrompt = option->prompt ? std::make_shared<ChoicePrompt>(*option->prompt) : nullptr;
-            clearPending();
+            clearPendingChoice();
             // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
             // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
-            // not replayed, since that line is about to play as content anyway. (clearPending() dropped the
+            // not replayed, since that line is about to play as content anyway. (clearPendingChoice() dropped the
             // options, so the shown prompt is copied out first.)
             pendingPromptBeat_ = nullptr; pendingPromptShown_.reset();
             if (host_->replayPromptOnChoose && shownPrompt)
@@ -1104,7 +1102,7 @@ namespace patter
             }
             selectors_ = snap.selectors;
 
-            clearPending();
+            clearPendingChoice();
             if (!snap.pendingOptions.empty())
             {
                 std::vector<ChoiceOption> options;
@@ -1221,7 +1219,19 @@ namespace patter
         // The dialect's host hooks, held by the flow so evalCtx_.host stays valid.
         PatterHost evalHost_;
 
-        void clearPending() { hasPendingChoice_ = false; pendingGroupId_.clear(); pendingOptions_.clear(); pendingById_.clear(); }
+        void clearPendingChoice() { hasPendingChoice_ = false; pendingGroupId_.clear(); pendingOptions_.clear(); pendingById_.clear(); }
+
+        /** Drop everything waiting to be delivered: an open choice, and a chosen option's prompt still to be
+         *  replayed. Every move that abandons the flow's place (start and reset, goto, close) does this, so none
+         *  leaves a stale prompt behind. start() cleared only the choice, so a restart between choose() and the
+         *  next advance() replayed the abandoned run's prompt, and close() left the shown prompt behind. */
+        void clearPending()
+        {
+            clearPendingChoice();
+            pendingPromptBeat_ = nullptr;
+            pendingPromptShown_.reset();
+            pendingPromptOwnerId_.clear();
+        }
 
         // -- scope resolvers --
         const PatterValue* patterGet(const std::string& n) const

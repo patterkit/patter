@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Reset` no longer replays a prompt from the run it abandoned.** With prompt replay on, `Choose` leaves the
+  chosen option's prompt waiting for the next `Advance`. `Reset` in between cleared only the choice, so the old
+  prompt played as the restarted run's first beat. Every move that leaves the flow's place (`Reset`, `Goto`,
+  `Close`) now drops both, through one helper.
+
 ## [0.19.0] - 2026-10-06
 
 ### Changed
