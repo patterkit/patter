@@ -33,6 +33,7 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **The Live Link control says "Live Link"** beside its plug icon in the bottom corner, as Storyletter's does.
 - **The welcome screen offers a kit to start from,** above the finished projects, as Storyletter's does.
   Clicking it opens New Project with that kit chosen.
 - **Menu items that need a project are greyed out when none is open,** Save, Play, Publish and Find among

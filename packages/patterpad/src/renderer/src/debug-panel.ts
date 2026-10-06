@@ -18,6 +18,9 @@ export interface DebugLink {
 export function mountDebugLink(): DebugLink {
   const flow = el("select", "linkstatus-flow"); flow.hidden = true;
   const chip = mountLinkStatus(document.body, {
+    // The word beside the plug, as Storyletter's chip has it: a bare icon in the corner said nothing to
+    // anyone who had not already met it. Capitalised as the Play menu shows it (house style rule 19).
+    label: "Live Link",
     // Start when off or failed, stop otherwise. The reply is applied HERE rather than returned, so the
     // flow picker follows it as well as the chip.
     onToggle: (current) => {
