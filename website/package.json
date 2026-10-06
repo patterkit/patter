@@ -8,12 +8,13 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "postbuild": "node scripts/check-docs.mjs",
+    "postbuild": "node scripts/search-index.mjs && node scripts/check-docs.mjs",
     "check": "node scripts/check-docs.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.41.3",
     "astro": "^7.3.2",
+    "pagefind": "^1.5.2",
     "sharp": "^0.35.4"
   },
   "overrides": {

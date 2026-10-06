@@ -48,6 +48,11 @@
 //    decorations the family's sites do not use: a rotated
 //    element, a radial gradient, a backdrop blur.
 //
+// 7. AN EMPTY SEARCH INDEX FILE. Pagefind 1.5.2 can be killed mid-write and
+//    leave a file in dist/pagefind/ at 0 bytes (see search-index.mjs, which
+//    runs first and repairs it). Search then fails to load on every page while
+//    every page still renders, so nothing else here would notice.
+//
 // Runs as `postbuild`, so `npm run build` is the whole gate and there is
 // nothing separate to remember. Every message is file:line so it can be
 // opened straight from the terminal.
@@ -229,6 +234,21 @@ const dist = join(root, "dist");
 if (!existsSync(dist)) {
   console.error("check-docs: no dist/ - run the build first");
   process.exit(1);
+}
+
+// --- 7. the search index is whole -------------------------------------------
+// Every file Pagefind wrote must have bytes in it, and the two the page loads
+// first must exist at all: without them search is dead on every page.
+{
+  const out = join(dist, "pagefind");
+  for (const name of ["pagefind.js", "pagefind-entry.json"]) {
+    if (!existsSync(join(out, name))) problems.push(`dist/pagefind/${name}  missing: site search will not load`);
+  }
+  if (existsSync(out)) {
+    for (const file of walk(out, [""])) {
+      if (statSync(file).size === 0) problems.push(`${relative(dist, file)}  empty: Pagefind was stopped mid-write; site search is broken`);
+    }
+  }
 }
 
 // --- 3. text run into an adjacent link -------------------------------------
