@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-06
+
 ### Security
 
 - **The editor's text library is updated** (prosemirror-view 1.42.6), fixing a cross-site scripting flaw in how it
