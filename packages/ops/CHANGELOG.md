@@ -1,5 +1,14 @@
 # @patterkit/ops
 
+## 0.13.1
+
+### Patch Changes
+
+- 6e115b2: The coverage summary no longer says "0 stalled at a choice with nothing to pick": a run can't stall any more, since a choice with nothing to pick runs dry, so a stall is named only if one ever happens.
+- 360912a: Playable HTML exports carry the runtime's fix for a restart that replayed the abandoned run's chosen prompt.
+- 2cfd00e: Playable HTML exports carry the runtime's `onTrace` fix: a tool tracing a run without the decision log now hears every decision.
+- 1892462: Uses `@patterkit/runtime` 0.20.0, the Patterplay 0.20.0 release.
+
 ## 0.13.0
 
 ### Minor Changes

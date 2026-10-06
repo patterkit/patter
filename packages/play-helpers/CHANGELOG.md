@@ -1,5 +1,17 @@
 # @patterkit/play-helpers
 
+## 0.8.0
+
+### Minor Changes
+
+- 2cfd00e: A debug link says what it is doing, as on every other runtime: `link.state` (`connecting`, `connected`, or `closed`), `link.build`, and `link.url`.
+
+### Patch Changes
+
+- 1892462: Uses `@patterkit/runtime` 0.20.0, the Patterplay 0.20.0 release.
+- b19593d: The audio resolver keeps a base path that is a root: a base of `"/"` used to lose its slash, so a take resolved to a relative path.
+- 73087eb: The state logger reads visit counts with the engine's `getVisitCounts()` rather than saving the whole game on every capture.
+
 ## 0.7.10
 
 ### Patch Changes

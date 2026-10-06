@@ -1,5 +1,16 @@
 # @patterkit/cli
 
+## 0.8.1
+
+### Patch Changes
+
+- a79d018: Piped output is no longer cut short: on macOS, `-o -` and `--json` output stopped at 64 KB when stdout was a pipe, because the process exited before the pipe drained.
+- Updated dependencies [6e115b2]
+- Updated dependencies [360912a]
+- Updated dependencies [2cfd00e]
+- Updated dependencies [1892462]
+  - @patterkit/ops@0.13.1
+
 ## 0.8.0
 
 ### Minor Changes
