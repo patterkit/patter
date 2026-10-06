@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Security
+
+- **Live Link refuses web pages.** While Live Link was on, a web page open in any browser could connect to it
+  and receive your story each time you saved. It now lets in only games and pages running on your own machine.
+
 ### Fixed
 
 - **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a

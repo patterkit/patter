@@ -4,7 +4,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { WebSocket } from "ws";
-import { createDebugServer, type DebugFrame, type DebugServer } from "../src/main/debug-link.js";
+import { createDebugServer, isLocalOrigin, type DebugFrame, type DebugServer } from "../src/main/debug-link.js";
 import { createDebugLink, type DebugSocketLike } from "@patterkit/play-helpers";
 import type { DebugStatus } from "../src/shared/api.js";
 
@@ -132,5 +132,53 @@ describe("live debug link", () => {
     await new Promise((r) => setTimeout(r, 150));
     expect(pushed).toHaveLength(1);
     link.close();
+  });
+});
+
+// A web page in any browser could dial the loopback port, take the slot and receive every compiled bundle.
+// Browsers always send Origin, so the server refuses any that is not this machine (Storyletter review 2026-10).
+describe("the debug link refuses web pages", () => {
+  it("accepts no Origin, and a loopback one with or without a scheme", () => {
+    expect(isLocalOrigin(undefined)).toBe(true);                  // Unity, Godot, Node
+    expect(isLocalOrigin("")).toBe(true);
+    expect(isLocalOrigin("127.0.0.1")).toBe(true);                // Unreal's libwebsockets sends the bare address
+    expect(isLocalOrigin("localhost:5173")).toBe(true);
+    expect(isLocalOrigin("http://localhost:5173")).toBe(true);    // a browser game on a local dev server
+    expect(isLocalOrigin("http://127.0.0.1:8080")).toBe(true);
+    expect(isLocalOrigin("http://[::1]:3000")).toBe(true);
+  });
+
+  it("refuses every other site, a sandboxed frame's null, and a name that only resolves to loopback", () => {
+    expect(isLocalOrigin("https://example.com")).toBe(false);
+    expect(isLocalOrigin("null")).toBe(false);
+    expect(isLocalOrigin("http://localhost.example.com")).toBe(false);
+    expect(isLocalOrigin("http://127.0.0.1.nip.io")).toBe(false);
+    expect(isLocalOrigin("not a url at all")).toBe(false);
+  });
+
+  it("closes the handshake for a page's Origin and leaves the slot to the game", async () => {
+    const h = await startServer("H");
+    const refused = await new Promise<number | "open">((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${h.port}`, { origin: "https://example.com" });
+      ws.on("open", () => { ws.close(); resolve("open"); });
+      ws.on("unexpected-response", (_req, res) => resolve(res.statusCode ?? 0));
+      ws.on("error", () => { /* the refusal also surfaces here */ });
+    });
+    expect(refused).toBe(401);
+    expect(h.connected()).toBeUndefined();
+
+    const link = await connect(h, "H");                           // no Origin: the game still gets in
+    expect(h.connected()).toMatchObject({ state: "connected", build: "match" });
+    link.close();
+  });
+
+  it("lets a loopback Origin in", async () => {
+    const h = await startServer("H");
+    const opened = await new Promise<boolean>((resolve) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${h.port}`, { origin: "http://localhost:5173" });
+      ws.on("open", () => { ws.close(); resolve(true); });
+      ws.on("error", () => resolve(false));
+    });
+    expect(opened).toBe(true);
   });
 });

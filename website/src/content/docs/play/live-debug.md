@@ -17,7 +17,8 @@ where.
 
 The debug half is **observe-only**, so the game stays in control and the editor is a passive mirror.
 The link is a **loopback-only** WebSocket (`127.0.0.1`), so only processes on your own machine
-can reach it, and nothing leaves your machine.
+can reach it, and nothing leaves your machine. Web pages are refused too, unless they are served from
+your own machine (`localhost`), so a site open in your browser cannot connect and read your story.
 
 > **Every engine ships a client** (JavaScript, Unity, Unreal, Godot), all speaking the same
 > `patterplay/debug@1` protocol below. Each is a **debug-only tool**, inert in a shipping build
@@ -208,5 +209,7 @@ One message travels the OTHER way, editor to game ([live bundle refresh](#live-b
 
 Send `hello` first; the editor reads the build + flow list from it before honouring any frames. The
 ids are the bundle's **opaque model ids**: the same ones every runtime already exposes on its step
-result and `currentScene`. The server binds to `127.0.0.1` only, so no pairing token is needed.
+result and `currentScene`. The server binds to `127.0.0.1` only, so no pairing token is needed. It refuses a connection whose
+`Origin` header names any host but `localhost`, `127.0.0.1` or `::1`; a native client sends no `Origin`,
+or (Unreal) the loopback address, and both are let in.
 

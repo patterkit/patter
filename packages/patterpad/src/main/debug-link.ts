@@ -18,6 +18,30 @@ import type { DebugStatus } from "../shared/api.js";
 
 const DEFAULT_PORT = 4471;
 
+/**
+ * Whether a connection's `Origin` header belongs to a client on this machine.
+ *
+ * Binding to loopback keeps other machines out, but not web pages: a page open in any browser can dial
+ * `ws://127.0.0.1:4471`, take the one slot, and receive the compiled bundle on every save. A browser
+ * always says which page is dialling, so the check is on that.
+ *
+ * Accepted: no Origin at all (Unity's ClientWebSocket, Godot, and Node send none), and an Origin whose
+ * host is loopback. The second is needed twice over. Unreal's libwebsockets client sends the address it
+ * dialled as a bare `127.0.0.1`, and a browser game under development on a local server
+ * (`http://localhost:5173`) is a documented use of the JS link. Refused: every other site, and `null`,
+ * which a file:// page sends but so does a sandboxed frame on any site. The host is matched literally,
+ * so a rebinding domain that resolves to 127.0.0.1 is still refused by name.
+ */
+export function isLocalOrigin(origin: string | undefined): boolean {
+  if (origin === undefined || origin === "") return true;
+  let host: string;
+  try {
+    // A browser sends scheme://host[:port]; Unreal sends a bare host, which URL would misread as a scheme.
+    host = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(origin) ? origin : `http://${origin}`).hostname;
+  } catch { return false; }
+  return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+}
+
 /** A position frame for one flow. */
 export interface DebugFrame { flow: string; sceneId: string | null; beatId: string | null; type: string; choiceId?: string }
 
@@ -129,7 +153,7 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
       if (wss) return;
       try {
         // Bind to loopback only: only processes on this machine can reach it (no pairing token needed).
-        wss = new WebSocketServer({ host: "127.0.0.1", port }, () => push()); // push "listening" once actually bound
+        wss = new WebSocketServer({ host: "127.0.0.1", port, verifyClient: (info: { origin?: string }) => isLocalOrigin(info.origin) }, () => push()); // push "listening" once actually bound
       } catch (e) { deps.onStatus({ state: "error", message: e instanceof Error ? e.message : String(e) }); wss = null; return; }
       wss.on("error", (e) => { deps.onStatus({ state: "error", message: e instanceof Error ? e.message : String(e) }); });
       wss.on("connection", (ws) => {
