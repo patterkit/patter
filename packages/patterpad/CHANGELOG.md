@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Security
+
+- **The editor's text library is updated** (prosemirror-view 1.42.6), fixing a cross-site scripting flaw in how it
+  handled pasted content.
+
 ### Changed
 
 - **The Play window marks a condition or effect that failed.** Patterplay now plays on past one (a failing
