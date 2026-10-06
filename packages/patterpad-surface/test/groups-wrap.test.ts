@@ -56,6 +56,16 @@ describe("wrapInGroup", () => {
     expect((choice.children[0] as Group).children[0]!.id).toBe("a"); // ...holding the original bubble
   });
 
+  it("gives each new option's prompt a fresh id of its own", () => {
+    const s = selectChunks(stateOf([line("a"), line("b"), line("c")]), 0, 2);
+    const out = s.apply(wrapInGroup(s, "choice")!);
+    const ids: unknown[] = [];
+    out.doc.descendants((n) => { if (n.type.name === "optionprompt") ids.push(n.firstChild?.attrs.id); return true; });
+    expect(ids).toHaveLength(3);
+    for (const id of ids) expect(typeof id === "string" && /^L/.test(id)).toBe(true); // not a map index
+    expect(new Set(ids).size).toBe(3);
+  });
+
   it("round-trips losslessly after wrapping", () => {
     const s = selectChunks(stateOf([line("a"), line("b")]), 0, 1);
     const out = s.apply(wrapInGroup(s, "if")!);

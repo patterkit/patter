@@ -306,7 +306,7 @@ export function wrapInGroup(state: EditorState, kind: GroupKind): Transaction | 
   if (!cr) return null;
   const { range, chunks } = cr;
   if (kind === "choice") {
-    const node = groupNode(groupRaw("choice"), chunks.map(optionGroup));
+    const node = groupNode(groupRaw("choice"), chunks.map((c) => optionGroup(c)));
     const tr = state.tr.replaceWith(range.start, range.end, node);
     return tr.setSelection(Selection.near(tr.doc.resolve(Math.min(range.start + 1, tr.doc.content.size)))).scrollIntoView();
   }
@@ -636,7 +636,7 @@ export function wrapChunksAt(state: EditorState, positions: number[], kind: Grou
   const at = sorted[0]!;
   const tr = state.tr;
   for (const p of [...sorted].sort((a, b) => b - a)) { const n = state.doc.nodeAt(p); if (n) tr.delete(p, p + n.nodeSize); }
-  const content = kind === "choice" ? nodes.map(optionGroup) : nodes;
+  const content = kind === "choice" ? nodes.map((n) => optionGroup(n)) : nodes;
   tr.insert(at, groupNode(groupRaw(kind), content)); // `at` (the lowest) is unshifted by the higher deletes
   return tr.setSelection(Selection.near(tr.doc.resolve(Math.min(at + 1, tr.doc.content.size)))).scrollIntoView();
 }
