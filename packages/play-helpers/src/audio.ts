@@ -31,12 +31,14 @@ interface AudioManifest {
 export function createAudioResolver(manifestJson: string, basePath: string): AudioResolver {
   const manifest = JSON.parse(manifestJson) as AudioManifest;
   const clips = manifest.clips ?? {};
-  const base = basePath.replace(/[/\\]+$/, ""); // trim trailing slash(es); we add exactly one when joining
+  // A base that already ends in a separator is joined as it stands: trimming it turned a root such as "/"
+  // or "res://" into "" or "res:", and the path lost its root.
+  const sep = basePath === "" || /[/\\]$/.test(basePath) ? "" : "/";
   return {
     resolve(beatId: string): string | null {
       const clip = clips[beatId];
       if (!clip || !clip.file) return null;
-      return base ? `${base}/${clip.file}` : clip.file;
+      return `${basePath}${sep}${clip.file}`;
     },
   };
 }

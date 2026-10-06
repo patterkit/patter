@@ -16,11 +16,15 @@ namespace Patterkit.Patterplay
     {
         private readonly Dictionary<string, string> _files = new Dictionary<string, string>();
         private readonly string _base;
+        private readonly string _sep;
 
         /// <summary>Parse a patteraudio.json manifest; `basePath` is where you deployed the audio folder.</summary>
         public PatterAudioResolver(string manifestJson, string basePath)
         {
-            _base = (basePath ?? "").TrimEnd('/', '\\');
+            // A base that already ends in a separator is joined as it stands: trimming it turned a root such
+            // as "/" into "", and the path lost its root.
+            _base = basePath ?? "";
+            _sep = _base.Length == 0 || _base.EndsWith("/") || _base.EndsWith("\\") ? "" : "/";
             var root = JObject.Parse(manifestJson);
             if (root["clips"] is JObject clips)
             {
@@ -36,7 +40,7 @@ namespace Patterkit.Patterplay
         public string Resolve(string beatId)
         {
             if (beatId == null || !_files.TryGetValue(beatId, out var file)) return null;
-            return _base.Length > 0 ? _base + "/" + file : file;
+            return _base + _sep + file;
         }
     }
 }

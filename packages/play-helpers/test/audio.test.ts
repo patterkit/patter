@@ -31,6 +31,11 @@ describe("createAudioResolver", () => {
     expect(createAudioResolver(MANIFEST, "").resolve("L1")).toBe("final/L1.wav");
   });
 
+  it("keeps a base that is a root", () => {
+    expect(createAudioResolver(MANIFEST, "/").resolve("L1")).toBe("/final/L1.wav");
+    expect(createAudioResolver(MANIFEST, "res://").resolve("L1")).toBe("res://final/L1.wav");
+  });
+
   it("handles an empty / clip-less manifest without throwing", () => {
     expect(createAudioResolver(JSON.stringify({ schema: "patter/audio@0" }), "audio").resolve("L1")).toBeNull();
   });

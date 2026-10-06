@@ -96,6 +96,7 @@ namespace Patterkit.Patterplay.TestHost
             RunOldSaveRuleChecks();
 
             RunDescribeSmoke();
+            RunAudioJoinCheck();
             RunDebugLinkUtf8Check();
             RunLegacySaveRngCheck(ParseBundle(root.GetProperty("runtime")[0].GetProperty("bundle")));
             // runtime[1] is "choice with greyed option, pick the eligible": a fixture that actually
@@ -1065,6 +1066,17 @@ namespace Patterkit.Patterplay.TestHost
         }
 
         // -- transcript normalisation (mirror runner.ts normaliseStep) -----------
+
+        /// <summary>The audio resolver joins its base and a take's path, keeping a base that is a root.</summary>
+        private static void RunAudioJoinCheck()
+        {
+            const string manifest = "{\"clips\": {\"L\": {\"file\": \"final/L.wav\"}}}";
+            Check("audio: a folder", new PatterAudioResolver(manifest, "Audio").Resolve("L") == "Audio/final/L.wav", new PatterAudioResolver(manifest, "Audio").Resolve("L"));
+            Check("audio: a folder with its slash", new PatterAudioResolver(manifest, "Audio/").Resolve("L") == "Audio/final/L.wav", new PatterAudioResolver(manifest, "Audio/").Resolve("L"));
+            Check("audio: the root keeps its slash", new PatterAudioResolver(manifest, "/").Resolve("L") == "/final/L.wav", new PatterAudioResolver(manifest, "/").Resolve("L"));
+            Check("audio: no base", new PatterAudioResolver(manifest, "").Resolve("L") == "final/L.wav", new PatterAudioResolver(manifest, "").Resolve("L"));
+            Check("audio: no take is null", new PatterAudioResolver(manifest, "Audio").Resolve("M") == null, "not null");
+        }
 
         private static object Normalize(StepResult s)
         {

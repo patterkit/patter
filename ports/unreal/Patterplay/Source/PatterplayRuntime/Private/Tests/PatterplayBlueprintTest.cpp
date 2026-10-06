@@ -12,6 +12,7 @@
 #include "PatterBundle.h"
 #include "PatterEngine.h"
 #include "PatterGameData.h"
+#include "PatterAudioResolver.h"
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 
@@ -72,6 +73,13 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("GameDataValue: a node with no override reads the default"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("light"), Light) && Light == TEXT("1"));
 	TestTrue(TEXT("GameDataValue: the block's override"), UPatterGameData::GameDataValue(BlockFields, BlockData, TEXT("light"), Light) && Light == TEXT("2"));
 	TestFalse(TEXT("GameDataValue: an undeclared field with no override"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("nothing"), Light));
+
+	// --- the audio resolver joins its base and a take, keeping a base that is a root --------------------
+	const FString Manifest = TEXT(R"({"clips": {"L": {"file": "final/L.wav"}}})");
+	TestEqual(TEXT("audio: a folder"), UPatterAudioResolver::Create(Manifest, TEXT("Audio"))->Resolve(TEXT("L")), FString(TEXT("Audio/final/L.wav")));
+	TestEqual(TEXT("audio: a folder with its slash"), UPatterAudioResolver::Create(Manifest, TEXT("Audio/"))->Resolve(TEXT("L")), FString(TEXT("Audio/final/L.wav")));
+	TestEqual(TEXT("audio: the root keeps its slash"), UPatterAudioResolver::Create(Manifest, TEXT("/"))->Resolve(TEXT("L")), FString(TEXT("/final/L.wav")));
+	TestEqual(TEXT("audio: no take is empty"), UPatterAudioResolver::Create(Manifest, TEXT("Audio"))->Resolve(TEXT("M")), FString());
 
 	// --- OpenFlow with a block and a seed, and Flows ---------------------------------------------
 	UPatterFlow* Flow = Engine->OpenFlow(TEXT("main"), TEXT("great-hall"), TEXT("the-door"), true, 7);

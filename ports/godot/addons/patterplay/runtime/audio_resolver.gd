@@ -16,7 +16,9 @@ var _files: Dictionary = {}
 
 # Parse a patteraudio.json manifest; base_path is where you deployed the audio folder (res:// or user://).
 func _init(manifest_json: String, base_path: String) -> void:
-	_base = base_path.rstrip("/\\")
+	# A base that already ends in a separator is joined as it stands: trimming it turned a root such as
+	# "user://" into "user:", and the path lost its root.
+	_base = base_path
 	var parsed = JSON.parse_string(manifest_json)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		push_error("Patterplay: not a valid patteraudio.json manifest")
@@ -34,4 +36,6 @@ func resolve(beat_id: String):
 	if not _files.has(beat_id):
 		return null
 	var file: String = _files[beat_id]
-	return (_base + "/" + file) if _base != "" else file
+	if _base == "" or _base.ends_with("/") or _base.ends_with("\\"):
+		return _base + file
+	return _base + "/" + file

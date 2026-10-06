@@ -18,11 +18,9 @@ UPatterAudio* UPatterAudio::Load(const FString& ManifestJson, const FString& Bas
 
 UPatterAudioResolver* UPatterAudioResolver::Fill(UPatterAudioResolver* Audio, const FString& ManifestJson, const FString& BasePath)
 {
+	// A base that already ends in a separator is joined as it stands: trimming it turned a root such as
+	// "/" into "", and the path lost its root.
 	Audio->Base = BasePath;
-	while (Audio->Base.EndsWith(TEXT("/")) || Audio->Base.EndsWith(TEXT("\\")))
-	{
-		Audio->Base = Audio->Base.LeftChop(1); // trim trailing slash(es); we add exactly one when joining
-	}
 
 	TSharedPtr<FJsonObject> Root;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ManifestJson);
@@ -52,5 +50,6 @@ FString UPatterAudioResolver::Resolve(const FString& BeatId) const
 {
 	const FString* File = Files.Find(BeatId);
 	if (!File) return FString();
-	return Base.IsEmpty() ? *File : Base + TEXT("/") + *File;
+	const bool bSeparated = Base.IsEmpty() || Base.EndsWith(TEXT("/")) || Base.EndsWith(TEXT("\\"));
+	return Base + (bSeparated ? TEXT("") : TEXT("/")) + *File;
 }

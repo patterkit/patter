@@ -94,6 +94,10 @@ func _check_absent_is_null(engine: PatterEngine) -> void:
 	var audio := PatterAudioResolver.new('{"clips": {"L": {"file": "l.wav"}}}', "res://audio")
 	_expect(audio.resolve("L") == "res://audio/l.wav", "resolve finds a recorded beat")
 	_expect(audio.resolve("M") == null, "resolve of a beat with no recording is null")
+	_expect(PatterAudioResolver.new('{"clips": {"L": {"file": "l.wav"}}}', "user://").resolve("L") == "user://l.wav",
+		"a base that is a root keeps it")
+	_expect(PatterAudioResolver.new('{"clips": {"L": {"file": "l.wav"}}}', "res://audio/").resolve("L") == "res://audio/l.wav",
+		"a base with its own slash gets no second one")
 
 
 func _expect(ok: bool, what: String) -> void:
