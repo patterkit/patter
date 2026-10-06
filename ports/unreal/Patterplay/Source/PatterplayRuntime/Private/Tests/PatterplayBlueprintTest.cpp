@@ -54,10 +54,16 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("TagsForBlock: the scene's, then its own"), FString::Join(Engine->TagsForBlock(TEXT("great-hall"), TEXT("the-door")), TEXT(",")), FString(TEXT("indoor,door")));
 	const TArray<FPatterGameDataEntry> SceneData = Engine->GameDataForScene(TEXT("great-hall"));
 	if (TestEqual(TEXT("GameDataForScene: the scene's own override"), SceneData.Num(), 1))
+	{
 		TestEqual(TEXT("GameDataForScene: music"), SceneData[0].Value, FString(TEXT("tense")));
+		TestTrue(TEXT("GameDataForScene: music is a string, typed"), SceneData[0].TypedValue.Kind == EPatterValueKind::String && SceneData[0].TypedValue.String == TEXT("tense"));
+	}
 	const TArray<FPatterGameDataEntry> BlockData = Engine->GameDataForBlock(TEXT("great-hall"), TEXT("the-door"));
 	if (TestEqual(TEXT("GameDataForBlock: the block's own override"), BlockData.Num(), 1))
+	{
 		TestEqual(TEXT("GameDataForBlock: light"), BlockData[0].Value, FString(TEXT("2")));
+		TestTrue(TEXT("GameDataForBlock: light is a number, typed"), BlockData[0].TypedValue.Kind == EPatterValueKind::Number && BlockData[0].TypedValue.Number == 2.0);
+	}
 
 	// --- the gameData helpers fill a node's overrides in from the declared defaults ------------------
 	const TArray<FPatterGameDataField> SceneFields = UPatterGameData::GameDataFields(Bundle, TEXT("scene"));
@@ -68,11 +74,16 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	}
 	const TArray<FPatterGameDataEntry> Effective = UPatterGameData::EffectiveGameData(SceneFields, SceneData);
 	TestTrue(TEXT("EffectiveGameData keeps the scene's override"), Effective.Num() == 1 && Effective[0].Value == TEXT("tense"));
+	const TArray<FPatterGameDataEntry> Defaults = UPatterGameData::EffectiveGameData(UPatterGameData::GameDataFields(Bundle, TEXT("block")), {});
+	TestTrue(TEXT("EffectiveGameData fills a default, typed"), Defaults.Num() == 1 && Defaults[0].TypedValue.Kind == EPatterValueKind::Number && Defaults[0].TypedValue.Number == 1.0);
 	FString Light;
 	const TArray<FPatterGameDataField> BlockFields = UPatterGameData::GameDataFields(Bundle, TEXT("block"));
-	TestTrue(TEXT("GameDataValue: a node with no override reads the default"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("light"), Light) && Light == TEXT("1"));
-	TestTrue(TEXT("GameDataValue: the block's override"), UPatterGameData::GameDataValue(BlockFields, BlockData, TEXT("light"), Light) && Light == TEXT("2"));
-	TestFalse(TEXT("GameDataValue: an undeclared field with no override"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("nothing"), Light));
+	FPatterValue TypedLight;
+	TestTrue(TEXT("GameDataValue: a node with no override reads the default"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("light"), Light, TypedLight) && Light == TEXT("1"));
+	TestTrue(TEXT("GameDataValue: the default typed"), TypedLight.Kind == EPatterValueKind::Number && TypedLight.Number == 1.0);
+	TestTrue(TEXT("GameDataValue: the block's override"), UPatterGameData::GameDataValue(BlockFields, BlockData, TEXT("light"), Light, TypedLight) && Light == TEXT("2"));
+	TestTrue(TEXT("GameDataValue: the override typed"), TypedLight.Kind == EPatterValueKind::Number && TypedLight.Number == 2.0);
+	TestFalse(TEXT("GameDataValue: an undeclared field with no override"), UPatterGameData::GameDataValue(BlockFields, {}, TEXT("nothing"), Light, TypedLight));
 
 	// --- the audio resolver joins its base and a take, keeping a base that is a root --------------------
 	const FString Manifest = TEXT(R"({"clips": {"L": {"file": "final/L.wav"}}})");

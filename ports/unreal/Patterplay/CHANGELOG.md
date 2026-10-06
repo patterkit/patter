@@ -7,6 +7,13 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Game Data values typed in Blueprint.** Each `FPatterGameDataEntry` carries `TypedValue` (an `FPatterValue`)
+  beside its display `Value`, so a Blueprint branching on a game event's cue reads a number as a number, or
+  flags as a list, without parsing text. `FPatterGameDataField` carries `TypedDefault`, and
+  `UPatterGameData::GameDataValue` hands back both.
+
 ### Changed
 
 - **`CastForScene` and `CastForBlock` work out a scene's or block's cast once and keep it.** They are pure

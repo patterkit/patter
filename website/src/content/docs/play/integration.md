@@ -146,10 +146,12 @@ Every runtime has the same three helpers:
 | | JavaScript | Unity (C#) | Unreal (Blueprint) | Godot (GDScript) |
 |---|---|---|---|---|
 | A node type's fields | `gameDataFields(bundle, kind)` | `GameDataHelpers.GameDataFields(bundle, kind)` | `UPatterGameData::GameDataFields(Bundle, Kind)` | `PatterBundle.game_data_fields(bundle, kind)` |
-| One field's value | `gameDataValue(fields, node, name)` | `GameDataHelpers.GameDataValue(fields, node, name)` | `UPatterGameData::GameDataValue(Fields, Node, Name, Value)` | `PatterBundle.game_data_value(fields, node, name)` |
+| One field's value | `gameDataValue(fields, node, name)` | `GameDataHelpers.GameDataValue(fields, node, name)` | `UPatterGameData::GameDataValue(Fields, Node, Name, Value, TypedValue)` | `PatterBundle.game_data_value(fields, node, name)` |
 | Every field resolved | `effectiveGameData(fields, node)` | `GameDataHelpers.EffectiveGameData(fields, node)` | `UPatterGameData::EffectiveGameData(Fields, Node)` | `PatterBundle.effective_game_data(fields, node)` |
 
-The Unreal C++ core has them too, as `patter::gameDataFields`, `gameDataValue`, and `effectiveGameData`.
+The Unreal C++ core has them too, as `patter::gameDataFields`, `gameDataValue`, and `effectiveGameData`. In
+Blueprint, each Game Data entry carries its value twice: `Value` as text to show, and `TypedValue` (an
+`FPatterValue`) to act on, so a number reads as a number without parsing it.
 
 ### Scene and block Game Data
 

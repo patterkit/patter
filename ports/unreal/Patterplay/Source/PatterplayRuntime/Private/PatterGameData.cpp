@@ -34,7 +34,11 @@ TArray<FPatterGameDataField> UPatterGameData::GameDataFields(UPatterBundle* Bund
 		Field.Name = Ue(F.name);
 		Field.Type = FieldType(F.type);
 		Field.bHasDefault = F.hasDefault;
-		if (F.hasDefault) Field.Default = Ue(F.def.toDisplayString());
+		if (F.hasDefault)
+		{
+			Field.Default = Ue(F.def.toDisplayString());
+			Field.TypedDefault = ToUeValue(F.def);
+		}
 		for (const std::string& V : F.values) Field.Values.Add(Ue(V));
 		Field.Purpose = Ue(F.purpose);
 		Out.Add(Field);
@@ -42,15 +46,17 @@ TArray<FPatterGameDataField> UPatterGameData::GameDataFields(UPatterBundle* Bund
 	return Out;
 }
 
-bool UPatterGameData::GameDataValue(const TArray<FPatterGameDataField>& Fields, const TArray<FPatterGameDataEntry>& Node, const FString& Name, FString& OutValue)
+bool UPatterGameData::GameDataValue(const TArray<FPatterGameDataField>& Fields, const TArray<FPatterGameDataEntry>& Node, const FString& Name, FString& OutValue, FPatterValue& OutTypedValue)
 {
 	OutValue = FString();
-	if (const FPatterGameDataEntry* E = Find(Node, Name)) { OutValue = E->Value; return true; }
+	OutTypedValue = FPatterValue();
+	if (const FPatterGameDataEntry* E = Find(Node, Name)) { OutValue = E->Value; OutTypedValue = E->TypedValue; return true; }
 	for (const FPatterGameDataField& F : Fields)
 		if (F.Name == Name)
 		{
 			if (!F.bHasDefault) return false;
 			OutValue = F.Default;
+			OutTypedValue = F.TypedDefault;
 			return true;
 		}
 	return false;
@@ -67,6 +73,7 @@ TArray<FPatterGameDataEntry> UPatterGameData::EffectiveGameData(const TArray<FPa
 		Entry.Name = F.Name;
 		Entry.Type = F.Type;
 		Entry.Value = F.Default;
+		Entry.TypedValue = F.TypedDefault;
 		Out.Add(Entry);
 	}
 	for (const FPatterGameDataEntry& E : Node)

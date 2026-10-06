@@ -30,6 +30,10 @@ struct FPatterGameDataField
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Default;
 
+	/** The default itself, typed, as an FPatterGameDataEntry's TypedValue. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FPatterValue TypedDefault;
+
 	/** An enum field's options. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Values;
@@ -49,10 +53,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
 	static TArray<FPatterGameDataField> GameDataFields(UPatterBundle* Bundle, const FString& Kind);
 
-	/** One node's value for a field: its override if it has one, else the field's default. False when
-	 *  neither is set. */
+	/** One node's value for a field: its override if it has one, else the field's default, as text and typed.
+	 *  False when neither is set. */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
-	static bool GameDataValue(const TArray<FPatterGameDataField>& Fields, const TArray<FPatterGameDataEntry>& Node, const FString& Name, FString& OutValue);
+	static bool GameDataValue(const TArray<FPatterGameDataField>& Fields, const TArray<FPatterGameDataEntry>& Node, const FString& Name, FString& OutValue, FPatterValue& OutTypedValue);
 
 	/** A node's full gameData: every declared field resolved (override or default), then any override with
 	 *  no declared field. Fields with no value are left out. */

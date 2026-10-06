@@ -1,5 +1,12 @@
 // Blueprint-facing types for a played step. The engine's std:: step result is converted to
 // these at the UObject boundary.
+//
+// Enums or strings: a value a Blueprint switches on while the game plays is an enum, so it gets a
+// dropdown and a Switch node (a step's type, a prompt's kind, a beat's kind, a content error's kind, a
+// property's type). A record kept for debugging and tooling (a decision log entry, the outline) keeps its
+// fields as strings, because it carries the JS runtime's record field for field, the same on every
+// runtime, and some of those fields are open sets (a selector, a jump's mode). A field's type is part of
+// every graph that reads it, so neither side is converted to the other.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -121,8 +128,8 @@ struct FPatterValue
 	FString Display;
 };
 
-/** One author Game Data value: name, value type, and the value as a display string. Carried by
- *  delivered steps (host events ride on Game Data) and by the structure-introspection beats. */
+/** One author Game Data value: name, value type, and the value, both as a display string and typed.
+ *  Carried by delivered steps (host events ride on Game Data) and by the structure-introspection beats. */
 USTRUCT(BlueprintType)
 struct FPatterGameDataEntry
 {
@@ -134,8 +141,14 @@ struct FPatterGameDataEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	EPatterPropertyType Type = EPatterPropertyType::String;
 
+	/** The value as text, for showing. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Value;
+
+	/** The value itself, for a game to act on: a number as a number, flags as a list. A game event's cue
+	 *  rides on Game Data, so a Blueprint branching on one reads this rather than parsing the text. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FPatterValue TypedValue;
 };
 
 /** A choice option's prompt, as the JS runtime's ChoicePrompt: a line someone speaks or plain text. The

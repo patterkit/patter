@@ -47,6 +47,7 @@ namespace
 			E.Name = Ue(KV.first);
 			E.Type = ValueTypeOf(KV.second);
 			E.Value = Ue(KV.second.toDisplayString());
+			E.TypedValue = ToUeValue(KV.second);
 			Out.Add(E);
 		}
 		return Out;
