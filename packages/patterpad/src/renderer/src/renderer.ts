@@ -1826,7 +1826,12 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   // also where the history records the place being left, for the same reason: one choke point means
   // a Find hit, a problem jump and a plain nav click all record themselves without knowing it.
   visitFrom();
+  const fromPropertiesDoc = !propsDocEl.hidden;
   await leavePropertiesDoc();
+  // The Properties document hides the chrome that speaks about a scene (Play, the problems badge, the
+  // inspector toggle). Leaving it for a scene has to bring that back: a scene opened from the navigator
+  // comes straight here, not through enterWorkspace, and left the title bar without its Play button.
+  if (fromPropertiesDoc) showSceneChrome();
   if (surface) await save();           // files are the truth - persist before switching
   await persistDocs();                          // flush any pending Notes edits before leaving the scene
   await persistComments();                      // flush any pending comment edits too
@@ -2016,9 +2021,16 @@ async function showProject(open: OpenResult): Promise<void> {
 function enterWorkspace(): void {
   void leavePropertiesDoc(); // flushes a save still in its debounce, then hides the page
   welcomeEl.hidden = true; overviewEl.hidden = true; panesEl.hidden = false;
-  toggleNavEl.hidden = false; toggleInspectorEl.hidden = false; // pane toggles only matter in the workspace
-  playTopEl.hidden = false;   // the primary loop's visible door: play what you wrote
-  healthEl.hidden = false;    // and the problems it has, at a glance
+  toggleNavEl.hidden = false;
+  showSceneChrome();
+}
+
+/** The chrome that speaks about an open scene: the inspector's toggle, Play (the primary loop's visible
+ *  door: play what you wrote), and the problems it has, at a glance. */
+function showSceneChrome(): void {
+  toggleInspectorEl.hidden = false;
+  playTopEl.hidden = false;
+  healthEl.hidden = false;
 }
 
 // --- project overview (#3a) --------------------------------------------------
