@@ -3,13 +3,13 @@
 #include "PatterDebug.h"
 #include "PatterWorld.h"
 #include "Patter/Engine.h"
+#include "PatterConvert.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
+
+using namespace PatterConvert;
 
 namespace
 {
-	std::string Std(const FString& S) { return std::string(TCHAR_TO_UTF8(*S)); }
-	FString Ue(const std::string& S) { return FString(UTF8_TO_TCHAR(S.c_str())); }
-
 	EPatterPropertyType PropertyTypeFrom(const std::string& T)
 	{
 		if (T == "number") return EPatterPropertyType::Number;
@@ -18,34 +18,6 @@ namespace
 		if (T == "enum") return EPatterPropertyType::Enum;
 		if (T == "quality") return EPatterPropertyType::Quality;
 		return EPatterPropertyType::Boolean;
-	}
-
-	// A value across the Blueprint boundary, both ways. Display is the core's rendering on the way out
-	// and ignored on the way in.
-	FPatterValue ToUeValue(const patter::PatterValue& V)
-	{
-		FPatterValue Out;
-		if (V.isNumber()) { Out.Kind = EPatterValueKind::Number; Out.Number = V.n; }
-		else if (V.isString()) { Out.Kind = EPatterValueKind::String; Out.String = Ue(V.s); }
-		else if (V.isFlags()) { Out.Kind = EPatterValueKind::Flags; for (const std::string& F : V.f) Out.Flags.Add(Ue(F)); }
-		else { Out.Kind = EPatterValueKind::Boolean; Out.bBool = V.b; }
-		Out.Display = Ue(V.toDisplayString());
-		return Out;
-	}
-	patter::PatterValue FromUeValue(const FPatterValue& V)
-	{
-		switch (V.Kind)
-		{
-			case EPatterValueKind::Number: return patter::PatterValue::Num(V.Number);
-			case EPatterValueKind::String: return patter::PatterValue::Str(Std(V.String));
-			case EPatterValueKind::Flags:
-			{
-				std::vector<std::string> Flags;
-				for (const FString& F : V.Flags) Flags.push_back(Std(F));
-				return patter::PatterValue::Flags(std::move(Flags));
-			}
-			default: return patter::PatterValue::Bool(V.bBool);
-		}
 	}
 
 	EPatterBeatKind BeatKindFrom(const std::string& K)

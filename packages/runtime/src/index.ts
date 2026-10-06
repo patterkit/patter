@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // @patterkit/runtime - public surface.
 //
-// The reference runtime. Construct an `Engine` from a compiled Bundle (the world
+// Patterplay for JavaScript. Construct an `Engine` from a compiled Bundle (the world
 // + flow manager: shared scope state, foreign scopes, whole-game save/load), then
 // `engine.openFlow(id, { scene })` to get a `Flow` and play it (advance / choices
 // / properties). Many flows run concurrently, sharing the shared `@patter`/`@scene`

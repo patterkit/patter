@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Removed
+
+- **Two unused helpers on `PatterBundle`**: `split_ref`, superseded by `split_ref_with`, and
+  `host_scope_default`.
+
 ## [0.20.0] - 2026-10-06
 
 ### Added

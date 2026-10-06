@@ -64,14 +64,6 @@ namespace patter
         return { "patter", toLower(body) };
     }
 
-    // The same split against a fixed set of tokens (the form this function had before the registry).
-    inline std::pair<std::string, std::string> splitRef(const std::string& ref,
-                                                       const std::set<std::string>& hostTokens = {})
-    {
-        return splitRef(ref, std::function<bool(const std::string&)>(
-            [&hostTokens](const std::string& t) { return hostTokens.count(t) > 0; }));
-    }
-
     // A host scope the story reads and writes, whose values the GAME keeps: an embedder binds one per
     // token through EngineOptions::hostScopes, and the engine registers it in the game's registry as an
     // EXTERNAL (foreign) scope, never stored or saved there. A declared scope nobody binds is
@@ -350,14 +342,7 @@ namespace patter
         return std::make_shared<PropertyBag>(&decls, nullptr, "@patter.");
     }
 
-    /** One bag as the flat name/value map the save envelope carries, and back. */
-    inline std::map<std::string, PatterValue> flatOf(const PropertyBag& bag)
-    {
-        std::map<std::string, PatterValue> flat;
-        for (const auto& e : bag.save()) flat[e.first] = e.second;
-        return flat;
-    }
-
+    /** A flat name/value map as the ordered map a bag loads. */
     inline OrderedMap<std::string, PatterValue> orderedOf(const std::map<std::string, PatterValue>& flat)
     {
         OrderedMap<std::string, PatterValue> values;
@@ -524,9 +509,8 @@ namespace patter
         std::vector<LogEntry>* engineLog = nullptr;
         int engineLogSeq = 0;   // the next engine-log seq: its own counter, since the log's size restarts after a clear
         /// Called with the group id when a choice runs dry - no takeable option and no
-        /// eligible fallback - so the silent fall-through is observable. Parity with the JS
-        /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct
-        /// from the log's `dry` entry.
+        /// eligible fallback - so the silent fall-through is observable, as on every runtime
+        /// (onDryChoice in JS). Live feedback, distinct from the log's `dry` entry.
         std::function<void(const std::string&)> onDryChoice;
         /// Where a content error the engine played through is reported (see PlayError). Unset: nowhere
         /// but the log, as a std-only core has no console of its own to warn on.
@@ -2448,24 +2432,35 @@ namespace patter
         // behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN speak
         // in the scene, not who a given playthrough heard. Empty for an unknown ref or a scene with no
         // dialogue. Tokens, not display names: read those off a delivered step.
+        // Kept once worked out, by scene id: Blueprint's CastForScene is a pure node, so it is asked again for
+        // every pin wired to it, and the walk is the whole scene. An engine's structure never changes (a hot
+        // swap builds a new engine), so the answer can't go stale.
         std::vector<std::string> castForScene(const std::string& sceneRef)
         {
+            const std::string sceneId = resolveSceneRef(sceneRef);
+            auto cached = sceneCast_.find(sceneId);
+            if (cached != sceneCast_.end()) return cached->second;
             std::vector<std::string> cast;
-            auto it = host_.bundle->scenes.find(resolveSceneRef(sceneRef));
+            auto it = host_.bundle->scenes.find(sceneId);
             if (it == host_.bundle->scenes.end()) return cast;
             std::set<std::string> seen;
             for (const auto& block : it->second.blocks) collectCast(block.children, seen, cast);
+            sceneCast_.emplace(sceneId, cast);
             return cast;
         }
 
         // One block's cast, by scene + block ref (id or gameId). castForScene, block-scoped.
         std::vector<std::string> castForBlock(const std::string& sceneRef, const std::string& blockRef)
         {
+            const std::string blockId = resolveBlockRef(resolveSceneRef(sceneRef), blockRef);
+            auto cached = blockCast_.find(blockId);
+            if (cached != blockCast_.end()) return cached->second;
             std::vector<std::string> cast;
-            auto it = host_.blockById.find(resolveBlockRef(resolveSceneRef(sceneRef), blockRef));
+            auto it = host_.blockById.find(blockId);
             if (it == host_.blockById.end()) return cast;
             std::set<std::string> seen;
             collectCast(it->second->children, seen, cast);
+            blockCast_.emplace(blockId, cast);
             return cast;
         }
 
@@ -2903,6 +2898,7 @@ namespace patter
         /// The read slot getProperty hands out for a registry scope's value.
         mutable PatterValue slot_;
         std::vector<LogEntry> engineLog_;
+        std::unordered_map<std::string, std::vector<std::string>> sceneCast_, blockCast_;   // see castForScene
         uint32_t defaultSeed_ = 0x9e3779b9u;
         // SHARED, not unique: a wrapper (UPatterFlow, and any host object of that shape) outlives the
         // core object by design, and three paths destroy a flow underneath one - loadGame rebuilds the

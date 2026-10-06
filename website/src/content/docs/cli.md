@@ -72,7 +72,7 @@ stakeholder. Defaults to `dist/<name>.html`; `-o -` writes to stdout. Reads in t
 source language, as [Building & shipping](/setup/building-and-shipping/) describes.
 
 ### `patter play [path]`
-Run the story through the reference runtime **non-interactively** and print a transcript, for
+Run the story through Patterplay **non-interactively** and print a transcript, for
 scripted checks and CI, not for exploring (to actually play through a story, use Patterpad's Play
 window). Choices come from `--choices a,b,c` (option ids taken in order; otherwise the first
 eligible is picked). `--scene id` · `--block id` · `--seed N`. Exits **1** if the playthrough

@@ -85,7 +85,7 @@ reference, the C# (Unity) port on .NET, the C++ (Unreal) port under clang, and t
 ## Why this matters
 
 You ship on one engine, and this is what makes **your** engine trustworthy. It plays the story
-exactly as Patterpad's preview and the reference runtime do, the same choices, conditions, saves,
+exactly as Patterpad's preview and every other Patterplay runtime do, the same choices, conditions, saves,
 right down to the random draws. What your writers saw in the editor is what your players get, with
 no "works in the editor, behaves differently on my engine" gap to chase.
 

@@ -35,6 +35,7 @@ namespace Patterkit.Patterplay
 {
     /// <summary>ExprValue as JSON: bool / number / string / flags (a string array). A save value is a
     /// bare scalar, never an object - the two-level scope maps are handled by the save reader itself.</summary>
+    [Obsolete("Nothing in Patterplay uses it: PatterSave reads and writes saves itself. It goes in a later release.")]
     public sealed class PatterValueConverter : JsonConverter<ExprValue>
     {
         public override void WriteJson(JsonWriter w, ExprValue v, JsonSerializer s) => PatterSave.ValueToken(v).WriteTo(w);
@@ -50,6 +51,7 @@ namespace Patterkit.Patterplay
     /// OverflowException on those. Coerce with the same ToUint32 every other runtime uses,
     /// so an old save loads and lands on the identical PRNG position.
     /// </summary>
+    [Obsolete("Nothing in Patterplay uses it: PatterSave reads and writes saves itself. It goes in a later release.")]
     public sealed class Uint32Converter : JsonConverter<uint>
     {
         public override void WriteJson(JsonWriter w, uint v, JsonSerializer s) => w.WriteValue(v);

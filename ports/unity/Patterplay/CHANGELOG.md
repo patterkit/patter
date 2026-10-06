@@ -6,6 +6,27 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The core runtime assembly (`Patterplay.Runtime`) declares that it uses no engine code**, so nothing
+  Unity-specific can creep into the part every runtime shares. The Unity glue stays in
+  `Patterplay.Runtime.Unity`.
+
+### Deprecated
+
+- **`PatterValueConverter` and `Uint32Converter`.** Nothing in Patterplay uses them: `PatterSave` reads and
+  writes saves itself. They go in a later release.
+
+### Removed
+
+- **`Ast.cs`, a file that held only a comment.** The expression tree lives in the shared expression code beside
+  it.
+
+### Fixed
+
+- **The Runtime State window starts each Play Mode session empty.** With Enter Play Mode Options turned on (no
+  domain reload), it went on listing the last session's engines and debug links.
+
 ## [0.20.0] - 2026-10-06
 
 ### Added

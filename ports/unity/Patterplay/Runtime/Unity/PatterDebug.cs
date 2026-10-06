@@ -73,5 +73,15 @@ namespace Patterkit.Patterplay
         {
             LinkRefs.RemoveAll(r => !r.TryGetTarget(out var t) || t == null || ReferenceEquals(t, link));
         }
+
+        // Play Mode can start without a domain reload (Enter Play Mode Options), and then these lists come
+        // through from the last session: the Runtime State window went on listing that run's engines and
+        // links until a collection happened to clear them. Start every session empty.
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetForPlayMode()
+        {
+            Refs.Clear();
+            LinkRefs.Clear();
+        }
     }
 }

@@ -5,12 +5,10 @@
 #include "Serialization/JsonSerializer.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
+#include "PatterConvert.h"
 #include <stdexcept>
 
-namespace
-{
-	std::string Std(const FString& S) { return std::string(TCHAR_TO_UTF8(*S)); }
-}
+using PatterConvert::Std;
 
 // The kernel's own namespace, since a template is specialised where it lives (the kernel is
 // shared with the Storylet Engine, which reads a neutral tree instead and specialises nothing: a

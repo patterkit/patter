@@ -269,9 +269,9 @@ namespace Patterkit.Patterplay
         /// <summary>The next engine-log Seq: its own counter, since the log's length restarts after a clear.</summary>
         public int EngineLogSeq;
         /// <summary>Called with the group id when a choice runs dry - no takeable option and no
-        /// eligible fallback - so the silent fall-through is observable. Parity with the JS
-        /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct from
-        /// the log's `dry` entry: a shipped game runs with the log off and this still wired.</summary>
+        /// eligible fallback - so the silent fall-through is observable, as on every runtime (onDryChoice
+        /// in JS). Live feedback, distinct from the log's `dry` entry: a shipped game runs with the log off
+        /// and this still wired.</summary>
         public Action<string> OnDryChoice;
         /// <summary>The game's EngineOptions.OnError, or null to report through Engine.DefaultOnError.</summary>
         public Action<PlayError> OnError;

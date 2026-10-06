@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// @patterkit/runtime - the reference runtime.
+// @patterkit/runtime - Patterplay for JavaScript.
 //
 // An `Engine` is the world + flow manager: it owns the compiled Bundle, the
 // shared state (shared `@patter` globals + shared `@scene` props + host foreign
@@ -1170,8 +1170,6 @@ export class Engine {
     if (this.host.journal && prev !== undefined) this.host.journal.undo.push(() => this.host.registry.set(scope, name, prev, { host: true }));
   }
 
-  /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
-   *  value, declared default (for reset), and enum options. Mirrors the Unity / Godot ports. */
   /** The run's decisions, in order, each naming the flow it happened in. Empty unless the
    *  run was opened with `log: true`. A flow's own log stays flow-local; this is the only
    *  place a story spanning several flows reads as one sequence. */
@@ -1208,6 +1206,8 @@ export class Engine {
     return Object.fromEntries(this.host.sharedVisits);
   }
 
+  /** The shared `@patter` properties, for a live state inspector: each with its ref, type, current
+   *  value, declared default (for reset), and enum options. Every runtime has the same call. */
   listProperties(): PropertyRow[] {
     return this.host.patterSharedDecls.map((d) => ({
       name: d.name,

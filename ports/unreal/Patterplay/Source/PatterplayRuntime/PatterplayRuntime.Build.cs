@@ -7,10 +7,8 @@ public class PatterplayRuntime : ModuleRules
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
 
-		// The pure C++ engine under Public/Patter is header-only std code; several files
-		// define same-named file-local helpers. Keep this module out of unity (jumbo) builds
-		// so each .cpp is its own translation unit.
-		bUseUnity = false;
+		// The UObject layer's shared conversions live once, in Private/PatterConvert.h, so the module
+		// builds in unity (jumbo) mode like any other: no two files define the same file-local helper.
 
 		// The engine uses the C++ standard library (std::string / std::map / ...). Allow exceptions
 		// for its std::runtime_error / EvalError use.

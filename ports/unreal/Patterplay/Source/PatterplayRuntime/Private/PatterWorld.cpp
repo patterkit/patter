@@ -1,4 +1,5 @@
 #include "PatterWorld.h"
+#include "PatterConvert.h"
 #include "Patter/Engine.h"
 
 #include <vector>
@@ -37,28 +38,7 @@ struct FPatterWorldImpl
 	}
 };
 
-namespace
-{
-	std::string Std(const FString& S) { return std::string(TCHAR_TO_UTF8(*S)); }
-	FString Ue(const std::string& S) { return FString(UTF8_TO_TCHAR(S.c_str())); }
-
-	FPatterValue ToUe(const patter::PatterValue& V)
-	{
-		FPatterValue Out;
-		switch (V.kind)
-		{
-			case patter::PatterKind::Bool:   Out.Kind = EPatterValueKind::Boolean; Out.bBool = V.asBool(); break;
-			case patter::PatterKind::Number: Out.Kind = EPatterValueKind::Number; Out.Number = V.asNumber(); break;
-			case patter::PatterKind::Str:    Out.Kind = EPatterValueKind::String; Out.String = Ue(V.asString()); break;
-			default:
-				Out.Kind = EPatterValueKind::Flags;
-				for (const std::string& F : V.asFlags()) Out.Flags.Add(Ue(F));
-				break;
-		}
-		Out.Display = Ue(V.toDisplayString());
-		return Out;
-	}
-}
+using namespace PatterConvert;
 
 UPatterWorld::UPatterWorld()
 {
@@ -86,7 +66,7 @@ bool UPatterWorld::GetValue(const FString& Name, FPatterValue& OutValue) const
 {
 	const FPatterWorldImpl::FEntry* E = Impl->Find(Std(Name));
 	if (!E) { OutValue = FPatterValue(); return false; }
-	OutValue = ToUe(E->Value);
+	OutValue = ToUeValue(E->Value);
 	return true;
 }
 
@@ -155,7 +135,7 @@ bool UPatterWorld::Get(const std::string& Name, patter::PatterValue& OutValue) c
 void UPatterWorld::HostSet(const std::string& Name, const patter::PatterValue& Value)
 {
 	Impl->Put(Name, Value);
-	OnChanged.Broadcast(Ue(Name), ToUe(Value), false);
+	OnChanged.Broadcast(Ue(Name), ToUeValue(Value), false);
 }
 
 void UPatterWorld::StorySet(const std::string& Name, const patter::PatterValue& Value)
@@ -167,7 +147,7 @@ void UPatterWorld::StorySet(const std::string& Name, const patter::PatterValue& 
 		throw patter::EvalError("@world." + Name + " is the game's alone: a story tried to set it");
 	}
 	Impl->Put(Name, Value);
-	OnChanged.Broadcast(Ue(Name), ToUe(Value), true);
+	OnChanged.Broadcast(Ue(Name), ToUeValue(Value), true);
 }
 
 patter::HostScope UPatterWorld::MakeHostScope()

@@ -7,6 +7,17 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **`CastForScene` and `CastForBlock` work out a scene's or block's cast once and keep it.** They are pure
+  Blueprint nodes, asked again for every pin wired to them, and each call walked the whole scene.
+- **The runtime module builds in unity (merged) mode again.** Its conversions between the core and Blueprint
+  live in one place rather than a copy in each file, which is what had kept it out.
+
+### Removed
+
+- **Two unused helpers in the C++ core**: the token-set overload of `splitRef` and `flatOf`.
+
 ## [0.20.0] - 2026-10-06
 
 ### Added

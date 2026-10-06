@@ -34,19 +34,11 @@ static func external_scopes(bundle: Dictionary) -> Array:
 	return out
 
 
-# Split a ref ("@name" / "@scope.name") into [scope, lowercased name].
-#
-# host_tokens are the scopes a project DECLARES (@world and friends). They have to be passed in
-# rather than hard-coded: without them "@world.gold" splits to a @patter property literally named
-# "world.gold", which reads as absent and takes the falsy branch in silence.
-static func split_ref(ref: String, host_tokens: Array = []) -> Array:
-	return split_ref_with(ref, func(t: String) -> bool:
-		return t == "scene" or t == "patter" or host_tokens.has(t))
-
-
-# The same split, asking `is_scope(token) -> bool` which heads are scopes. The engine asks its
-# registry, so a scope another engine registered (`@story`) splits as one too. Mirrors the JS
-# dialect's splitRef(ref, isScope).
+# Split a ref ("@name" / "@scope.name") into [scope, lowercased name], asking `is_scope(token) -> bool`
+# which heads are scopes. The engine asks its registry, so a scope another engine registered (`@story`)
+# splits as one too; without that, "@world.gold" would split to a @patter property literally named
+# "world.gold", which reads as absent and takes the falsy branch in silence. Mirrors the JS dialect's
+# splitRef(ref, isScope).
 static func split_ref_with(ref: String, is_scope: Callable) -> Array:
 	var body := ref.substr(1) if ref.begins_with("@") else ref
 	var dot := body.find(".")
@@ -56,30 +48,6 @@ static func split_ref_with(ref: String, is_scope: Callable) -> Array:
 		if is_scope.call(head):
 			return [head, tail.to_lower()]
 	return ["patter", body.to_lower()]
-
-
-# The seed value for a HOST scope declaration (its default, else the type default). Separate from
-# prop_default only because the shapes differ; the rule is the same.
-static func host_scope_default(decl: Dictionary):
-	if decl.has("default"):
-		return PatterValues.to_value(decl["default"])
-	match decl.get("type", ""):
-		"boolean":
-			return false
-		"number":
-			return 0.0
-		"string":
-			return ""
-		"flags":
-			return []
-		"enum":
-			var vals: Array = decl.get("values", [])
-			return str(vals[0]) if vals.size() > 0 else ""
-		"quality":
-			# The ladder's start: a quality seeds at its FIRST stage.
-			var stages: Array = decl.get("stages", [])
-			return str(stages[0]) if stages.size() > 0 else ""
-	return false
 
 
 # The seed value for a property declaration (its default, else the type default).

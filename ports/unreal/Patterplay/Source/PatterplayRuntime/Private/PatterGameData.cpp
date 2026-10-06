@@ -2,11 +2,12 @@
 
 #include "PatterBundle.h"
 #include "Patter/Bundle.h"
+#include "PatterConvert.h"
+
+using namespace PatterConvert;
 
 namespace
 {
-	FString Ue(const std::string& S) { return FString(UTF8_TO_TCHAR(S.c_str())); }
-
 	EPatterPropertyType FieldType(const std::string& T)
 	{
 		if (T == "number") return EPatterPropertyType::Number;
