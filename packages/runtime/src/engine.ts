@@ -397,6 +397,8 @@ export class Checkpoint {
 interface FlowHost {
   /** True when the run asked for a log. */
   logEnabled: boolean;
+  /** Each declaration set's quality ladders, built on first use (see `ladders`). */
+  qualityLadders: Map<string, Map<string, readonly string[]>>;
   /** True when anything takes the decisions: the log, or an {@link Engine.onTrace} handler. Flows skip
    *  the work only a decision needs (a `run` walk's entry, a write's previous value) otherwise. */
   tracing: boolean;
@@ -602,7 +604,7 @@ export class Engine {
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
       tagIndex: buildTagIndex(bundle), registry, ownsRegistry, patterBag, hostScopes,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
-      sharedVisits: new Map(),
+      sharedVisits: new Map(), qualityLadders: new Map(),
       sharedSelectors: new Map(),
       stageBags: new Map(),
       journal: null,
@@ -1200,6 +1202,12 @@ export class Engine {
     this.engineLog.push({ ...event, flow, seq: this.engineSeq++, ...(scene ? { scene } : {}) });
   }
 
+  /** How many times each node has been entered across every flow, by node id: the shared count. With a
+   *  flow's own {@link Flow.getVisitCounts}, every visit count the run keeps, read without a save. */
+  getVisitCounts(): Record<string, number> {
+    return Object.fromEntries(this.host.sharedVisits);
+  }
+
   listProperties(): PropertyRow[] {
     return this.host.patterSharedDecls.map((d) => ({
       name: d.name,
@@ -1430,19 +1438,18 @@ export class Flow {
    *  lowercase, as the compiler emits references (the selfBackedResolver lesson). */
   private stagesFor(scope: string, name: string): readonly string[] | undefined {
     const key = name.toLowerCase();
-    const fromDecls = (decls: ReadonlyArray<{ name: string; type: string; stages?: string[] }> | undefined) =>
-      decls?.find((d) => d.name.toLowerCase() === key && d.type === "quality")?.stages;
     if (scope === "patter") {
-      return fromDecls(this.host.patterSharedDecls) ?? fromDecls(this.host.patterLocalDecls);
+      return ladders(this.host, "patter", () => [...this.host.patterSharedDecls, ...this.host.patterLocalDecls]).get(key);
     }
     if (scope === "scene") {
-      const scene = this.currentSceneId != null ? this.host.bundle.scenes[this.currentSceneId] : undefined;
-      return fromDecls(scene?.sceneProps);
+      const sceneId = this.currentSceneId;
+      if (sceneId == null) return undefined;
+      return ladders(this.host, `scene/${sceneId}`, () => this.host.bundle.scenes[sceneId]?.sceneProps).get(key);
     }
     // Any other scope's ladder is the registry's (another engine's `@story`, the game's `@world`), with
     // the bundle's own host-scope declarations behind it for a game that registered `@world` undeclared.
     return this.registryQualities?.(scope, name)
-      ?? fromDecls(this.host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope)?.declarations);
+      ?? ladders(this.host, `host/${scope}`, () => this.host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope)?.declarations).get(key);
   }
 
   // -- Host API -------------------------------------------------------------
@@ -1704,13 +1711,18 @@ export class Flow {
     this.flowLog.length = 0;
   }
 
-  /** Record one decision, on this flow's log and the engine's. Cheap to call with logging
-   *  off: the entry is never built. */
+  /** Record one decision, on this flow's log and the engine's, and hand it to any `onTrace`. Each call
+   *  site checks `host.tracing` first, so with nothing logging or tracing the entry is never built. */
   private emit(event: TraceEvent): void {
     const scene = this.currentSceneId ?? undefined;
     this.host.emitEngine(this.id, event, scene);
     if (!this.host.logEnabled) return;
     this.flowLog.push({ ...event, seq: this.flowSeq++, ...(scene ? { scene } : {}) });
+  }
+
+  /** How many times this flow has entered each node, by node id. */
+  getVisitCounts(): Record<string, number> {
+    return Object.fromEntries(this.visitCounts);
   }
 
   /** The options of a pending choice (empty when not at a choice point). */
@@ -1727,7 +1739,7 @@ export class Flow {
     if (!option.eligible) throw new Error(`choice option is not eligible: ${id}`);
     this.touch();
     const node = choice.byId.get(id)!;
-    this.emit({ type: "chose", group: choice.groupId, option: id });
+    if (this.host.tracing) this.emit({ type: "chose", group: choice.groupId, option: id });
     this.pendingChoice = null;
     // Optionally speak the chosen option's prompt back as its first beat (spec §5): only an AUTHORED
     // prompt, and exactly as the choice showed it. A prompt borrowed from the option's own first content
@@ -1978,7 +1990,7 @@ export class Flow {
       // "why is that option greyed?" is asking about this moment, and a log of the taken
       // option alone cannot answer it. Options hidden by secretUntilEligible are absent
       // here too, exactly as the player sees them.
-      this.emit({ type: "choice", group: group.id, options: options.map((o) => ({ id: o.id, eligible: o.eligible })) });
+      if (this.host.tracing) this.emit({ type: "choice", group: group.id, options: options.map((o) => ({ id: o.id, eligible: o.eligible })) });
       this.pendingChoice = { groupId: group.id, options, byId };
       return;
     }
@@ -1990,7 +2002,7 @@ export class Flow {
     if (fallback) { this.enterChild(fallback); return; }
     // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks past it. The
     // behaviour is unchanged; the opt-in diagnostics hook makes this silent fall-through observable.
-    this.emit({ type: "dry", group: group.id });
+    if (this.host.tracing) this.emit({ type: "dry", group: group.id });
     // The callback stays beside the log deliberately. They are not the same thing: this is
     // live feedback a host acts on the moment it happens, the log is read afterwards, and a
     // shipped game runs with the log off and this hook still wired.
@@ -2013,7 +2025,7 @@ export class Flow {
    * hard-ends the flow regardless of the callstack.
    */
   private enterTarget(to: string, mode: "call" | "jump"): void {
-    this.emit({ type: "jump", to, mode });
+    if (this.host.tracing) this.emit({ type: "jump", to, mode });
     if (to === "END") { this.flowEnded = true; this.stack = []; return; }
 
     let sceneId: string;
@@ -2050,7 +2062,7 @@ export class Flow {
     // with why it was or was not takeable. "The line I expected is missing" is only
     // answerable if the log says which sibling was dropped and that it was dropped here.
     const trace = (picked: SelectableNode | null): SelectableNode | null => {
-      this.emit({
+      if (this.host.tracing) this.emit({
         type: "select", group: group.id, selector: group.selector ?? "default",
         ...(group.selector === "sequence" ? { order, exhaust } : {}),
         children: verdicts, picked: picked?.id ?? null,
@@ -2231,7 +2243,7 @@ export class Flow {
         // Only paid for when the run asked for a log.
         const prev = this.host.tracing ? this.getProperty(e.target) : undefined;
         this.writeProperty(e.target, value, false); // the STORY writes: a read-only host property refuses it
-        this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
+        if (this.host.tracing) this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
       } catch (err) {
         // Skipped, reported, and the rest of the list still runs (see PlayError).
         this.reportError("effect", owner, e.value, err);
@@ -2251,7 +2263,7 @@ export class Flow {
     const message = err instanceof Error ? err.message : String(err);
     const source = expr?.src;
     this.host.onError({ flow: this.id, kind, node, ...(source ? { source } : {}), message });
-    this.emit({ type: "diagnostic", kind, node, ...(source ? { source } : {}), message });
+    if (this.host.tracing) this.emit({ type: "diagnostic", kind, node, ...(source ? { source } : {}), message });
   }
 
   private evalExpr(expr: Expression): ScalarValue {
@@ -2604,6 +2616,23 @@ function toDecl(decl: PropertyDecl): ScopeDeclaration {
 /** The scopes the game binds: `hostScopes`, and the deprecated `world` as the scope of that name. */
 function boundScopes(options: EngineOptions): Record<string, HostScope> {
   return { ...(options.world ? { world: options.world } : {}), ...options.hostScopes };
+}
+
+/** The stage ladder of each declared quality in one set of declarations, by lowercased name (names compare
+ *  lowercase, as the compiler emits references; the first declaration of a name wins). Built once per set
+ *  and kept on the host: a comparison asks for a ladder every time it runs, and a scan of the declarations
+ *  each time cost a pass and a lowercasing per declaration per comparison. */
+function ladders(host: FlowHost, cacheKey: string, decls: () => ReadonlyArray<{ name: string; type: string; stages?: string[] }> | undefined): Map<string, readonly string[]> {
+  let found = host.qualityLadders.get(cacheKey);
+  if (!found) {
+    found = new Map();
+    for (const d of decls() ?? []) {
+      const k = d.name.toLowerCase();
+      if (d.type === "quality" && d.stages && !found.has(k)) found.set(k, d.stages);
+    }
+    host.qualityLadders.set(cacheKey, found);
+  }
+  return found;
 }
 
 /** A host-scope declaration (`@world.x`) → registry declaration. */

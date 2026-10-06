@@ -27,6 +27,7 @@ namespace Patterkit.Patterplay
         /// <summary>The registry keys this flow has registered (its globals and each scene bag).</summary>
         private readonly List<string> _registered = new List<string>();
         private uint _rngState;
+        private readonly Mulberry32 _prng = new Mulberry32(0u);
 
         private bool _started;
         private bool _flowEnded;
@@ -111,33 +112,44 @@ namespace Patterkit.Patterplay
         /// JS Flow.stagesFor.</summary>
         private List<string> StagesFor(string scope, string name)
         {
-            var key = name == null ? null : name.ToLowerInvariant();
-            List<string> FromDecls(List<PropertyDecl> decls)
-            {
-                if (decls == null) return null;
-                foreach (var d in decls)
-                {
-                    if (d.Type == "quality" && d.Name != null && d.Name.ToLowerInvariant() == key) return d.Stages;
-                }
-                return null;
-            }
-            if (scope == "patter") return FromDecls(_host.PatterSharedDecls) ?? FromDecls(_host.PatterLocalDecls);
+            if (name == null) return null;
+            var key = name.ToLowerInvariant();
+            if (scope == "patter")
+                return Ladders("patter", () => _host.PatterSharedDecls.Concat(_host.PatterLocalDecls).Select(d => (d.Name, d.Type, d.Stages)), key);
             if (scope == "scene")
             {
                 if (_currentSceneId == null || !_host.Bundle.Scenes.TryGetValue(_currentSceneId, out var scene)) return null;
-                return FromDecls(scene.SceneProps);
+                return Ladders("scene/" + _currentSceneId, () => scene.SceneProps.Select(d => (d.Name, d.Type, d.Stages)), key);
             }
             // Any other scope's ladder is the registry's (another engine's `@story`, the game's `@world`), with
             // the bundle's own host-scope declarations behind it for a game that registered `@world` undeclared.
             var fromRegistry = _registryQualities?.Invoke(scope, name);
             if (fromRegistry != null) return fromRegistry;
-            var spec = _host.Bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == scope);
-            if (spec?.Declarations == null) return null;
-            foreach (var d in spec.Declarations)
+            return Ladders("host/" + scope, () =>
             {
-                if (d.Type == "quality" && d.Name != null && d.Name.ToLowerInvariant() == key) return d.Stages;
+                var spec = _host.Bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == scope);
+                return (spec?.Declarations ?? new List<HostScopeDecl>()).Select(d => (d.Name, d.Type, d.Stages));
+            }, key);
+        }
+
+        /// <summary>The stage ladder of each declared quality in one set of declarations, by lowercased name (the
+        /// first declaration of a name wins). Built once per set and kept on the host: a comparison asks for a
+        /// ladder every time it runs, and scanning the declarations each time cost a pass and a lowercasing
+        /// per declaration per comparison.</summary>
+        private List<string> Ladders(string cacheKey, Func<IEnumerable<(string Name, string Type, List<string> Stages)>> decls, string key)
+        {
+            if (!_host.QualityLadders.TryGetValue(cacheKey, out var found))
+            {
+                found = new Dictionary<string, List<string>>();
+                foreach (var d in decls())
+                {
+                    if (d.Type != "quality" || d.Name == null || d.Stages == null) continue;
+                    var k = d.Name.ToLowerInvariant();
+                    if (!found.ContainsKey(k)) found[k] = d.Stages;
+                }
+                _host.QualityLadders[cacheKey] = found;
             }
-            return null;
+            return found.TryGetValue(key, out var stages) ? stages : null;
         }
 
         /// <summary>Advance repeatedly, collecting every played beat, until a choice or the end - the
@@ -393,6 +405,9 @@ namespace Patterkit.Patterplay
                 foreach (var h in _host.TraceHandlers.ToArray()) h(Id, wide);
         }
 
+        /// <summary>How many times this flow has entered each node, by node id.</summary>
+        public IReadOnlyDictionary<string, int> GetVisitCounts() => _visitCounts;
+
         public void Choose(string id)
         {
             var choice = _pendingChoice;
@@ -402,7 +417,7 @@ namespace Patterkit.Patterplay
             if (!option.Eligible) throw new Exception($"choice option is not eligible: {id}");
             Touch();
             var node = choice.ById[id];
-            Emit(new LogEntry { Type = "chose", Group = choice.GroupId, Option = id });
+            if (_host.Tracing) Emit(new LogEntry { Type = "chose", Group = choice.GroupId, Option = id });
             _pendingChoice = null;
             // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
             // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
@@ -579,7 +594,7 @@ namespace Patterkit.Patterplay
             {
                 // Including the options a condition left ineligible: "why is that greyed out"
                 // is a question about the moment the choice was built.
-                Emit(new LogEntry { Type = "choice", Group = group.Id,
+                if (_host.Tracing) Emit(new LogEntry { Type = "choice", Group = group.Id,
                     Options = options.Select(o => (o.Id, o.Eligible)).ToList() });
                 _pendingChoice = new ChoiceStateInternal { GroupId = group.Id, Options = options, ById = byId };
                 return;
@@ -590,7 +605,7 @@ namespace Patterkit.Patterplay
             if (fallback != null) { EnterChild(fallback); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
-            Emit(new LogEntry { Type = "dry", Group = group.Id });
+            if (_host.Tracing) Emit(new LogEntry { Type = "dry", Group = group.Id });
             _host.OnDryChoice?.Invoke(group.Id);
         }
 
@@ -604,7 +619,7 @@ namespace Patterkit.Patterplay
 
         private void EnterTarget(string to, string mode)
         {
-            Emit(new LogEntry { Type = "jump", To = to, Mode = mode });
+            if (_host.Tracing) Emit(new LogEntry { Type = "jump", To = to, Mode = mode });
             if (to == "END") { _flowEnded = true; _stack = new List<StackFrame>(); return; }
 
             string sceneId, containerId;
@@ -642,7 +657,7 @@ namespace Patterkit.Patterplay
             Node Trace(Node picked)
             {
                 bool sequence = group.Selector == "sequence";
-                Emit(new LogEntry { Type = "select", Group = group.Id, Selector = sel,
+                if (_host.Tracing) Emit(new LogEntry { Type = "select", Group = group.Id, Selector = sel,
                     Order = sequence ? group.Options?.Order ?? "sequential" : null,
                     Exhaust = sequence ? group.Options?.Exhaust ?? "once" : null,
                     Children = considered, Picked = picked?.Id });
@@ -809,7 +824,7 @@ namespace Patterkit.Patterplay
                     // paid for when the run asked for a log.
                     var prev = _host.Tracing ? GetProperty(e.Target) : null;
                     WriteProperty(e.Target, value, false);   // the STORY writes: a read-only host property refuses it
-                    Emit(new LogEntry { Type = "write", Target = e.Target, Value = value, Prev = prev });
+                    if (_host.Tracing) Emit(new LogEntry { Type = "write", Target = e.Target, Value = value, Prev = prev });
                 }
                 catch (Exception err)
                 {
@@ -835,7 +850,7 @@ namespace Patterkit.Patterplay
             string source = string.IsNullOrEmpty(expr?.Src) ? null : expr.Src;
             var error = new PlayError { Flow = Id, Kind = kind, Node = node, Source = source, Message = err.Message };
             (_host.OnError ?? Engine.DefaultOnError)?.Invoke(error);
-            Emit(new LogEntry { Type = "diagnostic", Kind = kind, Node = node, Source = source, Message = err.Message });
+            if (_host.Tracing) Emit(new LogEntry { Type = "diagnostic", Kind = kind, Node = node, Source = source, Message = err.Message });
         }
 
         private ExprValue EvalExpr(Expression expr)
@@ -867,9 +882,10 @@ namespace Patterkit.Patterplay
             // file carried its own until 2026-09-01, so Patterplay shipped the
             // algorithm twice in C# alone. _rngState is still the serialisable
             // position, so saves are unaffected.
-            var prng = new Mulberry32(_rngState);
-            double draw = prng.Next();
-            _rngState = prng.State;
+            // One generator per flow, re-pointed at the state each draw, rather than a new one per draw.
+            _prng.State = _rngState;
+            double draw = _prng.Next();
+            _rngState = _prng.State;
             return draw;
         }
 

@@ -77,6 +77,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	FString StripCaptions(const FString& Text);
 
+	// How many times this flow has entered each node, by node id.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
+	TMap<FString, int32> GetVisitCounts() const;
+
 	// Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
 	// onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
 	// discarded). Scene/Block are host-facing Game IDs (or internal ids); Block is scene-scoped, so it is
@@ -332,6 +336,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug", meta = (DeprecatedFunction, DeprecationMessage = "Use Log, the name every Patterplay runtime uses."))
 	TArray<FPatterLogEntry> GetLog() const { return Log(); }
+
+	// How many times each node has been entered across every flow, by node id: the shared count.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
+	TMap<FString, int32> GetVisitCounts() const;
 
 	// Drop the retained entries. Cosmetic: no game state changes, and Seq keeps counting.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")

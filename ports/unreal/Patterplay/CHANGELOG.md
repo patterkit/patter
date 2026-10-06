@@ -33,6 +33,8 @@ runtime behaviour.
   every other runtime's helpers do.
 - **A gameData field's `purpose`**, read from the bundle and carried in its description and in Blueprint's
   `FPatterGameDataField`, as on every other runtime.
+- **`getVisitCounts()` on the engine and a flow in the C++ core, and `GetVisitCounts` in Blueprint**, as on
+  every runtime: visit counts read without a save.
 
 ### Changed
 
@@ -50,6 +52,10 @@ runtime behaviour.
   `order` and `exhaust`, which it did not before. In Blueprint the old three are still filled, and go in a later
   release; the C++ core's are gone, so C++ that read them needs the new names. A `chose` entry's option is in
   `option`, no longer in `picked`. The corpus now holds every runtime's log to the same entries.
+- **Less work per step.** A decision's log entry is built only while the log is on or something is tracing; a
+  quality's stage ladder is looked up once rather than scanned for on every comparison; a locale switch or a
+  live string refresh points at the bundle's string tables rather than copying them; and the state logger reads
+  visit counts directly rather than saving the whole game.
 
 ### Deprecated
 

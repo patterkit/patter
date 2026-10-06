@@ -275,14 +275,15 @@ namespace Patterkit.Patterplay.Editor
 
         private void DrawReadOnlyState(Engine engine)
         {
-            var save = engine.SaveGame();
-            if (save.SharedVisits.Count > 0)
+            // Read straight off the engine: this runs on every repaint, and a save to read it cost the whole run.
+            var visits = engine.GetVisitCounts();
+            if (visits.Count > 0)
             {
                 EditorGUILayout.LabelField("Visits (world)", EditorStyles.miniBoldLabel);
-                foreach (var kv in save.SharedVisits) EditorGUILayout.LabelField("  " + kv.Key, kv.Value.ToString());
+                foreach (var kv in visits) EditorGUILayout.LabelField("  " + kv.Key, kv.Value.ToString());
             }
             EditorGUILayout.LabelField("Flows", EditorStyles.miniBoldLabel);
-            foreach (var kv in save.Flows) EditorGUILayout.LabelField("  " + kv.Key, kv.Value.CurrentSceneId ?? "-");
+            foreach (var flow in engine.Flows()) EditorGUILayout.LabelField("  " + flow.Id, flow.CurrentScene ?? "-");
         }
     }
 }

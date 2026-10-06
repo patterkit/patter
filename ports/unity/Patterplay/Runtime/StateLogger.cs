@@ -54,11 +54,10 @@ namespace Patterkit.Patterplay
         /// diffs these on Capture, which is all this logger used to do for everything.</summary>
         internal static OrderedMap<string, ExprValue> VisitState(Engine engine)
         {
-            var save = engine.SaveGame();
             var outMap = new OrderedMap<string, ExprValue>();
-            foreach (var kv in save.SharedVisits) outMap.Set($"visit:{kv.Key}", ExprValue.Num(kv.Value));
-            foreach (var flow in save.Flows)
-                foreach (var kv in flow.Value.Visits) outMap.Set($"{flow.Key}/visit:{kv.Key}", ExprValue.Num(kv.Value));
+            foreach (var kv in engine.GetVisitCounts()) outMap.Set($"visit:{kv.Key}", ExprValue.Num(kv.Value));
+            foreach (var flow in engine.Flows())
+                foreach (var kv in flow.GetVisitCounts()) outMap.Set($"{flow.Id}/visit:{kv.Key}", ExprValue.Num(kv.Value));
             return outMap;
         }
 

@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <memory>
 #include <functional>
@@ -532,8 +533,12 @@ namespace patter
         std::function<void(const PlayError&)> onError;
         const Bundle* bundle = nullptr;
         bool emitIds = false; // IDs-only build: emit beat IDs + omit character names (the game localises)
-        std::map<std::string, std::string> strings;
-        std::map<std::string, std::string> defaultStrings;
+        // The active locale's string table and the default locale's, pointing into the bundle the engine
+        // plays (or the one replaceStrings pushed), which outlives it. Pointers, not copies: a locale switch
+        // or a live string refresh re-points them rather than copying every line.
+        const std::map<std::string, std::string>* strings = &noStrings();
+        const std::map<std::string, std::string>* defaultStrings = &noStrings();
+        static const std::map<std::string, std::string>& noStrings() { static const std::map<std::string, std::string> none; return none; }
         std::map<std::string, std::string> castDisplay;
         std::map<std::string, const Node*> nodeIndex;
         std::map<std::string, std::string> blockToScene;
@@ -555,6 +560,9 @@ namespace patter
         /** Host scopes the embedder bound (EngineOptions::hostScopes), registered as external scopes. */
         std::vector<std::string> boundScopes;
         std::vector<PropertyDecl> patterSharedDecls;
+        /// Each declaration set's quality ladders, built on first use (see Flow::ladders). They point into the
+        /// bundle and these declarations, which live as long as the host.
+        std::unordered_map<std::string, std::unordered_map<std::string, const std::vector<std::string>*>> qualityLadders;
         std::vector<PropertyDecl> patterLocalDecls;
         std::set<std::string> patterSharedNames;
         std::map<std::string, std::set<std::string>> sceneSharedNames;
@@ -717,20 +725,13 @@ namespace patter
         const std::vector<std::string>* stagesFor(const std::string& scope, const std::string& name) const
         {
             const std::string key = toLower(name);
-            auto fromProps = [&key](const std::vector<PropertyDecl>& decls) -> const std::vector<std::string>* {
-                for (const auto& d : decls) if (d.type == "quality" && toLower(d.name) == key) return &d.stages;
-                return nullptr;
-            };
             if (scope == "patter")
-            {
-                if (const auto* s = fromProps(host_->patterSharedDecls)) return s;
-                return fromProps(host_->patterLocalDecls);
-            }
+                return ladders("patter", [&](auto add) { for (const auto& d : host_->patterSharedDecls) add(d); for (const auto& d : host_->patterLocalDecls) add(d); }, key);
             if (scope == "scene")
             {
                 auto it = host_->bundle->scenes.find(currentSceneId_);
                 if (it == host_->bundle->scenes.end()) return nullptr;
-                return fromProps(it->second.sceneProps);
+                return ladders("scene/" + currentSceneId_, [&](auto add) { for (const auto& d : it->second.sceneProps) add(d); }, key);
             }
             // Any other scope's ladder is the registry's (another engine's @story, the game's @world),
             // with the bundle's own host-scope declarations behind it for a game that registered
@@ -739,14 +740,29 @@ namespace patter
             {
                 if (const auto* s = registryQualities_(scope, name)) return s;
             }
-            for (const auto& spec : host_->bundle->scopeRegistry.scopes)
+            return ladders("host/" + scope, [&](auto add)
             {
-                if (spec.token != scope) continue;
-                for (const auto& d : spec.declarations)
-                    if (d.type == "quality" && toLower(d.name) == key) return &d.stages;
-                return nullptr;
+                for (const auto& spec : host_->bundle->scopeRegistry.scopes)
+                    if (spec.token == scope) for (const auto& d : spec.declarations) add(d);
+            }, key);
+        }
+
+        // The stage ladder of each declared quality in one set of declarations, by lowercased name (the first
+        // declaration of a name wins). Built once per set and kept on the host: a comparison asks for a ladder
+        // every time it runs, and scanning the declarations each time cost a pass and a lowercasing per
+        // declaration per comparison. `each` calls the function it is given with every declaration in the set.
+        template <typename Each>
+        const std::vector<std::string>* ladders(const std::string& cacheKey, Each each, const std::string& key) const
+        {
+            auto found = host_->qualityLadders.find(cacheKey);
+            if (found == host_->qualityLadders.end())
+            {
+                std::unordered_map<std::string, const std::vector<std::string>*> built;
+                each([&built](const auto& d) { if (d.type == "quality") built.emplace(toLower(d.name), &d.stages); });
+                found = host_->qualityLadders.emplace(cacheKey, std::move(built)).first;
             }
-            return nullptr;
+            auto hit = found->second.find(key);
+            return hit == found->second.end() ? nullptr : hit->second;
         }
 
         // The options of the choice currently waiting for the player, empty when none is pending. The same
@@ -892,6 +908,9 @@ namespace patter
         /** This flow's id, as the engine knows it. */
         const std::string& id() const { return id_; }
 
+        /** How many times this flow has entered each node, by node id. */
+        const std::map<std::string, int>& getVisitCounts() const { return visitCounts_; }
+
         StepResult advance()
         {
             if (closed_) { StepResult r; r.type = StepType::End; return r; } // a stale reference drives nothing
@@ -1015,7 +1034,7 @@ namespace patter
             if (!option->eligible) throw std::runtime_error("choice option is not eligible: " + id);
             touch();
             const Node* node = pendingById_[id];
-            { LogEntry e; e.type = "chose"; e.group = pendingGroupId_; e.option = id; emit(std::move(e)); }
+            if (host_->tracing) { LogEntry e; e.type = "chose"; e.group = pendingGroupId_; e.option = id; emit(std::move(e)); }
             const Node* picked = node;
             std::shared_ptr<ChoicePrompt> shownPrompt = option->prompt ? std::make_shared<ChoicePrompt>(*option->prompt) : nullptr;
             clearPendingChoice();
@@ -1580,7 +1599,7 @@ namespace patter
             for (const Node* f : fallbacks) if (eligible(f)) { enterChild(f); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
-            { LogEntry e; e.type = "dry"; e.group = group->id; emit(std::move(e)); }
+            if (host_->tracing) { LogEntry e; e.type = "dry"; e.group = group->id; emit(std::move(e)); }
             // Beside the log, not instead of it: live feedback a host acts on, against an audit
             // read afterwards. A shipped game runs with the log off and this still wired.
             if (host_->onDryChoice) host_->onDryChoice(group->id);
@@ -1594,7 +1613,7 @@ namespace patter
         }
         void enterTarget(const std::string& to, const std::string& mode)
         {
-            { LogEntry e; e.type = "jump"; e.to = to; e.mode = mode; emit(std::move(e)); }
+            if (host_->tracing) { LogEntry e; e.type = "jump"; e.to = to; e.mode = mode; emit(std::move(e)); }
             if (to == "END") { flowEnded_ = true; stack_.clear(); return; }
             std::string sceneId, containerId;
             auto sc = host_->bundle->scenes.find(to);
@@ -1630,6 +1649,7 @@ namespace patter
             // The reasoning goes in the entry: every child looked at, with its verdict.
             const auto trace = [&](const Node* picked) -> const Node*
             {
+                if (!host_->tracing) return picked;
                 LogEntry e; e.type = "select"; e.group = group->id;
                 e.selector = group->selector.empty() ? "default" : group->selector;
                 if (group->selector == "sequence")
@@ -1803,11 +1823,15 @@ namespace patter
                 {
                     PatterValue value = evalExpr(ef.value);
                     // `prev` read before the write, so a reader can say "0 -> 7" in one pass.
-                    LogEntry e; e.type = "write"; e.target = ef.target; e.value = value;
-                    if (host_->tracing)
+                    const bool tracing = host_->tracing;
+                    LogEntry e;
+                    if (tracing)
+                    {
+                        e.type = "write"; e.target = ef.target; e.value = value;
                         if (const PatterValue* pv = getProperty(ef.target)) { e.prev = *pv; e.hasPrev = true; }
+                    }
                     writeProperty(ef.target, value, false);   // the STORY writes: a read-only host property refuses it
-                    emit(std::move(e));
+                    if (tracing) emit(std::move(e));
                 }
                 catch (const std::exception& ex)
                 {
@@ -1838,6 +1862,7 @@ namespace patter
                 err.flow = id_; err.kind = kind; err.node = node; err.source = source; err.message = message;
                 host_->onError(err);
             }
+            if (!host_->tracing) return;
             LogEntry e; e.type = "diagnostic"; e.kind = kind; e.node = node; e.source = source; e.message = message;
             emit(std::move(e));
         }
@@ -1984,10 +2009,10 @@ namespace patter
         std::string resolveString(const std::string& id)
         {
             if (host_->emitIds) return id; // IDs-only build: the game resolves text from this id itself
-            auto a = host_->strings.find(id);
-            if (a != host_->strings.end()) return a->second;
-            auto d = host_->defaultStrings.find(id);
-            if (d != host_->defaultStrings.end()) return "<Untranslated: " + id + "> " + d->second;
+            auto a = host_->strings->find(id);
+            if (a != host_->strings->end()) return a->second;
+            auto d = host_->defaultStrings->find(id);
+            if (d != host_->defaultStrings->end()) return "<Untranslated: " + id + "> " + d->second;
             return id;
         }
         // A speaker's resolved name: the first of the active cast string, the default one, and the cast's
@@ -1998,8 +2023,8 @@ namespace patter
             if (host_->emitIds) return false; // IDs-only: omit the display name; the game maps the `character` token
             const std::string& character = beat.character;
             std::string key = "cast:" + character;
-            auto a = host_->strings.find(key); if (a != host_->strings.end()) { out = a->second; return true; }
-            auto d = host_->defaultStrings.find(key); if (d != host_->defaultStrings.end()) { out = d->second; return true; }
+            auto a = host_->strings->find(key); if (a != host_->strings->end()) { out = a->second; return true; }
+            auto d = host_->defaultStrings->find(key); if (d != host_->defaultStrings->end()) { out = d->second; return true; }
             auto c = host_->castDisplay.find(character); if (c != host_->castDisplay.end()) { out = c->second; return true; }
             return false;
         }
@@ -2077,8 +2102,8 @@ namespace patter
             host_.emitIds = bundle.localisation.mode == "ids" && !bundle.localisation.sourceDebug;
             sourceDebug_ = bundle.localisation.mode == "ids" && bundle.localisation.sourceDebug;
             if (sourceDebug_) std::cerr << "[Patterplay] source-only DEBUG build: strings are the source language for debugging, not a shippable localised build.\n";
-            auto ls = allStrings.find(locale); if (ls != allStrings.end()) host_.strings = ls->second;
-            auto ds = allStrings.find(bundle.locales.defaultLocale); if (ds != allStrings.end()) host_.defaultStrings = ds->second;
+            auto ls = allStrings.find(locale); if (ls != allStrings.end()) host_.strings = &ls->second;
+            auto ds = allStrings.find(bundle.locales.defaultLocale); if (ds != allStrings.end()) host_.defaultStrings = &ds->second;
 
             for (const auto& c : bundle.cast) if (!c.displayName.empty()) host_.castDisplay[c.name] = c.displayName;
             defaultSeed_ = options.hasSeed ? Mulberry32::ToUint32(options.seed) : 0x9e3779b9u;
@@ -2156,7 +2181,7 @@ namespace patter
             // Re-point the active strings off the live table source (the bundle's, unless replaceStrings
             // re-pointed it at a pushed bundle's) - no whole-table copy.
             auto it = allStrings_->find(locale);
-            host_.strings = it != allStrings_->end() ? it->second : std::map<std::string, std::string>();
+            host_.strings = it != allStrings_->end() ? &it->second : &FlowHost::noStrings();
         }
 
         // Live bundle refresh, tier 1 (strings only): swap every locale's string table in place from a
@@ -2168,9 +2193,9 @@ namespace patter
         {
             allStrings_ = &bundle.strings;
             auto it = allStrings_->find(currentLocale_);
-            host_.strings = it != allStrings_->end() ? it->second : std::map<std::string, std::string>();
+            host_.strings = it != allStrings_->end() ? &it->second : &FlowHost::noStrings();
             auto ds = allStrings_->find(host_.bundle->locales.defaultLocale);
-            host_.defaultStrings = ds != allStrings_->end() ? ds->second : std::map<std::string, std::string>();
+            host_.defaultStrings = ds != allStrings_->end() ? &ds->second : &FlowHost::noStrings();
         }
 
         // Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried
@@ -2230,6 +2255,10 @@ namespace patter
         /// the engine was built with EngineOptions::log. A flow's own log stays flow-local;
         /// this is the only place a story spanning several flows reads as one sequence.
         const std::vector<LogEntry>& log() const { return engineLog_; }
+
+        /** How many times each node has been entered across every flow, by node id: the shared count. With a
+         *  flow's own getVisitCounts, every visit count the run keeps, read without a save. */
+        const std::map<std::string, int>& getVisitCounts() const { return host_.sharedVisits; }
 
         /// Drop the retained entries. `seq` does NOT restart, so two reads either side of a
         /// clear still agree about what came first.
@@ -2666,16 +2695,16 @@ namespace patter
                 if (!beat.character.empty())
                 {
                     info.character = beat.character;
-                    auto c = host_.defaultStrings.find("cast:" + beat.character);
-                    if (c != host_.defaultStrings.end()) info.characterName = c->second;
+                    auto c = host_.defaultStrings->find("cast:" + beat.character);
+                    if (c != host_.defaultStrings->end()) info.characterName = c->second;
                     else { auto d = host_.castDisplay.find(beat.character); if (d != host_.castDisplay.end()) info.characterName = d->second; }
                 }
                 info.direction = beat.direction;
             }
             if (beat.kind == "line" || beat.kind == "text")
             {
-                auto t = host_.defaultStrings.find(beat.id);
-                if (t != host_.defaultStrings.end()) info.text = t->second;   // source, un-interpolated
+                auto t = host_.defaultStrings->find(beat.id);
+                if (t != host_.defaultStrings->end()) info.text = t->second;   // source, un-interpolated
             }
             if (beat.gameData) for (const auto& kv : *beat.gameData) info.gameData.emplace_back(kv.first, kv.second);
             info.tags = tagsById(beat.id);

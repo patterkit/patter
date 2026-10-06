@@ -96,6 +96,8 @@ const API = [
   { on: "Engine", js: "setProperty", unity: "SetProperty", godot: "set_property", unreal: "setProperty", bp: "SetProperty" },
   { on: "Engine", js: "listBags", unity: "ListBags", godot: "list_bags", unreal: "listBags", bp: null,
     why: "it hands back the kernel's live property bags, which have no Blueprint type; ListProperties is Blueprint's read of the same state" },
+  // On the engine (the shared counts) and on a flow (its own); one row covers both spellings here.
+  { on: "Engine", js: "getVisitCounts", unity: "GetVisitCounts", godot: "get_visit_counts", unreal: "getVisitCounts", bp: "GetVisitCounts" },
   { on: "Engine", js: "listProperties", unity: "ListProperties", godot: "list_properties", unreal: "listProperties", bp: "ListProperties" },
   { on: "Engine", js: "saveGame", unity: "SaveGame", godot: "save_game", unreal: "saveGame", bp: null,
     why: "Blueprint saves via the PatterSave helper" },

@@ -103,20 +103,13 @@ func current_scene():
 # lowercase, as the compiler emits references. Mirrors the JS Flow.stagesFor.
 func _stages_for(scope: String, name: String):
 	var key := name.to_lower()
-	var from_decls := func(decls):
-		if decls == null:
-			return null
-		for d in decls:
-			if d.get("type", "") == "quality" and str(d.get("name", "")).to_lower() == key:
-				return d.get("stages")
-		return null
 	if scope == "patter":
-		var hit = from_decls.call(_host.patter_shared_decls)
-		return hit if hit != null else from_decls.call(_host.patter_local_decls)
+		return _ladders("patter", func(): return _host.patter_shared_decls + _host.patter_local_decls).get(key)
 	if scope == "scene":
 		if _current_scene_id == "" or not _host.bundle["scenes"].has(_current_scene_id):
 			return null
-		return from_decls.call(_host.bundle["scenes"][_current_scene_id].get("sceneProps"))
+		var scene_id := _current_scene_id
+		return _ladders("scene/" + scene_id, func(): return _host.bundle["scenes"][scene_id].get("sceneProps", [])).get(key)
 	# Any other scope's ladder is the registry's (another engine's `@story`, the game's `@world`),
 	# with the bundle's own host-scope declarations behind it for a game that registered `@world`
 	# undeclared.
@@ -124,10 +117,27 @@ func _stages_for(scope: String, name: String):
 		var hit = (_registry_qualities as Callable).call(scope, name)
 		if hit != null:
 			return hit
-	for spec in _host.bundle.get("scopeRegistry", {}).get("scopes", []):
-		if spec.get("token", "") == scope:
-			return from_decls.call(spec.get("declarations"))
-	return null
+	return _ladders("host/" + scope, func():
+		for spec in _host.bundle.get("scopeRegistry", {}).get("scopes", []):
+			if spec.get("token", "") == scope:
+				return spec.get("declarations", [])
+		return []).get(key)
+
+
+# The stage ladder of each declared quality in one set of declarations, by lowercased name (the first
+# declaration of a name wins). Built once per set and kept on the host: a comparison asks for a ladder
+# every time it runs, and scanning the declarations each time cost a pass and a lowercasing per
+# declaration per comparison.
+func _ladders(cache_key: String, decls: Callable) -> Dictionary:
+	var found = _host.quality_ladders.get(cache_key)
+	if found == null:
+		found = {}
+		for d in decls.call():
+			var k := str(d.get("name", "")).to_lower()
+			if d.get("type", "") == "quality" and d.has("stages") and not found.has(k):
+				found[k] = d["stages"]
+		_host.quality_ladders[cache_key] = found
+	return found
 
 
 # Advance repeatedly, collecting every played beat, until a choice or the end - the "play to the next
@@ -297,6 +307,11 @@ func _emit(event: Dictionary) -> void:
 		h[1].call(id, wide)
 
 
+## How many times this flow has entered each node, by node id. A copy.
+func get_visit_counts() -> Dictionary:
+	return _visit_counts.duplicate()
+
+
 func get_choices() -> Array:
 	return _pending["options"] if _pending != null else []
 
@@ -411,7 +426,8 @@ func choose(option_id: String) -> void:
 	for o in _pending["options"]:
 		if o["id"] == option_id and o.has("prompt"):
 			shown = (o["prompt"] as Dictionary).duplicate()
-	_emit({"type": "chose", "group": _pending["group_id"], "option": option_id})
+	if _host.tracing:
+		_emit({"type": "chose", "group": _pending["group_id"], "option": option_id})
 	_pending = null
 	# Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and exactly
 	# as the choice showed it. A prompt borrowed from the option's own first content line is not replayed,
@@ -675,10 +691,11 @@ func _setup_choice(group: Dictionary) -> void:
 	if options.any(func(o): return o["eligible"]):
 		# Including the ones a condition left ineligible: "why is that greyed out" is a
 		# question about the moment the choice was built.
-		var offered: Array = []
-		for o in options:
-			offered.append({"id": o["id"], "eligible": o["eligible"]})
-		_emit({"type": "choice", "group": group["id"], "options": offered})
+		if _host.tracing:
+			var offered: Array = []
+			for o in options:
+				offered.append({"id": o["id"], "eligible": o["eligible"]})
+			_emit({"type": "choice", "group": group["id"], "options": offered})
 		_pending = {"group_id": group["id"], "options": options, "by_id": by_id}
 		return
 	for f in fallbacks:
@@ -687,7 +704,8 @@ func _setup_choice(group: Dictionary) -> void:
 			return
 	# Nothing takeable and no eligible fallback: the choice runs dry and the flow walks past
 	# it. The behaviour is unchanged; this makes the silent fall-through observable.
-	_emit({"type": "dry", "group": group["id"]})
+	if _host.tracing:
+		_emit({"type": "dry", "group": group["id"]})
 	# Beside the log, not instead of it: the callback is live feedback a host acts on, the
 	# log is an audit read afterwards, and a shipped game runs with the log off and this
 	# still wired. Parity with the JS runtime's onDryChoice, which the ports never had.
@@ -705,7 +723,8 @@ func _resolve_jump(jump) -> void:
 
 
 func _enter_target(to: String, mode: String) -> void:
-	_emit({"type": "jump", "to": to, "mode": mode})
+	if _host.tracing:
+		_emit({"type": "jump", "to": to, "mode": mode})
 	if to == "END":
 		_flow_ended = true
 		_stack = []
@@ -753,6 +772,8 @@ func _select_child(group: Dictionary):
 	var o: Dictionary = group.get("options", {})
 	# The reasoning goes in the entry: every child looked at, with its verdict.
 	var trace := func(picked):
+		if not _host.tracing:
+			return picked
 		var ev := {"type": "select", "group": group["id"],
 			"selector": sel if sel != "" else "default", "children": verdicts,
 			"picked": picked["id"] if picked != null else null}
@@ -963,10 +984,11 @@ func _run_effects(effects: Array, owner: String) -> void:
 		if refused != "":
 			_report_error("effect", owner, e["value"], refused)
 			continue
-		var ev := {"type": "write", "target": e["target"], "value": v}
-		if prev != null:
-			ev["prev"] = prev
-		_emit(ev)
+		if _host.tracing:
+			var ev := {"type": "write", "target": e["target"], "value": v}
+			if prev != null:
+				ev["prev"] = prev
+			_emit(ev)
 
 
 ## Whether a node's condition holds. A condition that fails to evaluate counts as false, and is reported.
@@ -999,6 +1021,8 @@ func _report_error(kind: String, node: String, expr, message: String) -> void:
 		(on_error as Callable).call(err)
 	else:
 		push_warning("Patterplay: %s on %s in flow '%s' failed, played through: %s" % [kind, node, id, message])
+	if not _host.tracing:
+		return
 	var ev := {"type": "diagnostic", "kind": kind, "node": node, "message": message}
 	if source != "":
 		ev["source"] = source

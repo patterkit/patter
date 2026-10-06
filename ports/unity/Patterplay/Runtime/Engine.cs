@@ -301,6 +301,8 @@ namespace Patterkit.Patterplay
         /// <summary>Host scopes this engine registered from EngineOptions.HostScopes bindings.</summary>
         public List<string> BoundTokens = new List<string>();
         public List<PropertyDecl> PatterSharedDecls;
+        /// <summary>Each declaration set's quality ladders, built on first use (see Flow.Ladders).</summary>
+        public readonly Dictionary<string, Dictionary<string, List<string>>> QualityLadders = new Dictionary<string, Dictionary<string, List<string>>>();
         public List<PropertyDecl> PatterLocalDecls;
         public HashSet<string> PatterSharedNames;
         public Dictionary<string, HashSet<string>> SceneSharedNames;
@@ -361,6 +363,10 @@ namespace Patterkit.Patterplay
         /// unless the run was opened with Log = true. A flow's own log stays flow-local; this is
         /// the only place a story spanning several flows reads as one sequence.</summary>
         public IReadOnlyList<LogEntry> Log() => _engineLog;
+
+        /// <summary>How many times each node has been entered across every flow, by node id: the shared count.
+        /// With a flow's own GetVisitCounts, every visit count the run keeps, read without a save.</summary>
+        public IReadOnlyDictionary<string, int> GetVisitCounts() => _host.SharedVisits;
 
         /// <summary>Drop the retained entries. Seq does NOT restart, so two reads either side of
         /// a clear still agree about what came first.</summary>

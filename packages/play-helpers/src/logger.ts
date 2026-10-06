@@ -85,11 +85,10 @@ const gd = (data: unknown): string => (data ? ` gameData=${JSON.stringify(data)}
 /** The visit counts, which live in no bag and so have no audit hook: the kernel diffs
  *  these on capture, exactly as the whole logger used to work. */
 function visitState(engine: Engine): StateSnapshot {
-  const save = engine.saveGame();
   const out: StateSnapshot = {};
-  for (const [id, n] of Object.entries(save.sharedVisits)) out[`visit:${id}`] = n;
-  for (const [fid, snap] of Object.entries(save.flows)) {
-    for (const [id, n] of Object.entries(snap.visits)) out[`${fid}/visit:${id}`] = n;
+  for (const [id, n] of Object.entries(engine.getVisitCounts())) out[`visit:${id}`] = n;
+  for (const flow of engine.flows()) {
+    for (const [id, n] of Object.entries(flow.getVisitCounts())) out[`${flow.id}/visit:${id}`] = n;
   }
   return out;
 }

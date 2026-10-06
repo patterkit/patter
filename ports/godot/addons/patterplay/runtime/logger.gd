@@ -63,13 +63,14 @@ static func snapshot_state(engine) -> Dictionary:
 ## The visit counts, which live in no bag and so have no audit hook: the core diffs these on
 ## capture(), which is all this logger used to do for everything.
 static func _visit_state(engine) -> Dictionary:
-	var save: Dictionary = engine.save_game()
 	var out := {}
-	for id in save["sharedVisits"]:
-		out["visit:%s" % id] = save["sharedVisits"][id]
-	for fid in save["flows"]:
-		for id in save["flows"][fid]["visits"]:
-			out["%s/visit:%s" % [fid, id]] = save["flows"][fid]["visits"][id]
+	var shared: Dictionary = engine.get_visit_counts()
+	for id in shared:
+		out["visit:%s" % id] = shared[id]
+	for flow in engine.flows():
+		var own: Dictionary = flow.get_visit_counts()
+		for id in own:
+			out["%s/visit:%s" % [flow.id, id]] = own[id]
 	return out
 
 

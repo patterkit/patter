@@ -17,6 +17,8 @@ same runtime behaviour.
   before it existed.
 - **`PatterDebugLink.state()`, `build()`, and `url()`**, the names every other runtime uses for what the link is
   doing.
+- **`get_visit_counts()` on `PatterEngine` and `PatterFlow`**, as on every runtime: visit counts read without a
+  save.
 
 ### Changed
 
@@ -34,6 +36,9 @@ same runtime behaviour.
   now return null, not `""`. Code that compared them with `""` should compare with null;
   `PatterDebugLink.observe` takes either.
 - **`apply_live_bundle`'s result carries the `bundle` now playing**, as every other runtime's does.
+- **Less work per step.** A decision's log entry is built only while the log is on or something is tracing; a
+  quality's stage ladder is looked up once rather than scanned for on every comparison; and the state logger
+  reads visit counts directly rather than saving the whole game.
 
 ### Deprecated
 

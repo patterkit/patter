@@ -19,6 +19,8 @@ extends RefCounted
 ## The run's decision trace (engine.log()). Off unless asked for: a shipped game should pay nothing
 ## for a surface it never reads.
 var log_enabled: bool = false
+## Each declaration set's quality ladders, built on first use (see PatterFlow._ladders).
+var quality_ladders: Dictionary = {}
 ## True when anything takes the decisions: the log, or an engine.on_trace handler. Flows skip building
 ## entries otherwise.
 var tracing: bool = false

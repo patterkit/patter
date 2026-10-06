@@ -279,6 +279,12 @@ func log() -> Array:
 	return _engine_log
 
 
+## How many times each node has been entered across every flow, by node id: the shared count. With a
+## flow's own get_visit_counts, every visit count the run keeps, read without a save. A copy.
+func get_visit_counts() -> Dictionary:
+	return _host.shared_visits.duplicate()
+
+
 ## Drop the retained entries. `seq` does NOT restart, so two reads either side of a clear
 ## still agree about what came first.
 func clear_log() -> void:

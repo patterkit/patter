@@ -287,6 +287,13 @@ FString UPatterFlow::StripCaptions(const FString& Text)
 	return Flow ? Ue(Flow->stripCaptions(Std(Text))) : Text;
 }
 
+TMap<FString, int32> UPatterFlow::GetVisitCounts() const
+{
+	TMap<FString, int32> Out;
+	if (Flow) for (const auto& KV : Flow->getVisitCounts()) Out.Add(Ue(KV.first), KV.second);
+	return Out;
+}
+
 // ----- UPatterEngine ----------------------------------------------------------
 
 UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)
@@ -422,6 +429,13 @@ void UPatterEngine::SetProperty(const FString& Ref, const FPatterValue& Value)
 	if (!Engine) return;
 	try { Engine->setProperty(Std(Ref), FromUeValue(Value)); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
+TMap<FString, int32> UPatterEngine::GetVisitCounts() const
+{
+	TMap<FString, int32> Out;
+	if (Engine) for (const auto& KV : Engine->getVisitCounts()) Out.Add(Ue(KV.first), KV.second);
+	return Out;
 }
 
 FString UPatterEngine::Locale() const { return Engine ? Ue(Engine->locale()) : FString(); }

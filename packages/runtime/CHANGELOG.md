@@ -42,6 +42,14 @@ version number always means the same runtime behaviour. This package is versione
   with.
 - **A bundle-description section in the conformance corpus.** What `describeBundle` says about one bundle, field
   for field, held on every runtime.
+- **`getVisitCounts()` on the engine and on a flow**, on every runtime: how many times each node has been
+  entered, across every flow or in this one, read without a save.
+
+### Changed
+
+- **Less work per step.** A decision's log entry is built only while the log is on or something is tracing, and
+  a quality's stage ladder is looked up once per set of declarations rather than scanned for on every
+  comparison.
 
 ### Deprecated
 

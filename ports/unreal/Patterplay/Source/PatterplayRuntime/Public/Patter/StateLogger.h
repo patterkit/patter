@@ -80,13 +80,12 @@ namespace patter
      *  these on capture(), which is all this logger used to do for everything. */
     inline StateSnapshot visitState(Engine& engine)
     {
-        SaveGame save = engine.saveGame();
         StateSnapshot out;
-        for (const auto& kv : save.sharedVisits) out.set("visit:" + kv.first, PatterValue::Num(kv.second));
-        for (const auto& fkv : save.flows)
+        for (const auto& kv : engine.getVisitCounts()) out.set("visit:" + kv.first, PatterValue::Num(kv.second));
+        for (Flow* f : engine.flows())
         {
-            for (const auto& kv : fkv.second.visits)
-                out.set(fkv.first + "/visit:" + kv.first, PatterValue::Num(kv.second));
+            for (const auto& kv : f->getVisitCounts())
+                out.set(f->id() + "/visit:" + kv.first, PatterValue::Num(kv.second));
         }
         return out;
     }

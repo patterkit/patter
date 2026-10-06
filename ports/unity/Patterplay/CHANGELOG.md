@@ -15,6 +15,7 @@ same runtime behaviour.
   before it existed.
 - **A gameData field's `Purpose`**, read from the bundle and carried in its description, as on every other
   runtime.
+- **`GetVisitCounts()` on `Engine` and `Flow`**, as on every runtime: visit counts read without a save.
 
 ### Changed
 
@@ -25,6 +26,11 @@ same runtime behaviour.
   `Option`, no longer in `Picked`. The corpus now holds every runtime's log to the same entries.
 - **`Engine.BuildId` is empty, not null, for a bundle compiled without a hash**, as on every other runtime.
 - **The corpus now holds the bundle description to the same fields on every runtime.** Unity's already matched it.
+- **Less work per step, and in the editor.** A decision's log entry is built only while the log is on or
+  something is tracing; a quality's stage ladder is looked up once rather than scanned for on every comparison;
+  one random-number generator serves a flow rather than a new one per draw; and the state logger and the Runtime
+  State window read visit counts directly rather than saving the whole game, which the window did on every
+  repaint.
 
 ### Deprecated
 
