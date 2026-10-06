@@ -70,94 +70,14 @@
 
     <!-- Delete Scene (File > Delete Scene… / right-click a nav row) is the shell's dialog frame (renderer.ts). -->
 
-    <dialog id="scene-props" class="identity scene-props-dialog">
-      <form method="dialog" class="identity-form">
-        <h2 class="identity-title">Scene properties</h2>
-        <p class="settings-note"><code>@scene</code> properties exist only within this scene. Tick Temporary to reset one on every entry.</p>
-        <div id="sp-host"></div>
-        <div class="identity-actions">
-          <button type="button" id="sp-cancel" class="btn" value="cancel">Cancel</button>
-          <button id="sp-save" class="btn primary" value="save">Save</button>
-        </div>
-      </form>
-    </dialog>
 
-    <dialog id="doc-notes" class="identity doc-dialog">
-      <form method="dialog" class="identity-form">
-        <h2 class="identity-title">Notes</h2>
-        <p class="settings-note">A VO note travels with the voice script and a Localisation note with the localisation handoff. An untyped note stays in the editor.</p>
-        <div id="doc-host" class="doc-host"></div>
-        <div class="identity-actions">
-          <button type="button" id="doc-close" class="btn primary" value="done">Done</button>
-        </div>
-      </form>
-    </dialog>
 
-    <dialog id="vo-export" class="identity vo-dialog">
-      <form method="dialog" class="identity-form">
-        <h2 class="identity-title">Export voice script</h2>
-        <p class="settings-note">One row per spoken line, with its scope and VO notes.</p>
-        <label class="settings-toggle"><input id="vo-everything" type="checkbox" /><span>Export everything<small>Includes lines not yet marked ready to record.</small></span></label>
-        <p class="settings-note" id="vo-status"></p>
-        <div class="identity-actions">
-          <button type="button" id="vo-cancel" class="btn" value="cancel">Cancel</button>
-          <button type="button" id="vo-export-btn" class="btn primary">Export…</button>
-        </div>
-      </form>
-    </dialog>
 
-    <dialog id="loc" class="identity loc-dialog">
-      <form method="dialog" class="identity-form">
-        <h2 class="identity-title">Localisation</h2>
-        <p class="settings-note">Export strings for translation, then import the translated file back. Character display names are included.</p>
-        <div class="loc-row">
-          <label class="identity-field">Format
-            <select id="loc-format" class="insp-select">
-              <option value="po">gettext PO / POT</option>
-              <option value="xlsx">Excel (.xlsx)</option>
-              <option value="json">JSON</option>
-            </select>
-          </label>
-          <label class="identity-field">Language
-            <select id="loc-locale" class="insp-select"></select>
-          </label>
-        </div>
-        <p class="settings-note" id="loc-status"></p>
-        <div class="identity-actions">
-          <button type="button" id="loc-import" class="btn">Import…</button>
-          <button type="button" id="loc-export" class="btn">Export…</button>
-          <button type="button" id="loc-close" class="btn primary" value="done">Close</button>
-        </div>
-      </form>
-    </dialog>
 
-    <dialog id="report" class="identity report-dialog">
-      <div class="identity-form report-form">
-        <h2 class="identity-title">Production information</h2>
-        <div id="report-scroll" class="report-scroll">
-          <div id="report-host" class="report-host"></div>
-          <button type="button" id="report-more" class="report-more" aria-label="Scroll for more" data-tip="More below">
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 6 L8 11 L13 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-        <div class="identity-actions">
-          <button type="button" id="report-export" class="btn">Export to spreadsheet…</button>
-          <button type="button" id="report-close" class="btn primary" value="done">Close</button>
-        </div>
-      </div>
-    </dialog>
 
-    <dialog id="set-start-prompt" class="identity">
-      <form method="dialog" class="identity-form">
-        <h2 class="identity-title">Where does your story start?</h2>
-        <p class="settings-note">You can change this later in Project Settings.</p>
-        <label class="identity-field">Start scene<select id="start-prompt-scene" class="field"></select></label>
-        <div class="identity-actions">
-          <button type="submit" value="cancel" class="btn">Cancel</button>
-          <button type="submit" value="set" class="btn primary">Set start</button>
-        </div>
-      </form>
-    </dialog>
+
+    <!-- Scene Properties, Notes, Export Voice Script, Localisation, Production Information and the start prompt
+         are the shell's dialog frame, built in renderer.ts each time they open. -->
 
     <script type="module" src="./dev.ts"></script>
   </body>

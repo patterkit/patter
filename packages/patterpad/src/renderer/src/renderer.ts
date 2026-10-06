@@ -241,28 +241,16 @@ const propsDocHostEl = $("props-doc-host");
 const propsDocWorldEl = $<HTMLButtonElement>("props-doc-world");
 propsDocWorldEl.addEventListener("click", () => void openProjectSettings("world"));
 const debugLink = mountDebugLink(); // live debug link control (#181): the bottom-right connect icon
-const scenePropsDialogEl = $<HTMLDialogElement>("scene-props");
-const spHost = $("sp-host");
-$<HTMLButtonElement>("sp-cancel").addEventListener("click", () => scenePropsDialogEl.close("cancel"));
-const reportDialogEl = $<HTMLDialogElement>("report");
-const reportHost = $("report-host");
-// The report body overflows its 70vh cap on most projects; keep the wrapper's edge scrims + "More
-// below" pill in sync with where the scroll actually is (see .report-scroll in shell.css).
-const reportScroll = $("report-scroll");
-const reportMoreBtn = $<HTMLButtonElement>("report-more");
-const updateReportScrollHints = (): void => {
-  reportScroll.classList.toggle("has-below", reportHost.scrollHeight - reportHost.clientHeight - reportHost.scrollTop > 4);
-  reportScroll.classList.toggle("has-above", reportHost.scrollTop > 4);
-};
-reportHost.addEventListener("scroll", updateReportScrollHints);
-new ResizeObserver(updateReportScrollHints).observe(reportHost); // window resizes move the 70vh cap
-reportMoreBtn.addEventListener("click", () => reportHost.scrollBy({ top: reportHost.clientHeight * 0.8, behavior: "smooth" }));
-$<HTMLButtonElement>("report-close").addEventListener("click", () => reportDialogEl.close("done"));
-const reportExportBtn = $<HTMLButtonElement>("report-export");
-reportExportBtn.addEventListener("click", () => void exportProductionInfo(reportExportBtn));
-// Set-start prompt (#159): raised by Play from Start / Coverage when the project has no start point.
-const startPromptDialog = $<HTMLDialogElement>("set-start-prompt");
-const startPromptSel = $<HTMLSelectElement>("start-prompt-scene");
+// The six modal dialogs below (scene properties, Notes, the voice script, localisation, Production
+// Information, the start prompt) are built on the shell's `dialogFrame` each time they open, like every
+// other dialog in the family; none of them lives in index.html any more.
+
+/** A button for a dialog's actions row. */
+function dialogButton(label: string, primary = false): HTMLButtonElement {
+  const b = el("button", primary ? "btn primary" : "btn", label);
+  b.type = "button";
+  return b;
+}
 
 /** Resolve the project's start point, prompting (and persisting) when it is unset. Returns the start, or
  *  null if the author cancelled / there are no scenes. */
@@ -271,37 +259,29 @@ async function ensureProjectStart(): Promise<{ scene: string; block?: string } |
   const s = await window.patter.readSettings();
   if (s?.start?.scene) return s.start;
   if (!project.scenes.length) return null;
-  startPromptSel.replaceChildren();
-  for (const sc of project.scenes) startPromptSel.append(new Option(sc.name, sc.id));
+  const scenes = project.scenes;
+  // Raised by Play from Start / Coverage when the project has no start point (#159).
   const chosen = await new Promise<string | null>((resolve) => {
-    const onClose = (): void => {
-      startPromptDialog.removeEventListener("close", onClose);
-      resolve(startPromptDialog.returnValue === "set" ? (startPromptSel.value || null) : null);
-    };
-    startPromptDialog.addEventListener("close", onClose);
-    startPromptDialog.showModal();
+    let answer: string | null = null;
+    const frame = dialogFrame({ title: "Where does your story start?", sub: "You can change this later in Project Settings.", onClose: () => resolve(answer) });
+    const sel = el("select", "field");
+    for (const sc of scenes) sel.append(new Option(sc.name, sc.id));
+    const field = el("label", "identity-field", "Start scene");
+    field.append(sel);
+    frame.body.append(field);
+    const cancel = dialogButton("Cancel");
+    const set = dialogButton("Set start", true);
+    cancel.addEventListener("click", () => frame.close());
+    set.addEventListener("click", () => { answer = sel.value || null; frame.close(); });
+    frame.actions.append(cancel, set);
+    frame.open();
+    set.focus();
   });
   if (!chosen) return null;
   const res = await window.patter.setStart({ scene: chosen });
   if (res.project) project = res.project;
   return { scene: chosen };
 }
-const locDialogEl = $<HTMLDialogElement>("loc");
-const locFormatSel = $<HTMLSelectElement>("loc-format");
-const locLocaleSel = $<HTMLSelectElement>("loc-locale");
-const locStatus = $("loc-status");
-$<HTMLButtonElement>("loc-close").addEventListener("click", () => locDialogEl.close("done"));
-$<HTMLButtonElement>("loc-export").addEventListener("click", () => void localisationExport());
-$<HTMLButtonElement>("loc-import").addEventListener("click", () => void localisationImport());
-// (Export / Import Localisation lives on the File menu, not duplicated in the Language settings tab.)
-const voDialogEl = $<HTMLDialogElement>("vo-export");
-const voEverythingInput = $<HTMLInputElement>("vo-everything");
-const voStatus = $("vo-status");
-$<HTMLButtonElement>("vo-cancel").addEventListener("click", () => voDialogEl.close("cancel"));
-$<HTMLButtonElement>("vo-export-btn").addEventListener("click", () => void voiceScriptExport());
-const docDialogEl = $<HTMLDialogElement>("doc-notes");
-const docHost = $("doc-host");
-$<HTMLButtonElement>("doc-close").addEventListener("click", () => docDialogEl.close("done"));
 let project: OpenedProject | null = null;
 let currentSceneId: string | null = null;
 let surface: SurfaceHandle | null = null;
@@ -1176,18 +1156,28 @@ const docVisible = (cls: string): boolean => cls === "" || cls === "everyone" ||
 /** Open the documentation-note editor (modal) for a node - from the surface note icon or a right-click
  *  "Note…". `kind` (the node kind) narrows which classes are offered. Persists + re-surfaces on close. */
 function openNoteEditor(id: string, _anchor: HTMLElement, kind?: string): void {
-  mountDocEditor(docHost, {
+  // A modal rather than a cramped anchored popover, so there is room to type; a text area per class.
+  const frame = dialogFrame({
+    title: "Notes", className: "doc-dialog",
+    onClose: () => {
+      pushDocNotes();   // reflect the edit in the script (the note icon appears / updates / clears)
+      lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // flip the inspector note icon
+      void persistDocs();
+    },
+  });
+  const host = el("div", "doc-host");
+  frame.body.append(
+    el("p", "settings-note", "A VO note travels with the voice script and a Localisation note with the localisation handoff. An untyped note stays in the editor."),
+    host,
+  );
+  mountDocEditor(host, {
     lines: docMap[id] ?? [], classes: docClassesForKind(kind),
     onChange: (lines) => { if (lines.length) docMap[id] = lines; else delete docMap[id]; docsDirty = true; },
   });
-  const onClose = (): void => {
-    docDialogEl.removeEventListener("close", onClose);
-    pushDocNotes();   // reflect the edit in the script (the note icon appears / updates / clears)
-    lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // flip the inspector note icon
-    void persistDocs();
-  };
-  docDialogEl.addEventListener("close", onClose);
-  docDialogEl.showModal();
+  const done = dialogButton("Done", true);
+  done.addEventListener("click", () => frame.close());
+  frame.actions.append(done);
+  frame.open();
 }
 
 /** Build the surface's visible-notes map from the scene's docMap, applying the class filter. */
@@ -2301,10 +2291,34 @@ async function openReport(): Promise<void> {
   if (surface) await save(); // persist pending edits so the report reflects them, not the last save
   const data = await window.patter.report();
   if (!data) return;
-  renderReport(reportHost, data);
-  reportHost.scrollTop = 0;
-  reportDialogEl.showModal();
-  updateReportScrollHints(); // measure only after showModal - a hidden dialog reads clientHeight 0
+  const frame = dialogFrame({ title: "Production information", className: "report-dialog", onClose: () => observer.disconnect() });
+  // The report usually overflows its 70vh body; the wrapper carries edge scrims and a "More below" pill so
+  // the cut-off is unmistakable (the thin app scrollbar alone is too quiet here). See .report-scroll.
+  const scroll = el("div", "report-scroll");
+  const host = el("div", "report-host");
+  const more = el("button", "report-more");
+  more.type = "button";
+  more.setAttribute("aria-label", "Scroll for more");
+  more.dataset.tip = "More below";
+  more.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 6 L8 11 L13 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  scroll.append(host, more);
+  frame.body.append(scroll);
+  renderReport(host, data);
+  const hints = (): void => {
+    scroll.classList.toggle("has-below", host.scrollHeight - host.clientHeight - host.scrollTop > 4);
+    scroll.classList.toggle("has-above", host.scrollTop > 4);
+  };
+  host.addEventListener("scroll", hints);
+  const observer = new ResizeObserver(hints); // window resizes move the 70vh cap
+  observer.observe(host);
+  more.addEventListener("click", () => host.scrollBy({ top: host.clientHeight * 0.8, behavior: "smooth" }));
+  const exportBtn = dialogButton("Export to spreadsheet…");
+  exportBtn.addEventListener("click", () => void exportProductionInfo(exportBtn));
+  const close = dialogButton("Close", true);
+  close.addEventListener("click", () => frame.close());
+  frame.actions.append(exportBtn, close);
+  frame.open();
+  hints(); // measure only once open - a hidden dialog reads clientHeight 0
 }
 
 /** Review > Coverage Test…: open the detached coverage window (prompting for a project start first if
@@ -2319,16 +2333,29 @@ async function openCoverage(): Promise<void> {
 function openVoiceScript(): void {
   if (!project) return;
   if (!project.voiced) { toast("Voice scripts are only available for a voiced project (Project Settings ▸ Voiced)."); return; } // #206
-  voEverythingInput.checked = false;
-  voStatus.textContent = "";
-  voDialogEl.showModal();
-}
-async function voiceScriptExport(): Promise<void> {
-  voStatus.textContent = "Exporting…";
-  const res = await withJob("Exporting the voice script…", () => window.patter.exportVoiceScript(voEverythingInput.checked));
-  if (res.ok) { voDialogEl.close(); toast(`Voice script exported to ${res.path}`, "ok"); } // done -> close, confirm via toast
-  else if (res.canceled) voStatus.textContent = "";
-  else voStatus.textContent = `Export failed: ${res.error ?? "unknown error"}`;
+  // A recording spreadsheet (spec §16).
+  const frame = dialogFrame({ title: "Export voice script", sub: "One row per spoken line, with its scope and VO notes.", className: "vo-dialog" });
+  const everything = el("input");
+  everything.type = "checkbox";
+  const toggle = el("label", "settings-toggle");
+  const words = el("span", undefined, "Export everything");
+  words.append(el("small", undefined, "Includes lines not yet marked ready to record."));
+  toggle.append(everything, words);
+  const status = el("p", "settings-note");
+  frame.body.append(toggle, status);
+  const cancel = dialogButton("Cancel");
+  const go = dialogButton("Export…", true);
+  cancel.addEventListener("click", () => frame.close());
+  go.addEventListener("click", () => void (async () => {
+    status.textContent = "Exporting…";
+    const res = await withJob("Exporting the voice script…", () => window.patter.exportVoiceScript(everything.checked));
+    if (res.ok) { frame.close(); toast(`Voice script exported to ${res.path}`, "ok"); } // done -> close, confirm via toast
+    else if (res.canceled) status.textContent = "";
+    else status.textContent = `Export failed: ${res.error ?? "unknown error"}`;
+  })());
+  frame.actions.append(cancel, go);
+  frame.open();
+  go.focus();
 }
 
 /** File > Export / Import Localisation (also the button in the Language settings tab): a modal over the
@@ -2337,32 +2364,46 @@ async function openLocalisation(): Promise<void> {
   if (!project) return; // nothing open
   const s = await window.patter.readSettings();
   if (!s) return;
-  locLocaleSel.replaceChildren();
-  locLocaleSel.append(new Option("Template (source, untranslated)", ""));
-  for (const loc of s.locales) if (loc !== s.localeDefault) locLocaleSel.append(new Option(loc, loc));
-  locStatus.textContent = "";
-  locDialogEl.showModal();
-}
+  const frame = dialogFrame({ title: "Localisation", sub: "Export strings for translation, then import the translated file back. Character display names are included.", className: "loc-dialog" });
+  const formatSel = el("select", "insp-select");
+  formatSel.append(new Option("gettext PO / POT", "po"), new Option("Excel (.xlsx)", "xlsx"), new Option("JSON", "json"));
+  const localeSel = el("select", "insp-select");
+  localeSel.append(new Option("Template (source, untranslated)", ""));
+  for (const loc of s.locales) if (loc !== s.localeDefault) localeSel.append(new Option(loc, loc));
+  const formatField = el("label", "identity-field", "Format");
+  formatField.append(formatSel);
+  const localeField = el("label", "identity-field", "Language");
+  localeField.append(localeSel);
+  const row = el("div", "loc-row");
+  row.append(formatField, localeField);
+  const status = el("p", "settings-note");
+  frame.body.append(row, status);
 
-async function localisationExport(): Promise<void> {
-  const format = locFormatSel.value as "json" | "xlsx" | "po";
-  const locale = locLocaleSel.value || undefined; // "" = template
-  locStatus.textContent = "Exporting…";
-  const res = await withJob("Exporting localisation…", () => window.patter.exportLoc({ format, locale }));
-  if (res.ok) locStatus.textContent = `Exported to ${res.path}`;
-  else if (res.canceled) locStatus.textContent = "";
-  else locStatus.textContent = `Export failed: ${res.error ?? "unknown error"}`;
-}
-
-async function localisationImport(): Promise<void> {
-  const fallback = locLocaleSel.value || undefined; // used when the file carries no locale (Excel)
-  locStatus.textContent = "Importing…";
-  const res = await window.patter.importLoc(fallback);
-  if (res.ok) {
-    locStatus.textContent = `Imported ${res.updated ?? 0} string(s) for ${res.locale} across ${res.files ?? 0} scene(s).`;
-    await refreshProblems(); // the bundle is now stale relative to the new strings
-  } else if (res.canceled) locStatus.textContent = "";
-  else locStatus.textContent = `Import failed: ${res.error ?? "unknown error"}`;
+  const importBtn = dialogButton("Import…");
+  const exportBtn = dialogButton("Export…");
+  const close = dialogButton("Close", true);
+  exportBtn.addEventListener("click", () => void (async () => {
+    const format = formatSel.value as "json" | "xlsx" | "po";
+    const locale = localeSel.value || undefined; // "" = template
+    status.textContent = "Exporting…";
+    const res = await withJob("Exporting localisation…", () => window.patter.exportLoc({ format, locale }));
+    if (res.ok) status.textContent = `Exported to ${res.path}`;
+    else if (res.canceled) status.textContent = "";
+    else status.textContent = `Export failed: ${res.error ?? "unknown error"}`;
+  })());
+  importBtn.addEventListener("click", () => void (async () => {
+    const fallback = localeSel.value || undefined; // used when the file carries no locale (Excel)
+    status.textContent = "Importing…";
+    const res = await window.patter.importLoc(fallback);
+    if (res.ok) {
+      status.textContent = `Imported ${res.updated ?? 0} string(s) for ${res.locale} across ${res.files ?? 0} scene(s).`;
+      await refreshProblems(); // the bundle is now stale relative to the new strings
+    } else if (res.canceled) status.textContent = "";
+    else status.textContent = `Import failed: ${res.error ?? "unknown error"}`;
+  })());
+  close.addEventListener("click", () => frame.close());
+  frame.actions.append(importBtn, exportBtn, close);
+  frame.open();
 }
 
 /** File > Export Production Info (also the button in the report view): render the report to an xlsx and
@@ -2828,13 +2869,26 @@ async function shareScopes(): Promise<void> {
 
 /** Scene inspector > Properties: edit the open scene's local `@scene` property declarations. Persists
  *  through the surface (the scene doc's raw, round-tripped on save) and refreshes the condition
- *  catalogue so the new props are usable immediately. */
-function openSceneProps(): void {
-  if (!surface) return;
-  const handle = mountProperties(spHost, surface.sceneProps(), { scope: "scene" });
-  const onClose = (): void => {
-    scenePropsDialogEl.removeEventListener("close", onClose);
-    if (scenePropsDialogEl.returnValue !== "save" || !surface) return;
+ *  catalogue so the new props are usable immediately. Returns the list's host, so "Go to definition" can
+ *  reveal a row in it, or null with no scene open. */
+function openSceneProps(): HTMLElement | null {
+  if (!surface) return null;
+  const frame = dialogFrame({ title: "Scene properties", className: "scene-props-dialog" });
+  const note = el("p", "settings-note");
+  note.append(el("code", undefined, "@scene"), " properties exist only within this scene. Tick Temporary to reset one on every entry.");
+  const host = el("div");
+  frame.body.append(note, host);
+  const handle = mountProperties(host, surface.sceneProps(), { scope: "scene" });
+  const cancel = dialogButton("Cancel");
+  const saveBtn = dialogButton("Save", true);
+  cancel.addEventListener("click", () => frame.close());
+  saveBtn.addEventListener("click", () => { apply(); frame.close(); });
+  frame.actions.append(cancel, saveBtn);
+  frame.open();
+  return host;
+
+  function apply(): void {
+    if (!surface) return;
     const next = handle.value();
     surface.setSceneProps(next); // dispatches a doc edit -> the surface's onChange marks dirty + revalidates
     sceneProps = [
@@ -2843,9 +2897,7 @@ function openSceneProps(): void {
     ];
     lastInspectorSig = null; // the count isn't in the level signature - force the Scene row to re-render
     if (lastInspectorCtx) showInspector(lastInspectorCtx);
-  };
-  scenePropsDialogEl.addEventListener("close", onClose);
-  scenePropsDialogEl.showModal();
+  }
 }
 
 /** The folder a project name will be saved as (mirrors the main process's patterFolderName, for preview). */
@@ -3009,7 +3061,7 @@ async function boot(): Promise<void> {
     const ref = scope === "patter" ? `@${name}` : `@${scope}.${name}`;
     const go: PropertyAction | null =
       scope === "patter" ? { label: "Go to definition", run: () => void showPropertiesDoc().then(() => revealRowWhenReady(propsDocHostEl, name)) }
-      : scope === "scene" ? { label: "Go to definition", run: () => { openSceneProps(); void revealRowWhenReady(spHost, name); } }
+      : scope === "scene" ? { label: "Go to definition", run: () => { const host = openSceneProps(); if (host) void revealRowWhenReady(host, name); } }
       : scope === "world" ? { label: "Go to definition", run: () => void openProjectSettings("world").then(() => { if (live.worldHost) void revealRowWhenReady(live.worldHost, name); }) }
       : null;
     return [...(go ? [go] : []), { label: "Find usages", run: () => openPropertyUsage(ref) }];

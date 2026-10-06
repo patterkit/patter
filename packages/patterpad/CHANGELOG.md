@@ -27,6 +27,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   the prompt to find Storyletter. They follow the app's theme, and their buttons are in the same order as its
   other dialogs.
 - **"Can't delete this scene" has an OK button.** It had a lone Cancel.
+- **Six more dialogs match the rest:** Scene Properties, Notes, Export Voice Script, Localisation, Production
+  Information, and "Where does your story start?". They now share the frame, title and button style of
+  Patterpad's other dialogs.
 
 ## [0.25.0] - 2026-10-06
 

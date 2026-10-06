@@ -469,14 +469,8 @@
 }
 .overview-scene:hover { background: color-mix(in oklab, var(--accent) 8%, transparent); border-color: var(--line); }
 
-/* First-run identity dialog. */
-.identity { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 0; max-width: 416px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-3); animation: var(--anim-panel-in); }
-/* Dim derived from --ink (palette-aware), matching the surface's confirm-overlay scrim rather than a fixed black. */
-.identity::backdrop { background: color-mix(in oklab, var(--ink) 28%, transparent); backdrop-filter: blur(3px); animation: var(--anim-backdrop-in); }
-.identity-form { display: flex; flex-direction: column; gap: 13px; padding: 22.5px; }
-/* The auto-update prompts are the shell's `showUpdaterDialog` (updater.css), on the dialog frame. */
-.identity-title { margin: 0; font: 700 19px var(--font-read); }
-.identity-sub { margin: 0; color: var(--muted); font-size: 13.5px; }
+/* A labelled field inside a dialog. Every dialog is on the shell's frame now (dialog.css), so only the
+   field and its hint are this app's; the name is left over from the first-run identity dialog. */
 .identity-field { display: flex; flex-direction: column; gap: 4px; font: 600 12px var(--font-ui); color: var(--muted); }
 .identity-field input { font: 16px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 9px; }
 .identity-field input:focus-visible { border-color: var(--accent); outline-offset: 0; }
@@ -484,7 +478,6 @@
    and shrank again as a `small`, reading as a squashed label rather than as prose. Sized and weighted
    here to match the shell's own `.shell-ident-hint`. */
 .identity-field .identity-hint { font: 11.5px/1.45 var(--font-ui); color: var(--muted); margin-top: 2px; }
-.identity-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6.5px; }
 
 /* New-project dialog (reuses the identity dialog chrome): a quiet preview of the .patter folder name. */
 /* New Project's own fields, in the kit gallery's details panel (the shell's kit-gallery.css). */
@@ -500,9 +493,8 @@
 .settings-dialog { width: min(1024px, 94vw); }
 .settings-body { min-height: 480px; }
 .settings-tabs > * { flex: none; } /* tab BUTTONS would crush on a short window instead of scrolling (#30) */
-/* Scene properties (the inspector's Scene section) keeps the identity chrome at a list's width. */
-.scene-props-dialog { width: 94vw; max-width: 640px; }
-.scene-props-dialog .identity-form { gap: 9.5px; }
+/* Scene properties (the inspector's Scene section), on the shell's dialog frame at a list's width. */
+.scene-props-dialog { --dialog-width: 640px; }
 /* Audio Status tab: the ladder / folders / scratch below the "Track Audio Status?" switch, dimmed + inert
    (the `inert` attribute blocks interaction) while tracking is off (#206). */
 .sp-audio-body.is-disabled { opacity: 0.45; }
@@ -534,7 +526,7 @@ input::placeholder, textarea::placeholder {
 }
 
 /* Documentation Notes modal (one text area per class). */
-.doc-dialog { width: 92vw; max-width: 544px; }
+.doc-dialog { --dialog-width: 544px; }
 .doc-host { display: flex; flex-direction: column; gap: 11px; max-height: 60vh; overflow: auto; }
 .doc-class { display: flex; flex-direction: column; gap: 3px; }
 .doc-class-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
@@ -543,8 +535,8 @@ input::placeholder, textarea::placeholder {
 .doc-add { align-self: flex-start; font: 13px var(--font-ui); }
 
 /* Localisation modal: format + language pickers side by side. */
-.loc-dialog { width: 92vw; max-width: 512px; }
-.vo-dialog { width: 92vw; max-width: 480px; }
+.loc-dialog { --dialog-width: 512px; }
+.vo-dialog { --dialog-width: 480px; }
 
 /* Editable script export + reimport (editable-dialogs.ts). The range choice leads, larger than the rest:
    each half carries its line count under its label. */
@@ -575,8 +567,7 @@ input::placeholder, textarea::placeholder {
 .loc-row .identity-field { flex: 1; }
 
 /* Production Information (read-only report view): summary line, headline cards, status bars, tables. */
-.report-dialog { max-width: 896px; width: 94vw; max-height: 88vh; }
-.report-form { gap: 14.5px; }
+.report-dialog { --dialog-width: 896px; max-height: 88vh; }
 .report-host { display: flex; flex-direction: column; gap: 17.5px; overflow: auto; max-height: 70vh; padding-right: 6.5px; }
 /* Scroll affordance: the report body almost always overflows, and the thin app scrollbar alone is too
    quiet to say so. The wrapper fades the clipped edge (a scrim per side, shown only while content
