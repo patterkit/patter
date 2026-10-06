@@ -1,6 +1,7 @@
 #include "PatterBundleLoader.h"
 #include "Patter/Bundle.h"
 #include "Patter/BundleJson.h"
+#include "Patter/Audio.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Dom/JsonObject.h"
@@ -89,5 +90,19 @@ bool PatterLoadBundle(const FString& Json, patter::Bundle& Out, FString& Error)
 		return false;
 	}
 
+	return true;
+}
+
+bool PatterLoadAudioManifest(const FString& Json, patter::AudioManifest& Out, FString& Error)
+{
+	Out = patter::AudioManifest();
+	TSharedPtr<FJsonValue> Root;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Json);
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid() || Root->Type != EJson::Object)
+	{
+		Error = TEXT("not a JSON object");
+		return false;
+	}
+	Out = patter::readAudioManifest(Root);
 	return true;
 }

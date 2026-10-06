@@ -61,6 +61,20 @@ func _initialize() -> void:
 			_fail("describes", c["name"], "description mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expected"]), JSON.stringify(got)])
 	print("describes: %d/%d  (the bundle description every runtime gives)" % [ds, root["describes"].size()])
 	_expect_all("describes", ds, root["describes"].size())
+	if not root.has("outlines"):
+		push_error("corpus has no outlines section")
+		quit(2)
+		return
+	var ol := _run_outlines(root["outlines"])
+	print("outlines: %d/%d  (get_outline and get_beat_sequence, in the reference's shape)" % [ol, root["outlines"].size()])
+	_expect_all("outlines", ol, root["outlines"].size())
+	if not root.has("audio"):
+		push_error("corpus has no audio section")
+		quit(2)
+		return
+	var au := _run_audio(root["audio"])
+	print("audio: %d/%d  (the audio resolver's path for a beat under a base)" % [au, root["audio"].size()])
+	_expect_all("audio", au, root["audio"].size())
 	_run_describe_smoke()
 	_run_host_scope_writable_check()
 
@@ -506,6 +520,43 @@ func _play_log_case(c: Dictionary, log_on: bool) -> Dictionary:
 	return { "log": logged, "traced": traced, "after_stop": traced.size() - before }
 
 
+# -- outlines and audio ----------------------------------------------------------
+
+# The static structure: get_outline() and get_beat_sequence() for a bundle, compared field for field
+# with the reference's, so an optional field the reference leaves out must be absent here too.
+func _run_outlines(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var engine := PatterEngine.new(c["bundle"], {})
+		var outline := engine.get_outline()
+		var sequence := engine.get_beat_sequence()
+		if not _deep_equal(outline, c["expectedOutline"]):
+			_fail("outlines", name, "outline mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedOutline"]), JSON.stringify(outline)])
+		elif not _deep_equal(sequence, c["expectedBeatSequence"]):
+			_fail("outlines", name, "beat sequence mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedBeatSequence"]), JSON.stringify(sequence)])
+		else:
+			pass_count += 1
+	return pass_count
+
+
+# Each lookup through PatterAudioResolver: the base and the take joined, or null for no take.
+func _run_audio(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var ok := true
+		for l in c["lookups"]:
+			var got = PatterAudioResolver.new(c["manifest"], l["base"]).resolve(l["beatId"])
+			var want = l["expected"]
+			if typeof(got) != typeof(want) or got != want:
+				_fail("audio", name, "%s under '%s': expected %s, got %s" % [l["beatId"], l["base"], JSON.stringify(want), JSON.stringify(got)])
+				ok = false
+		if ok:
+			pass_count += 1
+	return pass_count
+
+
 # -- scripted ------------------------------------------------------------------
 
 func _run_scripted(arr: Array) -> int:
@@ -586,10 +637,16 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 						_fail("scripted", name, "envelope round-trip changed flattened state at " + str(change["path"]))
 						break
 			"hotSwap":
-				# Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
-				var swap_blob: Dictionary = holder["engine"].save_game()
-				holder["engine"] = PatterEngine.new(bundle_b, options)
-				holder["engine"].load_game(swap_blob)
+				# Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle. A refused
+				# swap hands back this same engine, unchanged.
+				if op.get("expectRefused", false):
+					var swap_to: Dictionary = bundle_b if not bundle_b.is_empty() else bundle
+					if not _refused(holder, name, "hotSwap", func(e): return is_same(e.hot_swap(swap_to), e)):
+						return false
+				else:
+					var swap_blob: Dictionary = holder["engine"].save_game()
+					holder["engine"] = PatterEngine.new(bundle_b, options)
+					holder["engine"].load_game(swap_blob)
 			"setLocale":
 				holder["engine"].set_locale(op["locale"])
 			"setClosedCaptions":
@@ -626,11 +683,32 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					_fail("scripted", name, "expectGameData %s: expected %s, got %s" % [scope, JSON.stringify(want_gd), JSON.stringify(gd)])
 					break
 			"reset":
-				holder["engine"].reset()
-				current = ""
+				# reset() has nothing to return, and this addon refuses it only inside a checkpoint, so the
+				# refusal shows as the checkpoint still open; the ops after it prove nothing moved.
+				if op.get("expectRefused", false):
+					var call_reset := func(e):
+						e.reset()
+						return true
+					if not _refused(holder, name, "reset", call_reset):
+						return false
+				else:
+					holder["engine"].reset()
+					current = ""
 			"checkpoint":
-				# Checkpoints: no transcript of their own; the advances after them show the state left.
-				cp = holder["engine"].checkpoint()
+				# Checkpoints: no transcript of their own; the advances after them show the state left. A
+				# refused checkpoint is null, and the one already open stays open.
+				if op.get("expectRefused", false):
+					if not _refused(holder, name, "checkpoint", func(e): return e.checkpoint() == null):
+						return false
+				else:
+					cp = holder["engine"].checkpoint()
+			"expectProperties":
+				# The state inspector's rows, compared field for field: values / stages only where the
+				# declaration has them.
+				var rows: Array = holder["engine"].list_properties()
+				if not _deep_equal(rows, op["expectResult"]):
+					_fail("scripted", name, "expectProperties: expected %s, got %s" % [JSON.stringify(op["expectResult"]), JSON.stringify(rows)])
+					return false
 			"rollback":
 				holder["engine"].rollback(cp)
 				cp = null
@@ -644,6 +722,23 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 			_fail("scripted", name, "op %s: mismatch (got %s)" % [kind, JSON.stringify(chunk)])
 			break
 	return ok
+
+
+## A call the runtime must refuse (the reference throws; this addon cannot, so it push_errors and
+## changes nothing). `call` makes it on the engine and returns whether its result reads as a refusal.
+## Only an open checkpoint is grounds for these refusals, so one must be open before and still after.
+func _refused(holder: Dictionary, name: String, what: String, call: Callable) -> bool:
+	var engine: PatterEngine = holder["engine"]
+	if not engine.in_checkpoint():
+		_fail("scripted", name, "%s: expected a refusal, but no checkpoint is open to refuse it" % what)
+		return false
+	if not call.call(engine):
+		_fail("scripted", name, "%s: expected the runtime to refuse it" % what)
+		return false
+	if not engine.in_checkpoint():
+		_fail("scripted", name, "%s: a refusal changed the checkpoint" % what)
+		return false
+	return true
 
 
 # -- saves: an envelope the JS reference wrote, loaded through THIS addon's own boundary ------------

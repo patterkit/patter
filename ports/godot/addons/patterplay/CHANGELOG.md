@@ -6,10 +6,23 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
+  audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
+  and a block named under another scene.
+
 ### Removed
 
 - **Two unused helpers on `PatterBundle`**: `split_ref`, superseded by `split_ref_with`, and
   `host_scope_default`.
+
+### Fixed
+
+- **`list_properties` rows carry `values` and `stages` only where the declaration has them**, as every other
+  runtime's rows do. Every row carried both, empty when undeclared; read them with `.get()`.
+- **`get_outline` leaves out a scene's or block's `gameId` when it comes out empty**, as every other runtime
+  does, rather than giving an empty string.
 
 ## [0.20.0] - 2026-10-06
 

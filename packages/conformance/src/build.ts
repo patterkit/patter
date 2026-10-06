@@ -13,7 +13,7 @@ import { Engine, describeBundle } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { SaveEnvelope } from "@patterkit/model";
 import { envelopeKeyPaths, runScript } from "./runner.js";
-import type { Corpus, DescribeCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
+import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
 
 export function buildCorpus(fixtures: Fixtures): Corpus {
   const expressions: ExpressionCase[] = fixtures.expressions.map((f) => ({
@@ -107,5 +107,15 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     return { name: f.name, bundle, expected: JSON.parse(JSON.stringify(describeBundle(bundle))) };
   });
 
-  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs, describes };
+  const outlines: OutlineCase[] = fixtures.outlines.map((f) => {
+    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
+    const engine = new Engine(bundle);
+    return {
+      name: f.name, bundle,
+      expectedOutline: JSON.parse(JSON.stringify(engine.getOutline())),
+      expectedBeatSequence: JSON.parse(JSON.stringify(engine.getBeatSequence())),
+    };
+  });
+
+  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio };
 }

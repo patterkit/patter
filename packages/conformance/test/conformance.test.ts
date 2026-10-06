@@ -10,8 +10,8 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
-import { describeBundle } from "@patterkit/runtime";
-import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, cases } from "../src/index.js";
+import { describeBundle, Engine } from "@patterkit/runtime";
+import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runAudioCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -95,6 +95,24 @@ describe("describe cases (the bundle description every runtime gives)", () => {
   for (const c of corpus.describes) {
     it(c.name, () => {
       expect(JSON.parse(JSON.stringify(describeBundle(c.bundle)))).toEqual(c.expected);
+    });
+  }
+});
+
+describe("outline cases (the authored structure every runtime gives)", () => {
+  for (const c of corpus.outlines) {
+    it(c.name, () => {
+      const engine = new Engine(c.bundle);
+      expect(JSON.parse(JSON.stringify(engine.getOutline()))).toEqual(c.expectedOutline);
+      expect(JSON.parse(JSON.stringify(engine.getBeatSequence()))).toEqual(c.expectedBeatSequence);
+    });
+  }
+});
+
+describe("audio cases (the resolver's join, every runtime)", () => {
+  for (const c of corpus.audio) {
+    it(c.name, () => {
+      expect(runAudioCase(c)).toEqual(c.lookups.map((l) => l.expected));
     });
   }
 });

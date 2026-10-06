@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <cmath>
 #include <sstream>
@@ -21,6 +22,7 @@
 #include "Patter/Engine.h"
 #include "Patter/Mulberry32.h"
 #include "Patter/BundleJson.h"
+#include "Patter/Audio.h"
 #include "../Patterplay/Source/PatterplayRuntime/Private/Tests/PatterBundleReaderCase.h"   // shared with the plugin's test
 #include "RegistryCorpus.h"   // the shared registry corpus runner, vendored from ../expr
 
@@ -562,17 +564,206 @@ static int runDescribes(const JsonValue& arr)
     return pass;
 }
 
+// The corpus's outline cases: getOutline() and getBeatSequence() held field for field to the reference's.
+// An empty string, list, or gameData is the core's absent, and is left out where the reference omits it;
+// a group's selector and children and a snippet's beats are always there, as the reference writes them.
+static JsonValue strsToJson(const std::vector<std::string>& v)
+{
+    JsonValue a = JsonValue::Arr();
+    for (const auto& x : v) a.push(JsonValue::Str(x));
+    return a;
+}
+
+static JsonValue rawGameDataToJson(const std::vector<std::pair<std::string, PatterValue>>& gd)
+{
+    JsonValue o = JsonValue::Obj();
+    for (const auto& kv : gd) o.set(kv.first, valueToJson(kv.second));
+    return o;
+}
+
+static JsonValue beatInfoToJson(const BeatInfo& b)
+{
+    JsonValue o = JsonValue::Obj();
+    o.set("id", JsonValue::Str(b.id)); o.set("kind", JsonValue::Str(b.kind));
+    if (!b.character.empty()) o.set("character", JsonValue::Str(b.character));
+    if (!b.characterName.empty()) o.set("characterName", JsonValue::Str(b.characterName));
+    if (!b.direction.empty()) o.set("direction", JsonValue::Str(b.direction));
+    if (!b.text.empty()) o.set("text", JsonValue::Str(b.text));
+    if (!b.gameData.empty()) o.set("gameData", rawGameDataToJson(b.gameData));
+    if (!b.tags.empty()) o.set("tags", strsToJson(b.tags));
+    return o;
+}
+
+static JsonValue outlineNodeToJson(const OutlineNode& n)
+{
+    JsonValue o = JsonValue::Obj();
+    o.set("type", JsonValue::Str(n.type)); o.set("id", JsonValue::Str(n.id));
+    if (!n.tags.empty()) o.set("tags", strsToJson(n.tags));
+    if (n.type == "group")
+    {
+        if (!n.selector.empty()) o.set("selector", JsonValue::Str(n.selector));
+        if (n.hasPrompt) o.set("prompt", beatInfoToJson(n.prompt));
+        JsonValue children = JsonValue::Arr();
+        for (const auto& c : n.children) children.push(outlineNodeToJson(c));
+        o.set("children", children);
+    }
+    else
+    {
+        JsonValue beats = JsonValue::Arr();
+        for (const auto& b : n.beats) beats.push(beatInfoToJson(b));
+        o.set("beats", beats);
+        if (!n.jumpTo.empty())
+        {
+            o.set("jumpTo", JsonValue::Str(n.jumpTo));
+            if (!n.jumpMode.empty()) o.set("jumpMode", JsonValue::Str(n.jumpMode));
+        }
+    }
+    return o;
+}
+
+static JsonValue outlineToJson(const std::vector<OutlineScene>& scenes)
+{
+    JsonValue out = JsonValue::Arr();
+    for (const auto& s : scenes)
+    {
+        JsonValue so = JsonValue::Obj();
+        so.set("id", JsonValue::Str(s.id));
+        if (!s.gameId.empty()) so.set("gameId", JsonValue::Str(s.gameId));
+        so.set("name", JsonValue::Str(s.name));
+        if (!s.gameData.empty()) so.set("gameData", rawGameDataToJson(s.gameData));
+        if (!s.tags.empty()) so.set("tags", strsToJson(s.tags));
+        JsonValue blocks = JsonValue::Arr();
+        for (const auto& b : s.blocks)
+        {
+            JsonValue bo = JsonValue::Obj();
+            bo.set("id", JsonValue::Str(b.id));
+            if (!b.gameId.empty()) bo.set("gameId", JsonValue::Str(b.gameId));
+            bo.set("name", JsonValue::Str(b.name));
+            if (!b.gameData.empty()) bo.set("gameData", rawGameDataToJson(b.gameData));
+            if (!b.tags.empty()) bo.set("tags", strsToJson(b.tags));
+            JsonValue children = JsonValue::Arr();
+            for (const auto& c : b.children) children.push(outlineNodeToJson(c));
+            bo.set("children", children);
+            blocks.push(bo);
+        }
+        so.set("blocks", blocks);
+        out.push(so);
+    }
+    return out;
+}
+
+static JsonValue beatSequenceToJson(const std::vector<FlatBeat>& seq)
+{
+    JsonValue out = JsonValue::Arr();
+    for (const auto& f : seq)
+    {
+        JsonValue o = JsonValue::Obj();
+        o.set("sceneId", JsonValue::Str(f.sceneId)); o.set("blockId", JsonValue::Str(f.blockId));
+        o.set("snippetId", JsonValue::Str(f.snippetId)); o.set("beat", beatInfoToJson(f.beat));
+        out.push(o);
+    }
+    return out;
+}
+
+static int runOutlines(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            Bundle bundle = parseBundle(c.at("bundle"));
+            Engine engine(bundle, EngineOptions{});
+            JsonValue outline = outlineToJson(engine.getOutline());
+            JsonValue sequence = beatSequenceToJson(engine.getBeatSequence());
+            if (!matchValue(outline, c.at("expectedOutline")))
+                fail("outlines", name, "outline mismatch\n    expected " + dump(c.at("expectedOutline")) + "\n    got      " + dump(outline));
+            else if (!matchValue(sequence, c.at("expectedBeatSequence")))
+                fail("outlines", name, "beat sequence mismatch\n    expected " + dump(c.at("expectedBeatSequence")) + "\n    got      " + dump(sequence));
+            else ++pass;
+        }
+        catch (const std::exception& ex) { fail("outlines", name, ex.what()); }
+    }
+    return pass;
+}
+
+// The corpus's audio cases: a manifest read through the core's readAudioManifest (the reader the plugin
+// uses too), and each lookup's resolved path under its base, or null for no take.
+static int runAudio(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            const AudioManifest manifest = readAudioManifest(JsonParser(c.at("manifest").str).parse());
+            bool ok = true;
+            for (const auto& l : c.at("lookups").arr)
+            {
+                const std::optional<std::string> got = AudioResolver(manifest, l.at("base").str).resolve(l.at("beatId").str);
+                const JsonValue& want = l.at("expected");
+                const bool match = want.isNull() ? !got.has_value() : (got.has_value() && *got == want.str);
+                if (!match)
+                {
+                    fail("audio", name, "base \"" + l.at("base").str + "\", beat " + l.at("beatId").str + ": expected "
+                        + dump(want) + ", got " + (got ? "\"" + *got + "\"" : std::string("null")));
+                    ok = false;
+                }
+            }
+            if (ok) ++pass;
+        }
+        catch (const std::exception& ex) { fail("audio", name, ex.what()); }
+    }
+    return pass;
+}
+
+// A property row as the reference's listProperties() serialises it: values and stages only where the
+// declaration has them.
+static JsonValue propertiesToJson(const std::vector<PropertyRow>& rows)
+{
+    JsonValue out = JsonValue::Arr();
+    for (const auto& r : rows)
+    {
+        JsonValue o = JsonValue::Obj();
+        o.set("name", JsonValue::Str(r.name)); o.set("path", JsonValue::Str(r.path)); o.set("type", JsonValue::Str(r.type));
+        if (r.values) o.set("values", strsToJson(*r.values));
+        if (r.stages) o.set("stages", strsToJson(*r.stages));
+        o.set("value", valueToJson(r.value)); o.set("default", valueToJson(r.defaultValue));
+        o.set("writable", JsonValue::Boolean(r.writable));
+        out.push(o);
+    }
+    return out;
+}
+
 static int envelopeRoundTrips = 0;
 static int gameDataReads = 0;   // expectGameData ops that ran and matched
+static int propertyReads = 0;   // expectProperties ops that ran and matched
 
 // Run a script's ops against a LIVE engine, returning whether every op matched and the engine that
 // ends up live (saveLoad / hotSwap replace it). Shared by the scripted cases and the saves cases, whose
 // engine arrives already loaded from an envelope another runtime wrote.
-static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine> engine, const Bundle& bundle, const Bundle& bundleB,
+// `bundleB` is the case's EDITED bundle, null when it has none.
+static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine> engine, const Bundle& bundle, const Bundle* bundleB,
     const EngineOptions& opts, const JsonValue& script, const std::string& name, std::string current)
 {
     bool ok = true;
     patter::Checkpoint checkpoint;
+    // A call the runtime must refuse (expectRefused): it throws, and the engine is as it was, still
+    // inside its checkpoint. The ops after it prove nothing else moved.
+    const auto refused = [&engine](const std::string& what, const std::function<void()>& call)
+    {
+        const bool wasIn = engine->inCheckpoint();
+        try { call(); }
+        catch (const std::exception&)
+        {
+            if (engine->inCheckpoint() != wasIn) throw std::runtime_error(what + ": a refusal changed the checkpoint");
+            return;
+        }
+        throw std::runtime_error(what + ": expected the runtime to refuse it");
+    };
+    const auto refusing = [](const JsonValue& op) { const JsonValue* r = op.find("expectRefused"); return r && r->isBool() && r->b; };
             for (const auto& op : script.arr)
             {
                 JsonValue chunk = JsonValue::Arr();
@@ -642,12 +833,25 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 // Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
                 // Through the core's own hotSwap, as the reference runner does: the bags are handed to the
                 // replacement on the same registry.
-                else if (kind == "hotSwap") engine = std::shared_ptr<Engine>(engine->hotSwap(bundleB));
+                else if (kind == "hotSwap")
+                {
+                    if (refusing(op)) refused("hotSwap", [&] { engine->hotSwap(bundleB ? *bundleB : bundle); });
+                    else if (!bundleB) throw std::runtime_error("hotSwap: the case has no bundleB");
+                    else engine = std::shared_ptr<Engine>(engine->hotSwap(*bundleB));
+                }
                 else if (kind == "setLocale") engine->setLocale(op.at("locale").str);
                 else if (kind == "setClosedCaptions") engine->setClosedCaptions(op.at("on").b);
-                else if (kind == "reset") { engine->reset(); current.clear(); }
+                else if (kind == "reset")
+                {
+                    if (refusing(op)) refused("reset", [&] { engine->reset(); });
+                    else { engine->reset(); current.clear(); }
+                }
                 // Checkpoints: none produces a transcript; the advances after them show the state they left.
-                else if (kind == "checkpoint") checkpoint = engine->checkpoint();
+                else if (kind == "checkpoint")
+                {
+                    if (refusing(op)) refused("checkpoint", [&] { engine->checkpoint(); });
+                    else checkpoint = engine->checkpoint();
+                }
                 else if (kind == "rollback") { engine->rollback(checkpoint); checkpoint = patter::Checkpoint(); }
                 else if (kind == "commit") { engine->commit(checkpoint); checkpoint = patter::Checkpoint(); }
                 // Static structure query: no transcript, expectResult pins the exact list INCLUDING
@@ -685,6 +889,16 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     }
                     ++gameDataReads;
                 }
+                // The state inspector's rows, as JSON: each shared @patter property in declaration order.
+                else if (kind == "expectProperties")
+                {
+                    JsonValue got = propertiesToJson(engine->listProperties());
+                    if (!matchValue(got, op.at("expectResult")))
+                        throw std::runtime_error("expectProperties: expected " + dump(op.at("expectResult")) + ", got " + dump(got));
+                    ++propertyReads;
+                }
+                // An op this host cannot run is a check that cannot fail: refuse it, never skip it.
+                else throw std::runtime_error("unknown script op '" + kind + "'");
 
                 const JsonValue* expect = op.find("expect");
                 bool match = expect ? matchValue(chunk, *expect) : (chunk.arr.empty());
@@ -768,7 +982,7 @@ static int runSaves(const JsonValue& arr)
                 for (const auto& k : got) if (std::find(want.begin(), want.end(), k) == want.end()) extra += (extra.empty() ? "" : ", ") + k;
                 throw std::runtime_error("re-serialised save has different key paths; missing: [" + missing + "] extra: [" + extra + "]");
             }
-            if (runScript(engine, bundle, Bundle{}, opts, c.at("script"), name, "").first) ++pass;
+            if (runScript(engine, bundle, nullptr, opts, c.at("script"), name, "").first) ++pass;
         }
         catch (const std::exception& ex) { fail("saves", name, ex.what()); }
     }
@@ -786,12 +1000,13 @@ int runScripted(const JsonValue& arr)
             Bundle bundle = parseBundle(c.at("bundle"));
             // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, spec 9.8).
             Bundle bundleB;
-            if (const JsonValue* bb = c.find("bundleB")) bundleB = parseBundle(*bb);
+            const JsonValue* bb = c.find("bundleB");
+            if (bb) bundleB = parseBundle(*bb);
             EngineOptions opts;
             if (const JsonValue* sd = c.find("seed")) { opts.hasSeed = true; opts.seed = static_cast<int64_t>(sd->num); }
             applyEngineOptions(c, opts);
             auto engine = std::make_shared<Engine>(bundle, opts);
-            if (runScript(engine, bundle, bundleB, opts, c.at("script"), name, "").first) ++pass;
+            if (runScript(engine, bundle, bb ? &bundleB : nullptr, opts, c.at("script"), name, "").first) ++pass;
         }
         catch (const std::exception& ex) { fail("scripted", name, ex.what()); }
     }
@@ -2158,8 +2373,6 @@ static void runInspectorSmoke()
         fail("inspector", "live setProperty", "gold value did not reflect setProperty");
 }
 
-// Structure introspection (Engine::getOutline / getBeatSequence): not part of the shared corpus, so
-// exercise directly on a hand-built scene -> block -> choice group -> snippets -> beats.
 // describeBundle: the bundle inspector's runtime half. Not a corpus case - this adds no runtime
 // behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference or two
 // inspectors describe the same asset differently. The fixture mirrors the one in the JS tests.
@@ -2276,6 +2489,9 @@ static void runDescribeSmoke()
         fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts");
 }
 
+// Structure introspection (Engine::getOutline / getBeatSequence) on a hand-built scene -> block -> choice
+// group -> snippets -> beats. The corpus's outlines section holds the shape to the reference; this keeps
+// what that case does not reach, a cast display name read into characterName.
 static void runOutlineSmoke()
 {
     Bundle b;
@@ -2435,6 +2651,16 @@ int main(int argc, char** argv)
     int ds = runDescribes(*describesArr);
     std::cout << "  [describes] the bundle description every runtime gives: " << ds << "/" << describesArr->arr.size() << "\n";
     if (ds != static_cast<int>(describesArr->arr.size())) fail("describes", "section total", std::to_string(ds) + " of " + std::to_string(describesArr->arr.size()) + " passed");
+    const JsonValue* outlinesArr = root.find("outlines");
+    if (!outlinesArr) { std::cerr << "corpus has no outlines section\n"; return 2; }
+    int ol = runOutlines(*outlinesArr);
+    std::cout << "  [outlines] the outline and beat sequence every runtime gives: " << ol << "/" << outlinesArr->arr.size() << "\n";
+    if (ol != static_cast<int>(outlinesArr->arr.size())) fail("outlines", "section total", std::to_string(ol) + " of " + std::to_string(outlinesArr->arr.size()) + " passed");
+    const JsonValue* audioArr = root.find("audio");
+    if (!audioArr) { std::cerr << "corpus has no audio section\n"; return 2; }
+    int au = runAudio(*audioArr);
+    std::cout << "  [audio] the audio resolver's joins, through the reader the plugin uses: " << au << "/" << audioArr->arr.size() << "\n";
+    if (au != static_cast<int>(audioArr->arr.size())) fail("audio", "section total", std::to_string(au) + " of " + std::to_string(audioArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
     runKernelErrorCases();
@@ -2450,6 +2676,7 @@ int main(int argc, char** argv)
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "  [gameData] scripted scene / block gameData reads: " << gameDataReads << "\n";
+    std::cout << "  [properties] scripted listProperties reads: " << propertyReads << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
 
     // The expr parity corpus sits beside ours, vendored from ../expr. Absent is

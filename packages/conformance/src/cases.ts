@@ -2547,6 +2547,184 @@ const describeEverything = {
   locales: [loc("s_hall", { L_open: "Open.", P_knock: "Knock", P_leave: "Leave", T_k: "knocked" }), loc("s_yard", { T_g: "gate" })],
 } satisfies DescribeFixture;
 
+// --- checkpoint edge cases ------------------------------------------------------------------------
+// Inside an open checkpoint the runtime refuses what it could not undo, and changes nothing doing so: a
+// second checkpoint, a hot swap, an engine reset. The flow plays on regardless, and the rollback still
+// takes it back to where the checkpoint was opened.
+const edgeScenes = [{
+  id: "s", type: "scene", name: "S",
+  blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn_1", type: "snippet", beats: [{ id: "T1", kind: "text" }] },
+    { id: "sn_2", type: "snippet", beats: [{ id: "T2", kind: "text" }] },
+    { id: "sn_3", type: "snippet", beats: [{ id: "T3", kind: "text" }], jump: { to: "END" } },
+  ] }],
+}] satisfies Scene[];
+const edgeLoc = [loc("s", { T1: "one", T2: "two", T3: "three" })];
+const scriptedCheckpointRefusals = {
+  name: "checkpoint: a second checkpoint, a hot swap, and an engine reset are refused while one is open",
+  project: project(), scenes: edgeScenes, scenesB: edgeScenes, locales: edgeLoc,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one" }] },
+    { op: "checkpoint" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two" }] },
+    { op: "checkpoint", expectRefused: true },
+    { op: "hotSwap", expectRefused: true },
+    { op: "reset", expectRefused: true },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "three" }] },
+    { op: "rollback" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A save taken inside a checkpoint holds what has happened so far, as a save taken anywhere does: the
+// engine it loads into plays on from there, outside any checkpoint.
+const scriptedSaveInCheckpoint = {
+  name: "checkpoint: a save taken while one is open holds the steps taken inside it",
+  project: project(), scenes: edgeScenes, locales: edgeLoc,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "checkpoint" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "one" }] },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "two" }] },
+    { op: "saveLoad" },
+    { op: "useFlow", flow: "main" },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "three" }] },
+    { op: "checkpoint" },
+    { op: "commit" },
+  ],
+} satisfies ScriptedFixture;
+
+// --- a block is looked up within its scene ----------------------------------------------------------
+// A block address is scene-scoped: naming a block of ANOTHER scene finds nothing, for openFlow and goto
+// alike, and the flow stays where it was.
+const scriptedBlockInOtherScene = {
+  name: "addressing: a block named under another scene is not found",
+  project: project(),
+  scenes: [
+    { id: "scn_a", type: "scene", name: "Hall", blocks: [{ id: "b_a", type: "block", name: "Door", children: [
+      { id: "sn_a", type: "snippet", beats: [{ id: "A", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+    { id: "scn_b", type: "scene", name: "Yard", blocks: [{ id: "b_b", type: "block", name: "Gate", children: [
+      { id: "sn_b", type: "snippet", beats: [{ id: "B", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+  ],
+  locales: [loc("scn_a", { A: "hall" }), loc("scn_b", { B: "yard" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "hall", block: "gate", expectResult: false },
+    { op: "openFlow", flow: "main", scene: "hall", block: "b_b", expectResult: false },
+    { op: "openFlow", flow: "main", scene: "hall" },
+    { op: "goto", scene: "hall", block: "gate", expectResult: false },
+    { op: "advance", expect: [{ type: "text", id: "A", text: "hall" }] },
+    { op: "goto", scene: "yard", block: "gate", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "B", text: "yard" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// --- listProperties ---------------------------------------------------------------------------------
+// The state inspector's rows: each shared @patter property in declaration order, with its qualified path,
+// its value now, its default (the type's own when it declares none), and values / stages only where the
+// declaration has them. A per-flow property is not a row: it has a value per flow.
+const scriptedListProperties = {
+  name: "listProperties: the shared @patter rows, in declaration order",
+  project: project({ properties: [
+    { name: "gold", type: "number", shared: true, default: 2 },
+    { name: "mood", type: "enum", values: ["calm", "tense"], shared: true, default: "calm" },
+    { name: "deal", type: "quality", stages: ["none", "offered", "struck"], shared: true },
+    { name: "met", type: "boolean", shared: true },
+    { name: "mine", type: "number", shared: false, default: 0 },
+  ] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [{ id: "T", kind: "text" }],
+      onExit: [{ kind: "set", target: "@gold", value: "@gold + 3" }, { kind: "set", target: "@deal", value: "advance(@deal)" }],
+      jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T: "t" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "expectProperties", expectResult: [
+      { name: "gold", path: "@patter.gold", type: "number", value: 2, default: 2, writable: true },
+      { name: "mood", path: "@patter.mood", type: "enum", values: ["calm", "tense"], value: "calm", default: "calm", writable: true },
+      { name: "deal", path: "@patter.deal", type: "quality", stages: ["none", "offered", "struck"], value: "none", default: "none", writable: true },
+      { name: "met", path: "@patter.met", type: "boolean", value: false, default: false, writable: true },
+    ] },
+    { op: "advance", expect: [{ type: "text", id: "T", text: "t" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "expectProperties", expectResult: [
+      { name: "gold", path: "@patter.gold", type: "number", value: 5, default: 2, writable: true },
+      { name: "mood", path: "@patter.mood", type: "enum", values: ["calm", "tense"], value: "calm", default: "calm", writable: true },
+      { name: "deal", path: "@patter.deal", type: "quality", stages: ["none", "offered", "struck"], value: "offered", default: "none", writable: true },
+      { name: "met", path: "@patter.met", type: "boolean", value: false, default: false, writable: true },
+    ] },
+  ],
+} satisfies ScriptedFixture;
+
+// --- the outline and beat sequence --------------------------------------------------------------------
+// One project with something in every field the structure reads: tags and Game Data on a scene, a block,
+// and beats; a choice with a spoken prompt and a text one; a sequence; a call jump and a plain one; a
+// line with a direction; a game event; and a second block and scene.
+const outlineEverything = {
+  name: "the outline and beat sequence of a project with every kind of node",
+  project: project({
+    cast: [{ name: "ANNA" }, { name: "BRAM" }],
+    gameDataFields: { scene: [{ name: "music", type: "text" }], line: [{ name: "mood", type: "text" }] },
+  }),
+  scenes: [{
+    id: "s_hall", type: "scene", name: "Great Hall", tags: ["indoor"], gameData: { music: "harp" },
+    blocks: [{ id: "b_door", type: "block", name: "Door", tags: ["door"], children: [
+      { id: "sn_open", type: "snippet", tags: ["opening"], beats: [
+        { id: "L_hi", kind: "line", character: "ANNA", direction: "warmly", gameData: { mood: "glad" }, tags: ["greeting"] },
+        { id: "E_bell", kind: "gameEvent", gameData: { mood: "loud" } },
+        { id: "T_wind", kind: "text" },
+      ] },
+      { id: "g_ask", type: "group", selector: "choice", children: [
+        { id: "o_knock", type: "group", prompt: { id: "P_knock", kind: "line", character: "BRAM" },
+          children: [{ id: "sn_k", type: "snippet", beats: [{ id: "T_k", kind: "text" }], jump: { to: "b_cellar", mode: "call" } }] },
+        { id: "o_leave", type: "group", prompt: { id: "P_leave", kind: "text" },
+          children: [{ id: "sn_l", type: "snippet", jump: { to: "END" } }] },
+      ] },
+    ] }, {
+      id: "b_cellar", type: "block", name: "Cellar", children: [
+        { id: "g_seq", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "stick" }, children: [
+          { id: "sn_c1", type: "snippet", beats: [{ id: "T_c1", kind: "text" }] },
+          { id: "sn_c2", type: "snippet", beats: [{ id: "T_c2", kind: "text" }] },
+        ] },
+      ],
+    }],
+  }, {
+    id: "s_yard", type: "scene", name: "Yard", gameId: "the-yard", blocks: [{ id: "b_gate", type: "block", name: "Gate", children: [
+      { id: "sn_g", type: "snippet", beats: [{ id: "T_g", kind: "text" }], jump: { to: "s_hall" } },
+    ] }],
+  }],
+  locales: [
+    loc("s_hall", { L_hi: "Hello.", T_wind: "Wind.", P_knock: "Knock", P_leave: "Leave", T_k: "knock", T_c1: "dark", T_c2: "darker" }),
+    loc("s_yard", { T_g: "gate" }),
+  ],
+} satisfies DescribeFixture;
+
+// --- the audio resolver ----------------------------------------------------------------------------
+// A manifest names each beat's winning take relative to the audio folder; the resolver joins it to where
+// the game deployed that folder. A base that already ends in a separator (a root such as "/" or "res://")
+// is kept as it stands; a beat with no take, or a take with no file, is null.
+const audioManifest = {
+  name: "the audio resolver joins a base and a take, and has nothing for a beat with no take",
+  manifest: JSON.stringify({ schema: "patter/audio@0", clips: {
+    L1: { file: "final/L1.wav", rung: "final" },
+    L2: { file: "scratch/L2.mp3", rung: "scratch" },
+    L3: { file: "", rung: "final" },
+  } }),
+  lookups: [
+    { base: "audio", beatId: "L1", expected: "audio/final/L1.wav" },
+    { base: "audio/", beatId: "L2", expected: "audio/scratch/L2.mp3" },
+    { base: "/", beatId: "L1", expected: "/final/L1.wav" },
+    { base: "res://", beatId: "L1", expected: "res://final/L1.wav" },
+    { base: "C:\\Game\\Audio\\", beatId: "L1", expected: "C:\\Game\\Audio\\final/L1.wav" },
+    { base: "", beatId: "L2", expected: "scratch/L2.mp3" },
+    { base: "audio", beatId: "L9", expected: null },
+    { base: "audio", beatId: "L3", expected: null },
+  ],
+};
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -2602,7 +2780,8 @@ export const cases: Fixtures = {
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
-    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow],
+    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
+    scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
@@ -2626,4 +2805,6 @@ export const cases: Fixtures = {
   ],
   logs: [decisionLog],
   describes: [describeEverything],
+  outlines: [outlineEverything],
+  audio: [audioManifest],
 };

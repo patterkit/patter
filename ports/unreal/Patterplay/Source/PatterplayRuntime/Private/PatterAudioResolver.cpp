@@ -1,9 +1,9 @@
 #include "PatterAudioResolver.h"
 #include "PatterAudio.h"
 
-#include "Dom/JsonObject.h"
-#include "Serialization/JsonReader.h"
-#include "Serialization/JsonSerializer.h"
+#include "PatterBundleLoader.h"
+#include "PatterConvert.h"
+#include "Patter/Audio.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
 
 UPatterAudioResolver* UPatterAudioResolver::Create(const FString& ManifestJson, const FString& BasePath)
@@ -18,38 +18,20 @@ UPatterAudio* UPatterAudio::Load(const FString& ManifestJson, const FString& Bas
 
 UPatterAudioResolver* UPatterAudioResolver::Fill(UPatterAudioResolver* Audio, const FString& ManifestJson, const FString& BasePath)
 {
-	// A base that already ends in a separator is joined as it stands: trimming it turned a root such as
-	// "/" into "", and the path lost its root.
-	Audio->Base = BasePath;
-
-	TSharedPtr<FJsonObject> Root;
-	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(ManifestJson);
-	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	patter::AudioManifest Manifest;
+	FString Error;
+	if (!PatterLoadAudioManifest(ManifestJson, Manifest, Error))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Patterplay: not a valid patteraudio.json manifest"));
-		return Audio; // empty resolver rather than null
+		UE_LOG(LogTemp, Error, TEXT("Patterplay: not a valid patteraudio.json manifest (%s)"), *Error);
 	}
-
-	const TSharedPtr<FJsonObject>* Clips;
-	if (Root->TryGetObjectField(TEXT("clips"), Clips))
-	{
-		for (const TPair<FString, TSharedPtr<FJsonValue>>& KV : (*Clips)->Values)
-		{
-			const TSharedPtr<FJsonObject>* Clip;
-			FString File;
-			if (KV.Value->TryGetObject(Clip) && (*Clip)->TryGetStringField(TEXT("file"), File) && !File.IsEmpty())
-			{
-				Audio->Files.Add(KV.Key, File);
-			}
-		}
-	}
+	// A bad manifest still gives a resolver, one with no takes, rather than null.
+	Audio->Core = MakePimpl<patter::AudioResolver>(std::move(Manifest), PatterConvert::Std(BasePath));
 	return Audio;
 }
 
 FString UPatterAudioResolver::Resolve(const FString& BeatId) const
 {
-	const FString* File = Files.Find(BeatId);
-	if (!File) return FString();
-	const bool bSeparated = Base.IsEmpty() || Base.EndsWith(TEXT("/")) || Base.EndsWith(TEXT("\\"));
-	return Base + (bSeparated ? TEXT("") : TEXT("/")) + *File;
+	if (!Core) return FString();
+	const std::optional<std::string> Path = Core->resolve(PatterConvert::Std(BeatId));
+	return Path ? PatterConvert::Ue(*Path) : FString();
 }

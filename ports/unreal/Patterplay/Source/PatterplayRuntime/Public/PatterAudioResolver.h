@@ -3,6 +3,8 @@
 // (a USoundBase you load / stream from the returned path). The manifest already encodes the highest-rung
 // winner per beat, so there is no folder search at runtime. BlueprintCallable so audio wiring can stay in
 // Blueprint. Mirrors the JS createAudioResolver / Unity PatterAudioResolver / Godot PatterAudioResolver.
+// The reading, the lookup, and the join are the std core's (Patter/Audio.h), which the corpus checks; this
+// wraps it for Blueprint.
 //
 //   UPatterAudioResolver* Audio = UPatterAudioResolver::Create(ManifestJson, TEXT("Audio"));
 //   FString Path = Audio->Resolve(Step.Id);   // full path, or empty when the beat has no recording
@@ -10,7 +12,10 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "Templates/PimplPtr.h"
 #include "PatterAudioResolver.generated.h"
+
+namespace patter { class AudioResolver; }
 
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterAudioResolver : public UObject
@@ -31,6 +36,7 @@ protected:
 	// Read a manifest into a resolver Create or the deprecated UPatterAudio::Load made.
 	static UPatterAudioResolver* Fill(UPatterAudioResolver* Audio, const FString& ManifestJson, const FString& BasePath);
 
-	FString Base;
-	TMap<FString, FString> Files;
+	// The core resolver (Pimpl: the std core stays out of this header). Null on an object nothing filled,
+	// which resolves nothing.
+	TPimplPtr<patter::AudioResolver> Core;
 };

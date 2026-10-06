@@ -15896,6 +15896,747 @@
           ]
         }
       ]
+    },
+    {
+      "name": "checkpoint: a second checkpoint, a hot swap, and an engine reset are refused while one is open",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0paq75u",
+          "structureHash": "0hogulj"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0paq75u",
+          "structureHash": "0hogulj"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint",
+          "expectRefused": true
+        },
+        {
+          "op": "hotSwap",
+          "expectRefused": true
+        },
+        {
+          "op": "reset",
+          "expectRefused": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "three"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkpoint: a save taken while one is open holds the steps taken inside it",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0paq75u",
+          "structureHash": "0hogulj"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_2",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_3",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T3",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "one",
+            "T2": "two",
+            "T3": "three"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "three"
+            }
+          ]
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "commit"
+        }
+      ]
+    },
+    {
+      "name": "addressing: a block named under another scene is not found",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "10htqsl",
+          "structureHash": "0rusxyo"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "scn_a": {
+            "id": "scn_a",
+            "type": "scene",
+            "name": "Hall",
+            "blocks": [
+              {
+                "id": "b_a",
+                "type": "block",
+                "name": "Door",
+                "children": [
+                  {
+                    "id": "sn_a",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "A",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_b": {
+            "id": "scn_b",
+            "type": "scene",
+            "name": "Yard",
+            "blocks": [
+              {
+                "id": "b_b",
+                "type": "block",
+                "name": "Gate",
+                "children": [
+                  {
+                    "id": "sn_b",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "B",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "A": "hall",
+            "B": "yard"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "hall",
+          "block": "gate",
+          "expectResult": false
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "hall",
+          "block": "b_b",
+          "expectResult": false
+        },
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "hall"
+        },
+        {
+          "op": "goto",
+          "scene": "hall",
+          "block": "gate",
+          "expectResult": false
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "A",
+              "text": "hall"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "yard",
+          "block": "gate",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "B",
+              "text": "yard"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "listProperties: the shared @patter rows, in declaration order",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "128iuh3",
+          "structureHash": "0l4q9t4"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "shared": true,
+            "default": 2
+          },
+          {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ],
+            "shared": true,
+            "default": "calm"
+          },
+          {
+            "name": "deal",
+            "type": "quality",
+            "stages": [
+              "none",
+              "offered",
+              "struck"
+            ],
+            "shared": true
+          },
+          {
+            "name": "met",
+            "type": "boolean",
+            "shared": true
+          },
+          {
+            "name": "mine",
+            "type": "number",
+            "shared": false,
+            "default": 0
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T",
+                        "kind": "text"
+                      }
+                    ],
+                    "onExit": [
+                      {
+                        "kind": "set",
+                        "target": "@gold",
+                        "value": {
+                          "src": "@gold + 3",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "gold"
+                            ],
+                            [
+                              "n",
+                              3
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@deal",
+                        "value": {
+                          "src": "advance(@deal)",
+                          "ast": [
+                            "call",
+                            "advance",
+                            [
+                              "sv",
+                              "patter",
+                              "deal"
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T": "t"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "expectProperties",
+          "expectResult": [
+            {
+              "name": "gold",
+              "path": "@patter.gold",
+              "type": "number",
+              "value": 2,
+              "default": 2,
+              "writable": true
+            },
+            {
+              "name": "mood",
+              "path": "@patter.mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "value": "calm",
+              "default": "calm",
+              "writable": true
+            },
+            {
+              "name": "deal",
+              "path": "@patter.deal",
+              "type": "quality",
+              "stages": [
+                "none",
+                "offered",
+                "struck"
+              ],
+              "value": "none",
+              "default": "none",
+              "writable": true
+            },
+            {
+              "name": "met",
+              "path": "@patter.met",
+              "type": "boolean",
+              "value": false,
+              "default": false,
+              "writable": true
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T",
+              "text": "t"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "expectProperties",
+          "expectResult": [
+            {
+              "name": "gold",
+              "path": "@patter.gold",
+              "type": "number",
+              "value": 5,
+              "default": 2,
+              "writable": true
+            },
+            {
+              "name": "mood",
+              "path": "@patter.mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "value": "calm",
+              "default": "calm",
+              "writable": true
+            },
+            {
+              "name": "deal",
+              "path": "@patter.deal",
+              "type": "quality",
+              "stages": [
+                "none",
+                "offered",
+                "struck"
+              ],
+              "value": "offered",
+              "default": "none",
+              "writable": true
+            },
+            {
+              "name": "met",
+              "path": "@patter.met",
+              "type": "boolean",
+              "value": false,
+              "default": false,
+              "writable": true
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [
@@ -18149,6 +18890,621 @@
           "cast": 2
         }
       }
+    }
+  ],
+  "outlines": [
+    {
+      "name": "the outline and beat sequence of a project with every kind of node",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0o9e3ds",
+          "structureHash": "0f6jgtd"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA"
+          },
+          {
+            "name": "BRAM"
+          }
+        ],
+        "gameDataFields": {
+          "scene": [
+            {
+              "name": "music",
+              "type": "text"
+            }
+          ],
+          "line": [
+            {
+              "name": "mood",
+              "type": "text"
+            }
+          ]
+        },
+        "scenes": {
+          "s_hall": {
+            "id": "s_hall",
+            "type": "scene",
+            "name": "Great Hall",
+            "gameData": {
+              "music": "harp"
+            },
+            "tags": [
+              "indoor"
+            ],
+            "blocks": [
+              {
+                "id": "b_door",
+                "type": "block",
+                "name": "Door",
+                "children": [
+                  {
+                    "id": "sn_open",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_hi",
+                        "kind": "line",
+                        "character": "ANNA",
+                        "direction": "warmly",
+                        "gameData": {
+                          "mood": "glad"
+                        },
+                        "tags": [
+                          "greeting"
+                        ]
+                      },
+                      {
+                        "id": "E_bell",
+                        "kind": "gameEvent",
+                        "gameData": {
+                          "mood": "loud"
+                        }
+                      },
+                      {
+                        "id": "T_wind",
+                        "kind": "text"
+                      }
+                    ],
+                    "tags": [
+                      "opening"
+                    ]
+                  },
+                  {
+                    "id": "g_ask",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_knock",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_k",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_k",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "b_cellar",
+                              "mode": "call"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_knock",
+                          "kind": "line",
+                          "character": "BRAM"
+                        }
+                      },
+                      {
+                        "id": "o_leave",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_l",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_leave",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "tags": [
+                  "door"
+                ]
+              },
+              {
+                "id": "b_cellar",
+                "type": "block",
+                "name": "Cellar",
+                "children": [
+                  {
+                    "id": "g_seq",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "sequential",
+                      "exhaust": "stick"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_c1",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_c1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_c2",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_c2",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "s_yard": {
+            "id": "s_yard",
+            "type": "scene",
+            "name": "Yard",
+            "gameId": "the-yard",
+            "blocks": [
+              {
+                "id": "b_gate",
+                "type": "block",
+                "name": "Gate",
+                "children": [
+                  {
+                    "id": "sn_g",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_g",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "s_hall"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_hi": "Hello.",
+            "T_wind": "Wind.",
+            "P_knock": "Knock",
+            "P_leave": "Leave",
+            "T_k": "knock",
+            "T_c1": "dark",
+            "T_c2": "darker",
+            "T_g": "gate"
+          }
+        }
+      },
+      "expectedOutline": [
+        {
+          "id": "s_hall",
+          "gameId": "great-hall",
+          "name": "Great Hall",
+          "gameData": {
+            "music": "harp"
+          },
+          "tags": [
+            "indoor"
+          ],
+          "blocks": [
+            {
+              "id": "b_door",
+              "gameId": "door",
+              "name": "Door",
+              "tags": [
+                "indoor",
+                "door"
+              ],
+              "children": [
+                {
+                  "type": "snippet",
+                  "id": "sn_open",
+                  "tags": [
+                    "indoor",
+                    "door",
+                    "opening"
+                  ],
+                  "beats": [
+                    {
+                      "id": "L_hi",
+                      "kind": "line",
+                      "character": "ANNA",
+                      "direction": "warmly",
+                      "text": "Hello.",
+                      "gameData": {
+                        "mood": "glad"
+                      },
+                      "tags": [
+                        "indoor",
+                        "door",
+                        "opening",
+                        "greeting"
+                      ]
+                    },
+                    {
+                      "id": "E_bell",
+                      "kind": "gameEvent",
+                      "gameData": {
+                        "mood": "loud"
+                      },
+                      "tags": [
+                        "indoor",
+                        "door",
+                        "opening"
+                      ]
+                    },
+                    {
+                      "id": "T_wind",
+                      "kind": "text",
+                      "text": "Wind.",
+                      "tags": [
+                        "indoor",
+                        "door",
+                        "opening"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "group",
+                  "id": "g_ask",
+                  "tags": [
+                    "indoor",
+                    "door"
+                  ],
+                  "selector": "choice",
+                  "children": [
+                    {
+                      "type": "group",
+                      "id": "o_knock",
+                      "tags": [
+                        "indoor",
+                        "door"
+                      ],
+                      "prompt": {
+                        "id": "P_knock",
+                        "kind": "line",
+                        "character": "BRAM",
+                        "text": "Knock",
+                        "tags": [
+                          "indoor",
+                          "door"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "type": "snippet",
+                          "id": "sn_k",
+                          "tags": [
+                            "indoor",
+                            "door"
+                          ],
+                          "beats": [
+                            {
+                              "id": "T_k",
+                              "kind": "text",
+                              "text": "knock",
+                              "tags": [
+                                "indoor",
+                                "door"
+                              ]
+                            }
+                          ],
+                          "jumpTo": "b_cellar",
+                          "jumpMode": "call"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "group",
+                      "id": "o_leave",
+                      "tags": [
+                        "indoor",
+                        "door"
+                      ],
+                      "prompt": {
+                        "id": "P_leave",
+                        "kind": "text",
+                        "text": "Leave",
+                        "tags": [
+                          "indoor",
+                          "door"
+                        ]
+                      },
+                      "children": [
+                        {
+                          "type": "snippet",
+                          "id": "sn_l",
+                          "tags": [
+                            "indoor",
+                            "door"
+                          ],
+                          "beats": [],
+                          "jumpTo": "END"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "b_cellar",
+              "gameId": "cellar",
+              "name": "Cellar",
+              "tags": [
+                "indoor"
+              ],
+              "children": [
+                {
+                  "type": "group",
+                  "id": "g_seq",
+                  "tags": [
+                    "indoor"
+                  ],
+                  "selector": "sequence",
+                  "children": [
+                    {
+                      "type": "snippet",
+                      "id": "sn_c1",
+                      "tags": [
+                        "indoor"
+                      ],
+                      "beats": [
+                        {
+                          "id": "T_c1",
+                          "kind": "text",
+                          "text": "dark",
+                          "tags": [
+                            "indoor"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "snippet",
+                      "id": "sn_c2",
+                      "tags": [
+                        "indoor"
+                      ],
+                      "beats": [
+                        {
+                          "id": "T_c2",
+                          "kind": "text",
+                          "text": "darker",
+                          "tags": [
+                            "indoor"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "s_yard",
+          "gameId": "the-yard",
+          "name": "Yard",
+          "blocks": [
+            {
+              "id": "b_gate",
+              "gameId": "gate",
+              "name": "Gate",
+              "children": [
+                {
+                  "type": "snippet",
+                  "id": "sn_g",
+                  "beats": [
+                    {
+                      "id": "T_g",
+                      "kind": "text",
+                      "text": "gate"
+                    }
+                  ],
+                  "jumpTo": "s_hall"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expectedBeatSequence": [
+        {
+          "sceneId": "s_hall",
+          "blockId": "b_door",
+          "snippetId": "sn_open",
+          "beat": {
+            "id": "L_hi",
+            "kind": "line",
+            "character": "ANNA",
+            "direction": "warmly",
+            "text": "Hello.",
+            "gameData": {
+              "mood": "glad"
+            },
+            "tags": [
+              "indoor",
+              "door",
+              "opening",
+              "greeting"
+            ]
+          }
+        },
+        {
+          "sceneId": "s_hall",
+          "blockId": "b_door",
+          "snippetId": "sn_open",
+          "beat": {
+            "id": "E_bell",
+            "kind": "gameEvent",
+            "gameData": {
+              "mood": "loud"
+            },
+            "tags": [
+              "indoor",
+              "door",
+              "opening"
+            ]
+          }
+        },
+        {
+          "sceneId": "s_hall",
+          "blockId": "b_door",
+          "snippetId": "sn_open",
+          "beat": {
+            "id": "T_wind",
+            "kind": "text",
+            "text": "Wind.",
+            "tags": [
+              "indoor",
+              "door",
+              "opening"
+            ]
+          }
+        },
+        {
+          "sceneId": "s_hall",
+          "blockId": "b_door",
+          "snippetId": "sn_k",
+          "beat": {
+            "id": "T_k",
+            "kind": "text",
+            "text": "knock",
+            "tags": [
+              "indoor",
+              "door"
+            ]
+          }
+        },
+        {
+          "sceneId": "s_hall",
+          "blockId": "b_cellar",
+          "snippetId": "sn_c1",
+          "beat": {
+            "id": "T_c1",
+            "kind": "text",
+            "text": "dark",
+            "tags": [
+              "indoor"
+            ]
+          }
+        },
+        {
+          "sceneId": "s_hall",
+          "blockId": "b_cellar",
+          "snippetId": "sn_c2",
+          "beat": {
+            "id": "T_c2",
+            "kind": "text",
+            "text": "darker",
+            "tags": [
+              "indoor"
+            ]
+          }
+        },
+        {
+          "sceneId": "s_yard",
+          "blockId": "b_gate",
+          "snippetId": "sn_g",
+          "beat": {
+            "id": "T_g",
+            "kind": "text",
+            "text": "gate"
+          }
+        }
+      ]
+    }
+  ],
+  "audio": [
+    {
+      "name": "the audio resolver joins a base and a take, and has nothing for a beat with no take",
+      "manifest": "{\"schema\":\"patter/audio@0\",\"clips\":{\"L1\":{\"file\":\"final/L1.wav\",\"rung\":\"final\"},\"L2\":{\"file\":\"scratch/L2.mp3\",\"rung\":\"scratch\"},\"L3\":{\"file\":\"\",\"rung\":\"final\"}}}",
+      "lookups": [
+        {
+          "base": "audio",
+          "beatId": "L1",
+          "expected": "audio/final/L1.wav"
+        },
+        {
+          "base": "audio/",
+          "beatId": "L2",
+          "expected": "audio/scratch/L2.mp3"
+        },
+        {
+          "base": "/",
+          "beatId": "L1",
+          "expected": "/final/L1.wav"
+        },
+        {
+          "base": "res://",
+          "beatId": "L1",
+          "expected": "res://final/L1.wav"
+        },
+        {
+          "base": "C:\\Game\\Audio\\",
+          "beatId": "L1",
+          "expected": "C:\\Game\\Audio\\final/L1.wav"
+        },
+        {
+          "base": "",
+          "beatId": "L2",
+          "expected": "scratch/L2.mp3"
+        },
+        {
+          "base": "audio",
+          "beatId": "L9",
+          "expected": null
+        },
+        {
+          "base": "audio",
+          "beatId": "L3",
+          "expected": null
+        }
+      ]
     }
   ]
 }

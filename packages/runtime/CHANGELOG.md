@@ -33,6 +33,12 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Changed
+
+- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
+  audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
+  and a block named under another scene.
+
 ## [0.20.0] - 2026-10-06
 
 ### Added

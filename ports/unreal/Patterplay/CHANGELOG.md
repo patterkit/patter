@@ -13,10 +13,21 @@ runtime behaviour.
   Blueprint nodes, asked again for every pin wired to them, and each call walked the whole scene.
 - **The runtime module builds in unity (merged) mode again.** Its conversions between the core and Blueprint
   live in one place rather than a copy in each file, which is what had kept it out.
+- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
+  audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
+  and a block named under another scene.
+- **The audio resolver's reading and joining live in the C++ core** (`Patter/Audio.h`), with
+  `UPatterAudioResolver` built on it, so the corpus checks the same code a game runs. A manifest that won't read
+  still gives an empty resolver, and the log now says why.
 
 ### Removed
 
 - **Two unused helpers in the C++ core**: the token-set overload of `splitRef` and `flatOf`.
+
+### Fixed
+
+- **The audio resolver matches a beat id exactly**, as every other runtime does. It matched without regard to
+  case, so `l` found the take for `L`.
 
 ## [0.20.0] - 2026-10-06
 

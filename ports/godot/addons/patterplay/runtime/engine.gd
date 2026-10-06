@@ -692,8 +692,10 @@ func get_property(ref: String):
 
 
 # Editable @patter properties (the shared / engine-scoped ones), for a live inspector.
-# Each row: { "name":, "path":"@name", "type":, "value":, "default":, "values":[enum opts],
-# "stages":[ladder], "writable": }. The shape is @wildwinter/scoperegistry's property row,
+# Each row: { "name":, "path":"@patter.name", "type":, "values"?:[enum opts], "stages"?:[ladder],
+# "value":, "default":, "writable": }, with "values" and "stages" only where the declaration has
+# them (until 2026-10-06 every row carried both, empty when undeclared, where the reference leaves
+# them out; read them with .get()). The shape is @wildwinter/scoperegistry's property row,
 # shared with the Storylet Engine: "path" is the addressable reference get_property and
 # set_property take, "name" the bare declared name. It was "ref" until 2026-09-01, when the
 # JS runtime stopped forking that row type. Parity with
@@ -703,19 +705,22 @@ func list_properties() -> Array:
 	for d in _host.patter_shared_decls:
 		# The name as declared, as every runtime reports it; the bag keys it folded, which is how it reads.
 		var nm: String = str(d["name"])
-		rows.append({
+		var row := {
 			"name": nm,
 			# The QUALIFIED address, matching what the shared bag composes for every other
 			# scope. `@gold` still resolves on input - splitRef defaults an unqualified name to
 			# the patter scope - but it is the shorthand, not the address a row reports.
 			"path": "@patter." + nm,
 			"type": d.get("type", "boolean"),
-			"value": _host.patter_bag.get_value(nm.to_lower()),
-			"default": PatterBundle.prop_default(d),
-			"values": d.get("values", []),
-			"stages": d.get("stages", []),
-			"writable": d.get("writable", true),
-		})
+		}
+		if d.has("values"):
+			row["values"] = d["values"]
+		if d.has("stages"):
+			row["stages"] = d["stages"]
+		row["value"] = _host.patter_bag.get_value(nm.to_lower())
+		row["default"] = PatterBundle.prop_default(d)
+		row["writable"] = d.get("writable", true)
+		rows.append(row)
 	return rows
 
 
@@ -987,12 +992,14 @@ func get_outline() -> Array:
 	var out: Array = []
 	for sid in _host.bundle["scenes"].keys():
 		var scene: Dictionary = _host.bundle["scenes"][sid]
-		var os := {
-			"id": scene["id"],
-			"gameId": PatterBundle.effective_game_id(scene),
-			"name": scene.get("name", ""),
-			"blocks": [],
-		}
+		var os := {"id": scene["id"]}
+		# An address that comes out empty (no gameId, and a name with nothing to derive one from) is
+		# left out, as the reference leaves it out; it was an empty string here until 2026-10-06.
+		var sgid := PatterBundle.effective_game_id(scene)
+		if sgid != "":
+			os["gameId"] = sgid
+		os["name"] = scene.get("name", "")
+		os["blocks"] = []
 		# The node's own raw overrides, omitted when empty (parity with a beat's gameData).
 		var sgd := _own_game_data(scene)
 		if not sgd.is_empty():
@@ -1001,12 +1008,12 @@ func get_outline() -> Array:
 		if not st.is_empty():
 			os["tags"] = st
 		for block in scene["blocks"]:
-			var ob := {
-				"id": block["id"],
-				"gameId": PatterBundle.effective_game_id(block),
-				"name": block.get("name", ""),
-				"children": [],
-			}
+			var ob := {"id": block["id"]}
+			var bgid := PatterBundle.effective_game_id(block)
+			if bgid != "":
+				ob["gameId"] = bgid
+			ob["name"] = block.get("name", "")
+			ob["children"] = []
 			var bgd := _own_game_data(block)
 			if not bgd.is_empty():
 				ob["gameData"] = bgd

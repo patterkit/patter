@@ -11,6 +11,9 @@ same runtime behaviour.
 - **The core runtime assembly (`Patterplay.Runtime`) declares that it uses no engine code**, so nothing
   Unity-specific can creep into the part every runtime shares. The Unity glue stays in
   `Patterplay.Runtime.Unity`.
+- **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
+  audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
+  and a block named under another scene. Unity already matched it.
 
 ### Deprecated
 

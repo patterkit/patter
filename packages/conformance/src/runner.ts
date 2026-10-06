@@ -20,9 +20,10 @@ import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
+import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
-  LogCase,
+  AudioCase, LogCase,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -96,6 +97,12 @@ export function runScript(
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
   let checkpoint: Checkpoint | undefined;
+  // A call the runtime must refuse: it throws, and the engine is as it was (still inside its checkpoint).
+  const refused = (what: string, call: () => unknown): void => {
+    const wasIn = engine.inCheckpoint;
+    try { call(); } catch { if (engine.inCheckpoint !== wasIn) throw new Error(`${what}: a refusal changed the checkpoint`); return; }
+    throw new Error(`${what}: expected the runtime to refuse it`);
+  };
   for (const op of ops) {
     const chunk: TranscriptStep[] = [];
     switch (op.op) {
@@ -148,6 +155,7 @@ export function runScript(
         // Live bundle refresh: the whole game carried onto the EDITED bundle. The reference runner
         // uses Engine.hotSwap (save -> fresh engine on bundleB -> load); a port without the helper
         // does the same three calls with its own save API. Drift resolves per §9.8.
+        if (op.expectRefused) { refused("hotSwap", () => engine.hotSwap(ctx.bundleB ?? ctx.bundle)); break; }
         engine = engine.hotSwap(ctx.bundleB!);
         break;
       case "setLocale":
@@ -176,6 +184,7 @@ export function runScript(
         break;
       }
       case "reset":
+        if (op.expectRefused) { refused("reset", () => engine.reset()); break; }
         engine.reset();
         current = "";
         break;
@@ -183,8 +192,16 @@ export function runScript(
         engine.getFlow(current)!.reset(op.scene, op.block);
         break;
       case "checkpoint":
+        if (op.expectRefused) { refused("checkpoint", () => engine.checkpoint()); break; }
         checkpoint = engine.checkpoint();
         break;
+      case "expectProperties": {
+        const got = JSON.parse(JSON.stringify(engine.listProperties())) as unknown[];
+        if (JSON.stringify(got) !== JSON.stringify(op.expectResult)) {
+          throw new Error(`expectProperties: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
+        }
+        break;
+      }
       case "rollback":
         engine.rollback(checkpoint!);
         checkpoint = undefined;
@@ -332,4 +349,9 @@ export function runLogCase(c: LogCase, maxSteps = 200): { log: unknown[]; traced
   };
   const on = play(true);
   return { log: on.log, tracedOn: on.traced, tracedOff: play(false).traced };
+}
+
+/** What the audio resolver gives for each lookup of an audio case (the reference's createAudioResolver). */
+export function runAudioCase(c: AudioCase): (string | null)[] {
+  return c.lookups.map((l) => createAudioResolver(c.manifest, l.base).resolve(l.beatId));
 }

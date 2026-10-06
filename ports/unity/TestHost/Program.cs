@@ -80,6 +80,14 @@ namespace Patterkit.Patterplay.TestHost
             int ds = RunDescribes(describesArr);
             Console.WriteLine($"  [describes] the bundle description every runtime gives: {ds}/{describesArr.GetArrayLength()}");
             if (ds != describesArr.GetArrayLength()) Fail("describes", "section total", $"{ds} of {describesArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("outlines", out var outlinesArr)) { Console.Error.WriteLine("corpus has no outlines section"); return 2; }
+            int ol = RunOutlines(outlinesArr);
+            Console.WriteLine($"  [outlines] the outline and beat sequence every runtime gives: {ol}/{outlinesArr.GetArrayLength()}");
+            if (ol != outlinesArr.GetArrayLength()) Fail("outlines", "section total", $"{ol} of {outlinesArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("audio", out var audioArr)) { Console.Error.WriteLine("corpus has no audio section"); return 2; }
+            int au = RunAudio(audioArr);
+            Console.WriteLine($"  [audio] the audio resolver's path for each beat: {au}/{audioArr.GetArrayLength()}");
+            if (au != audioArr.GetArrayLength()) Fail("audio", "section total", $"{au} of {audioArr.GetArrayLength()} passed");
 
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.
@@ -875,6 +883,7 @@ namespace Patterkit.Patterplay.TestHost
                             }
                             case "hotSwap":
                             {
+                                if (Refused(op)) { ExpectRefused(engine, "hotSwap", () => engine.HotSwap(bundleB ?? bundle)); break; }
                                 // Live bundle refresh (§9.8): serialise the whole game, fresh engine on
                                 // the EDITED bundle, restore - drift resolves identically on every port.
                                 if (_jsonSaveLoad)
@@ -930,11 +939,13 @@ namespace Patterkit.Patterplay.TestHost
                                 break;
                             }
                             case "reset":
+                                if (Refused(op)) { ExpectRefused(engine, "reset", engine.Reset); break; }
                                 engine.Reset();
                                 current = "";
                                 break;
                             // Checkpoints: no transcript; the advances after them show the state they left.
                             case "checkpoint":
+                                if (Refused(op)) { ExpectRefused(engine, "checkpoint", () => engine.Checkpoint()); break; }
                                 checkpoint = engine.Checkpoint();
                                 break;
                             case "rollback":
@@ -945,12 +956,55 @@ namespace Patterkit.Patterplay.TestHost
                                 engine.Commit(checkpoint);
                                 checkpoint = null;
                                 break;
+                            case "expectProperties":
+                            {
+                                // The shared @patter rows as the reference's JSON: same keys and values,
+                                // values and stages present only where the declaration has them.
+                                var got = engine.ListProperties().Select(PropertyRowToObject).ToList();
+                                var want = op.GetProperty("expectResult");
+                                if (!MatchArray(got, want))
+                                    throw new Exception($"expectProperties: expected {want.GetRawText()}, got {Dump(got)}");
+                                break;
+                            }
+                            default:
+                                // An op this harness cannot run is a check that cannot fail: refuse it.
+                                throw new Exception($"unknown script op '{kind}'");
                         }
                         var expectChunk = op.TryGetProperty("expect", out var ex) ? ex : default;
                         var expected = expectChunk.ValueKind == JsonValueKind.Array ? expectChunk : (JsonElement?)null;
                         if (!MatchChunk(chunk, expected)) { ok = false; Fail("scripted", name, $"op {kind}: mismatch (got {Dump(chunk)})"); break; }
                     }
             return (ok, engine);
+        }
+
+        /// <summary>Whether a script op carries `expectRefused: true`.</summary>
+        private static bool Refused(JsonElement op)
+            => op.TryGetProperty("expectRefused", out var r) && r.ValueKind == JsonValueKind.True;
+
+        /// <summary>A call the runtime must refuse: it throws, and the engine is as it was (still inside its
+        /// checkpoint, or still outside one). The ops after it prove nothing else moved.</summary>
+        private static void ExpectRefused(Engine engine, string what, Action call)
+        {
+            bool wasIn = engine.InCheckpoint;
+            try { call(); }
+            catch (Exception)
+            {
+                if (engine.InCheckpoint != wasIn) throw new Exception($"{what}: a refusal changed the checkpoint");
+                return;
+            }
+            throw new Exception($"{what}: expected the runtime to refuse it");
+        }
+
+        /// <summary>A property row in the reference's JSON shape (listProperties, with an undefined field absent).</summary>
+        private static object PropertyRowToObject(PropertyRow r)
+        {
+            var o = new Dictionary<string, object> { ["name"] = r.Name, ["path"] = r.Path, ["type"] = r.Type };
+            if (r.Values != null) o["values"] = r.Values.Cast<object>().ToList();
+            if (r.Stages != null) o["stages"] = r.Stages.Cast<object>().ToList();
+            o["value"] = r.Value != null ? ValueToObject(r.Value) : null;
+            o["default"] = r.Default != null ? ValueToObject(r.Default) : null;
+            o["writable"] = r.Writable;
+            return o;
         }
 
         // -- saves: an envelope the JS reference wrote, loaded through THIS package's own boundary -----

@@ -160,7 +160,7 @@ export type ScriptOp =
   // on the case's EDITED bundle (`bundleB`), restore into it. Same semantics as saveLoad, onto changed
   // content: stack frames re-find their next child by id, drifted choice options drop, a vanished
   // active snippet is skipped. Every port must resolve the drift identically.
-  | { op: "hotSwap" }
+  | { op: "hotSwap"; expectRefused?: boolean }
   // Cast introspection: a STATIC structure query, so it reads the same at any point in a script and
   // produces no transcript. No `scene` = the project's declared cast (`getCast`), `scene` alone = that
   // scene's speakers, `scene` + `block` = the block's. `expectResult` pins the exact array INCLUDING
@@ -174,7 +174,7 @@ export type ScriptOp =
   // never merged with the project's declared defaults, never inherited from the scene by its blocks, and
   // `{}` for a node with none or a ref that does not resolve. Key order is not part of the contract.
   | { op: "expectGameData"; scene: string; block?: string; expectResult: GameData }
-  | { op: "reset" }
+  | { op: "reset"; expectRefused?: boolean }
   // Reset the CURRENT flow (Flow.reset, an alias of start): forget its per-flow state and anything waiting to be
   // delivered, and begin again at the scene (empty: the first authored scene) and block given. No transcript.
   | { op: "resetFlow"; scene?: string; block?: string }
@@ -182,9 +182,15 @@ export type ScriptOp =
   // as it was then (every property, visit count, shuffle and sequence position, every flow's cursor and
   // PRNG; a flow opened since is closed and forgotten); `commit` keeps everything. None produces a
   // transcript: the advances after them show the state they left. One checkpoint at a time.
-  | { op: "checkpoint" }
+  // `expectRefused`: the runtime refuses the call (inside an open checkpoint, say) and changes nothing.
+  // JS, C# and C++ throw; Godot, which cannot, reports it and returns null (checkpoint), the engine itself
+  // (hot_swap), or nothing (reset), leaving the engine as it was. The ops after it prove nothing moved.
+  | { op: "checkpoint"; expectRefused?: boolean }
   | { op: "rollback" }
-  | { op: "commit" };
+  | { op: "commit" }
+  // The engine's listProperties(), as JSON: each shared @patter property's row in declaration order, with
+  // values and stages present only where the declaration has them.
+  | { op: "expectProperties"; expectResult: unknown[] };
 
 /** A compiled scripted case in the portable corpus. */
 export interface ScriptedCase {
@@ -270,6 +276,31 @@ export interface Corpus {
   saves: SaveCase[];
   logs: LogCase[];
   describes: DescribeCase[];
+  outlines: OutlineCase[];
+  audio: AudioCase[];
+}
+
+/**
+ * A structure case: getOutline() and getBeatSequence() for one bundle, in the reference's shape (field
+ * names, order, and an absent optional field absent). Written by the reference at build time, as a
+ * describe case is; the reference's own tests pin what it says.
+ */
+export interface OutlineCase {
+  name: string;
+  bundle: Bundle;
+  expectedOutline: unknown;
+  expectedBeatSequence: unknown;
+}
+
+/**
+ * An audio case: a `patteraudio.json` manifest, and what the audio resolver gives for a beat under a base
+ * path: the base and the take's file joined (a base that already ends in a separator is kept as it stands),
+ * or null when the beat has no take.
+ */
+export interface AudioCase {
+  name: string;
+  manifest: string;
+  lookups: { base: string; beatId: string; expected: string | null }[];
 }
 
 /**
@@ -383,6 +414,8 @@ export interface Fixtures {
   saves: SaveFixture[];
   logs: LogFixture[];
   describes: DescribeFixture[];
+  outlines: DescribeFixture[];
+  audio: AudioCase[];
 }
 
 /** An authored describe fixture (source form; compiled by buildCorpus into a DescribeCase). */

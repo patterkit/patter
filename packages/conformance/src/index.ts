@@ -10,5 +10,5 @@ export type {
   ExpressionFixture, SpecificityFixture, RuntimeFixture, ScriptedFixture, GameDataFixture, SaveFixture, Fixtures,
 } from "./types.js";
 export { buildCorpus } from "./build.js";
-export { runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runScript, runSaveCase, runGameDataCase, runLogCase, envelopeKeyPaths, normaliseStep, mulberry32 } from "./runner.js";
+export { runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runScript, runSaveCase, runGameDataCase, runLogCase, runAudioCase, envelopeKeyPaths, normaliseStep, mulberry32 } from "./runner.js";
 export { cases } from "./cases.js";

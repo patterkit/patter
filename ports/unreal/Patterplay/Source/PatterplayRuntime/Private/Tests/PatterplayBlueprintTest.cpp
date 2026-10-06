@@ -80,6 +80,11 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("audio: a folder with its slash"), UPatterAudioResolver::Create(Manifest, TEXT("Audio/"))->Resolve(TEXT("L")), FString(TEXT("Audio/final/L.wav")));
 	TestEqual(TEXT("audio: the root keeps its slash"), UPatterAudioResolver::Create(Manifest, TEXT("/"))->Resolve(TEXT("L")), FString(TEXT("/final/L.wav")));
 	TestEqual(TEXT("audio: no take is empty"), UPatterAudioResolver::Create(Manifest, TEXT("Audio"))->Resolve(TEXT("M")), FString());
+	TestEqual(TEXT("audio: an empty base gives the take alone"), UPatterAudioResolver::Create(Manifest, TEXT(""))->Resolve(TEXT("L")), FString(TEXT("final/L.wav")));
+	// A beat id is matched exactly, as on every runtime: an FString map key once matched it in any case.
+	TestEqual(TEXT("audio: a beat id in another case is no take"), UPatterAudioResolver::Create(Manifest, TEXT("Audio"))->Resolve(TEXT("l")), FString());
+	AddExpectedErrorPlain(TEXT("not a valid patteraudio.json manifest"), EAutomationExpectedErrorFlags::Contains, 1);
+	TestEqual(TEXT("audio: a manifest that is not JSON resolves nothing"), UPatterAudioResolver::Create(TEXT("not json"), TEXT("Audio"))->Resolve(TEXT("L")), FString());
 
 	// --- OpenFlow with a block and a seed, and Flows ---------------------------------------------
 	UPatterFlow* Flow = Engine->OpenFlow(TEXT("main"), TEXT("great-hall"), TEXT("the-door"), true, 7);
