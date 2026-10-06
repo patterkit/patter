@@ -117,6 +117,8 @@ const api: PatterApi = {
   // Project-wide Replace coordination: main asks the editor to flush its open scene before applying, and
   // tells it to reload after. (The Replace UI itself lives in the search window: see searchApi below.)
   onEditorFlush: (handler) => { ipcRenderer.on("editor:flush", () => handler()); },
+  // Closing the window or quitting: main holds the close until the editor has written what it holds.
+  onFlushBeforeClose: (handler) => { ipcRenderer.on("app:flush-before-close", () => { void handler().finally(() => ipcRenderer.invoke("app:close-flushed")); }); },
   editorFlushed: () => { void ipcRenderer.invoke("editor:flushed"); },
   onReplaceApplied: (handler) => { ipcRenderer.on("replace:applied", (_e, announce?: boolean) => handler(announce === true)); },
   openCoverageWindow: () => ipcRenderer.invoke("coverage:open"),

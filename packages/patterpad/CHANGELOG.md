@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a
+  moment after you stop typing, and a quit inside that moment used to close without saving. It now finishes
+  writing first. Leaving the window for another app also saves.
+
 ## [0.25.0] - 2026-10-06
 
 ### Security

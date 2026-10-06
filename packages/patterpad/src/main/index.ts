@@ -3,7 +3,7 @@
 // lifecycle + window + native dialogs + IPC wiring; the project session lives in project.ts and the
 // open-where-you-left-off / recents / identity store in store.ts.
 
-import { app, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, Menu } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, ipcMain, screen, shell, systemPreferences, Menu } from "electron";
 import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -141,6 +141,26 @@ function flushEditorScene(): Promise<void> {
     setTimeout(() => { const i = flushWaiters.indexOf(resolve); if (i >= 0) { flushWaiters.splice(i, 1); resolve(); } }, 1500);
   });
 }
+
+// Closing the editor, or quitting, waits for the renderer to write what it still holds: text inside the
+// autosave debounce (about 700 ms), Notes, comments, and the remembered place. Without this, Cmd+Q a
+// moment after typing dropped the last edit: `beforeunload` cannot await a save, and nothing else asked.
+// The timeout is generous because the save goes through the VC layer (a first edit can mean a Perforce
+// checkout), but bounded, so a hung renderer delays the close rather than blocking it.
+let closeFlushWaiters: Array<() => void> = [];
+function flushBeforeClose(w: BrowserWindow): Promise<void> {
+  return new Promise((resolve) => {
+    if (w.isDestroyed() || w.webContents.isDestroyed() || w.webContents.isCrashed()) return resolve();
+    closeFlushWaiters.push(resolve);
+    w.webContents.send("app:flush-before-close");
+    setTimeout(() => { const i = closeFlushWaiters.indexOf(resolve); if (i >= 0) { closeFlushWaiters.splice(i, 1); resolve(); } }, 10_000);
+  });
+}
+// Set by Quit, so a close that waited for the flush resumes the quit rather than only closing the window.
+let quitting = false;
+// Installing an update closes the windows itself and cannot be resumed after a close is held up, so it
+// goes straight through. The shell's "Restart Now" has already offered to save before it gets here.
+let quittingForUpdate = false;
 
 /**
  * Opening a project, on the shell's `createProjectSession`.
@@ -1219,6 +1239,7 @@ function registerIpc(): void {
   // Project-wide Replace (the Find counterpart). Preview is read-only; Apply flushes the editor's open scene
   // to disk first (so unsaved edits are included + not clobbered), commits the rewritten shards through VC,
   // then tells the editor to reload its open scene with the new text.
+  ipcMain.handle("app:close-flushed", () => { const w = closeFlushWaiters; closeFlushWaiters = []; for (const r of w) r(); }); // the editor wrote what it held; the close may go on
   ipcMain.handle("editor:flushed", () => { const w = flushWaiters; flushWaiters = []; for (const r of w) r(); }); // the editor saved its open scene
   ipcMain.handle("searchWin:replacePreview", (_e, opts: import("@patterkit/ops").ReplaceOptions) => project.replacePreview(opts));
   ipcMain.handle("searchWin:replaceApply", async (_e, opts: import("@patterkit/ops").ReplaceOptions) => {
@@ -1315,12 +1336,26 @@ function createWindow(): void {
   const reveal = (): void => {
     if (revealed) return;
     revealed = true;
-    ipcMain.removeListener("app:ready", reveal);
     win?.show();
   };
-  ipcMain.on("app:ready", reveal);
+  // The signal also says the renderer's close-flush handler is listening. A renderer that never got that
+  // far has nothing typed in it, and holding its close would only wait out the timeout.
+  const self = win;
+  let booted = false;
+  const onReady = (e: Electron.IpcMainEvent): void => { if (e.sender !== self.webContents) return; booted = true; reveal(); };
+  ipcMain.on("app:ready", onReady);
   setTimeout(reveal, 4000);
-  win.on("closed", () => { win = null; for (const w of windows.all()) w.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
+  let flushed = false;
+  self.on("close", (event) => {
+    if (flushed || !booted || quittingForUpdate) return;
+    event.preventDefault(); // held until the renderer has written what it holds, then closed (or quit) again
+    void flushBeforeClose(self).then(() => {
+      flushed = true;
+      if (quitting) app.quit();
+      else if (!self.isDestroyed()) self.close();
+    });
+  });
+  win.on("closed", () => { ipcMain.removeListener("app:ready", onReady); win = null; for (const w of windows.all()) w.close(); debugServer?.stop(); }); // closing the editor closes its helper windows + the debug link
 
   if (process.env["ELECTRON_RENDERER_URL"]) void win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   else void win.loadFile(join(here, "../renderer/index.html"));
@@ -1420,4 +1455,6 @@ if (!app.requestSingleInstanceLock({ argv: process.argv })) {
 
   // Quit when all windows are closed - on macOS too (we don't keep a window-less app "hanging around").
   app.on("window-all-closed", () => app.quit());
+  app.on("before-quit", () => { quitting = true; });
+  autoUpdater.on("before-quit-for-update", () => { quittingForUpdate = true; });
 }

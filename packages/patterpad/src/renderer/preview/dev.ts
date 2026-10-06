@@ -295,6 +295,7 @@ const stub = {
   openSearchWindow: async () => undefined,
   onSearchNavigate: () => undefined,
   onEditorFlush: () => undefined,
+  onFlushBeforeClose: () => undefined,
   editorFlushed: () => undefined,
   onReplaceApplied: () => undefined,
   validate: async () => ({

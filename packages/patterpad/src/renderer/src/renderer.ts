@@ -2255,10 +2255,16 @@ function showWelcome(state: BootState): void {
  *  with nothing open. (Found beside the open-over fix, 2026-09-03.) */
 async function leaveProject(): Promise<void> {
   if (!project) return;
+  await flushPending();
+  flushRemember();
+}
+
+/** Write every edit still waiting: the scene's text inside the autosave debounce, Notes, and comments.
+ *  Each is a no-op when clean, so this is cheap enough to run whenever the window loses focus. */
+async function flushPending(): Promise<void> {
   if (surface) await save();
   await persistDocs();
   await persistComments();
-  flushRemember();
 }
 
 async function openPath(path: string): Promise<void> {
@@ -2956,6 +2962,10 @@ async function boot(): Promise<void> {
   });
   // No autosave timer: the controller runs its own clock off the edits themselves.
   window.addEventListener("beforeunload", flushRemember); // closing mid-debounce still records caret + scene
+  // Leaving the window writes what is pending, as Storyletter does: whatever the author goes to next (the
+  // play window, a diff tool, a game reading the files) sees current bytes. Closing and quitting are
+  // covered by main, which holds the close until onFlushBeforeClose below has answered.
+  window.addEventListener("blur", () => { if (project) void flushPending(); });
   const state = bootState; // read at the top of the module, before the frame was built
   docHidden = new Set(panes.docHidden ?? []); // restore the remembered documentation-class visibility
   lineStatusShown = panes.lineStatusShown ?? []; // restore the remembered Line-Status shown set (default none)
@@ -3092,6 +3102,8 @@ window.patter.onPlayFollow((sceneId, beatId) => void jumpTo({ id: beatId, kind: 
 // Project-wide Replace (driven from the search window): main asks us to flush the open scene before it
 // rewrites the shards, then to reload once it's done.
 window.patter.onEditorFlush(() => void (async () => { await save(); window.patter.editorFlushed(); })());
+// Closing the window or quitting: everything leaving a project writes, written before main lets go.
+window.patter.onFlushBeforeClose(leaveProject);
 window.patter.onReplaceApplied((announce) => void (async () => {
   await reloadOpenScene(); // re-read the open scene with the replaced text (loadScene skips the open one)
   await refreshProblems();

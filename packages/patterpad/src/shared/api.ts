@@ -1005,6 +1005,9 @@ export interface PatterApi {
   /** Project-wide Replace coordination (the Replace UI lives in the search window): main asks the editor to
    *  flush its open scene before applying (reply with `editorFlushed`), and to reload it after. */
   onEditorFlush(handler: () => void): void;
+  /** The window is closing or the app is quitting: write everything still pending. Main holds the close
+   *  until the returned promise settles (or a timeout passes), then lets it go on. */
+  onFlushBeforeClose(handler: () => Promise<void>): void;
   editorFlushed(): void;
   /** `announce` is true only for Replace itself; an import or a suggestion decision reloads quietly. */
   onReplaceApplied(handler: (announce: boolean) => void): void;
