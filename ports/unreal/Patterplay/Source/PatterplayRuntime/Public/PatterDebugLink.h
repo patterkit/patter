@@ -60,6 +60,7 @@ private:
 	FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl);
 	void Connect();
 	void Post(const FString& Message);
+	void GoQuiet();   // the editor refused or dropped the link: stop queuing for good
 	void Flush();
 	FString HelloMessage() const;
 

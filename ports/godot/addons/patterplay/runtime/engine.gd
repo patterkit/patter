@@ -65,6 +65,8 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		# keeps the engine alive forever and makes the weak debug registry report a dead one.
 		# test_debug_registry caught exactly that, which is what it is for.
 		"engine_log": _engine_log,
+		# The next engine-log seq: its own counter, since the log's size restarts after a clear.
+		"engine_log_seq": 0,
 		# Diagnostics hook (opt-in, dev tooling): called with the choice's group id whenever a
 		# choice runs dry - no takeable option and no eligible fallback - so the silent
 		# fall-through is observable. Parity with the JS runtime's onDryChoice, which the

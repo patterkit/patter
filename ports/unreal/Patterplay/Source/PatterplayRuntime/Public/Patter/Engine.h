@@ -462,6 +462,7 @@ namespace patter
         /// The engine's ordered stream, shared by pointer so a flow appends without holding
         /// the engine.
         std::vector<LogEntry>* engineLog = nullptr;
+        int engineLogSeq = 0;   // the next engine-log seq: its own counter, since the log's size restarts after a clear
         /// Called with the group id when a choice runs dry - no takeable option and no
         /// eligible fallback - so the silent fall-through is observable. Parity with the JS
         /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct
@@ -775,7 +776,7 @@ namespace patter
             else
             {
                 std::string id = sceneId;
-                if (id.empty() && !host_->bundle->scenes.empty()) id = host_->bundle->scenes.begin()->first;
+                if (id.empty() && !host_->bundle->scenes.empty()) id = host_->bundle->scenesInOrder().front()->id;
                 auto it = host_->bundle->scenes.find(id);
                 if (it == host_->bundle->scenes.end()) throw std::runtime_error(id.empty() ? "no scenes in bundle" : ("unknown scene: " + id));
                 enterSceneSetup(id);
@@ -831,7 +832,7 @@ namespace patter
             {
                 LogEntry wide = e;
                 wide.flow = id_;
-                wide.seq = static_cast<int>(host_->engineLog->size());
+                wide.seq = host_->engineLogSeq++;
                 host_->engineLog->push_back(std::move(wide));
             }
         }
@@ -1236,6 +1237,25 @@ namespace patter
             kernelCall([&] { host_->registry->mountOwned(key, bag, std::string(PATTER_OWNER)); });
         }
 
+        /** Mount, and say whether the mount CLAIMED values a load had parked at `key`. Only asked while a
+         *  checkpoint is open (`ask`), since only a rollback needs to know: it must hand claimed values back
+         *  to the registry, or a scene first entered inside the checkpoint loses its saved values. A fresh
+         *  bag holds only its defaults, so a change across the mount is a claim. Parked values equal to the
+         *  defaults are not told apart, and need not be: dropping them changes nothing a story can read. */
+        bool mountClaims(const std::string& key, const std::shared_ptr<PropertyBag>& bag, bool ask)
+        {
+            const std::string before = ask ? bagValues(*bag) : std::string();
+            mount(key, bag);
+            return ask && bagValues(*bag) != before;
+        }
+
+        static std::string bagValues(const PropertyBag& bag)
+        {
+            std::string out;
+            for (const auto& kv : bag.save()) { out += kv.first; out += '='; out += kv.second.toJsonString(); out += ';'; }
+            return out;
+        }
+
         /** Make (and register) scene `s`'s stage bag and this flow's bag for it, if not made yet. A bag
          *  made here claims whatever values the registry holds for its key: that is how a loaded save
          *  reaches it. The bag's constructor seeds each declared default (the type's when none),
@@ -1253,20 +1273,20 @@ namespace patter
                 std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, false);
                 auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
                 const std::string key = registrykeys::flowScene(id_, s);
-                mount(key, bag);
+                const bool claimed = mountClaims(key, bag, journal != nullptr);
                 registered_.push_back(key);
                 sceneBags_.emplace(s, bag);
                 // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next
-                // real entry.
+                // real entry, unless the mount claimed values a load had parked, which go back to the registry.
                 if (journal)
                 {
                     std::shared_ptr<Flow> self = shared_from_this();
-                    journal->undo.push_back([self, s, key, bag]
+                    journal->undo.push_back([self, s, key, bag, claimed]
                     {
                         auto it = self->sceneBags_.find(s);
                         if (it == self->sceneBags_.end() || it->second != bag) return; // already released with the flow
                         ScopeRegistry& reg = *self->host_->registry;
-                        if (reg.has(key)) reg.remove(key);
+                        if (reg.has(key)) reg.remove(key, claimed);
                         self->registered_.erase(std::remove(self->registered_.begin(), self->registered_.end(), key), self->registered_.end());
                         self->sceneBags_.erase(it);
                     });
@@ -1276,17 +1296,17 @@ namespace patter
             {
                 std::vector<ScopeDeclaration> decls = declsFor(sc->second.sceneProps, shared, true);
                 auto bag = std::make_shared<PropertyBag>(&decls, nullptr, "@scene.");
-                mount(registrykeys::stage(s), bag);
+                const bool claimed = mountClaims(registrykeys::stage(s), bag, journal != nullptr);
                 host_->stageBags.emplace(s, bag);
                 if (journal)
                 {
                     FlowHost* host = host_;
-                    journal->undo.push_back([host, s, bag]
+                    journal->undo.push_back([host, s, bag, claimed]
                     {
                         auto it = host->stageBags.find(s);
                         if (it == host->stageBags.end() || it->second != bag) return;
                         const std::string key = registrykeys::stage(s);
-                        if (host->registry->has(key)) host->registry->remove(key);
+                        if (host->registry->has(key)) host->registry->remove(key, claimed);
                         host->stageBags.erase(it);
                     });
                 }
@@ -2361,13 +2381,13 @@ namespace patter
 
         // --- Static structure introspection (editor / dev tooling) -----------------
         // The authored tree: scenes -> blocks -> children (groups + snippets, groups preserved) -> a
-        // snippet's beats. Static; per-beat data at the source locale. Scenes iterate by id (std::map).
+        // snippet's beats. Static; per-beat data at the source locale. Scenes in authored order.
         std::vector<OutlineScene> listOutline() const
         {
             std::vector<OutlineScene> out;
-            for (const auto& kv : host_.bundle->scenes)
+            for (const Scene* sp : host_.bundle->scenesInOrder())
             {
-                const Scene& scene = kv.second;
+                const Scene& scene = *sp;
                 OutlineScene os;
                 os.id = scene.id;
                 os.gameId = effectiveGameId(scene.gameId, scene.name);
@@ -2394,11 +2414,8 @@ namespace patter
         std::vector<OutlineFlatBeat> beatSequence() const
         {
             std::vector<OutlineFlatBeat> seq;
-            for (const auto& kv : host_.bundle->scenes)
-            {
-                const Scene& scene = kv.second;
-                for (const Block& block : scene.blocks) collectBeats(block.children, scene.id, block.id, seq);
-            }
+            for (const Scene* scene : host_.bundle->scenesInOrder())
+                for (const Block& block : scene->blocks) collectBeats(block.children, scene->id, block.id, seq);
             return seq;
         }
 

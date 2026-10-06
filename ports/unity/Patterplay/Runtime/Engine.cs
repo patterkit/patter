@@ -195,6 +195,8 @@ namespace Patterkit.Patterplay
         /// <summary>The engine's ordered stream, shared by reference so a flow appends to it
         /// without holding the engine (which would be a cycle).</summary>
         public List<LogEntry> EngineLog;
+        /// <summary>The next engine-log Seq: its own counter, since the log's length restarts after a clear.</summary>
+        public int EngineLogSeq;
         /// <summary>Called with the group id when a choice runs dry - no takeable option and no
         /// eligible fallback - so the silent fall-through is observable. Parity with the JS
         /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct from

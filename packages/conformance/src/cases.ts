@@ -818,6 +818,28 @@ const scriptedMultiFlow = {
   ],
 } satisfies ScriptedFixture;
 
+// The default start scene is the first AUTHORED scene (the bundle's key order, which is the project's
+// nav order), never the first by id. Scene ids are random, so a runtime that sorts them opens a game on
+// an arbitrary scene: Unreal kept its scenes in a sorted map and did exactly that (2026-10-06). The ids
+// here sort the other way round from the authored order on purpose.
+const scriptedDefaultStartScene = {
+  name: "openFlow with no scene starts on the first authored scene, not the first by id",
+  project: project({}),
+  scenes: [
+    { id: "scn_zz", type: "scene", name: "Tavern", blocks: [{ id: "b_t", type: "block", name: "B", children: [
+      { id: "sn_t", type: "snippet", beats: [{ id: "T_t", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+    { id: "scn_aa", type: "scene", name: "Gate", blocks: [{ id: "b_g", type: "block", name: "B", children: [
+      { id: "sn_g", type: "snippet", beats: [{ id: "T_g", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+  ],
+  locales: [loc("scn_zz", { T_t: "tavern" }), loc("scn_aa", { T_g: "gate" })],
+  script: [
+    { op: "openFlow", flow: "f" },
+    { op: "advance", expect: [{ type: "text", id: "T_t", text: "tavern" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // Host navigation by address. Pins every part of the contract in one script: a scene-address hop that
 // runs the target's onEntry, a scene-SCOPED block address, an unknown address that must NOT move the
 // cursor, abandonment of both the rest of a snippet and a pending call-return, and revival of an ended
@@ -941,6 +963,53 @@ const checkpointLoc = [
   loc("scn_hub", { T1: "one {@entered} {@mine}", T2: "two {@entered} {@mine}", T3: "three {@entered} {@mine}", T_seen: "seen", T_unseen: "unseen", O1: "o1", O2: "o2", T_been: "been", T_notbeen: "not been" }),
   loc("scn_side", { S1: "s1 {@entered} {@mine} {@scene.tally} {@world.alarms}", S2: "s2 {@entered} {@mine} {@scene.tally} {@world.alarms}", S3: "s3 {@entered} {@mine} {@scene.tally} {@world.alarms}", Q: "q" }),
 ];
+
+// A rollback after a load keeps a scene's saved `@scene` values. After a load, a flow mounts bags only for
+// the scenes it stands in; the rest wait in the registry, parked, until the flow enters them. Entering one
+// inside a checkpoint claims them, and the rollback used to drop the claimed values with the bag, so the
+// next real entry found the defaults (2026-10 review, all four runtimes). Door is per-flow, lamp shared.
+const scriptedRollbackKeepsParked = {
+  name: "checkpoint: a rollback after a load keeps the saved @scene values of a scene it entered",
+  project: project({}),
+  scenes: [
+    { id: "scn_yard", type: "scene", name: "Yard", blocks: [{ id: "b_yard", type: "block", name: "Yard", children: [
+      { id: "sn_yard", type: "snippet", beats: [{ id: "Y", kind: "text" }], jump: { to: "END" } },
+    ] }] },
+    { id: "scn_shed", type: "scene", name: "Shed",
+      sceneProps: [
+        { name: "doorOpen", type: "boolean", default: false },
+        { name: "lampLit", type: "boolean", default: false, shared: true },
+      ],
+      blocks: [{ id: "b_shed", type: "block", name: "Shed", children: [
+        { id: "g_shed", type: "group", selector: "branch", children: [
+          { id: "sn_known", type: "snippet", condition: "@scene.doorOpen and @scene.lampLit", beats: [{ id: "K", kind: "text" }], jump: { to: "END" } },
+          { id: "sn_first", type: "snippet",
+            onEnter: [
+              { kind: "set", target: "@scene.doorOpen", value: "true" },
+              { kind: "set", target: "@scene.lampLit", value: "true" },
+            ],
+            beats: [{ id: "F", kind: "text" }], jump: { to: "END" } },
+        ] },
+      ] }] },
+  ],
+  locales: [loc("scn_yard", { Y: "yard" }), loc("scn_shed", { K: "as you left it", F: "you open up" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "yard" },
+    { op: "advance", expect: [{ type: "text", id: "Y", text: "yard" }] },
+    { op: "goto", scene: "shed", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "F", text: "you open up" }] },
+    { op: "goto", scene: "yard", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "Y", text: "yard" }] },
+    { op: "saveLoad" },
+    { op: "useFlow", flow: "f" },
+    { op: "checkpoint" },
+    { op: "goto", scene: "shed", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "K", text: "as you left it" }] },
+    { op: "rollback" },
+    { op: "goto", scene: "shed", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "K", text: "as you left it" }] },
+  ],
+} satisfies ScriptedFixture;
 
 const scriptedCheckpoint = {
   name: "checkpoint: rollback undoes a step's every change, commit keeps them",
@@ -2217,11 +2286,11 @@ export const cases: Fixtures = {
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ],
-  scripted: [scriptedMultiFlow, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
+  scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
-    scriptedCheckpoint, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
+    scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [

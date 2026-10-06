@@ -460,6 +460,8 @@ export class Engine {
   /** The run's ordered stream: every flow's events, each naming its flow. Empty and
    *  unwritten unless `options.log` asked for it. */
   private readonly engineLog: EngineLogEntry[] = [];
+  /** The next engine-log `seq`: its own counter, since the log's length restarts after a clear. */
+  private engineSeq = 0;
   private readonly engineTraceHandlers = new Set<EngineTraceHandler>();
 
   constructor(bundle: Bundle, options: EngineOptions = {}) {
@@ -1146,7 +1148,7 @@ export class Engine {
   private emitEngine(flow: string, event: TraceEvent, scene?: string): void {
     for (const h of this.engineTraceHandlers) h(flow, event);
     if (!this.host.logEnabled) return;
-    this.engineLog.push({ ...event, flow, seq: this.engineLog.length, ...(scene ? { scene } : {}) });
+    this.engineLog.push({ ...event, flow, seq: this.engineSeq++, ...(scene ? { scene } : {}) });
   }
 
   listProperties(): PropertyRow[] {
@@ -2373,24 +2375,25 @@ export class Flow {
     if (!this.sceneBags.has(s)) {
       const bag = new PropertyBag(props.filter((d) => !shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
       const key = keys.flowScene(this.id, s);
-      this.host.registry.mountOwned(key, bag, { owner: OWNER });
+      const claimed = mountClaims(this.host.registry, key, bag, journal !== null);
       this.registered.add(key);
       this.sceneBags.set(s, bag);
-      // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry.
+      // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry,
+      // unless the mount claimed values a load had parked, which go back to the registry rather than away.
       if (journal) journal.undo.push(() => {
         if (this.sceneBags.get(s) !== bag) return; // already released with the flow
-        this.host.registry.remove(key);
+        this.host.registry.remove(key, claimed ? { keep: true } : undefined);
         this.registered.delete(key);
         this.sceneBags.delete(s);
       });
     }
     if (!this.host.stageBags.has(s)) {
       const bag = new PropertyBag(props.filter((d) => shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
-      this.host.registry.mountOwned(keys.stage(s), bag, { owner: OWNER });
+      const claimed = mountClaims(this.host.registry, keys.stage(s), bag, journal !== null);
       this.host.stageBags.set(s, bag);
       if (journal) journal.undo.push(() => {
         if (this.host.stageBags.get(s) !== bag) return;
-        this.host.registry.remove(keys.stage(s));
+        this.host.registry.remove(keys.stage(s), claimed ? { keep: true } : undefined);
         this.host.stageBags.delete(s);
       });
     }
@@ -2479,6 +2482,19 @@ function deserialiseSelectors(rec: Record<string, SelectorSnapshot> | undefined)
 }
 
 /** Adapt a Patter `PropertyDecl` to a registry `ScopeDeclaration` (same type vocabulary). */
+/**
+ * Mount `bag` at `key` and say whether the mount CLAIMED values a load had parked there. Only asked when a
+ * checkpoint is open (`ask`), since only a rollback needs to know: it must hand claimed values back to the
+ * registry, or a scene first entered inside the checkpoint loses its saved values. A fresh bag holds only
+ * its defaults, so a change across the mount is a claim. Parked values that equal the defaults are not told
+ * apart, and need not be: dropping them changes nothing a story can read.
+ */
+function mountClaims(registry: ScopeRegistry, key: string, bag: PropertyBag, ask: boolean): boolean {
+  const before = ask ? JSON.stringify(bag.save()) : "";
+  registry.mountOwned(key, bag, { owner: OWNER });
+  return ask && JSON.stringify(bag.save()) !== before;
+}
+
 function toDecl(decl: PropertyDecl): ScopeDeclaration {
   return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default };
 }

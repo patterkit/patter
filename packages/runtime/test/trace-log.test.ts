@@ -79,8 +79,15 @@ describe("the engine's trace log", () => {
     expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
     expect(new Set(seqs).size).toBe(seqs.length);
     expect(engine.log().every((e) => e.flow === "main")).toBe(true);
+    const lastBefore = Math.max(...engine.log().map((e) => e.seq));
     engine.clearLog();
     expect(engine.log()).toEqual([]);
     expect(flow.log().length).toBeGreaterThan(0); // a flow's own log is its own
+    // After the clear, the engine's stream keeps counting: it numbered entries by its length, so they
+    // restarted at 0 and a reader could not order entries read either side of the clear.
+    const again = engine.openFlow("again", { scene: "s", block: "b_probe" });
+    for (let i = 0; i < 10 && again.advance().type !== "end"; i++) { /* play it out */ }
+    expect(engine.log().length).toBeGreaterThan(0);
+    expect(Math.min(...engine.log().map((e) => e.seq))).toBeGreaterThan(lastBefore);
   });
 });

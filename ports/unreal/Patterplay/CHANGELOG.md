@@ -7,6 +7,40 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`CreateWithOptions` and `FPatterEngineOptions`.** Blueprint can now choose how an engine plays: a seed for a
+  repeatable run, the locale, the decision log (`GetLog` was always empty from Blueprint before), prompt replay
+  on choose, and closed captions. These are the options the other runtimes already offer. `CreateWithRegistry`
+  takes the same options.
+- **An `OnDryChoice` event** on the engine, fired with the choice's group id whenever a choice runs dry.
+
+### Changed
+
+- **Number properties are `double` in Blueprint.** `GetPropertyNumber` and `SetPropertyNumber` used `float`, so
+  0.1 was stored as 0.10000000149 and showed that way in any line that read it. C++ code comparing the result
+  with a `float` literal may need a `double` one.
+
+### Fixed
+
+- **The project's closed-caption settings now reach the game.** The plugin's bundle loader never read them, so a
+  game always used the default `[` `]` delimiters and `SFX` caption character. The corpus test host has its own
+  loader, which did read them, so the corpus could not see this.
+- **A flow opened with no scene starts on the first scene in authored order.** Scenes were walked in id order,
+  and ids are random, so a game could open on any scene. The outline, beat sequence and bundle description now
+  list scenes in authored order too.
+- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
+  standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
+  rolling back used to drop those values, so the next real entry found the defaults and the next save left them
+  out. A new corpus case pins this on all four runtimes.
+- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so
+  after `clearLog()` the numbers started again at 0 and entries read either side of the clear could not be put
+  in order.
+- **The debug link stops queuing once the editor is gone.** When the editor was not running, the link stayed
+  "connecting" and kept every message, one per step, for the rest of the game.
+- **Loading a state from the editor's state panel keeps the game's flows working.** It loaded without re-binding
+  the flows, so every flow the game held read as closed afterwards.
+
 ## [0.18.0] - 2026-10-05
 
 ### Changed

@@ -72,6 +72,10 @@ jobs:
       # flow ever opened leaked until 2026-10. A dropped flow must be freed, and so must its bags.
       - name: A flow the game lets go of is freed
         run: ./godot --headless --path ports/godot --script res://test/test_flow_lifetime.gd
+      # A greyed option is offered, never taken: the other three runtimes refuse it, and the corpus
+      # has no way to expect an error from a port that cannot throw.
+      - name: A greyed choice option cannot be chosen
+        run: ./godot --headless --path ports/godot --script res://test/test_choose.gd
 
   # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
   # makes that hard: an installed, activated Unity compiles from the command line, and

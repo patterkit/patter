@@ -89,6 +89,9 @@ private:
 	std::shared_ptr<patter::Flow> Flow;
 };
 
+/** A choice ran dry: none of its options could be offered. Carries the choice group's id. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterDryChoiceEvent, const FString&, GroupId);
+
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterEngine : public UObject
 {
@@ -110,6 +113,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	static UPatterEngine* Create(UPatterBundle* Bundle, UPatterWorld* World = nullptr);
 
+	// Create, choosing how the engine plays: a seed for a repeatable run, the locale, the decision log
+	// (GetLog), prompt replay on choose, and closed captions. See FPatterEngineOptions.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	static UPatterEngine* CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, UPatterWorld* World = nullptr);
+
+	// Fired with the choice group's id whenever a choice runs dry (no option could be offered), whether
+	// or not the log is on: live feedback for a writer testing the content.
+	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
+	FPatterDryChoiceEvent OnDryChoice;
+
 	// C++ only: construct on the GAME's registry, the one registry a game holds for every engine and
 	// system that keeps properties in it, saved once by the game. The engine registers its scopes in it
 	// (@patter under `patter`, its per-flow and per-scene bags under keys starting `patter/`, and a bound
@@ -123,7 +136,7 @@ public:
 	// registry to both. Not a Blueprint node, as a std C++ type has no Blueprint handle. The module that
 	// makes the registry includes "Patter/Kernel.h" and sets bEnableExceptions in its Build.cs.
 	static UPatterEngine* CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
-		UPatterWorld* World = nullptr);
+		UPatterWorld* World = nullptr, const FPatterEngineOptions& Options = FPatterEngineOptions());
 
 	// The @world container bound at Create, or null for a self-backed engine.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
@@ -141,8 +154,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	TArray<FPatterStep> RunFlow(const FString& FlowName, const FString& Scene, const FString& Block);
 
+	// double, like UPatterWorld and FPatterValue: a float stored 0.1 as 0.10000000149, which then showed in
+	// every {@ref} that read it.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
-	float GetPropertyNumber(const FString& Ref) const;
+	double GetPropertyNumber(const FString& Ref) const;
 
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	FString GetPropertyString(const FString& Ref) const;
@@ -151,7 +166,7 @@ public:
 	bool GetPropertyBool(const FString& Ref) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	void SetPropertyNumber(const FString& Ref, float Value);
+	void SetPropertyNumber(const FString& Ref, double Value);
 
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void SetPropertyBool(const FString& Ref, bool bValue);
@@ -197,7 +212,7 @@ public:
 	TArray<FPatterPropertyRow> ListProperties() const;
 
 	// The run's decisions, in order, each naming the flow it happened in. Empty unless the engine
-	// was created with a log (see FPatterDebug / the options). A debug UI reads this to answer
+	// was created with bLog on (CreateWithOptions). A debug UI reads this to answer
 	// "why that line and not its siblings", which no step result can.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
 	TArray<FPatterLogEntry> GetLog() const;
@@ -327,7 +342,8 @@ public:
 	bool IsInCheckpoint() const;
 
 private:
-	static UPatterEngine* Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry);
+	static UPatterEngine* Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry,
+		const FPatterEngineOptions& Options);
 
 	// SHARED rather than a pimpl: HotSwap takes the replacement core the engine hands back.
 	std::shared_ptr<patter::Engine> Engine;

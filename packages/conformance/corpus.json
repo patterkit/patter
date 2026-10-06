@@ -7272,6 +7272,107 @@
       ]
     },
     {
+      "name": "openFlow with no scene starts on the first authored scene, not the first by id",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1mx05bq",
+          "structureHash": "0zettxt"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "scn_zz": {
+            "id": "scn_zz",
+            "type": "scene",
+            "name": "Tavern",
+            "blocks": [
+              {
+                "id": "b_t",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_t",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_t",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_aa": {
+            "id": "scn_aa",
+            "type": "scene",
+            "name": "Gate",
+            "blocks": [
+              {
+                "id": "b_g",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_g",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_g",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_t": "tavern",
+            "T_g": "gate"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_t",
+              "text": "tavern"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "goto: address navigation, immediate landing, and move-without-reset",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -11746,6 +11847,256 @@
               "type": "text",
               "id": "S2",
               "text": "s2 1 2 1 1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "checkpoint: a rollback after a load keeps the saved @scene values of a scene it entered",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0hsn74v",
+          "structureHash": "1ju95y5"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "scn_yard": {
+            "id": "scn_yard",
+            "type": "scene",
+            "name": "Yard",
+            "blocks": [
+              {
+                "id": "b_yard",
+                "type": "block",
+                "name": "Yard",
+                "children": [
+                  {
+                    "id": "sn_yard",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "Y",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "scn_shed": {
+            "id": "scn_shed",
+            "type": "scene",
+            "name": "Shed",
+            "sceneProps": [
+              {
+                "name": "doorOpen",
+                "type": "boolean",
+                "default": false
+              },
+              {
+                "name": "lampLit",
+                "type": "boolean",
+                "default": false,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b_shed",
+                "type": "block",
+                "name": "Shed",
+                "children": [
+                  {
+                    "id": "g_shed",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_known",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@scene.doorOpen and @scene.lampLit",
+                          "ast": [
+                            "bin",
+                            "and",
+                            [
+                              "sv",
+                              "scene",
+                              "dooropen"
+                            ],
+                            [
+                              "sv",
+                              "scene",
+                              "lamplit"
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "K",
+                            "kind": "text"
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      },
+                      {
+                        "id": "sn_first",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "F",
+                            "kind": "text"
+                          }
+                        ],
+                        "onEnter": [
+                          {
+                            "kind": "set",
+                            "target": "@scene.doorOpen",
+                            "value": {
+                              "src": "true",
+                              "ast": [
+                                "b",
+                                true
+                              ]
+                            }
+                          },
+                          {
+                            "kind": "set",
+                            "target": "@scene.lampLit",
+                            "value": {
+                              "src": "true",
+                              "ast": [
+                                "b",
+                                true
+                              ]
+                            }
+                          }
+                        ],
+                        "jump": {
+                          "to": "END"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "Y": "yard",
+            "K": "as you left it",
+            "F": "you open up"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "yard"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "Y",
+              "text": "yard"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "shed",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "F",
+              "text": "you open up"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "yard",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "Y",
+              "text": "yard"
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "useFlow",
+          "flow": "f"
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "goto",
+          "scene": "shed",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "K",
+              "text": "as you left it"
+            }
+          ]
+        },
+        {
+          "op": "rollback"
+        },
+        {
+          "op": "goto",
+          "scene": "shed",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "K",
+              "text": "as you left it"
             }
           ]
         }

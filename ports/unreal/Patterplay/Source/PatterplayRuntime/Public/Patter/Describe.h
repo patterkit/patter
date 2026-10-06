@@ -186,9 +186,9 @@ namespace patter
         BundleDescription out;
         out.counts.cast = static_cast<int>(bundle.cast.size());
 
-        for (const auto& kv : bundle.scenes)
+        for (const Scene* scenePtr : bundle.scenesInOrder())
         {
-            const Scene& scene = kv.second;
+            const Scene& scene = *scenePtr;
             out.counts.scenes++;
             AddressSummary addr;
             addr.gameId = effectiveGameId(scene.gameId, scene.name);

@@ -139,7 +139,9 @@ export type ScriptOp =
   // replaced, and the current flow stays as it was. A runtime that throws refuses by throwing; one that
   // reports and returns null (Godot) refuses that way. The runner checks the name still means the same
   // flow; the script's following `advance` shows that flow carrying on.
-  | { op: "openFlow"; flow: string; scene: string; block?: string; seed?: number; expect?: TranscriptStep[]; expectResult?: boolean }
+  // No `scene` = the runtime's default start scene: the FIRST AUTHORED scene (the bundle's key order), never
+  // the first by id.
+  | { op: "openFlow"; flow: string; scene?: string; block?: string; seed?: number; expect?: TranscriptStep[]; expectResult?: boolean }
   | { op: "useFlow"; flow: string }
   | { op: "advance"; expect: TranscriptStep[] }
   | { op: "choose"; id: string; expect?: TranscriptStep[] }

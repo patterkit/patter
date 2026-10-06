@@ -266,6 +266,17 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 				if (const TSharedPtr<FJsonValue>* M = Field(Lz, TEXT("mode"))) Out.localisation.mode = Std((*M)->AsString());
 				if (const TSharedPtr<FJsonValue>* SD = Field(Lz, TEXT("sourceDebug"))) Out.localisation.sourceDebug = (*SD)->AsBool();
 			}
+			// The project's own caption delimiters and caption character (#214). This loader never read
+			// them, while the corpus TestHost's parser did, so the corpus passed and a real game always
+			// fell back to [ ] and SFX.
+			if (const TSharedPtr<FJsonValue>* P = Field(Root, TEXT("closedCaptions")))
+			{
+				const TSharedPtr<FJsonObject> Cc = (*P)->AsObject();
+				Out.closedCaptions.present = true;
+				Out.closedCaptions.open = ReqString(Cc, TEXT("open"));
+				Out.closedCaptions.close = ReqString(Cc, TEXT("close"));
+				if (const TSharedPtr<FJsonValue>* Ch = Field(Cc, TEXT("character"))) Out.closedCaptions.character = Std((*Ch)->AsString());
+			}
 
 		TSharedPtr<FJsonObject> Loc = ReqObject(Root, TEXT("locales"));
 		Out.locales.defaultLocale = ReqString(Loc, TEXT("default"));
@@ -356,6 +367,8 @@ bool PatterLoadBundle(const FString& Json, Bundle& Out, FString& Error)
 				if (const TSharedPtr<FJsonValue>* P = Field(Bo, TEXT("children"))) for (const auto& C : (*P)->AsArray()) Block.children.push_back(ToNode(C->AsObject()));
 				Scene.blocks.push_back(std::move(Block));
 			}
+			// FJsonObject keeps its fields in document order, which is the authored scene order.
+			if (!Out.scenes.count(Std(Sc.Key))) Out.sceneOrder.push_back(Std(Sc.Key));
 			Out.scenes[Std(Sc.Key)] = std::move(Scene);
 		}
 	}

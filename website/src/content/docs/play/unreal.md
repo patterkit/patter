@@ -48,6 +48,18 @@ The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint**, with `
 `FPatterOption` as Blueprint structs, so a designer can drive the flow and bind steps to a
 dialogue widget without touching C++.
 
+To choose how the engine plays, create it with **`UPatterEngine::CreateWithOptions`** and an
+`FPatterEngineOptions`: a seed for a repeatable run, the locale to play in, a decision log (read it
+with `GetLog`), whether a chosen option's prompt is spoken back, and whether closed captions start on.
+The engine's **`OnDryChoice`** event fires whenever a choice has nothing left to offer.
+
+```cpp
+FPatterEngineOptions Options;
+Options.Locale = TEXT("fr");
+Options.bLog = true;
+UPatterEngine* Engine = UPatterEngine::CreateWithOptions(Bundle, Options);
+```
+
 The **PatterplayDemo** sample project (the second folder in the release zip) holds two working
 references. Press **Play** in it and **`ATourDemoActor`** runs the complete interactive Patter
 tour in a UI overlay (a scrolling transcript with clickable choices), loading its bundle from

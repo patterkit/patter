@@ -48,6 +48,41 @@ enum class EPatterValueKind : uint8
 /** A Patter value crossing the Blueprint boundary: what a UPatterWorld holds and reports. Shaped
  *  like the Storylet Engine's FStoryletValue, so a project running both reads one shape. `Display`
  *  is the stringified rendering ("true", a JS-stable number, the raw string, flags comma-joined). */
+/** How an engine plays, set when it is made (UPatterEngine::CreateWithOptions). The same choices the JS
+ *  runtime's EngineOptions, Unity's EngineOptions and Godot's options dictionary offer; the dry-choice
+ *  callback is the engine's OnDryChoice event instead, the Blueprint way. */
+USTRUCT(BlueprintType)
+struct FPatterEngineOptions
+{
+	GENERATED_BODY()
+
+	/** Seed every flow's random choices (shuffle, random(), tie-breaks) with Seed, for a repeatable run.
+	 *  Off: the runtime's default seed. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
+	bool bUseSeed = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay", meta = (EditCondition = "bUseSeed"))
+	int64 Seed = 0;
+
+	/** The language to play in, such as "fr". Empty: the bundle's default locale. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
+	FString Locale;
+
+	/** Speak a chosen option's authored prompt back as the first beat after the choice. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
+	bool bReplayPromptOnChoose = false;
+
+	/** Show closed-caption cues in dialogue lines (the default). Off strips them, and silences the
+	 *  caption character's lines. SetClosedCaptions changes it later. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
+	bool bClosedCaptions = true;
+
+	/** Keep a log of the engine's decisions, read with GetLog. Off by default: a shipped game pays nothing
+	 *  for a debugging aid it never reads. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
+	bool bLog = false;
+};
+
 USTRUCT(BlueprintType)
 struct FPatterValue
 {

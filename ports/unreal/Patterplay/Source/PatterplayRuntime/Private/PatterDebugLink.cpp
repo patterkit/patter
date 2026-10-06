@@ -78,11 +78,18 @@ void FPatterDebugLink::Connect()
 			Self->OnBundle(Build, Data);
 		}
 	});
-	Socket->OnConnectionError().AddLambda([](const FString&) { /* editor not listening - stay a no-op */ });
+	// The editor is not listening, or it went away: go quiet for good, the way Unity's link does. Leaving
+	// the link "connecting" kept Post queuing one message per step for the rest of the game, and the
+	// header says this is safe to leave wired into a shipping build.
+	Socket->OnConnectionError().AddLambda([Weak](const FString&)
+	{
+		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
+		if (Self.IsValid()) Self->GoQuiet();
+	});
 	Socket->OnClosed().AddLambda([Weak](int32, const FString&, bool)
 	{
 		TSharedPtr<FPatterDebugLink> Self = Weak.Pin();
-		if (Self.IsValid()) Self->bOpen = false;
+		if (Self.IsValid()) Self->GoQuiet();
 	});
 	Socket->Connect();
 }
@@ -157,8 +164,16 @@ void FPatterDebugLink::Close()
 	}
 }
 
+void FPatterDebugLink::GoQuiet()
+{
+	bOpen = false;
+	bClosed = true;
+	Queue.Reset();
+}
+
 void FPatterDebugLink::Post(const FString& Message)
 {
+	if (bClosed) return;
 	Queue.Add(Message);
 	Flush();
 }

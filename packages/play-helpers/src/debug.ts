@@ -85,8 +85,12 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
     for (const m of queue) { try { sock.send(m); } catch { /* socket went away */ } }
     queue = [];
   };
+  // Queue only while there is a socket that is connecting or open. Once the editor is gone (or never
+  // answered), the socket is dropped and a message has nowhere to go, so it is dropped too: queueing it
+  // anyway grew the queue by one string per step for the rest of a game that shipped with the link wired
+  // in, which is exactly the build the docs say this is safe in.
   const post = (msg: object): void => {
-    if (closed) return;
+    if (closed || !sock || sock.readyState > OPEN) return;
     queue.push(JSON.stringify(msg));
     flush();
   };
@@ -120,7 +124,7 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
       } catch { /* not for us */ }
     });
     sock.addEventListener("error", () => { /* editor not listening - stay a no-op */ });
-    sock.addEventListener("close", () => { sock = null; });
+    sock.addEventListener("close", () => { sock = null; queue = []; });
   } catch { sock = null; } // malformed URL etc. - never throw into the game
 
   return {

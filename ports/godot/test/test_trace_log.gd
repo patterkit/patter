@@ -85,9 +85,20 @@ func _initialize() -> void:
 	_expect(shown.contains("sn_gated (x)"), "and marks the sibling that was dropped")
 	panel.queue_free()
 
+	var last_before := -1
+	for e in engine.log():
+		last_before = maxi(last_before, int(e["seq"]))
 	engine.clear_log()
 	_expect(engine.log().is_empty(), "clear_log empties the engine's stream")
 	_expect(not flow.log().is_empty(), "a flow's own log is its own")
+	# After the clear the engine's stream keeps counting: seq was the log's size, so it restarted
+	# at 0 and entries read either side of a clear could not be ordered.
+	_drain(engine.open_flow("again", "s", "b"))
+	var restarted: bool = engine.log().is_empty()
+	for e in engine.log():
+		if int(e["seq"]) <= last_before:
+			restarted = true
+	_expect(not restarted, "the engine's seq keeps counting after clear_log")
 
 	print("test_trace_log: %s" % ("ALL PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)

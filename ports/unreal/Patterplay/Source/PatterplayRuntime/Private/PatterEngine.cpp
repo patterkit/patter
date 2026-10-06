@@ -184,20 +184,27 @@ bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
 
 UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)
 {
-	return Build(Bundle, World, nullptr);
+	return Build(Bundle, World, nullptr, FPatterEngineOptions());
 }
 
-UPatterEngine* UPatterEngine::CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry, UPatterWorld* World)
+UPatterEngine* UPatterEngine::CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, UPatterWorld* World)
+{
+	return Build(Bundle, World, nullptr, Options);
+}
+
+UPatterEngine* UPatterEngine::CreateWithRegistry(UPatterBundle* Bundle, const std::shared_ptr<patter::ScopeRegistry>& Registry,
+	UPatterWorld* World, const FPatterEngineOptions& Options)
 {
 	if (!Registry)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Patterplay: CreateWithRegistry called with a null registry"));
 		return nullptr;
 	}
-	return Build(Bundle, World, Registry);
+	return Build(Bundle, World, Registry, Options);
 }
 
-UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry)
+UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry,
+	const FPatterEngineOptions& Options)
 {
 	if (!Bundle || !Bundle->Raw())
 	{
@@ -209,9 +216,22 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 	patter::EngineOptions Opts;
 	if (World) Opts.hostScopes["world"] = World->MakeHostScope();
 	Opts.registry = Registry;
+	Opts.hasSeed = Options.bUseSeed;
+	Opts.seed = static_cast<double>(Options.Seed);
+	Opts.locale = Std(Options.Locale);
+	Opts.replayPromptOnChoose = Options.bReplayPromptOnChoose;
+	Opts.closedCaptions = Options.bClosedCaptions;
+	Opts.log = Options.bLog;
 	UPatterEngine* E = NewObject<UPatterEngine>(GetTransientPackage());
 	E->BundleRef = Bundle;
 	E->WorldRef = World;
+	// The core's callback raises the Blueprint event. It holds the engine weakly: the callback lives in the
+	// core's creation options, which a hot swap hands on to the replacement core.
+	TWeakObjectPtr<UPatterEngine> Weak(E);
+	Opts.onDryChoice = [Weak](const std::string& GroupId)
+	{
+		if (UPatterEngine* Self = Weak.Get()) Self->OnDryChoice.Broadcast(Ue(GroupId));
+	};
 	try { E->Engine = std::make_shared<patter::Engine>(*Bundle->Raw(), Opts); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
 	return E;
@@ -292,11 +312,11 @@ void UPatterEngine::SetClosedCaptions(bool bOn)
 	if (Engine) Engine->setClosedCaptions(bOn);
 }
 
-float UPatterEngine::GetPropertyNumber(const FString& Ref) const
+double UPatterEngine::GetPropertyNumber(const FString& Ref) const
 {
-	if (!Engine) return 0.f;
+	if (!Engine) return 0.0;
 	const patter::PatterValue* V = Engine->getProperty(Std(Ref));
-	return (V && V->isNumber()) ? static_cast<float>(V->n) : 0.f;
+	return (V && V->isNumber()) ? V->n : 0.0;
 }
 
 FString UPatterEngine::GetPropertyString(const FString& Ref) const
@@ -315,7 +335,7 @@ bool UPatterEngine::GetPropertyBool(const FString& Ref) const
 
 // A refused write (a scope the game lent with no setter, an @scene ref) is logged like every other
 // guarded call here, never thrown through Blueprint.
-void UPatterEngine::SetPropertyNumber(const FString& Ref, float Value)
+void UPatterEngine::SetPropertyNumber(const FString& Ref, double Value)
 {
 	if (!Engine) return;
 	try { Engine->setProperty(Std(Ref), patter::PatterValue::Num(Value)); }

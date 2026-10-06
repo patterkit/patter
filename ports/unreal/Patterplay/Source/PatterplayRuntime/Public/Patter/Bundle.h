@@ -3,6 +3,7 @@
 // FJsonObject) - the engine stays parser-agnostic. Mirrors @patterkit/model's shapes.
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <map>
@@ -144,10 +145,31 @@ namespace patter
         std::vector<Cast> cast;
         std::vector<PropertyDecl> properties;
         std::map<std::string, Scene> scenes;
+        // Scene ids in AUTHORED order (the bundle's key order, which is the project's nav order). `scenes`
+        // is a sorted map, so anything order-dependent walks this instead: the default start scene, the
+        // outline, the beat sequence. Walking the map started a flow on the alphabetically first scene id.
+        std::vector<std::string> sceneOrder;
+
+        // The scenes in authored order: `sceneOrder` first, then any scene it does not name (a bundle
+        // built in code rather than by a loader) in id order.
+        std::vector<const Scene*> scenesInOrder() const
+        {
+            std::vector<const Scene*> out;
+            out.reserve(scenes.size());
+            for (const std::string& id : sceneOrder)
+            {
+                auto it = scenes.find(id);
+                if (it != scenes.end()) out.push_back(&it->second);
+            }
+            if (out.size() != scenes.size())
+                for (const auto& kv : scenes)
+                    if (std::find(sceneOrder.begin(), sceneOrder.end(), kv.first) == sceneOrder.end()) out.push_back(&kv.second);
+            return out;
+        }
         std::map<std::string, std::map<std::string, std::string>> strings;   // locale -> id -> text (empty in "ids")
         Localisation localisation;
         std::map<std::string, std::vector<GameDataField>> gameDataFields;
-        CaptionDelimiters closedCaptions;   // #214; `present=false` => use the default ( / )
+        CaptionDelimiters closedCaptions;   // #214; `present=false` => use the default [ / ]
         HostScopeRegistry scopeRegistry;    // declared host scopes; `present=false` => the project declares none
         // Other engines' game-wide scopes the content names (`story`), sorted: the family's shared
         // vocabulary, opaque to the compiler and never self-backed. A ref to one is a scope even before

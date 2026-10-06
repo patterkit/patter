@@ -14,7 +14,8 @@ string you can drop straight into `localStorage` or a file. See
 [Save and load](/play/integration/#save-and-load).
 
 For properties there's `getProperty`, `setProperty`, and a batched
-`setProperties(engine, { "@hp": 10, "@scene.locked": false })`.
+`setProperties(engine, { "@hp": 10 })`. Pass a flow instead of the engine for `@scene` properties,
+since each flow has its own: `setProperties(flow, { "@scene.locked": false })`.
 
 For debugging there's `createStateLogger(engine)`, which traces each step and diffs state over time
 while you're working.

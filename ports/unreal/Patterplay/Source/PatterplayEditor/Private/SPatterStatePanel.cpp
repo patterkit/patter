@@ -262,14 +262,14 @@ TSharedRef<SWidget> SPatterStatePanel::BuildRow(TWeakObjectPtr<UPatterEngine> En
 		break;
 
 	case EPatterPropertyType::Number:
-		Editor = SNew(SNumericEntryBox<float>)
+		Editor = SNew(SNumericEntryBox<double>)
 			.AllowSpin(false)
-			.Value_Lambda([Engine, Ref]() -> TOptional<float>
+			.Value_Lambda([Engine, Ref]() -> TOptional<double>
 			{
 				UPatterEngine* E = Engine.Get();
-				return E ? TOptional<float>(E->GetPropertyNumber(Ref)) : TOptional<float>();
+				return E ? TOptional<double>(E->GetPropertyNumber(Ref)) : TOptional<double>();
 			})
-			.OnValueCommitted_Lambda([Engine, Ref](float NewValue, ETextCommit::Type)
+			.OnValueCommitted_Lambda([Engine, Ref](double NewValue, ETextCommit::Type)
 			{
 				if (UPatterEngine* E = Engine.Get()) { E->SetPropertyNumber(Ref, NewValue); }
 			});
@@ -433,6 +433,10 @@ void SPatterStatePanel::LoadStateFromFile(UPatterEngine* Engine)
 	try
 	{
 		patter::deserializeState(*Engine->Raw(), std::string(TCHAR_TO_UTF8(*Text)));
+		// The load rebuilt the engine's flows, so every UPatterFlow the game holds points at an old one.
+		// Re-bind them by id, as UPatterSave::LoadStateFromJson does; without it the game's flows all read
+		// as closed after a load from this panel.
+		Engine->RebindFlows();
 	}
 	catch (const std::exception& Err)
 	{

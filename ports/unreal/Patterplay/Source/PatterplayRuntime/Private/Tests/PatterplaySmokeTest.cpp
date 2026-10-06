@@ -134,7 +134,7 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("a flow opens"), Flow)) return false;
 	const FPatterStep Step = Flow->Advance();
 	TestEqual(TEXT("the first beat is delivered with its text"), Step.Text, FString(TEXT("Quiet tonight.")));
-	TestEqual(TEXT("a declared @patter global reads its default"), Engine->GetPropertyNumber(TEXT("@gold")), 5.0f);
+	TestEqual(TEXT("a declared @patter global reads its default"), Engine->GetPropertyNumber(TEXT("@gold")), 5.0);
 
 	// A held flow SURVIVES a save/load. The core owns its flows by value and `loadGame` clears the
 	// map and rebuilds it, so a wrapper holding the old pointer was reading freed memory on the next
@@ -173,7 +173,7 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 		UPatterFlow* Second = Engine->OpenFlow(TEXT("f2"), TEXT("s1"));
 		Engine->Reset();
 		TestTrue(TEXT("Reset closes every flow's wrapper"), Second->IsClosed());
-		TestEqual(TEXT("and the shared world is back to its defaults"), Engine->GetPropertyNumber(TEXT("@gold")), 5.0f);
+		TestEqual(TEXT("and the shared world is back to its defaults"), Engine->GetPropertyNumber(TEXT("@gold")), 5.0);
 	}
 
 	// A flow the save did not carry comes back CLOSED rather than dangling: getFlow answers null for

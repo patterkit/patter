@@ -70,7 +70,9 @@ func _process(_delta: float) -> bool:
 				var r = flow.advance()
 				if r == null or r.get("type", "") == "end":
 					break
-			_panel._rebuild()
+			# The panel's own timer path, not a rebuild: playing a flow changes no property and opens
+			# no engine, so nothing forces a rebuild, and the log used to sit unchanged until one.
+			_panel._tick()
 		2:
 			# A played flow wrote a property through an effect, and the panel shows BOTH the
 			# new value and the decision that caused it. The second is the point: a state view

@@ -6,6 +6,19 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A shuffle no longer throws when it draws a child that has since become ineligible.** A shuffle fills its bag
+  from the children eligible on the first visit; if one of them later stops being eligible and is drawn, Unity
+  threw out of `Advance()`. It now plays nothing for that draw, as the other three runtimes do.
+- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
+  standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
+  rolling back used to drop those values, so the next real entry found the defaults and the next save left them
+  out. A new corpus case pins this on all four runtimes.
+- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so
+  after `ClearLog()` the numbers started again at 0 and entries read either side of the clear could not be put
+  in order.
+
 ## [0.18.0] - 2026-10-05
 
 ### Changed

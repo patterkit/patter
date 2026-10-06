@@ -292,7 +292,8 @@ func _emit(event: Dictionary) -> void:
 	var shared: Array = _host["engine_log"]
 	var wide := entry.duplicate()
 	wide["flow"] = id
-	wide["seq"] = shared.size()
+	wide["seq"] = _host["engine_log_seq"]
+	_host["engine_log_seq"] += 1
 	shared.append(wide)
 
 
@@ -381,6 +382,12 @@ func choose(option_id: String) -> void:
 	if not _pending["by_id"].has(option_id):
 		push_error("unknown choice option: " + option_id)
 		return
+	# A greyed option is offered so the player can see it, never so it can be taken. The other three
+	# runtimes refuse it; this one used to play its content and spend it.
+	for o in _pending["options"]:
+		if o["id"] == option_id and not o["eligible"]:
+			push_error("choice option is not eligible: " + option_id)
+			return
 	_touch()
 	var node = _pending["by_id"][option_id]
 	var shown = null
@@ -1157,37 +1164,49 @@ func _ensure_scene_bags(s: String) -> void:
 	if not _scene_bags.has(s):
 		var bag = PatterPropertyBag.new(_props_for(props, shared, false), {"path_prefix": "@scene."})
 		var key := key_flow_scene(id, s)
+		var before := var_to_str(bag.save()) if journal != null else ""
 		if _host["registry"].mount_owned(key, bag, {"owner": OWNER}) == "":
 			_registered[key] = true
 		_scene_bags[s] = bag
-		# Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry.
+		# Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry,
+		# unless the mount claimed values a load had parked, which go back to the registry (see _claimed).
 		if journal != null:
-			journal["undo"].append(_unmake_scene_bag.bind(s, bag, key))
+			journal["undo"].append(_unmake_scene_bag.bind(s, bag, key, _claimed(bag, before)))
 	if not _host["stage_bags"].has(s):
 		var bag = PatterPropertyBag.new(_props_for(props, shared, true), {"path_prefix": "@scene."})
+		var before := var_to_str(bag.save()) if journal != null else ""
 		_host["registry"].mount_owned(key_stage(s), bag, {"owner": OWNER})
 		_host["stage_bags"][s] = bag
 		if journal != null:
-			journal["undo"].append(PatterFlow._unmake_stage_bag.bind(_host, s, bag))
+			journal["undo"].append(PatterFlow._unmake_stage_bag.bind(_host, s, bag, _claimed(bag, before)))
+
+
+## Whether a mount CLAIMED values a load had parked: `before` is the fresh bag's values. Only a rollback
+## needs to know, since it must hand claimed values back to the registry, or a scene first entered inside
+## a checkpoint loses its saved values. A fresh bag holds only its defaults, so a change across the mount
+## is a claim. Parked values equal to the defaults are not told apart, and need not be: dropping them
+## changes nothing a story can read.
+static func _claimed(bag, before: String) -> bool:
+	return var_to_str(bag.save()) != before
 
 
 ## The undo of a flow scene bag made inside a checkpoint.
-func _unmake_scene_bag(s: String, bag, key: String) -> void:
+func _unmake_scene_bag(s: String, bag, key: String, claimed: bool) -> void:
 	if not is_same(_scene_bags.get(s), bag):
 		return   # already released with the flow
 	if _host["registry"].has(key):
-		_host["registry"].remove(key)
+		_host["registry"].remove(key, {"keep": claimed})
 	_registered.erase(key)
 	_scene_bags.erase(s)
 
 
 ## The undo of a scene's stage bag made inside a checkpoint.
-static func _unmake_stage_bag(host: Dictionary, s: String, bag) -> void:
+static func _unmake_stage_bag(host: Dictionary, s: String, bag, claimed: bool) -> void:
 	if not is_same(host["stage_bags"].get(s), bag):
 		return   # already gone
 	var key := key_stage(s)
 	if host["registry"].has(key):
-		host["registry"].remove(key)
+		host["registry"].remove(key, {"keep": claimed})
 	host["stage_bags"].erase(s)
 
 

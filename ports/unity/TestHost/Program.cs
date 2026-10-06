@@ -80,6 +80,7 @@ namespace Patterkit.Patterplay.TestHost
             RunHostScopeWritableCheck();
             RunOneRegistryChecks();
             RunCheckpointChecks();
+            RunStaleShuffleCheck();
 
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
@@ -171,9 +172,16 @@ namespace Patterkit.Patterplay.TestHost
             if (engine.Log().Any(e => e.Flow != "main"))
                 Fail("trace", "flow tag", "an engine entry does not name the flow it happened in");
 
+            int lastBefore = engine.Log().Max(e => e.Seq);
             engine.ClearLog();
             if (engine.Log().Count != 0) Fail("trace", "ClearLog", "the engine's stream did not empty");
             if (flow.Log().Count == 0) Fail("trace", "flow-local", "clearing the engine emptied a flow's own log");
+            // After the clear the engine's stream keeps counting: Seq was the log's length, so it restarted
+            // at 0 and entries read either side of a clear could not be ordered.
+            var again = engine.OpenFlow("again");
+            for (int i = 0; i < 20 && again.Advance().Type != StepType.End; i++) { }
+            if (engine.Log().Count == 0 || engine.Log().Min(e => e.Seq) <= lastBefore)
+                Fail("trace", "seq after ClearLog", "the engine's Seq restarted after a clear");
 
             Console.WriteLine($"  [trace] decisions logged: {flow.Log().Count}, with the greyed option named");
         }

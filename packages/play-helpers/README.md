@@ -48,12 +48,14 @@ deserializeState(engine, localStorage.getItem("slot1")!);   // throws on a non-p
 ## Runtime properties
 
 Read / write `@patter` globals, `@scene` props, or a wired foreign scope at runtime -
-e.g. the game pushing inventory into the dialogue.
+e.g. the game pushing inventory into the dialogue. Pass the engine for game-wide properties, or a
+flow for those plus `@scene`, since each flow has its own scene properties.
 
 ```ts
 import { setProperty, setProperties, getProperty } from "@patterkit/play-helpers";
 
-setProperties(engine, { "@hp": 10, "@scene.locked": false });
+setProperties(engine, { "@hp": 10 });
+setProperties(flow, { "@scene.locked": false });
 getProperty(engine, "@hp");   // 10
 ```
 

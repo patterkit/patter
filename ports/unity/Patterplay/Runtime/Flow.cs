@@ -364,7 +364,7 @@ namespace Patterkit.Patterplay
             e.Seq = _seq++;
             _log.Add(e);
             _host.EngineLog.Add(new LogEntry {
-                Type = e.Type, Scene = e.Scene, Flow = Id, Seq = _host.EngineLog.Count,
+                Type = e.Type, Scene = e.Scene, Flow = Id, Seq = _host.EngineLogSeq++,
                 Subject = e.Subject, Considered = e.Considered, Picked = e.Picked,
                 Selector = e.Selector, Value = e.Value, Prev = e.Prev, Detail = e.Detail,
             });
@@ -664,7 +664,9 @@ namespace Patterkit.Patterplay
             string pick = pool[i];
             pool.RemoveAt(i); // draw without replacement, in place
             st.Last = pick;
-            return eligible.First(c => c.Id == pick);
+            // The bag was filled from the children eligible THEN; one may have gone ineligible since. That
+            // draw plays nothing, as in JS, Unreal and Godot. First() threw out of Advance() here.
+            return eligible.Find(c => c.Id == pick);
         }
 
         // order == "specificity" (Best match): keep the top matched-specificity tier, tie-break by the
@@ -957,14 +959,15 @@ namespace Patterkit.Patterplay
             {
                 var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, false), null, "@scene.");
                 var key = PatterKeys.FlowScene(Id, s);
-                Mount(key, bag);
+                bool claimed = MountClaims(key, bag, journal != null);
                 _registered.Add(key);
                 _sceneBags[s] = bag;
-                // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real entry.
+                // Made inside a checkpoint: a rollback unmakes it, so the scene seeds afresh on its next real
+                // entry, unless the mount claimed values a load had parked, which go back to the registry.
                 if (journal != null) journal.Undo.Add(() =>
                 {
                     if (!_sceneBags.TryGetValue(s, out var now) || now != bag) return; // already released with the flow
-                    _host.Registry.Remove(key);
+                    _host.Registry.Remove(key, keep: claimed);
                     _registered.Remove(key);
                     _sceneBags.Remove(s);
                 });
@@ -973,12 +976,12 @@ namespace Patterkit.Patterplay
             {
                 var bag = new PropertyBag(Engine.DeclsFor(scene.SceneProps, shared, true), null, "@scene.");
                 var key = PatterKeys.Stage(s);
-                Mount(key, bag);
+                bool claimed = MountClaims(key, bag, journal != null);
                 _host.StageBags[s] = bag;
                 if (journal != null) journal.Undo.Add(() =>
                 {
                     if (!_host.StageBags.TryGetValue(s, out var now) || now != bag) return;
-                    _host.Registry.Remove(key);
+                    _host.Registry.Remove(key, keep: claimed);
                     _host.StageBags.Remove(s);
                 });
             }
@@ -1005,6 +1008,26 @@ namespace Patterkit.Patterplay
         {
             try { _host.Registry.MountOwned(key, bag, PatterKeys.Owner); }
             catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
+
+        /// <summary>Mount, and say whether the mount CLAIMED values a load had parked at `key`. Only asked
+        /// while a checkpoint is open (`ask`), since only a rollback needs to know: it must hand claimed
+        /// values back to the registry, or a scene first entered inside the checkpoint loses its saved
+        /// values. A fresh bag holds only its defaults, so a change across the mount is a claim. Parked
+        /// values equal to the defaults are not told apart, and need not be: dropping them changes nothing
+        /// a story can read.</summary>
+        private bool MountClaims(string key, PropertyBag bag, bool ask)
+        {
+            string before = ask ? BagValues(bag) : null;
+            Mount(key, bag);
+            return ask && BagValues(bag) != before;
+        }
+
+        private static string BagValues(PropertyBag bag)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var kv in bag.Save()) sb.Append(kv.Key).Append('=').Append(kv.Value.ToJsonString()).Append(';');
+            return sb.ToString();
         }
 
         /// <summary>Remove every bag this flow registered; with `keep`, their values wait in the registry

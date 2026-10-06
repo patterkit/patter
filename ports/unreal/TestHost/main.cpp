@@ -230,6 +230,7 @@ static Bundle parseBundle(const JsonValue& b)
             if (const JsonValue* ch = blk.find("children")) for (const auto& c : ch->arr) block.children.push_back(parseNode(c));
             scene.blocks.push_back(std::move(block));
         }
+        if (!bundle.scenes.count(sc.first)) bundle.sceneOrder.push_back(sc.first);
         bundle.scenes[sc.first] = std::move(scene);
     }
     return bundle;
@@ -582,8 +583,15 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     std::string json = serializeState(*engine);
                     engine = std::make_shared<Engine>(bundle, opts);
                     deserializeState(*engine, json);
-                    if (!diffState(before, snapshotState(*engine)).empty())
-                        throw std::runtime_error("envelope round-trip changed flattened state");
+                    // A load mounts @scene bags only for the scenes a flow stands in; the rest wait in the
+                    // registry, parked, and the snapshot sees mounted bags only. So an @scene value that is
+                    // there before and gone after is parked, not lost: the script's own steps prove it comes
+                    // back when the flow re-enters that scene. Anything else that differs is a real change.
+                    for (const auto& c : diffState(before, snapshotState(*engine)))
+                    {
+                        const bool parked = !c.to.has_value() && c.path.find("@scene:") != std::string::npos;
+                        if (!parked) throw std::runtime_error("envelope round-trip changed flattened state at " + c.path);
+                    }
                     ++envelopeRoundTrips;
                 }
                 // Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle.
@@ -827,9 +835,18 @@ static void runTraceLogSmoke()
     for (const auto& e : engine.log())
         if (e.flow != "main") fail("trace", "flow tag", "an engine entry does not name its flow");
 
+    int lastBefore = -1;
+    for (const auto& e : engine.log()) lastBefore = std::max(lastBefore, e.seq);
     engine.clearLog();
     if (!engine.log().empty()) fail("trace", "clearLog", "the engine's stream did not empty");
     if (flow->log().empty()) fail("trace", "flow-local", "clearing the engine emptied a flow's own log");
+    // After the clear the engine's stream keeps counting: seq was the log's size, so it restarted at 0
+    // and entries read either side of a clear could not be ordered.
+    Flow* again = engine.openFlow("again", "s", "b");
+    for (int i = 0; i < 20 && again->advance().type != StepType::End; i++) {}
+    bool restarted = engine.log().empty();
+    for (const auto& e : engine.log()) if (e.seq <= lastBefore) restarted = true;
+    if (restarted) fail("trace", "seq after clearLog", "the engine's seq restarted after a clear");
 
     std::cout << "  [trace] decisions logged: " << flow->log().size() << ", with the dropped sibling named\n";
 }

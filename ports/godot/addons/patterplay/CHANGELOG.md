@@ -6,6 +6,21 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A greyed-out choice option can no longer be chosen.** `choose()` accepted an option whose condition was
+  false, played its content and used it up. It now reports `choice option is not eligible` and leaves the choice
+  open, as the other three runtimes do.
+- **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
+  standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
+  rolling back used to drop those values, so the next real entry found the defaults and the next save left them
+  out. A new corpus case pins this on all four runtimes.
+- **The decision log's `seq` keeps counting after a clear.** The engine's log numbered entries by its length, so
+  after `clear_log()` the numbers started again at 0 and entries read either side of the clear could not be put
+  in order.
+- **The state panel's decision log updates as the game plays.** It was redrawn only when the panel rebuilt,
+  which playing a flow never causes, so new decisions did not appear.
+
 ## [0.18.0] - 2026-10-05
 
 ### Changed

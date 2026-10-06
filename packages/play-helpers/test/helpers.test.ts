@@ -19,6 +19,7 @@ const project: ProjectFile = {
 };
 const scene: Scene = {
   id: "s", type: "scene", name: "S",
+  sceneProps: [{ name: "locked", type: "boolean", default: true }],
   blocks: [{ id: "b", type: "block", name: "B", children: [
     { id: "sn", type: "snippet", beats: [{ id: "T", kind: "text" }], jump: { to: "END" } },
   ] }],
@@ -34,6 +35,21 @@ describe("runtime properties", () => {
     expect(getProperty(engine, "@hp")).toBe(7);
     setProperties(engine, { "@hp": 12 });
     expect(getProperty(engine, "@hp")).toBe(12);
+  });
+});
+
+describe("runtime properties on a flow", () => {
+  // `@scene` props are each flow's own, so the Engine refuses them. The docs showed
+  // setProperties(engine, { "@scene.locked": false }), which threw; the helpers take a Flow for these.
+  it("set @scene through the flow, alongside game-wide ones", () => {
+    const engine = new Engine(bundle);
+    const flow = engine.openFlow("f", { scene: "s" });
+    expect(() => setProperties(engine, { "@scene.locked": false })).toThrow();
+    setProperties(flow, { "@hp": 3, "@scene.locked": false });
+    expect(getProperty(flow, "@scene.locked")).toBe(false);
+    expect(getProperty(engine, "@hp")).toBe(3);
+    setProperty(flow, "@scene.locked", true);
+    expect(getProperty(flow, "@scene.locked")).toBe(true);
   });
 });
 

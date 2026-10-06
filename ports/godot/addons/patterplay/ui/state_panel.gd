@@ -79,6 +79,7 @@ func _tick() -> void:
 		_rebuild()
 	else:
 		_refresh_values()
+		_refresh_log_if_moved()
 
 
 # -- build ---------------------------------------------------------------------
@@ -274,7 +275,7 @@ func _build_log(e) -> void:
 	text.text = "\n".join(_visible_log_lines(e))
 	scroll.add_child(text)
 	_body.add_child(scroll)
-	_log_boxes.append({"engine": e, "scroll": scroll, "text": text})
+	_log_boxes.append({"engine": e, "scroll": scroll, "text": text, "mark": _log_mark(e)})
 
 
 func _on_log_kind(on: bool, kind: String) -> void:
@@ -303,11 +304,31 @@ func _visible_log_lines(e) -> Array:
 ## interrupt a field somebody is editing.
 func _refresh_log() -> void:
 	for box in _log_boxes:
-		var label: Label = box["text"]
-		label.text = "\n".join(_visible_log_lines(box["engine"]))
-		if _log_autoscroll:
-			var scroll: ScrollContainer = box["scroll"]
-			scroll.set_deferred("scroll_vertical", int(1 << 30))
+		_redraw_log_box(box)
+
+
+## On the timer: redraw only a log that has moved since it was drawn. The log is otherwise
+## drawn on a rebuild alone, which playing a flow never causes, so new decisions sat unseen.
+func _refresh_log_if_moved() -> void:
+	for box in _log_boxes:
+		if _log_mark(box["engine"]) != box["mark"]:
+			_redraw_log_box(box)
+
+
+func _redraw_log_box(box: Dictionary) -> void:
+	var label: Label = box["text"]
+	label.text = "\n".join(_visible_log_lines(box["engine"]))
+	box["mark"] = _log_mark(box["engine"])
+	if _log_autoscroll:
+		var scroll: ScrollContainer = box["scroll"]
+		scroll.set_deferred("scroll_vertical", int(1 << 30))
+
+
+## What a drawn log looked like: its length and its last entry's seq. Seq keeps counting through a
+## clear, so a clear followed by new entries never looks unchanged.
+static func _log_mark(e) -> Array:
+	var entries: Array = e.log()
+	return [entries.size(), int(entries[-1]["seq"]) if not entries.is_empty() else -1]
 
 
 static func _show_log_value(v) -> String:
