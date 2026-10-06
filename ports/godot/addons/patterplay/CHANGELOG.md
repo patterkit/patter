@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The engine and its flows share a typed host rather than a dictionary.** Its fields are named after the JS
+  runtime's, so a change there ports across line for line, and each one has a type, which the busiest paths now
+  use. Nothing a game sees changes.
+
 ## [0.19.0] - 2026-10-06
 
 ### Added

@@ -20,17 +20,29 @@ extends RefCounted
 ## registry. Not public API.
 const _OWNS_REGISTRY := "_owns_registry"
 
-var _host: Dictionary
+const FlowHost := preload("res://addons/patterplay/runtime/flow_host.gd")
+
+## The state this engine's flows share with it; see flow_host.gd.
+var _host: FlowHost
 ## Why construction was refused ("" when it was not): see init_error().
 var _init_error := ""
 var _default_seed: int = 0x9e3779b9
 var _flows: Dictionary = {}
-var _scene_gameid_to_id: Dictionary = {}
-var _block_gameid_to_id: Dictionary = {}
+var _scene_game_id_to_id: Dictionary = {}
+var _block_game_id_to_id: Dictionary = {}
 var _source_debug: bool = false  # source-only DEBUG build: strings are the source language, not shippable
 # The options this engine was built with - reused verbatim by hot_swap() so the replacement engine
 # keeps the same seed source and settings.
 var _creation_options: Dictionary = {}
+## Every locale's string table, kept so set_locale() can re-point the host's `strings` live.
+## Reassigned wholesale by replace_strings(). JS's allStrings.
+var _all_strings: Dictionary = {}
+## The active locale (string lookups and character names resolve in it). JS's currentLocale.
+var _current_locale: String = ""
+## Host scopes the game bound through the "host_scopes" option, registered as foreign scopes, so
+## _release() can remove them again. JS binds only `@world`, and finds it again in its creation
+## options.
+var _bound_scopes: Array = []
 
 ## The run's ordered decision stream; see log().
 var _engine_log: Array = []
@@ -51,139 +63,85 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	if locale == "":
 		locale = bundle["locales"]["default"]
 	var all_strings: Dictionary = bundle.get("strings", {})
+	_all_strings = all_strings
+	_current_locale = locale
 	# Localisation mode (spec §11): "ids" + no source-debug -> emit beat IDs + omit character names.
 	var loc: Dictionary = bundle.get("localisation", {})
 	var emit_ids: bool = loc.get("mode", "embedded") == "ids" and not loc.get("sourceDebug", false)
 	_source_debug = loc.get("mode", "embedded") == "ids" and loc.get("sourceDebug", false)
 
-	_host = {
-		# The run's decision trace (parity with the JS runtime's engine.log()). Off unless
-		# asked for: a shipped game should pay nothing for a surface it never reads.
-		"log_enabled": bool(options.get("log", false)),
-		# The SHARED array, not a callable closing over `self`. A lambda here would capture the
-		# engine, _host holds the lambda, and the engine holds _host: a reference cycle that
-		# keeps the engine alive forever and makes the weak debug registry report a dead one.
-		# test_debug_registry caught exactly that, which is what it is for.
-		"engine_log": _engine_log,
-		# The next engine-log seq: its own counter, since the log's size restarts after a clear.
-		"engine_log_seq": 0,
-		# Diagnostics hook (opt-in, dev tooling): called with the choice's group id whenever a
-		# choice runs dry - no takeable option and no eligible fallback - so the silent
-		# fall-through is observable. Parity with the JS runtime's onDryChoice, which the
-		# three ports never had. Live feedback, distinct from the log's `dry` entry.
-		"on_dry_choice": options.get("on_dry_choice"),
-		# Content errors the engine played through (a condition that failed and counted as false, an
-		# effect that failed and was skipped, a Best-match part that failed and scored as false): a
-		# Callable taking {flow, kind, node, source?, message}. Unset, each is push_warning'd, so a
-		# content bug is never silent. Parity with the JS runtime's onError.
-		"on_error": options.get("on_error"),
-		"bundle": bundle,
-		"all_strings": all_strings,                 # kept so set_locale() can re-point the active table live
-		"locale": locale,
-		"emit_ids": emit_ids,
-		"strings": all_strings.get(locale, {}),
-		"default_strings": all_strings.get(bundle["locales"]["default"], {}),
-		"cast_display": {},
-		"node_index": {},
-		"block_to_scene": {},
-		# Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id, and
-		# per-scene block gameId -> internal id. A flow needs them to resolve goto() by address.
-		"scene_gameid_to_id": _scene_gameid_to_id,
-		"block_gameid_to_id": _block_gameid_to_id,
-		"block_by_id": {},
-		"tag_index": {},
-		# The game's one registry: `@patter` (the SHARED globals), host scopes, every instance bag.
-		# Held untyped: a combined game may hand over a registry another addon's shim built.
-		"registry": null,
-		# True when the engine made the registry (a standalone game): save_game() then carries its values.
-		"owns_registry": false,
-		"shared_patter": null,   # the SHARED @patter globals' PatterPropertyBag, registered under `patter`
-		# Host scopes this engine self-backed and registered (the game bound none, nobody else had).
-		"self_backed": [],
-		# Host scopes the game bound through the "host_scopes" option, registered as foreign scopes.
-		"bound_scopes": [],
-		# Other engines' game-wide scopes the content names (the bundle's externalScopes): every one
-		# must be registered for a flow to open or a load to run, and each is a scope to
-		# PatterFlow.split_host_ref whether or not anybody registers it now.
-		"external_scopes": PatterBundle.external_scopes(bundle),
-		# Memoised ref splits (ref -> [scope, name]), dropped whenever the registry's scopes move.
-		"split_cache": {},
-		"split_revision": -1,
-		"patter_shared_decls": [],
-		"patter_local_decls": [],
-		"patter_shared_names": {},
-		"scene_shared_names": {},
-		"shared_visits": {},
-		"shared_selectors": {},
-		# Per-scene SHARED scene props, each registered under PatterFlow.key_stage(sceneId). Made the
-		# first time any flow needs the scene, so a bag loaded before then waits in the registry and
-		# is claimed there.
-		"stage_bags": {},
-		# The open checkpoint's undo journal, or null when none is open (see checkpoint()):
-		# { "undo": [Callable, ...] run newest first, "flows": {PatterFlow: true} whose cursor is already
-		# recorded (or opened inside the checkpoint), "opened": {PatterFlow: true} opened inside it,
-		# "selectors": {group id: true} shared selector cursors already copied, "flow_selectors":
-		# {PatterFlow: {group id: true}} each flow's own selector cursors already copied }.
-		"journal": null,
-		"custom_rng": options.get("rng"),
-		"replay_prompt_on_choose": options.get("replay_prompt_on_choose", false),
-		# Closed captions (#214): captions_on shows cues in dialogue lines (default true); when false the
-		# engine strips caption_open..caption_close spans from line text. Mutable via set_closed_captions.
-		"captions_on": options.get("closed_captions", true),
-		"caption_open": bundle.get("closedCaptions", {}).get("open", "["),   # default: square brackets (#214)
-		"caption_close": bundle.get("closedCaptions", {}).get("close", "]"),
-		# A cast member whose whole lines are captions (silent when off); absent/empty -> the default SFX.
-		"caption_character": bundle.get("closedCaptions", {}).get("character", "SFX"),
-	}
-	if str(_host["caption_character"]) == "":
-		_host["caption_character"] = "SFX"
+	# Field by field as JS builds its FlowHost literal; flow_host.gd says what each one is.
+	var h := FlowHost.new()
+	h.log_enabled = bool(options.get("log", false))
+	# The SHARED array, not a callable closing over `self`: see flow_host.gd.
+	h.engine_log = _engine_log
+	h.on_dry_choice = options.get("on_dry_choice")
+	h.on_error = options.get("on_error")
+	h.bundle = bundle
+	h.emit_ids = emit_ids
+	h.strings = all_strings.get(locale, {})
+	h.default_strings = all_strings.get(bundle["locales"]["default"], {})
+	# The same instances the engine resolves addresses with.
+	h.scene_game_id_to_id = _scene_game_id_to_id
+	h.block_game_id_to_id = _block_game_id_to_id
+	h.external_scopes = PatterBundle.external_scopes(bundle)
+	h.custom_rng = options.get("rng")
+	h.replay_prompt_on_choose = bool(options.get("replay_prompt_on_choose", false))
+	h.captions_on = bool(options.get("closed_captions", true))
+	var captions: Dictionary = bundle.get("closedCaptions", {})
+	h.caption_open = str(captions.get("open", "["))   # default: square brackets (#214)
+	h.caption_close = str(captions.get("close", "]"))
+	# Absent or empty -> the default SFX.
+	var caption_character = captions.get("character", "SFX")
+	h.caption_character = "SFX" if caption_character == null or str(caption_character) == "" else str(caption_character)
+	_host = h
 
 	if _source_debug:
 		push_warning("[Patterplay] source-only DEBUG build: strings are the source language for debugging, not a shippable localised build.")
 
 	for c in bundle.get("cast", []):
 		if str(c.get("displayName", "")) != "":
-			_host["cast_display"][c["name"]] = c["displayName"]
+			_host.cast_display[c["name"]] = c["displayName"]
 
 	if options.has("seed"):
 		_default_seed = PatterMulberry32.to_uint32(float(options["seed"]))
 
 	for sid in bundle["scenes"].keys():
 		var scene: Dictionary = bundle["scenes"][sid]
-		_scene_gameid_to_id[PatterBundle.effective_game_id(scene)] = sid
+		_scene_game_id_to_id[PatterBundle.effective_game_id(scene)] = sid
 		var block_addrs := {}
 		# Author tags (#215): accumulate scene -> block -> node (own + ancestors), deduped, outermost-first.
 		var scene_tags: Array = _dedupe_tags(scene.get("tags", []))
-		_host["tag_index"][sid] = scene_tags
+		_host.tag_index[sid] = scene_tags
 		for block in scene["blocks"]:
-			_host["block_to_scene"][block["id"]] = sid
-			_host["block_by_id"][block["id"]] = block
+			_host.block_index[block["id"]] = sid
+			_host.block_by_id[block["id"]] = block
 			block_addrs[PatterBundle.effective_game_id(block)] = block["id"]
 			var block_tags: Array = _dedupe_tags(scene_tags + block.get("tags", []))
-			_host["tag_index"][block["id"]] = block_tags
+			_host.tag_index[block["id"]] = block_tags
 			_index_nodes(block.get("children", []))
 			_index_tags(block.get("children", []), block_tags)
-		_block_gameid_to_id[sid] = block_addrs
+		_block_game_id_to_id[sid] = block_addrs
 
 	for p in bundle.get("properties", []):
 		var shared: bool = p.get("shared", true)
 		if shared:
-			_host["patter_shared_decls"].append(p)
-			_host["patter_shared_names"][str(p["name"]).to_lower()] = true
+			_host.patter_shared_decls.append(p)
+			_host.patter_shared_names[str(p["name"]).to_lower()] = true
 		else:
-			_host["patter_local_decls"].append(p)
+			_host.patter_local_decls.append(p)
 	# The @patter globals live in a bag, like every other scope: it is what carries the
 	# audit hook a state logger pushes from, and the clone guard on a mutable default.
 	# "@patter." is the address a row reports; the LOG path is the same here, because
 	# there is only one shared globals bag.
-	_host["shared_patter"] = PatterPropertyBag.new(_host["patter_shared_decls"], {"path_prefix": "@patter."})
+	_host.patter_bag = PatterPropertyBag.new(_host.patter_shared_decls, {"path_prefix": "@patter."})
 
 	for sid in bundle["scenes"].keys():
 		var names := {}
 		for p in bundle["scenes"][sid].get("sceneProps", []):
 			if p.get("shared", false):
 				names[str(p["name"]).to_lower()] = true
-		_host["scene_shared_names"][sid] = names
+		_host.scene_shared_names[sid] = names
 
 	_register(bundle, options)
 
@@ -196,11 +154,11 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 func _register(bundle: Dictionary, options: Dictionary) -> void:
 	var given = options.get("registry")
 	var registry = given if given != null else PatterScopeRegistry.new()
-	_host["registry"] = registry
-	_host["owns_registry"] = given == null or bool(options.get(_OWNS_REGISTRY, false))
-	_host["split_revision"] = registry.revision
+	_host.registry = registry
+	_host.owns_registry = given == null or bool(options.get(_OWNS_REGISTRY, false))
+	_host.ref_split_revision = registry.revision
 	var registered: Array = []
-	var refused: String = registry.mount_owned("patter", _host["shared_patter"], {"owner": PatterFlow.OWNER})
+	var refused: String = registry.mount_owned("patter", _host.patter_bag, {"owner": PatterFlow.OWNER})
 	if refused == "":
 		registered.append("patter")
 	var specs: Array = bundle.get("scopeRegistry", {}).get("scopes", [])
@@ -220,14 +178,14 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 			{"writable": spec.get("writable", true) != false, "owner": PatterFlow.OWNER})
 		if refused == "":
 			registered.append(str(token))
-			_host["bound_scopes"].append(str(token))
+			_bound_scopes.append(str(token))
 	# A declared host scope nobody bound. A standalone engine is its own game, so it self-backs the
 	# scope: a property bag seeded from the declarations, stored and SAVED by the registry like any
 	# other, since only a resolver the game binds is external. Given the GAME's registry the engine
 	# registers nothing here: those tokens are the game's to register, or another engine's (a bundle
 	# compiled against the Storylet Engine's spec declares `@story`), and self-backing one would clash
 	# with its real owner depending only on which engine was built first.
-	if _host["owns_registry"]:
+	if _host.owns_registry:
 		for spec in specs:
 			if refused != "":
 				break
@@ -240,12 +198,12 @@ func _register(bundle: Dictionary, options: Dictionary) -> void:
 			refused = registry.define_owned(token, decls, {"owner": PatterFlow.OWNER})
 			if refused == "":
 				registered.append(token)
-				_host["self_backed"].append(token)
+				_host.host_scopes.append(token)
 	if refused != "":
 		for k in registered:
 			registry.remove(k, {"keep": true})   # a clash leaves the game's registry as it was
-		_host["self_backed"] = []
-		_host["bound_scopes"] = []
+		_host.host_scopes = []
+		_bound_scopes = []
 		_init_error = refused
 
 
@@ -279,7 +237,7 @@ func init_error() -> String:
 
 func _index_nodes(nodes: Array) -> void:
 	for n in nodes:
-		_host["node_index"][n["id"]] = n
+		_host.node_index[n["id"]] = n
 		if n.get("type", "") == "group":
 			_index_nodes(n.get("children", []))
 
@@ -289,17 +247,17 @@ func _index_nodes(nodes: Array) -> void:
 func _index_tags(nodes: Array, inherited: Array) -> void:
 	for n in nodes:
 		var acc: Array = _dedupe_tags(inherited + n.get("tags", []))
-		_host["tag_index"][n["id"]] = acc
+		_host.tag_index[n["id"]] = acc
 		if n.get("type", "") == "group":
 			# An option's prompt beat is a beat like any other: its own tags plus the option's. Left
 			# out, a replayed prompt and the outline's prompt lost every tag.
 			if n.get("prompt") is Dictionary:
 				var prompt: Dictionary = n["prompt"]
-				_host["tag_index"][prompt["id"]] = _dedupe_tags(acc + prompt.get("tags", []))
+				_host.tag_index[prompt["id"]] = _dedupe_tags(acc + prompt.get("tags", []))
 			_index_tags(n.get("children", []), acc)
 		else:
 			for beat in n.get("beats", []):
-				_host["tag_index"][beat["id"]] = _dedupe_tags(acc + beat.get("tags", []))
+				_host.tag_index[beat["id"]] = _dedupe_tags(acc + beat.get("tags", []))
 
 
 # Dedupe a tag list, preserving first-seen order.
@@ -348,7 +306,7 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 	var scene_id: String = address["scene"]
 	var block_id: String = address["block"]
 	var prior: PatterFlow = _flows.get(id)
-	var journal = _host["journal"]
+	var journal = _host.journal
 	if journal != null and prior != null and not prior.is_closed():
 		push_error("open_flow would replace the open flow '%s', which can't be undone while a checkpoint is open" % id)
 		return null
@@ -379,7 +337,7 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 ## in that scene), so a block from another scene does not resolve. With no scene, the block is an
 ## internal id from any scene. Neither: the first scene. The same rule on every runtime.
 func _resolve_open_address(scene: String, block: String) -> Dictionary:
-	var scenes: Dictionary = _host["bundle"]["scenes"]
+	var scenes: Dictionary = _host.bundle["scenes"]
 	if scene != "":
 		var scene_id := PatterFlow.resolve_scene(_host, scene)
 		if scene_id == "":
@@ -391,7 +349,7 @@ func _resolve_open_address(scene: String, block: String) -> Dictionary:
 			return {"error": "unknown block: " + block}
 		return {"scene": scene_id, "block": block_id}
 	if block != "":
-		if not _host["block_to_scene"].has(block):
+		if not _host.block_index.has(block):
 			return {"error": "unknown block: " + block}
 		return {"scene": "", "block": block}
 	if scenes.is_empty():
@@ -404,8 +362,8 @@ func _resolve_open_address(scene: String, block: String) -> Dictionary:
 ## whatever order it built them in. The first token in the list the registry does not have is the
 ## refusal (a message for push_error), or "" when every one is there.
 func _external_scope_refusal() -> String:
-	for token in _host["external_scopes"]:
-		if not _host["registry"].has(token):
+	for token in _host.external_scopes:
+		if not _host.registry.has(token):
 			return ("this content names @%s, which no engine on this registry registered: " % token) \
 				+ "give every engine the game's one registry"
 	return ""
@@ -425,13 +383,13 @@ func get_flow(id: String) -> PatterFlow:
 # address resolution open_flow / goto do - for a host that wants to display, log, or pass back the
 # address of where it currently is.
 func scene_address(scene_id: String) -> String:
-	var scenes: Dictionary = _host["bundle"]["scenes"]
+	var scenes: Dictionary = _host.bundle["scenes"]
 	return PatterBundle.effective_game_id(scenes[scene_id]) if scenes.has(scene_id) else ""
 
 
 # The host-facing address (Game ID) of a block by internal id, or "" if unknown.
 func block_address(block_id: String) -> String:
-	var blocks: Dictionary = _host["block_by_id"]
+	var blocks: Dictionary = _host.block_by_id
 	return PatterBundle.effective_game_id(blocks[block_id]) if blocks.has(block_id) else ""
 
 
@@ -462,11 +420,11 @@ func _undo_open_flow(id: String, flow: PatterFlow, prior: PatterFlow) -> void:
 ## way. Not undone: trace and log events already emitted, and draws from a custom "rng" the game
 ## supplied.
 func checkpoint() -> Checkpoint:
-	if _host["journal"] != null:
+	if _host.journal != null:
 		push_error("a checkpoint is already open: roll it back or commit it first")
 		return null
 	var journal := {"undo": [], "flows": {}, "opened": {}, "selectors": {}, "flow_selectors": {}}
-	_host["journal"] = journal
+	_host.journal = journal
 	return Checkpoint.new(journal)
 
 
@@ -490,7 +448,7 @@ func commit(cp: Checkpoint) -> void:
 
 ## True while a checkpoint is open.
 func in_checkpoint() -> bool:
-	return _host["journal"] != null
+	return _host.journal != null
 
 
 ## Empty a finished journal, so a checkpoint handle a game keeps holds nothing.
@@ -500,16 +458,16 @@ static func _clear_journal(journal: Dictionary) -> void:
 
 
 func _end_checkpoint(cp: Checkpoint) -> bool:
-	if cp == null or _host["journal"] == null or not is_same(_host["journal"], cp.journal):
+	if cp == null or _host.journal == null or not is_same(_host.journal, cp.journal):
 		push_error("that checkpoint is not the open one")
 		return false
-	_host["journal"] = null
+	_host.journal = null
 	return true
 
 
 ## True (with push_error) when a checkpoint is open, refusing `what`, which can't be undone.
 func _refused_in_checkpoint(what: String) -> bool:
-	if _host["journal"] == null:
+	if _host.journal == null:
 		return false
 	push_error("%s can't be undone, so it isn't allowed while a checkpoint is open" % what)
 	return true
@@ -552,14 +510,14 @@ func reset() -> void:
 	_flows = {}
 	# Reseeded IN PLACE: the bag stays the one registered under `patter`, so the registry, a
 	# state logger and any eval context keep reading it.
-	_host["shared_patter"].reseed(_host["patter_shared_decls"])
-	_host["shared_visits"] = {}
-	_host["shared_selectors"] = {}
-	var reg = _host["registry"]
-	for sid in _host["stage_bags"]:
+	_host.patter_bag.reseed(_host.patter_shared_decls)
+	_host.shared_visits = {}
+	_host.shared_selectors = {}
+	var reg = _host.registry
+	for sid in _host.stage_bags:
 		if reg.has(PatterFlow.key_stage(sid)):
 			reg.remove(PatterFlow.key_stage(sid))
-	_host["stage_bags"] = {}
+	_host.stage_bags = {}
 	# Values loaded for bags nobody has claimed yet are the old game's too: a flow opened after the
 	# reset must not pick them up. Other engines' parked values are theirs, and stay.
 	reg.discard_parked("patter/")
@@ -574,27 +532,27 @@ func _release(keep: bool) -> void:
 	_flows = {}
 	if _init_error != "":
 		return   # registered nothing: `patter` in this registry is somebody else's
-	var reg = _host["registry"]
-	for sid in _host["stage_bags"]:
+	var reg = _host.registry
+	for sid in _host.stage_bags:
 		if reg.has(PatterFlow.key_stage(sid)):
 			reg.remove(PatterFlow.key_stage(sid), {"keep": keep})
-	_host["stage_bags"] = {}
-	for t in ["patter"] + _host["self_backed"]:
+	_host.stage_bags = {}
+	for t in ["patter"] + _host.host_scopes:
 		if reg.has(t):
 			reg.remove(t, {"keep": keep})
-	for t in _host["bound_scopes"]:
+	for t in _bound_scopes:
 		if reg.has(t):
 			reg.remove(t)
 
 
 func locale() -> String:
-	return _host["locale"]
+	return _current_locale
 
 
 # The compiled bundle's build hash (content.hash). Pass it to PatterDebugLink so Patterpad's live
 # debug link can tell whether the running game matches the currently open project (in-sync vs stale).
 func build_id() -> String:
-	return str(_host["bundle"].get("content", {}).get("hash", ""))
+	return str(_host.bundle.get("content", {}).get("hash", ""))
 
 
 # True for a source-only DEBUG build: the embedded strings are the source language (for debugging), not a
@@ -607,8 +565,8 @@ func is_source_debug() -> bool:
 # it; flow position / state / visits / rng are untouched. All open flows share the host string table, so the
 # swap reaches them at once. A locale with no table resolves every string via the <Untranslated> fallback.
 func set_locale(locale: String) -> void:
-	_host["locale"] = locale
-	_host["strings"] = _host["all_strings"].get(locale, {})
+	_current_locale = locale
+	_host.strings = _all_strings.get(locale, {})
 
 
 # Live bundle refresh, tier 1 (strings only): swap every locale's string table in place from a freshly
@@ -617,9 +575,9 @@ func set_locale(locale: String) -> void:
 # hot_swap() instead (a structure change here simply won't show).
 func replace_strings(bundle: Dictionary) -> void:
 	var all_strings: Dictionary = bundle.get("strings", {})
-	_host["all_strings"] = all_strings
-	_host["strings"] = all_strings.get(_host["locale"], {})
-	_host["default_strings"] = all_strings.get(_host["bundle"]["locales"]["default"], {})
+	_all_strings = all_strings
+	_host.strings = all_strings.get(_current_locale, {})
+	_host.default_strings = all_strings.get(_host.bundle["locales"]["default"], {})
 
 
 # Live bundle refresh, tier 2 (full swap): rebuild on an edited bundle with the whole run carried over
@@ -640,8 +598,8 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 	# The replacement registers on the SAME registry, and a standalone engine's replacement is still
 	# its own game (so its save_game keeps carrying the registry's values).
 	var opts := _creation_options.duplicate()
-	opts["registry"] = _host["registry"]
-	opts[_OWNS_REGISTRY] = _host["owns_registry"]
+	opts["registry"] = _host.registry
+	opts[_OWNS_REGISTRY] = _host.owns_registry
 	_release(true)
 	var next := PatterEngine.new(bundle, opts)
 	if next.init_error() != "" or not next.load_game(snapshot):
@@ -656,8 +614,8 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 				next.open_flow(str(id))
 			elif (bundle.get("scenes", {}) as Dictionary).has(str(sid)):
 				next.open_flow(str(id), str(sid))
-	next.set_locale(_host["locale"])
-	next.set_closed_captions(_host["captions_on"])
+	next.set_locale(_current_locale)
+	next.set_closed_captions(_host.captions_on)
 	return next
 
 
@@ -679,7 +637,7 @@ func apply_live_bundle(data: String) -> Dictionary:
 	var next = PatterBundle.load_from_string(data)
 	if next == null:
 		return {"engine": self, "kind": "error"}
-	var cur: String = str((_host["bundle"] as Dictionary).get("content", {}).get("structureHash", ""))
+	var cur: String = str(_host.bundle.get("content", {}).get("structureHash", ""))
 	var nxt: String = str((next as Dictionary).get("content", {}).get("structureHash", ""))
 	if cur != "" and cur == nxt:
 		replace_strings(next)
@@ -689,14 +647,14 @@ func apply_live_bundle(data: String) -> Dictionary:
 
 # Whether closed captions are currently shown (full dialogue text).
 func closed_captions() -> bool:
-	return _host["captions_on"]
+	return _host.captions_on
 
 
 # Turn closed captions on/off LIVE (#214). When OFF, subsequent dialogue lines have their caption cues +
 # surrounding whitespace stripped; narration / prompts / etc. untouched. A presentation toggle reaching
 # every open flow at once; not save state.
 func set_closed_captions(on: bool) -> void:
-	_host["captions_on"] = on
+	_host.captions_on = on
 
 
 ## Read a shared property by ref: a `@patter` global, a host scope, or any scope another engine
@@ -706,7 +664,7 @@ func get_property(ref: String):
 	if sp[0] == "scene":
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return null
-	return _host["registry"].get_value(sp[0], sp[1])
+	return _host.registry.get_value(sp[0], sp[1])
 
 
 # Editable @patter properties (the shared / engine-scoped ones), for a live inspector.
@@ -718,7 +676,7 @@ func get_property(ref: String):
 # the Unity PatterStateWindow property inspector.
 func list_properties() -> Array:
 	var rows: Array = []
-	for d in _host["patter_shared_decls"]:
+	for d in _host.patter_shared_decls:
 		var nm: String = str(d["name"]).to_lower()
 		rows.append({
 			"name": nm,
@@ -727,7 +685,7 @@ func list_properties() -> Array:
 			# the patter scope - but it is the shorthand, not the address a row reports.
 			"path": "@patter." + nm,
 			"type": d.get("type", "boolean"),
-			"value": _host["shared_patter"].get_value(nm),
+			"value": _host.patter_bag.get_value(nm),
 			"default": PatterBundle.prop_default(d),
 			"values": d.get("values", []),
 			"stages": d.get("stages", []),
@@ -745,11 +703,11 @@ func set_property(ref: String, value) -> void:
 		push_error("'%s': @scene properties are scene-scoped - read/write them on a Flow" % ref)
 		return
 	# A refusal (an unknown scope, or a resolver with no setter) is push_error'd by the registry.
-	var journal = _host["journal"]
-	var prev = _host["registry"].get_value(sp[0], sp[1]) if journal != null else null
-	var refused: String = _host["registry"].set_value(sp[0], sp[1], value, {"host": true})
+	var journal = _host.journal
+	var prev = _host.registry.get_value(sp[0], sp[1]) if journal != null else null
+	var refused: String = _host.registry.set_value(sp[0], sp[1], value, {"host": true})
 	if journal != null and refused == "" and prev != null:
-		journal["undo"].append(Callable(_host["registry"], "set_value").bind(sp[0], sp[1], prev, {"host": true}))
+		journal["undo"].append(Callable(_host.registry, "set_value").bind(sp[0], sp[1], prev, {"host": true}))
 
 
 # -- save / load ---------------------------------------------------------------
@@ -764,9 +722,9 @@ func set_property(ref: String, value) -> void:
 ##
 ## load_game() replaces every bag, so re-enumerate after a load.
 func list_bags() -> Array:
-	var mounts: Array = [{"bag": _host["shared_patter"]}]
-	for sid in _host["stage_bags"]:
-		mounts.append({"bag": _host["stage_bags"][sid], "path_prefix": "@scene:%s." % sid})
+	var mounts: Array = [{"bag": _host.patter_bag}]
+	for sid in _host.stage_bags:
+		mounts.append({"bag": _host.stage_bags[sid], "path_prefix": "@scene:%s." % sid})
 	return mounts
 
 
@@ -786,10 +744,10 @@ func save_game() -> Dictionary:
 	for id in _flows.keys():
 		flows[id] = _flows[id].snapshot()
 	var out := {"version": SAVE_VERSION}
-	if _host["owns_registry"]:
-		out["registry"] = _host["registry"].save()
-	out["sharedVisits"] = _host["shared_visits"].duplicate(true)
-	out["sharedSelectors"] = PatterFlow._save_selectors(_host["shared_selectors"])
+	if _host.owns_registry:
+		out["registry"] = _host.registry.save()
+	out["sharedVisits"] = _host.shared_visits.duplicate(true)
+	out["sharedSelectors"] = PatterFlow._save_selectors(_host.shared_selectors)
 	out["flows"] = flows
 	return out
 
@@ -823,7 +781,7 @@ func load_game(save: Dictionary) -> bool:
 	if unregistered != "":
 		push_error("load_game: " + unregistered)
 		return false
-	var reg = _host["registry"]
+	var reg = _host.registry
 	var saved_flows: Dictionary = save["flows"]
 	# Flows the save does not have are over: their bags go. The rest are handed back with their values,
 	# which is what a game that loaded its registry first has just laid the save's values over.
@@ -831,23 +789,23 @@ func load_game(save: Dictionary) -> bool:
 		_flows[id]._release_bags(saved_flows.has(id))
 		_flows[id].close()
 	_flows = {}
-	for sid in _host["stage_bags"]:
+	for sid in _host.stage_bags:
 		if reg.has(PatterFlow.key_stage(sid)):
 			reg.remove(PatterFlow.key_stage(sid), {"keep": true})
-	_host["stage_bags"] = {}
+	_host.stage_bags = {}
 
 	var values = PatterFlow.sections_from_v2(save) if v == 2.0 else save.get("registry")
 	if values is Dictionary:
 		# The engine's own registry takes the save wholesale. A game's registry may hold values the
 		# game loaded for other engines, still waiting to be claimed: add to those, never replace them.
-		if _host["owns_registry"]:
+		if _host.owns_registry:
 			reg.load(values)
 		else:
 			reg.load(values, {"keep_parked": true})
 	# Reads the family's camelCase shape and the snake_case one this addon wrote before 0.11.0.
 	var visits = PatterFlow._k(save, "sharedVisits", "shared_visits")
-	_host["shared_visits"] = (visits as Dictionary).duplicate(true) if visits is Dictionary else {}
-	_host["shared_selectors"] = PatterFlow._load_selectors(PatterFlow._k(save, "sharedSelectors", "shared_selectors"))
+	_host.shared_visits = (visits as Dictionary).duplicate(true) if visits is Dictionary else {}
+	_host.shared_selectors = PatterFlow._load_selectors(PatterFlow._k(save, "sharedSelectors", "shared_selectors"))
 	for id in saved_flows:
 		var flow := PatterFlow.new(_host, float(_default_seed))
 		flow.id = str(id)
@@ -882,18 +840,18 @@ func _resolve_block_ref(scene_id: String, r: String) -> String:
 # Author tags (#215): a beat's accumulated tags (own + every ancestor's), the same value its step carries.
 # Empty array for an unknown id or a beat with no tags anywhere up the chain.
 func tags_for_beat(beat_id: String) -> Array:
-	return _host["tag_index"].get(beat_id, [])
+	return _host.tag_index.get(beat_id, [])
 
 
 # A scene's own tags, by internal id or gameId address.
 func tags_for_scene(scene_ref: String) -> Array:
-	return _host["tag_index"].get(_resolve_scene_ref(scene_ref), [])
+	return _host.tag_index.get(_resolve_scene_ref(scene_ref), [])
 
 
 # A block's accumulated tags (scene + block), by scene + block ref (id or gameId).
 func tags_for_block(scene_ref: String, block_ref: String) -> Array:
 	var scene_id := _resolve_scene_ref(scene_ref)
-	return _host["tag_index"].get(_resolve_block_ref(scene_id, block_ref), [])
+	return _host.tag_index.get(_resolve_block_ref(scene_id, block_ref), [])
 
 
 # -- scene / block gameData ----------------------------------------------------
@@ -905,9 +863,9 @@ func tags_for_block(scene_ref: String, block_ref: String) -> Array:
 ## step's gameData is; empty when the scene sets none or the ref does not resolve.
 func game_data_for_scene(scene_ref: String) -> Dictionary:
 	var scene_id := _resolve_scene_ref(scene_ref)
-	if not _host["bundle"]["scenes"].has(scene_id):
+	if not _host.bundle["scenes"].has(scene_id):
 		return {}
-	return _own_game_data(_host["bundle"]["scenes"][scene_id])
+	return _own_game_data(_host.bundle["scenes"][scene_id])
 
 
 ## A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
@@ -916,9 +874,9 @@ func game_data_for_scene(scene_ref: String) -> Dictionary:
 ## not resolve.
 func game_data_for_block(scene_ref: String, block_ref: String) -> Dictionary:
 	var block_id := _resolve_block_ref(_resolve_scene_ref(scene_ref), block_ref)
-	if not _host["block_by_id"].has(block_id):
+	if not _host.block_by_id.has(block_id):
 		return {}
-	return _own_game_data(_host["block_by_id"][block_id])
+	return _own_game_data(_host.block_by_id[block_id])
 
 
 # A node's own gameData as a fresh, normalised copy (the same per-value rule as PatterFlow's step
@@ -941,7 +899,7 @@ func get_cast() -> Array:
 	# "cast" is absent from a bundle whose project declares none, and a nameless member is junk from a
 	# hand-edited bundle: both give an empty answer, not an error.
 	var names: Array = []
-	for c in _host["bundle"].get("cast", []):
+	for c in _host.bundle.get("cast", []):
 		var n: String = c.get("name", "")
 		if n != "":
 			names.append(n)
@@ -956,9 +914,9 @@ func get_cast() -> Array:
 func cast_for_scene(scene_ref: String) -> Array:
 	var cast: Array = []
 	var scene_id := _resolve_scene_ref(scene_ref)
-	if not _host["bundle"]["scenes"].has(scene_id):
+	if not _host.bundle["scenes"].has(scene_id):
 		return cast
-	var scene: Dictionary = _host["bundle"]["scenes"][scene_id]
+	var scene: Dictionary = _host.bundle["scenes"][scene_id]
 	var seen := {}
 	for block in scene["blocks"]:
 		_collect_cast(block.get("children", []), seen, cast)
@@ -969,9 +927,9 @@ func cast_for_scene(scene_ref: String) -> Array:
 func cast_for_block(scene_ref: String, block_ref: String) -> Array:
 	var cast: Array = []
 	var block_id := _resolve_block_ref(_resolve_scene_ref(scene_ref), block_ref)
-	if not _host["block_by_id"].has(block_id):
+	if not _host.block_by_id.has(block_id):
 		return cast
-	var block: Dictionary = _host["block_by_id"][block_id]
+	var block: Dictionary = _host.block_by_id[block_id]
 	_collect_cast(block.get("children", []), {}, cast)
 	return cast
 
@@ -1002,8 +960,8 @@ func _collect_cast(nodes: Array, seen: Dictionary, into: Array) -> void:
 # tooling that builds against the writer's structure (see also get_beat_sequence()).
 func get_outline() -> Array:
 	var out: Array = []
-	for sid in _host["bundle"]["scenes"].keys():
-		var scene: Dictionary = _host["bundle"]["scenes"][sid]
+	for sid in _host.bundle["scenes"].keys():
+		var scene: Dictionary = _host.bundle["scenes"][sid]
 		var os := {
 			"id": scene["id"],
 			"gameId": PatterBundle.effective_game_id(scene),
@@ -1014,7 +972,7 @@ func get_outline() -> Array:
 		var sgd := _own_game_data(scene)
 		if not sgd.is_empty():
 			os["gameData"] = sgd
-		var st: Array = _host["tag_index"].get(scene["id"], [])
+		var st: Array = _host.tag_index.get(scene["id"], [])
 		if not st.is_empty():
 			os["tags"] = st
 		for block in scene["blocks"]:
@@ -1027,7 +985,7 @@ func get_outline() -> Array:
 			var bgd := _own_game_data(block)
 			if not bgd.is_empty():
 				ob["gameData"] = bgd
-			var bt: Array = _host["tag_index"].get(block["id"], [])
+			var bt: Array = _host.tag_index.get(block["id"], [])
 			if not bt.is_empty():
 				ob["tags"] = bt
 			for n in block.get("children", []):
@@ -1041,8 +999,8 @@ func get_outline() -> Array:
 # to and its static data. The linear view of get_outline(), for a tool that lays one item per beat.
 func get_beat_sequence() -> Array:
 	var seq: Array = []
-	for sid in _host["bundle"]["scenes"].keys():
-		var scene: Dictionary = _host["bundle"]["scenes"][sid]
+	for sid in _host.bundle["scenes"].keys():
+		var scene: Dictionary = _host.bundle["scenes"][sid]
 		for block in scene["blocks"]:
 			_collect_beats(block.get("children", []), scene["id"], block["id"], seq)
 	return seq
@@ -1065,7 +1023,7 @@ func _collect_beats(nodes: Array, scene_id: String, block_id: String, into: Arra
 func _outline_node(n: Dictionary) -> Dictionary:
 	if n.get("type", "") == "group":
 		var g := {"type": "group", "id": n["id"], "children": []}
-		var gt: Array = _host["tag_index"].get(n["id"], [])
+		var gt: Array = _host.tag_index.get(n["id"], [])
 		if not gt.is_empty():
 			g["tags"] = gt
 		if n.has("selector"):
@@ -1076,7 +1034,7 @@ func _outline_node(n: Dictionary) -> Dictionary:
 			g["children"].append(_outline_node(c))
 		return g
 	var s := {"type": "snippet", "id": n["id"], "beats": []}
-	var stg: Array = _host["tag_index"].get(n["id"], [])
+	var stg: Array = _host.tag_index.get(n["id"], [])
 	if not stg.is_empty():
 		s["tags"] = stg
 	for b in n.get("beats", []):
@@ -1095,20 +1053,20 @@ func _beat_info(beat: Dictionary) -> Dictionary:
 	if kind == "line":
 		if beat.has("character"):
 			info["character"] = beat["character"]
-			var nm = _host["default_strings"].get("cast:" + str(beat["character"]))
+			var nm = _host.default_strings.get("cast:" + str(beat["character"]))
 			if nm == null:
-				nm = _host["cast_display"].get(beat["character"])
+				nm = _host.cast_display.get(beat["character"])
 			if nm != null:
 				info["characterName"] = nm
 		if beat.has("direction"):
 			info["direction"] = beat["direction"]
 	if kind == "line" or kind == "text":
-		var src = _host["default_strings"].get(beat["id"])  # source text, un-interpolated
+		var src = _host.default_strings.get(beat["id"])  # source text, un-interpolated
 		if src != null:
 			info["text"] = src
 	if beat.has("gameData") and not (beat["gameData"] as Dictionary).is_empty():
 		info["gameData"] = beat["gameData"]
-	var tg: Array = _host["tag_index"].get(beat["id"], [])
+	var tg: Array = _host.tag_index.get(beat["id"], [])
 	if not tg.is_empty():
 		info["tags"] = tg
 	return info
