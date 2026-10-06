@@ -28,7 +28,7 @@ import { createProjectSession } from "@wildwinter/app-shell/session";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
 import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
-import type { SceneKitId } from "../shared/api.js";
+import type { AppPrompt, SceneKitId } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -156,6 +156,25 @@ function flushBeforeClose(w: BrowserWindow): Promise<void> {
     setTimeout(() => { const i = closeFlushWaiters.indexOf(resolve); if (i >= 0) { closeFlushWaiters.splice(i, 1); resolve(); } }, 10_000);
   });
 }
+// Ask in the editor's own chrome (the renderer's `promptDialog` on the family's dialog frame), never a
+// system message box, and resolve with the chosen button's index. For a flow that runs here in main
+// between its file pickers. With no window to answer, or none after five minutes, it is `cancelId`.
+let promptSeq = 0;
+const promptWaiters = new Map<number, (i: number) => void>();
+function askInWindow(prompt: AppPrompt): Promise<number> {
+  return new Promise((resolve) => {
+    const w = win;
+    if (!w || w.isDestroyed() || w.webContents.isDestroyed()) return resolve(prompt.cancelId);
+    const id = ++promptSeq;
+    const timer = setTimeout(() => { promptWaiters.delete(id); resolve(prompt.cancelId); }, 300_000);
+    promptWaiters.set(id, (i) => { clearTimeout(timer); promptWaiters.delete(id); resolve(typeof i === "number" ? i : prompt.cancelId); });
+    w.webContents.send("app:prompt", id, prompt);
+  });
+}
+/** A notice: one button, "OK". */
+const tellInWindow = (title: string, sub: string, body?: string[]): Promise<number> =>
+  askInWindow({ title, sub, ...(body ? { body } : {}), buttons: ["OK"], defaultId: 0, cancelId: 0 });
+
 // Set by Quit, so a close that waited for the flush resumes the quit rather than only closing the window.
 let quitting = false;
 // Installing an update closes the windows itself and cannot be resumed after a close is held up, so it
@@ -573,12 +592,12 @@ function examplePath(file: string): string | undefined {
 
 /** Help ▸ Open an Example, and the welcome's tiles: a copy in a folder the writer chooses, opened.
  *  Never in place, since the original is inside the installed app, which the next update replaces.
- *  A copy that cannot be made is said here, in a message box, since the writer may be mid-project
- *  with no welcome screen to carry it; null then, as for a cancelled picker. */
+ *  A copy that cannot be made is said here, in a notice, since the writer may be mid-project with no
+ *  welcome screen to carry it; null then, as for a cancelled picker. */
 async function openExample(file: string): Promise<OpenResult | null> {
   if (!win) return null;
   const refuse = async (message: string): Promise<null> => {
-    if (win) await dialog.showMessageBox(win, { type: "warning", message: "The example could not be opened.", detail: message });
+    await tellInWindow("The example could not be opened", message);
     return null;
   };
   const source = EXAMPLES.some((x) => x.file === file) ? examplePath(file) : undefined;
@@ -750,20 +769,19 @@ async function shareScopesDialog(): Promise<{ dir: string } | { shared: string }
   const info = project.shareScopesInfo();
   if (!info) return { error: "no project open" };
   if (info.shared) return { shared: info.shared };
-  const ask = await dialog.showMessageBox(win, {
-    type: "question",
-    buttons: ["Share", "Choose Another Folder…", "Cancel"],
-    defaultId: 0,
-    cancelId: 2,
-    message: "Share this project's scopes with the game's other tools?",
-    detail: [
+  const ask = await askInWindow({
+    title: "Share this project's scopes with the game's other tools?",
+    body: [
       `Patterpad will create ${info.suggested} and write this project's shared properties and its World properties there.`,
       "The game's other editing tools (Storyletter, and any others) find the folder by walking up from their projects, so they can check the names this project declares, and this project can check theirs. The project keeps its own copy of the World properties, so it still works on its own.",
-    ].join("\n\n"),
+    ],
+    buttons: ["Cancel", "Choose another folder…", "Share"],
+    defaultId: 2,
+    cancelId: 0,
   });
-  if (ask.response === 2) return null;
+  if (ask === 0) return null;
   let dir = info.suggested;
-  if (ask.response === 1) {
+  if (ask === 1) {
     const r = await dialog.showOpenDialog(win, {
       title: "Choose where the game's scopes folder goes",
       message: "Patterpad will create a “game-scopes” folder here.",
@@ -795,12 +813,12 @@ async function unpackAndOpen(packPath: string): Promise<OpenResult | null> {
   let dest = r.filePath;
   if (!/\.patter$/i.test(dest)) dest += ".patter"; // the save panel may drop the package extension
   if (existsSync(dest)) { // our target is a folder; the picker only confirms overwrite of a FILE - don't clobber
-    await dialog.showMessageBox(win, { type: "error", message: "That project folder already exists.", detail: `${dest}\n\nChoose a different name or location.` });
+    await tellInWindow("That project folder already exists", "Choose a different name or location.", [dest]);
     return null;
   }
   const res = await project.unpackTo(packPath, dest);
   if (!res.ok) {
-    await dialog.showMessageBox(win, { type: "error", message: "Could not unpack the Patterpack.", detail: res.error ?? "" });
+    await tellInWindow("Could not unpack the Patterpack", res.error ?? "Something went wrong while unpacking it.");
     return null;
   }
   return openAndRecord(dest); // open + record the unpacked project; the renderer switches the editor to it
@@ -1155,12 +1173,11 @@ function registerIpc(): void {
     if (!name) return { ok: false, error: "Open a scene first." };
     let executable = findStoryletter(store.storyletterPath());
     if (executable === undefined) {
-      const answer = await dialog.showMessageBox(win!, {
-        type: "question", message: "Patterpad can't find Storyletter.",
-        detail: "Point to it once and Patterpad will remember where it is.",
-        buttons: ["Locate Storyletter…", "Cancel"], defaultId: 0, cancelId: 1,
+      const answer = await askInWindow({
+        title: "Patterpad can't find Storyletter", sub: "Point to it once and Patterpad will remember where it is.",
+        buttons: ["Cancel", "Locate Storyletter…"], defaultId: 1, cancelId: 0,
       });
-      if (answer.response !== 0) return { ok: false, canceled: true };
+      if (answer !== 1) return { ok: false, canceled: true };
       const picked = await dialog.showOpenDialog(win!, {
         title: "Locate Storyletter", message: "Choose the Storyletter app. Patterpad will remember where it is.",
         buttonLabel: "Use Storyletter", properties: ["openFile"],
@@ -1207,6 +1224,7 @@ function registerIpc(): void {
   // Project-wide Replace (the Find counterpart). Preview is read-only; Apply flushes the editor's open scene
   // to disk first (so unsaved edits are included + not clobbered), commits the rewritten shards through VC,
   // then tells the editor to reload its open scene with the new text.
+  ipcMain.handle("app:promptReply", (_e, id: number, i: number) => { promptWaiters.get(id)?.(i); });
   ipcMain.handle("app:close-flushed", () => { const w = closeFlushWaiters; closeFlushWaiters = []; for (const r of w) r(); }); // the editor wrote what it held; the close may go on
   ipcMain.handle("editor:flushed", () => { const w = flushWaiters; flushWaiters = []; for (const r of w) r(); }); // the editor saved its open scene
   ipcMain.handle("searchWin:replacePreview", (_e, opts: import("@patterkit/ops").ReplaceOptions) => project.replacePreview(opts));

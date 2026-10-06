@@ -446,6 +446,21 @@ export interface PackMergeSummary {
   gameScopes?: { path: string; error?: string };
 }
 
+/** A prompt main asks the editor window to show on the family's dialog frame, answered with the index
+ *  of the button chosen. Buttons are in display order, the way out first. */
+export interface AppPrompt {
+  title: string;
+  /** One plain sentence under the title. */
+  sub?: string;
+  /** Paragraphs of body copy. */
+  body?: string[];
+  buttons: string[];
+  /** The button that wears the accent and takes the focus. */
+  defaultId: number;
+  /** What Esc and the backdrop answer. */
+  cancelId: number;
+}
+
 /** A localisation export: a format + an optional target locale (omitted = a blank source template). */
 export interface LocExportRequest {
   format: "json" | "xlsx" | "po";
@@ -1012,6 +1027,8 @@ export interface PatterApi {
   /** The window is closing or the app is quitting: write everything still pending. Main holds the close
    *  until the returned promise settles (or a timeout passes), then lets it go on. */
   onFlushBeforeClose(handler: () => Promise<void>): void;
+  /** Main asks a question in the app's own chrome, mid-flow; reply with the chosen button's index. */
+  onPrompt(handler: (prompt: AppPrompt) => Promise<number>): void;
   editorFlushed(): void;
   /** `announce` is true only for Replace itself; an import or a suggestion decision reloads quietly. */
   onReplaceApplied(handler: (announce: boolean) => void): void;

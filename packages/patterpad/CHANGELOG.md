@@ -20,6 +20,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   now uses Patterpad's own dialog, matching its other confirmations, with Cancel selected to begin with.
   A pack with nothing to merge now says so in a message rather than a system dialog.
 
+### Changed
+
+- **The last system message boxes now use Patterpad's own dialogs:** an example that could not be opened,
+  Share Scopes with Other Tools, a Patterpack that could not be unpacked or whose folder already exists, and
+  the prompt to find Storyletter. They follow the app's theme, and their buttons are in the same order as its
+  other dialogs.
+- **"Can't delete this scene" has an OK button.** It had a lone Cancel.
+
 ## [0.25.0] - 2026-10-06
 
 ### Security

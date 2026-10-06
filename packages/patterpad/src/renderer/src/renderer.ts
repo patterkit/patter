@@ -92,7 +92,7 @@ import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from 
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 import { openJumpPicker } from "./jump-picker.js";
-import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary } from "../../shared/api.js";
+import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
@@ -636,27 +636,36 @@ function newScenePrompt(): void {
 // Severity scales with the evidence (design/proposals/delete-scene.md): an untouched scaffold
 // deletes silently; content asks; inbound references list the referring scenes BY NAME.
 
-/** A Cancel-only notice on the confirm frame ("Can't delete this scene"): the shell's `confirmDialog`
- *  always offers a destructive button, so the one case with nothing to confirm keeps this small frame.
- *  The real delete confirm goes through `confirmDialog` with its evidence as `bodyNode`. */
-function confirmWith(opts: { title: string; sub: string; body?: Node[]; confirmLabel?: string }): Promise<boolean> {
+/** A prompt on the family's dialog frame, for whatever `confirmDialog` does not fit: a notice with
+ *  nothing to confirm, or a choice of more than one way forward. Buttons are given in display order
+ *  (the way out first, as the shell's confirm draws it). The default wears the accent and takes the
+ *  focus; Esc and the backdrop answer `cancelId`. A notice is one button, and it reads "OK".
+ *
+ *  Main's prompts arrive here too (`onPrompt`), so a flow running in main, between its file pickers,
+ *  is drawn in the app's own chrome rather than a system message box. */
+function promptDialog(opts: AppPrompt): Promise<number> {
   return new Promise((resolve) => {
     let done = false;
-    const finish = (ok: boolean): void => { if (done) return; done = true; resolve(ok); frame.close(); };
-    const frame = dialogFrame({ title: opts.title, sub: opts.sub, className: "confirm-dialog", onClose: () => finish(false) });
-    if (opts.body?.length) frame.body.append(...opts.body);
-    const cancel = el("button", "btn confirm-btn cancel", "Cancel"); cancel.type = "button";
-    cancel.addEventListener("click", () => finish(false));
-    frame.actions.append(cancel);
-    if (opts.confirmLabel) {
-      const go = el("button", "btn danger confirm-btn", opts.confirmLabel); go.type = "button";
-      go.addEventListener("click", () => finish(true));
-      frame.actions.append(go);
-    }
-    frame.dialog.addEventListener("mousedown", (e) => { if (e.target === frame.dialog) finish(false); });
+    const finish = (i: number): void => { if (done) return; done = true; resolve(i); frame.close(); };
+    const frame = dialogFrame({ title: opts.title, ...(opts.sub ? { sub: opts.sub } : {}), className: "confirm-dialog", onClose: () => finish(opts.cancelId) });
+    for (const para of opts.body ?? []) frame.body.append(el("p", "confirm-body", para));
+    let focus: HTMLButtonElement | null = null;
+    opts.buttons.forEach((label, i) => {
+      const b = el("button", i === opts.defaultId && opts.buttons.length > 1 ? "btn primary confirm-btn" : "btn confirm-btn", label);
+      b.type = "button";
+      b.addEventListener("click", () => finish(i));
+      frame.actions.append(b);
+      if (i === opts.defaultId) focus = b;
+    });
+    frame.dialog.addEventListener("mousedown", (e) => { if (e.target === frame.dialog) finish(opts.cancelId); });
     frame.open();
-    cancel.focus(); // a destructive default must be chosen, not stumbled into by a stray Enter
+    (focus as HTMLButtonElement | null)?.focus();
   });
+}
+
+/** A notice: something the author needs to know, and nothing to decide. */
+function notice(title: string, sub: string): Promise<number> {
+  return promptDialog({ title, sub, buttons: ["OK"], defaultId: 0, cancelId: 0 });
 }
 
 async function deleteScenePrompt(sceneId?: string): Promise<void> {
@@ -666,7 +675,7 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   const info = await window.patter.sceneDeleteInfo(id);
   if (!scene || !info) return;
   if (info.lastScene) {
-    await confirmWith({ title: "Can't delete this scene", sub: "A project needs at least one scene." });
+    await notice("Can't delete this scene", "A project needs at least one scene.");
     return;
   }
 
@@ -3149,6 +3158,8 @@ window.patter.onPlayFollow((sceneId, beatId) => void jumpTo({ id: beatId, kind: 
 window.patter.onEditorFlush(() => void (async () => { await save(); window.patter.editorFlushed(); })());
 // Closing the window or quitting: everything leaving a project writes, written before main lets go.
 window.patter.onFlushBeforeClose(leaveProject);
+// A flow running in main (between its file pickers) asks its questions in our chrome, not a system box.
+window.patter.onPrompt(promptDialog);
 window.patter.onReplaceApplied((announce) => void (async () => {
   await reloadOpenScene(); // re-read the open scene with the replaced text (loadScene skips the open one)
   await refreshProblems();
