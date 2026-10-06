@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-06
+
 ### Added
 
 - **`PatterSave.LoadState` and `GameDataHelpers.GameDataValue`**, as the other runtimes have: restore a save

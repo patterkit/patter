@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-06
+
 ### Added
 
 - **`Flow::reset` in the C++ core, and `Reset` on the Blueprint flow**, as the other three runtimes have: they

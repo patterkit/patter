@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-06
+
 ### Added
 
 - **`hostScopes`, the engine option every other runtime takes**: the scopes the game binds, by token, each a `{

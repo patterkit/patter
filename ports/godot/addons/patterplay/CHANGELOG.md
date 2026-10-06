@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-06
+
 ### Added
 
 - **`PatterFlow.reset()`**, as the other three runtimes have: it forgets the flow's own state and anything

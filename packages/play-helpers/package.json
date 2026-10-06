@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@patterkit/model": "^0.9.0",
-    "@patterkit/runtime": "0.19.0"
+    "@patterkit/runtime": "0.20.0"
   },
   "peerDependencies": {
     "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0"
