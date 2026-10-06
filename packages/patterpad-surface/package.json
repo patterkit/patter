@@ -37,7 +37,7 @@
     "prosemirror-model": "^1.23.0",
     "prosemirror-state": "^1.4.3",
     "prosemirror-transform": "^1.10.0",
-    "prosemirror-view": "^1.34.0"
+    "prosemirror-view": "^1.42.6"
   },
   "devDependencies": {
     "jsdom": "^25.0.0",
