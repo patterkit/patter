@@ -273,6 +273,8 @@ export interface PlayError {
   message: string;
 }
 
+/** @deprecated Nothing takes one: a flow has no tap of its own, and `onTrace` takes an
+ *  {@link EngineTraceHandler}. Goes in a later release. */
 export type TraceHandler = (event: TraceEvent) => void;
 /** The engine-level tap: every flow's events, tagged with the flow id - one stream for tools. */
 export type EngineTraceHandler = (flow: string, event: TraceEvent) => void;

@@ -17784,5 +17784,371 @@
         }
       ]
     }
+  ],
+  "describes": [
+    {
+      "name": "a bundle described: addresses, host scopes, properties, gameData, counts",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "00qys72",
+          "structureHash": "1uw9aw2"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA"
+          },
+          {
+            "name": "BRAM"
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "shared": true,
+            "default": 0
+          },
+          {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ],
+            "shared": false
+          }
+        ],
+        "scopeRegistry": {
+          "version": 1,
+          "scopes": [
+            {
+              "token": "world",
+              "writable": false,
+              "declarations": [
+                {
+                  "name": "isNight",
+                  "type": "boolean",
+                  "default": false
+                },
+                {
+                  "name": "era",
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "token": "story"
+            }
+          ]
+        },
+        "gameDataFields": {
+          "scene": [
+            {
+              "name": "music",
+              "type": "text",
+              "default": "calm",
+              "purpose": "The track the scene plays under"
+            }
+          ],
+          "line": [
+            {
+              "name": "camera",
+              "type": "enum",
+              "values": [
+                "wide",
+                "close"
+              ],
+              "default": "wide"
+            },
+            {
+              "name": "shake",
+              "type": "number"
+            }
+          ]
+        },
+        "scenes": {
+          "s_hall": {
+            "id": "s_hall",
+            "type": "scene",
+            "name": "Great Hall",
+            "sceneProps": [
+              {
+                "name": "knocks",
+                "type": "number",
+                "default": 0
+              },
+              {
+                "name": "seen",
+                "type": "boolean",
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b_door",
+                "type": "block",
+                "name": "The Door",
+                "children": [
+                  {
+                    "id": "sn_open",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_open",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "E_bell",
+                        "kind": "gameEvent"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_ask",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_knock",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_k",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_k",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_knock",
+                          "kind": "line",
+                          "character": "BRAM"
+                        }
+                      },
+                      {
+                        "id": "o_leave",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_l",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_leave",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "s_yard": {
+            "id": "s_yard",
+            "type": "scene",
+            "name": "Yard",
+            "gameId": "the-yard",
+            "blocks": [
+              {
+                "id": "b_gate",
+                "type": "block",
+                "name": "Gate",
+                "gameId": "gate",
+                "children": [
+                  {
+                    "id": "sn_g",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_g",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_open": "Open.",
+            "P_knock": "Knock",
+            "P_leave": "Leave",
+            "T_k": "knocked",
+            "T_g": "gate"
+          }
+        }
+      },
+      "expected": {
+        "identity": {
+          "schema": "patter/bundle@0",
+          "project": "conf",
+          "hash": "00qys72",
+          "structureHash": "1uw9aw2",
+          "voiced": false,
+          "defaultLocale": "en",
+          "locales": [
+            "en"
+          ],
+          "localisation": "embedded",
+          "sourceDebug": false
+        },
+        "addresses": [
+          {
+            "gameId": "great-hall",
+            "name": "Great Hall",
+            "blocks": [
+              {
+                "gameId": "the-door",
+                "name": "The Door"
+              }
+            ]
+          },
+          {
+            "gameId": "the-yard",
+            "name": "Yard",
+            "blocks": [
+              {
+                "gameId": "gate",
+                "name": "Gate"
+              }
+            ]
+          }
+        ],
+        "hostScopes": [
+          {
+            "token": "world",
+            "writable": false,
+            "opaque": false,
+            "properties": [
+              {
+                "name": "isNight",
+                "type": "boolean",
+                "hasDefault": true,
+                "default": false,
+                "shared": true
+              },
+              {
+                "name": "era",
+                "type": "string",
+                "hasDefault": false,
+                "shared": true
+              }
+            ]
+          },
+          {
+            "token": "story",
+            "writable": true,
+            "opaque": true,
+            "properties": []
+          }
+        ],
+        "properties": {
+          "patter": [
+            {
+              "name": "gold",
+              "type": "number",
+              "hasDefault": true,
+              "default": 0,
+              "shared": true
+            },
+            {
+              "name": "mood",
+              "type": "enum",
+              "hasDefault": false,
+              "shared": false
+            }
+          ],
+          "scene": [
+            {
+              "gameId": "great-hall",
+              "properties": [
+                {
+                  "name": "knocks",
+                  "type": "number",
+                  "hasDefault": true,
+                  "default": 0,
+                  "shared": false
+                },
+                {
+                  "name": "seen",
+                  "type": "boolean",
+                  "hasDefault": false,
+                  "shared": true
+                }
+              ]
+            }
+          ]
+        },
+        "gameData": [
+          {
+            "kind": "scene",
+            "fields": [
+              {
+                "name": "music",
+                "type": "text",
+                "hasDefault": true,
+                "purpose": "The track the scene plays under"
+              }
+            ]
+          },
+          {
+            "kind": "line",
+            "fields": [
+              {
+                "name": "camera",
+                "type": "enum",
+                "hasDefault": true,
+                "values": [
+                  "wide",
+                  "close"
+                ]
+              },
+              {
+                "name": "shake",
+                "type": "number",
+                "hasDefault": false
+              }
+            ]
+          }
+        ],
+        "counts": {
+          "scenes": 2,
+          "blocks": 2,
+          "groups": 3,
+          "snippets": 4,
+          "beats": 4,
+          "prompts": 2,
+          "gameEvents": 1,
+          "cast": 2
+        }
+      }
+    }
   ]
 }

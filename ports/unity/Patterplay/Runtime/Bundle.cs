@@ -211,6 +211,8 @@ namespace Patterkit.Patterplay
         public string Type;
         public ExprValue Default;
         public List<string> Values;
+        /// <summary>What the field is for, in the author's words; null when they gave none.</summary>
+        public string Purpose;
     }
 
     /// <summary>A node's sparse gameData overrides (name -> value).</summary>

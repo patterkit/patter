@@ -76,6 +76,10 @@ namespace Patterkit.Patterplay.TestHost
             int lg = RunLogs(logsArr);
             Console.WriteLine($"  [logs] decision logs, and OnTrace streaming the same decisions: {lg}/{logsArr.GetArrayLength()}");
             if (lg != logsArr.GetArrayLength()) Fail("logs", "section total", $"{lg} of {logsArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("describes", out var describesArr)) { Console.Error.WriteLine("corpus has no describes section"); return 2; }
+            int ds = RunDescribes(describesArr);
+            Console.WriteLine($"  [describes] the bundle description every runtime gives: {ds}/{describesArr.GetArrayLength()}");
+            if (ds != describesArr.GetArrayLength()) Fail("describes", "section total", $"{ds} of {describesArr.GetArrayLength()} passed");
 
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.

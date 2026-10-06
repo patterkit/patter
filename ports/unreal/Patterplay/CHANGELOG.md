@@ -31,6 +31,8 @@ runtime behaviour.
 - **gameData helpers in Blueprint, and `gameDataValue` in the C++ core**: `UPatterGameData::GameDataFields`,
   `GameDataValue`, and `EffectiveGameData` fill a node's overrides in from its type's declared defaults, as
   every other runtime's helpers do.
+- **A gameData field's `purpose`**, read from the bundle and carried in its description and in Blueprint's
+  `FPatterGameDataField`, as on every other runtime.
 
 ### Changed
 
@@ -74,6 +76,8 @@ runtime behaviour.
 - **The audio resolver keeps a base path that is a root.** It trimmed every trailing slash before adding its
   own, so a base of `"/"` lost its root and a take resolved to a relative path. A base that ends in a slash is
   now joined as it stands.
+- **A bundle description lists gameData node types in bundle order**, as every other runtime does, not sorted by
+  name. The conformance corpus now holds every runtime's description to the same fields in the same order.
 
 ## [0.19.0] - 2026-10-06
 

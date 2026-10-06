@@ -9,11 +9,11 @@
 // ---------------------------------------------------------------------------
 
 import { compileExpression, exportBundle } from "@patterkit/compiler";
-import { Engine } from "@patterkit/runtime";
+import { Engine, describeBundle } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { SaveEnvelope } from "@patterkit/model";
 import { envelopeKeyPaths, runScript } from "./runner.js";
-import type { Corpus, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
+import type { Corpus, DescribeCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
 
 export function buildCorpus(fixtures: Fixtures): Corpus {
   const expressions: ExpressionCase[] = fixtures.expressions.map((f) => ({
@@ -102,5 +102,10 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     expectedLog: f.expectedLog, // hand-authored contract, carried through unchanged
   }));
 
-  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs };
+  const describes: DescribeCase[] = fixtures.describes.map((f) => {
+    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
+    return { name: f.name, bundle, expected: JSON.parse(JSON.stringify(describeBundle(bundle))) };
+  });
+
+  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs, describes };
 }

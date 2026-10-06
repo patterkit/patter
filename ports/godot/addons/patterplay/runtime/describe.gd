@@ -25,9 +25,9 @@ class_name PatterDescribe
 #   addresses  [ { gameId, name, blocks: [ { gameId, name } ] } ]
 #   hostScopes [ { token, writable, opaque, properties: [property] } ]
 #   properties { patter: [property], scene: [ { gameId, properties: [property] } ] }
-#   gameData   [ { kind, fields: [ { name, type, hasDefault, values, purpose? } ] } ]
+#   gameData   [ { kind, fields: [ { name, type, hasDefault, values?, purpose? } ] } ]
 #   counts     { scenes, blocks, groups, snippets, beats, prompts, gameEvents, cast }
-# where a property is { name, type, hasDefault, default, shared }.
+# where a property is { name, type, hasDefault, default?, shared }, and a ? field is absent when unset.
 static func describe_bundle(bundle: Dictionary) -> Dictionary:
 	var counts := {
 		"scenes": 0, "blocks": 0, "groups": 0, "snippets": 0,
@@ -84,8 +84,9 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 				"name": f.get("name", ""),
 				"type": f.get("type", ""),
 				"hasDefault": f.has("default"),
-				"values": f.get("values", []),
 			}
+			if f.has("values"):
+				row["values"] = f["values"]
 			if str(f.get("purpose", "")) != "":
 				row["purpose"] = f["purpose"]
 			rows.append(row)
@@ -93,15 +94,18 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 
 	var loc: Dictionary = bundle.get("localisation", {})
 	var content: Dictionary = bundle.get("content", {})
+	var identity := {
+		"schema": bundle.get("schema", ""),
+		"project": content.get("project", ""),
+	}
+	# Absent when the bundle has none, as in every runtime's description. structureHash is the same
+	# fingerprint as hash with the string tables left out: equal structureHash with a different hash
+	# means a TEXT-ONLY edit, which is what makes a live hot-swap safe.
+	for key in ["version", "hash", "structureHash"]:
+		if content.has(key):
+			identity[key] = content[key]
 	return {
-		"identity": {
-			"schema": bundle.get("schema", ""),
-			"project": content.get("project", ""),
-			"version": content.get("version", ""),
-			"hash": content.get("hash", ""),
-			# The same fingerprint with the string tables left out. Equal structureHash plus a
-			# different hash means a TEXT-ONLY edit, which is what makes a live hot-swap safe.
-			"structureHash": content.get("structureHash", ""),
+		"identity": identity.merged({
 			"voiced": bundle.get("voiced", false),
 			"defaultLocale": bundle.get("locales", {}).get("default", ""),
 			"locales": bundle.get("locales", {}).get("included", []),
@@ -111,7 +115,7 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 			# True when the source locale was embedded purely for debug playback. Such a build is NOT
 			# shippable, which is worth saying loudly in an inspector.
 			"sourceDebug": loc.get("sourceDebug", false),
-		},
+		}),
 		"addresses": addresses,
 		"hostScopes": host_scopes,
 		"properties": { "patter": patter_props, "scene": scene_props },
@@ -123,13 +127,15 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 # A declaration's sharing default differs by the scope it sits in: a project-level property is
 # shared, a scene-local one is per-flow.
 static func _summarise_property(decl: Dictionary, scope_default: bool) -> Dictionary:
-	return {
+	var row := {
 		"name": decl.get("name", ""),
 		"type": decl.get("type", ""),
 		"hasDefault": decl.has("default"),
-		"default": PatterValues.to_value(decl["default"]) if decl.has("default") else null,
 		"shared": decl.get("shared", scope_default),
 	}
+	if decl.has("default"):
+		row["default"] = PatterValues.to_value(decl["default"])
+	return row
 
 
 # A host scope's values live outside the story, so "shared" is not a choice its declarations make:

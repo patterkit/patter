@@ -101,6 +101,8 @@ namespace Patterkit.Patterplay
         public string Type;
         public bool HasDefault;
         public List<string> Values;   // enum options: the set host code switches on
+        /// <summary>What the field is for, in the author's words; null when they gave none.</summary>
+        public string Purpose;
     }
 
     public sealed class GameDataSummary
@@ -194,6 +196,7 @@ namespace Patterkit.Patterplay
                         {
                             Name = f.Name, Type = f.Type, HasDefault = f.Default != null,
                             Values = f.Values != null ? new List<string>(f.Values) : null,
+                            Purpose = f.Purpose,
                         });
                     d.GameData.Add(gd);
                 }

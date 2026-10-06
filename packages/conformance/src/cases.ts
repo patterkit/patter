@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
+import type { DescribeFixture, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
 import { castStringKey } from "@patterkit/model";
 
@@ -2502,6 +2502,51 @@ const decisionLog = {
   ],
 } satisfies LogFixture;
 
+// --- the bundle description ----------------------------------------------------------------------
+// A bundle with something in every part of the description: addresses (one derived, one explicit), a
+// declared host scope and an opaque one, @patter and @scene properties with and without defaults,
+// gameData fields for two node types (declared out of alphabetical order, which the description keeps)
+// with an enum's values and a purpose, and every count.
+const describeEverything = {
+  name: "a bundle described: addresses, host scopes, properties, gameData, counts",
+  project: project({
+    cast: [{ name: "ANNA" }, { name: "BRAM" }],
+    properties: [
+      { name: "gold", type: "number", shared: true, default: 0 },
+      { name: "mood", type: "enum", values: ["calm", "tense"], shared: false },
+    ],
+    scopeRegistry: { version: 1, scopes: [
+      { token: "world", writable: false, declarations: [{ name: "isNight", type: "boolean", default: false }, { name: "era", type: "string" }] },
+      { token: "story" },
+    ] },
+    gameDataFields: {
+      scene: [{ name: "music", type: "text", default: "calm", purpose: "The track the scene plays under" }],
+      line: [
+        { name: "camera", type: "enum", values: ["wide", "close"], default: "wide" },
+        { name: "shake", type: "number" },
+      ],
+    },
+  }),
+  scenes: [{
+    id: "s_hall", type: "scene", name: "Great Hall",
+    sceneProps: [{ name: "knocks", type: "number", default: 0 }, { name: "seen", type: "boolean", shared: true }],
+    blocks: [{ id: "b_door", type: "block", name: "The Door", children: [
+      { id: "sn_open", type: "snippet", beats: [{ id: "L_open", kind: "line", character: "ANNA" }, { id: "E_bell", kind: "gameEvent" }] },
+      { id: "g_ask", type: "group", selector: "choice", children: [
+        { id: "o_knock", type: "group", prompt: { id: "P_knock", kind: "line", character: "BRAM" },
+          children: [{ id: "sn_k", type: "snippet", beats: [{ id: "T_k", kind: "text" }], jump: { to: "END" } }] },
+        { id: "o_leave", type: "group", prompt: { id: "P_leave", kind: "text" }, children: [{ id: "sn_l", type: "snippet", jump: { to: "END" } }] },
+      ] },
+    ] }],
+  }, {
+    id: "s_yard", type: "scene", name: "Yard", gameId: "the-yard",
+    blocks: [{ id: "b_gate", type: "block", name: "Gate", gameId: "gate", children: [
+      { id: "sn_g", type: "snippet", beats: [{ id: "T_g", kind: "text" }], jump: { to: "END" } },
+    ] }],
+  }],
+  locales: [loc("s_hall", { L_open: "Open.", P_knock: "Knock", P_leave: "Leave", T_k: "knocked" }), loc("s_yard", { T_g: "gate" })],
+} satisfies DescribeFixture;
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -2580,4 +2625,5 @@ export const cases: Fixtures = {
     asSaveFixture(scriptedEmptySpeakerSaveLoad, "a save written by the JS reference keeps a pending choice's empty speaker fields"),
   ],
   logs: [decisionLog],
+  describes: [describeEverything],
 };

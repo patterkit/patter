@@ -695,7 +695,8 @@ func get_property(ref: String):
 func list_properties() -> Array:
 	var rows: Array = []
 	for d in _host.patter_shared_decls:
-		var nm: String = str(d["name"]).to_lower()
+		# The name as declared, as every runtime reports it; the bag keys it folded, which is how it reads.
+		var nm: String = str(d["name"])
 		rows.append({
 			"name": nm,
 			# The QUALIFIED address, matching what the shared bag composes for every other
@@ -703,7 +704,7 @@ func list_properties() -> Array:
 			# the patter scope - but it is the shorthand, not the address a row reports.
 			"path": "@patter." + nm,
 			"type": d.get("type", "boolean"),
-			"value": _host.patter_bag.get_value(nm),
+			"value": _host.patter_bag.get_value(nm.to_lower()),
 			"default": PatterBundle.prop_default(d),
 			"values": d.get("values", []),
 			"stages": d.get("stages", []),

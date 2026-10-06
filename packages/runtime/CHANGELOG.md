@@ -40,6 +40,8 @@ version number always means the same runtime behaviour. This package is versione
   `HostScope`.
 - **`engine.buildId`**, as the other runtimes have: the bundle's content hash, the build a debug link handshakes
   with.
+- **A bundle-description section in the conformance corpus.** What `describeBundle` says about one bundle, field
+  for field, held on every runtime.
 
 ### Deprecated
 
@@ -48,6 +50,8 @@ version number always means the same runtime behaviour. This package is versione
   `flow.start()` goes in a later release.
 - **The `world` option and the `WorldResolver` type: use `hostScopes: { world }` and `HostScope`.** `world` is
   still the world scope, and goes in a later release.
+- **The `TraceHandler` type.** Nothing takes one: `onTrace` takes an `EngineTraceHandler`. It goes in a later
+  release.
 
 ### Fixed
 

@@ -29,6 +29,8 @@
     <Compile Include="PlayErrorChecks.cs" />
     <!-- The corpus's decision-log cases, and OnTrace held to them. -->
     <Compile Include="LogChecks.cs" />
+    <!-- The corpus's describe cases. -->
+    <Compile Include="DescribeChecks.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

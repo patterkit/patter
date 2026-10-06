@@ -17,7 +17,7 @@ func _render(res: Resource) -> void:
 	var d := PatterDescribe.describe_bundle(selected.get_bundle())
 	var identity: Dictionary = d["identity"]
 	var counts: Dictionary = d["counts"]
-	var version := str(identity["version"])
+	var version := str(identity.get("version", ""))
 	_summary.text = (
 		"[b]%s[/b]  [color=gray]%s[/color]\n"
 		+ "[color=gray]schema[/color] %s\n"
@@ -31,7 +31,7 @@ func _render(res: Resource) -> void:
 			"  (+%d)" % (int((identity["locales"] as Array).size()) - 1)
 			if (identity["locales"] as Array).size() > 1 else ""),
 		str(identity["localisation"]),
-		("(none)" if str(identity["hash"]) == "" else str(identity["hash"])),
+		("(none)" if str(identity.get("hash", "")) == "" else str(identity.get("hash", ""))),
 	]
 	# A source-debug build embeds the source language purely so it can be played. Shipping one is a
 	# mistake otherwise visible only as "strings: ids".

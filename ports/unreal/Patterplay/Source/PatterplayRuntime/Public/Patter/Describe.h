@@ -94,6 +94,7 @@ namespace patter
         std::string name, type;
         bool hasDefault = false;
         std::vector<std::string> values;   // enum options: the set host code switches on
+        std::string purpose;               // what the field is for; empty when the author gave none
     };
 
     struct GameDataSummary { std::string kind; std::vector<GameDataFieldSummary> fields; };
@@ -218,18 +219,23 @@ namespace patter
 
         for (const PropertyDecl& d : bundle.properties) out.properties.patter.push_back(detail::summariseProperty(d, true));
 
-        for (const auto& kv : bundle.gameDataFields)
+        // Bundle order; a Bundle built by hand, with no order recorded, falls back on the map's.
+        std::vector<std::string> kinds = bundle.gameDataKinds;
+        if (kinds.empty()) for (const auto& kv : bundle.gameDataFields) kinds.push_back(kv.first);
+        for (const std::string& kind : kinds)
         {
-            if (kv.second.empty()) continue;
+            auto it = bundle.gameDataFields.find(kind);
+            if (it == bundle.gameDataFields.end() || it->second.empty()) continue;
             GameDataSummary gd;
-            gd.kind = kv.first;
-            for (const GameDataField& f : kv.second)
+            gd.kind = kind;
+            for (const GameDataField& f : it->second)
             {
                 GameDataFieldSummary fs;
                 fs.name = f.name;
                 fs.type = f.type;
                 fs.hasDefault = f.hasDefault;
                 fs.values = f.values;
+                fs.purpose = f.purpose;
                 gd.fields.push_back(fs);
             }
             out.gameData.push_back(gd);

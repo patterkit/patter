@@ -269,6 +269,19 @@ export interface Corpus {
   gameData: GameDataCase[];
   saves: SaveCase[];
   logs: LogCase[];
+  describes: DescribeCase[];
+}
+
+/**
+ * A bundle description case: what `describeBundle` says about a bundle, in the reference's shape (field
+ * names, order, and an absent optional field absent). Each port describes the bundle through its own
+ * call and compares. The expectation is the JS reference's own description, written at build time: the
+ * reference's describe tests pin what it should say, and this pins every port to it.
+ */
+export interface DescribeCase {
+  name: string;
+  bundle: Bundle;
+  expected: unknown;
 }
 
 // --- Authoring fixtures (source form, compiled into the corpus) -------------
@@ -369,4 +382,13 @@ export interface Fixtures {
   gameData: GameDataFixture[];
   saves: SaveFixture[];
   logs: LogFixture[];
+  describes: DescribeFixture[];
+}
+
+/** An authored describe fixture (source form; compiled by buildCorpus into a DescribeCase). */
+export interface DescribeFixture {
+  name: string;
+  project: ProjectFile;
+  scenes: Scene[];
+  locales?: LocaleFile[];
 }

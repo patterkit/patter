@@ -124,6 +124,7 @@ namespace patter
         std::string name, type;
         bool hasDefault = false; PatterValue def;
         std::vector<std::string> values;
+        std::string purpose;   // what the field is for, in the author's words; empty when they gave none
     };
 
     // How strings ship + resolve (spec §11): "embedded" (resolve per locale) or "ids" (emit beat IDs);
@@ -171,6 +172,9 @@ namespace patter
         std::map<std::string, std::map<std::string, std::string>> strings;   // locale -> id -> text (empty in "ids")
         Localisation localisation;
         std::map<std::string, std::vector<GameDataField>> gameDataFields;
+        // The node types in gameDataFields in bundle order, which the map does not keep: a description
+        // lists them in this order, as every runtime does.
+        std::vector<std::string> gameDataKinds;
         CaptionDelimiters closedCaptions;   // #214; `present=false` => use the default [ / ]
         HostScopeRegistry scopeRegistry;    // declared host scopes; `present=false` => the project declares none
         // Other engines' game-wide scopes the content names (`story`), sorted: the family's shared

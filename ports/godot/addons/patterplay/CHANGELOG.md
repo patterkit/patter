@@ -54,6 +54,11 @@ same runtime behaviour.
 - **The audio resolver keeps a base path that is a root.** It trimmed every trailing slash before adding its
   own, so a base of `"user://"` or `"res://"` lost its root and a take resolved to `user:/take.wav`. A base that
   ends in a slash is now joined as it stands.
+- **`list_properties` reports each property's name as declared**, as every other runtime does, not lower-cased.
+- **`describe_bundle` leaves out a field that isn't set**, as every other runtime's description does: a gameData
+  field's `values` when it has none, a property's `default` when it has none, and the bundle's `version`,
+  `hash`, or `structureHash` when it carries none. The conformance corpus now holds every runtime's description
+  to the same fields.
 
 ## [0.19.0] - 2026-10-06
 

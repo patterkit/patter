@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
+import { describeBundle } from "@patterkit/runtime";
 import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
@@ -86,6 +87,14 @@ describe("decision-log cases (the engine log, and onTrace streaming the same dec
       const decisions = c.expectedLog.map(({ seq: _seq, scene: _scene, ...e }) => e);
       expect(tracedOn).toEqual(decisions);
       expect(tracedOff).toEqual(decisions);
+    });
+  }
+});
+
+describe("describe cases (the bundle description every runtime gives)", () => {
+  for (const c of corpus.describes) {
+    it(c.name, () => {
+      expect(JSON.parse(JSON.stringify(describeBundle(c.bundle)))).toEqual(c.expected);
     });
   }
 });

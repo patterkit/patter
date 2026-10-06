@@ -481,6 +481,87 @@ static int runLogs(const JsonValue& arr)
     return pass;
 }
 
+// The corpus's describe cases: what describeBundle says about a bundle, held field for field to the
+// reference's description. An empty optional string or list is the core's absent, and is left out.
+static JsonValue describeToJson(const BundleDescription& d)
+{
+    const auto str = [](const std::string& v) { return JsonValue::Str(v); };
+    const auto strs = [](const std::vector<std::string>& v) { JsonValue a = JsonValue::Arr(); for (const auto& x : v) a.push(JsonValue::Str(x)); return a; };
+    const auto prop = [&](const PropertySummary& p)
+    {
+        JsonValue o = JsonValue::Obj();
+        o.set("name", str(p.name)); o.set("type", str(p.type)); o.set("hasDefault", JsonValue::Boolean(p.hasDefault));
+        if (p.hasDefault) o.set("default", valueToJson(p.def));
+        o.set("shared", JsonValue::Boolean(p.shared));
+        return o;
+    };
+    const auto props = [&](const std::vector<PropertySummary>& v) { JsonValue a = JsonValue::Arr(); for (const auto& p : v) a.push(prop(p)); return a; };
+    JsonValue id = JsonValue::Obj();
+    id.set("schema", str(d.identity.schema)); id.set("project", str(d.identity.project));
+    if (!d.identity.version.empty()) id.set("version", str(d.identity.version));
+    if (!d.identity.hash.empty()) id.set("hash", str(d.identity.hash));
+    if (!d.identity.structureHash.empty()) id.set("structureHash", str(d.identity.structureHash));
+    id.set("voiced", JsonValue::Boolean(d.identity.voiced)); id.set("defaultLocale", str(d.identity.defaultLocale));
+    id.set("locales", strs(d.identity.locales)); id.set("localisation", str(d.identity.localisation));
+    id.set("sourceDebug", JsonValue::Boolean(d.identity.sourceDebug));
+    JsonValue addresses = JsonValue::Arr();
+    for (const auto& a : d.addresses)
+    {
+        JsonValue o = JsonValue::Obj(); o.set("gameId", str(a.gameId)); o.set("name", str(a.name));
+        JsonValue blocks = JsonValue::Arr();
+        for (const auto& b : a.blocks) { JsonValue bo = JsonValue::Obj(); bo.set("gameId", str(b.gameId)); bo.set("name", str(b.name)); blocks.push(bo); }
+        o.set("blocks", blocks); addresses.push(o);
+    }
+    JsonValue hostScopes = JsonValue::Arr();
+    for (const auto& h : d.hostScopes)
+    {
+        JsonValue o = JsonValue::Obj(); o.set("token", str(h.token)); o.set("writable", JsonValue::Boolean(h.writable));
+        o.set("opaque", JsonValue::Boolean(h.opaque)); o.set("properties", props(h.properties)); hostScopes.push(o);
+    }
+    JsonValue scene = JsonValue::Arr();
+    for (const auto& sp : d.properties.scene) { JsonValue o = JsonValue::Obj(); o.set("gameId", str(sp.gameId)); o.set("properties", props(sp.properties)); scene.push(o); }
+    JsonValue owned = JsonValue::Obj(); owned.set("patter", props(d.properties.patter)); owned.set("scene", scene);
+    JsonValue gameData = JsonValue::Arr();
+    for (const auto& g : d.gameData)
+    {
+        JsonValue fields = JsonValue::Arr();
+        for (const auto& f : g.fields)
+        {
+            JsonValue o = JsonValue::Obj(); o.set("name", str(f.name)); o.set("type", str(f.type)); o.set("hasDefault", JsonValue::Boolean(f.hasDefault));
+            if (!f.values.empty()) o.set("values", strs(f.values));
+            if (!f.purpose.empty()) o.set("purpose", str(f.purpose));
+            fields.push(o);
+        }
+        JsonValue o = JsonValue::Obj(); o.set("kind", str(g.kind)); o.set("fields", fields); gameData.push(o);
+    }
+    JsonValue counts = JsonValue::Obj();
+    counts.set("scenes", JsonValue::Num(d.counts.scenes)); counts.set("blocks", JsonValue::Num(d.counts.blocks));
+    counts.set("groups", JsonValue::Num(d.counts.groups)); counts.set("snippets", JsonValue::Num(d.counts.snippets));
+    counts.set("beats", JsonValue::Num(d.counts.beats)); counts.set("prompts", JsonValue::Num(d.counts.prompts));
+    counts.set("gameEvents", JsonValue::Num(d.counts.gameEvents)); counts.set("cast", JsonValue::Num(d.counts.cast));
+    JsonValue o = JsonValue::Obj();
+    o.set("identity", id); o.set("addresses", addresses); o.set("hostScopes", hostScopes);
+    o.set("properties", owned); o.set("gameData", gameData); o.set("counts", counts);
+    return o;
+}
+
+static int runDescribes(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            JsonValue got = describeToJson(describeBundle(parseBundle(c.at("bundle"))));
+            if (matchValue(got, c.at("expected"))) ++pass;
+            else fail("describes", name, "description mismatch\n    expected " + dump(c.at("expected")) + "\n    got      " + dump(got));
+        }
+        catch (const std::exception& ex) { fail("describes", name, ex.what()); }
+    }
+    return pass;
+}
+
 static int envelopeRoundTrips = 0;
 static int gameDataReads = 0;   // expectGameData ops that ran and matched
 
@@ -2349,6 +2430,11 @@ int main(int argc, char** argv)
     int lg = runLogs(*logsArr);
     std::cout << "  [logs] decision logs, and onTrace streaming the same decisions: " << lg << "/" << logsArr->arr.size() << "\n";
     if (lg != static_cast<int>(logsArr->arr.size())) fail("logs", "section total", std::to_string(lg) + " of " + std::to_string(logsArr->arr.size()) + " passed");
+    const JsonValue* describesArr = root.find("describes");
+    if (!describesArr) { std::cerr << "corpus has no describes section\n"; return 2; }
+    int ds = runDescribes(*describesArr);
+    std::cout << "  [describes] the bundle description every runtime gives: " << ds << "/" << describesArr->arr.size() << "\n";
+    if (ds != static_cast<int>(describesArr->arr.size())) fail("describes", "section total", std::to_string(ds) + " of " + std::to_string(describesArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
     runKernelErrorCases();

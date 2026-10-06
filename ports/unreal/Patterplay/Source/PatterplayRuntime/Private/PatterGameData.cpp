@@ -35,6 +35,7 @@ TArray<FPatterGameDataField> UPatterGameData::GameDataFields(UPatterBundle* Bund
 		Field.bHasDefault = F.hasDefault;
 		if (F.hasDefault) Field.Default = Ue(F.def.toDisplayString());
 		for (const std::string& V : F.values) Field.Values.Add(Ue(V));
+		Field.Purpose = Ue(F.purpose);
 		Out.Add(Field);
 	}
 	return Out;

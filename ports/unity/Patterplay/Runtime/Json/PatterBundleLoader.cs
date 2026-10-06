@@ -152,6 +152,7 @@ namespace Patterkit.Patterplay
             Type = (string)f["type"],
             Default = f["default"] != null ? ToValue(f["default"]) : null,
             Values = f["values"] is JArray vs ? ToStringList(vs) : null,
+            Purpose = f["purpose"]?.Type == JTokenType.String && (string)f["purpose"] != "" ? (string)f["purpose"] : null,
         };
 
         private static List<string> ToStringList(JArray a)

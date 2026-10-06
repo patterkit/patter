@@ -48,6 +48,19 @@ func _initialize() -> void:
 	var lg := _run_logs(root["logs"])
 	print("logs: %d/%d  (decision logs, and on_trace streaming the same decisions)" % [lg, root["logs"].size()])
 	_expect_all("logs", lg, root["logs"].size())
+	if not root.has("describes"):
+		push_error("corpus has no describes section")
+		quit(2)
+		return
+	var ds := 0
+	for c in root["describes"]:
+		var got := PatterDescribe.describe_bundle(c["bundle"])
+		if _deep_equal(got, c["expected"]):
+			ds += 1
+		else:
+			_fail("describes", c["name"], "description mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expected"]), JSON.stringify(got)])
+	print("describes: %d/%d  (the bundle description every runtime gives)" % [ds, root["describes"].size()])
+	_expect_all("describes", ds, root["describes"].size())
 	_run_describe_smoke()
 	_run_host_scope_writable_check()
 

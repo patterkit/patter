@@ -13,6 +13,8 @@ same runtime behaviour.
 - **`Engine.OnTrace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened
   in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `OnTrace`
   before it existed.
+- **A gameData field's `Purpose`**, read from the bundle and carried in its description, as on every other
+  runtime.
 
 ### Changed
 
@@ -22,6 +24,7 @@ same runtime behaviour.
   still read as they did, and go in a later release, with one difference: a `chose` entry's option is in
   `Option`, no longer in `Picked`. The corpus now holds every runtime's log to the same entries.
 - **`Engine.BuildId` is empty, not null, for a bundle compiled without a hash**, as on every other runtime.
+- **The corpus now holds the bundle description to the same fields on every runtime.** Unity's already matched it.
 
 ### Deprecated
 

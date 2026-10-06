@@ -33,6 +33,10 @@ struct FPatterGameDataField
 	/** An enum field's options. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Values;
+
+	/** What the field is for, in the author's words; empty when they gave none. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Purpose;
 };
 
 UCLASS()
@@ -41,7 +45,7 @@ class PATTERPLAYRUNTIME_API UPatterGameData : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	/** The gameData fields declared for a node type ("beat", "scene", "block", and so on; empty when none). */
+	/** The gameData fields declared for a node type ("scene", "block", "line", and so on; empty when none). */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
 	static TArray<FPatterGameDataField> GameDataFields(UPatterBundle* Bundle, const FString& Kind);
 
