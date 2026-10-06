@@ -47,6 +47,9 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
   storyletter = false): void {
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
+  // One rule, the family's (Storyletter's review, 2026-10): every item that acts on a project is disabled
+  // without one. Preferences that are remembered across projects (panes, themes, what shows) stay live.
+  const hasProject = spelling?.hasProject ?? false;
 
   // The Open Recent submenu is the shell's: it shows WHERE each recent lives (a dimmed second line on
   // macOS, folded into the label elsewhere), says "No Recent Projects" when empty, and offers Clear
@@ -89,23 +92,23 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // The way back to the welcome screen: without it, opening a project is a one-way door and the
         // recents list is unreachable. No accelerator - it is not a key you tap. Close PROJECT, not
         // Close Window: the window stays, showing the welcome.
-        { ...FILE_MENU.closeProject, enabled: spelling?.hasProject ?? false, click: () => send("close-project") },
+        { ...FILE_MENU.closeProject, enabled: hasProject, click: () => send("close-project") },
         { type: "separator" },
-        { ...FILE_MENU.save, click: () => send("save") },
-        { ...FILE_MENU.saveAs, click: () => send("save-as") }, // duplicate the project folder
-        { label: "Export as Patterpack…", click: () => send("export-patterpack") }, // bundle the project into one sendable file
+        { ...FILE_MENU.save, enabled: hasProject, click: () => send("save") },
+        { ...FILE_MENU.saveAs, enabled: hasProject, click: () => send("save-as") }, // duplicate the project folder
+        { label: "Export as Patterpack…", enabled: hasProject, click: () => send("export-patterpack") }, // bundle the project into one sendable file
         // The return leg of the line above, and a THIRD act rather than a mode of Open: export writes a
         // file, Open Patterpack replaces the project with a new one, this edits the open project in place.
-        { label: "Merge Returned Patterpack…", click: () => send("merge-patterpack") },
+        { label: "Merge Returned Patterpack…", enabled: hasProject, click: () => send("merge-patterpack") },
         { type: "separator" },
         // Scene-level actions: within the OPEN project (project-level New/Open live above).
-        { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", click: () => send("new-scene") },
-        { label: "Delete Scene…", click: () => send("delete-scene") },
+        { label: "New Scene…", accelerator: "Shift+CmdOrCtrl+N", enabled: hasProject, click: () => send("new-scene") },
+        { label: "Delete Scene…", enabled: hasProject, click: () => send("delete-scene") },
         { type: "separator" },
-        { ...FILE_MENU.projectSettings, click: () => send("project-settings") },
+        { ...FILE_MENU.projectSettings, enabled: hasProject, click: () => send("project-settings") },
         // Make the game's shared scopes folder, so the game's other editing tools and this project check
         // each other's names (patterkit/design/shared-scopes.md). Needs an open project.
-        { label: "Share Scopes with Other Tools…", enabled: spelling?.hasProject ?? false, click: () => send("share-scopes") },
+        { label: "Share Scopes with Other Tools…", enabled: hasProject, click: () => send("share-scopes") },
         // User identity (name + optional email) lives in the macOS app menu; on other platforms it sits here.
         ...(isMac ? [] : [{ ...APP_MENU.userInfo, click: () => send("user-info") }]),
         // macOS: no File ▸ Close Window - the App menu's Quit (and the window's close button) already cover
@@ -144,22 +147,22 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { type: "separator" },
         // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
         // inside it - the copy takes fresh ids throughout, so it never aliases the original.
-        { ...EDIT_MENU.duplicate, click: () => send("duplicate") },
+        { ...EDIT_MENU.duplicate, enabled: hasProject, click: () => send("duplicate") },
         // Storyletter's Edit Scene in Patterpad, the other way: the storylet card this scene plays. Only
         // while a Storyletter project nearby names this one as its Patter project.
         ...(storyletter ? [{ label: "Show Card in Storyletter", click: () => send("show-in-storyletter") }] : []),
         { type: "separator" },
         // Open the detached search window (#205) in the right mode. The accelerators ARE the shortcuts:
         // Find = Cmd/Ctrl+F; Replace = Cmd+Alt+F on macOS, Ctrl+H elsewhere (the platform conventions).
-        { ...EDIT_MENU.find, click: () => send("find") },
-        { label: EDIT_MENU.replace.label, accelerator: isMac ? EDIT_MENU.replace.acceleratorMac : EDIT_MENU.replace.acceleratorOther, click: () => send("replace") },
+        { ...EDIT_MENU.find, enabled: hasProject, click: () => send("find") },
+        { label: EDIT_MENU.replace.label, accelerator: isMac ? EDIT_MENU.replace.acceleratorMac : EDIT_MENU.replace.acceleratorOther, enabled: hasProject, click: () => send("replace") },
       ],
     },
     {
       label: "Play",
       submenu: [
-        { label: "Play Scene", accelerator: "CmdOrCtrl+P", click: () => send("play") },
-        { label: "Play from Start", accelerator: "CmdOrCtrl+Shift+P", click: () => send("play-from-start") },
+        { label: "Play Scene", accelerator: "CmdOrCtrl+P", enabled: hasProject, click: () => send("play") },
+        { label: "Play from Start", accelerator: "CmdOrCtrl+Shift+P", enabled: hasProject, click: () => send("play-from-start") },
         { type: "separator" },
         // Checked while the link is active (listening / connected); toggles it (the bottom-right connect icon
         // mirrors the same state). Follows a running game's cursor (#181).
@@ -172,29 +175,29 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // suggestion across the script, looping) plus the resolved-visibility toggles.
       label: "Review",
       submenu: [
-        { ...REVIEW_MENU.reviewFeedback, type: "checkbox", checked: panes.reviewFeedback ?? false, click: () => send("toggle-review-feedback") },
-        { ...REVIEW_MENU.nextFeedback, click: () => send("review-next") },
-        { ...REVIEW_MENU.previousFeedback, click: () => send("review-prev") },
+        { ...REVIEW_MENU.reviewFeedback, type: "checkbox", checked: panes.reviewFeedback ?? false, enabled: hasProject, click: () => send("toggle-review-feedback") },
+        { ...REVIEW_MENU.nextFeedback, enabled: hasProject, click: () => send("review-next") },
+        { ...REVIEW_MENU.previousFeedback, enabled: hasProject, click: () => send("review-prev") },
         { type: "separator" },
         // Narrative coverage (#159): random playthroughs find never-reached / needs-input content.
-        { ...REVIEW_MENU.coverageTest, click: () => send("coverage-test") },
+        { ...REVIEW_MENU.coverageTest, enabled: hasProject, click: () => send("coverage-test") },
         { type: "separator" },
         // The editable script handoff: send the script to an editor outside Patter, bring their edits
         // back as suggestions, then work through every open suggestion (the search palette's Suggestions
         // tab, with Accept / Reject per line and Accept all clean).
-        { label: "Export Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("export-editable") },
-        { label: "Reimport Editable Script…", enabled: spelling?.hasProject ?? false, click: () => send("import-editable") },
-        { label: "Review Suggestions…", enabled: spelling?.hasProject ?? false, click: () => send("review-suggestions") },
+        { label: "Export Editable Script…", enabled: hasProject, click: () => send("export-editable") },
+        { label: "Reimport Editable Script…", enabled: hasProject, click: () => send("import-editable") },
+        { label: "Review Suggestions…", enabled: hasProject, click: () => send("review-suggestions") },
         { type: "separator" },
         // Browse every line at a writing status (#205) - the search palette in status mode.
-        { label: "Find Lines by Writing Status…", accelerator: "CmdOrCtrl+Shift+L", click: () => send("find-by-status") },
+        { label: "Find Lines by Writing Status…", accelerator: "CmdOrCtrl+Shift+L", enabled: hasProject, click: () => send("find-by-status") },
         // Browse every dialogue line at a recording status (#206) - the search palette in recording mode.
         // Audio status tracking is voiced-only + opt-outable, so this is disabled when it's off (matches the inspector).
         { label: "Find Lines by Recording Status…", enabled: audioTracked, click: () => send("find-by-recording") },
         // Find where a property is used in conditions / effects / text - the search palette in property mode.
-        { ...REVIEW_MENU.findPropertyUsage, click: () => send("find-property") },
+        { ...REVIEW_MENU.findPropertyUsage, enabled: hasProject, click: () => send("find-property") },
         // Browse every node carrying an author tag (#215) - the search palette in tag mode.
-        { label: "Find by Tag…", click: () => send("find-by-tag") },
+        { label: "Find by Tag…", enabled: hasProject, click: () => send("find-by-tag") },
         {
           // Which writing-status rungs show their per-beat gutter pill. Per-rung check/uncheck, plus
           // Show All / Show None; remembered in panes.lineStatusShown (default none). Empty when no
@@ -202,7 +205,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
           label: "Line Status",
           submenu: [
             { label: "Show All", enabled: lineStatuses.length > 0, click: () => send("line-status:all") },
-            { label: "Show None", click: () => send("line-status:none") },
+            { label: "Show None", enabled: hasProject, click: () => send("line-status:none") },
             ...(lineStatuses.length ? [{ type: "separator" as const }] : []),
             ...lineStatuses.map((name) => ({
               label: name, type: "checkbox" as const, checked: shownStatuses.includes(name),
@@ -216,7 +219,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
           // an on/off toggle plus the installed dictionaries (the active one ticked). Disabled with no project.
           label: "Spelling",
           submenu: [
-            { label: "Check Spelling", type: "checkbox", checked: spelling?.enabled ?? true, enabled: spelling?.hasProject ?? false, click: () => send("spelling:toggle") },
+            { label: "Check Spelling", type: "checkbox", checked: spelling?.enabled ?? true, enabled: hasProject, click: () => send("spelling:toggle") },
             ...((spelling?.dictionaries.length)
               ? [{ type: "separator" as const }, ...spelling.dictionaries.map((d) => ({
                   label: d.label, type: "radio" as const, checked: spelling.language === d.id,
@@ -237,12 +240,12 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // exports of the project's content - distinct from Build, which compiles the runtime bundle.
       label: "Production",
       submenu: [
-        { label: "Production Information…", click: () => send("production-report") },
+        { label: "Production Information…", enabled: hasProject, click: () => send("production-report") },
         { type: "separator" },
-        { label: "Export Production Info…", click: () => send("export-production-info") },
+        { label: "Export Production Info…", enabled: hasProject, click: () => send("export-production-info") },
         { label: "Export Voice Script…", enabled: voiced, click: () => send("voice-script") }, // VO script only for a voiced project (#206)
         { label: "Update Audio Manifest…", enabled: voiced, click: () => send("audio-manifest") }, // #206: rewrite patteraudio.json from the audio folders
-        { label: "Export / Import Localisation…", click: () => send("localisation") },
+        { label: "Export / Import Localisation…", enabled: hasProject, click: () => send("localisation") },
       ],
     },
     {
@@ -254,14 +257,14 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // game-facing compiled bundle.
       label: "Publish",
       submenu: [
-        { ...PUBLISH_MENU.playableHtml, click: () => send("playable-html") },
-        { label: "Publish for Web…", click: () => send("publish-web") },
-        { label: "Publish Readable Script…", click: () => send("export-script") },
+        { ...PUBLISH_MENU.playableHtml, enabled: hasProject, click: () => send("playable-html") },
+        { label: "Publish for Web…", enabled: hasProject, click: () => send("publish-web") },
+        { label: "Publish Readable Script…", enabled: hasProject, click: () => send("export-script") },
         { type: "separator" },
-        { ...PUBLISH_MENU.bundle, click: () => send("build-bundle") },
+        { ...PUBLISH_MENU.bundle, enabled: hasProject, click: () => send("build-bundle") },
         // Auto Rebuild: recompile the bundle after edits (debounced + deduped). Mirrors the same project
         // setting as the Project Settings ▸ General toggle.
-        { ...PUBLISH_MENU.autoRebuild, type: "checkbox", checked: autoRebuild, click: () => send("toggle-auto-rebuild") },
+        { ...PUBLISH_MENU.autoRebuild, type: "checkbox", checked: autoRebuild, enabled: hasProject, click: () => send("toggle-auto-rebuild") },
       ],
     },
     {
@@ -269,10 +272,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
       // remembered state - then the standard view roles. Replaces role:viewMenu so both live in one place.
       label: "View",
       submenu: [
-        { ...VIEW_MENU.projectOverview, click: () => send("project-overview") }, // the #3a landing (scene index + stats)
+        { ...VIEW_MENU.projectOverview, enabled: hasProject, click: () => send("project-overview") }, // the #3a landing (scene index + stats)
         // Up a Level: the family's hierarchy step (Cmd+[), which here is a scene (or the Properties page)
         // up to the project overview. History (Back / Forward) is the other axis, below.
-        { ...VIEW_MENU.upALevel, click: () => send("up-a-level") },
+        { ...VIEW_MENU.upALevel, enabled: hasProject, click: () => send("up-a-level") },
         { type: "separator" },
         // Navigation HISTORY, the other axis from the navigator's hierarchy (from-storylets/nav-history).
         // Always enabled: the arrows in the topbar carry the greyed state, and a step with nowhere to go
@@ -290,7 +293,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // (handled natively, before the web content) so it toggles reliably even with the ProseMirror
         // editor focused - unlike a renderer keydown, which the editor can swallow. Shift+Cmd/Ctrl+M
         // to steer clear of the macOS Cmd-M (Minimize) default. Ephemeral - no checkbox state to sync.
-        { label: "Writing View", accelerator: "Shift+CmdOrCtrl+M", click: () => send("toggle-writing-view") },
+        { label: "Writing View", accelerator: "Shift+CmdOrCtrl+M", enabled: hasProject, click: () => send("toggle-writing-view") },
         { type: "separator" },
         // (Line Status moved to the Review menu - a per-rung show/hide submenu.)
         {
