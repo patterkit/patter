@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-06
+
 ### Changed
 
 - **Content that fails at run time no longer stops the story.** A condition that fails to evaluate (a division

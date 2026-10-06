@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-06
+
 ### Added
 
 - **Content errors are reported through a new `on_error` engine option.** Content can fail at run time in ways the

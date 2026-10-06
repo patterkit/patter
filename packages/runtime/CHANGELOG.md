@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-06
+
 ### Added
 
 - **`EngineOptions.onError` and `PlayError`.** Each condition or effect that fails while the story plays is

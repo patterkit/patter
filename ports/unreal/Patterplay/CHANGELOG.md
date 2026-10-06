@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-06
+
 ### Added
 
 - **`CreateWithOptions` and `FPatterEngineOptions`.** Blueprint can now choose how an engine plays: a seed for a
