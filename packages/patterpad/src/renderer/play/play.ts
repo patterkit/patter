@@ -271,7 +271,7 @@ function showEnd(error?: string): void {
 }
 
 // The script changed under this run: freeze Step / Continue / choices and prompt a restart, which
-// rebuilds the run from the new source. (Also reachable via the persistent "Rewind to start".)
+// rebuilds the run from the new source. (Also reachable via the head's persistent Restart.)
 function showStale(): void {
   trayShown = false;
   runGen++; // freeze any in-flight table-read - the script changed underneath it
@@ -400,9 +400,10 @@ async function startRun(): Promise<void> {
 // editor rather than about the thing being played. OFF by default and remembered: marking is the
 // default behaviour and following is the author asking for it.
 const addrEl = el("span", "play-addr");
-const rewindEl = el("button", { className: "play-rewind", tip: "Rewind to the start and play again", onClick: () => void startRun() }, iconNode("restart"));
+// "Restart", the one verb for running again: the end of a run says it, and so does Storyletter's Board.
+const rewindEl = el("button", { className: "play-rewind", tip: "Restart", onClick: () => void startRun() }, iconNode("restart"));
 rewindEl.type = "button";
-rewindEl.setAttribute("aria-label", "Rewind to the start and play again");
+rewindEl.setAttribute("aria-label", "Restart");
 const pin = pinButton({ pinned: true, onToggle: (on) => play.setPin(on) });
 const follow = followButton({ on: false, onToggle: (on) => play.setFollow(on) });
 document.body.prepend(toolWindowHead({

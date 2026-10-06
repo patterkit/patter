@@ -49,8 +49,8 @@ folder, the window can't know those values and says so, with the way to fix it (
 Scopes with Other Tools**, or declaring the scope under World Properties); with the folder but no
 file for that engine yet, it names the file that's missing.
 
-Rewind (**↺**, top-left) starts the run again from the top at any time, and **↺ Restart**
-shows up at the end.
+**Restart** (**↺**, top-left) starts the run again from the top at any time, and the same
+**↺ Restart** shows up at the end.
 
 The **CC** control shows or hides the non-spoken
 [caption cues](/play/closed-captions/) (on by default). In an

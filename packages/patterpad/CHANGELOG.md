@@ -35,6 +35,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - **Menu items that need a project are greyed out when none is open,** Save, Play, Publish and Find among
   them, as they are in Storyletter. Some already were; now they all are.
+- **The Play window's head button is called Restart,** the same word as the button at the end of a run. Its
+  tip used to say "Rewind to the start and play again".
 - **Reload and Toggle Developer Tools are gone from the View menu in released builds.** They are for
   working on Patterpad itself.
 - **The last system message boxes now use Patterpad's own dialogs:** an example that could not be opened,
