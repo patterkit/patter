@@ -1663,7 +1663,7 @@ function renderReviewBar(): void {
     })),
     at: reviewAt,
     tone: "accent",
-    tips: { prev: "Previous feedback", next: "Next feedback", go: "Go to this feedback" },
+    tips: { prev: tipWithKey("Previous feedback", "Shift+F8"), next: tipWithKey("Next feedback", "F8"), go: "Go to this feedback" }, // the Review menu's keys, as Storyletter's bar shows them
     onStep: (next) => { reviewAt = next; void stepReviewTo(next); },
     onGo: (i) => { const item = reviewItems[i]; if (item) void gotoReviewItem(item); },
     // A MODE, not an ambient bar: entering the walk and seeing nothing at all reads as a broken command
@@ -2992,7 +2992,7 @@ function createDialog(initial?: string): void {
     sections: [
       { caption: "Start from a kit", note: "A starting point you own, fully editable the moment it lands.", action: "Choose location\u2026", items: PROJECT_KITS },
       { caption: "Learn from a finished project", note: "Each opens as your own copy, in a folder you choose.",
-        action: "Open a Copy", usesDetails: false, items: EXAMPLE_KITS },
+        action: "Open a copy\u2026", usesDetails: false, items: EXAMPLE_KITS },
     ],
     onPick: (kit, { name }) => {
       if (kit.startsWith("example:")) { void openExample(kit.slice("example:".length)); return; }

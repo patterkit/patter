@@ -227,7 +227,9 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
     const scenes = new Set(replaceHits.map((h) => h.sceneId)).size;
     const ok = await confirmDialog({
       title: `Replace ${plural(n, "occurrence")} across ${plural(scenes, "scene")}?`,
-      body: `Replace “${input.value}” with “${replaceInput.value}”.`,
+      // House style rule 30: a confirmation ends with what undo does. Here, nothing: main rewrites the
+      // shards and the open scene is remounted from disk, so its editor history starts again.
+      body: `Replace “${input.value}” with “${replaceInput.value}”. This cannot be undone from the Edit menu.`,
       confirmLabel: "Replace",
     });
     if (!ok) return;
