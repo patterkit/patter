@@ -33,11 +33,21 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **`hostScopes`, the engine option every other runtime takes**: the scopes the game binds, by token, each a `{
+  get, set? }` over values it owns, as in `hostScopes: { world: { get, set } }`. A resolver's type is
+  `HostScope`.
+- **`engine.buildId`**, as the other runtimes have: the bundle's content hash, the build a debug link handshakes
+  with.
+
 ### Deprecated
 
 - **`flow.start()` is deprecated: use `flow.reset()`.** They were the same call under two names. `flow.reset()`
   is the one public name for beginning a flow again on every runtime (opening a flow begins a new one);
   `flow.start()` goes in a later release.
+- **The `world` option and the `WorldResolver` type: use `hostScopes: { world }` and `HostScope`.** `world` is
+  still the world scope, and goes in a later release.
 
 ### Fixed
 
@@ -45,6 +55,9 @@ version number always means the same runtime behaviour. This package is versione
   the chosen option's prompt waiting for the next `advance()`. `reset()` in between cleared only the choice, so
   the old prompt played as the restarted run's first beat. Every move that leaves the flow's place (`reset()`,
   `goto`, `close`) now drops both, through one helper.
+- **`onTrace` hears every decision with the log off.** A `run` walk past a snippet whose condition failed, and a
+  write's previous value, were only worked out when the log was on, so a tool tracing a run without the log
+  missed the one and got a write without the other. They are now worked out whenever anything is tracing.
 
 ## [0.19.0] - 2026-10-06
 

@@ -71,6 +71,7 @@ bool FPatterplayErrorsTest::RunTest(const FString& Parameters)
 
 	UPatterplayErrorsListener* Listener = NewObject<UPatterplayErrorsListener>();
 	Engine->OnError.AddDynamic(Listener, &UPatterplayErrorsListener::HandleError);
+	Engine->OnTrace.AddDynamic(Listener, &UPatterplayErrorsListener::HandleTrace);
 
 	// Each error is a Warning in the log as well as the event: three of them, none an Error.
 	AddExpectedMessagePlain(TEXT("played through"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 3);
@@ -111,19 +112,29 @@ bool FPatterplayErrorsTest::RunTest(const FString& Parameters)
 	TArray<FPatterLogEntry> Diagnostics;
 	for (const FPatterLogEntry& Row : Engine->Log())
 	{
-		if (Row.Type == TEXT("write")) Writes.Add(Row.Subject);
+		if (Row.Type == TEXT("write")) Writes.Add(Row.Target);
 		if (Row.Type == TEXT("diagnostic")) Diagnostics.Add(Row);
 	}
 	TestEqual(TEXT("only the effects that landed are writes"), FString::Join(Writes, TEXT(",")), FString(TEXT("@a,@d")));
 	if (TestEqual(TEXT("three diagnostic rows"), Diagnostics.Num(), 3))
 	{
 		TestEqual(TEXT("diagnostic: kind"), Diagnostics[0].Kind, FString(TEXT("effect")));
-		TestEqual(TEXT("diagnostic: subject is the node"), Diagnostics[0].Subject, FString(TEXT("sn_set")));
-		TestEqual(TEXT("diagnostic: detail is the message"), Diagnostics[0].Detail, FString(TEXT("division by zero")));
+		TestEqual(TEXT("diagnostic: node"), Diagnostics[0].Node, FString(TEXT("sn_set")));
+		TestEqual(TEXT("diagnostic: message"), Diagnostics[0].Message, FString(TEXT("division by zero")));
 		TestEqual(TEXT("diagnostic: source"), Diagnostics[0].Source, FString(TEXT("10 / @zero")));
 		TestEqual(TEXT("diagnostic: flow"), Diagnostics[0].Flow, FString(TEXT("main")));
 		TestEqual(TEXT("diagnostic: a condition's kind"), Diagnostics[2].Kind, FString(TEXT("condition")));
 	}
+
+	// --- OnTrace handed over the same decisions, as they happened ------------------------------
+	const TArray<FPatterLogEntry> Logged = Engine->Log();
+	if (TestEqual(TEXT("OnTrace carried every logged decision"), Listener->Traces.Num(), Logged.Num()))
+		for (int32 I = 0; I < Logged.Num(); ++I)
+		{
+			TestEqual(TEXT("OnTrace: type"), Listener->Traces[I].Type, Logged[I].Type);
+			TestEqual(TEXT("OnTrace: node"), Listener->Traces[I].Node, Logged[I].Node);
+			TestEqual(TEXT("OnTrace: flow"), Listener->Traces[I].Flow, Logged[I].Flow);
+		}
 
 	// --- a save the engine cannot read is refused before anything changes -----------------
 	// Each refusal is logged as an Error, which UE counts as a test failure unless declared.

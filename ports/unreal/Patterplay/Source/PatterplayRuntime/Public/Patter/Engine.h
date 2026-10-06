@@ -463,11 +463,17 @@ namespace patter
         std::string message;
     };
 
-    /// One retained decision: what the engine CHOSE, not what it produced. `type` is
-    /// select | choice | chose | dry | jump | write | diagnostic; `seq` is monotonic across the flow
-    /// and survives clearLog. Parity with the JS runtime's LogEntry. A `diagnostic` (a content error
-    /// played through, see PlayError) carries the node in `subject`, the message in `detail`, and
-    /// `kind` and `source`.
+    /// One retained decision: what the engine CHOSE, not what it produced. The JS runtime's LogEntry,
+    /// under the same field names: `type` says which of them an entry carries, and the rest are empty.
+    /// `seq` is monotonic across the flow and survives clearLog.
+    ///   select:     group, selector, order and exhaust (a sequence's), children, picked (empty when
+    ///               nothing was takeable)
+    ///   choice:     group, options
+    ///   chose:      group, option
+    ///   dry:        group
+    ///   jump:       to, mode
+    ///   write:      target, value, prev (hasPrev false when there was none)
+    ///   diagnostic: a content error played through (see PlayError): kind, node, source, message
     struct LogEntry
     {
         std::string type;
@@ -476,27 +482,42 @@ namespace patter
         /// The flow this happened in. Set on the ENGINE's stream, where a run is several
         /// flows in one order; empty on a flow's own log, which already says whose it is.
         std::string flow;
-        /// Group / target / jump destination, whichever the type names.
-        std::string subject;
-        /// Every child or option considered, WITH ITS VERDICT: the reasoning, not just the
-        /// outcome. "Why is my line missing" is only answerable from this.
-        std::vector<std::pair<std::string, bool>> considered;
+
+        std::string group;
+        std::string selector, order, exhaust;
+        /// Every child a select considered, WITH ITS VERDICT: the reasoning, not just the outcome.
+        /// "Why is my line missing" is only answerable from this.
+        std::vector<std::pair<std::string, bool>> children;
         std::string picked;
-        std::string selector;
-        std::string detail;
+        /// Every option a choice offered, with the ones a condition greyed out marked.
+        std::vector<std::pair<std::string, bool>> options;
+        std::string option;
+        std::string to, mode;
+        std::string target;
         PatterValue value;
         bool hasPrev = false;
         PatterValue prev;
-        /// A `diagnostic`'s PlayError kind: condition | effect | best-match. Empty on every other type.
+        /// A diagnostic's PlayError kind: condition | effect | best-match.
         std::string kind;
-        /// A `diagnostic`'s expression source text, when the bundle carries it.
+        std::string node;
+        /// A diagnostic's expression source text, when the bundle carries it.
         std::string source;
+        std::string message;
     };
+
+    /// The engine-level live tap (Engine::onTrace): every flow's decisions, each with the flow it happened in.
+    using TraceHandler = std::function<void(const std::string& flow, const LogEntry& entry)>;
 
     struct FlowHost
     {
-        /// True when the run asked for a log; flows skip building entries otherwise.
+        /// True when the run asked for a log.
         bool logEnabled = false;
+        /// True when anything takes the decisions: the log, or an Engine::onTrace handler. Flows skip
+        /// building entries otherwise.
+        bool tracing = false;
+        /// The engine's live taps, each under the id its unsubscribe removes.
+        std::vector<std::pair<int, TraceHandler>> traceHandlers;
+        int nextTraceHandler = 0;
         /// The engine's ordered stream, shared by pointer so a flow appends without holding
         /// the engine.
         std::vector<LogEntry>* engineLog = nullptr;
@@ -965,16 +986,22 @@ namespace patter
         /// nothing captures the engine, which is the shape Godot's weak debug registry forced.
         void emit(LogEntry e)
         {
-            if (!host_->logEnabled) return;
+            if (!host_->tracing) return;
             e.scene = currentSceneId_;
-            e.seq = seq_++;
-            log_.push_back(e);
-            if (host_->engineLog)
+            LogEntry wide = e;
+            wide.flow = id_;
+            if (host_->logEnabled)
             {
-                LogEntry wide = e;
-                wide.flow = id_;
+                e.seq = seq_++;
+                log_.push_back(std::move(e));
                 wide.seq = host_->engineLogSeq++;
-                host_->engineLog->push_back(std::move(wide));
+                if (host_->engineLog) host_->engineLog->push_back(wide);
+            }
+            if (!host_->traceHandlers.empty())
+            {
+                // A copy: a handler may unsubscribe itself, or another, while being called.
+                const auto handlers = host_->traceHandlers;
+                for (const auto& h : handlers) h.second(id_, wide);
             }
         }
 
@@ -988,7 +1015,7 @@ namespace patter
             if (!option->eligible) throw std::runtime_error("choice option is not eligible: " + id);
             touch();
             const Node* node = pendingById_[id];
-            { LogEntry e; e.type = "chose"; e.subject = pendingGroupId_; e.picked = id; emit(std::move(e)); }
+            { LogEntry e; e.type = "chose"; e.group = pendingGroupId_; e.option = id; emit(std::move(e)); }
             const Node* picked = node;
             std::shared_ptr<ChoicePrompt> shownPrompt = option->prompt ? std::make_shared<ChoicePrompt>(*option->prompt) : nullptr;
             clearPendingChoice();
@@ -1455,11 +1482,11 @@ namespace patter
                 // condition does not hold. That skip IS the decision an author asks about.
                 const int from = frame.index;
                 while (frame.index < static_cast<int>(children->size()) && !eligible((*children)[frame.index].get())) frame.index++;
-                if (host_->logEnabled && frame.index != from)
+                if (host_->tracing && frame.index != from)
                 {
-                    LogEntry e; e.type = "select"; e.subject = frame.containerId; e.selector = "run";
+                    LogEntry e; e.type = "select"; e.group = frame.containerId; e.selector = "run";
                     for (int i = from; i <= frame.index && i < static_cast<int>(children->size()); i++)
-                        e.considered.emplace_back((*children)[i]->id, i == frame.index);
+                        e.children.emplace_back((*children)[i]->id, i == frame.index);
                     if (frame.index < static_cast<int>(children->size())) e.picked = (*children)[frame.index]->id;
                     emit(std::move(e));
                 }
@@ -1539,10 +1566,10 @@ namespace patter
             {
                 // Including options a condition left ineligible: "why is that greyed out" is a
                 // question about the moment the choice was built.
-                if (host_->logEnabled)
+                if (host_->tracing)
                 {
-                    LogEntry e; e.type = "choice"; e.subject = group->id;
-                    for (const auto& o : options) e.considered.emplace_back(o.id, o.eligible);
+                    LogEntry e; e.type = "choice"; e.group = group->id;
+                    for (const auto& o : options) e.options.emplace_back(o.id, o.eligible);
                     emit(std::move(e));
                 }
                 hasPendingChoice_ = true; pendingGroupId_ = group->id; pendingOptions_ = options; pendingById_ = byId;
@@ -1553,7 +1580,7 @@ namespace patter
             for (const Node* f : fallbacks) if (eligible(f)) { enterChild(f); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
-            { LogEntry e; e.type = "dry"; e.subject = group->id; emit(std::move(e)); }
+            { LogEntry e; e.type = "dry"; e.group = group->id; emit(std::move(e)); }
             // Beside the log, not instead of it: live feedback a host acts on, against an audit
             // read afterwards. A shipped game runs with the log off and this still wired.
             if (host_->onDryChoice) host_->onDryChoice(group->id);
@@ -1567,7 +1594,7 @@ namespace patter
         }
         void enterTarget(const std::string& to, const std::string& mode)
         {
-            { LogEntry e; e.type = "jump"; e.subject = to; e.detail = mode; emit(std::move(e)); }
+            { LogEntry e; e.type = "jump"; e.to = to; e.mode = mode; emit(std::move(e)); }
             if (to == "END") { flowEnded_ = true; stack_.clear(); return; }
             std::string sceneId, containerId;
             auto sc = host_->bundle->scenes.find(to);
@@ -1603,9 +1630,14 @@ namespace patter
             // The reasoning goes in the entry: every child looked at, with its verdict.
             const auto trace = [&](const Node* picked) -> const Node*
             {
-                LogEntry e; e.type = "select"; e.subject = group->id;
+                LogEntry e; e.type = "select"; e.group = group->id;
                 e.selector = group->selector.empty() ? "default" : group->selector;
-                e.considered = considered;
+                if (group->selector == "sequence")
+                {
+                    e.order = group->options && !group->options->order.empty() ? group->options->order : "sequential";
+                    e.exhaust = group->options && !group->options->exhaust.empty() ? group->options->exhaust : "once";
+                }
+                e.children = considered;
                 if (picked) e.picked = picked->id;
                 emit(std::move(e));
                 return picked;
@@ -1771,8 +1803,8 @@ namespace patter
                 {
                     PatterValue value = evalExpr(ef.value);
                     // `prev` read before the write, so a reader can say "0 -> 7" in one pass.
-                    LogEntry e; e.type = "write"; e.subject = ef.target; e.value = value;
-                    if (host_->logEnabled)
+                    LogEntry e; e.type = "write"; e.target = ef.target; e.value = value;
+                    if (host_->tracing)
                         if (const PatterValue* pv = getProperty(ef.target)) { e.prev = *pv; e.hasPrev = true; }
                     writeProperty(ef.target, value, false);   // the STORY writes: a read-only host property refuses it
                     emit(std::move(e));
@@ -1806,7 +1838,7 @@ namespace patter
                 err.flow = id_; err.kind = kind; err.node = node; err.source = source; err.message = message;
                 host_->onError(err);
             }
-            LogEntry e; e.type = "diagnostic"; e.kind = kind; e.subject = node; e.source = source; e.detail = message;
+            LogEntry e; e.type = "diagnostic"; e.kind = kind; e.node = node; e.source = source; e.message = message;
             emit(std::move(e));
         }
         // A refusal from the evaluator is the kernel's ExprError, rethrown as Patterplay's EvalError.
@@ -2037,6 +2069,7 @@ namespace patter
             currentLocale_ = locale;
             // Localisation mode (spec §11): "ids" + no source-debug -> emit beat IDs + omit character names.
             host_.logEnabled = options.log;
+            host_.tracing = options.log;
             // By POINTER, so a flow appends to the engine's stream without holding the engine.
             host_.engineLog = &engineLog_;
             host_.onDryChoice = options.onDryChoice;
@@ -2110,6 +2143,9 @@ namespace patter
         // True for a source-only DEBUG build: the embedded strings are the source language (for debugging),
         // not a shippable localised build. An IDs-only ship build is false.
         bool isSourceDebug() const { return sourceDebug_; }
+
+        // The bundle's build identity (its content hash), the one a debug link handshakes with.
+        const std::string& buildId() const { return host_.bundle->contentHash; }
 
         // Switch the active locale LIVE - subsequent string lookups (new beats, character names, {@ref})
         // render in it; flow position / state / visits / rng are untouched. All open flows share host_, so
@@ -2198,6 +2234,23 @@ namespace patter
         /// Drop the retained entries. `seq` does NOT restart, so two reads either side of a
         /// clear still agree about what came first.
         void clearLog() { engineLog_.clear(); }
+
+        /// Live tap on the run's decisions, for tooling that wants them as they happen rather than retained:
+        /// each is handed over with the flow it happened in, with the log on or off. Returns its own
+        /// unsubscribe, which must not outlive the engine.
+        std::function<void()> onTrace(TraceHandler handler)
+        {
+            const int id = host_.nextTraceHandler++;
+            host_.traceHandlers.emplace_back(id, std::move(handler));
+            host_.tracing = true;
+            FlowHost* host = &host_;
+            return [host, id]
+            {
+                auto& v = host->traceHandlers;
+                v.erase(std::remove_if(v.begin(), v.end(), [id](const auto& h) { return h.first == id; }), v.end());
+                host->tracing = host->logEnabled || !v.empty();
+            };
+        }
 
         // Open (and start) a named flow; re-opening a name replaces it. Throws on an address that does not
         // resolve (an unknown scene, or a block that is not in the named scene), before anything changes:
@@ -2332,7 +2385,7 @@ namespace patter
 
         // A scene's own author gameData, by internal id or gameId address: the RAW sparse overrides, exactly
         // as a beat's step carries its own. Not merged with the project's declared field defaults (resolve
-        // those with effectiveGameData(gameDataFieldsFor(bundle, "scene"), ...)), and not inherited by the
+        // those with effectiveGameData(gameDataFields(bundle, "scene"), ...)), and not inherited by the
         // scene's blocks. A fresh copy each call; empty when the scene sets none or the ref is unknown.
         GameData gameDataForScene(const std::string& sceneRef)
         {
@@ -2340,7 +2393,7 @@ namespace patter
             return it != host_.bundle->scenes.end() && it->second.gameData ? *it->second.gameData : GameData{};
         }
         // A block's own author gameData, by scene + block ref (id or gameId). Raw overrides, like
-        // gameDataForScene (merge defaults with gameDataFieldsFor(bundle, "block")); the scene's gameData
+        // gameDataForScene (merge defaults with gameDataFields(bundle, "block")); the scene's gameData
         // is not folded in. A fresh copy each call; empty when the block sets none or the ref is unknown.
         GameData gameDataForBlock(const std::string& sceneRef, const std::string& blockRef)
         {

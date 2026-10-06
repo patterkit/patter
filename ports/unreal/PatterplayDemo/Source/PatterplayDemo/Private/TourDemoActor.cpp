@@ -238,13 +238,13 @@ void ATourDemoActor::ShowChoices(const FPatterStep& S)
 			.IsEnabled(O.bEligible)
 			.HAlign(HAlign_Left)
 			.ContentPadding(FMargin(12.f, 7.f))
-			.OnClicked(FOnClicked::CreateWeakLambda(this, [this, Id = O.Id, Text = O.Text]()
+			.OnClicked(FOnClicked::CreateWeakLambda(this, [this, Id = O.Id, Text = O.Prompt.Text]()
 			{
 				OnChoose(Id, Text);
 				return FReply::Handled();
 			}))
 			[
-				RichBody(O.Text)   // options can carry <b>/<i>/<bi> too
+				RichBody(O.Prompt.Text)   // options can carry <b>/<i>/<bi> too
 			]
 		];
 	}

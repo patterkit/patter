@@ -44,8 +44,38 @@ public:
 
 	// Advance repeatedly, collecting every beat played, until a choice or the end. The terminal
 	// choice / end is returned in OutStop; the return value is what played on the way to it.
-	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Played"))
 	TArray<FPatterStep> AdvanceToStop(FPatterStep& OutStop);
+
+	// The options of the pending choice (empty when the flow is not at one).
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	TArray<FPatterOption> GetChoices() const;
+
+	// Read a property by ref, as the story sees it from this flow: @scene included, which the engine's
+	// GetProperty cannot reach. False when it is unset.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool GetProperty(const FString& Ref, FPatterValue& OutValue) const;
+
+	// Write a property by ref from this flow, @scene included. The GAME's write, so a host declaration's
+	// read-only flag (the story's promise) does not refuse it.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void SetProperty(const FString& Ref, const FPatterValue& Value);
+
+	// This flow's decisions, in order. Empty unless the engine was created with bLog on.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
+	TArray<FPatterLogEntry> Log() const;
+
+	// Drop this flow's retained entries. Seq keeps counting.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
+	void ClearLog();
+
+	// Fill {@ref} interpolations in a string as the story would here, in this flow's state.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	FString Interpolate(const FString& Text);
+
+	// Strip the closed-caption cues from a string, as a line is with captions off.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	FString StripCaptions(const FString& Text);
 
 	// Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
 	// onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
@@ -107,6 +137,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterDryChoiceEvent, const FString
 /** A content error the engine played through: what failed, where, and why. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterErrorEvent, const FPatterPlayError&, Error);
 
+/** One decision the engine made, as it happens: the entry the log would keep, naming its flow. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterTraceEvent, const FPatterLogEntry&, Entry);
+
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterEngine : public UObject
 {
@@ -145,6 +178,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
 	FPatterErrorEvent OnError;
 
+	// Fired with each decision the engine makes, as it happens, with the decision log on or off: the same
+	// entries Log keeps, for a tool that wants them live rather than retained. The engine's onTrace on
+	// every runtime.
+	UPROPERTY(BlueprintAssignable, Category = "Patterplay|Debug")
+	FPatterTraceEvent OnTrace;
+
 	// C++ only: construct on the GAME's registry, the one registry a game holds for every engine and
 	// system that keeps properties in it, saved once by the game. The engine registers its scopes in it
 	// (@patter under `patter`, its per-flow and per-scene bags under keys starting `patter/`, and a bound
@@ -165,8 +204,57 @@ public:
 	UPatterWorld* GetBoundWorld() const;
 
 	// Open (and start) a named flow at a scene (its id or gameId; empty = the first scene).
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (AdvancedDisplay = "Block,bUseSeed,Seed"))
+	UPatterFlow* OpenFlow(const FString& Id, const FString& Scene, const FString& Block = TEXT(""), bool bUseSeed = false, int64 Seed = 0);
+
+	// Every open flow.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
-	UPatterFlow* OpenFlow(const FString& Id, const FString& Scene);
+	TArray<UPatterFlow*> Flows();
+
+	// Read a shared property by ref (@patter, @world, another engine's scope). False when it is unset.
+	// The typed getters below are shortcuts for one kind.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool GetProperty(const FString& Ref, FPatterValue& OutValue) const;
+
+	// Write a shared property by ref. The typed setters below are shortcuts for one kind.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void SetProperty(const FString& Ref, const FPatterValue& Value);
+
+	// The language playing now.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	FString Locale() const;
+
+	// True for a build that embeds the source language only so it can be played: not shippable.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool IsSourceDebug() const;
+
+	// Whether closed-caption cues are showing (SetClosedCaptions changes it).
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	bool ClosedCaptions() const;
+
+	// The address (Game ID) a game passes for a scene, from its internal id. Empty when unknown.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	FString SceneAddress(const FString& SceneId) const;
+
+	// The address (Game ID) a game passes for a block, from its internal id. Empty when unknown.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	FString BlockAddress(const FString& BlockId) const;
+
+	// A scene's accumulated author tags.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FString> TagsForScene(const FString& SceneRef) const;
+
+	// A block's accumulated author tags (its scene's first).
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FString> TagsForBlock(const FString& SceneRef, const FString& BlockRef) const;
+
+	// A scene's own author Game Data (raw overrides, not merged with the declared defaults).
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FPatterGameDataEntry> GameDataForScene(const FString& SceneRef) const;
+
+	// A block's own author Game Data (raw overrides, not merged with the declared defaults).
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FPatterGameDataEntry> GameDataForBlock(const FString& SceneRef, const FString& BlockRef) const;
 
 	// "Play this address and give me everything it produced" - the one-call bark form. The NAMED flow is
 	// reused if it already exists (moved with Goto) and opened at the address if not, then run to its next
@@ -332,6 +420,8 @@ public:
 	 * in an honest "closed" state instead of a live pointer to nothing.
 	 */
 	void RebindFlows();
+	// Forward the core's live tap to OnTrace; again after a hot swap, whose replacement core starts with none.
+	void TapTrace();
 
 	// Fetch a flow already opened under this name, or null. The counterpart to OpenFlow, which
 	// REPLACES: a Blueprint holding only an id needs a way to get the live wrapper back.

@@ -240,6 +240,26 @@ export interface SaveCase {
   script: ScriptOp[];
 }
 
+/**
+ * A decision-log case: the engine's log, entry for entry, in the reference's shape. Played as a
+ * RuntimeCase is (the same choices contract), with `log` on, and compared as the ENGINE log
+ * (`Engine.log()`, every entry tagged with its flow). The flow is opened as "main".
+ *
+ * Each port also holds its live tap to the same run: `onTrace` must hand over exactly the decisions
+ * the log keeps, in order, with the log on and with it off.
+ */
+export interface LogCase {
+  name: string;
+  bundle: Bundle;
+  seed?: number;
+  start: { scene: string; block?: string };
+  choices?: string[];
+  expectedLog: ExpectedLogEntry[];
+}
+
+/** One expected engine-log entry: the reference's `EngineLogEntry`, as JSON. */
+export type ExpectedLogEntry = { type: string; flow: string; seq: number; scene?: string } & Record<string, unknown>;
+
 export interface Corpus {
   version: number;
   expressions: ExpressionCase[];
@@ -248,6 +268,7 @@ export interface Corpus {
   scripted: ScriptedCase[];
   gameData: GameDataCase[];
   saves: SaveCase[];
+  logs: LogCase[];
 }
 
 // --- Authoring fixtures (source form, compiled into the corpus) -------------
@@ -328,6 +349,18 @@ export interface SaveFixture {
   script: ScriptOp[];
 }
 
+/** An authored decision-log fixture (source form; compiled by buildCorpus into a LogCase). */
+export interface LogFixture {
+  name: string;
+  project: ProjectFile;
+  scenes: Scene[];
+  locales?: LocaleFile[];
+  seed?: number;
+  start?: { scene?: string; block?: string };
+  choices?: string[];
+  expectedLog: ExpectedLogEntry[];
+}
+
 export interface Fixtures {
   expressions: ExpressionFixture[];
   specificity: SpecificityFixture[];
@@ -335,4 +368,5 @@ export interface Fixtures {
   scripted: ScriptedFixture[];
   gameData: GameDataFixture[];
   saves: SaveFixture[];
+  logs: LogFixture[];
 }

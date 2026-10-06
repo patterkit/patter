@@ -138,25 +138,25 @@ namespace Patterkit.Patterplay.Editor
             {
                 case "select":
                 {
-                    var parts = e.Considered == null ? new List<string>()
-                        : e.Considered.Select(c => c.Eligible ? c.Id : c.Id + " (x)").ToList();
-                    return $"{stamp}select {e.Subject} [{e.Selector}]: {string.Join(", ", parts)} -> {e.Picked ?? "(nothing)"}";
+                    var parts = e.Children == null ? new List<string>()
+                        : e.Children.Select(c => c.Eligible ? c.Id : c.Id + " (x)").ToList();
+                    return $"{stamp}select {e.Group} [{e.Selector}]: {string.Join(", ", parts)} -> {e.Picked ?? "(nothing)"}";
                 }
                 case "choice":
                 {
-                    var opts = e.Considered == null ? new List<string>()
-                        : e.Considered.Select(o => o.Eligible ? o.Id : o.Id + " (greyed)").ToList();
-                    return $"{stamp}choice {e.Subject}: {string.Join(", ", opts)}";
+                    var opts = e.Options == null ? new List<string>()
+                        : e.Options.Select(o => o.Eligible ? o.Id : o.Id + " (greyed)").ToList();
+                    return $"{stamp}choice {e.Group}: {string.Join(", ", opts)}";
                 }
-                case "chose":  return $"{stamp}chose {e.Subject} -> {e.Picked}";
-                case "dry":    return $"{stamp}dry {e.Subject} (nothing takeable, no eligible fallback)";
-                case "jump":   return $"{stamp}jump {e.Subject} ({e.Detail})";
-                case "write":  return $"{stamp}write {e.Subject}: {ShowLogValue(e.Prev)} -> {ShowLogValue(e.Value)}";
+                case "chose":  return $"{stamp}chose {e.Group} -> {e.Option}";
+                case "dry":    return $"{stamp}dry {e.Group} (nothing takeable, no eligible fallback)";
+                case "jump":   return $"{stamp}jump {e.To} ({e.Mode})";
+                case "write":  return $"{stamp}write {e.Target}: {ShowLogValue(e.Prev)} -> {ShowLogValue(e.Value)}";
                 // A content error the engine played through: a condition counted as false, an effect skipped.
                 case "diagnostic":
                 {
                     string source = e.Source != null ? " (" + e.Source + ")" : "";
-                    return $"{stamp}{e.Kind} failed on {e.Subject}{source}, played through: {e.Detail}";
+                    return $"{stamp}{e.Kind} failed on {e.Node}{source}, played through: {e.Message}";
                 }
             }
             return stamp + "(unknown)";

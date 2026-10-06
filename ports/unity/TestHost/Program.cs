@@ -72,6 +72,10 @@ namespace Patterkit.Patterplay.TestHost
             int sv = RunSaves(savesArr);
             Console.WriteLine($"  [saves] envelopes written by the JS reference, loaded here + continued: {sv}/{savesArr.GetArrayLength()}");
             if (sv != savesArr.GetArrayLength()) Fail("saves", "section total", $"{sv} of {savesArr.GetArrayLength()} passed");
+            if (!root.TryGetProperty("logs", out var logsArr)) { Console.Error.WriteLine("corpus has no logs section"); return 2; }
+            int lg = RunLogs(logsArr);
+            Console.WriteLine($"  [logs] decision logs, and OnTrace streaming the same decisions: {lg}/{logsArr.GetArrayLength()}");
+            if (lg != logsArr.GetArrayLength()) Fail("logs", "section total", $"{lg} of {logsArr.GetArrayLength()} passed");
 
             // Verify the Unity JSON save/load: replay the scripted cases routing saveLoad through
             // PatterSave's JSON string round-trip.
@@ -170,8 +174,8 @@ namespace Patterkit.Patterplay.TestHost
             // both - "why is that greyed" is unanswerable from the taken option alone.
             var choice = flow.Log().FirstOrDefault(e => e.Type == "choice");
             if (choice == null) Fail("trace", "choice", "the offered choice was not recorded");
-            else if (choice.Considered == null || !choice.Considered.Any(o => o.Eligible)
-                     || !choice.Considered.Any(o => !o.Eligible))
+            else if (choice.Options == null || !choice.Options.Any(o => o.Eligible)
+                     || !choice.Options.Any(o => !o.Eligible))
                 Fail("trace", "reasoning",
                     "the choice entry does not carry both the live and the greyed option");
 
@@ -194,6 +198,7 @@ namespace Patterkit.Patterplay.TestHost
 
             Console.WriteLine($"  [trace] decisions logged: {flow.Log().Count}, with the greyed option named");
         }
+
 
         private static void RunLegacySaveRngCheck(Bundle bundle)
         {
@@ -1175,6 +1180,7 @@ namespace Patterkit.Patterplay.TestHost
                     return produced is double pn && pn == expected.GetDouble();
                 case JsonValueKind.True: return produced is bool tb && tb;
                 case JsonValueKind.False: return produced is bool fb && !fb;
+                case JsonValueKind.Null: return produced == null;
                 default: return false;
             }
         }

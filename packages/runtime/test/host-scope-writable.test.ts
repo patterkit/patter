@@ -47,7 +47,7 @@ describe.each([
   ["bound", (opts: EngineOptions = {}) => {
     // A bound scope has no defaults: the GAME owns its values and seeds them itself.
     const store = new Map<string, unknown>([["clock", "day"], ["known", false]]);
-    const engine = new Engine(bundle, { ...opts, world: { get: (n) => store.get(n) as never, set: (n, v) => { store.set(n, v); } } });
+    const engine = new Engine(bundle, { ...opts, hostScopes: { world: { get: (n) => store.get(n) as never, set: (n, v) => { store.set(n, v); } } } });
     return { engine, store };
   }],
 ])("a writable:false host declaration, %s", (_label, make) => {

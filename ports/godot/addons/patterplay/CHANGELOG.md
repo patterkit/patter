@@ -12,6 +12,11 @@ same runtime behaviour.
   waiting to be delivered, and begins again at a scene (the first authored scene by default). A new corpus op,
   `resetFlow`, holds all four to it.
 - **`PatterBundle.game_data_value`**, as the other runtimes have: one gameData field with its default applied.
+- **`engine.on_trace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened
+  in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `on_trace`
+  before it existed.
+- **`PatterDebugLink.state()`, `build()`, and `url()`**, the names every other runtime uses for what the link is
+  doing.
 
 ### Changed
 
@@ -22,6 +27,13 @@ same runtime behaviour.
   `defaultLocale`, `sourceDebug`, `gameId`, `hostScopes`, `gameData`, `hasDefault`, and `gameEvents`), as every
   other result Dictionary in the addon already did, and carries a gameData field's `purpose`. Code that read the
   snake_case keys needs the new ones.
+- **The corpus now holds the decision log to the same entries on every runtime.** Godot's already matched the JS
+  runtime's entry for entry; the check makes sure it stays that way.
+- **Absent is null, as on every other runtime.** `PatterAudioResolver.resolve` for a beat with no recording,
+  `scene_address` and `block_address` for an unknown id, and a flow's `current_scene()` before it enters a scene
+  now return null, not `""`. Code that compared them with `""` should compare with null;
+  `PatterDebugLink.observe` takes either.
+- **`apply_live_bundle`'s result carries the `bundle` now playing**, as every other runtime's does.
 
 ### Deprecated
 
@@ -31,6 +43,7 @@ same runtime behaviour.
 - **Names that differed from every other runtime's now match them; the old names still work, and go in a later
   release.** `PatterBundle.game_data_fields` (was `game_data_fields_for`) and `PatterAudioResolver` (was
   `PatterAudio`).
+- **`PatterDebugLink.status()`: use `state()`, `build()`, and `url()`.** It goes in a later release.
 
 ### Fixed
 

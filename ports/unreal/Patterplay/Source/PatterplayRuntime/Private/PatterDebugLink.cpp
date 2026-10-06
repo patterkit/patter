@@ -30,7 +30,7 @@ TSharedRef<FPatterDebugLink> FPatterDebugLink::Create(const FString& Build, cons
 }
 
 FPatterDebugLink::FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl)
-	: BuildId(InBuild), Project(InProject), Url(InUrl)
+	: BuildId(InBuild), Project(InProject), DialUrl(InUrl)
 {
 }
 
@@ -45,7 +45,7 @@ void FPatterDebugLink::Connect()
 	{
 		FModuleManager::Get().LoadModule("WebSockets");
 	}
-	Socket = FWebSocketsModule::Get().CreateWebSocket(Url, TEXT(""));
+	Socket = FWebSocketsModule::Get().CreateWebSocket(DialUrl, TEXT(""));
 	if (!Socket.IsValid())
 	{
 		return;
@@ -215,7 +215,7 @@ TSharedRef<FPatterDebugLink> FPatterDebugLink::Create(const FString& Build, cons
 }
 
 FPatterDebugLink::FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl)
-	: BuildId(InBuild), Project(InProject), Url(InUrl)
+	: BuildId(InBuild), Project(InProject), DialUrl(InUrl)
 {
 }
 

@@ -27,6 +27,8 @@
     <!-- Content errors play through and are reported (OnError, the log's diagnostic entry); a bare
          snapshot and a save with no flows are refused before anything changes. -->
     <Compile Include="PlayErrorChecks.cs" />
+    <!-- The corpus's decision-log cases, and OnTrace held to them. -->
+    <Compile Include="LogChecks.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

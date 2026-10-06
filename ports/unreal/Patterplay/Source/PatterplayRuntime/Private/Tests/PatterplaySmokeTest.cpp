@@ -207,7 +207,7 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 			const FString State = FPatterDebug::Links()[0]->State();
 			TestTrue(FString::Printf(TEXT("the link reports an honest state (got '%s')"), *State),
 				State == TEXT("connecting") || State == TEXT("closed"));
-			TestEqual(TEXT("and carries its build"), FPatterDebug::Links()[0]->GetBuild(), FString(TEXT("build-hash")));
+			TestEqual(TEXT("and carries its build"), FPatterDebug::Links()[0]->Build(), FString(TEXT("build-hash")));
 		}
 		FPatterDebug::UnregisterLink(Link);
 		TestEqual(TEXT("unregistering drops the link"), FPatterDebug::Links().Num(), 0);

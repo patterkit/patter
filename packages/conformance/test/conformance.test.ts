@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
-import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, cases } from "../src/index.js";
+import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
@@ -73,6 +73,19 @@ describe("save cases (a save written by the reference loads, writes back the sam
         const expected = "expect" in op ? op.expect ?? [] : [];
         expect(actual[i], `op ${i} (${op.op})`).toEqual(expected);
       });
+    });
+  }
+});
+
+describe("decision-log cases (the engine log, and onTrace streaming the same decisions)", () => {
+  for (const c of corpus.logs) {
+    it(c.name, () => {
+      const { log, tracedOn, tracedOff } = runLogCase(c);
+      expect(log).toEqual(c.expectedLog);
+      // The live tap carries the event and its flow; seq and scene are the log's.
+      const decisions = c.expectedLog.map(({ seq: _seq, scene: _scene, ...e }) => e);
+      expect(tracedOn).toEqual(decisions);
+      expect(tracedOff).toEqual(decisions);
     });
   }
 });

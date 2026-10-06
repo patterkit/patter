@@ -73,6 +73,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	# Field by field as JS builds its FlowHost literal; flow_host.gd says what each one is.
 	var h := FlowHost.new()
 	h.log_enabled = bool(options.get("log", false))
+	h.tracing = h.log_enabled
 	# The SHARED array, not a callable closing over `self`: see flow_host.gd.
 	h.engine_log = _engine_log
 	h.on_dry_choice = options.get("on_dry_choice")
@@ -284,6 +285,22 @@ func clear_log() -> void:
 	_engine_log.clear()
 
 
+## Live tap on the run's decisions, for tooling that wants them as they happen rather than retained:
+## `handler` is called with the flow id and the entry, with the log on or off. Returns its own
+## unsubscribe, a Callable taking no arguments.
+func on_trace(handler: Callable) -> Callable:
+	var host = _host
+	var handler_id: int = host.next_trace_handler
+	host.next_trace_handler += 1
+	host.trace_handlers.append([handler_id, handler])
+	host.tracing = true
+	return func() -> void:
+		for i in range(host.trace_handlers.size() - 1, -1, -1):
+			if host.trace_handlers[i][0] == handler_id:
+				host.trace_handlers.remove_at(i)
+		host.tracing = host.log_enabled or not host.trace_handlers.is_empty()
+
+
 ## Open (and start) a named flow; re-opening a name replaces it. Returns null (with push_error, and
 ## nothing changed) when this engine was refused its registration, when the content names another
 ## engine's scope that nothing on this registry registered, or when the address does not resolve: an
@@ -379,18 +396,18 @@ func get_flow(id: String) -> PatterFlow:
 	return _flows.get(id)
 
 
-# The host-facing address (Game ID) of a scene by internal id, or "" if unknown. The inverse of the
+# The host-facing address (Game ID) of a scene by internal id, or null if unknown. The inverse of the
 # address resolution open_flow / goto do - for a host that wants to display, log, or pass back the
 # address of where it currently is.
-func scene_address(scene_id: String) -> String:
+func scene_address(scene_id: String):
 	var scenes: Dictionary = _host.bundle["scenes"]
-	return PatterBundle.effective_game_id(scenes[scene_id]) if scenes.has(scene_id) else ""
+	return PatterBundle.effective_game_id(scenes[scene_id]) if scenes.has(scene_id) else null
 
 
-# The host-facing address (Game ID) of a block by internal id, or "" if unknown.
-func block_address(block_id: String) -> String:
+# The host-facing address (Game ID) of a block by internal id, or null if unknown.
+func block_address(block_id: String):
 	var blocks: Dictionary = _host.block_by_id
-	return PatterBundle.effective_game_id(blocks[block_id]) if blocks.has(block_id) else ""
+	return PatterBundle.effective_game_id(blocks[block_id]) if blocks.has(block_id) else null
 
 
 ## The undo of an open_flow made inside a checkpoint: close the new flow and give the name back to
@@ -623,8 +640,9 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 # GDScript parity of @patterkit/play-helpers' applyLiveBundle). Picks the tier itself by comparing
 # content.structureHash: same structure -> replace_strings (tier 1, THIS engine, nothing restarts);
 # changed structure -> hot_swap (tier 2, a REPLACEMENT engine - re-bind flow handles via
-# get_flow). Returns { "engine": PatterEngine, "kind": "text"|"structure"|"error" }; on "error"
-# (unparseable json) the engine is untouched. Wire-up:
+# get_flow). Returns { "engine": PatterEngine, "bundle": the bundle now playing, "kind":
+# "text"|"structure"|"error" }, the shape every runtime's result has; on "error" (unparseable json) the
+# engine and its bundle are untouched. Wire-up:
 #
 #   link.bundle_pushed.connect(func(build: String, data: String) -> void:
 #       var r := engine.apply_live_bundle(data)
@@ -636,13 +654,13 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 func apply_live_bundle(data: String) -> Dictionary:
 	var next = PatterBundle.load_from_string(data)
 	if next == null:
-		return {"engine": self, "kind": "error"}
+		return {"engine": self, "bundle": _host.bundle, "kind": "error"}
 	var cur: String = str(_host.bundle.get("content", {}).get("structureHash", ""))
 	var nxt: String = str((next as Dictionary).get("content", {}).get("structureHash", ""))
 	if cur != "" and cur == nxt:
 		replace_strings(next)
-		return {"engine": self, "kind": "text"}
-	return {"engine": hot_swap(next), "kind": "structure"}
+		return {"engine": self, "bundle": next, "kind": "text"}
+	return {"engine": hot_swap(next), "bundle": next, "kind": "structure"}
 
 
 # Whether closed captions are currently shown (full dialogue text).

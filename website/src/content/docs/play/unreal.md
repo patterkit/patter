@@ -40,13 +40,17 @@ UPatterFlow*   Flow   = Engine->OpenFlow(TEXT("main"), TEXT("intro"));
 
 FPatterStep Step = Flow->Advance();   // Step.Type, Step.Text, Step.Character, Step.Options
 // Render Step by its kind (line / text / game event / choice / end). On a choice,
-// present Step.Options (each has prompt text, its PromptKind, and an eligibility flag), then:
+// present Step.Options (each has its Prompt, with its Kind and Text, and an eligibility flag), then:
 Flow->Choose(Step.Options[0].Id);     // your UI chooses; here, the first option
 ```
 
 The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint**, with `FPatterStep` and
 `FPatterOption` as Blueprint structs, so a designer can drive the flow and bind steps to a
-dialogue widget without touching C++.
+dialogue widget without touching C++. It is the API the other runtimes have, under the same names:
+a flow's `GetChoices`, `GetProperty` and `SetProperty` (its `@scene` values included), `Log`,
+`Interpolate` and `StripCaptions`; and the engine's `Flows`, addresses, tags, Game Data, and
+`OpenFlow` with a block and a seed. A step's `bHasCharacter`, `bHasCharacterName` and
+`bHasDirection` tell a field that isn't set from one that is empty.
 
 To choose how the engine plays, create it with **`UPatterEngine::CreateWithOptions`** and an
 `FPatterEngineOptions`: a seed for a repeatable run, the locale to play in, a decision log (read it

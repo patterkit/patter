@@ -95,7 +95,7 @@ void SPatterStatePanel::Rebuild()
 			TArray<FString> Lines;
 			for (const TSharedPtr<FPatterDebugLink>& L : Links)
 			{
-				Lines.Add(FString::Printf(TEXT("Live Link: %s - %s - build %s"), *L->State(), *L->GetUrl(), *L->GetBuild()));
+				Lines.Add(FString::Printf(TEXT("Live Link: %s - %s - build %s"), *L->State(), *L->Url(), *L->Build()));
 			}
 			LinkText = FString::Join(Lines, TEXT("\n"));
 		}
@@ -218,26 +218,26 @@ FString SPatterStatePanel::FormatLogEntry(const FPatterLogEntry& E)
 	if (!E.Flow.IsEmpty()) Stamp += E.Flow + TEXT(" ");
 
 	TArray<FString> Parts;
-	for (const FPatterLogConsidered& C : E.Considered)
+	for (const FPatterLogConsidered& C : E.Type == TEXT("choice") ? E.Options : E.Children)
 		Parts.Add(C.bEligible ? C.Id : C.Id + (E.Type == TEXT("choice") ? TEXT(" (greyed)") : TEXT(" (x)")));
 	const FString Joined = FString::Join(Parts, TEXT(", "));
 
 	if (E.Type == TEXT("select"))
-		return FString::Printf(TEXT("%sselect %s [%s]: %s -> %s"), *Stamp, *E.Subject, *E.Selector,
+		return FString::Printf(TEXT("%sselect %s [%s]: %s -> %s"), *Stamp, *E.Group, *E.Selector,
 			*Joined, E.Picked.IsEmpty() ? TEXT("(nothing)") : *E.Picked);
 	if (E.Type == TEXT("choice"))
-		return FString::Printf(TEXT("%schoice %s: %s"), *Stamp, *E.Subject, *Joined);
+		return FString::Printf(TEXT("%schoice %s: %s"), *Stamp, *E.Group, *Joined);
 	if (E.Type == TEXT("chose"))
-		return FString::Printf(TEXT("%schose %s -> %s"), *Stamp, *E.Subject, *E.Picked);
+		return FString::Printf(TEXT("%schose %s -> %s"), *Stamp, *E.Group, *E.Option);
 	if (E.Type == TEXT("dry"))
-		return FString::Printf(TEXT("%sdry %s (nothing takeable, no eligible fallback)"), *Stamp, *E.Subject);
+		return FString::Printf(TEXT("%sdry %s (nothing takeable, no eligible fallback)"), *Stamp, *E.Group);
 	if (E.Type == TEXT("jump"))
-		return FString::Printf(TEXT("%sjump %s (%s)"), *Stamp, *E.Subject, *E.Detail);
+		return FString::Printf(TEXT("%sjump %s (%s)"), *Stamp, *E.To, *E.Mode);
 	if (E.Type == TEXT("write"))
-		return FString::Printf(TEXT("%swrite %s: %s -> %s"), *Stamp, *E.Subject,
+		return FString::Printf(TEXT("%swrite %s: %s -> %s"), *Stamp, *E.Target,
 			E.bHasPrev ? *E.Prev : TEXT("<unset>"), *E.Value);
 	if (E.Type == TEXT("diagnostic"))
-		return FString::Printf(TEXT("%s%s on %s failed, played through: %s%s"), *Stamp, *E.Kind, *E.Subject, *E.Detail,
+		return FString::Printf(TEXT("%s%s on %s failed, played through: %s%s"), *Stamp, *E.Kind, *E.Node, *E.Message,
 			E.Source.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *E.Source));
 	return Stamp + TEXT("(unknown)");
 }

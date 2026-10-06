@@ -197,12 +197,15 @@ export interface ChoiceOption {
 }
 
 /**
- * The host's **World Properties** resolver: a `{ get, set? }` the game provides so the story can read
- * (and, if you allow it, write) its `@world.*` values at runtime. Property metadata (types, read-only)
- * comes from the compiled bundle's declared world properties; the values themselves live in the host and
+ * A host scope's resolver: a `{ get, set? }` the game provides so the story can read (and, if you allow
+ * it, write) values the game owns, `@world.*` among them, at runtime. Property metadata (types,
+ * read-only) comes from the compiled bundle's declarations; the values themselves live in the host and
  * are never stored or saved by this engine.
  */
-export type WorldResolver = ScopeResolver;
+export type HostScope = ScopeResolver;
+
+/** @deprecated Use {@link HostScope}, the name every Patterplay runtime uses. */
+export type WorldResolver = HostScope;
 
 /** What the engine DECIDED, as opposed to what it produced. A step tells you the line that
  *  played; a trace event tells you why that line and not its siblings - which children were
@@ -295,14 +298,18 @@ export interface EngineOptions {
   /** Active locale for string lookups (embedded localisation). Defaults to the bundle's default locale.
    *  Ignored by an "ids" bundle, which emits beat IDs for the game to localise itself. */
   locale?: string;
-  /** The host's resolver for **World Properties** (`@world.*`): the values the game owns and the story
-   *  reads. Omit it and the runtime self-backs `@world` from the declared defaults, as a property the
-   *  registry stores and saves. Shared by all flows. A game running several engines registers `@world`
-   *  in its registry itself instead, and no engine is given a resolver. */
-  world?: WorldResolver;
+  /** The host scopes the game binds, by token: for each, a resolver over values the game owns and the
+   *  story reads, such as `{ world: { get, set } }` for **World Properties** (`@world.*`). A declared
+   *  scope left unbound is self-backed from its defaults, as a property the registry stores and saves.
+   *  Shared by all flows. A game running several engines registers its scopes in its registry itself
+   *  instead, and binds none here. The same option on every runtime. */
+  hostScopes?: Record<string, HostScope>;
+  /** @deprecated Use `hostScopes: { world }`, the option every Patterplay runtime takes. Goes in a later
+   *  release. */
+  world?: HostScope;
   /** The game's registry: ONE per game, holding every engine's properties except those the game keeps
    *  itself, saved once. Given one, the engine registers its own scopes in it (`@patter` under `patter`,
-   *  its per-flow and per-scene bags under keys starting `patter/`, and `@world` if `world` is passed),
+   *  its per-flow and per-scene bags under keys starting `patter/`, and each scope `hostScopes` binds),
    *  reads every other scope from it, and `saveGame()` leaves the property values to the game. Host
    *  scopes the bundle declares (`@world`) are then the game's to register: owned if the registry should
    *  store them, foreign if the game keeps them. Omit it and the engine makes its own registry and acts as
@@ -386,8 +393,11 @@ export class Checkpoint {
 
 /** Shared, read-mostly context the engine hands to every flow it owns. */
 interface FlowHost {
-  /** True when the run asked for a log; flows skip building entries otherwise. */
+  /** True when the run asked for a log. */
   logEnabled: boolean;
+  /** True when anything takes the decisions: the log, or an {@link Engine.onTrace} handler. Flows skip
+   *  the work only a decision needs (a `run` walk's entry, a write's previous value) otherwise. */
+  tracing: boolean;
   /** A flow's events reach the ENGINE's stream through here, tagged with the flow id. */
   emitEngine: (flow: string, event: TraceEvent, scene?: string) => void;
   bundle: Bundle;
@@ -482,7 +492,7 @@ export class Engine {
   private readonly blockGameIdToId = new Map<string, Map<string, string>>();
 
   /** The options this engine was built with - reused verbatim by `hotSwap` so the replacement
-   *  engine keeps the same world resolver, custom RNG, and diagnostic hooks. */
+   *  engine keeps the same host scopes, custom RNG, and diagnostic hooks. */
   private readonly creationOptions: EngineOptions;
   /** The run's ordered stream: every flow's events, each naming its flow. Empty and
    *  unwritten unless `options.log` asked for it. */
@@ -546,15 +556,15 @@ export class Engine {
     try {
       registry.mountOwned("patter", patterBag, { owner: OWNER }); // claims values the game loaded first
       registered.push("patter");
-      // The host's World Properties resolver binds `@world` as an external scope: the game keeps the values,
-      // the registry never saves them. Its declarations (types, read-only) come from the compiled bundle.
+      // Each scope the game binds is EXTERNAL: the game keeps the values, the registry never saves them.
+      // Its declarations (types, read-only) come from the compiled bundle.
       const hostBound = new Set<string>();
-      if (options.world) {
-        const worldSpec = bundle.scopeRegistry?.scopes.find((s) => s.token === "world");
-        const decls = (worldSpec?.declarations ?? []).map(toForeignDecl);
-        registry.defineForeign("world", options.world, decls, { writable: worldSpec?.writable ?? true, owner: OWNER });
-        registered.push("world");
-        hostBound.add("world");
+      for (const [token, resolver] of Object.entries(boundScopes(options))) {
+        const spec = bundle.scopeRegistry?.scopes.find((s) => s.token === token);
+        const decls = (spec?.declarations ?? []).map(toForeignDecl);
+        registry.defineForeign(token, resolver, decls, { writable: spec?.writable ?? true, owner: OWNER });
+        registered.push(token);
+        hostBound.add(token);
       }
       // A declared host scope nobody bound. A standalone engine is its own game, so it self-backs the scope:
       // a property bag seeded from the declarations, stored and SAVED by the registry like any other, since
@@ -584,6 +594,7 @@ export class Engine {
 
     this.host = {
       logEnabled: options.log ?? false,
+      tracing: options.log ?? false,
       emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
       bundle, emitIds, strings, defaultStrings, castDisplay, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
@@ -612,6 +623,10 @@ export class Engine {
   /** True for a source-only DEBUG build: the embedded strings are the source language (for debugging),
    *  not a shippable localised build. An IDs-only ship build is `false`. */
   get isSourceDebug(): boolean { return this.sourceDebug; }
+
+  /** The bundle's build identity (its content hash), the one a debug link handshakes with, or an empty
+   *  string for a bundle compiled without one. */
+  get buildId(): string { return this.host.bundle.content?.hash ?? ""; }
 
   /**
    * Switch the active locale LIVE - a real game's "language" setting can change mid-session. Subsequent
@@ -1128,7 +1143,7 @@ export class Engine {
     for (const s of this.host.stageBags.keys()) reg.remove(keys.stage(s), { keep });
     this.host.stageBags.clear();
     for (const t of ["patter", ...this.host.hostScopes]) if (reg.has(t)) reg.remove(t, { keep });
-    if (this.creationOptions.world && reg.has("world")) reg.remove("world");
+    for (const t of Object.keys(boundScopes(this.creationOptions))) if (reg.has(t)) reg.remove(t);
   }
 
   /** Read a shared (`@patter` / foreign) property by ref. `@scene` refs are rejected (flow-level). */
@@ -1170,7 +1185,11 @@ export class Engine {
    *  retained. Returns its own unsubscribe. */
   onTrace(handler: EngineTraceHandler): () => void {
     this.engineTraceHandlers.add(handler);
-    return () => this.engineTraceHandlers.delete(handler);
+    this.host.tracing = true;
+    return () => {
+      this.engineTraceHandlers.delete(handler);
+      this.host.tracing = this.host.logEnabled || this.engineTraceHandlers.size > 0;
+    };
   }
 
   private emitEngine(flow: string, event: TraceEvent, scene?: string): void {
@@ -1647,7 +1666,7 @@ export class Flow {
       // which is what a block is.
       const from = frame.index;
       while (frame.index < children.length && !this.eligible(children[frame.index]!)) frame.index++;
-      if (this.host.logEnabled && frame.index !== from) {
+      if (this.host.tracing && frame.index !== from) {
         this.emit({
           type: "select", group: frame.containerId, selector: "run",
           children: children.slice(from, frame.index + 1)
@@ -2208,7 +2227,7 @@ export class Flow {
         value = this.evalExpr(e.value);
         // `prev` read before the write, so a reader can say "0 -> 1" without a second pass.
         // Only paid for when the run asked for a log.
-        const prev = this.host.logEnabled ? this.getProperty(e.target) : undefined;
+        const prev = this.host.tracing ? this.getProperty(e.target) : undefined;
         this.writeProperty(e.target, value, false); // the STORY writes: a read-only host property refuses it
         this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
       } catch (err) {
@@ -2579,6 +2598,11 @@ function toDecl(decl: PropertyDecl): ScopeDeclaration {
   return { name: decl.name, type: decl.type, values: decl.values, stages: decl.stages, default: decl.default };
 }
 
+
+/** The scopes the game binds: `hostScopes`, and the deprecated `world` as the scope of that name. */
+function boundScopes(options: EngineOptions): Record<string, HostScope> {
+  return { ...(options.world ? { world: options.world } : {}), ...options.hostScopes };
+}
 
 /** A host-scope declaration (`@world.x`) → registry declaration. */
 function toForeignDecl(decl: HostScopeDecl): ScopeDeclaration {

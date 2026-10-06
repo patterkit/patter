@@ -117,7 +117,7 @@ describe("cross-engine: runtime evaluation through a host resolver", () => {
       get: (n) => world[n],
       set: (n, v) => { world[n] = v; },
     };
-    return new Engine(bundle, { world: resolver });
+    return new Engine(bundle, { hostScopes: { world: resolver } });
   }
 
   it("evaluates a mixed owned+foreign condition and writes back through the resolver", () => {

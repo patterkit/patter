@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_expect(step["type"] == "text" and step["text"] == "asked", "the eligible option still plays: " + str(step))
 
 	_check_pending_cleared()
+	_check_absent_is_null(engine)
 
 	print("test_choose: ALL PASS" if _fails == 0 else "test_choose: %d FAILED" % _fails)
 	quit(1 if _fails > 0 else 0)
@@ -83,6 +84,16 @@ func _check_pending_cleared() -> void:
 	moved.goto("s")
 	var after_goto: Dictionary = moved.advance()
 	_expect(after_goto["id"] == "OPEN", "a goto drops it too: " + str(after_goto))
+
+
+# Absent is null, as on every other runtime: an unknown address, and audio for a beat with no recording.
+func _check_absent_is_null(engine: PatterEngine) -> void:
+	_expect(engine.scene_address("s") == "s", "scene_address finds a scene")
+	_expect(engine.scene_address("nowhere") == null, "scene_address of an unknown scene is null")
+	_expect(engine.block_address("nowhere") == null, "block_address of an unknown block is null")
+	var audio := PatterAudioResolver.new('{"clips": {"L": {"file": "l.wav"}}}', "res://audio")
+	_expect(audio.resolve("L") == "res://audio/l.wav", "resolve finds a recorded beat")
+	_expect(audio.resolve("M") == null, "resolve of a beat with no recording is null")
 
 
 func _expect(ok: bool, what: String) -> void:

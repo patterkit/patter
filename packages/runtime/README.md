@@ -44,9 +44,10 @@ for (;;) {
 }
 ```
 
-`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, world?, registry?, replayPromptOnChoose?, closedCaptions? }`:
-- `world` is the host's resolver for `@world` properties (World Properties): `{ get(name), set?(name, value) }`.
-  Omit it and the runtime self-backs `@world` from the declared defaults, as a property it saves.
+`new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions? }`:
+- `hostScopes` binds the scopes your game owns, by token, each `{ get(name), set?(name, value) }`: for World
+  Properties, `hostScopes: { world: { get, set } }`. Leave `world` unbound and the runtime self-backs `@world`
+  from the declared defaults, as a property it saves.
 - `registry` is the game's one `ScopeRegistry` (from `@wildwinter/scoperegistry`), holding every
   engine's properties. Omit it and the engine makes its own. See *One registry per game* below.
 - `locale` plays a non-default language (embedded localisation; an IDs-only bundle ignores it).

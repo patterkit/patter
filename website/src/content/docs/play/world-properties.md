@@ -11,26 +11,31 @@ state: a threat level, the player's class, whether the alarm is ringing.
 
 You **declare** them in Patterpad (Project Settings ▸ World Properties, see
 [Properties & game data](/setup/properties-and-data/#world-values-your-game-owns)), giving
-each a name, type, default, and whether the story may write it. At runtime you **bind** one resolver
+each a name, type, default, and whether the story may write it. At runtime you **bind** a resolver
 so the story reads, and if you allow it, writes your live state.
 
 ## Bind a world resolver (JavaScript)
 
-Pass a single `world` resolver to the `Engine`, a `get` (and optional `set`) over your own state:
+Bind `world` in the engine's `hostScopes`, a `get` (and optional `set`) over your own state:
 
 ```ts
 const engine = new Engine(bundle, {
-  world: {
-    get: (name) => game.world[name],                     // the story reads your live game state...
-    set: (name, value) => { game.world[name] = value; }, // ...and can write it back
+  hostScopes: {
+    world: {
+      get: (name) => game.world[name],                     // the story reads your live game state...
+      set: (name, value) => { game.world[name] = value; }, // ...and can write it back
+    },
   },
 });
 ```
 
 Now a condition on `@world.alarm` reads your live `game.world.alarm`, and an effect that sets
 `@world.reputation` writes straight into your system, so the next line reacts and your game sees the
-change. Everything under `@world` goes through this one resolver: there's a single World Properties
-scope, not a set of arbitrary host scopes to register.
+change. Everything under `@world` goes through this one resolver. `hostScopes` is keyed by scope
+because every runtime takes the same option, but a Patter project declares the one scope, `world`.
+
+Earlier releases took the resolver as a `world` option of its own. That still works, and goes in a
+later release.
 
 ## Read-only properties
 
@@ -62,7 +67,7 @@ Three rules, and each one says whose it is.
 
 ## If you don't bind a resolver
 
-Binding is optional. Omit `world` and the runtime **self-backs** `@world` from the declared defaults:
+Binding is optional. Leave `world` unbound and the runtime **self-backs** `@world` from the declared defaults:
 a live in-memory value per property, seeded from its default, that the story reads and writes for the
 length of the run. That's what lets a story using `@world` play standalone, in the Play window, a
 [playable HTML](/setup/building-and-shipping/#a-playable-html-to-send-anyone) export, or a quick
@@ -78,7 +83,7 @@ registry should store and save it, or foreign, with a resolver, when your game k
 
 ## The native ports
 
-Every runtime takes a live host resolver, in its own idiom, and self-backs `@world` when you give it
+Every runtime takes the same host scopes, in its own idiom, and self-backs `@world` when you bind
 none:
 
 - **Unity** takes `EngineOptions.HostScopes`, an `IHostScope` per token, and the [Unity](/play/unity/#your-games-state) page has the detail.

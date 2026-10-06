@@ -22,7 +22,7 @@ func _initialize() -> void:
 	var reworded: Dictionary = JSON.parse_string(json)
 	reworded["strings"]["en"]["L_uk56f61b"] = "Reworded, live."
 	var r1: Dictionary = engine.apply_live_bundle(JSON.stringify(reworded))
-	if r1["kind"] != "text" or r1["engine"] != engine:
+	if r1["kind"] != "text" or r1["engine"] != engine or r1["bundle"]["strings"]["en"]["L_uk56f61b"] != "Reworded, live.":
 		push_error("live refresh: expected a tier-1 text swap on the same engine (got %s)" % str(r1["kind"]))
 		quit(1)
 		return
@@ -37,7 +37,7 @@ func _initialize() -> void:
 	var restructured: Dictionary = JSON.parse_string(json)
 	restructured["content"]["structureHash"] = "different"
 	var r2: Dictionary = engine.apply_live_bundle(JSON.stringify(restructured))
-	if r2["kind"] != "structure" or r2["engine"] == engine:
+	if r2["kind"] != "structure" or r2["engine"] == engine or r2["bundle"]["content"]["structureHash"] != "different":
 		push_error("live refresh: expected a tier-2 hot swap onto a replacement engine")
 		quit(1)
 		return

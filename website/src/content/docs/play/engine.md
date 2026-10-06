@@ -164,6 +164,39 @@ const engine = new Engine(bundle, {
 Patterpad's Play window marks each failure in its transcript, and the
 [coverage test](/production/coverage-testing/) lists every one it saw.
 
+## Why that line?
+
+A step tells you what played, not why. The decision log records each decision the engine made and its
+reasoning:
+
+- each branch or sequence it chose from, with every option it looked at and why each was or wasn't
+  taken;
+- each choice it offered, with the options it greyed out, and the option chosen;
+- each jump;
+- each property it set, with the value it replaced;
+- each content error it played through.
+
+Turn it on with `log: true` in the engine options. `engine.log()` is the whole run in order, each entry
+naming its flow and scene. A flow's own `log()` holds only that flow's decisions. `clearLog()` empties a
+log, and entries keep counting from where they were, so two reads either side of a clear still agree on
+the order.
+
+For a tool that wants the decisions as they happen, `onTrace` hands each one over with the flow it
+happened in, whether the log is on or off. It returns a function that stops it.
+
+```ts
+const stop = engine.onTrace((flow, entry) => console.log(flow, entry.type));
+```
+
+| Runtime | The log | Live |
+|---|---|---|
+| JS | `log` option; `engine.log()`, `flow.log()`, `clearLog()` | `engine.onTrace(handler)`, returning its stop |
+| Unity | `EngineOptions.Log`; `Log()`, `ClearLog()` | `engine.OnTrace(handler)`, returning its stop |
+| Unreal | `bLog` in `FPatterEngineOptions`; `Log()`, `ClearLog()` | the engine's `OnTrace` event; `Engine::onTrace` in C++ |
+| Godot | `"log"` in the options; `log()`, `clear_log()` | `engine.on_trace(handler)`, returning its stop |
+
+Without the log, and with nothing tracing, the engine does none of this work.
+
 ## Next
 
 - [Integration](/play/integration/): save/load, Game Data, localisation at runtime, and helpers.

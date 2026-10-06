@@ -25,12 +25,12 @@ func _initialize() -> void:
 	var link = LinkT.new("build-hash", "Test")
 	PatterDebug.register_link(link)
 	_expect(PatterDebug.links.size() == 1, "a registered link is listed")
-	var s: Dictionary = link.status()
-	_expect(s["build"] == "build-hash", "the link reports the build it handshook")
-	_expect(s["url"].begins_with("ws://"), "and the address it dials")
+	_expect(link.build() == "build-hash", "the link reports the build it handshook")
+	_expect(link.url().begins_with("ws://"), "and the address it dials")
 	# Nothing is listening in a test, so this is connecting or closed - never a lie about being
 	# connected, which is the whole reason the panel shows it.
-	_expect(s["state"] in ["connecting", "connected", "closed"], "and an honest state (got %s)" % s["state"])
+	_expect(link.state() in ["connecting", "connected", "closed"], "and an honest state (got %s)" % link.state())
+	_expect(link.status()["build"] == "build-hash", "the deprecated status() still reads")
 	PatterDebug.unregister_link(link)
 	_expect(PatterDebug.links.is_empty(), "unregistering drops it")
 

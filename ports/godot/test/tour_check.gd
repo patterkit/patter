@@ -42,8 +42,8 @@ func _initialize() -> void:
 	var base := repo.path_join("examples/projects/audio")
 	var manifest := FileAccess.get_file_as_string(base.path_join("patteraudio.json"))
 	var audio = PatterAudioScript.new(manifest, base)
-	var path: String = audio.resolve("L_uk56f61b")
-	if path == "" or not FileAccess.file_exists(path):
+	var path = audio.resolve("L_uk56f61b")
+	if path == null or not FileAccess.file_exists(path):
 		push_error("tour demo: audio manifest did not resolve L_uk56f61b to a real file (got '%s')" % path)
 		quit(1)
 		return

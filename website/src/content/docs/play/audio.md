@@ -86,8 +86,8 @@ FString Path = Audio->Resolve(Step.Id);                    // full path, or empt
 ```gdscript
 var json := FileAccess.get_file_as_string("res://audio/patteraudio.json")
 var audio := PatterAudioResolver.new(json, "res://audio")
-var path := audio.resolve(step.get("id", ""))              # full path, or "" when none
-if path != "": my_player.stream = load(path)
+var path = audio.resolve(step.get("id", ""))               # full path, or null when none
+if path != null: my_player.stream = load(path)
 ```
 
 ## Notes

@@ -378,16 +378,19 @@ namespace Patterkit.Patterplay
         /// registry refused.</summary>
         private void Emit(LogEntry e)
         {
-            if (!_host.LogEnabled) return;
+            if (!_host.Tracing) return;
             e.Scene = _currentSceneId;
-            e.Seq = _seq++;
-            _log.Add(e);
-            _host.EngineLog.Add(new LogEntry {
-                Type = e.Type, Scene = e.Scene, Flow = Id, Seq = _host.EngineLogSeq++,
-                Subject = e.Subject, Considered = e.Considered, Picked = e.Picked,
-                Selector = e.Selector, Value = e.Value, Prev = e.Prev, Detail = e.Detail,
-                Kind = e.Kind, Source = e.Source,
-            });
+            var wide = e.Copy();
+            wide.Flow = Id;
+            if (_host.LogEnabled)
+            {
+                e.Seq = _seq++;
+                _log.Add(e);
+                wide.Seq = _host.EngineLogSeq++;
+                _host.EngineLog.Add(wide);
+            }
+            if (_host.TraceHandlers.Count > 0)
+                foreach (var h in _host.TraceHandlers.ToArray()) h(Id, wide);
         }
 
         public void Choose(string id)
@@ -399,7 +402,7 @@ namespace Patterkit.Patterplay
             if (!option.Eligible) throw new Exception($"choice option is not eligible: {id}");
             Touch();
             var node = choice.ById[id];
-            Emit(new LogEntry { Type = "chose", Subject = choice.GroupId, Picked = id });
+            Emit(new LogEntry { Type = "chose", Group = choice.GroupId, Option = id });
             _pendingChoice = null;
             // Speak the chosen option's prompt back as its first beat (spec 5): only an AUTHORED prompt, and
             // exactly as the choice showed it. A prompt borrowed from the option's own first content line is
@@ -506,13 +509,13 @@ namespace Patterkit.Patterplay
                 // so the trace records the ones walked past, not only the one entered.
                 int from = frame.Index;
                 while (frame.Index < children.Count && !Eligible(children[frame.Index])) frame.Index++;
-                if (_host.LogEnabled && frame.Index != from)
+                if (_host.Tracing && frame.Index != from)
                 {
                     var seen = new List<(string, bool)>();
                     for (int i = from; i <= frame.Index && i < children.Count; i++)
                         seen.Add((children[i].Id, i == frame.Index));
-                    Emit(new LogEntry { Type = "select", Subject = frame.ContainerId, Selector = "run",
-                        Considered = seen,
+                    Emit(new LogEntry { Type = "select", Group = frame.ContainerId, Selector = "run",
+                        Children = seen,
                         Picked = frame.Index < children.Count ? children[frame.Index].Id : null });
                 }
                 if (frame.Index >= children.Count) { _stack.RemoveAt(_stack.Count - 1); continue; }
@@ -576,8 +579,8 @@ namespace Patterkit.Patterplay
             {
                 // Including the options a condition left ineligible: "why is that greyed out"
                 // is a question about the moment the choice was built.
-                Emit(new LogEntry { Type = "choice", Subject = group.Id,
-                    Considered = options.Select(o => (o.Id, o.Eligible)).ToList() });
+                Emit(new LogEntry { Type = "choice", Group = group.Id,
+                    Options = options.Select(o => (o.Id, o.Eligible)).ToList() });
                 _pendingChoice = new ChoiceStateInternal { GroupId = group.Id, Options = options, ById = byId };
                 return;
             }
@@ -587,7 +590,7 @@ namespace Patterkit.Patterplay
             if (fallback != null) { EnterChild(fallback); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
-            Emit(new LogEntry { Type = "dry", Subject = group.Id });
+            Emit(new LogEntry { Type = "dry", Group = group.Id });
             _host.OnDryChoice?.Invoke(group.Id);
         }
 
@@ -601,7 +604,7 @@ namespace Patterkit.Patterplay
 
         private void EnterTarget(string to, string mode)
         {
-            Emit(new LogEntry { Type = "jump", Subject = to, Detail = mode });
+            Emit(new LogEntry { Type = "jump", To = to, Mode = mode });
             if (to == "END") { _flowEnded = true; _stack = new List<StackFrame>(); return; }
 
             string sceneId, containerId;
@@ -638,8 +641,11 @@ namespace Patterkit.Patterplay
             // The reasoning goes in the entry: every child looked at, with its verdict.
             Node Trace(Node picked)
             {
-                Emit(new LogEntry { Type = "select", Subject = group.Id, Selector = sel,
-                    Considered = considered, Picked = picked?.Id });
+                bool sequence = group.Selector == "sequence";
+                Emit(new LogEntry { Type = "select", Group = group.Id, Selector = sel,
+                    Order = sequence ? group.Options?.Order ?? "sequential" : null,
+                    Exhaust = sequence ? group.Options?.Exhaust ?? "once" : null,
+                    Children = considered, Picked = picked?.Id });
                 return picked;
             }
             if (eligible.Count == 0) return Trace(null);
@@ -801,9 +807,9 @@ namespace Patterkit.Patterplay
                     var value = EvalExpr(e.Value);
                     // Prev read before the write, so a reader can say "0 -> 7" in one pass. Only
                     // paid for when the run asked for a log.
-                    var prev = _host.LogEnabled ? GetProperty(e.Target) : null;
+                    var prev = _host.Tracing ? GetProperty(e.Target) : null;
                     WriteProperty(e.Target, value, false);   // the STORY writes: a read-only host property refuses it
-                    Emit(new LogEntry { Type = "write", Subject = e.Target, Value = value, Prev = prev });
+                    Emit(new LogEntry { Type = "write", Target = e.Target, Value = value, Prev = prev });
                 }
                 catch (Exception err)
                 {
@@ -829,7 +835,7 @@ namespace Patterkit.Patterplay
             string source = string.IsNullOrEmpty(expr?.Src) ? null : expr.Src;
             var error = new PlayError { Flow = Id, Kind = kind, Node = node, Source = source, Message = err.Message };
             (_host.OnError ?? Engine.DefaultOnError)?.Invoke(error);
-            Emit(new LogEntry { Type = "diagnostic", Kind = kind, Subject = node, Source = source, Detail = err.Message });
+            Emit(new LogEntry { Type = "diagnostic", Kind = kind, Node = node, Source = source, Message = err.Message });
         }
 
         private ExprValue EvalExpr(Expression expr)

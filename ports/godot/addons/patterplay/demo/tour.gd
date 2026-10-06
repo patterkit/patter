@@ -83,8 +83,8 @@ func _step() -> void:
 func _play_clip(beat_id: String) -> void:
 	if _audio == null or not _audio_toggle.button_pressed:
 		return
-	var path: String = _audio.resolve(beat_id)
-	if path == "":
+	var path = _audio.resolve(beat_id)
+	if path == null:
 		return
 	# `load_from_file` is 4.4+, which is this addon's floor. Naming it costs nothing above that and
 	# everything below it: Godot parses every script when a project OPENS, so on 4.3 this one line

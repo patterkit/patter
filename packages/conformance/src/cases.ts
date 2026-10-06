@@ -8,7 +8,7 @@
 // corpus.json; the test asserts the reference engine reproduces every value.
 // ---------------------------------------------------------------------------
 
-import type { Fixtures, GameDataFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
+import type { Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
 import { castStringKey } from "@patterkit/model";
 
@@ -2456,6 +2456,52 @@ const asSaveFixture = (f: ScriptedFixture, name: string): SaveFixture => {
   };
 };
 
+// --- the decision log ------------------------------------------------------------------------
+// One run that makes every kind of decision but `dry` and `diagnostic` (those have play-errors and
+// dry-choice cases of their own): a `run` walk past a snippet whose condition fails, a write with the
+// value it replaced, a choice with a greyed option, the option chosen, a jump, and a sequence pick.
+// The log is the contract: each entry's fields, in order, tagged with its flow and scene.
+const decisionLog = {
+  name: "every decision a run makes, in order, with its reasoning",
+  project: project({ properties: [{ name: "gold", type: "number", shared: true, default: 0 }] }),
+  scenes: [{
+    id: "s", type: "scene", name: "S",
+    blocks: [{ id: "b_main", type: "block", name: "Main", children: [
+      { id: "sn_rich", type: "snippet", condition: "@gold > 5", beats: [{ id: "T_rich", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_open", type: "snippet", beats: [{ id: "T_open", kind: "text" }],
+        onExit: [{ kind: "set", target: "@gold", value: "@gold + 3" }] },
+      { id: "g_ask", type: "group", selector: "choice", children: [
+        { id: "opt_buy", type: "group", condition: "@gold > 1", prompt: { id: "C_buy", kind: "text" },
+          children: [{ id: "sn_buy", type: "snippet", jump: { to: "b_end" } }] },
+        { id: "opt_rob", type: "group", condition: "@gold > 10", prompt: { id: "C_rob", kind: "text" },
+          children: [{ id: "sn_rob", type: "snippet", jump: { to: "END" } }] },
+      ] },
+    ] }, {
+      id: "b_end", type: "block", name: "End", children: [
+        { id: "g_seq", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "stick" }, children: [
+          { id: "sn_1", type: "snippet", beats: [{ id: "T_1", kind: "text" }], jump: { to: "END" } },
+          { id: "sn_2", type: "snippet", beats: [{ id: "T_2", kind: "text" }], jump: { to: "END" } },
+        ] },
+      ],
+    }],
+  }],
+  locales: [loc("s", { T_rich: "rich", T_open: "open", C_buy: "Buy", C_rob: "Rob", T_1: "one", T_2: "two" })],
+  choices: ["opt_buy"],
+  expectedLog: [
+    // The run walked past sn_rich (gold 0 is not > 5) to sn_open. A walk that skips nothing logs nothing.
+    { type: "select", flow: "main", seq: 0, scene: "s", group: "b_main", selector: "run",
+      children: [{ id: "sn_rich", eligible: false }, { id: "sn_open", eligible: true }], picked: "sn_open" },
+    { type: "write", flow: "main", seq: 1, scene: "s", target: "@gold", value: 3, prev: 0 },
+    { type: "choice", flow: "main", seq: 2, scene: "s", group: "g_ask",
+      options: [{ id: "opt_buy", eligible: true }, { id: "opt_rob", eligible: false }] },
+    { type: "chose", flow: "main", seq: 3, scene: "s", group: "g_ask", option: "opt_buy" },
+    { type: "jump", flow: "main", seq: 4, scene: "s", to: "b_end", mode: "jump" },
+    { type: "select", flow: "main", seq: 5, scene: "s", group: "g_seq", selector: "sequence", order: "sequential", exhaust: "stick",
+      children: [{ id: "sn_1", eligible: true }, { id: "sn_2", eligible: true }], picked: "sn_1" },
+    { type: "jump", flow: "main", seq: 6, scene: "s", to: "END", mode: "jump" },
+  ],
+} satisfies LogFixture;
+
 export const cases: Fixtures = {
   expressions: [
     { name: "number comparison", src: "@hp > 5", scopes: { patter: { hp: 10 } }, expected: true },
@@ -2533,4 +2579,5 @@ export const cases: Fixtures = {
     },
     asSaveFixture(scriptedEmptySpeakerSaveLoad, "a save written by the JS reference keeps a pending choice's empty speaker fields"),
   ],
+  logs: [decisionLog],
 };

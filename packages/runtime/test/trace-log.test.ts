@@ -90,4 +90,20 @@ describe("the engine's trace log", () => {
     expect(engine.log().length).toBeGreaterThan(0);
     expect(Math.min(...engine.log().map((e) => e.seq))).toBeGreaterThan(lastBefore);
   });
+
+  it("streams every decision to onTrace as it happens, the same ones the log keeps, with the log on or off", () => {
+    const logged = run({ seed: 0, log: true }).engine.log().map(({ seq: _seq, scene: _scene, ...e }) => e);
+    for (const log of [true, false]) {
+      const engine = new Engine(bundle(), { seed: 0, log } as never);
+      const traced: unknown[] = [];
+      const stop = engine.onTrace((flow, event) => traced.push({ ...event, flow }));
+      const flow = engine.openFlow("main", { scene: "s", block: "b_probe" });
+      for (let i = 0; i < 10 && flow.advance().type !== "end"; i++) { /* play it out */ }
+      expect(traced).toEqual(logged);
+      stop();
+      const after = traced.length;
+      engine.openFlow("again", { scene: "s", block: "b_probe" }).advance();
+      expect(traced.length).toBe(after); // unsubscribed
+    }
+  });
 });

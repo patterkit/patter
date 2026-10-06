@@ -14,6 +14,23 @@ runtime behaviour.
   authored scene). A new corpus op, `resetFlow`, holds all four to it.
 - **A flow's id, from Blueprint and the C++ core**: `Id` on `UPatterFlow` and `Flow::id()`, as `flow.id` is on
   every runtime.
+- **`OnTrace`**, as the JS runtime has: each decision as it happens, with the flow it happened in, whether the
+  log is on or off. `Engine::onTrace` in the C++ core returns its own unsubscribe; Blueprint binds the engine's
+  `OnTrace` event. An earlier entry here described `OnTrace` before it existed.
+- **The rest of the API in Blueprint, under the names the other runtimes use.** On `UPatterFlow`: `GetChoices`,
+  `GetProperty` and `SetProperty` (so Blueprint reaches a flow's `@scene` values), `Log` and `ClearLog`,
+  `Interpolate`, and `StripCaptions`. On `UPatterEngine`: `Flows`, `GetProperty` and `SetProperty` taking an
+  `FPatterValue` (the typed getters and setters stay as shortcuts), `Locale`, `IsSourceDebug`, `ClosedCaptions`,
+  `SceneAddress`, `BlockAddress`, `TagsForScene`, `TagsForBlock`, `GameDataForScene`, and `GameDataForBlock`;
+  and `OpenFlow` takes a block and a seed. A new automation test, `Patterplay.Blueprint`, drives each one.
+- **An option's prompt is one value in Blueprint**, `Prompt` (an `FPatterChoicePrompt`) with `bHasPrompt`, as on
+  every other runtime. A step and a prompt say whether their speaker, its display name, and the direction are
+  set (`bHasCharacter`, `bHasCharacterName`, `bHasDirection`), so a field that isn't set reads differently from
+  one that is empty. `AdvanceToStop`'s result pin is named `Played`.
+- **`Engine::buildId()` in the C++ core**, as the other runtimes have: the bundle's content hash.
+- **gameData helpers in Blueprint, and `gameDataValue` in the C++ core**: `UPatterGameData::GameDataFields`,
+  `GameDataValue`, and `EffectiveGameData` fill a node's overrides in from its type's declared defaults, as
+  every other runtime's helpers do.
 
 ### Changed
 
@@ -25,6 +42,12 @@ runtime behaviour.
   to load with an error naming the field, and a JSON `null` anywhere reads as an absent field.
 - **`Flow::begin` and `Flow::writeProperty` are private in the C++ core**, as they are on every other runtime.
   They are the engine's own: a game begins a flow again with `reset`, and writes a property with `setProperty`.
+- **A log entry has the JS runtime's fields, in the C++ core and Blueprint.** `group`, `children`, `options`,
+  `option`, `to`, `mode`, `target`, `node`, and `message` (PascalCase in Blueprint), each where that type of
+  entry has it, in place of the shared `subject`, `considered`, and `detail`; and a sequence's select names its
+  `order` and `exhaust`, which it did not before. In Blueprint the old three are still filled, and go in a later
+  release; the C++ core's are gone, so C++ that read them needs the new names. A `chose` entry's option is in
+  `option`, no longer in `picked`. The corpus now holds every runtime's log to the same entries.
 
 ### Deprecated
 
@@ -37,6 +60,10 @@ runtime behaviour.
   Blueprint: `UPatterSave::SerializeState` and `DeserializeState` (were `SaveStateToJson` and
   `LoadStateFromJson`), `Log` (was `GetLog`), `BuildId` (was `GetBuildId`), `InCheckpoint` (was
   `IsInCheckpoint`), and `UPatterAudioResolver::Create` (was `UPatterAudio::Load`).
+- **An option's flat prompt fields in Blueprint** (`Text`, `PromptKind`, `Character`, `CharacterName`, and
+  `Direction` on `FPatterOption`): use `Prompt`. They are still filled, and go in a later release.
+- **`gameDataFieldsFor` in the C++ core and the debug link's `GetBuild` and `GetUrl`: use `gameDataFields`,
+  `Build`, and `Url`**, the names every other runtime uses. The old names go in a later release.
 
 ### Fixed
 

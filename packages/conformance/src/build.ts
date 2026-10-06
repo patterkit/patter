@@ -13,7 +13,7 @@ import { Engine } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { SaveEnvelope } from "@patterkit/model";
 import { envelopeKeyPaths, runScript } from "./runner.js";
-import type { Corpus, ExpressionCase, Fixtures, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
+import type { Corpus, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
 
 export function buildCorpus(fixtures: Fixtures): Corpus {
   const expressions: ExpressionCase[] = fixtures.expressions.map((f) => ({
@@ -93,5 +93,14 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves };
+  const logs: LogCase[] = fixtures.logs.map((f) => ({
+    name: f.name,
+    bundle: exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }),
+    ...(f.seed !== undefined ? { seed: f.seed } : {}),
+    start: { scene: f.start?.scene ?? f.scenes[0]!.id, ...(f.start?.block ? { block: f.start.block } : {}) },
+    ...(f.choices ? { choices: f.choices } : {}),
+    expectedLog: f.expectedLog, // hand-authored contract, carried through unchanged
+  }));
+
+  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs };
 }

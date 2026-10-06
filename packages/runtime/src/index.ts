@@ -17,7 +17,7 @@ export type { Bundle } from "@patterkit/model";
 // host typing a row should not have to depend on the kernel to name it.
 export type { PropertyRow } from "@wildwinter/scoperegistry";
 export type {
-  StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, WorldResolver,
+  StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, HostScope, WorldResolver,
   EngineSave, SaveGame, FlowSnapshot, FlowCursor, SelectorSnapshot, SavedChoice, SavedChoiceOption, SavedChoicePrompt, StackFrame, SaveEnvelope,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
   TraceEvent, TraceHandler, EngineTraceHandler, LogEntry, EngineLogEntry, PlayError,

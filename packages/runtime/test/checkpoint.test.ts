@@ -62,7 +62,7 @@ describe("checkpoints", () => {
 
   it("write a game's own @world store back on rollback, and keep everything on commit", () => {
     const store = new Map<string, unknown>([["alarms", 0]]);
-    const engine = new Engine(bundle, { world: { get: (n) => store.get(n) as never, set: (n, v) => { store.set(n, v); } } });
+    const engine = new Engine(bundle, { hostScopes: { world: { get: (n) => store.get(n) as never, set: (n, v) => { store.set(n, v); } } } });
     let cp = engine.checkpoint();
     engine.openFlow("f", { scene: "s" }).advance();
     expect(store.get("alarms")).toBe(1);

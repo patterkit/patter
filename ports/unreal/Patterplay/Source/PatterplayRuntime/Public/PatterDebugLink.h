@@ -52,9 +52,14 @@ public:
 	 *  (from-storylets/weak-debug-registries). Always "closed" in Shipping, where the link is a no-op. */
 	FString State() const;
 	/** The build identity this link handshook with (moves on SetBuild after a live refresh). */
-	const FString& GetBuild() const { return BuildId; }
+	const FString& Build() const { return BuildId; }
 	/** The editor address this link dials. */
-	const FString& GetUrl() const { return Url; }
+	const FString& Url() const { return DialUrl; }
+
+	UE_DEPRECATED(5.7, "Use Build(), the name every Patterplay runtime uses.")
+	const FString& GetBuild() const { return BuildId; }
+	UE_DEPRECATED(5.7, "Use Url(), the name every Patterplay runtime uses.")
+	const FString& GetUrl() const { return DialUrl; }
 
 private:
 	FPatterDebugLink(const FString& InBuild, const FString& InProject, const FString& InUrl);
@@ -66,7 +71,7 @@ private:
 
 	FString BuildId;
 	FString Project;
-	FString Url;
+	FString DialUrl;
 	TSet<FString> Flows;
 	TArray<FString> Queue;   // messages awaiting an open socket
 	bool bOpen = false;

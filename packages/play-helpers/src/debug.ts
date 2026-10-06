@@ -63,6 +63,13 @@ export interface DebugLink {
   setBuild(build: string): void;
   /** Close the link. */
   close(): void;
+  /** What the link is doing: `connecting`, `connected`, or `closed`. From inside a running game "the editor
+   *  is not listening" and "I never attached" look the same, and this tells them apart. */
+  readonly state: "connecting" | "connected" | "closed";
+  /** The build the link handshakes with (the bundle's content hash), as `setBuild` last left it. */
+  readonly build: string;
+  /** The address the link dials. */
+  readonly url: string;
 }
 
 const OPEN = 1; // WebSocket.OPEN
@@ -97,7 +104,7 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
 
   if (!Ctor) {
     // No WebSocket available (old Node, no impl passed) - degrade to a silent no-op link.
-    return { flowOpened() {}, observe() {}, flowClosed() {}, setBuild() {}, close() { closed = true; } };
+    return { flowOpened() {}, observe() {}, flowClosed() {}, setBuild() {}, close() { closed = true; }, state: "closed", build, url };
   }
 
   const sendHello = (): void => {
@@ -145,5 +152,8 @@ export function createDebugLink(opts: DebugLinkOptions): DebugLink {
       if (sock && sock.readyState === OPEN) sendHello(); // re-handshake: the editor re-reads the build
     },
     close(): void { closed = true; queue = []; try { sock?.close(); } catch { /* already gone */ } sock = null; },
+    get state() { return closed || !sock ? "closed" : sock.readyState === OPEN ? "connected" : "connecting"; },
+    get build() { return build; },
+    url,
   };
 }

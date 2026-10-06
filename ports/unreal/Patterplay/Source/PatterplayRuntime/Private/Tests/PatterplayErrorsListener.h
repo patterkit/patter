@@ -1,4 +1,4 @@
-// A test-only listener for UPatterEngine::OnError. A dynamic delegate binds only a UFUNCTION on a UObject
+// A test-only listener for UPatterEngine::OnError and OnTrace. A dynamic delegate binds only a UFUNCTION on a UObject
 // (there is no AddLambda for one), and a UCLASS must live in a header for UHT to see it, so the
 // Patterplay.Errors automation test binds this the way a Blueprint binds the event. Transient, hidden,
 // and not Blueprintable: nothing outside the test can make or pick one. UHT cannot guard a UCLASS with
@@ -22,4 +22,10 @@ public:
 
 	UFUNCTION()
 	void HandleError(const FPatterPlayError& Error) { Errors.Add(Error); }
+
+	/** Every decision the bound engine handed over, in order. */
+	TArray<FPatterLogEntry> Traces;
+
+	UFUNCTION()
+	void HandleTrace(const FPatterLogEntry& Entry) { Traces.Add(Entry); }
 };

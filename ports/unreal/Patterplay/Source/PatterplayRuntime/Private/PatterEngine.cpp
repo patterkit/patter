@@ -20,6 +20,34 @@ namespace
 		return EPatterPropertyType::Boolean;
 	}
 
+	// A value across the Blueprint boundary, both ways. Display is the core's rendering on the way out
+	// and ignored on the way in.
+	FPatterValue ToUeValue(const patter::PatterValue& V)
+	{
+		FPatterValue Out;
+		if (V.isNumber()) { Out.Kind = EPatterValueKind::Number; Out.Number = V.n; }
+		else if (V.isString()) { Out.Kind = EPatterValueKind::String; Out.String = Ue(V.s); }
+		else if (V.isFlags()) { Out.Kind = EPatterValueKind::Flags; for (const std::string& F : V.f) Out.Flags.Add(Ue(F)); }
+		else { Out.Kind = EPatterValueKind::Boolean; Out.bBool = V.b; }
+		Out.Display = Ue(V.toDisplayString());
+		return Out;
+	}
+	patter::PatterValue FromUeValue(const FPatterValue& V)
+	{
+		switch (V.Kind)
+		{
+			case EPatterValueKind::Number: return patter::PatterValue::Num(V.Number);
+			case EPatterValueKind::String: return patter::PatterValue::Str(Std(V.String));
+			case EPatterValueKind::Flags:
+			{
+				std::vector<std::string> Flags;
+				for (const FString& F : V.Flags) Flags.push_back(Std(F));
+				return patter::PatterValue::Flags(std::move(Flags));
+			}
+			default: return patter::PatterValue::Bool(V.bBool);
+		}
+	}
+
 	EPatterBeatKind BeatKindFrom(const std::string& K)
 	{
 		if (K == "text") return EPatterBeatKind::Text;
@@ -88,6 +116,34 @@ namespace
 		return MyIndex;
 	}
 
+	FPatterOption ConvertOption(const patter::ChoiceOption& O)
+	{
+		FPatterOption Opt;
+		Opt.Id = Ue(O.id);
+		Opt.bEligible = O.eligible;
+		if (O.gameData) Opt.GameData = ConvertGameData(*O.gameData);
+		if (O.prompt)
+		{
+			FPatterChoicePrompt& P = Opt.Prompt;
+			Opt.bHasPrompt = true;
+			P.Kind = O.prompt->kind == "line" ? EPatterPromptKind::Line : EPatterPromptKind::Text;
+			P.Text = Ue(O.prompt->text);
+			P.bHasCharacter = O.prompt->hasCharacter;
+			if (O.prompt->hasCharacter) P.Character = Ue(O.prompt->character);
+			P.bHasCharacterName = O.prompt->hasCharacterName;
+			if (O.prompt->hasCharacterName) P.CharacterName = Ue(O.prompt->characterName);
+			P.bHasDirection = O.prompt->hasDirection;
+			if (O.prompt->hasDirection) P.Direction = Ue(O.prompt->direction);
+			// The deprecated flat fields, filled as they were, for Blueprints that still read them.
+			Opt.PromptKind = P.Kind;
+			Opt.Text = P.Text;
+			Opt.Character = P.Character;
+			Opt.CharacterName = P.CharacterName;
+			Opt.Direction = P.Direction;
+		}
+		return Opt;
+	}
+
 	FPatterStep Convert(const patter::StepResult& S)
 	{
 		FPatterStep Out;
@@ -101,35 +157,25 @@ namespace
 		}
 		Out.Id = Ue(S.id);
 		Out.Text = Ue(S.text);
+		Out.bHasCharacter = S.hasCharacter;
 		if (S.hasCharacter) Out.Character = Ue(S.character);
+		Out.bHasCharacterName = S.hasCharacterName;
 		if (S.hasCharacterName) Out.CharacterName = Ue(S.characterName);
+		Out.bHasDirection = S.hasDirection;
 		if (S.hasDirection) Out.Direction = Ue(S.direction);
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);
 		if (S.hasTags) for (const std::string& T : S.tags) Out.Tags.Add(Ue(T));
 		if (S.type == patter::StepType::Choice) Out.GroupId = Ue(S.groupId);
-		for (const patter::ChoiceOption& O : S.options)
-		{
-			FPatterOption Opt;
-			Opt.Id = Ue(O.id);
-			Opt.bEligible = O.eligible;
-			if (O.gameData) Opt.GameData = ConvertGameData(*O.gameData);
-			if (O.prompt)
-			{
-				Opt.PromptKind = O.prompt->kind == "line" ? EPatterPromptKind::Line : EPatterPromptKind::Text;
-				Opt.Text = Ue(O.prompt->text);
-				if (O.prompt->hasCharacter) Opt.Character = Ue(O.prompt->character);
-				if (O.prompt->hasCharacterName) Opt.CharacterName = Ue(O.prompt->characterName);
-				if (O.prompt->hasDirection) Opt.Direction = Ue(O.prompt->direction);
-			}
-			Out.Options.Add(Opt);
-		}
+		for (const patter::ChoiceOption& O : S.options) Out.Options.Add(ConvertOption(O));
 		return Out;
 	}
 }
 
 // ----- UPatterFlow ------------------------------------------------------------
+
+static FPatterLogEntry ConvertLogEntry(const patter::LogEntry& E);
 
 void UPatterFlow::Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow) { Owner = InOwner; FlowId = InId; Flow = InFlow; }
 
@@ -189,6 +235,57 @@ void UPatterFlow::Reset(const FString& Scene, const FString& Block)
 }
 
 bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
+
+TArray<FPatterOption> UPatterFlow::GetChoices() const
+{
+	TArray<FPatterOption> Out;
+	if (!Flow) return Out;
+	for (const patter::ChoiceOption& O : Flow->getChoices()) Out.Add(ConvertOption(O));
+	return Out;
+}
+
+bool UPatterFlow::GetProperty(const FString& Ref, FPatterValue& OutValue) const
+{
+	OutValue = FPatterValue();
+	if (!Flow) return false;
+	try
+	{
+		const patter::PatterValue* V = Flow->getProperty(Std(Ref));
+		if (!V) return false;
+		OutValue = ToUeValue(*V);
+		return true;
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+void UPatterFlow::SetProperty(const FString& Ref, const FPatterValue& Value)
+{
+	if (!Flow) return;
+	try { Flow->setProperty(Std(Ref), FromUeValue(Value)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
+TArray<FPatterLogEntry> UPatterFlow::Log() const
+{
+	TArray<FPatterLogEntry> Out;
+	if (!Flow) return Out;
+	for (const patter::LogEntry& E : Flow->log()) Out.Add(ConvertLogEntry(E));
+	return Out;
+}
+
+void UPatterFlow::ClearLog() { if (Flow) Flow->clearLog(); }
+
+FString UPatterFlow::Interpolate(const FString& Text)
+{
+	if (!Flow) return Text;
+	try { return Ue(Flow->interpolate(Std(Text))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return Text; }
+}
+
+FString UPatterFlow::StripCaptions(const FString& Text)
+{
+	return Flow ? Ue(Flow->stripCaptions(Std(Text))) : Text;
+}
 
 // ----- UPatterEngine ----------------------------------------------------------
 
@@ -262,17 +359,30 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 	};
 	try { E->Engine = std::make_shared<patter::Engine>(*Bundle->Raw(), Opts); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	E->TapTrace();
 	return E;
+}
+
+void UPatterEngine::TapTrace()
+{
+	// Held weakly, like the other callbacks. Only a bound event pays for the entry's conversion.
+	TWeakObjectPtr<UPatterEngine> Weak(this);
+	Engine->onTrace([Weak](const std::string&, const patter::LogEntry& Entry)
+	{
+		UPatterEngine* Self = Weak.Get();
+		if (Self && Self->OnTrace.IsBound()) Self->OnTrace.Broadcast(ConvertLogEntry(Entry));
+	});
 }
 
 UPatterWorld* UPatterEngine::GetBoundWorld() const { return WorldRef; }
 
-UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
+UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene, const FString& Block, bool bUseSeed, int64 Seed)
 {
 	if (!Engine) return nullptr;
 	try
 	{
-		Engine->openFlow(Std(Id), Std(Scene));
+		const int64_t SeedValue = static_cast<int64_t>(Seed);
+		Engine->openFlow(Std(Id), Std(Scene), Std(Block), bUseSeed ? &SeedValue : nullptr);
 		UPatterFlow* Flow = NewObject<UPatterFlow>(this);
 		Flow->Init(this, Id, Engine->flowPtr(Std(Id))); // an OWNING handle: see UPatterFlow::Flow
 		// A reopen REPLACES: the core has closed the flow this name used to mean, so its wrapper
@@ -282,6 +392,78 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
 		return Flow;
 	}
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+}
+
+TArray<UPatterFlow*> UPatterEngine::Flows()
+{
+	TArray<UPatterFlow*> Out;
+	if (!Engine) return Out;
+	for (patter::Flow* F : Engine->flows())
+		if (UPatterFlow* Wrapper = GetFlow(Ue(F->id()))) Out.Add(Wrapper);
+	return Out;
+}
+
+bool UPatterEngine::GetProperty(const FString& Ref, FPatterValue& OutValue) const
+{
+	OutValue = FPatterValue();
+	if (!Engine) return false;
+	try
+	{
+		const patter::PatterValue* V = Engine->getProperty(Std(Ref));
+		if (!V) return false;
+		OutValue = ToUeValue(*V);
+		return true;
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+void UPatterEngine::SetProperty(const FString& Ref, const FPatterValue& Value)
+{
+	if (!Engine) return;
+	try { Engine->setProperty(Std(Ref), FromUeValue(Value)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
+FString UPatterEngine::Locale() const { return Engine ? Ue(Engine->locale()) : FString(); }
+
+bool UPatterEngine::IsSourceDebug() const { return Engine && Engine->isSourceDebug(); }
+
+bool UPatterEngine::ClosedCaptions() const { return Engine ? Engine->closedCaptions() : true; }
+
+FString UPatterEngine::SceneAddress(const FString& SceneId) const { return Engine ? Ue(Engine->sceneAddress(Std(SceneId))) : FString(); }
+
+FString UPatterEngine::BlockAddress(const FString& BlockId) const { return Engine ? Ue(Engine->blockAddress(Std(BlockId))) : FString(); }
+
+TArray<FString> UPatterEngine::TagsForScene(const FString& SceneRef) const
+{
+	TArray<FString> Out;
+	if (!Engine) return Out;
+	try { for (const std::string& T : Engine->tagsForScene(Std(SceneRef))) Out.Add(Ue(T)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Out;
+}
+
+TArray<FString> UPatterEngine::TagsForBlock(const FString& SceneRef, const FString& BlockRef) const
+{
+	TArray<FString> Out;
+	if (!Engine) return Out;
+	try { for (const std::string& T : Engine->tagsForBlock(Std(SceneRef), Std(BlockRef))) Out.Add(Ue(T)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+	return Out;
+}
+
+TArray<FPatterGameDataEntry> UPatterEngine::GameDataForScene(const FString& SceneRef) const
+{
+	if (!Engine) return {};
+	try { return ConvertGameData(Engine->gameDataForScene(Std(SceneRef))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+}
+
+TArray<FPatterGameDataEntry> UPatterEngine::GameDataForBlock(const FString& SceneRef, const FString& BlockRef) const
+{
+	if (!Engine) return {};
+	try { return ConvertGameData(Engine->gameDataForBlock(Std(SceneRef), Std(BlockRef))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
 TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FString& Scene, const FString& Block)
@@ -421,6 +603,7 @@ bool UPatterEngine::HotSwap(UPatterBundle* NewBundle)
 		BundleRef = NewBundle;
 		StringsBundleRef = nullptr;
 		RebindFlows(); // the swap rebuilt the flows; the same re-bind the load path needs
+		TapTrace();
 		return true;
 	}
 	catch (const std::exception& Ex)
@@ -537,35 +720,55 @@ void UPatterEngine::SetPropertyFlags(const FString& Ref, const TArray<FString>& 
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
-TArray<FPatterLogEntry> UPatterEngine::Log() const
+static FPatterLogEntry ConvertLogEntry(const patter::LogEntry& E)
 {
-	TArray<FPatterLogEntry> Out;
-	if (!Engine) return Out;
-	for (const patter::LogEntry& E : Engine->log())
+	const auto Verdicts = [](const std::vector<std::pair<std::string, bool>>& List)
 	{
-		FPatterLogEntry Row;
-		Row.Type = Ue(E.type);
-		Row.Seq = E.seq;
-		Row.Flow = Ue(E.flow);
-		Row.Scene = Ue(E.scene);
-		Row.Subject = Ue(E.subject);
-		Row.Picked = Ue(E.picked);
-		Row.Selector = Ue(E.selector);
-		Row.Detail = Ue(E.detail);
-		Row.Value = Ue(E.value.toDisplayString());
-		Row.bHasPrev = E.hasPrev;
-		if (E.hasPrev) Row.Prev = Ue(E.prev.toDisplayString());
-		Row.Kind = Ue(E.kind);
-		Row.Source = Ue(E.source);
-		for (const auto& C : E.considered)
+		TArray<FPatterLogConsidered> Out;
+		for (const auto& C : List)
 		{
 			FPatterLogConsidered Item;
 			Item.Id = Ue(C.first);
 			Item.bEligible = C.second;
-			Row.Considered.Add(Item);
+			Out.Add(Item);
 		}
-		Out.Add(Row);
-	}
+		return Out;
+	};
+	FPatterLogEntry Row;
+	Row.Type = Ue(E.type);
+	Row.Seq = E.seq;
+	Row.Flow = Ue(E.flow);
+	Row.Scene = Ue(E.scene);
+	Row.Group = Ue(E.group);
+	Row.Selector = Ue(E.selector);
+	Row.Order = Ue(E.order);
+	Row.Exhaust = Ue(E.exhaust);
+	Row.Children = Verdicts(E.children);
+	Row.Picked = Ue(E.picked);
+	Row.Options = Verdicts(E.options);
+	Row.Option = Ue(E.option);
+	Row.To = Ue(E.to);
+	Row.Mode = Ue(E.mode);
+	Row.Target = Ue(E.target);
+	if (E.type == "write") Row.Value = Ue(E.value.toDisplayString());
+	Row.bHasPrev = E.hasPrev;
+	if (E.hasPrev) Row.Prev = Ue(E.prev.toDisplayString());
+	Row.Kind = Ue(E.kind);
+	Row.Node = Ue(E.node);
+	Row.Source = Ue(E.source);
+	Row.Message = Ue(E.message);
+	// The deprecated fields, filled as they were, for Blueprints that still read them.
+	Row.Subject = !Row.Group.IsEmpty() ? Row.Group : !Row.To.IsEmpty() ? Row.To : !Row.Target.IsEmpty() ? Row.Target : Row.Node;
+	Row.Considered = Row.Children.Num() ? Row.Children : Row.Options;
+	Row.Detail = !Row.Mode.IsEmpty() ? Row.Mode : Row.Message;
+	return Row;
+}
+
+TArray<FPatterLogEntry> UPatterEngine::Log() const
+{
+	TArray<FPatterLogEntry> Out;
+	if (!Engine) return Out;
+	for (const patter::LogEntry& E : Engine->log()) Out.Add(ConvertLogEntry(E));
 	return Out;
 }
 

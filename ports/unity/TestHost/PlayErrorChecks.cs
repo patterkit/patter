@@ -95,23 +95,23 @@ namespace Patterkit.Patterplay.TestHost
             // `write` entry for a skipped effect.
             var flowLog = engine.GetFlow("main").Log();
             var diags = flowLog.Where(e => e.Type == "diagnostic").ToList();
-            string ShowDiags(IEnumerable<LogEntry> es) => string.Join(" | ", es.Select(e => $"{e.Kind}/{e.Subject}/{e.Source}/{e.Detail}"));
+            string ShowDiags(IEnumerable<LogEntry> es) => string.Join(" | ", es.Select(e => $"{e.Kind}/{e.Node}/{e.Source}/{e.Message}"));
             Check("play-error: a diagnostic log entry per failure", diags.Count == 3
-                && diags[0].Kind == "effect" && diags[0].Subject == "s"
-                && diags[1].Kind == "effect" && diags[1].Subject == "sn_set" && diags[1].Source == "10 / @zero" && diags[1].Detail == "division by zero"
-                && diags[2].Kind == "condition" && diags[2].Subject == "sn_bad" && diags[2].Source == "10 / @zero > 1",
+                && diags[0].Kind == "effect" && diags[0].Node == "s"
+                && diags[1].Kind == "effect" && diags[1].Node == "sn_set" && diags[1].Source == "10 / @zero" && diags[1].Message == "division by zero"
+                && diags[2].Kind == "condition" && diags[2].Node == "sn_bad" && diags[2].Source == "10 / @zero > 1",
                 ShowDiags(diags));
             var engineDiags = engine.Log().Where(e => e.Type == "diagnostic").ToList();
             Check("play-error: the engine's log carries them too, with the flow", engineDiags.Count == 3
                 && engineDiags.All(e => e.Flow == "main") && engineDiags[2].Kind == "condition" && engineDiags[2].Source == "10 / @zero > 1",
                 ShowDiags(engineDiags));
-            var writes = flowLog.Where(e => e.Type == "write").Select(e => e.Subject).ToList();
+            var writes = flowLog.Where(e => e.Type == "write").Select(e => e.Target).ToList();
             Check("play-error: no write entry for a skipped effect", string.Join(",", writes) == "@a,@d", string.Join(",", writes));
             // The branch's select entry records the failed condition as ineligible.
-            var select = flowLog.FirstOrDefault(e => e.Type == "select" && e.Subject == "g_br");
+            var select = flowLog.FirstOrDefault(e => e.Type == "select" && e.Group == "g_br");
             Check("play-error: the failed condition is ineligible in the select entry",
-                select != null && select.Considered.SequenceEqual(new[] { ("sn_bad", false), ("sn_ok", true) }) && select.Picked == "sn_ok",
-                select == null ? "no select entry" : string.Join(",", select.Considered));
+                select != null && select.Children.SequenceEqual(new[] { ("sn_bad", false), ("sn_ok", true) }) && select.Picked == "sn_ok",
+                select == null ? "no select entry" : string.Join(",", select.Children));
 
             // With the log off, nothing is logged, and OnError still hears it.
             var quietErrors = new List<PlayError>();

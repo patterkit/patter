@@ -181,10 +181,27 @@ namespace patter
 
     // ----- gameData merge-at-read (port of gamedata.ts) ------------------------
 
-    inline std::vector<GameDataField> gameDataFieldsFor(const Bundle& bundle, const std::string& kind)
+    // The author-defined gameData fields declared for a node TYPE (empty when none).
+    inline std::vector<GameDataField> gameDataFields(const Bundle& bundle, const std::string& kind)
     {
         auto it = bundle.gameDataFields.find(kind);
         return it != bundle.gameDataFields.end() ? it->second : std::vector<GameDataField>{};
+    }
+
+    [[deprecated("Use gameDataFields, the name every Patterplay runtime uses.")]]
+    inline std::vector<GameDataField> gameDataFieldsFor(const Bundle& bundle, const std::string& kind) { return gameDataFields(bundle, kind); }
+
+    // One node's effective value for a field: its sparse OVERRIDE if present, else the field's declared
+    // default (null if neither is set). `fields` is the schema for the node's type; `node` may be null.
+    inline const PatterValue* gameDataValue(const std::vector<GameDataField>& fields, const GameData* node, const std::string& name)
+    {
+        if (node)
+        {
+            auto it = node->find(name);
+            if (it != node->end()) return &it->second;
+        }
+        for (const auto& fld : fields) if (fld.name == name) return fld.hasDefault ? &fld.def : nullptr;
+        return nullptr;
     }
 
     // A node's FULL effective gameData: declared fields filled (override or default), override-only

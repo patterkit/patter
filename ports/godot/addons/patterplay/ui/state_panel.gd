@@ -121,8 +121,7 @@ func _build_link() -> void:
 		_body.add_child(_hint("Live Link: not attached (PatterDebug.register_link(link))"))
 		return
 	for l in links:
-		var s: Dictionary = l.status()
-		_body.add_child(_hint("Live Link: %s - %s - build %s" % [s["state"], s["url"], s["build"]]))
+		_body.add_child(_hint("Live Link: %s - %s - build %s" % [l.state(), l.url(), l.build()]))
 
 
 func _hint(text: String) -> Label:

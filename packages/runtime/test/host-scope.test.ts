@@ -85,10 +85,20 @@ describe("first-class host scopes", () => {
   it("a host-bound resolver wins over the self-backed bag", () => {
     const bag = new Map<string, number>([["gold", 100]]);
     const flow = new Engine(bundle, {
-      world: { get: (n) => (n === "phase" ? "a2" : bag.get(n)), set: (n, v) => { bag.set(n, v as number); } },
+      hostScopes: { world: { get: (n) => (n === "phase" ? "a2" : bag.get(n)), set: (n, v) => { bag.set(n, v as number); } } },
     }).openFlow("f", { scene: "s" });
     // onEntry read 100 from the host bag, wrote 105 back to it; phase comes from the host too.
     expect(firstLine(flow)).toBe("gold 105 phase a2");
     expect(bag.get("gold")).toBe(105);
+  });
+
+  it("still takes the deprecated `world` option as the world scope", () => {
+    const bag = new Map<string, number>([["gold", 100]]);
+    const engine = new Engine(bundle, {
+      world: { get: (n) => (n === "phase" ? "a2" : bag.get(n)), set: (n, v) => { bag.set(n, v as number); } },
+    });
+    expect(firstLine(engine.openFlow("f", { scene: "s" }))).toBe("gold 105 phase a2");
+    // Bound, so released with the engine like any scope hostScopes binds.
+    engine.hotSwap(bundle);
   });
 });

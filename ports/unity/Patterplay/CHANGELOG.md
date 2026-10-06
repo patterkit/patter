@@ -10,6 +10,18 @@ same runtime behaviour.
 
 - **`PatterSave.LoadState` and `GameDataHelpers.GameDataValue`**, as the other runtimes have: restore a save
   envelope you already hold as a `JObject`, and read one gameData field with its default applied.
+- **`Engine.OnTrace(handler)`**, as the JS runtime has: each decision as it happens, with the flow it happened
+  in, whether the log is on or off. It returns its own unsubscribe. An earlier entry here described `OnTrace`
+  before it existed.
+
+### Changed
+
+- **A log entry has the JS runtime's fields.** `Group`, `Children`, `Options`, `Option`, `To`, `Mode`, `Target`,
+  `Node`, and `Message`, each where that type of entry has it, in place of the shared `Subject`, `Considered`,
+  and `Detail`; and a sequence's select names its `Order` and `Exhaust`, which it did not before. The old three
+  still read as they did, and go in a later release, with one difference: a `chose` entry's option is in
+  `Option`, no longer in `Picked`. The corpus now holds every runtime's log to the same entries.
+- **`Engine.BuildId` is empty, not null, for a bundle compiled without a hash**, as on every other runtime.
 
 ### Deprecated
 

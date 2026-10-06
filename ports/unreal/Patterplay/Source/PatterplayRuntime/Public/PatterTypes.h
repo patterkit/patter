@@ -95,27 +95,29 @@ struct FPatterEngineOptions
 	bool bLog = false;
 };
 
+/** Made in Blueprint for SetProperty: set Kind and the one field it names (bBool, Number, String, or Flags).
+ *  Display is ignored on the way in. */
 USTRUCT(BlueprintType)
 struct FPatterValue
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	EPatterValueKind Kind = EPatterValueKind::Boolean;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	bool bBool = false;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	double Number = 0;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	FString String;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	TArray<FString> Flags;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	FString Display;
 };
 
@@ -136,6 +138,39 @@ struct FPatterGameDataEntry
 	FString Value;
 };
 
+/** A choice option's prompt, as the JS runtime's ChoicePrompt: a line someone speaks or plain text. The
+ *  bHas flags tell an unset field from an empty one. */
+USTRUCT(BlueprintType)
+struct FPatterChoicePrompt
+{
+	GENERATED_BODY()
+
+	/** Line or Text. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	EPatterPromptKind Kind = EPatterPromptKind::Text;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Text;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Character;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasCharacter = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString CharacterName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasCharacterName = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Direction;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasDirection = false;
+};
+
 USTRUCT(BlueprintType)
 struct FPatterOption
 {
@@ -144,13 +179,12 @@ struct FPatterOption
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Id;
 
+	/** The option's prompt, when it has one (bHasPrompt). */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	FString Text;
+	FPatterChoicePrompt Prompt;
 
-	/** The prompt's kind: a Line (Character, CharacterName, and Direction may be set), Text, or None when the
-	 *  option has no prompt (then Text is empty). */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	EPatterPromptKind PromptKind = EPatterPromptKind::None;
+	bool bHasPrompt = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bEligible = false;
@@ -159,14 +193,21 @@ struct FPatterOption
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterGameDataEntry> GameData;
 
-	// The prompt's spoken metadata for a LINE prompt (empty for a text prompt) - mirrors FPatterStep.
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	/** Prompt.Text, from before the prompt was its own value. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Text, as every Patterplay runtime's option has it."))
+	FString Text;
+
+	/** Prompt.Kind, or None without a prompt, from before the prompt was its own value. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Kind and bHasPrompt, as every Patterplay runtime's option has it."))
+	EPatterPromptKind PromptKind = EPatterPromptKind::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Character, as every Patterplay runtime's option has it."))
 	FString Character;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.CharacterName, as every Patterplay runtime's option has it."))
 	FString CharacterName;
 
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Direction, as every Patterplay runtime's option has it."))
 	FString Direction;
 };
 
@@ -194,9 +235,15 @@ struct FPatterLogEntry
 {
 	GENERATED_BODY()
 
-	/** select | choice | chose | dry | jump | write | diagnostic. A diagnostic is a content error the
-	 *  engine played through (see FPatterPlayError): Subject is the node, Detail the message, and Kind and
-	 *  Source say what failed. */
+	/** select | choice | chose | dry | jump | write | diagnostic. The JS runtime's entry under the same
+	 *  field names: Type says which of them an entry carries, and the rest are empty.
+	 *    select:     Group, Selector, Order and Exhaust (a sequence's), Children, Picked (empty when nothing was takeable)
+	 *    choice:     Group, Options
+	 *    chose:      Group, Option
+	 *    dry:        Group
+	 *    jump:       To, Mode
+	 *    write:      Target, Value, Prev (bHasPrev false when there was none)
+	 *    diagnostic: a content error the engine played through (see FPatterPlayError): Kind, Node, Source, Message */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Type;
 
@@ -211,22 +258,41 @@ struct FPatterLogEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Scene;
 
-	/** Group / target / jump destination, whichever the type names. */
+	/** The group a select, choice, chose, or dry entry is about. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	FString Subject;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	TArray<FPatterLogConsidered> Considered;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	FString Picked;
+	FString Group;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Selector;
 
-	/** The jump's mode, where the type is `jump`; the error message, where it is `diagnostic`. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
-	FString Detail;
+	FString Order;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Exhaust;
+
+	/** Every child a select considered, with its verdict: the reasoning, not just the outcome. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterLogConsidered> Children;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Picked;
+
+	/** Every option a choice offered, with the ones a condition greyed out marked. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterLogConsidered> Options;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Option;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString To;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Mode;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Target;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Value;
@@ -237,13 +303,31 @@ struct FPatterLogEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasPrev = false;
 
-	/** A diagnostic's kind: condition | effect | best-match. Empty for every other type. */
+	/** A diagnostic's kind: condition | effect | best-match. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Kind;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Node;
 
 	/** A diagnostic's expression source text, when the bundle carries it. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Source;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Message;
+
+	/** Group, To, Target, or Node, whichever the type names: the field before entries took the JS names. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Group, To, Target, or Node, the fields every Patterplay runtime's entry has."))
+	FString Subject;
+
+	/** Children or Options: the field before entries took the JS names. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Children or Options, the fields every Patterplay runtime's entry has."))
+	TArray<FPatterLogConsidered> Considered;
+
+	/** Mode or Message: the field before entries took the JS names. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Mode or Message, the fields every Patterplay runtime's entry has."))
+	FString Detail;
 };
 
 /** A content error the engine played through, as UPatterEngine::OnError reports it. Content can fail at
@@ -339,11 +423,22 @@ struct FPatterStep
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Character;
 
+	/** Whether the step has a character at all: a line whose speaker is unset reads differently from one
+	 *  whose speaker is empty. Likewise bHasCharacterName and bHasDirection. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasCharacter = false;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString CharacterName;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasCharacterName = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Direction;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasDirection = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterOption> Options;

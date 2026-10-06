@@ -5,8 +5,8 @@
 # and the Unity and Unreal PatterAudioResolver.
 #
 #   var audio := PatterAudioResolver.new(manifest_json, "res://audio")
-#   var path := audio.resolve(step.get("id", ""))   # full path, or "" when the beat has no recording
-#   if path != "": my_player.stream = load(path)
+#   var path = audio.resolve(step.get("id", ""))   # full path, or null when the beat has no recording
+#   if path != null: my_player.stream = load(path)
 class_name PatterAudioResolver
 extends RefCounted
 
@@ -29,9 +29,9 @@ func _init(manifest_json: String, base_path: String) -> void:
 				_files[beat_id] = file
 
 
-# The full path of a beat's winning audio take, or "" when it has none.
-func resolve(beat_id: String) -> String:
+# The full path of a beat's winning audio take, or null when it has none, as on every other runtime.
+func resolve(beat_id: String):
 	if not _files.has(beat_id):
-		return ""
+		return null
 	var file: String = _files[beat_id]
 	return (_base + "/" + file) if _base != "" else file

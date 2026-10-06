@@ -22,6 +22,7 @@ import type { Checkpoint, EngineOptions, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
 import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
+  LogCase,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
 
@@ -304,4 +305,31 @@ export function mulberry32(seed: number): () => number {
   // repo. Same algorithm, same draws; it just lives in one place now.
   const prng = makePrng(seed);
   return () => prng.next();
+}
+
+/**
+ * Play a decision-log case and return what the engine logged, and what `onTrace` handed over with the
+ * log on and with it off (each traced decision as the log entry it matches, less `seq`). As JSON, so an
+ * absent field is absent rather than undefined.
+ */
+export function runLogCase(c: LogCase, maxSteps = 200): { log: unknown[]; tracedOn: unknown[]; tracedOff: unknown[] } {
+  const play = (log: boolean) => {
+    const engine = new Engine(c.bundle, { ...(c.seed !== undefined ? { seed: c.seed } : {}), log });
+    const traced: unknown[] = [];
+    engine.onTrace((flow, event) => traced.push({ ...event, flow }));
+    const flow = engine.openFlow("main", { scene: c.start.scene, ...(c.start.block ? { block: c.start.block } : {}) });
+    const choices = [...(c.choices ?? [])];
+    for (let i = 0; i < maxSteps; i++) {
+      const r = flow.advance();
+      if (r.type === "end") break;
+      if (r.type === "choice") {
+        const pick = choices.shift() ?? r.options.find((o) => o.eligible)?.id;
+        if (pick === undefined) break;
+        flow.choose(pick);
+      }
+    }
+    return { log: JSON.parse(JSON.stringify(engine.log())) as unknown[], traced: JSON.parse(JSON.stringify(traced)) as unknown[] };
+  };
+  const on = play(true);
+  return { log: on.log, tracedOn: on.traced, tracedOff: play(false).traced };
 }

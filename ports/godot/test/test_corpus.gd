@@ -41,6 +41,13 @@ func _initialize() -> void:
 
 	print("saves: %d/%d  (envelopes written by the JS reference, loaded here and continued)" % [sv, root["saves"].size()])
 	_expect_all("saves", sv, root["saves"].size())
+	if not root.has("logs"):
+		push_error("corpus has no logs section")
+		quit(2)
+		return
+	var lg := _run_logs(root["logs"])
+	print("logs: %d/%d  (decision logs, and on_trace streaming the same decisions)" % [lg, root["logs"].size()])
+	_expect_all("logs", lg, root["logs"].size())
 	_run_describe_smoke()
 	_run_host_scope_writable_check()
 
@@ -410,6 +417,80 @@ func _run_runtime(arr: Array) -> int:
 		else:
 			_fail("runtime", name, "transcript mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedTranscript"]), JSON.stringify(transcript)])
 	return pass_count
+
+
+# -- logs ----------------------------------------------------------------------
+
+# Each decision-log case played as a runtime case is, with the log on: the engine's log must match the
+# case entry for entry, and on_trace must hand over the same decisions, in order, with the log on and
+# with it off, and none once unsubscribed.
+func _run_logs(arr: Array) -> int:
+	var pass_count := 0
+	for c in arr:
+		var name: String = c["name"]
+		var on := _play_log_case(c, true)
+		var off := _play_log_case(c, false)
+		var decisions: Array = []
+		for e in c["expectedLog"]:
+			decisions.append(_without_seq(e))
+		if not _deep_equal(on["log"], c["expectedLog"]):
+			_fail("logs", name, "log mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedLog"]), JSON.stringify(on["log"])])
+		elif not _deep_equal(on["traced"], decisions):
+			_fail("logs", name, "on_trace with the log on handed over %s" % JSON.stringify(on["traced"]))
+		elif not _deep_equal(off["traced"], decisions):
+			_fail("logs", name, "on_trace with the log off handed over %s" % JSON.stringify(off["traced"]))
+		elif on["after_stop"] != 0:
+			_fail("logs", name, "a handler was called after its unsubscribe")
+		else:
+			pass_count += 1
+	return pass_count
+
+
+func _without_seq(entry: Dictionary) -> Dictionary:
+	var out := entry.duplicate(true)
+	out.erase("seq")
+	return out
+
+
+func _play_log_case(c: Dictionary, log_on: bool) -> Dictionary:
+	var options := { "log": log_on }
+	if c.has("seed"):
+		var rng := PatterMulberry32.new(int(c["seed"]))
+		options["rng"] = func(): return rng.next()
+	var engine := PatterEngine.new(c["bundle"], options)
+	var traced: Array = []
+	var stop := engine.on_trace(func(flow_id: String, entry: Dictionary) -> void:
+		var e := _without_seq(entry)
+		if flow_id != str(entry.get("flow", "")):
+			e["handedOverAs"] = flow_id
+		traced.append(e))
+	var start: Dictionary = c["start"]
+	var flow := engine.open_flow("main", start["scene"], start.get("block", ""))
+	var scripted: Array = (c.get("choices", []) as Array).duplicate()
+	for i in 200:
+		var step := flow.advance()
+		if step["type"] == "end":
+			break
+		if step["type"] == "choice":
+			var pick := ""
+			if not scripted.is_empty():
+				pick = scripted.pop_front()
+			else:
+				for o in step["options"]:
+					if o["eligible"]:
+						pick = o["id"]
+						break
+			if pick == "":
+				break
+			flow.choose(pick)
+	stop.call()
+	var before := traced.size()
+	engine.open_flow("later", start["scene"], "").advance()
+	var logged: Array = []
+	for e in engine.log():
+		if e.get("flow", "") == "main":
+			logged.append(e)
+	return { "log": logged, "traced": traced, "after_stop": traced.size() - before }
 
 
 # -- scripted ------------------------------------------------------------------

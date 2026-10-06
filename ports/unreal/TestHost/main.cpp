@@ -371,6 +371,116 @@ static int runRuntime(const JsonValue& arr)
     return pass;
 }
 
+// The corpus's decision-log cases. Each is played as a runtime case is, with the log on, and the live
+// tap is held to it: onTrace must hand over exactly the decisions the log keeps, in order, with the log
+// on and with it off, and none once unsubscribed.
+// An entry as the reference writes it: its type's fields under the JS names, an absent field absent, and
+// a select's picked present even when nothing was (null).
+static JsonValue logEntryToJson(const LogEntry& e, bool withSeq = true)
+{
+    JsonValue o = JsonValue::Obj();
+    o.set("type", JsonValue::Str(e.type));
+    if (!e.flow.empty()) o.set("flow", JsonValue::Str(e.flow));
+    if (withSeq) o.set("seq", JsonValue::Num(e.seq));
+    if (!e.scene.empty()) o.set("scene", JsonValue::Str(e.scene));
+    const auto verdicts = [](const std::vector<std::pair<std::string, bool>>& list)
+    {
+        JsonValue a = JsonValue::Arr();
+        for (const auto& c : list) { JsonValue v = JsonValue::Obj(); v.set("id", JsonValue::Str(c.first)); v.set("eligible", JsonValue::Boolean(c.second)); a.push(v); }
+        return a;
+    };
+    if (e.type == "select")
+    {
+        o.set("group", JsonValue::Str(e.group)); o.set("selector", JsonValue::Str(e.selector));
+        if (!e.order.empty()) o.set("order", JsonValue::Str(e.order));
+        if (!e.exhaust.empty()) o.set("exhaust", JsonValue::Str(e.exhaust));
+        o.set("children", verdicts(e.children));
+        o.set("picked", e.picked.empty() ? JsonValue() : JsonValue::Str(e.picked));
+    }
+    else if (e.type == "choice") { o.set("group", JsonValue::Str(e.group)); o.set("options", verdicts(e.options)); }
+    else if (e.type == "chose") { o.set("group", JsonValue::Str(e.group)); o.set("option", JsonValue::Str(e.option)); }
+    else if (e.type == "dry") o.set("group", JsonValue::Str(e.group));
+    else if (e.type == "jump") { o.set("to", JsonValue::Str(e.to)); o.set("mode", JsonValue::Str(e.mode)); }
+    else if (e.type == "write")
+    {
+        o.set("target", JsonValue::Str(e.target)); o.set("value", valueToJson(e.value));
+        if (e.hasPrev) o.set("prev", valueToJson(e.prev));
+    }
+    else if (e.type == "diagnostic")
+    {
+        o.set("kind", JsonValue::Str(e.kind)); o.set("node", JsonValue::Str(e.node));
+        if (!e.source.empty()) o.set("source", JsonValue::Str(e.source));
+        o.set("message", JsonValue::Str(e.message));
+    }
+    return o;
+}
+
+static std::string traceKey(const LogEntry& e) { return dump(logEntryToJson(e, false)); }
+
+struct LogRun { std::vector<std::string> logged, traced; JsonValue shaped = JsonValue::Arr(); size_t afterStop = 0; };
+
+static LogRun playLogCase(const JsonValue& c, bool log)
+{
+    Bundle bundle = parseBundle(c.at("bundle"));
+    EngineOptions opts;
+    opts.log = log;
+    std::shared_ptr<Mulberry32> rng;
+    if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(seed->num); opts.rng = [rng]() { return rng->next(); }; }
+    Engine engine(bundle, opts);
+    LogRun run;
+    auto stop = engine.onTrace([&run](const std::string& flow, const LogEntry& e)
+        { run.traced.push_back(flow == e.flow ? traceKey(e) : "handed over as " + flow + ", entry says " + e.flow); });
+    const JsonValue& start = c.at("start");
+    std::string startBlock;
+    if (const JsonValue* bl = start.find("block")) startBlock = bl->str;
+    Flow* flow = engine.openFlow("main", start.at("scene").str, startBlock);
+    std::queue<std::string> scripted;
+    if (const JsonValue* ch = c.find("choices")) for (const auto& x : ch->arr) scripted.push(x.str);
+    for (int i = 0; i < 200; ++i)
+    {
+        StepResult step = flow->advance();
+        if (step.type == StepType::End) break;
+        if (step.type == StepType::Choice)
+        {
+            std::string pick;
+            if (!scripted.empty()) { pick = scripted.front(); scripted.pop(); }
+            else for (auto& o : step.options) if (o.eligible) { pick = o.id; break; }
+            if (pick.empty()) break;
+            flow->choose(pick);
+        }
+    }
+    stop();
+    const size_t before = run.traced.size();
+    engine.openFlow("later", start.at("scene").str, "")->advance();
+    run.afterStop = run.traced.size() - before;
+    for (const LogEntry& e : engine.log())
+        if (e.flow == "main") { run.logged.push_back(traceKey(e)); run.shaped.push(logEntryToJson(e)); }
+    return run;
+}
+
+static int runLogs(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        std::string name = c.at("name").str;
+        try
+        {
+            LogRun on = playLogCase(c, true), off = playLogCase(c, false);
+            if (!matchValue(on.shaped, c.at("expectedLog")))
+                fail("logs", name, "log mismatch\n    expected " + dump(c.at("expectedLog")) + "\n    got      " + dump(on.shaped));
+            else if (on.traced != on.logged)
+                fail("logs", name, "onTrace with the log on handed over " + std::to_string(on.traced.size()) + " decisions, the log kept " + std::to_string(on.logged.size()) + ", or they differ");
+            else if (off.traced != on.logged)
+                fail("logs", name, "onTrace with the log off handed over " + std::to_string(off.traced.size()) + " decisions, the log kept " + std::to_string(on.logged.size()) + ", or they differ");
+            else if (on.afterStop != 0) fail("logs", name, "a handler was called after its unsubscribe");
+            else ++pass;
+        }
+        catch (const std::exception& ex) { fail("logs", name, ex.what()); }
+    }
+    return pass;
+}
+
 static int envelopeRoundTrips = 0;
 static int gameDataReads = 0;   // expectGameData ops that ran and matched
 
@@ -619,7 +729,15 @@ static int runGameData(const JsonValue& arr)
             std::string kind = c.at("kind").str;
             std::shared_ptr<GameData> node;
             if (const JsonValue* n = c.find("node")) node = parseGameData(*n);
-            auto effective = effectiveGameData(gameDataFieldsFor(bundle, kind), node.get());
+            const std::vector<GameDataField> fields = gameDataFields(bundle, kind);
+            auto effective = effectiveGameData(fields, node.get());
+            // gameDataValue agrees with the merge, field by field.
+            for (const auto& p : effective)
+            {
+                const PatterValue* v = gameDataValue(fields, node.get(), p.first);
+                if (!v || valueToJson(*v).str != valueToJson(p.second).str || v->kind != p.second.kind)
+                    throw std::runtime_error("gameDataValue disagrees with effectiveGameData on " + p.first);
+            }
             JsonValue produced = JsonValue::Obj();
             for (auto& p : effective) produced.set(p.first, valueToJson(p.second));
             if (matchValue(produced, c.at("expected"))) ++pass;
@@ -676,10 +794,10 @@ static void runTraceLogSmoke()
     const LogEntry* sel = nullptr;
     for (const auto& e : flow->log()) if (e.type == "select") { sel = &e; break; }
     if (!sel) { fail("trace", "select", "the skip past an ineligible sibling was not recorded"); return; }
-    if (sel->considered.size() != 2)
+    if (sel->children.size() != 2)
         fail("trace", "reasoning", "the select does not name both children it walked");
-    else if (sel->considered[0].first != "sn_gated" || sel->considered[0].second
-          || sel->considered[1].first != "sn_open" || !sel->considered[1].second)
+    else if (sel->children[0].first != "sn_gated" || sel->children[0].second
+          || sel->children[1].first != "sn_open" || !sel->children[1].second)
         fail("trace", "reasoning", "the select does not say WHICH sibling was dropped");
     if (sel->picked != "sn_open") fail("trace", "picked", "the pick was not recorded");
 
@@ -1720,17 +1838,17 @@ static void runPlayErrorCases()
         for (const LogEntry& e : engine.log())
         {
             if (e.type == "diagnostic") diagnostics.push_back(&e);
-            if (e.type == "write") writes.push_back(e.subject);
+            if (e.type == "write") writes.push_back(e.target);
         }
         need(diagnostics.size() == errors.size() && !errors.empty(),
             "expected one diagnostic entry per report (" + std::to_string(errors.size()) + "), got " + std::to_string(diagnostics.size()));
         for (size_t i = 0; i < errors.size(); ++i)
         {
             const LogEntry& d = *diagnostics[i];
-            if (d.kind != errors[i].kind || d.subject != errors[i].node || d.source != errors[i].source || d.detail != errors[i].message
+            if (d.kind != errors[i].kind || d.node != errors[i].node || d.source != errors[i].source || d.message != errors[i].message
                 || d.flow != "main" || d.scene != "s")
-                throw std::runtime_error("diagnostic " + std::to_string(i) + " does not match its report: kind=" + d.kind + " subject=" + d.subject
-                    + " source=" + d.source + " detail=" + d.detail + " flow=" + d.flow);
+                throw std::runtime_error("diagnostic " + std::to_string(i) + " does not match its report: kind=" + d.kind + " node=" + d.node
+                    + " source=" + d.source + " message=" + d.message + " flow=" + d.flow);
         }
         // Only the two effects that landed are writes: @a and @d. Not @c, and not the scene's @e.
         need(joined(writes) == "[@a, @d]", "the write entries should be @a and @d only, got " + joined(writes));
@@ -1771,7 +1889,7 @@ static void runPlayErrorCases()
         const PatterValue* clock = engine.getProperty("@world.clock");
         need(clock && clock->s == "day", "the refused write changed @world.clock");
         for (const LogEntry& e : engine.log())
-            need(!(e.type == "write" && e.subject == "@world.clock"), "a refused write left a write entry");
+            need(!(e.type == "write" && e.target == "@world.clock"), "a refused write left a write entry");
     });
 
     std::cout << "  [play-errors] content errors played through and reported: " << g_playErrPass << "/" << g_playErrTotal << "\n";
@@ -2226,6 +2344,11 @@ int main(int argc, char** argv)
     int sv = runSaves(*savesArr);
     std::cout << "  [saves] envelopes written by the JS reference, loaded here + continued: " << sv << "/" << savesArr->arr.size() << "\n";
     if (sv != static_cast<int>(savesArr->arr.size())) fail("saves", "section total", std::to_string(sv) + " of " + std::to_string(savesArr->arr.size()) + " passed");
+    const JsonValue* logsArr = root.find("logs");
+    if (!logsArr) { std::cerr << "corpus has no logs section\n"; return 2; }
+    int lg = runLogs(*logsArr);
+    std::cout << "  [logs] decision logs, and onTrace streaming the same decisions: " << lg << "/" << logsArr->arr.size() << "\n";
+    if (lg != static_cast<int>(logsArr->arr.size())) fail("logs", "section total", std::to_string(lg) + " of " + std::to_string(logsArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
     runKernelErrorCases();

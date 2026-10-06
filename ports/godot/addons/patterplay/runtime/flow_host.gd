@@ -19,6 +19,13 @@ extends RefCounted
 ## The run's decision trace (engine.log()). Off unless asked for: a shipped game should pay nothing
 ## for a surface it never reads.
 var log_enabled: bool = false
+## True when anything takes the decisions: the log, or an engine.on_trace handler. Flows skip building
+## entries otherwise.
+var tracing: bool = false
+## The engine's live taps (engine.on_trace), each [id, handler]. The game's own Callables: nothing here
+## closes over the engine, so they make no cycle.
+var trace_handlers: Array = []
+var next_trace_handler: int = 0
 ## Godot only, standing in for JS's emitEngine: the ENGINE's log Array itself, which a flow appends
 ## to directly, since a callback would have to close over the engine (see the top of this file).
 var engine_log: Array = []

@@ -190,7 +190,7 @@ describe("one registry per game: Patter", () => {
     expect(() => new Engine(bundle, { registry })).toThrow("scope '@patter' is already registered by Patter");
 
     const withWorld = new ScopeRegistry().defineOwned("world", [], { owner: "Game" });
-    expect(() => new Engine(bundle, { registry: withWorld, world: { get: () => 0 } }))
+    expect(() => new Engine(bundle, { registry: withWorld, hostScopes: { world: { get: () => 0 } } }))
       .toThrow("scope '@world' is already registered by Game");
     expect(withWorld.has("patter")).toBe(false); // the half-built engine took nothing with it
   });

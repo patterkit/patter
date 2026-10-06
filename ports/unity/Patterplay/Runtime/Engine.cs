@@ -174,11 +174,18 @@ namespace Patterkit.Patterplay
             => $"{Kind} on {Node} in flow '{Flow}' failed, played through: {Message}";
     }
 
-    /// <summary>One retained decision: what the engine chose and why, not what it produced.
-    /// `Type` is select | choice | chose | dry | jump | write | diagnostic; `Seq` is monotonic
-    /// across the flow and survives ClearLog. Parity with the JS runtime's LogEntry. A `diagnostic`
-    /// entry is a content error the engine played through (see <see cref="PlayError"/>): its node is the
-    /// Subject, its message the Detail, and Kind and Source say what failed.</summary>
+    /// <summary>One retained decision: what the engine chose and why, not what it produced. The JS runtime's
+    /// LogEntry, under the same field names: `Type` says which of them an entry carries, and the rest are
+    /// null. `Seq` is monotonic across the flow and survives ClearLog.
+    /// <list type="bullet">
+    /// <item>select: Group, Selector, Order and Exhaust (a sequence's), Children, Picked (null when nothing was takeable)</item>
+    /// <item>choice: Group, Options</item>
+    /// <item>chose: Group, Option</item>
+    /// <item>dry: Group</item>
+    /// <item>jump: To, Mode</item>
+    /// <item>write: Target, Value, Prev (null when there was none)</item>
+    /// <item>diagnostic: a content error the engine played through (see <see cref="PlayError"/>): Kind, Node, Source, Message</item>
+    /// </list></summary>
     public sealed class LogEntry
     {
         public string Type;
@@ -187,20 +194,40 @@ namespace Patterkit.Patterplay
         /// <summary>The flow this happened in. Set on the ENGINE's stream, where a run is
         /// several flows in one order; null on a flow's own log, which already says whose it is.</summary>
         public string Flow;
-        /// <summary>Group / target / jump destination, whichever the type names.</summary>
-        public string Subject;
-        /// <summary>Every child or option considered, with its verdict: the REASONING, not
-        /// just the outcome. "Why is my line missing" is only answerable from this.</summary>
-        public List<(string Id, bool Eligible)> Considered;
-        public string Picked;
+
+        /// <summary>The group a select, choice, chose, or dry entry is about.</summary>
+        public string Group;
         public string Selector;
+        public string Order;
+        public string Exhaust;
+        /// <summary>Every child a select considered, with its verdict: the REASONING, not just the outcome.
+        /// "Why is my line missing" is only answerable from this.</summary>
+        public List<(string Id, bool Eligible)> Children;
+        public string Picked;
+        /// <summary>Every option a choice offered, with the ones a condition greyed out marked.</summary>
+        public List<(string Id, bool Eligible)> Options;
+        public string Option;
+        public string To;
+        public string Mode;
+        public string Target;
         public ExprValue Value;
         public ExprValue Prev;
-        public string Detail;
-        /// <summary>A `diagnostic` entry's <see cref="PlayError.Kind"/>: condition | effect | best-match.</summary>
+        /// <summary>A diagnostic's <see cref="PlayError.Kind"/>: condition | effect | best-match.</summary>
         public string Kind;
-        /// <summary>A `diagnostic` entry's expression source, when the bundle carries it.</summary>
+        public string Node;
+        /// <summary>A diagnostic's expression source, when the bundle carries it.</summary>
         public string Source;
+        public string Message;
+
+        [Obsolete("Use Group, To, Target, or Node, the fields every Patterplay runtime's entry has.")]
+        public string Subject => Group ?? To ?? Target ?? Node;
+        [Obsolete("Use Children or Options, the fields every Patterplay runtime's entry has.")]
+        public List<(string Id, bool Eligible)> Considered => Children ?? Options;
+        [Obsolete("Use Mode or Message, the fields every Patterplay runtime's entry has.")]
+        public string Detail => Mode ?? Message;
+
+        /// <summary>A copy, for the engine's stream.</summary>
+        internal LogEntry Copy() => (LogEntry)MemberwiseClone();
     }
 
     /// <summary>What an open checkpoint records: how to undo each change, newest last. Each piece of state
@@ -229,8 +256,13 @@ namespace Patterkit.Patterplay
 
     internal sealed class FlowHost
     {
-        /// <summary>True when the run asked for a log; flows skip building entries otherwise.</summary>
+        /// <summary>True when the run asked for a log.</summary>
         public bool LogEnabled;
+        /// <summary>True when anything takes the decisions: the log, or an Engine.OnTrace handler. Flows skip
+        /// building entries otherwise.</summary>
+        public bool Tracing;
+        /// <summary>The engine's live taps (Engine.OnTrace), each called with the flow id and the entry.</summary>
+        public readonly List<Action<string, LogEntry>> TraceHandlers = new List<Action<string, LogEntry>>();
         /// <summary>The engine's ordered stream, shared by reference so a flow appends to it
         /// without holding the engine (which would be a cycle).</summary>
         public List<LogEntry> EngineLog;
@@ -333,6 +365,20 @@ namespace Patterkit.Patterplay
         /// <summary>Drop the retained entries. Seq does NOT restart, so two reads either side of
         /// a clear still agree about what came first.</summary>
         public void ClearLog() => _engineLog.Clear();
+
+        /// <summary>Live tap on the run's decisions, for tooling that wants them as they happen rather than
+        /// retained: each is handed over with the flow it happened in, with the log on or off. Returns its
+        /// own unsubscribe.</summary>
+        public Action OnTrace(Action<string, LogEntry> handler)
+        {
+            _host.TraceHandlers.Add(handler);
+            _host.Tracing = true;
+            return () =>
+            {
+                _host.TraceHandlers.Remove(handler);
+                _host.Tracing = _host.LogEnabled || _host.TraceHandlers.Count > 0;
+            };
+        }
 
         public Engine(Bundle bundle, EngineOptions options = null)
         {
@@ -448,6 +494,7 @@ namespace Patterkit.Patterplay
             _host = new FlowHost
             {
                 LogEnabled = options.Log,
+                Tracing = options.Log,
                 EngineLog = _engineLog,
                 OnDryChoice = options.OnDryChoice,
                 OnError = options.OnError,
@@ -554,7 +601,7 @@ namespace Patterkit.Patterplay
 
         /// <summary>The compiled bundle's build hash (content.hash). Pass it to PatterDebugLink so Patterpad's
         /// live debug link can tell whether the running game matches the open project (in-sync vs stale).</summary>
-        public string BuildId => _host.Bundle?.ContentHash;
+        public string BuildId => _host.Bundle?.ContentHash ?? "";
 
         /// <summary>Whether closed captions are currently shown (full dialogue text).</summary>
         public bool ClosedCaptions => _host.CaptionsOn;

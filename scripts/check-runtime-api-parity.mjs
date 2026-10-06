@@ -48,7 +48,8 @@ const DECL = {
   unity: (n) => new RegExp(`\\b(public|internal)\\b[^;\\n]*\\b${n}\\s*[({=]`), // method or expression-bodied property
   godot: (n) => new RegExp(`\\n(static\\s+)?func\\s+${n}\\s*\\(`),
   unreal: (n) => new RegExp(`\\b${n}\\s*\\(`),
-  bp: (n) => new RegExp(`\\b${n}\\s*\\(`),
+  // A UFUNCTION, or a BlueprintAssignable event (`FPatterTraceEvent OnTrace;`).
+  bp: (n) => new RegExp(`\\b${n}\\s*[(;]`),
 };
 
 // The public runtime API. One row per member; the value is that runtime's spelling, or `null` where
@@ -58,8 +59,7 @@ const API = [
   // --- playing a flow -------------------------------------------------------
   { on: "Flow", js: "advance", unity: "Advance", godot: "advance", unreal: "advance", bp: "Advance" },
   { on: "Flow", js: "advanceToStop", unity: "AdvanceToStop", godot: "advance_to_stop", unreal: "advanceToStop", bp: "AdvanceToStop" },
-  { on: "Flow", js: "getChoices", unity: "GetChoices", godot: "get_choices", unreal: "getChoices", bp: null,
-    why: "Blueprint reads the options off the choice step instead" },
+  { on: "Flow", js: "getChoices", unity: "GetChoices", godot: "get_choices", unreal: "getChoices", bp: "GetChoices" },
   { on: "Flow", js: "choose", unity: "Choose", godot: "choose", unreal: "choose", bp: "Choose" },
   { on: "Flow", js: "isEnded", unity: "IsEnded", godot: "is_ended", unreal: "isEnded", bp: "IsEnded" },
   { on: "Flow", js: "currentScene", unity: "CurrentScene", godot: "current_scene", unreal: "currentScene", bp: "CurrentScene" },
@@ -72,10 +72,14 @@ const API = [
   { on: "Flow", js: "restore", unity: "Restore", godot: "restore", unreal: "restore", bp: null,
     why: "Blueprint saves the whole engine (SaveGame); a single flow's snapshot is for C++ hosts" },
   { on: "Flow", js: "isClosed", unity: "IsClosed", godot: "is_closed", unreal: "isClosed", bp: "IsClosed" },
+  { on: "Flow", js: "reset", unity: "Reset", godot: "reset", unreal: "reset", bp: "Reset" },
+  { on: "Flow", js: "interpolate", unity: "Interpolate", godot: "interpolate", unreal: "interpolate", bp: "Interpolate" },
+  { on: "Flow", js: "stripCaptions", unity: "StripCaptions", godot: "strip_captions", unreal: "stripCaptions", bp: "StripCaptions" },
   { on: "Engine", js: "runFlow", unity: "RunFlow", godot: "run_flow", unreal: "runFlow", bp: "RunFlow" },
 
   // --- flow lifecycle -------------------------------------------------------
   { on: "Engine", js: "openFlow", unity: "OpenFlow", godot: "open_flow", unreal: "openFlow", bp: "OpenFlow" },
+  { on: "Engine", js: "flows", unity: "Flows", godot: "flows", unreal: "flows", bp: "Flows" },
   { on: "Engine", js: "getFlow", unity: "GetFlow", godot: "get_flow", unreal: "getFlow", bp: "GetFlow" },
   { on: "Engine", js: "closeFlow", unity: "CloseFlow", godot: "close_flow", unreal: "closeFlow", bp: "CloseFlow" },
   { on: "Engine", js: "reset", unity: "Reset", godot: "reset", unreal: "reset", bp: "Reset" },
@@ -84,13 +88,14 @@ const API = [
   { on: "Engine", js: "checkpoint", unity: "Checkpoint", godot: "checkpoint", unreal: "checkpoint", bp: "Checkpoint" },
   { on: "Engine", js: "rollback", unity: "Rollback", godot: "rollback", unreal: "rollback", bp: "Rollback" },
   { on: "Engine", js: "commit", unity: "Commit", godot: "commit", unreal: "commit", bp: "Commit" },
-  { on: "Engine", js: "inCheckpoint", unity: "InCheckpoint", godot: "in_checkpoint", unreal: "inCheckpoint", bp: "IsInCheckpoint" },
+  { on: "Engine", js: "inCheckpoint", unity: "InCheckpoint", godot: "in_checkpoint", unreal: "inCheckpoint", bp: "InCheckpoint" },
 
   // --- state ----------------------------------------------------------------
-  { on: "Engine", js: "getProperty", unity: "GetProperty", godot: "get_property", unreal: "getProperty", bp: null,
-    why: "Blueprint has typed accessors (GetPropertyNumber / String / Bool)" },
-  { on: "Engine", js: "setProperty", unity: "SetProperty", godot: "set_property", unreal: "setProperty", bp: null,
-    why: "Blueprint has typed setters" },
+  // On the engine and on a flow (whose reach includes @scene); one row covers both spellings here.
+  { on: "Engine", js: "getProperty", unity: "GetProperty", godot: "get_property", unreal: "getProperty", bp: "GetProperty" },
+  { on: "Engine", js: "setProperty", unity: "SetProperty", godot: "set_property", unreal: "setProperty", bp: "SetProperty" },
+  { on: "Engine", js: "listBags", unity: "ListBags", godot: "list_bags", unreal: "listBags", bp: null,
+    why: "it hands back the kernel's live property bags, which have no Blueprint type; ListProperties is Blueprint's read of the same state" },
   { on: "Engine", js: "listProperties", unity: "ListProperties", godot: "list_properties", unreal: "listProperties", bp: "ListProperties" },
   { on: "Engine", js: "saveGame", unity: "SaveGame", godot: "save_game", unreal: "saveGame", bp: null,
     why: "Blueprint saves via the PatterSave helper" },
@@ -98,23 +103,17 @@ const API = [
     why: "Blueprint loads via the PatterSave helper" },
 
   // --- addressing + introspection ------------------------------------------
-  { on: "Engine", js: "sceneAddress", unity: "SceneAddress", godot: "scene_address", unreal: "sceneAddress", bp: null,
-    why: "not yet surfaced to Blueprint" },
-  { on: "Engine", js: "blockAddress", unity: "BlockAddress", godot: "block_address", unreal: "blockAddress", bp: null,
-    why: "not yet surfaced to Blueprint" },
-  { on: "Engine", js: "getOutline", unity: "GetOutline", godot: "get_outline", unreal: "listOutline", bp: "GetOutline" },
-  { on: "Engine", js: "getBeatSequence", unity: "GetBeatSequence", godot: "get_beat_sequence", unreal: "beatSequence", bp: "GetBeatSequence" },
+  { on: "Engine", js: "sceneAddress", unity: "SceneAddress", godot: "scene_address", unreal: "sceneAddress", bp: "SceneAddress" },
+  { on: "Engine", js: "blockAddress", unity: "BlockAddress", godot: "block_address", unreal: "blockAddress", bp: "BlockAddress" },
+  { on: "Engine", js: "getOutline", unity: "GetOutline", godot: "get_outline", unreal: "getOutline", bp: "GetOutline" },
+  { on: "Engine", js: "getBeatSequence", unity: "GetBeatSequence", godot: "get_beat_sequence", unreal: "getBeatSequence", bp: "GetBeatSequence" },
   { on: "Engine", js: "tagsForBeat", unity: "TagsForBeat", godot: "tags_for_beat", unreal: "tagsForBeat", bp: "TagsForBeat" },
-  { on: "Engine", js: "tagsForScene", unity: "TagsForScene", godot: "tags_for_scene", unreal: "tagsForScene", bp: null,
-    why: "not yet surfaced to Blueprint" },
-  { on: "Engine", js: "tagsForBlock", unity: "TagsForBlock", godot: "tags_for_block", unreal: "tagsForBlock", bp: null,
-    why: "not yet surfaced to Blueprint" },
+  { on: "Engine", js: "tagsForScene", unity: "TagsForScene", godot: "tags_for_scene", unreal: "tagsForScene", bp: "TagsForScene" },
+  { on: "Engine", js: "tagsForBlock", unity: "TagsForBlock", godot: "tags_for_block", unreal: "tagsForBlock", bp: "TagsForBlock" },
   // Scene / block gameData: the node's own raw overrides by address, corpus-gated by the
   // `expectGameData` script op.
-  { on: "Engine", js: "gameDataForScene", unity: "GameDataForScene", godot: "game_data_for_scene", unreal: "gameDataForScene", bp: null,
-    why: "not yet surfaced to Blueprint" },
-  { on: "Engine", js: "gameDataForBlock", unity: "GameDataForBlock", godot: "game_data_for_block", unreal: "gameDataForBlock", bp: null,
-    why: "not yet surfaced to Blueprint" },
+  { on: "Engine", js: "gameDataForScene", unity: "GameDataForScene", godot: "game_data_for_scene", unreal: "gameDataForScene", bp: "GameDataForScene" },
+  { on: "Engine", js: "gameDataForBlock", unity: "GameDataForBlock", godot: "game_data_for_block", unreal: "gameDataForBlock", bp: "GameDataForBlock" },
 
   // Cast: who is declared, and who speaks in a scope. Static structure queries, corpus-gated by the
   // `expectCast` script op (declaration order for the project, first-appearance order for a scope).
@@ -127,7 +126,7 @@ const API = [
   // A BUNDLE-level function on every surface, deliberately not an Engine method: it answers what a
   // game may call on an imported asset, with nothing running. Spelled as a free function where the
   // language has them and as a static on a holder where it does not.
-  { on: "Bundle", js: "describeBundle", unity: "Describe", godot: "describe_bundle", unreal: "describeBundle", bp: null,
+  { on: "Bundle", js: "describeBundle", unity: "DescribeBundle", godot: "describe_bundle", unreal: "describeBundle", bp: null,
     why: "the Unreal view is an IDetailCustomization in C++; no Blueprint node consumes a description" },
   //
   // And the VIEW that draws it, one idiom probe per engine. These are not one member under four
@@ -137,9 +136,15 @@ const API = [
   { on: "BundleView", js: "createBundleInspector", unity: "OnInspectorGUI", godot: "_can_handle", unreal: "CustomizeDetails", bp: null,
     why: "the details customisation IS the Unreal view; a Blueprint node would be a second surface for the same read" },
 
+  // --- the decision log --------------------------------------------------------
+  // On the engine and on a flow; one row covers both spellings here.
+  { on: "Engine", js: "log", unity: "Log", godot: "log", unreal: "log", bp: "Log" },
+  { on: "Engine", js: "clearLog", unity: "ClearLog", godot: "clear_log", unreal: "clearLog", bp: "ClearLog" },
+  { on: "Engine", js: "onTrace", unity: "OnTrace", godot: "on_trace", unreal: "onTrace", bp: "OnTrace" },
+
   // --- save envelope + state logger (dev tools; parity brief B1/B2) ---------
-  { on: "Save", js: "serializeState", unity: "SerializeState", godot: "serialize_state", unreal: "serializeState", bp: "SaveStateToJson" },
-  { on: "Save", js: "deserializeState", unity: "DeserializeState", godot: "deserialize_state", unreal: "deserializeState", bp: "LoadStateFromJson" },
+  { on: "Save", js: "serializeState", unity: "SerializeState", godot: "serialize_state", unreal: "serializeState", bp: "SerializeState" },
+  { on: "Save", js: "deserializeState", unity: "DeserializeState", godot: "deserialize_state", unreal: "deserializeState", bp: "DeserializeState" },
   { on: "Logger", js: "snapshotState", unity: "SnapshotState", godot: "snapshot_state", unreal: "snapshotState", bp: null,
     why: "dev tool; Blueprint users watch state in the editor panel" },
   { on: "Logger", js: "diffState", unity: "DiffState", godot: "diff_state", unreal: "diffState", bp: null,
@@ -148,10 +153,13 @@ const API = [
     godotWhy: true, why: "Godot: PatterStateLogger.new() IS the constructor; Unreal: patter::StateLogger(engine, sink, label) likewise; Blueprint as above" },
 
   // --- live refresh + presentation -----------------------------------------
+  { on: "Engine", js: "locale", unity: "Locale", godot: "locale", unreal: "locale", bp: "Locale" },
   { on: "Engine", js: "setLocale", unity: "SetLocale", godot: "set_locale", unreal: "setLocale", bp: "SetLocale" },
+  { on: "Engine", js: "isSourceDebug", unity: "IsSourceDebug", godot: "is_source_debug", unreal: "isSourceDebug", bp: "IsSourceDebug" },
+  { on: "Engine", js: "closedCaptions", unity: "ClosedCaptions", godot: "closed_captions", unreal: "closedCaptions", bp: "ClosedCaptions" },
   { on: "Engine", js: "setClosedCaptions", unity: "SetClosedCaptions", godot: "set_closed_captions", unreal: "setClosedCaptions", bp: "SetClosedCaptions" },
-  { on: "Engine", js: "replaceStrings", unity: "ReplaceStrings", godot: "replace_strings", unreal: "replaceStrings", bp: null,
-    why: "Blueprint refreshes through the debug link" },
+  { on: "Engine", js: "hotSwap", unity: "HotSwap", godot: "hot_swap", unreal: "hotSwap", bp: "HotSwap" },
+  { on: "Engine", js: "replaceStrings", unity: "ReplaceStrings", godot: "replace_strings", unreal: "replaceStrings", bp: "ReplaceStrings" },
 ];
 
 const sources = Object.fromEntries(

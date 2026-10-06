@@ -94,8 +94,9 @@ func _shared_visits(nid):
 	return _host.shared_visits.get(nid, 0)
 
 
-func current_scene() -> String:
-	return _current_scene_id
+## The scene the flow is in, or null before it enters one, as on every other runtime.
+func current_scene():
+	return null if _current_scene_id == "" else _current_scene_id
 
 
 # The stage ladder of "@scope.name" when it is a declared quality, else null. Names compare
@@ -273,24 +274,27 @@ func clear_log() -> void:
 ## Record one decision, on this flow's log and the engine's. Cheap with logging off: the
 ## entry is never built.
 func _emit(event: Dictionary) -> void:
-	if not _host.log_enabled:
+	if not _host.tracing:
 		return
 	var scene = _current_scene_id if _current_scene_id != "" else null
 	var entry := event.duplicate()
-	entry["seq"] = _seq
-	_seq += 1
 	if scene != null:
 		entry["scene"] = scene
-	_log.append(entry)
-	# The engine's stream is the same Array instance, appended to directly: a callback
-	# would have to close over the engine, and that cycle is what test_debug_registry
-	# refuses. Each entry names its flow, since a run is several flows in one order.
-	var shared: Array = _host.engine_log
 	var wide := entry.duplicate()
 	wide["flow"] = id
-	wide["seq"] = _host.engine_log_seq
-	_host.engine_log_seq += 1
-	shared.append(wide)
+	if _host.log_enabled:
+		entry["seq"] = _seq
+		_seq += 1
+		_log.append(entry)
+		# The engine's stream is the same Array instance, appended to directly: a callback
+		# would have to close over the engine, and that cycle is what test_debug_registry
+		# refuses. Each entry names its flow, since a run is several flows in one order.
+		wide["seq"] = _host.engine_log_seq
+		_host.engine_log_seq += 1
+		_host.engine_log.append(wide)
+	# A copy: a handler may unsubscribe itself, or another, while being called.
+	for h in _host.trace_handlers.duplicate():
+		h[1].call(id, wide)
 
 
 func get_choices() -> Array:
@@ -584,7 +588,7 @@ func _settle() -> void:
 		var _from: int = frame["index"]
 		while frame["index"] < children.size() and not _eligible(children[frame["index"]]):
 			frame["index"] += 1
-		if _host.log_enabled and frame["index"] != _from:
+		if _host.tracing and frame["index"] != _from:
 			var seen: Array = []
 			for i in range(_from, mini(frame["index"] + 1, children.size())):
 				seen.append({"id": children[i]["id"], "eligible": i == frame["index"]})
@@ -953,7 +957,7 @@ func _run_effects(effects: Array, owner: String) -> void:
 			continue
 		# `prev` read before the write, so a reader can say "0 -> 1" in one pass. Only
 		# paid for when the run asked for a log.
-		var prev = get_property(e["target"]) if _host.log_enabled else null
+		var prev = get_property(e["target"]) if _host.tracing else null
 		# The STORY writes: a read-only host property refuses it, and a refused write is a failed effect.
 		var refused := _write_property(e["target"], v, false)
 		if refused != "":

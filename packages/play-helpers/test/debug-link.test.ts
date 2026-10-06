@@ -117,3 +117,27 @@ describe("a link with no editor on the other end", () => {
     expect(kinds(sent)).toEqual(["hello", "flowOpen", "frame"]);
   });
 });
+
+describe("the debug link says what it is doing, as on every other runtime", () => {
+  it("reports its state, build, and address", () => {
+    const { Sock } = fakeSocket();
+    const link = createDebugLink({ build: "b1", url: "ws://127.0.0.1:4999", WebSocket: Sock as never });
+    expect(link.state).toBe("connected");
+    expect(link.url).toBe("ws://127.0.0.1:4999");
+    link.setBuild("b2");
+    expect(link.build).toBe("b2");
+    link.close();
+    expect(link.state).toBe("closed");
+  });
+
+  it("is closed when there is no WebSocket to dial with", () => {
+    vi.stubGlobal("WebSocket", undefined);
+    try {
+      const link = createDebugLink({ build: "b1" });
+      expect(link.state).toBe("closed");
+      expect(link.build).toBe("b1");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

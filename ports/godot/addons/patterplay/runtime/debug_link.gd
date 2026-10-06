@@ -66,15 +66,29 @@ func _process(_delta: float) -> void:
 			_enabled = false   # editor closed the link - go quiet
 
 
-## What the link is doing, for the editor / state panel: "connecting", "connected" or "closed", with
-## the build it handshook and the address it dials. From inside a running game "the editor is not
-## listening" and "I never attached" look identical, and that is the first question a link's user
-## asks (from-storylets/weak-debug-registries).
+## What the link is doing: "connecting", "connected" or "closed". From inside a running game "the editor
+## is not listening" and "I never attached" look identical, and that is the first question a link's
+## user asks (from-storylets/weak-debug-registries).
+func state() -> String:
+	if not _enabled:
+		return "closed"
+	return "connected" if _ws.get_ready_state() == WebSocketPeer.STATE_OPEN else "connecting"
+
+
+## The build the link handshook with (moves on set_build after a live refresh).
+func build() -> String:
+	return _build
+
+
+## The editor address the link dials.
+func url() -> String:
+	return _url
+
+
+## Deprecated: use state(), build() and url(), the names every Patterplay runtime uses. Goes in a later
+## release.
 func status() -> Dictionary:
-	var state := "closed"
-	if _enabled:
-		state = "connected" if _ws.get_ready_state() == WebSocketPeer.STATE_OPEN else "connecting"
-	return { "state": state, "build": _build, "url": _url }
+	return { "state": state(), "build": _build, "url": _url }
 
 
 # -- public API (mirrors the JS DebugLink) -------------------------------------
@@ -91,7 +105,7 @@ func flow_closed(flow_id: String) -> void:
 
 # Report a flow's current position - call after each advance() / choose(). An empty beat_id (e.g. a
 # choice stop) is sent as null, matching the JS client.
-func observe(flow_id: String, scene_id: String, beat_id: String, type: String, choice_id: String = "") -> void:
+func observe(flow_id: String, scene_id, beat_id: String, type: String, choice_id: String = "") -> void:
 	# A flow reports itself: flow_opened is the host's job and nothing could check it, so a game that
 	# forgot it left the editor's list short - and the omission survived a reconnect, because the hello
 	# sends this set. Announce a flow we have not seen, then the frame.
@@ -101,7 +115,7 @@ func observe(flow_id: String, scene_id: String, beat_id: String, type: String, c
 	var frame := {
 		"t": "frame",
 		"flow": flow_id,
-		"sceneId": scene_id,
+		"sceneId": null if scene_id == null or str(scene_id) == "" else str(scene_id),
 		"beatId": null if beat_id == "" else beat_id,
 		"type": type,
 	}
