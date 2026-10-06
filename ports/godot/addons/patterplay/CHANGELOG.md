@@ -6,6 +6,12 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`PatterFlow.reset()`**, as the other three runtimes have: it forgets the flow's own state and anything
+  waiting to be delivered, and begins again at a scene (the first authored scene by default). A new corpus op,
+  `resetFlow`, holds all four to it.
+
 ### Changed
 
 - **The engine and its flows share a typed host rather than a dictionary.** Its fields are named after the JS
@@ -18,6 +24,12 @@ same runtime behaviour.
   `choose()` leaves the chosen option's prompt waiting for the next `advance()`. A restart (`start`) in between
   cleared only the choice, so the old prompt played as the restarted run's first beat. Every move that leaves
   the flow's place (a restart, `goto`, `close`) now drops both, through one helper.
+
+### Deprecated
+
+- **`PatterFlow.start()` is deprecated: use `PatterFlow.reset()`.** They were the same call under two names.
+  `PatterFlow.reset()` is the one public name for beginning a flow again on every runtime (opening a flow begins
+  a new one); `PatterFlow.start()` goes in a later release.
 
 ## [0.19.0] - 2026-10-06
 

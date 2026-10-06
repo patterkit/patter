@@ -174,7 +174,7 @@ func goto(scene: String, block: String = "") -> bool:
 	if not _started:
 		if _start_refused():
 			return false
-		start(scene_id, block_id)
+		_begin(scene_id, block_id)
 		return true
 
 	_clear_pending()
@@ -303,7 +303,24 @@ func is_ended() -> bool:
 
 # -- host API ------------------------------------------------------------------
 
-func start(scene_id: String, block_id: String) -> void:
+## Forget everything in this flow and begin again: its per-flow state (not-shared @patter globals and
+## @scene props), cursor, call stack, selector cursors, visit counts, and anything waiting to be delivered.
+## Shared state is untouched. The one public way to begin a flow again (open_flow begins a new one), as
+## Flow.reset is on every runtime.
+func reset(scene_id: String = "", block_id: String = "") -> void:
+	_begin(scene_id, block_id)
+
+
+## Deprecated: use reset(), the one public name for beginning a flow again on every runtime. start() was
+## the same call under a second name, and goes in a later release.
+func start(scene_id: String = "", block_id: String = "") -> void:
+	reset(scene_id, block_id)
+
+
+## Begin this flow at a scene (empty: the first authored scene), and optionally a block within it. The
+## engine's own entry point: open_flow and a goto on an unstarted flow begin a flow here. A game calls
+## reset().
+func _begin(scene_id: String = "", block_id: String = "") -> void:
 	if _start_refused():
 		return
 	# A start is a reset: this flow's bags go, and so does anything a load left waiting for them.

@@ -464,6 +464,8 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				chunk.append(holder["engine"].get_flow(current).advance())
 			"choose":
 				holder["engine"].get_flow(current).choose(op["id"])
+			"resetFlow":
+				holder["engine"].get_flow(current).reset(op.get("scene", ""), op.get("block", ""))
 			"goto":
 				# Host navigation by address. No transcript of its own; the next advance shows where
 				# it landed. expectResult pins the returned bool.

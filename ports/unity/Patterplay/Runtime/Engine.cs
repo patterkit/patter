@@ -596,7 +596,7 @@ namespace Patterkit.Patterplay
                 });
             }
             _flows[id] = flow;
-            flow.Start(sceneId, blockId);
+            flow.Begin(sceneId, blockId);
             return flow;
         }
 

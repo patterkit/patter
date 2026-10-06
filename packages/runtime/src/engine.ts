@@ -735,7 +735,7 @@ export class Engine {
       });
     }
     this.flowsById.set(id, flow);
-    flow.start(sceneId, blockId);
+    flow.begin(sceneId, blockId);
     return flow;
   }
 
@@ -1426,8 +1426,10 @@ export class Flow {
 
   // -- Host API -------------------------------------------------------------
 
-  /** Begin this flow at a scene (and optionally a specific block within it). */
-  start(sceneId?: string, blockId?: string): void {
+  /** Begin this flow at a scene (and optionally a specific block within it). The engine's own entry point:
+   *  openFlow and a goto on an unstarted flow begin a flow here. A game calls {@link reset}.
+   *  @internal */
+  begin(sceneId?: string, blockId?: string): void {
     // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
     // inside the checkpoint may start in one.
     if (this.host.journal && !this.host.journal.opened.has(this)) throw new Error("a flow can't be started or reset while a checkpoint is open");
@@ -1466,10 +1468,16 @@ export class Flow {
    * Forget everything in this flow and begin again - its per-flow state (not-shared
    * `@patter` globals + `@scene` props), cursor, callstack, selector cursors, and
    * visit counts. Shared state (shared `@patter` / `@scene`, world visit counts) is
-   * untouched. A clearer-named alias of `start()`.
+   * untouched. The one public way to begin a flow again (openFlow begins a new one).
    */
   reset(sceneId?: string, blockId?: string): void {
-    this.start(sceneId, blockId);
+    this.begin(sceneId, blockId);
+  }
+
+  /** @deprecated Use {@link reset}, the one public name for beginning a flow again on every runtime. `start`
+   *  was the same call under a second name, and goes in a later release. */
+  start(sceneId?: string, blockId?: string): void {
+    this.reset(sceneId, blockId);
   }
 
   /**
@@ -1507,7 +1515,7 @@ export class Flow {
       if (blockId === undefined) return false; // a block address is scene-scoped: unknown HERE is unknown
     }
     // Never started: start() does the same landing plus the one-time per-flow setup.
-    if (!this.started) { this.start(sceneId, blockId); return true; }
+    if (!this.started) { this.begin(sceneId, blockId); return true; }
 
     this.clearPending();
     this.activeSnippet = null; this.beatIndex = 0; // abandon the rest of the snippet being delivered

@@ -57,6 +57,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	bool Goto(const FString& Scene, const FString& Block);
 
+	// Forget everything in this flow and begin again at a scene (empty: the first authored scene), and
+	// optionally a block within it: its per-flow properties, cursor, call stack, selector cursors, visit
+	// counts, and anything waiting to be delivered. Shared state is untouched. Refused (and logged) while a
+	// checkpoint is open, unless the flow was opened inside it. Flow.reset on every runtime.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	void Reset(const FString& Scene, const FString& Block);
+
 	// True once the engine has closed this flow (closed, dropped by Reset, or replaced by name). A closed
 	// flow is inert: Advance reports the end and Goto refuses.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")

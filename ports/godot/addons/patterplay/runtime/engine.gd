@@ -326,7 +326,7 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 		journal["opened"][flow] = true
 		journal["undo"].append(_undo_open_flow.bind(id, flow, prior))
 	_flows[id] = flow
-	flow.start(scene_id, block_id)
+	flow._begin(scene_id, block_id)
 	return flow
 
 

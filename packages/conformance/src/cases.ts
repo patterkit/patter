@@ -1008,6 +1008,36 @@ const ruleAllGreyedRunsDry = {
   expectedTranscript: [{ type: "text", id: "FB", text: "nothing for it" }, { type: "text", id: "AFTER", text: "moving on" }, { type: "end" }],
 } satisfies RuntimeFixture;
 
+// Flow.reset (an alias of start) on all four runtimes: it forgets the flow's own state and anything waiting
+// to be delivered, and begins again. Here the per-flow @mine counts entries to the opening, and a reset between
+// choose() and the next advance() must not replay the abandoned run's prompt (it did on every runtime until
+// 2026-10-06, when start cleared only the choice).
+const scriptedResetFlow = {
+  name: "resetFlow: forgets per-flow state and a chosen prompt still waiting, and begins again",
+  project: project({ properties: [{ name: "mine", type: "number", default: 0, shared: false }] }),
+  engineOptions: { replayPromptOnChoose: true },
+  scenes: [
+    { id: "scn_r", type: "scene", name: "Room", blocks: [{ id: "b_r", type: "block", name: "B", children: [
+      { id: "sn_open", type: "snippet", onEnter: [{ kind: "set", target: "@mine", value: "@mine + 1" }],
+        beats: [{ id: "OPEN", kind: "text" }] },
+      { id: "g_r", type: "group", selector: "choice", children: [
+        { id: "o_ask", type: "group", prompt: { id: "P_ask", kind: "line", character: "PC" }, children: [
+          { id: "sn_ans", type: "snippet", beats: [{ id: "ANS", kind: "text" }], jump: { to: "END" } },
+        ] },
+      ] },
+    ] }] },
+  ],
+  locales: [loc("scn_r", { OPEN: "opening {@mine}", P_ask: "Ask", ANS: "answer" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "room" },
+    { op: "advance", expect: [{ type: "text", id: "OPEN", text: "opening 1" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g_r", options: [{ id: "o_ask", eligible: true, prompt: { kind: "line", text: "Ask", character: "PC" } }] }] },
+    { op: "choose", id: "o_ask" },
+    { op: "resetFlow" },
+    { op: "advance", expect: [{ type: "text", id: "OPEN", text: "opening 1" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // The default start scene is the first AUTHORED scene (the bundle's key order, which is the project's
 // nav order), never the first by id. Scene ids are random, so a runtime that sorts them opens a game on
 // an arbitrary scene: Unreal kept its scenes in a sorted map and did exactly that (2026-10-06). The ids
@@ -2481,7 +2511,7 @@ export const cases: Fixtures = {
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
-    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule],
+    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

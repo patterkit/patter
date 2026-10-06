@@ -1,7 +1,7 @@
 # Choosing from a choice, headless. A greyed (ineligible) option is shown but cannot be taken: JS, Unity
 # and Unreal refuse it with "choice option is not eligible"; Godot used to accept it, play its content and
 # spend it. A refused choose leaves the choice pending, so the player can still pick. And a chosen prompt
-# still waiting to be replayed does not survive a restart or a goto.
+# still waiting to be replayed does not survive a reset or a goto.
 #
 #   godot --headless --path ports/godot --script res://test/test_choose.gd
 extends SceneTree
@@ -52,7 +52,7 @@ func _initialize() -> void:
 
 
 # Moving a flow drops everything waiting to be delivered. With replay_prompt_on_choose, choose() leaves the
-# chosen option's prompt waiting to be spoken back by the next advance(). A restart (start) between the two
+# chosen option's prompt waiting to be spoken back by the next advance(). A reset (start) between the two
 # used to clear only the choice, so the abandoned run's prompt played as the restarted run's first beat.
 func _check_pending_cleared() -> void:
 	var bundle := {
@@ -76,9 +76,9 @@ func _check_pending_cleared() -> void:
 	var replayed: Dictionary = to_chosen.call().advance()
 	_expect(replayed["id"] == "P", "a chosen prompt is spoken back by the next advance: " + str(replayed))
 	var restarted: PatterFlow = to_chosen.call()
-	restarted.start("s", "")
-	var after_start: Dictionary = restarted.advance()
-	_expect(after_start["id"] == "OPEN", "a restart drops the waiting prompt: " + str(after_start))
+	restarted.reset("s", "")
+	var after_reset: Dictionary = restarted.advance()
+	_expect(after_reset["id"] == "OPEN", "a reset drops the waiting prompt: " + str(after_reset))
 	var moved: PatterFlow = to_chosen.call()
 	moved.goto("s")
 	var after_goto: Dictionary = moved.advance()

@@ -178,6 +178,9 @@ export function runScript(
         engine.reset();
         current = "";
         break;
+      case "resetFlow":
+        engine.getFlow(current)!.reset(op.scene, op.block);
+        break;
       case "checkpoint":
         checkpoint = engine.checkpoint();
         break;

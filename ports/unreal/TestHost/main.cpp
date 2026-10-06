@@ -419,6 +419,9 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 else if (kind == "choose") engine->getFlow(current)->choose(op.at("id").str);
                 // Host navigation by address. No transcript of its own; the next advance shows where it
                 // landed. expectResult pins the returned bool.
+                else if (kind == "resetFlow")
+                    engine->getFlow(current)->reset(op.has("scene") ? op.at("scene").str : std::string(),
+                                                    op.has("block") ? op.at("block").str : std::string());
                 else if (kind == "goto")
                 {
                     const bool moved = engine->getFlow(current)->gotoAddress(
@@ -741,8 +744,8 @@ static void runPendingClearedCheck()
         return flow;
     };
     { Engine e(bundle, opts); if (toChosen(e)->advance().id != "P") fail("pending", "replay", "the chosen prompt was not spoken back"); }
-    { Engine e(bundle, opts); Flow* f = toChosen(e); f->start("s", ""); const auto r = f->advance();
-      if (r.id != "OPEN") fail("pending", "start", "a restart replayed the abandoned run's prompt (got " + r.id + ")"); }
+    { Engine e(bundle, opts); Flow* f = toChosen(e); f->reset("s", ""); const auto r = f->advance();
+      if (r.id != "OPEN") fail("pending", "reset", "a reset replayed the abandoned run's prompt (got " + r.id + ")"); }
     { Engine e(bundle, opts); Flow* f = toChosen(e); f->gotoAddress("s", ""); const auto r = f->advance();
       if (r.id != "OPEN") fail("pending", "goto", "a goto replayed the abandoned run's prompt (got " + r.id + ")"); }
     std::cout << "  [pending] a restart or a goto drops a chosen prompt still waiting to be replayed\n";

@@ -89,7 +89,9 @@ does not resolve throws. See [Host navigation](/play/navigation/).
   It throws if there's no pending choice, or the id is unknown or ineligible.
 - **`flow.isEnded()`, `flow.currentScene`**: state for tooling that follows the
   story across scenes.
-- **`flow.reset(scene?, block?)`**: forget this flow's position, keep shared state.
+- **`flow.reset(scene?, block?)`**: begin this flow again at a scene (the first one by default), forgetting
+  everything that is its own: its position, its own properties, its visit counts, and anything waiting to be
+  delivered. Shared state is kept. Every runtime calls it `reset` (`Reset` in C# and Blueprint).
 - **`flow.goto(scene, block?)`**: returns a `boolean` and moves the cursor to an address, exactly as an
   authored jump would (on-entry effects run, arriving counts as a visit, the call stack is
   replaced). It moves rather than resets, so variation and visit counts carry on; it lands

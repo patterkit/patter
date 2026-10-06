@@ -816,6 +816,11 @@ namespace Patterkit.Patterplay.TestHost
                             case "choose":
                                 engine.GetFlow(current).Choose(op.GetProperty("id").GetString());
                                 break;
+                            case "resetFlow":
+                                engine.GetFlow(current).Reset(
+                                    op.TryGetProperty("scene", out var rs) ? rs.GetString() : null,
+                                    op.TryGetProperty("block", out var rb) ? rb.GetString() : null);
+                                break;
                             case "goto":
                             {
                                 // Host navigation by address. No transcript of its own; the next advance

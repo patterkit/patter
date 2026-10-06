@@ -175,6 +175,9 @@ export type ScriptOp =
   // `{}` for a node with none or a ref that does not resolve. Key order is not part of the contract.
   | { op: "expectGameData"; scene: string; block?: string; expectResult: GameData }
   | { op: "reset" }
+  // Reset the CURRENT flow (Flow.reset, an alias of start): forget its per-flow state and anything waiting to be
+  // delivered, and begin again at the scene (empty: the first authored scene) and block given. No transcript.
+  | { op: "resetFlow"; scene?: string; block?: string }
   // Checkpoints: `checkpoint` opens one (the engine's `checkpoint()`); `rollback` puts the whole game back
   // as it was then (every property, visit count, shuffle and sequence position, every flow's cursor and
   // PRNG; a flow opened since is closed and forgotten); `commit` keeps everything. None produces a

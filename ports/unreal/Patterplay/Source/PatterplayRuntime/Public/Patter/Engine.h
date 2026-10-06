@@ -772,7 +772,7 @@ namespace patter
                 blockId = resolveBlock(*host_, sceneId, block);
                 if (blockId.empty()) return false; // a block address is scene-scoped: unknown HERE is unknown
             }
-            if (!started_) { start(sceneId, blockId); return true; }
+            if (!started_) { begin(sceneId, blockId); return true; }
 
             clearPending();
             activeSnippet_ = nullptr; beatIndex_ = 0; // abandon the rest of the snippet being delivered
@@ -799,7 +799,24 @@ namespace patter
         bool isClosed() const { return closed_; }
         bool isEnded() const { return flowEnded_; }
 
-        void start(const std::string& sceneId, const std::string& blockId)
+        /** Forget everything in this flow and begin again: its per-flow state (not-shared @patter globals and
+         *  @scene props), cursor, call stack, selector cursors, visit counts, and anything waiting to be
+         *  delivered. Shared state is untouched. The one public way to begin a flow again (openFlow begins a
+         *  new one), as Flow.reset is on every runtime. */
+        void reset(const std::string& sceneId = std::string(), const std::string& blockId = std::string())
+        {
+            begin(sceneId, blockId);
+        }
+
+        /** Use reset(), the one public name for beginning a flow again on every runtime. start() was the same
+         *  call under a second name, and goes in a later release. */
+        [[deprecated("Use reset(), the same call under the name every Patterplay runtime uses.")]]
+        void start(const std::string& sceneId, const std::string& blockId) { reset(sceneId, blockId); }
+
+        /** Begin this flow at a scene (empty: the first authored scene), and optionally a block within it. The
+         *  engine's own entry point: openFlow and a goto on an unstarted flow begin a flow here. A game calls
+         *  reset(). */
+        void begin(const std::string& sceneId, const std::string& blockId)
         {
             // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
             // inside the checkpoint may start in one.
@@ -2201,7 +2218,7 @@ namespace patter
                 });
             }
             flows_[id] = std::move(flow);
-            raw->start(sceneId, blockId);
+            raw->begin(sceneId, blockId);
             return raw;
         }
         Flow* getFlow(const std::string& id) { auto it = flows_.find(id); return it != flows_.end() ? it->second.get() : nullptr; }

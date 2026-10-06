@@ -1,4 +1,5 @@
-// GetFlow after a flow id is REOPENED, through the Blueprint wrapper. Runs via
+// GetFlow after a flow id is REOPENED, through the Blueprint wrapper, and a flow begun again with Reset.
+// Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Flows"
 //
 // The UE-boundary half the clang TestHost cannot reach: the core's flowPtr always answers with the
@@ -95,6 +96,19 @@ bool FPatterplayFlowsTest::RunTest(const FString& Parameters)
 			TestEqual(TEXT("and asking again gives the same wrapper"), Fresh->GetFlow(TEXT("main")), Restored);
 		}
 	}
+
+	// --- Reset begins a flow again from Blueprint, as Flow.reset does on every runtime -----------------
+	UPatterEngine* Again = UPatterEngine::Create(Bundle);
+	if (!TestNotNull(TEXT("an engine to restart in"), Again)) return false;
+	UPatterFlow* Run = Again->OpenFlow(TEXT("run"), TEXT("s1"));
+	if (!TestNotNull(TEXT("a flow to restart"), Run)) return false;
+	TestEqual(TEXT("the flow plays its line"), Run->Advance().Id, FString(TEXT("T1")));
+	TestTrue(TEXT("and then ends"), Run->Advance().Type == EPatterStepType::End);
+	Run->Reset(TEXT(""), TEXT(""));
+	TestEqual(TEXT("Reset begins it again at the first scene"), Run->Advance().Id, FString(TEXT("T1")));
+	Run->Advance();
+	Run->Reset(TEXT("s1"), TEXT(""));
+	TestEqual(TEXT("and at a named scene"), Run->Advance().Id, FString(TEXT("T1")));
 	return true;
 }
 

@@ -7,6 +7,12 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`Flow::reset` in the C++ core, and `Reset` on the Blueprint flow**, as the other three runtimes have: they
+  forget the flow's own state and anything waiting to be delivered, and begin again at a scene (empty: the first
+  authored scene). A new corpus op, `resetFlow`, holds all four to it.
+
 ### Changed
 
 - **The plugin and its test host now read a bundle through one parser, so the conformance corpus checks the
@@ -22,6 +28,12 @@ runtime behaviour.
   chosen option's prompt waiting for the next `advance`. A restart in between cleared only the choice, so the
   old prompt played as the restarted run's first beat. Every move that leaves the flow's place (a restart,
   `goto`, `close`) now drops both, through one helper.
+
+### Deprecated
+
+- **`Flow::start` is deprecated: use `Flow::reset`.** They were the same call under two names. `Flow::reset` is
+  the one public name for beginning a flow again on every runtime (opening a flow begins a new one);
+  `Flow::start` goes in a later release.
 
 ## [0.19.0] - 2026-10-06
 

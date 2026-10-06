@@ -181,7 +181,7 @@ namespace Patterkit.Patterplay
                 blockId = Engine.ResolveBlock(_host, sceneId, block);
                 if (blockId == null) return false; // a block address is scene-scoped: unknown HERE is unknown
             }
-            if (!_started) { Start(sceneId, blockId); return true; }
+            if (!_started) { Begin(sceneId, blockId); return true; }
 
             ClearPending();
             _activeSnippet = null; _beatIndex = 0; // abandon the rest of the snippet being delivered
@@ -291,7 +291,10 @@ namespace Patterkit.Patterplay
 
         // -- host API -----------------------------------------------------------
 
-        public void Start(string sceneId, string blockId)
+        /// <summary>Begin this flow at a scene (null: the first authored scene), and optionally a block within
+        /// it. The engine's own entry point: OpenFlow and a Goto on an unstarted flow begin a flow here. A
+        /// game calls <see cref="Reset"/>.</summary>
+        internal void Begin(string sceneId, string blockId)
         {
             // Starting resets this flow's property bags, which a rollback can't put back: only a flow opened
             // inside the checkpoint may start in one.
@@ -330,7 +333,16 @@ namespace Patterkit.Patterplay
             Settle();
         }
 
-        public void Reset(string sceneId = null, string blockId = null) => Start(sceneId, blockId);
+        /// <summary>Forget everything in this flow and begin again: its per-flow state (not-shared @patter
+        /// globals and @scene props), cursor, call stack, selector cursors, visit counts, and anything waiting to
+        /// be delivered. Shared state is untouched. The one public way to begin a flow again (OpenFlow begins a
+        /// new one), on every runtime.</summary>
+        public void Reset(string sceneId = null, string blockId = null) => Begin(sceneId, blockId);
+
+        /// <summary>Use <see cref="Reset"/>, the one public name for beginning a flow again on every runtime.
+        /// Start was the same call under a second name, and goes in a later release.</summary>
+        [Obsolete("Use Reset, the same call under the name every Patterplay runtime uses.")]
+        public void Start(string sceneId, string blockId) => Reset(sceneId, blockId);
 
         public StepResult Advance()
         {

@@ -181,6 +181,13 @@ bool UPatterFlow::Goto(const FString& Scene, const FString& Block)
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
+void UPatterFlow::Reset(const FString& Scene, const FString& Block)
+{
+	if (!Flow) return;
+	try { Flow->reset(Std(Scene), Std(Block)); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
+}
+
 bool UPatterFlow::IsClosed() const { return Flow ? Flow->isClosed() : true; }
 
 // ----- UPatterEngine ----------------------------------------------------------

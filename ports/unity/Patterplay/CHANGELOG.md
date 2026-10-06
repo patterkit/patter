@@ -13,6 +13,12 @@ same runtime behaviour.
   prompt played as the restarted run's first beat. Every move that leaves the flow's place (`Reset`, `Goto`,
   `Close`) now drops both, through one helper.
 
+### Deprecated
+
+- **`Flow.Start` is deprecated: use `Flow.Reset`.** They were the same call under two names. `Flow.Reset` is the
+  one public name for beginning a flow again on every runtime (opening a flow begins a new one); `Flow.Start`
+  goes in a later release.
+
 ## [0.19.0] - 2026-10-06
 
 ### Changed

@@ -15722,6 +15722,180 @@
           ]
         }
       ]
+    },
+    {
+      "name": "resetFlow: forgets per-flow state and a chosen prompt still waiting, and begins again",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "17a39uk",
+          "structureHash": "0d9gp9f"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "mine",
+            "type": "number",
+            "default": 0,
+            "shared": false
+          }
+        ],
+        "scenes": {
+          "scn_r": {
+            "id": "scn_r",
+            "type": "scene",
+            "name": "Room",
+            "blocks": [
+              {
+                "id": "b_r",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_open",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "OPEN",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@mine",
+                        "value": {
+                          "src": "@mine + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "mine"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_r",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_ans",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "ANS",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "PC"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "OPEN": "opening {@mine}",
+            "P_ask": "Ask",
+            "ANS": "answer"
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "room"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "OPEN",
+              "text": "opening 1"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_r",
+              "options": [
+                {
+                  "id": "o_ask",
+                  "eligible": true,
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Ask",
+                    "character": "PC"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_ask"
+        },
+        {
+          "op": "resetFlow"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "OPEN",
+              "text": "opening 1"
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [
