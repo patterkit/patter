@@ -113,7 +113,11 @@ function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown,
     input.placeholder = defHint ? `Default is ${defHint}` : f.type === "number" ? "Number" : "Text";
     input.value = current == null ? "" : String(current);
     if (!id) input.disabled = true;
-    // Commit on change (blur / Enter), not per keystroke - so the inspector re-render doesn't steal focus.
+    // Commit on change (blur / Enter), not per keystroke, which is where this departs from the family's
+    // as-you-type rule (ruling N, 2026-10). The inspector re-renders whenever its levels change, and a
+    // gameData value is in them, so a per-keystroke commit would rebuild this row and drop the focus.
+    // Esc still restores, as everywhere in the family.
+    escRestores(input);
     input.addEventListener("change", () => {
       const raw = input.value.trim();
       if (raw === "") set(undefined);
@@ -122,6 +126,15 @@ function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown,
     r.append(input);
   }
   return r;
+}
+
+/** Esc puts back the value the field held when it got focus (the family's field rule, ruling N). The
+ *  event is not stopped: whatever Esc does next (the blur) still happens, and with the value back where
+ *  it started, no change event follows it. Registered before the field's own keydown handlers. */
+function escRestores(input: HTMLInputElement): void {
+  let atFocus = input.value;
+  input.addEventListener("focus", () => { atFocus = input.value; });
+  input.addEventListener("keydown", (e) => { if (e.key === "Escape" && input.value !== atFocus) input.value = atFocus; });
 }
 
 /** The gameData node-kind for a leaf beat (the inspector calls a text beat "prose"; the model "text"). */
@@ -326,6 +339,7 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
     if (changed) { repaint(); commit(); }
   };
 
+  escRestores(input); // Esc drops a half-typed tag rather than letting the blur that follows add it
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(input.value); input.value = ""; }
     else if (e.key === "Backspace" && input.value === "" && current.length) {

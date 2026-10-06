@@ -20,6 +20,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   whose folder has gone is taken off the recent list as before; one that is still there but won't open (a
   conflict in its project file, say) stays on the list so you can try again once it is fixed. The same goes
   for the last project, when it can't be reopened at launch.
+- **Esc in an inspector field puts back what was there.** Typing a game data value or a tag and pressing Esc
+  restores the value the field had when you clicked into it, as Storyletter's fields do. A half-typed tag is
+  dropped rather than added when you click away.
 - **Help ▸ PatterKit Documentation Home** is named for the suite. It said "Patter".
 - **The Autosave setting describes what it does:** it saves a moment after you stop typing, not every
   30 seconds.
