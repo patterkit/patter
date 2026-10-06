@@ -80,7 +80,7 @@ let bundle = BUNDLE;
 let flow = engine.openFlow("main");
 
 const link = createDebugLink({
-  build: bundle.content.hash,
+  build: engine.buildId,
   onBundle: ({ build, data }) => {
     const r = applyLiveBundle(engine, bundle, data); // picks the tier itself
     engine = r.engine; bundle = r.bundle;
@@ -126,7 +126,7 @@ throws into your game loop, and if Patterpad isn't listening every call is a no-
 import { createDebugLink } from "@patterkit/play-helpers";
 
 const link = createDebugLink({
-  build: BUNDLE.content.hash,       // the build identity, from your compiled bundle
+  build: engine.buildId,            // the build identity: your compiled bundle's content hash
   project: "My Game",               // shown in the editor's debug-link tooltip (optional)
   // url: "ws://127.0.0.1:4471",    // the default; override if you changed the port
 });
@@ -178,6 +178,12 @@ link.flow_opened("main")
 # ...after each step:
 link.observe("main", flow.current_scene(), step.get("id", ""), step["type"])
 ```
+
+Each link also says what it is doing, which matters because from inside a running game "the editor
+isn't listening" and "I never attached" look the same: its state (`connecting`, `connected`, or
+`closed`), the build it handshook with, and the address it dials. That's `link.state`, `link.build`,
+and `link.url` in JavaScript, `State`, `Build`, and `Url` in Unity, `State()`, `Build()`, and `Url()` in
+Unreal, and `state()`, `build()`, and `url()` in Godot.
 
 That's the whole integration on any engine. Leave the client wired behind your engine's debug flag
 and it costs nothing in a shipped game.

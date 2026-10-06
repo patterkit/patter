@@ -141,6 +141,16 @@ gameDataValue(fields, step.gameData, "portrait"); // this node's value, or the f
 effectiveGameData(fields, step.gameData);         // every field resolved into one object
 ```
 
+Every runtime has the same three helpers:
+
+| | JavaScript | Unity (C#) | Unreal (Blueprint) | Godot (GDScript) |
+|---|---|---|---|---|
+| A node type's fields | `gameDataFields(bundle, kind)` | `GameDataHelpers.GameDataFields(bundle, kind)` | `UPatterGameData::GameDataFields(Bundle, Kind)` | `PatterBundle.game_data_fields(bundle, kind)` |
+| One field's value | `gameDataValue(fields, node, name)` | `GameDataHelpers.GameDataValue(fields, node, name)` | `UPatterGameData::GameDataValue(Fields, Node, Name, Value)` | `PatterBundle.game_data_value(fields, node, name)` |
+| Every field resolved | `effectiveGameData(fields, node)` | `GameDataHelpers.EffectiveGameData(fields, node)` | `UPatterGameData::EffectiveGameData(Fields, Node)` | `PatterBundle.effective_game_data(fields, node)` |
+
+The Unreal C++ core has them too, as `patter::gameDataFields`, `gameDataValue`, and `effectiveGameData`.
+
 ### Scene and block Game Data
 
 Scenes and blocks carry Game Data too (a scene's music, a block's location or lighting), but no
@@ -166,10 +176,12 @@ A host typically reads them when it starts or `goto`s a flow at an address, or o
 The same overrides appear as `gameData` on each scene and block of
 [`getOutline()`](/play/structure/) (left out when empty).
 
-| | JavaScript | Unity (C#) | Unreal (C++) | Godot (GDScript) |
+| | JavaScript | Unity (C#) | Unreal (Blueprint) | Godot (GDScript) |
 |---|---|---|---|---|
-| A scene's Game Data | `engine.gameDataForScene(scene)` | `engine.GameDataForScene(scene)` | `Engine->Raw()->gameDataForScene(scene)` | `engine.game_data_for_scene(scene)` |
-| A block's Game Data | `engine.gameDataForBlock(scene, block)` | `engine.GameDataForBlock(scene, block)` | `Engine->Raw()->gameDataForBlock(scene, block)` | `engine.game_data_for_block(scene, block)` |
+| A scene's Game Data | `engine.gameDataForScene(scene)` | `engine.GameDataForScene(scene)` | `Engine->GameDataForScene(Scene)` | `engine.game_data_for_scene(scene)` |
+| A block's Game Data | `engine.gameDataForBlock(scene, block)` | `engine.GameDataForBlock(scene, block)` | `Engine->GameDataForBlock(Scene, Block)` | `engine.game_data_for_block(scene, block)` |
+
+In Unreal's C++ core they are `gameDataForScene` and `gameDataForBlock`.
 
 ## Host events
 

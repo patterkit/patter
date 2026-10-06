@@ -136,6 +136,11 @@ property values) are read and written on a `Flow`. The
 [`@patterkit/play-helpers`](/play/integration/) package adds conveniences like
 `setProperties(engine, { "@hp": 10 })`.
 
+Visit counts, which a story reads with `visits()` and `seen()`, are there for a debug panel too:
+`engine.getVisitCounts()` gives the counts shared across every flow and `flow.getVisitCounts()` a
+flow's own, each by node id. Every runtime has the same call (`GetVisitCounts` in C# and Blueprint,
+`get_visit_counts` in Godot).
+
 ## When content fails
 
 A condition or effect can fail while the story plays, in ways the compiler can't see: a division by
