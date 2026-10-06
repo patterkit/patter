@@ -1,5 +1,19 @@
 # @patterkit/cli
 
+## 0.8.0
+
+### Minor Changes
+
+- c7dad40: `patter play` exits 1 when a condition or effect fails on the way, as well as when the playthrough does not reach the end, since the engine now plays on past such a failure instead of stopping. The transcript marks each one with `!`. `patter coverage` lists them.
+
+### Patch Changes
+
+- Updated dependencies [c7dad40]
+- Updated dependencies [076831c]
+- Updated dependencies [a7ab2f3]
+- Updated dependencies [6a30def]
+  - @patterkit/ops@0.13.0
+
 ## 0.7.5
 
 ### Patch Changes

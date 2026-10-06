@@ -1,5 +1,17 @@
 # @patterkit/ops
 
+## 0.13.0
+
+### Minor Changes
+
+- c7dad40: Coverage and playthroughs report content errors. The runtime now plays through a condition or effect that fails (a failing condition counts as false, a failing effect is skipped), so the coverage report gains `contentErrors`: each failure with its kind, node, scene, source, message, and the number of runs it happened in, also listed in `renderCoverageText`. `runPlay` records each as an `error` event in order, and `renderPlay` marks it with `!`. Playable HTML exports carry the runtime's new play rules.
+
+### Patch Changes
+
+- 076831c: Playable HTML exports carry `@wildwinter/expr` 0.5.1 and `@wildwinter/scoperegistry` 0.8.1 (expression kernel `k492cf234`): a listener's own error is no longer reported as a read-only refusal, and every listener registered when a write starts hears it exactly once.
+- a7ab2f3: Playable HTML exports carry the runtime's latest fixes: a rollback after a load keeps a scene's saved `@scene` values, and the decision log's `seq` keeps counting after a clear.
+- 6a30def: Uses `@patterkit/runtime` 0.19.0, the Patterplay 0.19.0 release.
+
 ## 0.12.5
 
 ### Patch Changes
