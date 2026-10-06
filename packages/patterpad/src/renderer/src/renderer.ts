@@ -2188,6 +2188,9 @@ async function hydrateProject(): Promise<void> {
   syncSceneName(); // a rename still inside the save debounce is newer than main's copy
   // Refresh the surface's cross-scene jump targets so the divert picker now offers every scene + block.
   surface?.setJumpTargets(project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })));
+  // The inspector painted before the other scenes arrived, so a cross-scene Jump row (and any condition
+  // pill naming another scene) still shows the raw target id. Its level signature hasn't changed, so force it.
+  lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
 }
 
 // --- welcome screen ----------------------------------------------------------

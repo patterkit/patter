@@ -25,6 +25,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - **No stray "Replaced across the project".** Reimporting an editable script, and accepting or rejecting
   suggestions, also showed the message that belongs to Replace. Now only Replace says it.
+- **The inspector's Jump row names the destination.** Right after opening a project, a jump to another scene
+  could show that scene's internal id instead of its name until the caret moved. It now shows the name as
+  soon as the project has finished loading, as do condition pills that name another scene.
 
 ## [0.24.1] - 2026-10-04
 
