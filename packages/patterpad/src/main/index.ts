@@ -218,6 +218,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     pairedStorylets = undefined;
     searchFocus = undefined; // and the search window's ranking anchor belongs to that project too
     lastCoverageResult = null;
+    pendingMerge = null;     // a merge planned against it is no answer for the next (Storyletter drops its own here too)
   },
   open: (path) => {
     // Resolve the remembered scene FIRST (cheap root walk) so the landing-first open (#171) parses the
