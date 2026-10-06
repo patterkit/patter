@@ -16,6 +16,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a
   moment after you stop typing, and a quit inside that moment used to close without saving. It now finishes
   writing first. Leaving the window for another app also saves.
+- **Pressing Enter at Merge Returned Patterpack's confirmation cancels.** It used to merge. The confirmation
+  now uses Patterpad's own dialog, matching its other confirmations, with Cancel selected to begin with.
+  A pack with nothing to merge now says so in a message rather than a system dialog.
 
 ## [0.25.0] - 2026-10-06
 

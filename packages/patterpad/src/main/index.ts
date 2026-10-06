@@ -686,10 +686,19 @@ async function openPatterpackDialog(): Promise<OpenResult | null> {
  * (`deleteScene`, whose comment says the same thing): the VCS is the safety net, and the confirm carries
  * the weight. It is shown AFTER the merge has run, so it reports what the merge actually found rather
  * than asking for approval sight unseen - which the op's purity makes free.
+ *
+ * The confirm itself is the renderer's, on the shell's themed `confirmDialog`, as Storyletter's is: a
+ * native box made Merge the default, so a stray Enter merged. So this is two calls with the renderer
+ * between them. This one runs the pickers and the plan and holds the plan; `commitPatterpackMerge` lands
+ * it, and `patterpack:mergeDrop` lets it go.
  */
-async function mergePatterpack(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string } | null> {
+let pendingMerge: { plan: project.PackMergePlan; root: string } | null = null;
+
+async function planPatterpackMerge(): Promise<{ summary: PackMergeSummary } | { error: string } | null> {
+  pendingMerge = null;
   if (!win) return null;
-  if (!project.currentRoot()) return { error: "no project open" };
+  const root = project.currentRoot();
+  if (!root) return { error: "no project open" };
 
   const returned = await dialog.showOpenDialog(win, {
     title: "Merge a Returned Patterpack",
@@ -713,63 +722,20 @@ async function mergePatterpack(): Promise<{ project: OpenedProject; summary: Pac
 
   const plan = await project.planPackMerge(returnedPath, basePath);
   if ("error" in plan) return plan;
+  if (plan.summary.shards.length > 0) pendingMerge = { plan, root }; // an empty one has nothing to commit
+  return { summary: plan.summary };
+}
 
-  const { summary } = plan;
-  const added = summary.shards.filter((sh) => sh.added).length;
-  const merged = summary.shards.length - added;
-  if (summary.shards.length === 0) {
-    await dialog.showMessageBox(win, { type: "info", message: "Nothing to merge.", detail: "That pack has no project files in it." });
-    return null;
-  }
-  const what = `Merge ${plural(merged, "file")}${added ? ` and add ${added}` : ""} into this project?`;
-  const conflictLine = summary.conflicts > 0
-    ? `${plural(summary.conflicts, "conflict")} will keep YOUR version and leave a .patterconflict file beside the shard saying what disagreed.`
-    : "";
-  const cannotUndo = "This edits the open project and cannot be undone from the Edit menu.";
-  // Their World edit goes to the game's shared file too, which the game's other tools read, so say so.
-  const worldLine = summary.gameScopes?.error
-    ? `They changed the World properties, but ${summary.gameScopes.path} won't parse, so their change will not be written there: ${summary.gameScopes.error}`
-    : summary.gameScopes ? `They changed the World properties, so ${summary.gameScopes.path}, which the game's other tools share, will take their change too.` : "";
-
-  // A project-id mismatch takes the headline and flips the default button to Cancel. It nearly always
-  // means the wrong file was chosen at one of the two prompts, and the merge that follows would be a
-  // heap of conflicts that reads as though the other author rewrote everything. Still only a WARNING:
-  // ids can legitimately differ across a fork or a reissue, and the author knows which is the case.
-  const confirm = await dialog.showMessageBox(win, summary.provenance.ok
-    ? {
-        type: summary.conflicts > 0 ? "warning" : "question",
-        buttons: ["Merge", "Cancel"],
-        defaultId: 0,
-        cancelId: 1,
-        message: what,
-        detail: [conflictLine, worldLine, cannotUndo].filter(Boolean).join("\n\n"),
-      }
-    : {
-        type: "warning",
-        buttons: ["Merge Anyway", "Cancel"],
-        defaultId: 1,
-        cancelId: 1,
-        message: "These do not look like the same project.",
-        // Name the three ids rather than only reporting that they disagree. Which FILE is wrong is the
-        // thing the author has to act on, and only the ids tell them that. Wording follows Storyletter's,
-        // which said it better than ours did; the two apps are deliberately identical here.
-        detail: [
-          [
-            `The returned pack carries project id ${summary.provenance.returned ?? "(none)"}`,
-            `the pack you sent carries ${summary.provenance.base ?? "(none)"}`,
-            `and this project is ${summary.provenance.target ?? "(unreadable)"}.`,
-          ].join(", "),
-          "Usually that means the wrong file was chosen at one of the two prompts. Merging anyway will work, but if the ancestor is wrong you will get conflicts everywhere rather than only where you and they really disagreed.",
-          what.replace(/\?$/, "."),
-          worldLine,
-          cannotUndo,
-        ].filter(Boolean).join("\n\n"),
-      });
-  if (confirm.response !== 0) return null;
-
-  const res = await project.commitPackMerge(plan);
+/** Land the plan `planPatterpackMerge` holds, once the author has said Merge. Refused if the project
+ *  changed in between, since the plan's writes were worked out against the other one. */
+async function commitPatterpackMerge(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string }> {
+  const held = pendingMerge;
+  pendingMerge = null;
+  if (!held) return { error: "there is no merge waiting" };
+  if (!samePath(project.currentRoot(), held.root)) return { error: "a different project is open now" };
+  const res = await project.commitPackMerge(held.plan);
   if (!res.ok || !res.project) return { error: res.error ?? "merge failed" };
-  return { project: res.project, summary };
+  return { project: res.project, summary: held.plan.summary };
 }
 
 /**
@@ -1033,7 +999,9 @@ function registerIpc(): void {
   ipcMain.handle("handoffs:open", () => project.openHandoffs());
   ipcMain.handle("patterpack:export", (): Promise<ExportResult> => publishJob(exportPatterpack));
   ipcMain.handle("patterpack:open", (): Promise<OpenResult | null> => openPatterpackDialog());
-  ipcMain.handle("patterpack:merge", () => publishJob(mergePatterpack));
+  ipcMain.handle("patterpack:mergePlan", () => publishJob(planPatterpackMerge));
+  ipcMain.handle("patterpack:mergeCommit", () => publishJob(commitPatterpackMerge));
+  ipcMain.handle("patterpack:mergeDrop", () => { pendingMerge = null; });
   ipcMain.handle("project:shareScopes", () => shareScopesDialog());
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));

@@ -92,7 +92,7 @@ import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from 
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
 import { openJumpPicker } from "./jump-picker.js";
-import type { SearchEntry, AudioEntry, SceneKitId } from "../../shared/api.js";
+import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
@@ -2452,6 +2452,43 @@ async function openPatterpack(): Promise<void> {
   if (r) await showProject(r);
 }
 
+/** The merge's confirmation, saying what the plan found. Patterpad cannot undo a merge (its undo is
+ *  per-scene editor history, and this writes across the project), so it says so; the VCS is the net.
+ *
+ *  A project-id mismatch takes the title. It nearly always means the wrong file was chosen at one of the
+ *  two pickers, and the merge that follows would be a heap of conflicts that reads as though the other
+ *  author rewrote everything. Still only a warning: ids can legitimately differ across a fork or a
+ *  reissue. The three ids are named, because which FILE is wrong is what the author has to act on. */
+function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
+  const added = summary.shards.filter((sh) => sh.added).length;
+  const merged = summary.shards.length - added;
+  const what = `This merges ${plural(merged, "file")}${added ? ` and adds ${added}` : ""} into the open project.`;
+  const { provenance: pv, gameScopes } = summary;
+  const lines = [
+    pv.ok ? "" : [
+      `The returned pack carries project id ${pv.returned ?? "(none)"}`,
+      `the pack you sent carries ${pv.base ?? "(none)"}`,
+      `and this project is ${pv.target ?? "(unreadable)"}.`,
+    ].join(", ") + " Usually that means the wrong file was chosen at one of the two prompts. Merging anyway will work, but if the ancestor is wrong you will get conflicts everywhere rather than only where you and they really disagreed.",
+    summary.conflicts > 0
+      ? `${plural(summary.conflicts, "conflict")} will keep your version and leave a .patterconflict file beside the shard saying what disagreed.`
+      : "",
+    // Their World edit goes to the game's shared file too, which the game's other tools read, so say so.
+    gameScopes?.error
+      ? `They changed the World properties, but ${gameScopes.path} won't parse, so their change will not be written there: ${gameScopes.error}`
+      : gameScopes ? `They changed the World properties, so ${gameScopes.path}, which the game's other tools share, will take their change too.` : "",
+    "It cannot be undone from the Edit menu.",
+  ].filter(Boolean);
+  const evidence = el("div", "merge-evidence");
+  evidence.append(...lines.map((t) => el("p", "confirm-body", t)));
+  return confirmDialog({
+    title: pv.ok ? "Merge the returned pack?" : "This pack may not belong to this project",
+    body: what,
+    bodyNode: evidence,
+    confirmLabel: pv.ok ? "Merge" : "Merge anyway",
+  });
+}
+
 /** File ▸ Merge Returned Patterpack: fold a pack that came back into the OPEN project.
  *
  *  Flush first, and flush everything. A merge reads the working copy off DISK, so any pending edit still
@@ -2459,16 +2496,24 @@ async function openPatterpack(): Promise<void> {
  *  one way this operation could actually lose work. Same flush as Export as Patterpack, for the same
  *  reason from the other direction.
  *
- *  Main runs both pickers and the confirmation, so null covers all three dismissals and means nothing was
- *  written. On success the project has been re-read from disk, so the whole editor is rebuilt from the
- *  returned payload rather than patched. */
+ *  Main runs both pickers and works the merge out without writing; null means a picker was dismissed. The
+ *  confirm is ours, on the shell's frame with Cancel focused, so Enter never merges by accident (it did
+ *  on the native box). It reports what the merge actually found, and only then does main write. On
+ *  success the project has been re-read from disk, so the whole editor is rebuilt from the returned
+ *  payload rather than patched. */
 async function mergePatterpack(): Promise<void> {
   if (!project) return;
   if (surface) await save(); // pending text edits
   await persistDocs();                // pending Notes
   await persistComments();            // pending comments
-  const r = await withJob("Merging the returned Patterpack…", () => window.patter.mergePatterpack());
-  if (!r) return;                                        // cancelled at one of the three prompts
+  const planned = await withJob("Merging the returned Patterpack…", () => window.patter.mergePatterpackPlan());
+  if (!planned) return;                                  // cancelled at one of the two pickers
+  if ("error" in planned) { toast(`Merge failed: ${planned.error}`, "error"); return; }
+  const { summary } = planned;
+  if (summary.shards.length === 0) { toast("Nothing to merge\nThat pack has no project files in it.", "info"); return; }
+  if (!(await confirmPackMerge(summary))) { await window.patter.mergePatterpackDrop(); return; }
+
+  const r = await withJob("Merging the returned Patterpack…", () => window.patter.mergePatterpackCommit());
   if ("error" in r) { toast(`Merge failed: ${r.error}`, "error"); return; }
 
   project = r.project;

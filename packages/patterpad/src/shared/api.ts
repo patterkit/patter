@@ -831,11 +831,15 @@ export interface PatterApi {
   /** Open Patterpack: pick a `.patterpack` file, then a destination folder to unpack it into, and open the
    *  result. Null if either picker is cancelled. A dedicated file picker (the normal Open is folder-oriented). */
   openPatterpack(): Promise<OpenResult | null>;
-  /** Merge Returned Patterpack: pick the pack that came BACK, then the pack you SENT (the common
-   *  ancestor), merge by id into the OPEN project, and refresh it. Two pickers plus a confirmation, all
-   *  in main; the renderer never sees a path. Null when any of the three is dismissed, which writes
-   *  nothing. Unlike Open Patterpack this edits the project in place rather than opening another one. */
-  mergePatterpack(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string } | null>;
+  /** Merge Returned Patterpack, step one: pick the pack that came BACK, then the pack you SENT (the
+   *  common ancestor), and work out the merge into the OPEN project without writing anything. Main holds
+   *  the plan; the renderer gets what it found, to confirm, and never sees a path. Null when either picker
+   *  is dismissed. Unlike Open Patterpack this edits the project in place rather than opening another. */
+  mergePatterpackPlan(): Promise<{ summary: PackMergeSummary } | { error: string } | null>;
+  /** Step two, after the author confirms: write the held plan and re-read the project from disk. */
+  mergePatterpackCommit(): Promise<{ project: OpenedProject; summary: PackMergeSummary } | { error: string }>;
+  /** Or the author cancelled: let the held plan go. */
+  mergePatterpackDrop(): Promise<void>;
   /** File ▸ Share Scopes with Other Tools: create the game's `game-scopes/` folder (where, asked in main)
    *  with Patter's file and a `game.scopes.json` of the project's World properties, so the game's other
    *  editing tools check and preview this project's names and it checks theirs. `shared` when the
