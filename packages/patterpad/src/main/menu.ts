@@ -19,6 +19,7 @@ import { EXAMPLES } from "../shared/examples.js";
 const NAMED = namedMenuItems({
   appName: "Patterpad",
   docsUrl: "https://patterkit.dev/patterpad/overview/",
+  suiteName: "PatterKit", // the shell's default is "Patter", the language; the site home is the suite's
   suiteDocsUrl: "https://patterkit.dev/",
 });
 import { manualCheckForUpdates } from "@wildwinter/app-shell/updater";
@@ -324,7 +325,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // window, so declaring the role here too listed it TWICE. Let the system own it there (it carries
         // the standard Ctrl-Cmd-F); Windows / Linux get no such item, so they still need ours.
         ...(isMac ? [] : [{ role: "togglefullscreen" } as const]),
-        { role: "reload" }, { role: "toggleDevTools" },
+        // Reload and the developer tools in development builds only, as Storyletter's are.
+        ...(app.isPackaged ? [] : [{ type: "separator" } as const, { role: "reload" } as const, { role: "toggleDevTools" } as const]),
       ],
     },
     { role: "windowMenu" },

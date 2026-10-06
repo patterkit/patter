@@ -2226,7 +2226,7 @@ async function closeProject(): Promise<void> {
   showWelcome(await window.patter.boot());
 }
 
-function showWelcome(state: BootState): void {
+function showWelcome(state: Pick<BootState, "recents">): void {
   // One call, because all four editors ARE the one anchored panel: closing it
   // fires whichever onClose is registered, which clears that module's singleton.
   closeAnchoredPanel();
@@ -2244,6 +2244,7 @@ function showWelcome(state: BootState): void {
   projectNameEl.textContent = "Patterpad";
   delete projectNameEl.dataset.tip; // no project, no path
   setWelcomeRecents(state.recents);
+  welcome.setError(undefined); // a failure is said once, by the open that failed (openPath), not on every visit
   signalReady(); // the welcome screen is up - safe to reveal the window (no-op if already revealed)
 }
 
@@ -2268,8 +2269,16 @@ async function flushPending(): Promise<void> {
 
 async function openPath(path: string): Promise<void> {
   await leaveProject();
+  // The name it is listed under, read now: a project that has gone is forgotten by the failed open.
+  const name = (await window.patter.recents()).find((r) => r.path === path)?.name ?? path.split(/[\\/]/).filter(Boolean).pop() ?? path;
   try { await showProject(await window.patter.openPath(path)); }
-  catch { showWelcome(await window.patter.forget(path)); } // moved / deleted -> drop it, back to welcome
+  catch (e) {
+    // Back to the welcome, saying why rather than leaving the author to wonder where the project went.
+    // Main forgot it only if the folder is gone; one that is there but won't open stays in the list.
+    const reason = (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+    showWelcome({ recents: await window.patter.recents() });
+    welcome.setError(`Couldn't open “${name}”. ${reason}`);
+  }
 }
 
 async function openDialog(): Promise<void> { await leaveProject(); const r = await window.patter.openDialog(); if (r) await showProject(r); }
@@ -2666,7 +2675,7 @@ const settingsDlg = mountSettingsDialog({
       // below), and flipping it here updates the tab without reopening.
       voiced.input.addEventListener("change", () => settingsDlg.refreshTabs());
       const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and narration.", s.formatting);
-      const autosave = sToggle("Autosave", "Saves the open scene every 30 seconds.", s.autosave);
+      const autosave = sToggle("Autosave", "Saves the open scene a moment after you stop typing.", s.autosave);
       const autoRebuild = sToggle("Auto rebuild", "Recompiles the .patterc bundle as your edits settle.", s.autoRebuild);
       host.append(sField("Project name", name), sField("Start", start, sNote("settings-fieldnote", "The scene Play from Start opens.")),
         voiced.row, formatting.row, autosave.row, autoRebuild.row);
@@ -3084,7 +3093,7 @@ async function boot(): Promise<void> {
   await ensureIdentity(state.identity);
   authorName = (await window.patter.getIdentity())?.name ?? state.identity?.name ?? ""; // stamp comments
   if (state.open) await showProject(state.open);
-  else showWelcome(state);
+  else { showWelcome(state); if (state.openError) welcome.setError(state.openError); }
 }
 
 // (The welcome screen's actions are wired where it is mounted, at the top of the module.)
@@ -3176,7 +3185,7 @@ window.patter.onMenu((cmd) => {
     appName: "Patterpad",
     version: cmd.slice("about:".length),
     blurb: "A writer-first editor for branching game dialogue.",
-    credits: "Part of PatterKit. Open source under the MIT license.\nMade by Ian Thomas.",
+    credits: "Part of PatterKit. Open source under the MIT licence.\nMade by Ian Thomas.",
     wordmark: PATTERKIT_WORDMARK,
     links: [
       { label: "patterkit.dev", url: "https://patterkit.dev" },

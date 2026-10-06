@@ -16,12 +16,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a
   moment after you stop typing, and a quit inside that moment used to close without saving. It now finishes
   writing first. Leaving the window for another app also saves.
+- **A recent project that won't open says why.** The welcome screen now gives the reason. A project
+  whose folder has gone is taken off the recent list as before; one that is still there but won't open (a
+  conflict in its project file, say) stays on the list so you can try again once it is fixed. The same goes
+  for the last project, when it can't be reopened at launch.
+- **Help ▸ PatterKit Documentation Home** is named for the suite. It said "Patter".
+- **The Autosave setting describes what it does:** it saves a moment after you stop typing, not every
+  30 seconds.
+- **The About box says "licence"**, in UK English like the rest of Patterpad.
 - **Pressing Enter at Merge Returned Patterpack's confirmation cancels.** It used to merge. The confirmation
   now uses Patterpad's own dialog, matching its other confirmations, with Cancel selected to begin with.
   A pack with nothing to merge now says so in a message rather than a system dialog.
 
 ### Changed
 
+- **Reload and Toggle Developer Tools are gone from the View menu in released builds.** They are for
+  working on Patterpad itself.
 - **The last system message boxes now use Patterpad's own dialogs:** an example that could not be opened,
   Share Scopes with Other Tools, a Patterpack that could not be unpacked or whose folder already exists, and
   the prompt to find Storyletter. They follow the app's theme, and their buttons are in the same order as its

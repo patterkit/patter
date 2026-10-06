@@ -86,7 +86,6 @@ const stub = {
   openPath: async () => ({ project }),
   closeProject: async () => undefined,
   createDialog: async (_name: string, _vcs: string) => ({ project }),
-  forget: async () => ({ open: null, recents, identity }),
   readScene: async () => ({
     flowSource, locSource, sceneName: "The Tavern",
     hostScopes: ["world"], // the project's host-scope tokens (ReadSceneResult.hostScopes)
@@ -183,6 +182,7 @@ const stub = {
   exportReport: async () => ({ ok: true, path: "The Tavern - production.xlsx" }),
   cancelJob: () => undefined,            // the publish paths resolve at once here; nothing to stop
   onJobProgress: () => undefined,        // and report no progress
+  recents: async () => recents,
   clearRecents: async () => { recents.splice(1); return recents; }, // the open project stays, as main keeps it
   buildBundle: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/dist/the_tavern.patterc" }),
   toggleAutoRebuild: async () => true,

@@ -262,6 +262,8 @@ export interface ThemePrefs {
  *  remembered side-pane (slide/pin) state. */
 export interface BootState {
   open: OpenResult | null;
+  /** Why the last project did not reopen at launch, for the welcome to say. */
+  openError?: string;
   recents: RecentProject[];
   identity: Identity | null;
   panes: PaneState;
@@ -805,8 +807,6 @@ export interface PatterApi {
    *  this opens the system folder picker for the parent location, runs runInit, and opens it; null if
    *  the location picker is cancelled. */
   createDialog(name: string, vcs: VcsKind, buildBundle?: string): Promise<OpenResult | null>;
-  /** Drop a project from recents / last-session (e.g. it moved or was deleted). */
-  forget(path: string): Promise<BootState>;
   /** Compute the production report (spec §13) for the Production Information view (null if no project open). */
   report(): Promise<ReportData | null>;
   /** Export the voice (VO) recording script (spec §16) as an xlsx: opens a native Save dialog. `everything`
@@ -876,6 +876,8 @@ export interface PatterApi {
   onJobProgress(handler: (p: JobProgressDto) => void): void;
   /** File ▸ Open Recent ▸ Clear Recents: forget every recent (the open project stays, as the one entry)
    *  and return what is left, so the welcome screen's list can follow. */
+  /** The recent projects as the store holds them now (reads only; opens nothing). */
+  recents(): Promise<RecentProject[]>;
   clearRecents(): Promise<RecentProject[]>;
   /** Build Bundle (Build menu): compile the project to its runtime `.patterc` and write it to the output
    *  path configured in Project Settings ▸ Build (else the dist/ default). Returns where it landed. */

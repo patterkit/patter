@@ -199,7 +199,10 @@ const session = createProjectSession<OpenedProject, OpenResult>({
   store: {
     get: () => { const s = store.read(); return { recents: s.recents, ...(s.lastProject !== undefined ? { lastProject: s.lastProject } : {}) }; },
     touchProject: (path, name) => store.recordOpen(path, name ?? basename(path)),
-    forgetProject: (path) => store.forget(path),
+    // The shell forgets a project that fails to open, meaning one that has moved. A folder that is still
+    // there but will not open (a conflict in its project file, a drive mid-sync) is kept, so it can be
+    // tried again once it is fixed; the welcome says why it failed either way.
+    forgetProject: (path) => { if (!existsSync(path)) store.forget(path); },
     clearLastProject: () => store.clearLastProject(),
   },
   // The teardown half the shell runs first: main holds a whole project's worth of state behind
@@ -225,9 +228,10 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     const remembered = root ? store.read().lastScene[root] : undefined;
     let proj: OpenedProject;
     // `openProject` throws on a bad / missing / unreadable project; the shell wants that as a value,
-    // and turns it into a `forgetProject` so a moved project stops being offered.
+    // and passes it to `forgetProject`. The error is the sentence the welcome shows after the name.
+    if (!existsSync(path)) return { error: "It has moved or been deleted, so it is no longer in your recent projects." };
     try { proj = project.openProject(path, remembered); }
-    catch (e) { return { error: e instanceof Error ? e.message : String(e) }; }
+    catch (e) { return { error: `Patterpad could not read it: ${e instanceof Error ? e.message : String(e)}` }; }
     currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
     pairedStorylets = findPairedStorylets(proj.root); // Show Card in Storyletter, when a project there pairs with this one
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
@@ -293,9 +297,9 @@ function openAndRecord(path: string): OpenResult {
   return r;
 }
 
-function bootState(open: OpenResult | null): BootState {
+function bootState(open: OpenResult | null, openError?: string): BootState {
   const s = store.read();
-  return { open, recents: s.recents, identity: s.identity ?? null, panes: s.panes, theme: s.theme };
+  return { open, ...(openError ? { openError } : {}), recents: s.recents, identity: s.identity ?? null, panes: s.panes, theme: s.theme };
 }
 
 /** A `.patter` package double-clicked in Finder, captured before the window exists (open-file can fire
@@ -386,9 +390,11 @@ function boot(): BootState {
   const last = store.read().lastProject;
   if (last && existsSync(last)) {
     // A bare `patterpad --at <where>` (no path) reopens the last project straight at that location.
-    // The session already drops a project that fails to open, so this only has to not crash the boot.
+    // One that will not open lands on the welcome, which says why (the folder is there, so it stays in
+    // recents to be tried again once fixed).
+    const name = store.read().recents.find((r) => samePath(r.path, last))?.name ?? basename(last);
     try { return bootState(openAt(last, at)); }
-    catch { /* moved / deleted / unreadable -> the session forgot it; show welcome */ }
+    catch (e) { return bootState(null, `Couldn't open “${name}”. ${e instanceof Error ? e.message : String(e)}`); }
   }
   return bootState(null);
 }
@@ -929,7 +935,7 @@ function registerIpc(): void {
     return openAndRecord(path);
   });
   ipcMain.handle("project:createDialog", (_e, name: string, vcs: VcsKind, buildBundle?: string): Promise<OpenResult | null> => createDialog(name, vcs, buildBundle));
-  ipcMain.handle("project:forget", (_e, path: string): BootState => { store.forget(path); if (samePath(path, currentRoot)) currentRoot = null; refreshMenu(); return bootState(null); });
+  ipcMain.handle("project:recents", (): RecentProject[] => store.read().recents);
   ipcMain.handle("project:clearRecents", (): RecentProject[] => clearRecents());
   ipcMain.handle("project:report", () => project.report());
   ipcMain.handle("project:proposeCoverageDrivers", () => project.proposeCoverageDrivers());
