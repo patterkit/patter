@@ -34,6 +34,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **A new option starts with its choice text.** Adding an option to a choice put the caret on the option's
   first line, under a choice text not yet written. It now lands in the choice text, as a new choice's first
   option always has, and the line below follows.
+- **New Project opens at its full width again** (`@wildwinter/app-shell` 0.46.4). It had opened narrow, at the
+  width of an ordinary dialog, since the Search window's Replace confirm arrived.
 - **No stray "Replaced across the project".** Reimporting an editable script, and accepting or rejecting
   suggestions, also showed the message that belongs to Replace. Now only Replace says it.
 - **The inspector's Jump row names the destination.** Right after opening a project, a jump to another scene
