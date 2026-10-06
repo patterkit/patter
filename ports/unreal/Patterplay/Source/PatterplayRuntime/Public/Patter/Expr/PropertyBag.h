@@ -11,8 +11,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k9821750c_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x9821750c
-#define WILDWINTER_EXPR_k9821750c_PROPERTYBAG_H
+#if !defined(WILDWINTER_EXPR_k492cf234_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
+#define WILDWINTER_EXPR_k492cf234_PROPERTYBAG_H
 
 #include <algorithm>
 #include <cctype>
@@ -26,7 +26,7 @@
 #include "OrderedMap.h"
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k9821750c
+namespace wildwinter { namespace expr { inline namespace k492cf234
 {
     /** The property type vocabulary (boolean / number / string / enum /
      *  flags). Kept as strings, exactly as the kernel and the bundle carry
@@ -153,6 +153,16 @@ namespace wildwinter { namespace expr { inline namespace k9821750c
         {
             const ExprValue* v = values_.get(norm_(name));
             return v ? std::optional<ExprValue>(*v) : std::nullopt;
+        }
+
+        /** Whether a STORY write to this property is allowed: false only for a
+         *  declaration marked writable false. A host write is always allowed. The
+         *  registry asks before writing, so it never has to read a refusal out of an
+         *  exception that a listener might have thrown instead. */
+        bool writable(const std::string& name) const
+        {
+            const ScopeDeclaration* decl = decls_.get(norm_(name));
+            return !(decl && decl->writable.has_value() && !*decl->writable);
         }
 
         /** Write a property. Engine writes (the default) notify subscribers;

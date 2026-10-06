@@ -33,8 +33,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k9821750c_EXPR_H) && WILDWINTER_EXPR_KERNEL == 0x9821750c
-#define WILDWINTER_EXPR_k9821750c_EXPR_H
+#if !defined(WILDWINTER_EXPR_k492cf234_EXPR_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
+#define WILDWINTER_EXPR_k492cf234_EXPR_H
 
 #include <algorithm>
 #include <functional>
@@ -47,7 +47,7 @@
 #include "Value.h"
 #include "Ast.h"
 
-namespace wildwinter { namespace expr { inline namespace k9821750c
+namespace wildwinter { namespace expr { inline namespace k492cf234
 {
     /** A scope readable by the evaluator: a static bag or a host resolver.
      *  get returns nullopt when the property is not present (TS undefined). */

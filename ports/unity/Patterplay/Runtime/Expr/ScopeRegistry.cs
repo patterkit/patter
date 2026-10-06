@@ -448,14 +448,11 @@ namespace Wildwinter.Expr
             if (e == null) throw new RegistryError($"unknown scope '@{scope}'");
             if (e is OwnedScope owned)
             {
-                try
-                {
-                    owned.Bag.Set(name, value, host: host);
-                }
-                catch (Exception)
-                {
-                    throw new RegistryError($"'@{scope}.{name}' is read-only");
-                }
+                // Asked first, never caught afterwards: a catch around the bag's write reported
+                // anything it raised, a game's audit hook or subscriber included, as a
+                // read-only refusal (October 2026 review).
+                if (!host && !owned.Bag.IsWritable(name)) throw new RegistryError($"'@{scope}.{name}' is read-only");
+                owned.Bag.Set(name, value, host: host);
                 return;
             }
             var foreign = (ForeignScope)e;

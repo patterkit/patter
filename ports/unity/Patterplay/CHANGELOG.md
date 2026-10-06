@@ -52,6 +52,8 @@ same runtime behaviour.
 
 ### Fixed
 
+- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every
+  listener registered when a write starts hears it exactly once, and the hot path allocates less, with no leaks.
 - **A bare snippet option's `fallback`, `sticky`, and `secretUntilEligible` are read.** The bundle loader read
   them on Option groups only, so a snippet fallback was offered as an ordinary option, a sticky snippet option
   was once-only, and a secret one was shown greyed.

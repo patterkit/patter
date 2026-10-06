@@ -3,6 +3,12 @@
 Headless checks for the Godot addon. **Not part of the shipped addon zip** (only
 `addons/patterplay` ships); end-users never need these.
 
+CI runs each through **`run.sh`** (`ports/godot/test/run.sh test_choose.gd`, with `GODOT` set to the
+binary). Godot cannot report a test script that fails to compile: it prints the parse error and exits
+0, or on some machines sits waiting, because the script never reaches its own `quit(1)`. `run.sh` fails
+the run when the output shows a script that did not load, and stops one that runs past `RUN_TIMEOUT`
+seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon's own scripts.
+
 - `test_debug_registry.gd` - the debug registry is an OBSERVER: it can say what is live and must not
   keep anything alive. Covers weak engines, weak links, and a link's honest state.
 

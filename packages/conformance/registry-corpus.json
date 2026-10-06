@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
       "name": "an owned scope seeds each property from its default, else its type's",
@@ -2186,6 +2186,382 @@
               "writable": true
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "a listener that unsubscribes itself mid-write costs no other listener the write",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "first",
+          "kind": "subscribe",
+          "then": {
+            "unsubscribe": "first"
+          }
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "second",
+          "kind": "subscribe"
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "watch",
+          "kind": "audit",
+          "then": {
+            "unsubscribe": "watch"
+          }
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "log",
+          "kind": "audit"
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 8
+        },
+        {
+          "op": "heard",
+          "id": "first",
+          "expect": [
+            "hp"
+          ]
+        },
+        {
+          "op": "heard",
+          "id": "second",
+          "expect": [
+            "hp",
+            "hp"
+          ]
+        },
+        {
+          "op": "heard",
+          "id": "watch",
+          "expect": [
+            "hp"
+          ]
+        },
+        {
+          "op": "heard",
+          "id": "log",
+          "expect": [
+            "hp",
+            "hp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a listener unsubscribed by another mid-write still hears that write, and no later one",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "first",
+          "kind": "subscribe",
+          "then": {
+            "unsubscribe": "second"
+          }
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "second",
+          "kind": "subscribe"
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9
+        },
+        {
+          "op": "heard",
+          "id": "second",
+          "expect": [
+            "hp"
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 8
+        },
+        {
+          "op": "heard",
+          "id": "first",
+          "expect": [
+            "hp",
+            "hp"
+          ]
+        },
+        {
+          "op": "heard",
+          "id": "second",
+          "expect": [
+            "hp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a listener's own error reaches the caller as itself, not as a read-only refusal",
+      "needs": [
+        "exceptions"
+      ],
+      "steps": [
+        {
+          "op": "owned",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "listen",
+          "scope": "world",
+          "id": "hook",
+          "kind": "subscribe",
+          "then": {
+            "throw": "the game's hook broke"
+          }
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "hp",
+          "value": 9,
+          "expectError": "the game's hook broke"
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "hp",
+          "expect": 9
+        },
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "gold",
+              "type": "number",
+              "default": 0
+            }
+          ]
+        },
+        {
+          "op": "listen",
+          "scope": "game",
+          "id": "audit",
+          "kind": "audit",
+          "then": {
+            "throw": "the audit broke"
+          }
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "gold",
+          "value": 1,
+          "host": true,
+          "expectError": "the audit broke"
+        }
+      ]
+    },
+    {
+      "name": "a name every object inherits is missing from a scope, not a built-in",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "constructor",
+          "expectUnset": true
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "__proto__",
+          "expectUnset": true
+        },
+        {
+          "op": "eval",
+          "src": "@world.constructor",
+          "expect": false,
+          "ast": [
+            "sv",
+            "world",
+            "constructor"
+          ]
+        },
+        {
+          "op": "mount",
+          "token": "game",
+          "normalise": "identity",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "toString",
+          "expectUnset": true
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hasOwnProperty",
+          "expectUnset": true
+        },
+        {
+          "op": "eval",
+          "src": "@game.toString",
+          "expect": false,
+          "ast": [
+            "sv",
+            "game",
+            "tostring"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a property named like a built-in is an ordinary property, stored, saved and loaded",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "world",
+          "declarations": [
+            {
+              "name": "constructor",
+              "type": "number",
+              "default": 3
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "constructor",
+          "expect": 3
+        },
+        {
+          "op": "eval",
+          "src": "@world.constructor + 1",
+          "expect": 4,
+          "ast": [
+            "bin",
+            "+",
+            [
+              "sv",
+              "world",
+              "constructor"
+            ],
+            [
+              "n",
+              1
+            ]
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "world",
+          "name": "__proto__",
+          "value": 1
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "__proto__",
+          "expect": 1
+        },
+        {
+          "op": "save",
+          "expect": {
+            "world": {
+              "constructor": 3,
+              "__proto__": 1
+            }
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "world": {
+              "__proto__": 2,
+              "valueof": 5
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "__proto__",
+          "expect": 2
+        },
+        {
+          "op": "get",
+          "scope": "world",
+          "name": "valueOf",
+          "expect": 5
         }
       ]
     },

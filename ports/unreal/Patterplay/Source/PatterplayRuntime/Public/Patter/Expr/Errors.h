@@ -51,15 +51,15 @@
 // crosses a plugin's public API. A game calling the registry itself sees
 // RegistryError.
 // ---------------------------------------------------------------------------
-#if defined(WILDWINTER_EXPR_KERNEL) && WILDWINTER_EXPR_KERNEL != 0x9821750c && !defined(WILDWINTER_EXPR_KERNEL_CLASH)
+#if defined(WILDWINTER_EXPR_KERNEL) && WILDWINTER_EXPR_KERNEL != 0x492cf234 && !defined(WILDWINTER_EXPR_KERNEL_CLASH)
 #define WILDWINTER_EXPR_KERNEL_CLASH   // said once per translation unit, not once per header
-#error "Two different wildwinter::expr kernels in one translation unit (this copy is kernel k9821750c). The Patterplay and Storylet Engine plugins must be built from the same kernel: update the older plugin."
+#error "Two different wildwinter::expr kernels in one translation unit (this copy is kernel k492cf234). The Patterplay and Storylet Engine plugins must be built from the same kernel: update the older plugin."
 #endif
 // The first kernel a translation unit sees claims it; a different one after it compiles
 // nothing, so the #error above is the whole of the failure rather than the first of hundreds.
-#if !defined(WILDWINTER_EXPR_k9821750c_ERRORS_H) && (!defined(WILDWINTER_EXPR_KERNEL) || WILDWINTER_EXPR_KERNEL == 0x9821750c)
-#define WILDWINTER_EXPR_k9821750c_ERRORS_H
-#define WILDWINTER_EXPR_KERNEL 0x9821750c
+#if !defined(WILDWINTER_EXPR_k492cf234_ERRORS_H) && (!defined(WILDWINTER_EXPR_KERNEL) || WILDWINTER_EXPR_KERNEL == 0x492cf234)
+#define WILDWINTER_EXPR_k492cf234_ERRORS_H
+#define WILDWINTER_EXPR_KERNEL 0x492cf234
 
 #include <stdexcept>
 #include <string>
@@ -78,7 +78,7 @@
 #endif
 #endif
 
-namespace wildwinter { namespace expr { inline namespace k9821750c
+namespace wildwinter { namespace expr { inline namespace k492cf234
 {
     /** An expression that cannot be evaluated: a type error, an unknown
      *  operator or function, a malformed AST node, a division by zero. */

@@ -131,12 +131,35 @@ func set_value(name: String, value, opts: Dictionary = {}) -> Dictionary:
 	if opts.has("reason"):
 		change["reason"] = opts["reason"]
 	values[n] = value
-	for audit in _auditors:
-		audit.call(change)
+	_notify(_auditors, change)
 	if not change["silent"]:
-		for fn in _subscribers:
-			fn.call(change)
+		_notify(_subscribers, change)
 	return change
+
+
+## Tell each listener as the list stood when the write began, whatever any of them does
+## to it meanwhile (the registry corpus's contract). Until October 2026 this walked the
+## live array, so a listener that unsubscribed made the next one miss the write. A
+## Callable whose object has been freed is skipped and dropped, rather than raising an
+## error on this write and every later one.
+func _notify(listeners: Array, change: Dictionary) -> void:
+	var stale := false
+	for fn in listeners.duplicate():
+		if (fn as Callable).is_valid():
+			fn.call(change)
+		else:
+			stale = true
+	if stale:
+		for i in range(listeners.size() - 1, -1, -1):
+			if not (listeners[i] as Callable).is_valid():
+				listeners.remove_at(i)
+
+
+## Whether a STORY write to this property is allowed: false only for a declaration
+## marked writable false. A host write is always allowed.
+func is_writable(name: String) -> bool:
+	var n: String = _normalise.call(name)
+	return not (_decls.has(n) and _decls[n].get("writable", true) == false)
 
 
 ## Notified of engine (non-silent) writes. Returns the unsubscribe Callable.

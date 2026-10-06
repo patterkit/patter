@@ -103,11 +103,27 @@ namespace Wildwinter.Expr
     {
         public static ExprValue Evaluate(ExprNode node, EvalContext ctx, Dialect dialect)
         {
-            // Per-scope missing-property policy, precomputed once per top-level evaluate.
-            var missingPolicy = new Dictionary<string, string>();
-            foreach (var s in dialect.Scopes) missingPolicy[s.Token] = s.Missing ?? MissingPolicy.False;
+            return new Evaluation(ctx, dialect).Rec(node);
+        }
 
-            ExprValue Rec(ExprNode n)
+        /// <summary>One top-level evaluation: the context and dialect it reads, and the
+        /// helpers its function calls share. It is the only object an evaluation allocates
+        /// for itself. Until October 2026 every Evaluate built a policy table and a closure,
+        /// and every function call a delegate and an EvalHelpers, on the hot path of every
+        /// condition a game checks.</summary>
+        private sealed class Evaluation
+        {
+            private readonly EvalContext ctx;
+            private readonly Dialect dialect;
+            private EvalHelpers helpers;
+
+            internal Evaluation(EvalContext ctx, Dialect dialect)
+            {
+                this.ctx = ctx;
+                this.dialect = dialect;
+            }
+
+            internal ExprValue Rec(ExprNode n)
             {
                 switch (n)
                 {
@@ -126,7 +142,7 @@ namespace Wildwinter.Expr
                         if (val == null)
                         {
                             // Property not declared on the present scope. Policy decides.
-                            if (missingPolicy.TryGetValue(sv.Scope, out var policy) && policy == MissingPolicy.Throw)
+                            if (MissingPolicyOf(sv.Scope) == MissingPolicy.Throw)
                             {
                                 throw new ExprError($"@{sv.Scope}.{sv.Name} is not declared on the current {sv.Scope}.");
                             }
@@ -158,7 +174,8 @@ namespace Wildwinter.Expr
                         {
                             throw new ExprError($"unknown function '{call.Name}'");
                         }
-                        return def.Eval(call.Args, new EvalHelpers { Evaluate = Rec, Ctx = ctx });
+                        // One EvalHelpers per evaluation, made at its first call, shared by the rest.
+                        return def.Eval(call.Args, helpers ??= new EvalHelpers { Evaluate = Rec, Ctx = ctx });
                     }
 
                     case FlagDeltaNode _:
@@ -256,7 +273,18 @@ namespace Wildwinter.Expr
                 }
             }
 
-            return Rec(node);
+            /// <summary>A scope's missing-property policy, read from the dialect when a property
+            /// is missing (the rare path) rather than tabled on every evaluation. The last scope
+            /// with the token wins, as the table built from the list did.</summary>
+            private string MissingPolicyOf(string token)
+            {
+                string policy = null;
+                foreach (var s in dialect.Scopes)
+                {
+                    if (s.Token == token) policy = s.Missing ?? MissingPolicy.False;
+                }
+                return policy;
+            }
         }
 
         /// <summary>JS typeof for error messages (a flags array is "object").</summary>

@@ -64,6 +64,9 @@ runtime behaviour.
 
 ### Fixed
 
+- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every
+  listener registered when a write starts hears it exactly once, and the hot path allocates less, with no leaks.
+  A game combining Patterplay and the Storylet Engine needs both on this kernel.
 - **A bare-snippet option can be sticky, a fallback, or secret until eligible.** The bundle loader read those
   flags on an Option group only, so the same flags on a snippet option were lost. The corpus test host had the
   same gap, so the corpus could not see it.

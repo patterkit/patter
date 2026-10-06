@@ -51,35 +51,37 @@ jobs:
       # (from-storylets/godot-addon-scripts-are-never-all-parsed).
       - name: Every addon script parses
         run: GODOT="$PWD/godot" ports/godot/test/parse_check.sh
+      # Each test runs through run.sh: Godot exits 0 (or hangs) when a test script fails to compile,
+      # because the script never reaches its own quit(1), so a broken test would otherwise pass.
       - name: Conformance corpus (and the expr parity corpus beside it)
-        run: ./godot --headless --path ports/godot --script res://test/test_corpus.gd -- "$PWD/packages/conformance/corpus.json"
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_corpus.gd -- "$PWD/packages/conformance/corpus.json"
       # The decision trace. Its own test rather than a corpus case: the corpus pins what
       # the engine PRODUCES, and this is about what it decided on the way.
       - name: The event log records the decisions
-        run: ./godot --headless --path ports/godot --script res://test/test_trace_log.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_trace_log.gd
       # The Runtime State panel, headless. Nothing else runs the walk it does: the registry,
       # each engine's properties and log, and the Live Link's status.
       - name: The state panel draws what it is given
-        run: ./godot --headless --path ports/godot --script res://test/test_state_panel.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_state_panel.gd
       # One registry per game: the engine's side of it (keys, owner, saves with and without the
       # game's registry, either load order, old saves, clashes, reset, hot swap) and the save's
       # version 3 shape. Neither is in the corpus, which runs one engine on its own.
       - name: One registry per game
-        run: ./godot --headless --path ports/godot --script res://test/test_one_registry.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_one_registry.gd
       - name: The save's shape
-        run: ./godot --headless --path ports/godot --script res://test/test_save_shape.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_save_shape.gd
       # Flows and their bags are RefCounted, so a reference cycle among them is never collected: every
       # flow ever opened leaked until 2026-10. A dropped flow must be freed, and so must its bags.
       - name: A flow the game lets go of is freed
-        run: ./godot --headless --path ports/godot --script res://test/test_flow_lifetime.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_flow_lifetime.gd
       # A greyed option is offered, never taken: the other three runtimes refuse it, and the corpus
       # has no way to expect an error from a port that cannot throw.
       - name: A greyed choice option cannot be chosen
-        run: ./godot --headless --path ports/godot --script res://test/test_choose.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_choose.gd
       # Content errors play through and are reported: the corpus pins what plays, this pins the
       # on_error report and the log's diagnostic entries, and that a refused load changes nothing.
       - name: Content errors are reported, and a refused load changes nothing
-        run: ./godot --headless --path ports/godot --script res://test/test_play_errors.gd
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_play_errors.gd
 
   # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
   # makes that hard: an installed, activated Unity compiles from the command line, and

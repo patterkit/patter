@@ -66,6 +66,9 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Fixed
 
+- **`@wildwinter/expr` 0.5.1 and `@wildwinter/scoperegistry` 0.8.1 (kernel `k492cf234`):** a listener's own
+  error is no longer reported as a read-only refusal, every listener registered when a write starts hears it
+  exactly once, and the hot path allocates less, with no leaks.
 - **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
   standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
   rolling back used to drop those values, so the next real entry found the defaults and the next save left them

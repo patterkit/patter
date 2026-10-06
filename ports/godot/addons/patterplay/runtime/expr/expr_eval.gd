@@ -84,14 +84,34 @@ static func value_equals(a, b) -> bool:
 
 ## Evaluate `node` in `ctx` under `dialect`; a scalar value or an EvalError.
 static func evaluate(node: Array, ctx: Dictionary, dialect: Dictionary) -> Variant:
-	# Per-scope missing-property policy, precomputed once per top-level evaluate.
-	var policy := {}
+	# `run` is the one thing an evaluation allocates for itself: it holds the helpers its
+	# function calls share, made at the first call. Until October 2026 every evaluate
+	# built a missing-policy table, and every function call a helpers Dictionary and a
+	# lambda, on the hot path of every condition a game checks.
+	#
+	# The helpers' lambda captures `run` (and `ctx`), and `run` holds the helpers: a
+	# reference cycle, which Godot's reference counting never collects. So the evaluation
+	# empties `run` when it ends, or every evaluation that reached a function call leaked
+	# its run, the lambda, and everything `ctx` holds (found by the Storylet Engine's
+	# leak counts, October 2026).
+	var run := {}
+	var out = _rec(node, ctx, dialect, run)
+	run.clear()
+	return out
+
+
+## A scope's missing-property policy, read from the dialect when a property is missing
+## (the rare path) rather than tabled on every evaluation. The last scope with the token
+## wins, as the table built from the list did.
+static func _missing_policy(dialect: Dictionary, token) -> Variant:
+	var policy = null
 	for sc in dialect.get("scopes", []):
-		policy[sc["token"]] = sc.get("missing", "false")
-	return _rec(node, ctx, dialect, policy)
+		if sc["token"] == token:
+			policy = sc.get("missing", "false")
+	return policy
 
 
-static func _rec(node: Array, ctx: Dictionary, dialect: Dictionary, policy: Dictionary) -> Variant:
+static func _rec(node: Array, ctx: Dictionary, dialect: Dictionary, run: Dictionary) -> Variant:
 	var tag = node[0]
 	match tag:
 		"b":
@@ -117,16 +137,16 @@ static func _rec(node: Array, ctx: Dictionary, dialect: Dictionary, policy: Dict
 				v = bag.get(name)
 			if v == null:
 				# Property not declared on the PRESENT scope. Policy decides.
-				if policy.get(scope) == "throw":
+				if _missing_policy(dialect, scope) == "throw":
 					return error("@%s.%s is not declared on the current %s." % [scope, name, scope])
 				return false
 			return v
 		"call":
-			return _eval_call(node, ctx, dialect, policy)
+			return _eval_call(node, ctx, dialect, run)
 		"fd":
 			return error("flagdelta node is only valid as an argument to a flag-delta function")
 		"u":
-			var v = _rec(node[2], ctx, dialect, policy)
+			var v = _rec(node[2], ctx, dialect, run)
 			if is_error(v):
 				return v
 			if node[1] == "not":
@@ -138,16 +158,16 @@ static func _rec(node: Array, ctx: Dictionary, dialect: Dictionary, policy: Dict
 				return error("unary '-' requires a numeric operand, got %s" % type_name(v))
 			return -float(v)
 		"bin":
-			return _eval_binary(node, ctx, dialect, policy)
+			return _eval_binary(node, ctx, dialect, run)
 	return error("unknown ast node '%s'" % str(tag))
 
 
-static func _eval_binary(node: Array, ctx: Dictionary, dialect: Dictionary, policy: Dictionary) -> Variant:
+static func _eval_binary(node: Array, ctx: Dictionary, dialect: Dictionary, run: Dictionary) -> Variant:
 	var op = node[1]
 
 	# Short-circuit operators first.
 	if op == "and" or op == "or":
-		var l = _rec(node[2], ctx, dialect, policy)
+		var l = _rec(node[2], ctx, dialect, run)
 		if is_error(l):
 			return l
 		if typeof(l) != TYPE_BOOL:
@@ -156,17 +176,17 @@ static func _eval_binary(node: Array, ctx: Dictionary, dialect: Dictionary, poli
 			return false
 		if op == "or" and l:
 			return true
-		var r = _rec(node[3], ctx, dialect, policy)
+		var r = _rec(node[3], ctx, dialect, run)
 		if is_error(r):
 			return r
 		if typeof(r) != TYPE_BOOL:
 			return error("'%s' requires boolean operands, right is %s" % [op, type_name(r)])
 		return r
 
-	var left = _rec(node[2], ctx, dialect, policy)
+	var left = _rec(node[2], ctx, dialect, run)
 	if is_error(left):
 		return left
-	var right = _rec(node[3], ctx, dialect, policy)
+	var right = _rec(node[3], ctx, dialect, run)
 	if is_error(right):
 		return right
 
@@ -262,7 +282,7 @@ static func _stage_index(value, ladder: Variant, op: String) -> Variant:
 	return i
 
 
-static func _eval_call(node: Array, ctx: Dictionary, dialect: Dictionary, policy: Dictionary) -> Variant:
+static func _eval_call(node: Array, ctx: Dictionary, dialect: Dictionary, run: Dictionary) -> Variant:
 	var fn = node[1]
 	var args: Array = node.slice(2)
 	var functions: Dictionary = dialect.get("functions", {})
@@ -276,7 +296,7 @@ static func _eval_call(node: Array, ctx: Dictionary, dialect: Dictionary, policy
 		var ladder = _ladder_of(args[0], ctx)
 		if ladder == null:
 			return error("advance() needs a quality reference (@scope.name of a quality property)")
-		var current = _rec(args[0], ctx, dialect, policy)
+		var current = _rec(args[0], ctx, dialect, run)
 		if is_error(current):
 			return current
 		var idx = _stage_index(current, ladder, "advance")
@@ -285,8 +305,10 @@ static func _eval_call(node: Array, ctx: Dictionary, dialect: Dictionary, policy
 		return str((ladder as Array)[mini(int(idx) + 1, (ladder as Array).size() - 1)])
 	if not functions.has(fn):
 		return error("unknown function '%s'" % str(fn))
-	var helpers := {
-		"evaluate": func(child: Array): return _rec(child, ctx, dialect, policy),
-		"ctx": ctx,
-	}
-	return (functions[fn] as Callable).call(args, helpers)
+	# One helpers Dictionary per evaluation, made at its first call, shared by the rest.
+	if not run.has("helpers"):
+		run["helpers"] = {
+			"evaluate": func(child: Array): return _rec(child, ctx, dialect, run),
+			"ctx": ctx,
+		}
+	return (functions[fn] as Callable).call(args, run["helpers"])

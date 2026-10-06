@@ -29,8 +29,8 @@
 #include "Patter/Expr/ScopeRegistry.h"
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k9821750c_TESTING_REGISTRYCORPUS_H) && WILDWINTER_EXPR_KERNEL == 0x9821750c
-#define WILDWINTER_EXPR_k9821750c_TESTING_REGISTRYCORPUS_H
+#if !defined(WILDWINTER_EXPR_k492cf234_TESTING_REGISTRYCORPUS_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
+#define WILDWINTER_EXPR_k492cf234_TESTING_REGISTRYCORPUS_H
 
 #include <cmath>
 #include <cstddef>
@@ -39,6 +39,7 @@
 #include <exception>
 #include <fstream>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -47,7 +48,7 @@
 #include <utility>
 #include <vector>
 
-namespace wildwinter { namespace expr { inline namespace k9821750c { namespace testing
+namespace wildwinter { namespace expr { inline namespace k492cf234 { namespace testing
 {
     namespace registrycorpus
     {
@@ -459,6 +460,13 @@ namespace wildwinter { namespace expr { inline namespace k9821750c { namespace t
             return v && v->isString() ? std::optional<std::string>(v->str) : std::nullopt;
         }
 
+        inline std::string NeedString(const Json& step, const std::string& key)
+        {
+            std::optional<std::string> v = OptString(step, key);
+            if (!v.has_value()) throw std::runtime_error("the step has no string '" + key + "'");
+            return *v;
+        }
+
         inline bool Flag(const Json& step, const std::string& key)
         {
             const Json* v = step.find(key);
@@ -486,6 +494,24 @@ namespace wildwinter { namespace expr { inline namespace k9821750c { namespace t
             ScopeRegistry r;
             OrderedMap<std::string, std::shared_ptr<Store>> stores;
             const Dialect dialect = CorpusDialect();
+            // Each listener's record of the names it heard, and its unsubscribe. Shared
+            // pointers, because a listener outlives the step that attached it.
+            auto heard = std::make_shared<std::map<std::string, std::vector<std::string>>>();
+            auto unsubscribes = std::make_shared<std::map<std::string, PropertyBag::Unsubscribe>>();
+
+            // A case may need a capability a language lacks (`needs`). C++ has every one the
+            // corpus names; one this runner has never heard of is a failure, not a skip.
+            if (const Json* needs = c.find("needs"); needs && needs->isArray())
+            {
+                for (const auto& need : needs->arr)
+                {
+                    if (!need.isString() || need.str != "exceptions")
+                    {
+                        fails.push_back(caseName + ": needs " + Show(need) + ", which this runner does not know (a corpus newer than this runner)");
+                    }
+                }
+                if (!fails.empty()) return fails;
+            }
 
             // Run fn. With want, it must throw a message containing want;
             // without, it must not throw. True when it ran without throwing.
@@ -689,6 +715,47 @@ namespace wildwinter { namespace expr { inline namespace k9821750c { namespace t
                             if (!Same(summary, expect)) fails.push_back(at + ": read " + Show(summary) + ", expected " + Show(expect));
                         }
                     }
+                    else if (op == "listen")
+                    {
+                        const std::string id = NeedString(step, "id");
+                        (*heard)[id] = {};
+                        std::optional<std::string> unsubscribe, raise;
+                        if (const Json* then = step.find("then"); then && then->isObject())
+                        {
+                            unsubscribe = OptString(*then, "unsubscribe");
+                            raise = OptString(*then, "throw");
+                        }
+                        PropertyBag::Listener fn = [heard, unsubscribes, id, unsubscribe, raise](const BagChange& change)
+                        {
+                            (*heard)[id].push_back(change.name);
+                            if (unsubscribe.has_value())
+                            {
+                                auto off = unsubscribes->find(*unsubscribe);
+                                if (off != unsubscribes->end()) off->second();
+                            }
+                            if (raise.has_value()) throw std::runtime_error(*raise);
+                        };
+                        const auto& bag = r.ownedBag(NeedString(step, "scope"));
+                        (*unsubscribes)[id] = OptString(step, "kind").value_or("subscribe") == "audit"
+                            ? bag->onAudit(std::move(fn)) : bag->subscribe(std::move(fn));
+                    }
+                    else if (op == "heard")
+                    {
+                        const std::string id = NeedString(step, "id");
+                        std::optional<Json> got;
+                        auto record = heard->find(id);
+                        if (record != heard->end())
+                        {
+                            Json list = Json::MakeArray();
+                            for (const auto& name : record->second) list.arr.push_back(Json::MakeString(name));
+                            got = std::move(list);
+                        }
+                        const Json& expect = Need(step, "expect");
+                        if (!Same(got, std::optional<Json>(expect)))
+                        {
+                            fails.push_back(at + ": listener " + id + " heard " + (got ? Show(*got) : std::string("<unset>")) + ", expected " + Show(expect));
+                        }
+                    }
                     else
                     {
                         // The reference's step union has no other member, so a
@@ -714,7 +781,7 @@ namespace wildwinter { namespace expr { inline namespace k9821750c { namespace t
     };
 
     /** The corpus version this runner understands. */
-    constexpr int REGISTRY_CORPUS_VERSION = 1;
+    constexpr int REGISTRY_CORPUS_VERSION = 2;   // 2: listeners (listen, heard) and a case's `needs`
 
     /** Run the registry corpus at `path`. A corpus that is missing, unreadable,
      *  empty or of a version this runner does not know is a FAILURE, never a

@@ -110,6 +110,20 @@ namespace Wildwinter.Expr.Testing
             var stores = new Dictionary<string, OrderedMap<string, ExprValue>>();
             string caseName = NameOf(c);
             var steps = (List<object>)c.GetOrDefault("steps");
+            // Each listener's record of the names it heard, and its unsubscribe.
+            var heard = new Dictionary<string, List<object>>();
+            var unsubscribes = new Dictionary<string, Action>();
+
+            // A case may need a capability a language lacks (`needs`). C# has every one the
+            // corpus names; one this runner has never heard of is a failure, not a skip.
+            if (c.GetOrDefault("needs") is List<object> needs)
+            {
+                foreach (var need in needs)
+                {
+                    if ((need as string) != "exceptions") fails.Add($"{caseName}: needs '{need}', which this runner does not know (a corpus newer than this runner)");
+                }
+                if (fails.Count > 0) return fails;
+            }
 
             // Run `fn`. With `want`, it must throw a message containing `want`; without,
             // it must not throw. Returns true when it ran without throwing.
@@ -321,6 +335,33 @@ namespace Wildwinter.Expr.Testing
                             var want = Expected(step, "expect");
                             if (!Same(summary, want)) fails.Add($"{at}: read {Show(summary)}, expected {Show(want)}");
                         }
+                        break;
+                    }
+
+                    case "listen":
+                    {
+                        string id = Str(step, "id");
+                        var record = new List<object>();
+                        heard[id] = record;
+                        var then = step.GetOrDefault("then") as OrderedMap<string, object>;
+                        string unsubscribe = then == null ? null : Str(then, "unsubscribe");
+                        string raise = then == null ? null : Str(then, "throw");
+                        Action<BagChange> fn = change =>
+                        {
+                            record.Add(change.Name);
+                            if (unsubscribe != null && unsubscribes.TryGetValue(unsubscribe, out var off)) off();
+                            if (raise != null) throw new InvalidOperationException(raise);
+                        };
+                        var bag = r.OwnedBag(Str(step, "scope"));
+                        unsubscribes[id] = Str(step, "kind") == "audit" ? bag.OnAudit(fn) : bag.Subscribe(fn);
+                        break;
+                    }
+
+                    case "heard":
+                    {
+                        object got = heard.TryGetValue(Str(step, "id"), out var record) ? (object)record : Unset;
+                        var want = Expected(step, "expect");
+                        if (!Same(got, want)) fails.Add($"{at}: listener {Str(step, "id")} heard {Show(got)}, expected {Show(want)}");
                         break;
                     }
 

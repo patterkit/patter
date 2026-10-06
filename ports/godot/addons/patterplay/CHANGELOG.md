@@ -48,6 +48,9 @@ same runtime behaviour.
 
 ### Fixed
 
+- **Expression kernel `k492cf234`:** a listener's own error is no longer reported as a read-only refusal, every
+  listener registered when a write starts hears it exactly once (a listener whose object was freed is dropped),
+  and the hot path allocates less, with no leaks.
 - **A greyed-out choice option can no longer be chosen.** `choose()` accepted an option whose condition was
   false, played its content and used it up. It now reports `choice option is not eligible` and leaves the choice
   open, as the other three runtimes do.

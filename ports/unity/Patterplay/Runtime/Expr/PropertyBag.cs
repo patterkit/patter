@@ -101,8 +101,11 @@ namespace Wildwinter.Expr
         public OrderedMap<string, ExprValue> Values { get; } = new OrderedMap<string, ExprValue>();
 
         private OrderedMap<string, ScopeDeclaration> _decls = new OrderedMap<string, ScopeDeclaration>();
-        private readonly List<Action<BagChange>> _subscribers = new List<Action<BagChange>>();
-        private readonly List<Action<BagChange>> _auditors = new List<Action<BagChange>>();
+        // Copy-on-write: subscribing and unsubscribing REPLACE an array, never edit one, so a
+        // write iterates the listeners as they stood when it began (the registry corpus's
+        // contract) with no copy of its own. Two copies per write until October 2026.
+        private Action<BagChange>[] _subscribers = Array.Empty<Action<BagChange>>();
+        private Action<BagChange>[] _auditors = Array.Empty<Action<BagChange>>();
 
         /// <summary>Name normalisation policy: lowercase by default (the registry's
         /// long-standing contract); a product whose names are case-significant
@@ -167,23 +170,53 @@ namespace Wildwinter.Expr
                 Reason = reason,
             };
             Values.Set(n, value);
-            foreach (var audit in _auditors.ToArray()) audit(change);
-            if (!change.Silent) foreach (var fn in _subscribers.ToArray()) fn(change);
+            foreach (var audit in _auditors) audit(change);
+            if (!change.Silent) foreach (var fn in _subscribers) fn(change);
             return change;
         }
 
         /// <summary>Notified of engine (non-silent) writes. Returns the unsubscribe.</summary>
         public Action Subscribe(Action<BagChange> fn)
         {
-            _subscribers.Add(fn);
-            return () => _subscribers.Remove(fn);
+            _subscribers = With(_subscribers, fn);
+            return () => _subscribers = Without(_subscribers, fn);
         }
 
         /// <summary>Notified of EVERY write, silent or not. Returns the unsubscribe.</summary>
         public Action OnAudit(Action<BagChange> fn)
         {
-            _auditors.Add(fn);
-            return () => _auditors.Remove(fn);
+            _auditors = With(_auditors, fn);
+            return () => _auditors = Without(_auditors, fn);
+        }
+
+        /// <summary>Whether a STORY write to this property is allowed: false only for a
+        /// declaration marked Writable = false. A host write is always allowed. The registry
+        /// asks before writing, so it never has to read a refusal out of an exception that a
+        /// listener might have thrown instead.</summary>
+        public bool IsWritable(string name)
+        {
+            var decl = _decls.GetOrDefault(_norm(name));
+            return decl == null || decl.Writable != false;
+        }
+
+        private static Action<BagChange>[] With(Action<BagChange>[] list, Action<BagChange> fn)
+        {
+            var next = new Action<BagChange>[list.Length + 1];
+            Array.Copy(list, next, list.Length);
+            next[list.Length] = fn;
+            return next;
+        }
+
+        /// <summary>The list without fn's first occurrence (List.Remove's rule, so a listener
+        /// added twice is removed once per unsubscribe).</summary>
+        private static Action<BagChange>[] Without(Action<BagChange>[] list, Action<BagChange> fn)
+        {
+            var at = Array.IndexOf(list, fn);
+            if (at < 0) return list;
+            var next = new Action<BagChange>[list.Length - 1];
+            Array.Copy(list, 0, next, 0, at);
+            Array.Copy(list, at + 1, next, at, list.Length - at - 1);
+            return next;
         }
 
         /// <summary>Examiner rows: the declared surface only (stray values are

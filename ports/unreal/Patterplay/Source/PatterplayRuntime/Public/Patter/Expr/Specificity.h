@@ -16,8 +16,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k9821750c_SPECIFICITY_H) && WILDWINTER_EXPR_KERNEL == 0x9821750c
-#define WILDWINTER_EXPR_k9821750c_SPECIFICITY_H
+#if !defined(WILDWINTER_EXPR_k492cf234_SPECIFICITY_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
+#define WILDWINTER_EXPR_k492cf234_SPECIFICITY_H
 
 #include <algorithm>
 #include <functional>
@@ -26,7 +26,7 @@
 
 #include "Ast.h"
 
-namespace wildwinter { namespace expr { inline namespace k9821750c
+namespace wildwinter { namespace expr { inline namespace k492cf234
 {
     /** Evaluate an expression subtree to a boolean, with the host's own
      *  truthiness coercion (storylets' conditionPasses). */
