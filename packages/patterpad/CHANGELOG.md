@@ -31,6 +31,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   project was reopened.
 - **The Coverage window no longer reports "0 stalled at a choice".** A run can't stall any more, since a choice
   with nothing to pick now runs dry and play moves on, so the count is shown only if one ever does.
+- **A new option starts with its choice text.** Adding an option to a choice put the caret on the option's
+  first line, under a choice text not yet written. It now lands in the choice text, as a new choice's first
+  option always has, and the line below follows.
 - **No stray "Replaced across the project".** Reimporting an editable script, and accepting or rejecting
   suggestions, also showed the message that belongs to Replace. Now only Replace says it.
 - **The inspector's Jump row names the destination.** Right after opening a project, a jump to another scene

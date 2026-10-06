@@ -29,6 +29,14 @@ function optionPos(s: EditorState, n: number): number {
   return p;
 }
 const choiceOf = (s: EditorState): Group => docToScene(s.doc).scene.blocks[0]!.children[0] as Group;
+/** True when the caret is in the prompt cell of the choice's option number `n`. */
+function caretInPromptOf(s: EditorState, n: number): boolean {
+  const start = optionPos(s, n) + 1;
+  const prompt = s.doc.nodeAt(start);
+  if (prompt?.type.name !== "optionprompt") return false;
+  const { from } = s.selection;
+  return from > start && from < start + prompt.nodeSize;
+}
 
 describe("choice option editing", () => {
   it("insertOption appends an Option group with a seeded bubble", () => {
@@ -40,7 +48,7 @@ describe("choice option editing", () => {
     expect(choice.children).toHaveLength(2);
     expect((choice.children[1] as Group).type).toBe("group");          // the new option is an Option group
     expect((choice.children[1] as Group).children[0]!.type).toBe("snippet"); // ...with a bubble
-    expect(context(out).zone?.role).toBe("cue");                       // dialogue content -> caret in the cue (cast popup opens)
+    expect(caretInPromptOf(out, 1)).toBe(true);                        // the choice text first, as a new choice does
   });
 
   it("setGroupProps edits an option's secret flag", () => {
@@ -61,7 +69,7 @@ describe("choice option editing", () => {
     expect(kids).toHaveLength(2);
     expect(kids[0]!.id).toBe(firstId);                       // original stays first
     expect(kids[1]!.type).toBe("group");                     // the fresh option follows it
-    expect(context(out).zone?.role).toBe("cue");             // dialogue content -> caret in the cue (as insertOption)
+    expect(caretInPromptOf(out, 1)).toBe(true);              // the choice text first, as insertOption
   });
 
   it("insertOptionAfter refuses a non-option group (not a choice's child)", () => {

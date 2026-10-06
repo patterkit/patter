@@ -46,7 +46,7 @@ const groupNode = (raw: object, children: PMNode[]): PMNode => S.node("group", {
  *  Accepts the inner beat's id so a caller can land the caret on the prompt it just made. */
 const optionPromptNode = (id: string = newId("L")): PMNode => S.node("optionprompt", null, [S.node("prose", { id, raw: "{}" }, [S.node("say", null, [])])]);
 /** An Option group: the prompt cell first, then the option's content run (§8 / §13.10). */
-const optionGroup = (content: PMNode): PMNode => groupNode({ id: newId("opt"), type: "group" }, [optionPromptNode(), content]);
+const optionGroup = (content: PMNode, promptId: string = newId("L")): PMNode => groupNode({ id: newId("opt"), type: "group" }, [optionPromptNode(promptId), content]);
 
 /** The `raw` model object (id + selector + options) for a group preset (shared by create + wrap). */
 function groupRaw(kind: GroupKind): Record<string, unknown> {
@@ -474,9 +474,12 @@ export function insertOption(state: EditorState, choicePos: number): Transaction
   // The option's CONTENT follows the snippet BEFORE the whole choice - not the option prompt (always
   // text, so unhelpful) nor a sibling option's content. Measure from the choice's own position.
   const line = emptyBeat(prevBeatKind(state.doc, choicePos));
-  const option = optionGroup(bubbleWith(line)); // prompt cell + a seeded content bubble (§13.10)
+  const promptId = newId("L");
+  const option = optionGroup(bubbleWith(line), promptId); // prompt cell + a seeded content bubble (§13.10)
   const tr = state.tr.insert(choicePos + node.nodeSize - 1, option); // just inside the choice's end
-  landOnBeat(tr, line.attrs.id as string); // dialogue lands in the cue (popup); text in content
+  // The caret lands in the PROMPT, as it does in a new choice's first option: the choice text is what an
+  // author writes first, then what follows it.
+  landOnBeat(tr, promptId);
   return tr.scrollIntoView();
 }
 
@@ -489,9 +492,10 @@ export function insertOptionAfter(state: EditorState, optionPos: number): Transa
   if (!isChoiceGroup($opt.parent)) return null;
   // Follow the snippet BEFORE the whole choice (its position), not the prompt or a sibling option.
   const line = emptyBeat(prevBeatKind(state.doc, $opt.before($opt.depth)));
-  const option = optionGroup(bubbleWith(line)); // prompt cell + a seeded content bubble (§13.10)
+  const promptId = newId("L");
+  const option = optionGroup(bubbleWith(line), promptId); // prompt cell + a seeded content bubble (§13.10)
   const tr = state.tr.insert(optionPos + node.nodeSize, option); // after this option
-  landOnBeat(tr, line.attrs.id as string); // dialogue lands in the cue (popup); text in content
+  landOnBeat(tr, promptId); // the choice text first, as insertOption
   return tr.scrollIntoView();
 }
 
