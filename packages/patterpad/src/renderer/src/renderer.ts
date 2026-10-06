@@ -172,10 +172,22 @@ const inspectorStackEl = $("inspector-stack");
 shell.inspector.append($("inspector-label"), inspectorStackEl);
 frameHost.hidden = false;
 
+/** The project kits New Project offers. One today: what `patter init` writes (ops/src/init.ts),
+ *  said in the concrete. More arrive as the Patter side specifies them; inventing plausible ones
+ *  here would be putting content in front of a decision (the kit gallery brief, section 7). */
+const PROJECT_KITS = [
+  { id: "starter" as const, name: "Starter project",
+    blurb: "A scene called Start with one line of narration in it, so the project plays the moment it opens. Replace that line with your own writing.",
+    tile: "One scene, one line of narration, ready to play.",
+    features: ["A first scene", "Playable at once"],
+    play: "Press Play: the Start scene plays its line.",
+    lands: ["A scene called Start", "One line of narration in English, your default language"] },
+];
+
 const welcomeEl = $("welcome");
 const hintbarEl = $("hintbar");
 // The welcome is the shell's `mountWelcome` (ui-review-2026-09, finding 10): title, one line, the two
-// actions, the shipped examples and the recents. The examples are tiles, as Storyletter's welcome draws
+// actions, the kits, the shipped examples and the recents. The examples are tiles, as Storyletter's welcome draws
 // its own (2026-09-30): the Tour and the Night Ferry ship inside the app, so the teaching door that used
 // to open the download page is a tile now, and each opens as the writer's own copy.
 const welcome = mountWelcome(welcomeEl, {
@@ -186,11 +198,17 @@ const welcome = mountWelcome(welcomeEl, {
     { label: "New project…", onClick: () => createDialog() },
   ],
   recents: [],
-  // An example is never opened in place (it lives inside the installed app, which is read-only and
-  // replaced by the next update), so opening one asks for a folder. Say so BEFORE the click.
-  groups: [{ caption: "Learn from a finished project", note: "Each opens as your own copy, in a folder you choose.", tiles: true,
-    items: EXAMPLES.map((x) => ({ name: x.name, hint: x.tile ?? x.hint, ...(x.features ? { features: [...x.features] } : {}),
-      ...(x.badge !== undefined ? { badge: x.badge } : {}), onOpen: () => createDialog(`example:${x.file}`) })) }],
+  // Start, then Learn (storylet-studio/design/kit-gallery.md, section 6), as Storyletter's welcome has
+  // them: a kit tile opens New Project with that kit chosen, its details panel already showing.
+  groups: [
+    { caption: "Start from a kit", tiles: true,
+      items: PROJECT_KITS.map((k) => ({ name: k.name, hint: k.tile, features: [...k.features], onOpen: () => createDialog(k.id) })) },
+    // An example is never opened in place (it lives inside the installed app, which is read-only and
+    // replaced by the next update), so opening one asks for a folder. Say so BEFORE the click.
+    { caption: "Learn from a finished project", note: "Each opens as your own copy, in a folder you choose.", tiles: true,
+      items: EXAMPLES.map((x) => ({ name: x.name, hint: x.tile ?? x.hint, ...(x.features ? { features: [...x.features] } : {}),
+        ...(x.badge !== undefined ? { badge: x.badge } : {}), onOpen: () => createDialog(`example:${x.file}`) })) },
+  ],
   maxRecents: 8, // the store keeps eight; the welcome shows what the menu shows
 });
 function setWelcomeRecents(recents: RecentProject[]): void {
@@ -2919,17 +2937,6 @@ const patterFolderPreview = (name: string): string =>
 const buildDefaultFor = (name: string): string =>
   `../patter-dist/${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "_"}.patterc`;
 
-/** The project kits New Project offers. One today: what `patter init` writes (ops/src/init.ts),
- *  said in the concrete. More arrive as the Patter side specifies them; inventing plausible ones
- *  here would be putting content in front of a decision (the kit gallery brief, section 7). */
-const PROJECT_KITS = [
-  { id: "starter" as const, name: "Starter project",
-    blurb: "A scene called Start with one line of narration in it, so the project plays the moment it opens. Replace that line with your own writing.",
-    tile: "One scene, one line of narration, ready to play.",
-    features: ["A first scene", "Playable at once"],
-    play: "Press Play: the Start scene plays its line.",
-    lands: ["A scene called Start", "One line of narration in English, your default language"] },
-];
 
 /**
  * New Project: the shell's kit gallery (app-shell kit-gallery.ts), the same moment Storyletter's New

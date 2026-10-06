@@ -33,6 +33,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **The welcome screen offers a kit to start from,** above the finished projects, as Storyletter's does.
+  Clicking it opens New Project with that kit chosen.
 - **Menu items that need a project are greyed out when none is open,** Save, Play, Publish and Find among
   them, as they are in Storyletter. Some already were; now they all are.
 - **The Play window's head button is called Restart,** the same word as the button at the end of a run. Its
