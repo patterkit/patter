@@ -140,7 +140,11 @@ namespace Patterkit.Patterplay
     /// rows once rather than per repaint.</summary>
     public static class BundleInfo
     {
-        public static BundleDescription Describe(Bundle bundle)
+        /// <summary>The name this had before it took the name every runtime uses; goes in a later release.</summary>
+        [System.Obsolete("Use DescribeBundle, the name every Patterplay runtime uses.")]
+        public static BundleDescription Describe(Bundle bundle) => DescribeBundle(bundle);
+
+        public static BundleDescription DescribeBundle(Bundle bundle)
         {
             var d = new BundleDescription();
             d.Counts.Cast = bundle.Cast != null ? bundle.Cast.Count : 0;

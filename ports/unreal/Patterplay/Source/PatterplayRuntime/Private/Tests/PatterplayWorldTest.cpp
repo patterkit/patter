@@ -133,10 +133,10 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	// Covered structurally: HostSet and StorySet each broadcast, with bFromStory false / true.
 
 	// --- a save never carries the container; a load never writes it -------------------
-	const FString Saved = UPatterSave::SaveStateToJson(Engine);
+	const FString Saved = UPatterSave::SerializeState(Engine);
 	TestFalse(TEXT("save excludes @world"), Saved.Contains(TEXT("knows_road")));
 	World->SetBool(TEXT("knows_road"), false);
-	TestTrue(TEXT("load"), UPatterSave::LoadStateFromJson(Engine, Saved));
+	TestTrue(TEXT("load"), UPatterSave::DeserializeState(Engine, Saved));
 	TestFalse(TEXT("load left the container to the host"), World->GetBool(TEXT("knows_road")));
 	TestEqual(TEXT("still bound after load"), Engine->GetBoundWorld(), World);
 
@@ -154,10 +154,10 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("self-backed reads the default"), Plain->GetPropertyString(TEXT("@world.time_of_day")), FString(TEXT("day")));
 	TestEqual(TEXT("learn plays self-backed"), PlayScene(Plain, TEXT("l"), TEXT("learn")), FString(TEXT("You learn the road.")));
 	{
-		const FString PlainSave = UPatterSave::SaveStateToJson(Plain);
+		const FString PlainSave = UPatterSave::SerializeState(Plain);
 		TestTrue(TEXT("a self-backed @world is saved"), PlainSave.Contains(TEXT("knows_road")));
 		UPatterEngine* Reloaded = UPatterEngine::Create(Bundle);
-		TestTrue(TEXT("self-backed save loads"), UPatterSave::LoadStateFromJson(Reloaded, PlainSave));
+		TestTrue(TEXT("self-backed save loads"), UPatterSave::DeserializeState(Reloaded, PlainSave));
 		TestTrue(TEXT("and brings @world back"), Reloaded->GetPropertyBool(TEXT("@world.knows_road")));
 	}
 
@@ -176,7 +176,7 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("learn plays on the game's registry"), PlayScene(Shared, TEXT("l"), TEXT("learn")), FString(TEXT("You learn the road.")));
 		TestTrue(TEXT("the flow's bags are in the game's registry"), Registry->has("patter/flow/l/patter"));
 		TestTrue(TEXT("the world container took the story's write"), GameWorld->GetBool(TEXT("knows_road")));
-		const FString SharedSave = UPatterSave::SaveStateToJson(Shared);
+		const FString SharedSave = UPatterSave::SerializeState(Shared);
 		TestFalse(TEXT("the game saves its registry, not the engine"), SharedSave.Contains(TEXT("\"registry\"")));
 
 		// A token the registry already holds fails as the game combines its engines, and says whose.

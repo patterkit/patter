@@ -54,7 +54,7 @@ carries on as it was.
 Two demos ship **inside the addon**, under `addons/patterplay/demo/` (delete the folder freely):
 a headless **play-through demo** (`demo.gd`, the smallest possible integration) and the **Tour
 scene** (`tour.tscn`), which plays the full interactive Patter tour with clickable choice
-buttons. The tour also shows per-line audio resolution via `PatterAudio`; audio files are not
+buttons. The tour also shows per-line audio resolution via `PatterAudioResolver`; audio files are not
 bundled (playback is your platform call), so point its **audio base** at a Patter audio folder
 to hear it, or leave it unset to play silently.
 

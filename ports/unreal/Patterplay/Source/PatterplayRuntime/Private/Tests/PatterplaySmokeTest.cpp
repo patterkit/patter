@@ -121,7 +121,7 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 		}
 		TestTrue(TEXT("@patter defaults to shared"), D.properties.patter[0].shared);
 		TestFalse(TEXT("@scene defaults to per-flow"), D.properties.scene[0].properties[0].shared);
-		// beats counts what beatSequence walks; the choice prompt is a SEPARATE row.
+		// beats counts what getBeatSequence walks; the choice prompt is a SEPARATE row.
 		TestEqual(TEXT("describe beats"), D.counts.beats, 3);
 		TestEqual(TEXT("describe prompts"), D.counts.prompts, 1);
 		TestEqual(TEXT("describe game events"), D.counts.gameEvents, 1);
@@ -142,14 +142,14 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 	// call - a crash in a shipped build, and the obvious way to hold a flow from Blueprint is exactly
 	// this: a variable. Reported from the Storylet Studio side, 2026-08-29.
 	{
-		const FString Save = UPatterSave::SaveStateToJson(Engine);
+		const FString Save = UPatterSave::SerializeState(Engine);
 		TestFalse(TEXT("the save produces JSON"), Save.IsEmpty());
-		if (TestTrue(TEXT("the save loads back"), UPatterSave::LoadStateFromJson(Engine, Save)))
+		if (TestTrue(TEXT("the save loads back"), UPatterSave::DeserializeState(Engine, Save)))
 		{
 			// The wrapper the game was already holding must answer for the RESTORED flow. Before the
 			// fix this read freed memory; the test would pass or crash depending on the allocator.
 			TestFalse(TEXT("a held flow is still live after a load"), Flow->IsClosed());
-			TestEqual(TEXT("and it is still the same flow"), Flow->GetFlowId(), FString(TEXT("f")));
+			TestEqual(TEXT("and it is still the same flow"), Flow->Id(), FString(TEXT("f")));
 			const FPatterStep After = Flow->Advance();
 			TestEqual(TEXT("and it advances into the restored story"), static_cast<uint8>(After.Type), static_cast<uint8>(EPatterStepType::Choice));
 			// A choice step names its group, and each option says what kind of prompt it has (a bare snippet
@@ -182,8 +182,8 @@ bool FPatterplaySmokeTest::RunTest(const FString& Parameters)
 	{
 		UPatterEngine* Fresh = UPatterEngine::Create(Bundle);
 		UPatterFlow* Ghost = Fresh->OpenFlow(TEXT("ghost"), TEXT("s1"));
-		const FString EmptySave = UPatterSave::SaveStateToJson(Engine); // a save with flow "f", not "ghost"
-		if (TestTrue(TEXT("the other engine's save loads"), UPatterSave::LoadStateFromJson(Fresh, EmptySave)))
+		const FString EmptySave = UPatterSave::SerializeState(Engine); // a save with flow "f", not "ghost"
+		if (TestTrue(TEXT("the other engine's save loads"), UPatterSave::DeserializeState(Fresh, EmptySave)))
 		{
 			TestTrue(TEXT("a flow the save did not carry reads as closed"), Ghost->IsClosed());
 		}

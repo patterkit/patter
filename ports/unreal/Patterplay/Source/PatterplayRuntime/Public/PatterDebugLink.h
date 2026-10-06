@@ -7,7 +7,7 @@
 // compiled out entirely (see PatterplayRuntime.Build.cs), so it is safe to leave wired in. Hold the
 // returned shared pointer for as long as you want the link open:
 //
-//   Link = FPatterDebugLink::Create(Engine->GetBuildId(), TEXT("My Game"));
+//   Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));
 //   Link->FlowOpened(TEXT("main"));
 //   // ...after each Advance()/Choose():
 //   Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
@@ -23,7 +23,7 @@ class IWebSocket;
 class PATTERPLAYRUNTIME_API FPatterDebugLink : public TSharedFromThis<FPatterDebugLink>
 {
 public:
-	// Open a link to the editor. `Build` is the bundle's content hash (UPatterEngine::GetBuildId()).
+	// Open a link to the editor. `Build` is the bundle's content hash (UPatterEngine::BuildId()).
 	static TSharedRef<FPatterDebugLink> Create(const FString& Build, const FString& Project = FString(), const FString& Url = TEXT("ws://127.0.0.1:4471"));
 	~FPatterDebugLink();
 

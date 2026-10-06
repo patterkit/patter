@@ -1,6 +1,6 @@
 # The Godot tour demo: play the interactive Patter tour. Mirrors the web / Unity / Unreal tour
 # demos: step the flow, offer the choices, and (optionally) play each line's WINNING take via the
-# patteraudio.json resolver (PatterAudio) - whatever rung the audio folder holds; no rung is
+# patteraudio.json resolver (PatterAudioResolver) - whatever rung the audio folder holds; no rung is
 # hard-coded here.
 #
 # The bundle ships INSIDE the addon (demo/tour.patterc), so the demo runs straight from the
@@ -13,11 +13,11 @@
 extends Control
 
 # Preloaded by path so the demo also runs headless with a cold class cache.
-const PatterAudioScript := preload("res://addons/patterplay/runtime/audio.gd")
+const PatterAudioResolverScript := preload("res://addons/patterplay/runtime/audio_resolver.gd")
 
 var _engine: PatterEngine
 var _flow: PatterFlow
-var _audio = null  # PatterAudio, or null when the manifest is missing
+var _audio = null  # PatterAudioResolver, or null when the manifest is missing
 var _audio_base: String = ""
 
 @onready var _transcript: VBoxContainer = $Layout/Scroll/Transcript
@@ -45,7 +45,7 @@ func _ready() -> void:
 		_audio_base = ProjectSettings.globalize_path("res://").path_join("../../examples/projects/audio")
 	var manifest := FileAccess.get_file_as_string(_audio_base.path_join("patteraudio.json"))
 	if manifest != "":
-		_audio = PatterAudioScript.new(manifest, _audio_base)
+		_audio = PatterAudioResolverScript.new(manifest, _audio_base)
 
 	_start()
 

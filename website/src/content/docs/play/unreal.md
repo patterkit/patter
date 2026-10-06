@@ -50,7 +50,7 @@ dialogue widget without touching C++.
 
 To choose how the engine plays, create it with **`UPatterEngine::CreateWithOptions`** and an
 `FPatterEngineOptions`: a seed for a repeatable run, the locale to play in, a decision log (read it
-with `GetLog`), whether a chosen option's prompt is spoken back, and whether closed captions start on.
+with `Log`), whether a chosen option's prompt is spoken back, and whether closed captions start on.
 The engine's **`OnDryChoice`** event fires whenever a choice has nothing left to offer.
 
 ```cpp
@@ -65,7 +65,7 @@ references. Press **Play** in it and **`ATourDemoActor`** runs the complete inte
 tour in a UI overlay (a scrolling transcript with clickable choices), loading its bundle from
 disk, so a fresh unzip plays with no setup. **`APatterplayDemoActor`** is the minimal shared
 demo flow (the smallest render-and-choose loop, logged) to read first. The tour actor also
-shows per-line audio resolution via `UPatterAudio`; audio files are not bundled (playback is
+shows per-line audio resolution via `UPatterAudioResolver`; audio files are not bundled (playback is
 your platform call), so point its **Audio Root** at a Patter audio folder to hear it, or leave
 it empty to play silently.
 
@@ -111,7 +111,7 @@ it holds every property in the game, except values your game keeps itself and le
 container like `UPatterWorld`. The registry is saved and loaded as one.
 
 An engine you build with `Create` makes its own and acts as its own game, which is why a single
-`UPatterSave::SaveStateToJson` needs no wiring. A C++ game that wants to hold the properties itself,
+`UPatterSave::SerializeState` needs no wiring. A C++ game that wants to hold the properties itself,
 or share them with its own systems, makes the registry and hands it to the engine with
 **`UPatterEngine::CreateWithRegistry`**:
 
@@ -129,11 +129,11 @@ UPatterEngine* Engine = UPatterEngine::CreateWithRegistry(Bundle, Registry);
 
 // One save for the game: the registry's values once, and the engine's part.
 const std::string RegistryJson = patter::saveRegistry(*Registry);
-const FString PatterJson = UPatterSave::SaveStateToJson(Engine);
+const FString PatterJson = UPatterSave::SerializeState(Engine);
 
 // Load in either order: values for bags that aren't open yet wait in the registry.
 patter::loadRegistry(*Registry, RegistryJson);
-UPatterSave::LoadStateFromJson(Engine, PatterJson);
+UPatterSave::DeserializeState(Engine, PatterJson);
 ```
 
 Given a registry, the engine registers `@patter` under `patter` and each flow's and scene's bag under
@@ -148,7 +148,7 @@ every registered scope.
 without checking its names, since the Storylet Engine owns them, and lists it in the bundle. Only the
 other engine's shared values are visible. If no engine on Patterplay's registry registered that
 scope, Patterplay refuses the content before anything changes: `OpenFlow` returns null and
-`UPatterSave::LoadStateFromJson` returns false, each logging `this content names @story, which no
+`UPatterSave::DeserializeState` returns false, each logging `this content names @story, which no
 engine on this registry registered: give every engine the game's one registry` as an error. So build
 every engine on the game's one registry before opening a flow or loading a save. If another engine
 takes its scope away mid-game, a write to it fails naming the scope rather than landing in `@patter`.
@@ -223,7 +223,7 @@ cursor like a debugger. It compiles to no-ops in a Shipping build (the WebSocket
 dropped there), so it is safe to leave wired in:
 
 ```cpp
-Link = FPatterDebugLink::Create(Engine->GetBuildId(), TEXT("My Game"));   // Link: TSharedPtr<FPatterDebugLink>
+Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));   // Link: TSharedPtr<FPatterDebugLink>
 Link->FlowOpened(TEXT("main"));
 // ...after each Advance()/Choose() (map EPatterStepType -> "line"/"text"/"gameEvent"/"choice"/"end"):
 Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));
@@ -242,7 +242,7 @@ loads here. A save written before property values moved into the registry (versi
 and its values move into the registry as it does.
 
 Use **`UPatterSave`**, which is Blueprint-callable and gives you the JSON to write where you like:
-`SaveStateToJson(Engine)` returns it, `LoadStateFromJson(Engine, Json)` restores it and returns
+`SerializeState(Engine)` returns it, `DeserializeState(Engine, Json)` restores it and returns
 whether the file was accepted (a refusal is logged with its reason).
 
 Prefer it over reaching past the wrapper. Loading REBUILDS the engine's flows, so any `UPatterFlow`

@@ -12,6 +12,8 @@ runtime behaviour.
 - **`Flow::reset` in the C++ core, and `Reset` on the Blueprint flow**, as the other three runtimes have: they
   forget the flow's own state and anything waiting to be delivered, and begin again at a scene (empty: the first
   authored scene). A new corpus op, `resetFlow`, holds all four to it.
+- **A flow's id, from Blueprint and the C++ core**: `Id` on `UPatterFlow` and `Flow::id()`, as `flow.id` is on
+  every runtime.
 
 ### Changed
 
@@ -21,6 +23,20 @@ runtime behaviour.
   reader (`Patter/BundleJson.h`) and supply only how to read their JSON library. Along the way, a malformed
   bundle the plugin used to crash on (a cast, property, or effect without its name or target, say) now fails
   to load with an error naming the field, and a JSON `null` anywhere reads as an absent field.
+- **`Flow::begin` and `Flow::writeProperty` are private in the C++ core**, as they are on every other runtime.
+  They are the engine's own: a game begins a flow again with `reset`, and writes a property with `setProperty`.
+
+### Deprecated
+
+- **`Flow::start` is deprecated: use `Flow::reset`.** They were the same call under two names. `Flow::reset` is
+  the one public name for beginning a flow again on every runtime (opening a flow begins a new one);
+  `Flow::start` goes in a later release.
+- **Names that differed from every other runtime's now match them; the old names still work, and go in a later
+  release.** In the C++ core: `getOutline` (was `listOutline`), `getBeatSequence` (was `beatSequence`),
+  `BeatInfo` (was `OutlineBeat`), `FlatBeat` (was `OutlineFlatBeat`), and `parseBundle` (was `ParseBundle`). In
+  Blueprint: `UPatterSave::SerializeState` and `DeserializeState` (were `SaveStateToJson` and
+  `LoadStateFromJson`), `Log` (was `GetLog`), `BuildId` (was `GetBuildId`), `InCheckpoint` (was
+  `IsInCheckpoint`), and `UPatterAudioResolver::Create` (was `UPatterAudio::Load`).
 
 ### Fixed
 
@@ -28,12 +44,6 @@ runtime behaviour.
   chosen option's prompt waiting for the next `advance`. A restart in between cleared only the choice, so the
   old prompt played as the restarted run's first beat. Every move that leaves the flow's place (a restart,
   `goto`, `close`) now drops both, through one helper.
-
-### Deprecated
-
-- **`Flow::start` is deprecated: use `Flow::reset`.** They were the same call under two names. `Flow::reset` is
-  the one public name for beginning a flow again on every runtime (opening a flow begins a new one);
-  `Flow::start` goes in a later release.
 
 ## [0.19.0] - 2026-10-06
 

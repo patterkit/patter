@@ -74,9 +74,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void Close();
 
-	// The name this flow was opened under. Not a UFUNCTION: no other runtime exposes a flow's own
-	// id, and a Blueprint-only member breaks the parity contract from the other side.
-	const FString& GetFlowId() const { return Id; }
+	// The name this flow was opened under: Flow.id on every runtime.
+	UFUNCTION(BlueprintPure, Category = "Patterplay")
+	FString Id() const { return FlowId; }
+
+	UE_DEPRECATED(5.7, "Use Id(), the name every Patterplay runtime uses.")
+	const FString& GetFlowId() const { return FlowId; }
 
 	void Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow);
 	// Live bundle refresh, a save load, a close: point this wrapper at the flow of the SAME id inside
@@ -91,7 +94,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<UPatterEngine> Owner = nullptr;
 
-	FString Id; // the flow's id, for re-binding after a load / hot swap
+	FString FlowId; // the flow's id, for re-binding after a load / hot swap
 	// OWNING, not borrowed. The engine rebuilds or drops its flows on loadGame / closeFlow / reset,
 	// and this wrapper outlives those by design; holding a share means a missed re-bind reads as a
 	// finished flow rather than as freed memory.
@@ -113,7 +116,7 @@ public:
 	// Construct a play-ready engine on a (parsed) bundle. Returns nullptr (and logs) on error.
 	//
 	// The engine makes its own property registry and acts as its own game: every property it holds
-	// (@patter, each flow's and each scene's) is in that registry, and UPatterSave's SaveStateToJson
+	// (@patter, each flow's and each scene's) is in that registry, and UPatterSave's SerializeState
 	// carries all of it in one save.
 	//
 	// `World` is the GAME's @world container (UPatterWorld): bind one and the story reads and writes your
@@ -126,7 +129,7 @@ public:
 	static UPatterEngine* Create(UPatterBundle* Bundle, UPatterWorld* World = nullptr);
 
 	// Create, choosing how the engine plays: a seed for a repeatable run, the locale, the decision log
-	// (GetLog), prompt replay on choose, and closed captions. See FPatterEngineOptions.
+	// (Log), prompt replay on choose, and closed captions. See FPatterEngineOptions.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	static UPatterEngine* CreateWithOptions(UPatterBundle* Bundle, const FPatterEngineOptions& Options, UPatterWorld* World = nullptr);
 
@@ -146,8 +149,8 @@ public:
 	// system that keeps properties in it, saved once by the game. The engine registers its scopes in it
 	// (@patter under `patter`, its per-flow and per-scene bags under keys starting `patter/`, and a bound
 	// World as an external @world), reads every other scope from it, and self-backs nothing: a declared
-	// @world with no World bound is the game's to register. SaveStateToJson then leaves the property
-	// values out; save `Registry->save()` beside it, and load it before or after LoadStateFromJson.
+	// @world with no World bound is the game's to register. SerializeState then leaves the property
+	// values out; save `Registry->save()` beside it, and load it before or after DeserializeState.
 	// Returns nullptr (and logs) on error, including a token the registry already holds.
 	//
 	// patter::ScopeRegistry is the shared kernel's wildwinter::expr::ScopeRegistry, the SAME type the
@@ -196,7 +199,10 @@ public:
 	// The compiled bundle's build hash (content.hash). Pass it to FPatterDebugLink so Patterpad's live
 	// link can tell whether the running game matches the currently open project (in-sync vs stale).
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
-	FString GetBuildId() const;
+	FString BuildId() const;
+
+	UFUNCTION(BlueprintPure, Category = "Patterplay", meta = (DeprecatedFunction, DeprecationMessage = "Use BuildId, the name every Patterplay runtime uses."))
+	FString GetBuildId() const { return BuildId(); }
 
 	// Live bundle refresh (editor pushes over the live link, or any bundle you loaded yourself).
 	// Applies IN PLACE - this engine object and every UPatterFlow handle stay valid:
@@ -234,7 +240,10 @@ public:
 	// was created with bLog on (CreateWithOptions). A debug UI reads this to answer
 	// "why that line and not its siblings", which no step result can.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
-	TArray<FPatterLogEntry> GetLog() const;
+	TArray<FPatterLogEntry> Log() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug", meta = (DeprecatedFunction, DeprecationMessage = "Use Log, the name every Patterplay runtime uses."))
+	TArray<FPatterLogEntry> GetLog() const { return Log(); }
 
 	// Drop the retained entries. Cosmetic: no game state changes, and Seq keeps counting.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
@@ -358,7 +367,10 @@ public:
 
 	// True while a checkpoint is open.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
-	bool IsInCheckpoint() const;
+	bool InCheckpoint() const;
+
+	UFUNCTION(BlueprintPure, Category = "Patterplay", meta = (DeprecatedFunction, DeprecationMessage = "Use InCheckpoint, the name every Patterplay runtime uses."))
+	bool IsInCheckpoint() const { return InCheckpoint(); }
 
 private:
 	static UPatterEngine* Build(UPatterBundle* Bundle, UPatterWorld* World, const std::shared_ptr<patter::ScopeRegistry>& Registry,

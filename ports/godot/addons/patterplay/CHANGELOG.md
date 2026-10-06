@@ -11,12 +11,26 @@ same runtime behaviour.
 - **`PatterFlow.reset()`**, as the other three runtimes have: it forgets the flow's own state and anything
   waiting to be delivered, and begins again at a scene (the first authored scene by default). A new corpus op,
   `resetFlow`, holds all four to it.
+- **`PatterBundle.game_data_value`**, as the other runtimes have: one gameData field with its default applied.
 
 ### Changed
 
 - **The engine and its flows share a typed host rather than a dictionary.** Its fields are named after the JS
   runtime's, so a change there ports across line for line, and each one has a type, which the busiest paths now
   use. Nothing a game sees changes.
+- **`PatterDescribe.describe_bundle` uses the same keys as every other runtime** (`structureHash`,
+  `defaultLocale`, `sourceDebug`, `gameId`, `hostScopes`, `gameData`, `hasDefault`, and `gameEvents`), as every
+  other result Dictionary in the addon already did, and carries a gameData field's `purpose`. Code that read the
+  snake_case keys needs the new ones.
+
+### Deprecated
+
+- **`PatterFlow.start()` is deprecated: use `PatterFlow.reset()`.** They were the same call under two names.
+  `PatterFlow.reset()` is the one public name for beginning a flow again on every runtime (opening a flow begins
+  a new one); `PatterFlow.start()` goes in a later release.
+- **Names that differed from every other runtime's now match them; the old names still work, and go in a later
+  release.** `PatterBundle.game_data_fields` (was `game_data_fields_for`) and `PatterAudioResolver` (was
+  `PatterAudio`).
 
 ### Fixed
 
@@ -24,12 +38,6 @@ same runtime behaviour.
   `choose()` leaves the chosen option's prompt waiting for the next `advance()`. A restart (`start`) in between
   cleared only the choice, so the old prompt played as the restarted run's first beat. Every move that leaves
   the flow's place (a restart, `goto`, `close`) now drops both, through one helper.
-
-### Deprecated
-
-- **`PatterFlow.start()` is deprecated: use `PatterFlow.reset()`.** They were the same call under two names.
-  `PatterFlow.reset()` is the one public name for beginning a flow again on every runtime (opening a flow begins
-  a new one); `PatterFlow.start()` goes in a later release.
 
 ## [0.19.0] - 2026-10-06
 

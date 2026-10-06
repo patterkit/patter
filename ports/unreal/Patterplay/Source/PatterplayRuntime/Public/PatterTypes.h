@@ -89,7 +89,7 @@ struct FPatterEngineOptions
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	bool bClosedCaptions = true;
 
-	/** Keep a log of the engine's decisions, read with GetLog. Off by default: a shipped game pays nothing
+	/** Keep a log of the engine's decisions, read with Log. Off by default: a shipped game pays nothing
 	 *  for a debugging aid it never reads. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Patterplay")
 	bool bLog = false;

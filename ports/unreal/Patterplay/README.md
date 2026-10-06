@@ -56,7 +56,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   and prints the transcript. Read this first.
 - **`ATourDemoActor`** - the full interactive Patter tour in a UI overlay: a scrolling
   transcript with **clickable choices** (auto-spawned on Play by the sample's game mode),
-  plus per-line audio resolution via `UPatterAudio`. Audio files are not bundled (playback
+  plus per-line audio resolution via `UPatterAudioResolver`. Audio files are not bundled (playback
   is your platform call): point its *Audio Root* at a Patter audio folder to hear it, or
   leave it empty to play silently.
 
@@ -65,7 +65,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
 - **Properties**: `GetProperty*` / `SetProperty*` read and write `@patter` (and wired
   external) values from C++ or Blueprint - the game pushing state into the dialogue. Bind your
   own `@world` container with `UPatterEngine::Create(Bundle, World)`.
-- **Save and load**: `UPatterSave::SaveStateToJson` / `LoadStateFromJson` write and read the
+- **Save and load**: `UPatterSave::SerializeState` / `DeserializeState` write and read the
   whole run as one JSON string (save version 3; a version 2 save inside the same envelope still loads).
 - **One registry per game** (C++): every property lives in a `patter::ScopeRegistry`. An engine
   makes its own by default; `UPatterEngine::CreateWithRegistry` builds one on your game's registry,
@@ -75,7 +75,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   `bEnableExceptions = true` in that module's Build.cs. Both plugins must be built from the same
   kernel (a mismatch is a compile error naming the fix). See
   [the Unreal guide](https://patterkit.dev/play/unreal/#one-registry-per-game).
-- **Audio**: `UPatterAudio` reads the `patteraudio.json` manifest exported next to a Patter
+- **Audio**: `UPatterAudioResolver` reads the `patteraudio.json` manifest exported next to a Patter
   audio folder and resolves each line to its winning take - it resolves the path, you play
   it. See [the audio guide](https://patterkit.dev/play/audio/).
 - **Live state**: the editor module adds **Window ▸ Tools ▸ Patterplay Runtime State**;

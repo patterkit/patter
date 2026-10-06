@@ -86,7 +86,6 @@ namespace patter
     };
 }
 
-static Bundle parseBundle(const JsonValue& b) { return ParseBundle(b); }
 
 // ----- normalised step -> JsonValue (mirror normaliseStep) --------------------
 
@@ -1960,7 +1959,7 @@ static void runInspectorSmoke()
         fail("inspector", "live setProperty", "gold value did not reflect setProperty");
 }
 
-// Structure introspection (Engine::listOutline / beatSequence): not part of the shared corpus, so
+// Structure introspection (Engine::getOutline / getBeatSequence): not part of the shared corpus, so
 // exercise directly on a hand-built scene -> block -> choice group -> snippets -> beats.
 // describeBundle: the bundle inspector's runtime half. Not a corpus case - this adds no runtime
 // behaviour, so the corpus is untouched - but the numbers have to agree with the JS reference or two
@@ -2105,7 +2104,7 @@ static void runOutlineSmoke()
     EngineOptions opts;
     Engine engine(b, opts);
 
-    auto outline = engine.listOutline();
+    auto outline = engine.getOutline();
     if (outline.size() != 1 || outline[0].name != "Opening") { fail("outline", "scene", "expected 1 scene 'Opening'"); return; }
     const auto& blk = outline[0].blocks.at(0);
     if (blk.children.size() != 2 || blk.children[0].type != "group" || blk.children[0].children.size() != 2)
@@ -2120,10 +2119,10 @@ static void runOutlineSmoke()
     if (blk.gameData.size() != 1 || blk.gameData[0].first != "lit" || blk.gameData[0].second.b != false)
         fail("outline", "block gameData", "block gameData not carried raw (or the scene's leaked in)");
 
-    auto seq = engine.beatSequence();
+    auto seq = engine.getBeatSequence();
     std::vector<std::string> ids; for (const auto& f : seq) ids.push_back(f.beat.id);
     if (ids != std::vector<std::string>{ "L1", "T1", "E1" })
-        fail("outline", "beatSequence", "flat order wrong (got " + [&]{ std::string o; for (auto& x : ids) o += x + " "; return o; }() + ")");
+        fail("outline", "getBeatSequence", "flat order wrong (got " + [&]{ std::string o; for (auto& x : ids) o += x + " "; return o; }() + ")");
     if (seq[0].snippetId != "opt1" || seq[2].snippetId != "sn")
         fail("outline", "breadcrumb", "flat beat breadcrumb wrong");
 }

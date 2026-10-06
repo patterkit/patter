@@ -200,7 +200,7 @@ void FPatterBundleDetails::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
 		TEXT("Counts"), LOCTEXT("CountCategory", "Counts"));
 	AddLine(CountCategory, FString::Printf(TEXT("scenes %d   blocks %d   groups %d   snippets %d"),
 		D.counts.scenes, D.counts.blocks, D.counts.groups, D.counts.snippets));
-	// Beats is the population beatSequence walks; a choice prompt hangs off its group and is counted
+	// Beats is the population getBeatSequence walks; a choice prompt hangs off its group and is counted
 	// separately rather than folded in or dropped.
 	AddLine(CountCategory, FString::Printf(TEXT("beats %d   choice prompts %d   game events %d   cast %d"),
 		D.counts.beats, D.counts.prompts, D.counts.gameEvents, D.counts.cast));

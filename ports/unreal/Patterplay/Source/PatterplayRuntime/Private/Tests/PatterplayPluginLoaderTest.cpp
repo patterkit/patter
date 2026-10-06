@@ -104,7 +104,7 @@ bool FPatterplayPluginPathTest::RunTest(const FString& Parameters)
 		UPatterFlow* Flow = Engine->OpenFlow(TEXT("f"), TEXT("scn_aa"));
 		if (!TestNotNull(TEXT("flow"), Flow)) return false;
 		TestEqual(TEXT("the locale option plays in French"), Flow->Advance().Text, FString(TEXT("porte")));
-		TestTrue(TEXT("the log option keeps a decision log"), Engine->GetLog().Num() > 0);
+		TestTrue(TEXT("the log option keeps a decision log"), Engine->Log().Num() > 0);
 	}
 
 	// --- a number property is a double through Blueprint --------------------------------------------

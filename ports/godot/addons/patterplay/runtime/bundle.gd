@@ -123,8 +123,25 @@ static func effective_game_id(decl: Dictionary) -> String:
 	return g if g != "" else game_idify(str(decl.get("name", "")))
 
 
-static func game_data_fields_for(bundle: Dictionary, kind: String) -> Array:
+# The author-defined gameData fields declared for a node TYPE (empty when none).
+static func game_data_fields(bundle: Dictionary, kind: String) -> Array:
 	return bundle.get("gameDataFields", {}).get(kind, [])
+
+
+## Deprecated: use game_data_fields, the name every Patterplay runtime uses. Goes in a later release.
+static func game_data_fields_for(bundle: Dictionary, kind: String) -> Array:
+	return game_data_fields(bundle, kind)
+
+
+# One node's effective value for a field: its sparse OVERRIDE if present, else the field's declared
+# default (null if neither is set). `fields` is the schema for the node's type; `node` may be null.
+static func game_data_value(fields: Array, node, name: String):
+	if node != null and node.has(name):
+		return PatterValues.to_value(node[name])
+	for f in fields:
+		if f.get("name", "") == name:
+			return PatterValues.to_value(f["default"]) if f.has("default") else null
+	return null
 
 
 # A node's FULL effective gameData: declared fields filled (override or default), override-only orphans
@@ -133,10 +150,9 @@ static func effective_game_data(fields: Array, node) -> Dictionary:
 	var out := {}
 	for f in fields:
 		var name = f["name"]
-		if node != null and node.has(name):
-			out[name] = PatterValues.to_value(node[name])
-		elif f.has("default"):
-			out[name] = PatterValues.to_value(f["default"])
+		var v = game_data_value(fields, node, name)
+		if v != null:
+			out[name] = v
 	if node != null:
 		for k in node.keys():
 			if not out.has(k):

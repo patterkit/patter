@@ -83,7 +83,7 @@ bool FPatterplayExternalScopesTest::RunTest(const FString& Parameters)
 		UPatterEngine* Game = UPatterEngine::CreateWithRegistry(Bundle, GameRegistry);
 		if (!TestNotNull(TEXT("engine where the other engine is present"), Game)) return false;
 		TestNotNull(TEXT("its flow opens"), Game->OpenFlow(TEXT("f"), TEXT("gate")));
-		const FString Save = UPatterSave::SaveStateToJson(Game);
+		const FString Save = UPatterSave::SerializeState(Game);
 
 		auto Elsewhere = MakeStory(1);
 		UPatterEngine* Other = UPatterEngine::CreateWithRegistry(Bundle, Elsewhere);
@@ -91,7 +91,7 @@ bool FPatterplayExternalScopesTest::RunTest(const FString& Parameters)
 		UPatterFlow* Keep = Other->OpenFlow(TEXT("keep"), TEXT("gate"));
 		TestNotNull(TEXT("its flow opens"), Keep);
 		Elsewhere->remove("story");
-		TestFalse(TEXT("the load is refused"), UPatterSave::LoadStateFromJson(Other, Save));
+		TestFalse(TEXT("the load is refused"), UPatterSave::DeserializeState(Other, Save));
 		TestTrue(TEXT("the load changed nothing"), Keep && !Keep->IsClosed() && Other->GetFlow(TEXT("keep")) == Keep);
 		TestNull(TEXT("and restored no flow"), Other->GetFlow(TEXT("f")));
 

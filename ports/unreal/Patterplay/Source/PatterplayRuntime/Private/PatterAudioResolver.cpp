@@ -1,3 +1,4 @@
+#include "PatterAudioResolver.h"
 #include "PatterAudio.h"
 
 #include "Dom/JsonObject.h"
@@ -5,9 +6,18 @@
 #include "Serialization/JsonSerializer.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
 
+UPatterAudioResolver* UPatterAudioResolver::Create(const FString& ManifestJson, const FString& BasePath)
+{
+	return Fill(NewObject<UPatterAudioResolver>(GetTransientPackage()), ManifestJson, BasePath);
+}
+
 UPatterAudio* UPatterAudio::Load(const FString& ManifestJson, const FString& BasePath)
 {
-	UPatterAudio* Audio = NewObject<UPatterAudio>(GetTransientPackage());
+	return static_cast<UPatterAudio*>(Fill(NewObject<UPatterAudio>(GetTransientPackage()), ManifestJson, BasePath));
+}
+
+UPatterAudioResolver* UPatterAudioResolver::Fill(UPatterAudioResolver* Audio, const FString& ManifestJson, const FString& BasePath)
+{
 	Audio->Base = BasePath;
 	while (Audio->Base.EndsWith(TEXT("/")) || Audio->Base.EndsWith(TEXT("\\")))
 	{
@@ -38,7 +48,7 @@ UPatterAudio* UPatterAudio::Load(const FString& ManifestJson, const FString& Bas
 	return Audio;
 }
 
-FString UPatterAudio::Resolve(const FString& BeatId) const
+FString UPatterAudioResolver::Resolve(const FString& BeatId) const
 {
 	const FString* File = Files.Find(BeatId);
 	if (!File) return FString();

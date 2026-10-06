@@ -45,7 +45,7 @@ In `demo/` (delete the folder freely):
   prints each step. Read this first.
   Run it: `godot --headless --path <project> --script res://addons/patterplay/demo/demo.gd`
 - **`tour.tscn`** - the full interactive Patter tour with clickable choice buttons, plus
-  per-line audio resolution via `PatterAudio`. Audio files are not bundled (playback is your
+  per-line audio resolution via `PatterAudioResolver`. Audio files are not bundled (playback is your
   platform call): point its audio base at a Patter audio folder to hear it, or leave it unset
   to play silently.
 
@@ -60,7 +60,7 @@ In `demo/` (delete the folder freely):
   option so every engine in the game shares one set of properties and one save. Without a registry
   the engine makes its own, and its save carries every property value. See
   [One registry per game](https://patterkit.dev/play/godot/#one-registry-per-game).
-- **Audio**: `PatterAudio` reads the `patteraudio.json` manifest exported next to a Patter
+- **Audio**: `PatterAudioResolver` reads the `patteraudio.json` manifest exported next to a Patter
   audio folder and resolves each line to its winning take - it resolves the path, you play
   it. See [the audio guide](https://patterkit.dev/play/audio/).
 - **Live state**: add a `PatterStatePanel` (an in-game overlay) and register your engine with

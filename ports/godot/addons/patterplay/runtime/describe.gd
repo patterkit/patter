@@ -18,19 +18,20 @@ class_name PatterDescribe
 
 # Describe a compiled bundle Dictionary (as returned by PatterBundle.load_from_string).
 #
-# Returns a Dictionary shaped like the JS BundleDescription:
-#   identity   { schema, project, version, hash, structure_hash, voiced, default_locale, locales,
-#                localisation, source_debug }
-#   addresses  [ { game_id, name, blocks: [ { game_id, name } ] } ]
-#   host_scopes[ { token, writable, opaque, properties: [property] } ]
-#   properties { patter: [property], scene: [ { game_id, properties: [property] } ] }
-#   game_data  [ { kind, fields: [ { name, type, has_default, values } ] } ]
-#   counts     { scenes, blocks, groups, snippets, beats, prompts, game_events, cast }
-# where a property is { name, type, has_default, default, shared }.
+# Returns a Dictionary shaped like the JS BundleDescription, under the same keys (as every result
+# Dictionary in this addon is):
+#   identity   { schema, project, version, hash, structureHash, voiced, defaultLocale, locales,
+#                localisation, sourceDebug }
+#   addresses  [ { gameId, name, blocks: [ { gameId, name } ] } ]
+#   hostScopes [ { token, writable, opaque, properties: [property] } ]
+#   properties { patter: [property], scene: [ { gameId, properties: [property] } ] }
+#   gameData   [ { kind, fields: [ { name, type, hasDefault, values, purpose? } ] } ]
+#   counts     { scenes, blocks, groups, snippets, beats, prompts, gameEvents, cast }
+# where a property is { name, type, hasDefault, default, shared }.
 static func describe_bundle(bundle: Dictionary) -> Dictionary:
 	var counts := {
 		"scenes": 0, "blocks": 0, "groups": 0, "snippets": 0,
-		"beats": 0, "prompts": 0, "game_events": 0,
+		"beats": 0, "prompts": 0, "gameEvents": 0,
 		"cast": bundle.get("cast", []).size(),
 	}
 	var addresses: Array = []
@@ -42,8 +43,8 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 		var game_id := PatterBundle.effective_game_id(scene)
 		var blocks: Array = []
 		for block in scene.get("blocks", []):
-			blocks.append({ "game_id": PatterBundle.effective_game_id(block), "name": block.get("name", "") })
-		addresses.append({ "game_id": game_id, "name": scene.get("name", ""), "blocks": blocks })
+			blocks.append({ "gameId": PatterBundle.effective_game_id(block), "name": block.get("name", "") })
+		addresses.append({ "gameId": game_id, "name": scene.get("name", ""), "blocks": blocks })
 		for block in scene.get("blocks", []):
 			_count_block(block, counts)
 		# Scene-local declarations default to PER-FLOW, unlike project-level ones.
@@ -52,7 +53,7 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 			var rows: Array = []
 			for d in props:
 				rows.append(_summarise_property(d, false))
-			scene_props.append({ "game_id": game_id, "properties": rows })
+			scene_props.append({ "gameId": game_id, "properties": rows })
 
 	var host_scopes: Array = []
 	for spec in bundle.get("scopeRegistry", {}).get("scopes", []):
@@ -79,12 +80,15 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 			continue
 		var rows: Array = []
 		for f in fields:
-			rows.append({
+			var row := {
 				"name": f.get("name", ""),
 				"type": f.get("type", ""),
-				"has_default": f.has("default"),
+				"hasDefault": f.has("default"),
 				"values": f.get("values", []),
-			})
+			}
+			if str(f.get("purpose", "")) != "":
+				row["purpose"] = f["purpose"]
+			rows.append(row)
 		game_data.append({ "kind": kind, "fields": rows })
 
 	var loc: Dictionary = bundle.get("localisation", {})
@@ -95,23 +99,23 @@ static func describe_bundle(bundle: Dictionary) -> Dictionary:
 			"project": content.get("project", ""),
 			"version": content.get("version", ""),
 			"hash": content.get("hash", ""),
-			# The same fingerprint with the string tables left out. Equal structure_hash plus a
+			# The same fingerprint with the string tables left out. Equal structureHash plus a
 			# different hash means a TEXT-ONLY edit, which is what makes a live hot-swap safe.
-			"structure_hash": content.get("structureHash", ""),
+			"structureHash": content.get("structureHash", ""),
 			"voiced": bundle.get("voiced", false),
-			"default_locale": bundle.get("locales", {}).get("default", ""),
+			"defaultLocale": bundle.get("locales", {}).get("default", ""),
 			"locales": bundle.get("locales", {}).get("included", []),
 			# Absent means "embedded": the back-compat default a bundle written before the field
 			# existed relies on.
 			"localisation": loc.get("mode", "embedded"),
 			# True when the source locale was embedded purely for debug playback. Such a build is NOT
 			# shippable, which is worth saying loudly in an inspector.
-			"source_debug": loc.get("sourceDebug", false),
+			"sourceDebug": loc.get("sourceDebug", false),
 		},
 		"addresses": addresses,
-		"host_scopes": host_scopes,
+		"hostScopes": host_scopes,
 		"properties": { "patter": patter_props, "scene": scene_props },
-		"game_data": game_data,
+		"gameData": game_data,
 		"counts": counts,
 	}
 
@@ -122,7 +126,7 @@ static func _summarise_property(decl: Dictionary, scope_default: bool) -> Dictio
 	return {
 		"name": decl.get("name", ""),
 		"type": decl.get("type", ""),
-		"has_default": decl.has("default"),
+		"hasDefault": decl.has("default"),
 		"default": PatterValues.to_value(decl["default"]) if decl.has("default") else null,
 		"shared": decl.get("shared", scope_default),
 	}
@@ -156,4 +160,4 @@ static func _count_block(block: Dictionary, counts: Dictionary) -> void:
 		for beat in node.get("beats", []):
 			counts["beats"] += 1
 			if beat.get("kind", "") == "gameEvent":
-				counts["game_events"] += 1
+				counts["gameEvents"] += 1

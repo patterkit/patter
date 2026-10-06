@@ -83,7 +83,7 @@ bool PatterLoadBundle(const FString& Json, patter::Bundle& Out, FString& Error)
 	// check() no catch can recover from.
 	try
 	{
-		Out = patter::ParseBundle(Root);
+		Out = patter::parseBundle(Root);
 	}
 	catch (const std::exception& Ex)
 	{

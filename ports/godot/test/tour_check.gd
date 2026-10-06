@@ -4,7 +4,7 @@
 extends SceneTree
 
 # Preloaded by path: the global class cache may be cold in a raw --script run.
-const PatterAudioScript := preload("res://addons/patterplay/runtime/audio.gd")
+const PatterAudioScript := preload("res://addons/patterplay/runtime/audio_resolver.gd")
 
 
 func _initialize() -> void:

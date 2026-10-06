@@ -52,7 +52,7 @@ namespace
 		return Out;
 	}
 
-	FPatterBeatInfo ConvertBeat(const patter::OutlineBeat& B)
+	FPatterBeatInfo ConvertBeat(const patter::BeatInfo& B)
 	{
 		FPatterBeatInfo Out;
 		Out.Id = Ue(B.id);
@@ -77,7 +77,7 @@ namespace
 		Node.Selector = Ue(N.selector);
 		Node.bHasPrompt = N.hasPrompt;
 		if (N.hasPrompt) Node.Prompt = ConvertBeat(N.prompt);
-		for (const patter::OutlineBeat& B : N.beats) Node.Beats.Add(ConvertBeat(B));
+		for (const patter::BeatInfo& B : N.beats) Node.Beats.Add(ConvertBeat(B));
 		Node.JumpTo = Ue(N.jumpTo);
 		Node.JumpMode = Ue(N.jumpMode);
 
@@ -131,11 +131,11 @@ namespace
 
 // ----- UPatterFlow ------------------------------------------------------------
 
-void UPatterFlow::Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow) { Owner = InOwner; Id = InId; Flow = InFlow; }
+void UPatterFlow::Init(UPatterEngine* InOwner, const FString& InId, const std::shared_ptr<patter::Flow>& InFlow) { Owner = InOwner; FlowId = InId; Flow = InFlow; }
 
 void UPatterFlow::Close()
 {
-	if (Owner) Owner->CloseFlow(Id); // the engine finishes and drops it, then re-binds this wrapper
+	if (Owner) Owner->CloseFlow(FlowId); // the engine finishes and drops it, then re-binds this wrapper
 }
 
 FPatterStep UPatterFlow::Advance()
@@ -277,7 +277,7 @@ UPatterFlow* UPatterEngine::OpenFlow(const FString& Id, const FString& Scene)
 		Flow->Init(this, Id, Engine->flowPtr(Std(Id))); // an OWNING handle: see UPatterFlow::Flow
 		// A reopen REPLACES: the core has closed the flow this name used to mean, so its wrapper
 		// leaves the list. Kept, the next re-bind by id would point it at this new flow.
-		WrappedFlows.RemoveAll([&Id](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid() || Weak->GetFlowId() == Id; });
+		WrappedFlows.RemoveAll([&Id](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid() || Weak->Id() == Id; });
 		WrappedFlows.Add(Flow); // so a live hot swap can re-bind the wrapper by id
 		return Flow;
 	}
@@ -384,7 +384,7 @@ void UPatterEngine::SetPropertyString(const FString& Ref, const FString& Value)
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
-FString UPatterEngine::GetBuildId() const
+FString UPatterEngine::BuildId() const
 {
 	return (BundleRef && BundleRef->Raw()) ? Ue(BundleRef->Raw()->contentHash) : FString();
 }
@@ -499,7 +499,7 @@ void UPatterEngine::Commit()
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
-bool UPatterEngine::IsInCheckpoint() const { return Engine && Engine->inCheckpoint(); }
+bool UPatterEngine::InCheckpoint() const { return Engine && Engine->inCheckpoint(); }
 
 void UPatterEngine::RebindFlows()
 {
@@ -512,7 +512,7 @@ void UPatterEngine::RebindFlows()
 	}
 	for (const TWeakObjectPtr<UPatterFlow>& Weak : WrappedFlows)
 		if (UPatterFlow* Wrapper = Weak.Get())
-			Wrapper->Rebind(Engine->flowPtr(Std(Wrapper->GetFlowId())));
+			Wrapper->Rebind(Engine->flowPtr(Std(Wrapper->Id())));
 	// A wrapper whose flow did not survive (closed, reset, not in the save) is closed for good: it
 	// leaves the list, so a later re-bind cannot revive it on the next flow opened under its name.
 	WrappedFlows.RemoveAll([](const TWeakObjectPtr<UPatterFlow>& Weak) { return !Weak.IsValid() || Weak->IsClosed(); });
@@ -537,7 +537,7 @@ void UPatterEngine::SetPropertyFlags(const FString& Ref, const TArray<FString>& 
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); }
 }
 
-TArray<FPatterLogEntry> UPatterEngine::GetLog() const
+TArray<FPatterLogEntry> UPatterEngine::Log() const
 {
 	TArray<FPatterLogEntry> Out;
 	if (!Engine) return Out;
@@ -600,7 +600,7 @@ TArray<FPatterOutlineScene> UPatterEngine::GetOutline() const
 {
 	TArray<FPatterOutlineScene> Out;
 	if (!Engine) return Out;
-	for (const patter::OutlineScene& S : Engine->listOutline())
+	for (const patter::OutlineScene& S : Engine->getOutline())
 	{
 		FPatterOutlineScene Scene;
 		Scene.Id = Ue(S.id);
@@ -628,7 +628,7 @@ TArray<FPatterFlatBeat> UPatterEngine::GetBeatSequence() const
 {
 	TArray<FPatterFlatBeat> Out;
 	if (!Engine) return Out;
-	for (const patter::OutlineFlatBeat& F : Engine->beatSequence())
+	for (const patter::FlatBeat& F : Engine->getBeatSequence())
 	{
 		FPatterFlatBeat Flat;
 		Flat.SceneId = Ue(F.sceneId);

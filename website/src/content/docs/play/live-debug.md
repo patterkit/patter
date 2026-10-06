@@ -95,7 +95,7 @@ engine's threading.
 
 In Unity, drain the link from your `Update()` (the socket runs on a worker thread), then apply
 `if (_link.TryReceive(out var raw) && PatterLiveBundle.TryParsePush(raw, out var build, out var data))
-{ var r = PatterLiveBundle.Apply(_engine, _bundle, data); … _link.SetBuild(build); }`.
+{ var r = PatterLiveBundle.ApplyLiveBundle(_engine, _bundle, data); … _link.SetBuild(build); }`.
 
 In Unreal, set `Link->OnBundle`, which fires on the game thread. Load with
 `UPatterBundle::LoadFromString(Data)`, apply with `Engine->ApplyLiveBundle(NewBundle)` (the engine
@@ -162,7 +162,7 @@ _link.Observe("main", flow.CurrentScene, step.Id, PatterDebugLink.TypeName(step.
 WebSockets dependency is dropped there), so it is safe to leave in:
 
 ```cpp
-Link = FPatterDebugLink::Create(Engine->GetBuildId(), TEXT("My Game"));
+Link = FPatterDebugLink::Create(Engine->BuildId(), TEXT("My Game"));
 Link->FlowOpened(TEXT("main"));
 // ...after each step (map EPatterStepType -> "line" / "text" / "gameEvent" / "choice" / "end"):
 Link->Observe(TEXT("main"), Flow->CurrentScene(), Step.Id, StepTypeName(Step.Type));

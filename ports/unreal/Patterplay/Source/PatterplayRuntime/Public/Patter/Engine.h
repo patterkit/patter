@@ -186,7 +186,7 @@ namespace patter
 
     // Static structure introspection (editor / dev tooling): a read-only view of the AUTHORED tree
     // (scenes -> blocks -> groups/snippets -> beats), mirroring the JS BeatInfo / OutlineNode / etc.
-    struct OutlineBeat
+    struct BeatInfo
     {
         std::string id, kind, character, characterName, direction, text;
         std::vector<std::pair<std::string, PatterValue>> gameData;   // author overrides (raw)
@@ -199,10 +199,10 @@ namespace patter
         // group
         std::string selector;
         bool hasPrompt = false;
-        OutlineBeat prompt;
+        BeatInfo prompt;
         std::vector<OutlineNode> children;
         // snippet
-        std::vector<OutlineBeat> beats;
+        std::vector<BeatInfo> beats;
         std::string jumpTo, jumpMode;
     };
     struct OutlineBlock
@@ -219,7 +219,10 @@ namespace patter
         std::vector<std::string> tags;
         std::vector<OutlineBlock> blocks;
     };
-    struct OutlineFlatBeat { std::string sceneId, blockId, snippetId; OutlineBeat beat; };
+    struct FlatBeat { std::string sceneId, blockId, snippetId; BeatInfo beat; };
+    // The names these types had before they took the JS names; they go in a later release.
+    using OutlineBeat [[deprecated("Use BeatInfo, the name every Patterplay runtime uses.")]] = BeatInfo;
+    using OutlineFlatBeat [[deprecated("Use FlatBeat, the name every Patterplay runtime uses.")]] = FlatBeat;
 
     inline std::string gameIdify(const std::string& text)
     {
@@ -813,6 +816,9 @@ namespace patter
         [[deprecated("Use reset(), the same call under the name every Patterplay runtime uses.")]]
         void start(const std::string& sceneId, const std::string& blockId) { reset(sceneId, blockId); }
 
+    private:
+        friend class Engine;
+
         /** Begin this flow at a scene (empty: the first authored scene), and optionally a block within it. The
          *  engine's own entry point: openFlow and a goto on an unstarted flow begin a flow here. A game calls
          *  reset(). */
@@ -861,6 +867,10 @@ namespace patter
             settle();
         }
 
+    public:
+        /** This flow's id, as the engine knows it. */
+        const std::string& id() const { return id_; }
+
         StepResult advance()
         {
             if (closed_) { StepResult r; r.type = StepType::End; return r; } // a stale reference drives nothing
@@ -890,6 +900,66 @@ namespace patter
         void clearLog() { log_.clear(); }
 
     private:
+        // The write itself. `host` says WHO is writing, which is all `writable: false` cares about: the
+        // registry refuses a story's write to a read-only declaration, bound or self-backed alike. A
+        // refusal is the kernel's RegistryError, rethrown as Patterplay's EvalError.
+        void writeProperty(const std::string& ref, const PatterValue& value, bool host)
+        {
+            kernelCall([&]
+            {
+                auto sp = splitHostRef(*host_, ref);
+                const std::string& name = sp.second;
+                Journal* journal = host_->journal.get();
+                if (sp.first == "patter")
+                {
+                    // Inside a checkpoint, each write records how to put the old value back, against the bag
+                    // it actually landed in (a `@scene` write's bag depends on the scene the flow is in).
+                    if (journal)
+                    {
+                        const bool shared = host_->patterSharedNames.count(name) > 0;
+                        std::optional<PatterValue> prev = shared ? host_->patterBag->get(name) : local_->get(name);
+                        if (prev)
+                        {
+                            if (shared)
+                            {
+                                std::shared_ptr<ScopeRegistry> reg = host_->registry;
+                                journal->undo.push_back([reg, name, was = *prev] { reg->set("patter", name, was); });
+                            }
+                            else
+                            {
+                                std::shared_ptr<PropertyBag> bag = local_;
+                                journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
+                            }
+                        }
+                    }
+                    patterSet(name, value);
+                }
+                else if (sp.first == "scene")
+                {
+                    if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
+                    if (journal)
+                    {
+                        std::shared_ptr<PropertyBag> bag = sceneBagShared(name);
+                        std::optional<PatterValue> prev = bag ? bag->get(name) : std::nullopt;
+                        if (bag && prev) journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
+                    }
+                    sceneSet(name, value);
+                }
+                else
+                {
+                    std::optional<PatterValue> prev = journal ? host_->registry->get(sp.first, name) : std::nullopt;
+                    host_->registry->set(sp.first, name, value, host); // host scopes, other engines' scopes
+                    // Recorded after the write: one a read-only host scope refused never happened, so has
+                    // nothing to undo.
+                    if (journal && prev)
+                    {
+                        std::shared_ptr<ScopeRegistry> reg = host_->registry;
+                        journal->undo.push_back([reg, scope = sp.first, name, was = *prev] { reg->set(scope, name, was, /*host=*/true); });
+                    }
+                }
+            });
+        }
+
         /// Record one decision, on this flow's log and the engine's. Cheap with logging off:
         /// the entry is never built. The engine's vector is appended to through a pointer -
         /// nothing captures the engine, which is the shape Godot's weak debug registry forced.
@@ -950,65 +1020,6 @@ namespace patter
         // the story, not the game that owns the value. Effects use writeProperty(.., false).
         void setProperty(const std::string& ref, const PatterValue& value) { writeProperty(ref, value, true); }
 
-        // The write itself. `host` says WHO is writing, which is all `writable: false` cares about: the
-        // registry refuses a story's write to a read-only declaration, bound or self-backed alike. A
-        // refusal is the kernel's RegistryError, rethrown as Patterplay's EvalError.
-        void writeProperty(const std::string& ref, const PatterValue& value, bool host)
-        {
-            kernelCall([&]
-            {
-                auto sp = splitHostRef(*host_, ref);
-                const std::string& name = sp.second;
-                Journal* journal = host_->journal.get();
-                if (sp.first == "patter")
-                {
-                    // Inside a checkpoint, each write records how to put the old value back, against the bag
-                    // it actually landed in (a `@scene` write's bag depends on the scene the flow is in).
-                    if (journal)
-                    {
-                        const bool shared = host_->patterSharedNames.count(name) > 0;
-                        std::optional<PatterValue> prev = shared ? host_->patterBag->get(name) : local_->get(name);
-                        if (prev)
-                        {
-                            if (shared)
-                            {
-                                std::shared_ptr<ScopeRegistry> reg = host_->registry;
-                                journal->undo.push_back([reg, name, was = *prev] { reg->set("patter", name, was); });
-                            }
-                            else
-                            {
-                                std::shared_ptr<PropertyBag> bag = local_;
-                                journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
-                            }
-                        }
-                    }
-                    patterSet(name, value);
-                }
-                else if (sp.first == "scene")
-                {
-                    if (currentSceneId_.empty()) throw std::runtime_error("'" + ref + "': the flow has not entered a scene yet");
-                    if (journal)
-                    {
-                        std::shared_ptr<PropertyBag> bag = sceneBagShared(name);
-                        std::optional<PatterValue> prev = bag ? bag->get(name) : std::nullopt;
-                        if (bag && prev) journal->undo.push_back([bag, name, was = *prev] { bag->set(name, was); });
-                    }
-                    sceneSet(name, value);
-                }
-                else
-                {
-                    std::optional<PatterValue> prev = journal ? host_->registry->get(sp.first, name) : std::nullopt;
-                    host_->registry->set(sp.first, name, value, host); // host scopes, other engines' scopes
-                    // Recorded after the write: one a read-only host scope refused never happened, so has
-                    // nothing to undo.
-                    if (journal && prev)
-                    {
-                        std::shared_ptr<ScopeRegistry> reg = host_->registry;
-                        journal->undo.push_back([reg, scope = sp.first, name, was = *prev] { reg->set(scope, name, was, /*host=*/true); });
-                    }
-                }
-            });
-        }
 
         // Expand {@ref} slots against this flow's CURRENT state. An IDs-only game calls this on a string it
         // looked up in its OWN loc system for a beat id the engine emitted, to apply property replacement.
@@ -2351,7 +2362,7 @@ namespace patter
         }
 
         // A scene's cast: the character token of every speaker with a line anywhere in it, deduped, in
-        // first-appearance order. Static, like listOutline: it walks the authored structure, so a speaker
+        // first-appearance order. Static, like getOutline: it walks the authored structure, so a speaker
         // behind a condition, inside any group, or voicing a choice prompt counts - this is who CAN speak
         // in the scene, not who a given playthrough heard. Empty for an unknown ref or a scene with no
         // dialogue. Tokens, not display names: read those off a delivered step.
@@ -2518,7 +2529,7 @@ namespace patter
         // --- Static structure introspection (editor / dev tooling) -----------------
         // The authored tree: scenes -> blocks -> children (groups + snippets, groups preserved) -> a
         // snippet's beats. Static; per-beat data at the source locale. Scenes in authored order.
-        std::vector<OutlineScene> listOutline() const
+        std::vector<OutlineScene> getOutline() const
         {
             std::vector<OutlineScene> out;
             for (const Scene* sp : host_.bundle->scenesInOrder())
@@ -2547,23 +2558,28 @@ namespace patter
         }
 
         // Every beat in document order, flattened through groups, with its scene/block/snippet + data.
-        std::vector<OutlineFlatBeat> beatSequence() const
+        std::vector<FlatBeat> getBeatSequence() const
         {
-            std::vector<OutlineFlatBeat> seq;
+            std::vector<FlatBeat> seq;
             for (const Scene* scene : host_.bundle->scenesInOrder())
                 for (const Block& block : scene->blocks) collectBeats(block.children, scene->id, block.id, seq);
             return seq;
         }
 
+        [[deprecated("Use getOutline(), the name every Patterplay runtime uses.")]]
+        std::vector<OutlineScene> listOutline() const { return getOutline(); }
+        [[deprecated("Use getBeatSequence(), the name every Patterplay runtime uses.")]]
+        std::vector<FlatBeat> beatSequence() const { return getBeatSequence(); }
+
     private:
         void collectBeats(const std::vector<NodePtr>& nodes, const std::string& sceneId, const std::string& blockId,
-                          std::vector<OutlineFlatBeat>& into) const
+                          std::vector<FlatBeat>& into) const
         {
             for (const NodePtr& n : nodes)
             {
                 if (n->isGroup()) { collectBeats(n->children, sceneId, blockId, into); continue; }
                 for (const Beat& b : n->beats)
-                    into.push_back(OutlineFlatBeat{ sceneId, blockId, n->id, beatInfo(b) });
+                    into.push_back(FlatBeat{ sceneId, blockId, n->id, beatInfo(b) });
             }
         }
 
@@ -2587,9 +2603,9 @@ namespace patter
             return on;
         }
 
-        OutlineBeat beatInfo(const Beat& beat) const
+        BeatInfo beatInfo(const Beat& beat) const
         {
-            OutlineBeat info;
+            BeatInfo info;
             info.id = beat.id;
             info.kind = beat.kind;
             if (beat.kind == "line")

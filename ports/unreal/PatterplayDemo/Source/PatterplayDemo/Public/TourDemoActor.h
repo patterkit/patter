@@ -8,7 +8,7 @@
 // You can also place the actor in your own level and assign an imported bundle instead.
 //
 // Audio files are NOT bundled (playback is your platform call); point AudioRoot at any Patter
-// audio folder to hear each line's winning take via the patteraudio.json resolver (UPatterAudio).
+// audio folder to hear each line's winning take via the patteraudio.json resolver (UPatterAudioResolver).
 // Inside the PatterKit repo the shared scratch takes are picked up automatically.
 
 #pragma once
@@ -20,7 +20,7 @@
 class UPatterBundle;
 class UPatterEngine;
 class UPatterFlow;
-class UPatterAudio;
+class UPatterAudioResolver;
 class UAudioComponent;
 class SScrollBox;
 class SVerticalBox;
@@ -73,7 +73,7 @@ private:
 	UPROPERTY() UPatterBundle* LoadedBundle = nullptr;   // keeps a disk-loaded bundle alive
 	UPROPERTY() UPatterEngine* Engine = nullptr;
 	UPROPERTY() UPatterFlow* Flow = nullptr;
-	UPROPERTY() UPatterAudio* Audio = nullptr;
+	UPROPERTY() UPatterAudioResolver* Audio = nullptr;
 	UPROPERTY() UAudioComponent* Voice = nullptr;
 
 	TSharedPtr<SWidget> RootWidget;

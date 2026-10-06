@@ -27,7 +27,7 @@ func _render(res: Resource) -> void:
 		("(unnamed project)" if str(identity["project"]) == "" else str(identity["project"])),
 		version,
 		str(identity["schema"]),
-		str(identity["default_locale"]) + (
+		str(identity["defaultLocale"]) + (
 			"  (+%d)" % (int((identity["locales"] as Array).size()) - 1)
 			if (identity["locales"] as Array).size() > 1 else ""),
 		str(identity["localisation"]),
@@ -35,7 +35,7 @@ func _render(res: Resource) -> void:
 	]
 	# A source-debug build embeds the source language purely so it can be played. Shipping one is a
 	# mistake otherwise visible only as "strings: ids".
-	if bool(identity["source_debug"]):
+	if bool(identity["sourceDebug"]):
 		_summary.text += "\n[b][color=red]SOURCE DEBUG build - not shippable[/color][/b]"
 
 	# Addresses: what runFlow() and goto() take. The first thing an integrator opens the asset for.
@@ -43,17 +43,17 @@ func _render(res: Resource) -> void:
 	if (d["addresses"] as Array).is_empty():
 		_add_row("(no scenes)", true)
 	for a in d["addresses"]:
-		_add_row("%s  [color=gray]%s[/color]" % [str(a["game_id"]), str(a["name"])])
+		_add_row("%s  [color=gray]%s[/color]" % [str(a["gameId"]), str(a["name"])])
 		# Nested, because a block address is SCENE-SCOPED: the pair is the address, and a flat list
 		# would invite calling one alone.
 		for b in a["blocks"]:
-			_add_row("    %s  [color=gray]%s[/color]" % [str(b["game_id"]), str(b["name"])])
+			_add_row("    %s  [color=gray]%s[/color]" % [str(b["gameId"]), str(b["name"])])
 
 	# Host properties: what the GAME must supply. The highest-value section here.
 	_add_section("Host properties")
-	if (d["host_scopes"] as Array).is_empty():
+	if (d["hostScopes"] as Array).is_empty():
 		_add_row("(the game supplies nothing)", true)
-	for s in d["host_scopes"]:
+	for s in d["hostScopes"]:
 		var head := "@%s: " % str(s["token"])
 		if bool(s["opaque"]):
 			head += "any name, unchecked"
@@ -73,14 +73,14 @@ func _render(res: Resource) -> void:
 	for p in owned:
 		_add_row(_property_label(p))
 	for sc in d["properties"]["scene"]:
-		_add_row("@scene %s" % str(sc["game_id"]))
+		_add_row("@scene %s" % str(sc["gameId"]))
 		for p in sc["properties"]:
 			_add_row("    " + _property_label(p))
 
 	# Only when there are some: an always-empty section teaches the reader to skip it.
-	if not (d["game_data"] as Array).is_empty():
+	if not (d["gameData"] as Array).is_empty():
 		_add_section("Game data")
-		for g in d["game_data"]:
+		for g in d["gameData"]:
 			_add_row("on %s" % str(g["kind"]))
 			for f in g["fields"]:
 				_add_row("    %s  [color=gray]%s[/color]" % [str(f["name"]), str(f["type"])])
@@ -91,13 +91,13 @@ func _render(res: Resource) -> void:
 	_add_row("scenes %d   blocks %d   groups %d   snippets %d" % [
 		int(counts["scenes"]), int(counts["blocks"]), int(counts["groups"]), int(counts["snippets"])])
 	_add_row("beats %d   choice prompts %d   game events %d   cast %d" % [
-		int(counts["beats"]), int(counts["prompts"]), int(counts["game_events"]), int(counts["cast"])])
+		int(counts["beats"]), int(counts["prompts"]), int(counts["gameEvents"]), int(counts["cast"])])
 
 
 ## A declaration line. "no default" is the part an integrator is scanning for: it is the value the
 ## host must supply, or a condition reads the type default and a branch never fires.
 func _property_label(p: Dictionary) -> String:
 	var label := "%s  [color=gray]%s[/color]" % [str(p["name"]), str(p["type"])]
-	if not bool(p["has_default"]):
+	if not bool(p["hasDefault"]):
 		label += "  [color=gray](no default)[/color]"
 	return label

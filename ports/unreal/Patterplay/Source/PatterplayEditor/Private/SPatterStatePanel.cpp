@@ -191,7 +191,7 @@ void SPatterStatePanel::BuildLog(UPatterEngine* Engine)
 		.ColorAndOpacity(FSlateColor::UseSubduedForeground())
 	];
 
-	const TArray<FPatterLogEntry> Entries = Engine->GetLog();
+	const TArray<FPatterLogEntry> Entries = Engine->Log();
 	if (Entries.Num() == 0)
 	{
 		Body->AddSlot().AutoHeight().Padding(16.f, 0.f, 10.f, 6.f)
@@ -437,7 +437,7 @@ void SPatterStatePanel::LoadStateFromFile(UPatterEngine* Engine)
 	{
 		patter::deserializeState(*Engine->Raw(), std::string(TCHAR_TO_UTF8(*Text)));
 		// The load rebuilt the engine's flows, so every UPatterFlow the game holds points at an old one.
-		// Re-bind them by id, as UPatterSave::LoadStateFromJson does; without it the game's flows all read
+		// Re-bind them by id, as UPatterSave::DeserializeState does; without it the game's flows all read
 		// as closed after a load from this panel.
 		Engine->RebindFlows();
 	}

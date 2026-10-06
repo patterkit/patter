@@ -129,14 +129,14 @@ func _run_describe_smoke() -> void:
 		_fail("describe", "identity", "schema / project / version not carried")
 	if d["identity"]["localisation"] != "embedded":
 		_fail("describe", "identity", "absent localisation must read as embedded")
-	if d["addresses"].size() != 1 or d["addresses"][0]["game_id"] != "opening-night" or d["addresses"][0]["name"] != "Opening Night":
+	if d["addresses"].size() != 1 or d["addresses"][0]["gameId"] != "opening-night" or d["addresses"][0]["name"] != "Opening Night":
 		_fail("describe", "addresses", "scene address derived from the name")
-	if d["addresses"][0]["blocks"].size() != 1 or d["addresses"][0]["blocks"][0]["game_id"] != "the-bar":
+	if d["addresses"][0]["blocks"].size() != 1 or d["addresses"][0]["blocks"][0]["gameId"] != "the-bar":
 		_fail("describe", "addresses", "block address nested under its scene")
-	if d["host_scopes"].size() != 2 or d["host_scopes"][0]["token"] != "world" or d["host_scopes"][0]["opaque"]:
-		_fail("describe", "host_scopes", "declared scope")
-	if not d["host_scopes"][1]["opaque"] or d["host_scopes"][1]["properties"].size() != 0:
-		_fail("describe", "host_scopes", "a scope with no declarations is OPAQUE, not empty")
+	if d["hostScopes"].size() != 2 or d["hostScopes"][0]["token"] != "world" or d["hostScopes"][0]["opaque"]:
+		_fail("describe", "hostScopes", "declared scope")
+	if not d["hostScopes"][1]["opaque"] or d["hostScopes"][1]["properties"].size() != 0:
+		_fail("describe", "hostScopes", "a scope with no declarations is OPAQUE, not empty")
 	if d["properties"]["patter"].size() != 1 or not d["properties"]["patter"][0]["shared"]:
 		_fail("describe", "properties", "@patter defaults to shared")
 	if d["properties"]["scene"].size() != 1 or d["properties"]["scene"][0]["properties"][0]["shared"]:
@@ -144,7 +144,7 @@ func _run_describe_smoke() -> void:
 	# beats counts the population get_beat_sequence walks; the choice prompt is a SEPARATE row.
 	var c: Dictionary = d["counts"]
 	if c["scenes"] != 1 or c["blocks"] != 1 or c["groups"] != 1 or c["snippets"] != 2 \
-		or c["beats"] != 2 or c["prompts"] != 1 or c["game_events"] != 1:
+		or c["beats"] != 2 or c["prompts"] != 1 or c["gameEvents"] != 1:
 		_fail("describe", "counts", "scene/block/group/snippet/beat/prompt/gameEvent counts")
 
 
@@ -612,7 +612,7 @@ func _run_gamedata(arr: Array) -> int:
 	for c in arr:
 		var name: String = c["name"]
 		var node = c.get("node")
-		var effective := PatterBundle.effective_game_data(PatterBundle.game_data_fields_for(c["bundle"], c["kind"]), node)
+		var effective := PatterBundle.effective_game_data(PatterBundle.game_data_fields(c["bundle"], c["kind"]), node)
 		if _deep_equal(effective, c["expected"]):
 			pass_count += 1
 		else:

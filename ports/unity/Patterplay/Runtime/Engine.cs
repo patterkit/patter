@@ -700,7 +700,7 @@ namespace Patterkit.Patterplay
 
         /// <summary>A scene's own author gameData, by internal id or gameId address: the RAW sparse
         /// overrides, exactly as a beat's step carries its own, NOT merged with the project's declared
-        /// field defaults (resolve those with GameDataHelpers.Effective(GameDataHelpers.FieldsFor(bundle,
+        /// field defaults (resolve those with GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle,
         /// "scene"), ...)). Not inherited by the scene's blocks. A fresh copy each call; empty (never null)
         /// when the scene sets none or the ref is unknown.</summary>
         public GameData GameDataForScene(string sceneRef)
@@ -727,7 +727,7 @@ namespace Patterkit.Patterplay
         // --- cast ------------------------------------------------------------
 
         /// <summary>Every cast member the PROJECT declares, in authored order - the same list
-        /// BundleInfo.Describe counts. A superset of any scene's cast: a beat's character must be a
+        /// BundleInfo.DescribeBundle counts. A superset of any scene's cast: a beat's character must be a
         /// declared member, so CastForScene / CastForBlock only ever return names from here.</summary>
         public List<string> GetCast()
         {

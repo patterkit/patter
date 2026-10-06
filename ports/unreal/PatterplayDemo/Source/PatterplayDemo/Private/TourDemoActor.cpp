@@ -1,7 +1,7 @@
 #include "TourDemoActor.h"
 #include "PatterEngine.h"
 #include "PatterBundle.h"
-#include "PatterAudio.h"
+#include "PatterAudioResolver.h"
 #include "PatterDebug.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundWaveProcedural.h"
@@ -115,7 +115,7 @@ void ATourDemoActor::BeginPlay()
 	Root = FPaths::IsRelative(Root) ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir(), Root) : Root;
 	FString ManifestJson;
 	if (FFileHelper::LoadFileToString(ManifestJson, *(Root / TEXT("patteraudio.json"))))
-		Audio = UPatterAudio::Load(ManifestJson, Root);
+		Audio = UPatterAudioResolver::Create(ManifestJson, Root);
 
 	StartTour();
 }

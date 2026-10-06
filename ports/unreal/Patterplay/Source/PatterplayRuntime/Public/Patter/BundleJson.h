@@ -4,7 +4,7 @@
 // There used to be two, written by hand: the plugin's loader over Unreal's FJsonValue, and the corpus
 // TestHost's over its own JsonValue. They drifted (the plugin never read `closedCaptions` while the
 // TestHost did), and since the corpus runs through the TestHost, it could not see what the plugin
-// missed. Now both call ParseBundle, so the corpus checks the reader games use, and a new bundle field
+// missed. Now both call parseBundle, so the corpus checks the reader games use, and a new bundle field
 // is added once, here. What stays per host is how to read its JSON type, which is the BundleJson
 // specialisation below, as AstJson already is for the expression AST.
 //
@@ -21,7 +21,7 @@
 
 namespace patter
 {
-    /** How to read the OBJECT side of one JSON library, for ParseBundle. Arrays, strings, numbers, and
+    /** How to read the OBJECT side of one JSON library, for parseBundle. Arrays, strings, numbers, and
      *  booleans are read through AstJson<J> (Patter/Expr/Ast.h), which every host already specialises
      *  for the expression AST, so they are said once per library rather than twice. A host supplies:
      *
@@ -360,8 +360,12 @@ namespace patter
     /** Read a compiled bundle's root JSON object into a Bundle. J is the host's JSON node type; it needs
      *  BundleJson<J> and AstJson<J> (see above). Throws on a missing or malformed required field. */
     template <typename J>
-    inline Bundle ParseBundle(const J& root)
+    inline Bundle parseBundle(const J& root)
     {
         return BundleReader<J>::read(root);
     }
+
+    template <typename J>
+    [[deprecated("Use parseBundle, named in the core's camelCase like the rest of it.")]]
+    inline Bundle ParseBundle(const J& root) { return parseBundle(root); }
 }

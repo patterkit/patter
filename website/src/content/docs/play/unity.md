@@ -142,7 +142,7 @@ var patter = Bundle.CreateEngine(new EngineOptions { Registry = registry });
 var save = new JObject
 {
     ["registry"] = PatterSave.SaveRegistry(registry),
-    ["patter"] = PatterSave.Envelope(patter.SaveGame()),
+    ["patter"] = PatterSave.SaveState(patter),
 };
 
 // Load in either order: values for bags that aren't open yet wait in the registry.

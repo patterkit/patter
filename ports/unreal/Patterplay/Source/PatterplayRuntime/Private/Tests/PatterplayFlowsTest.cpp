@@ -75,8 +75,8 @@ bool FPatterplayFlowsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("and GetFlow still hands back the live one"), Engine->GetFlow(TEXT("main")), Third);
 
 	// --- and through a load, which re-binds every wrapper to the restored flows ----------------
-	const FString Saved = UPatterSave::SaveStateToJson(Engine);
-	if (TestTrue(TEXT("the save loads back"), UPatterSave::LoadStateFromJson(Engine, Saved)))
+	const FString Saved = UPatterSave::SerializeState(Engine);
+	if (TestTrue(TEXT("the save loads back"), UPatterSave::DeserializeState(Engine, Saved)))
 	{
 		TestTrue(TEXT("a replaced wrapper is still closed after a load"), First->IsClosed());
 		TestTrue(TEXT("a closed wrapper is still closed after a load"), Second->IsClosed());
@@ -87,7 +87,7 @@ bool FPatterplayFlowsTest::RunTest(const FString& Parameters)
 	// --- a load into an engine that never opened the flow --------------------------------------
 	UPatterEngine* Fresh = UPatterEngine::Create(Bundle);
 	if (!TestNotNull(TEXT("a fresh engine"), Fresh)) return false;
-	if (TestTrue(TEXT("the save loads into a fresh engine"), UPatterSave::LoadStateFromJson(Fresh, Saved)))
+	if (TestTrue(TEXT("the save loads into a fresh engine"), UPatterSave::DeserializeState(Fresh, Saved)))
 	{
 		UPatterFlow* Restored = Fresh->GetFlow(TEXT("main"));
 		if (TestNotNull(TEXT("GetFlow hands back a flow the load restored"), Restored))

@@ -2,7 +2,7 @@
 //
 // It answers the integrator's question from the imported asset alone, with nothing running:
 // what may my game code call, and is this the bundle I think it is? The data comes from
-// BundleInfo.Describe (Runtime/BundleDescription.cs), which is the same description the JS,
+// BundleInfo.DescribeBundle (Runtime/BundleDescription.cs), which is the same description the JS,
 // Unreal and Godot views render - so two people on two engines reading the same asset see the
 // same rows in the same order.
 //
@@ -44,7 +44,7 @@ namespace Patterkit.Patterplay.Editor
             try { b = asset.Bundle; }
             catch (Exception e) { EditorGUILayout.HelpBox(e.Message, MessageType.Error); return; }
 
-            var d = BundleInfo.Describe(b);
+            var d = BundleInfo.DescribeBundle(b);
 
             // --- identity --------------------------------------------------------------
             EditorGUILayout.LabelField(

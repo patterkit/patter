@@ -74,10 +74,10 @@ var audio = new PatterAudioResolver(json, Path.Combine(Application.streamingAsse
 string path = audio.Resolve(step.Id);                      // full path, or null
 ```
 
-**Unreal** (C++ / Blueprint). `UPatterAudio` is BlueprintCallable, so this can be graph-only:
+**Unreal** (C++ / Blueprint). `UPatterAudioResolver` is BlueprintCallable, so this can be graph-only:
 
 ```cpp
-UPatterAudio* Audio = UPatterAudio::Load(ManifestJson, TEXT("Audio"));
+UPatterAudioResolver* Audio = UPatterAudioResolver::Create(ManifestJson, TEXT("Audio"));
 FString Path = Audio->Resolve(Step.Id);                    // full path, or empty
 ```
 
@@ -85,7 +85,7 @@ FString Path = Audio->Resolve(Step.Id);                    // full path, or empt
 
 ```gdscript
 var json := FileAccess.get_file_as_string("res://audio/patteraudio.json")
-var audio := PatterAudio.new(json, "res://audio")
+var audio := PatterAudioResolver.new(json, "res://audio")
 var path := audio.resolve(step.get("id", ""))              # full path, or "" when none
 if path != "": my_player.stream = load(path)
 ```

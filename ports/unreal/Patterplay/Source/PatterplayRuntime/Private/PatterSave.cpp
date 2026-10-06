@@ -3,14 +3,14 @@
 #include "PatterEngine.h"
 #include "Patter/Save.h"
 
-FString UPatterSave::SaveStateToJson(UPatterEngine* Engine)
+FString UPatterSave::SerializeState(UPatterEngine* Engine)
 {
 	if (!Engine || !Engine->Raw()) return FString();
 	const std::string Json = patter::serializeState(*Engine->Raw());
 	return FString(UTF8_TO_TCHAR(Json.c_str()));
 }
 
-bool UPatterSave::LoadStateFromJson(UPatterEngine* Engine, const FString& Json)
+bool UPatterSave::DeserializeState(UPatterEngine* Engine, const FString& Json)
 {
 	if (!Engine || !Engine->Raw()) return false;
 	try

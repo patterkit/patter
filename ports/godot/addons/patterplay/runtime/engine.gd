@@ -858,7 +858,7 @@ func tags_for_block(scene_ref: String, block_ref: String) -> Array:
 
 ## A scene's own author gameData, by internal id or gameId address: the RAW sparse overrides, exactly
 ## as a beat's step carries its own, NOT merged with the project's declared field defaults (resolve
-## those with PatterBundle.effective_game_data(PatterBundle.game_data_fields_for(bundle, "scene"), ...)).
+## those with PatterBundle.effective_game_data(PatterBundle.game_data_fields(bundle, "scene"), ...)).
 ## Not inherited by the scene's blocks. A fresh Dictionary each call, its values normalised the way a
 ## step's gameData is; empty when the scene sets none or the ref does not resolve.
 func game_data_for_scene(scene_ref: String) -> Dictionary:

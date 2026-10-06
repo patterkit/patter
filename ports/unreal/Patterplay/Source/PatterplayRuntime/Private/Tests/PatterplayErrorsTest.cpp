@@ -4,7 +4,7 @@
 // The UE-boundary half the clang TestHost cannot reach: the core reports each content error through
 // EngineOptions::onError, and the wrapper turns that into a Warning in the log and the OnError event,
 // bound here as a Blueprint binds it (a UFUNCTION on a UObject). Beside it, the decision log's
-// `diagnostic` rows through GetLog, and the save refusals a load now makes before changing anything,
+// `diagnostic` rows through Log, and the save refusals a load now makes before changing anything,
 // through UPatterSave. The core's own reports are pinned in the TestHost ([play-errors]).
 
 #include "Misc/AutomationTest.h"
@@ -109,7 +109,7 @@ bool FPatterplayErrorsTest::RunTest(const FString& Parameters)
 	// --- the decision log has a diagnostic row for each, and no write for a skipped effect ---
 	TArray<FString> Writes;
 	TArray<FPatterLogEntry> Diagnostics;
-	for (const FPatterLogEntry& Row : Engine->GetLog())
+	for (const FPatterLogEntry& Row : Engine->Log())
 	{
 		if (Row.Type == TEXT("write")) Writes.Add(Row.Subject);
 		if (Row.Type == TEXT("diagnostic")) Diagnostics.Add(Row);
@@ -130,17 +130,17 @@ bool FPatterplayErrorsTest::RunTest(const FString& Parameters)
 	AddExpectedErrorPlain(TEXT("not a patter/save@0 envelope"), EAutomationExpectedErrorFlags::Contains, 1);
 	AddExpectedErrorPlain(TEXT("unsupported save version: 3.9"), EAutomationExpectedErrorFlags::Contains, 1);
 	AddExpectedErrorPlain(TEXT("malformed save: no flows"), EAutomationExpectedErrorFlags::Contains, 1);
-	const FString Good = UPatterSave::SaveStateToJson(Engine);
+	const FString Good = UPatterSave::SerializeState(Engine);
 	const FString Bare = TEXT(R"({"version":3,"registry":{},"sharedVisits":{},"sharedSelectors":{},"flows":{}})");
 	const FString Fractional = TEXT(R"({"schema":"patter/save@0","save":{"version":3.9,"registry":{},"sharedVisits":{},"sharedSelectors":{},"flows":{}}})");
 	const FString NoFlows = TEXT(R"({"schema":"patter/save@0","save":{"version":3,"registry":{},"sharedVisits":{},"sharedSelectors":{}}})");
-	TestFalse(TEXT("a bare snapshot with no envelope is refused"), UPatterSave::LoadStateFromJson(Engine, Bare));
-	TestFalse(TEXT("a version of 3.9 is refused, not read as 3"), UPatterSave::LoadStateFromJson(Engine, Fractional));
-	TestFalse(TEXT("a save with no flows is refused"), UPatterSave::LoadStateFromJson(Engine, NoFlows));
+	TestFalse(TEXT("a bare snapshot with no envelope is refused"), UPatterSave::DeserializeState(Engine, Bare));
+	TestFalse(TEXT("a version of 3.9 is refused, not read as 3"), UPatterSave::DeserializeState(Engine, Fractional));
+	TestFalse(TEXT("a save with no flows is refused"), UPatterSave::DeserializeState(Engine, NoFlows));
 	TestFalse(TEXT("the flow is still open"), Flow->IsClosed());
 	TestEqual(TEXT("the same flow, still the engine's"), Engine->GetFlow(TEXT("main")), Flow);
-	TestEqual(TEXT("nothing changed"), UPatterSave::SaveStateToJson(Engine), Good);
-	TestTrue(TEXT("and the good save still loads"), UPatterSave::LoadStateFromJson(Engine, Good));
+	TestEqual(TEXT("nothing changed"), UPatterSave::SerializeState(Engine), Good);
+	TestTrue(TEXT("and the good save still loads"), UPatterSave::DeserializeState(Engine, Good));
 
 	return true;
 }

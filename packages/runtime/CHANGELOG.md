@@ -33,18 +33,18 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`flow.start()` is deprecated: use `flow.reset()`.** They were the same call under two names. `flow.reset()`
+  is the one public name for beginning a flow again on every runtime (opening a flow begins a new one);
+  `flow.start()` goes in a later release.
+
 ### Fixed
 
 - **`reset()` no longer replays a prompt from the run it abandoned.** With prompt replay on, `choose()` leaves
   the chosen option's prompt waiting for the next `advance()`. `reset()` in between cleared only the choice, so
   the old prompt played as the restarted run's first beat. Every move that leaves the flow's place (`reset()`,
   `goto`, `close`) now drops both, through one helper.
-
-### Deprecated
-
-- **`flow.start()` is deprecated: use `flow.reset()`.** They were the same call under two names. `flow.reset()`
-  is the one public name for beginning a flow again on every runtime (opening a flow begins a new one);
-  `flow.start()` goes in a later release.
 
 ## [0.19.0] - 2026-10-06
 

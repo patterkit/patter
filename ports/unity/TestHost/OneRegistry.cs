@@ -254,7 +254,7 @@ namespace Patterkit.Patterplay.TestHost
                 var save = new Newtonsoft.Json.Linq.JObject
                 {
                     ["registry"] = PatterSave.SaveRegistry(registry),
-                    ["patter"] = PatterSave.Envelope(patter.SaveGame()),
+                    ["patter"] = PatterSave.SaveState(patter),
                 };
                 var text = save.ToString();
 

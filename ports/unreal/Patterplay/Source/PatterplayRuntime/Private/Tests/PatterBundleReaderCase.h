@@ -1,6 +1,6 @@
 // One bundle, and what reading it must give, shared by the two hosts of the bundle reader: the plugin's
 // automation test Patterplay.BundleReader (through PatterLoadBundle and FJsonValue) and the corpus
-// TestHost (through its own JsonValue). Both call patter::ParseBundle, so the reading itself is one
+// TestHost (through its own JsonValue). Both call patter::parseBundle, so the reading itself is one
 // function; what differs is each host's BundleJson / AstJson accessors, and this is what checks them
 // against each other: the same JSON must give the same facts through either. Std-only, so the TestHost
 // includes it by path.

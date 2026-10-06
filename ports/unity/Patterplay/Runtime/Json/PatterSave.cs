@@ -67,23 +67,33 @@ namespace Patterkit.Patterplay
 
         /// <summary>Serialise the whole game (visits, selectors, every live flow, and the registry's values when the
         /// engine made its own registry) to a tagged JSON string.</summary>
-        public static string SerializeState(Engine engine) => Envelope(engine.SaveGame()).ToString(Formatting.None);
+        public static string SerializeState(Engine engine) => SaveState(engine).ToString(Formatting.None);
 
-        /// <summary>The tagged envelope as a JObject: `{ schema, save }`, the save in the family's shape.</summary>
-        public static JObject Envelope(SaveGame s) => new JObject { ["schema"] = Schema, ["save"] = SaveToken(s) };
+        /// <summary>The whole game as the tagged envelope, a JObject: `{ schema, save }`, the save in the family's
+        /// shape. <see cref="SerializeState"/> is this as a string.</summary>
+        public static JObject SaveState(Engine engine) => EnvelopeOf(engine.SaveGame());
+
+        /// <summary>Restore a <see cref="SaveState"/> envelope into an engine. Throws on anything but a
+        /// `patter/save@0` envelope (a bare snapshot with no envelope included), and on a save the engine
+        /// refuses; either way before the engine changes.</summary>
+        public static void LoadState(Engine engine, JObject envelope)
+        {
+            var schema = envelope?["schema"];
+            if (schema == null || schema.Type != JTokenType.String || (string)schema != Schema)
+                throw new Exception($"PatterSave: not a {Schema} envelope");
+            if (!(envelope["save"] is JObject save)) throw new Exception($"PatterSave: not a {Schema} envelope");
+            engine.LoadGame(ReadSave(save));
+        }
+
+        [System.Obsolete("Use SaveState, the name every Patterplay runtime uses.")]
+        public static JObject Envelope(SaveGame s) => EnvelopeOf(s);
+
+        private static JObject EnvelopeOf(SaveGame s) => new JObject { ["schema"] = Schema, ["save"] = SaveToken(s) };
 
         /// <summary>Restore a <see cref="SerializeState"/> string into an engine. Throws on anything but a
         /// `patter/save@0` envelope (a bare snapshot with no envelope included), and on a save the engine
         /// refuses; either way before the engine changes.</summary>
-        public static void DeserializeState(Engine engine, string json)
-        {
-            var root = JObject.Parse(json);
-            var schema = root["schema"];
-            if (schema == null || schema.Type != JTokenType.String || (string)schema != Schema)
-                throw new Exception($"PatterSave: not a {Schema} envelope");
-            if (!(root["save"] is JObject save)) throw new Exception($"PatterSave: not a {Schema} envelope");
-            engine.LoadGame(ReadSave(save));
-        }
+        public static void DeserializeState(Engine engine, string json) => LoadState(engine, JObject.Parse(json));
 
         /// <summary>A registry's values as JSON (registry key -> name -> value), for a game that made its own
         /// registry and saves it once beside each engine's part. The same shape a standalone engine's save

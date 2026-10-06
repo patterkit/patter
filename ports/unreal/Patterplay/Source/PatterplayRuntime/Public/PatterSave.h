@@ -24,9 +24,17 @@ class PATTERPLAYRUNTIME_API UPatterSave : public UBlueprintFunctionLibrary
 public:
 	/** Serialise the whole game (every live flow, visits, and the engine's own registry's values) to a tagged JSON string. */
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Save")
-	static FString SaveStateToJson(UPatterEngine* Engine);
+	static FString SerializeState(UPatterEngine* Engine);
 
-	/** Parse + restore a SaveStateToJson string. False = refused (and logged), engine untouched. */
+	/** Parse + restore a SerializeState string. False = refused (and logged), engine untouched. */
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Save")
-	static bool LoadStateFromJson(UPatterEngine* Engine, const FString& Json);
+	static bool DeserializeState(UPatterEngine* Engine, const FString& Json);
+
+	/** The name SerializeState had before it took the name every runtime uses; goes in a later release. */
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Save", meta = (DeprecatedFunction, DeprecationMessage = "Use SerializeState, the name every Patterplay runtime uses."))
+	static FString SaveStateToJson(UPatterEngine* Engine) { return SerializeState(Engine); }
+
+	/** The name DeserializeState had before it took the name every runtime uses; goes in a later release. */
+	UFUNCTION(BlueprintCallable, Category = "Patterplay|Save", meta = (DeprecatedFunction, DeprecationMessage = "Use DeserializeState, the name every Patterplay runtime uses."))
+	static bool LoadStateFromJson(UPatterEngine* Engine, const FString& Json) { return DeserializeState(Engine, Json); }
 };

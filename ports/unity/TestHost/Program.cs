@@ -421,7 +421,7 @@ namespace Patterkit.Patterplay.TestHost
             scene.SceneProps.Add(new PropertyDecl { Name = "seen", Type = "boolean" });
             b.Scenes["s1"] = scene;
 
-            var d = BundleInfo.Describe(b);
+            var d = BundleInfo.DescribeBundle(b);
 
             if (d.Identity.Schema != "patter/bundle@0" || d.Identity.Project != "Tavern" || d.Identity.Version != "1.2.0")
                 Fail("describe", "identity", "schema / project / version not carried");
@@ -1050,7 +1050,7 @@ namespace Patterkit.Patterplay.TestHost
                     var bundle = _loader(c.GetProperty("bundle"));
                     string kind = c.GetProperty("kind").GetString();
                     GameData node = c.TryGetProperty("node", out var n) ? ParseGameData(n) : null;
-                    var effective = GameDataHelpers.Effective(GameDataHelpers.FieldsFor(bundle, kind), node);
+                    var effective = GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle, kind), node);
                     if (MatchObject(GameDataToObject(effective), c.GetProperty("expected"))) pass++;
                     else Fail("gameData", name, $"expected {c.GetProperty("expected")}, got {Dump(GameDataToObject(effective))}");
                 }
