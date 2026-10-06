@@ -149,13 +149,15 @@ namespace Patterkit.Patterplay
         public GameData GameData;
         public List<string> Tags;    // author tags (#215)
 
+        // option position (a direct child of a choice): an Option group or a bare snippet option
+        public bool Sticky;
+        public bool Fallback;
+        public bool SecretUntilEligible;
+
         // group
         public string Selector;      // run (default) | choice | branch | sequence
         public List<Node> Children;
         public Beat Prompt;
-        public bool Sticky;
-        public bool Fallback;
-        public bool SecretUntilEligible;
         public SelectorOptions Options;
         public bool Shared;          // selector cursor shared across flows
 
@@ -186,6 +188,9 @@ namespace Patterkit.Patterplay
     public sealed class Expression
     {
         public ExprNode Ast;
+        /// <summary>The expression's source text as the author wrote it, when the bundle carries it (a
+        /// content error report names it); null otherwise.</summary>
+        public string Src;
     }
 
     public sealed class Effect

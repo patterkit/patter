@@ -141,6 +141,9 @@ void UPatterFlow::Close()
 FPatterStep UPatterFlow::Advance()
 {
 	if (!Flow) return FPatterStep();
+	// A content error no longer reaches here: the core plays through it and reports it (OnError), so the
+	// flow carries on instead of ending. What can still arrive is a refusal of a different kind, such as a
+	// jump cycle with nothing to deliver, which ends the step as it always did.
 	try { return Convert(Flow->advance()); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return FPatterStep(); }
 }
@@ -231,6 +234,24 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 	Opts.onDryChoice = [Weak](const std::string& GroupId)
 	{
 		if (UPatterEngine* Self = Weak.Get()) Self->OnDryChoice.Broadcast(Ue(GroupId));
+	};
+	// A content error the core played through: always a Warning in the log, so a content bug is never
+	// silent, and the Blueprint event for a game or tool that wants to act on it.
+	Opts.onError = [Weak](const patter::PlayError& Err)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Patterplay: %s on %s in flow '%s' failed, played through: %s"),
+			UTF8_TO_TCHAR(Err.kind.c_str()), UTF8_TO_TCHAR(Err.node.c_str()), UTF8_TO_TCHAR(Err.flow.c_str()), UTF8_TO_TCHAR(Err.message.c_str()));
+		UPatterEngine* Self = Weak.Get();
+		if (!Self) return;
+		FPatterPlayError Out;
+		Out.Flow = Ue(Err.flow);
+		Out.Kind = Err.kind == "effect" ? EPatterPlayErrorKind::Effect
+			: Err.kind == "best-match" ? EPatterPlayErrorKind::BestMatch
+			: EPatterPlayErrorKind::Condition;
+		Out.Node = Ue(Err.node);
+		Out.Source = Ue(Err.source);
+		Out.Message = Ue(Err.message);
+		Self->OnError.Broadcast(Out);
 	};
 	try { E->Engine = std::make_shared<patter::Engine>(*Bundle->Raw(), Opts); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
@@ -527,6 +548,8 @@ TArray<FPatterLogEntry> UPatterEngine::GetLog() const
 		Row.Value = Ue(E.value.toDisplayString());
 		Row.bHasPrev = E.hasPrev;
 		if (E.hasPrev) Row.Prev = Ue(E.prev.toDisplayString());
+		Row.Kind = Ue(E.kind);
+		Row.Source = Ue(E.source);
 		for (const auto& C : E.considered)
 		{
 			FPatterLogConsidered Item;

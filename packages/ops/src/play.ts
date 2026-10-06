@@ -7,7 +7,7 @@
 
 import { exportBundle } from "@patterkit/compiler";
 import { Engine } from "@patterkit/runtime";
-import type { StepResult, ChoiceOption } from "@patterkit/runtime";
+import type { StepResult, ChoiceOption, PlayError } from "@patterkit/runtime";
 import type { GameData } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { resolveStart } from "./loaded-helpers.js";
@@ -31,7 +31,9 @@ export type PlayEvent =
   | { type: "line"; id: string; text: string; character?: string; direction?: string; gameData?: GameData }
   | { type: "text"; id: string; text: string; gameData?: GameData }
   | { type: "gameEvent"; id: string; gameData?: GameData }
-  | { type: "choice"; options: ChoiceOption[]; picked?: string };
+  | { type: "choice"; options: ChoiceOption[]; picked?: string }
+  /** A condition or effect that failed; the engine played through it (see the runtime's PlayError). */
+  | { type: "error"; error: PlayError };
 
 /** "end" = the flow finished; "stalled" = a choice with no pickable option; "max-steps" = bound hit. */
 export type PlayOutcome = "end" | "stalled" | "max-steps";
@@ -52,7 +54,7 @@ export function runPlay(loaded: LoadedProject, opts: PlayOptions = {}): PlayResu
   const events: PlayEvent[] = [];
   // Playing alone: another engine's scope the story names is stood in from the game's scopes files.
   const registry = previewRegistry(loaded.gameScopes, bundle);
-  const engine = new Engine(bundle, { seed: opts.seed, ...(registry ? { registry } : {}) });
+  const engine = new Engine(bundle, { seed: opts.seed, onError: (error) => events.push({ type: "error", error }), ...(registry ? { registry } : {}) });
 
   const start = resolveStart(loaded, opts); // explicit override, else the project's authored start point
   const flow = engine.openFlow("main", { scene: start.scene, block: start.block });
@@ -82,6 +84,11 @@ export function renderPlay(result: PlayResult): string[] {
       case "line": out.push(`${e.character ?? "?"}: ${e.text}`); break;
       case "text": out.push(`  ${e.text}`); break;
       case "gameEvent": out.push(`    (game event ${JSON.stringify(e.gameData ?? {})})`); break;
+      case "error": {
+        const { kind, node, source, message } = e.error;
+        out.push(`    ! ${kind} on '${node}'${source ? ` (${source})` : ""} failed, played through: ${message}`);
+        break;
+      }
       case "choice":
         for (const o of e.options) out.push(`    ${o.eligible ? "[ ]" : "[x]"} ${o.prompt?.text ?? "(no label)"}  (${o.id})`);
         if (e.picked !== undefined) out.push(`    > ${e.picked}`);

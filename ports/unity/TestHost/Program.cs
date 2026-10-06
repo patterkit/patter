@@ -46,6 +46,11 @@ namespace Patterkit.Patterplay.TestHost
             int e = RunExpressions(root.GetProperty("expressions"));
             int sp = root.TryGetProperty("specificity", out var specArr) ? RunSpecificity(specArr) : 0;
 
+            // The rule cases make content fail on purpose; the engine's default report of each (a warning on
+            // standard error) is checked in RunPlayErrorChecks, so the corpus runs keep it out of the output.
+            var defaultOnError = Engine.DefaultOnError;
+            Engine.DefaultOnError = _ => { };
+
             int r = 0, s = 0, g = 0;
             foreach (var (label, loader) in new (string, Func<JsonElement, Bundle>)[]
                      {
@@ -75,12 +80,15 @@ namespace Patterkit.Patterplay.TestHost
             int sj = RunScripted(root.GetProperty("scripted"));
             _jsonSaveLoad = false;
             Console.WriteLine($"  [PatterSave JSON] scripted save/load: {sj}");
+            Engine.DefaultOnError = defaultOnError;
 
             RunSaveShapeCheck();
             RunHostScopeWritableCheck();
             RunOneRegistryChecks();
             RunCheckpointChecks();
             RunStaleShuffleCheck();
+            RunPlayErrorChecks();
+            RunOldSaveRuleChecks();
 
             RunDescribeSmoke();
             RunDebugLinkUtf8Check();
@@ -232,8 +240,10 @@ namespace Patterkit.Patterplay.TestHost
         /// every save already on disk. So this reads the JSON, and loads one written by hand.</summary>
         // A host-scope declaration's `writable: false` is refused by the ENGINE, whether the scope is bound
         // by the game or self-backed. The JS reference always did; this package let a bound scope's Set
-        // through unchecked until 2026-09-03. Not a corpus case: the script grammar has no "this op must
-        // throw", so it is pinned here, beside the other checks the corpus cannot express.
+        // through unchecked until 2026-09-03. Since 2026-10-06 the refusal is a content error the story
+        // plays through: the write is skipped and reported to OnError, never thrown out of the flow. Not a
+        // corpus case: the corpus cannot see OnError, so it is pinned here, beside the other checks the
+        // corpus cannot express.
         private sealed class RecordingScope : IHostScope
         {
             public readonly Dictionary<string, ExprValue> Values = new Dictionary<string, ExprValue>();
@@ -271,20 +281,26 @@ namespace Patterkit.Patterplay.TestHost
             {
                 var label = bound ? "bound" : "self-backed";
                 var scope = new RecordingScope();
-                var opts = new EngineOptions();
+                var errors = new List<PlayError>();
+                var opts = new EngineOptions { OnError = errors.Add };
                 if (bound) opts.HostScopes = new Dictionary<string, IHostScope> { ["world"] = scope };
                 var engine = new Engine(b, opts);
                 string message = null;
                 // The refusal surfaces from OpenFlow: a flow settles into its first snippet on open and
-                // runs that snippet's effects there, before any Advance.
-                // Refused as Patterplay's own EvalError, which the kernel's RegistryError is rethrown as, so
-                // a game's `catch (EvalError)` still sees it.
-                string thrown = null;
-                try { engine.OpenFlow("main", "s", "b").Advance(); } catch (Exception ex) { message = ex.Message; thrown = ex.GetType().Name; }
-                if (message == null || !message.Contains("'@world.clock' is read-only") || thrown != nameof(EvalError))
-                    Fail("host-scope", label, $"a story write to a writable:false declaration was not refused as an EvalError (got: {thrown} {message ?? "no error"})");
+                // runs that snippet's effects there, before any Advance. The story plays on past it, and the
+                // report carries the kernel's sentence.
+                try { engine.OpenFlow("main", "s", "b").Advance(); } catch (Exception ex) { message = ex.Message; }
+                if (message != null)
+                    Fail("host-scope", label, $"a refused story write threw out of the flow: {message}");
+                if (errors.Count != 1 || errors[0].Flow != "main" || errors[0].Kind != "effect" || errors[0].Node != "sn"
+                    || errors[0].Message == null || !errors[0].Message.Contains("'@world.clock' is read-only"))
+                    Fail("host-scope", label, $"a story write to a writable:false declaration was not reported to OnError once as an effect error (got {errors.Count}: {string.Join(" | ", errors)})");
                 if (bound && scope.Values.ContainsKey("clock"))
                     Fail("host-scope", label, "the refused write still landed in the game's scope");
+                if (!bound && engine.GetProperty("@world.clock")?.AsString != "day")
+                    Fail("host-scope", label, "the refused write still landed in the self-backed scope");
+                if (engine.GetProperty("@world.known")?.AsBool != true)
+                    Fail("host-scope", label, "the writable effect beside the refused one did not land");
                 // The GAME's own path through the engine is NOT refused: `writable: false` is the story's
                 // promise about the story's writes, never a lock on the value's owner (ruled across the
                 // family 2026-09-05, from-storylets/host-writes-to-read-only-world).
@@ -1229,7 +1245,11 @@ namespace Patterkit.Patterplay.TestHost
         }
 
         private static Expression ParseExpr(JsonElement e)
-            => new Expression { Ast = ParseAst(e.GetProperty("ast")) };
+            => new Expression
+            {
+                Ast = ParseAst(e.GetProperty("ast")),
+                Src = e.TryGetProperty("src", out var src) && src.ValueKind == JsonValueKind.String ? src.GetString() : null,
+            };
 
         private static List<Effect> ParseEffects(JsonElement e)
             => e.EnumerateArray().Select(x => new Effect { Target = x.GetProperty("target").GetString(), Value = ParseExpr(x.GetProperty("value")) }).ToList();
@@ -1372,6 +1392,10 @@ namespace Patterkit.Patterplay.TestHost
             if (n.TryGetProperty("onExit", out var oex)) node.OnExit = ParseEffects(oex);
             if (n.TryGetProperty("gameData", out var gd)) node.GameData = ParseGameData(gd);
             if (n.TryGetProperty("tags", out var nt)) node.Tags = TagList(nt);
+            // Option-position flags, on a bare snippet option as on an Option group.
+            if (n.TryGetProperty("sticky", out var st)) node.Sticky = st.GetBoolean();
+            if (n.TryGetProperty("fallback", out var fb)) node.Fallback = fb.GetBoolean();
+            if (n.TryGetProperty("secretUntilEligible", out var su)) node.SecretUntilEligible = su.GetBoolean();
 
             if (node.IsGroup)
             {
@@ -1379,9 +1403,6 @@ namespace Patterkit.Patterplay.TestHost
                 node.Children = new List<Node>();
                 if (n.TryGetProperty("children", out var ch)) foreach (var c in ch.EnumerateArray()) node.Children.Add(ParseNode(c));
                 if (n.TryGetProperty("prompt", out var pr)) node.Prompt = ParseBeat(pr);
-                if (n.TryGetProperty("sticky", out var st)) node.Sticky = st.GetBoolean();
-                if (n.TryGetProperty("fallback", out var fb)) node.Fallback = fb.GetBoolean();
-                if (n.TryGetProperty("secretUntilEligible", out var su)) node.SecretUntilEligible = su.GetBoolean();
                 if (n.TryGetProperty("shared", out var sh)) node.Shared = sh.GetBoolean();
                 if (n.TryGetProperty("options", out var op))
                     node.Options = new SelectorOptions

@@ -76,7 +76,8 @@ Run the story through the reference runtime **non-interactively** and print a tr
 scripted checks and CI, not for exploring (to actually play through a story, use Patterpad's Play
 window). Choices come from `--choices a,b,c` (option ids taken in order; otherwise the first
 eligible is picked). `--scene id` · `--block id` · `--seed N`. Exits **1** if the playthrough
-didn't reach the end: a completion gate for CI. A line that names another engine's scope
+didn't reach the end, or if a condition or effect failed on the way (the engine plays on past it, and
+the transcript marks it with `!`): a completion gate for CI. A line that names another engine's scope
 (`@story.act`) plays where the game shares its scopes, standing that engine in from its file's
 defaults; without the folder it is refused, since Patter is playing alone.
 

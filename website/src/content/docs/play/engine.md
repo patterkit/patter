@@ -112,7 +112,9 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 lines, which are static. `characterName` is the localised display name; if a character
 has none, it's absent and you fall back to the `character` token. A **`ChoiceOption`**
 is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present (greyed)
-unless they're secret; pass `id` to `choose()`. **`tags`** is the beat's accumulated
+unless they're secret; pass `id` to `choose()`. A choice is only offered when at least one option
+can be taken: if every remaining option is greyed out, the choice runs dry, as one with no options
+does, so its fallback plays if it has one and otherwise the flow moves on. **`tags`** is the beat's accumulated
 author tags (its own plus every ancestor's), absent when empty: see
 [Tags at runtime](/play/tags/).
 
@@ -131,6 +133,34 @@ flow.setProperty("@scene.locked", false);
 property values) are read and written on a `Flow`. The
 [`@patterkit/play-helpers`](/play/integration/) package adds conveniences like
 `setProperties(engine, { "@hp": 10 })`.
+
+## When content fails
+
+A condition or effect can fail while the story plays, in ways the compiler can't see: a division by
+zero, a value from your game of an unexpected type, or the story setting a `@world` value your game
+marks read-only. The story never stops for one. A failing condition counts as false, so its line,
+option, or branch is skipped, and a failing effect is skipped while the rest of its list still runs.
+Every runtime does the same.
+
+Each failure is reported, so it's never silent. Pass `onError` to hear about it: it receives the flow,
+what failed (`condition`, `effect`, or `best-match`), the node, the expression's source, and the
+error. With the decision log on, each is also a `diagnostic` entry in it.
+
+```ts
+const engine = new Engine(bundle, {
+  onError: (e) => console.error(`${e.kind} on ${e.node}: ${e.message}`),
+});
+```
+
+| Runtime | How to hear about it | Unset |
+|---|---|---|
+| JS | `onError` in the engine options | `console.warn` |
+| Unity | `EngineOptions.OnError` (a `PlayError`) | `Debug.LogWarning` |
+| Unreal | the engine's `OnError` event (an `FPatterPlayError`); `EngineOptions::onError` in C++ | a log warning |
+| Godot | `"on_error"` in the options, a `Callable` taking a Dictionary | `push_warning` |
+
+Patterpad's Play window marks each failure in its transcript, and the
+[coverage test](/production/coverage-testing/) lists every one it saw.
 
 ## Next
 

@@ -16,6 +16,7 @@
 
 import { exportBundle } from "@patterkit/compiler";
 import { Engine } from "@patterkit/runtime";
+import type { PlayError } from "@patterkit/runtime";
 import { walkNodes } from "@patterkit/model";
 import type {
   Group, Snippet, Bundle, CompiledGroup, CompiledSnippet, CompiledEffect, Expression,
@@ -97,6 +98,22 @@ export interface BlockedGate {
  *  fallback, so it fell through silently and the flow carried on past it. This is easy to author by
  *  accident (all options gated and every condition happened to fail, or a re-enterable hub whose once-only
  *  options all got consumed) and the runtime hides it, so coverage surfaces it explicitly. */
+/** A condition or effect that failed during the runs. The engine plays through these (a failing condition
+ *  counts as false, a failing effect is skipped), so without this list they would pass unseen. */
+export interface ContentError {
+  /** What failed: a condition, an effect, or a part of a condition scored for Best match. */
+  kind: PlayError["kind"];
+  /** The snippet, group, or option whose condition failed, or the snippet or scene owning the effect. */
+  node: string;
+  /** The scene the node lives in. */
+  scene: string;
+  /** The expression's source text, when known. */
+  source?: string;
+  message: string;
+  /** Distinct runs in which it failed (out of runs executed). */
+  runs: number;
+}
+
 export interface DryChoice {
   /** The choice group's id. */
   id: string;
@@ -127,6 +144,8 @@ export interface CoverageReport {
   /** Choices observed running dry (falling through with nothing takeable) during the run, most-frequent
    *  first. Empty when none. A dry choice is a likely dead-end-by-accident the runtime hides. */
   dryChoices: DryChoice[];
+  /** Conditions and effects that failed and were played through, most frequent first. */
+  contentErrors: ContentError[];
   cancelled: boolean;
 }
 
@@ -427,9 +446,12 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
   const order: string[] = [];
   const meta = new Map<string, { scene: string; kind: CoverageBeat["kind"]; character?: string; preview: string }>();
   const choiceScene = new Map<string, string>(); // choice group id -> scene id (for the dry-choice report)
+  const nodeScene = new Map<string, string>(); // any node id -> scene id (for the content-error report)
   for (const scene of loaded.scenes) {
+    nodeScene.set(scene.id, scene.id);
     for (const block of scene.blocks) {
       walkNodes<Group | Snippet>(block.children, (node) => {
+        nodeScene.set(node.id, scene.id);
         if (node.type === "group") {
           if (node.selector === "choice") choiceScene.set(node.id, scene.id);
           return;
@@ -451,6 +473,7 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
   const hitCount = new Map<string, number>(order.map((id) => [id, 0]));
   const reachedRuns = new Map<string, number>(order.map((id) => [id, 0]));
   const dryRuns = new Map<string, number>(); // choice group id -> distinct runs it ran dry in
+  const errorRuns = new Map<string, ContentError>(); // kind|node|message -> the error, with its run count
   const termination = { ended: 0, capped: 0, stalled: 0, evalError: 0 };
 
   const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
@@ -479,11 +502,17 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     // reset), so the samples are unbiased. The per-run engine seed is drawn from the same harness stream.
     // The onDryChoice hook records which choices fell through this run (deduped per run below).
     const dryThisRun = new Set<string>();
+    // Content errors this run, deduped by what failed where, so a run counts once per error.
+    const errorsThisRun = new Map<string, Omit<ContentError, "runs" | "scene">>();
     // Another engine's scope the story names is stood in from the game's scopes files, afresh each run.
     const registry = previewRegistry(loaded.gameScopes, bundle);
     const engine = new Engine(bundle, {
       seed: Math.floor(rng() * 0x100000000),
       onDryChoice: (groupId) => dryThisRun.add(groupId),
+      onError: (e) => {
+        const key = `${e.kind}|${e.node}|${e.message}`;
+        if (!errorsThisRun.has(key)) errorsThisRun.set(key, { kind: e.kind, node: e.node, ...(e.source ? { source: e.source } : {}), message: e.message });
+      },
       ...(registry ? { registry } : {}),
     });
     // Initial drivers feed the host scope BEFORE the flow enters its start scene, so first-scene entry
@@ -520,6 +549,10 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
 
     for (const id of seenThisRun) reachedRuns.set(id, reachedRuns.get(id)! + 1);
     for (const id of dryThisRun) dryRuns.set(id, (dryRuns.get(id) ?? 0) + 1);
+    for (const [key, e] of errorsThisRun) {
+      const seen = errorRuns.get(key);
+      if (seen) seen.runs++; else errorRuns.set(key, { ...e, scene: nodeScene.get(e.node) ?? "", runs: 1 });
+    }
     termination[term]++;
     executed++;
     if ((run & 0xff) === 0) hooks.onProgress?.(executed, runs); // ~every 256 runs
@@ -564,7 +597,9 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     runs: executed, maxSteps, seed, start, beats,
     totals: { beats: beats.length, covered, neverHit, rare, coveragePct: beats.length ? (covered / beats.length) * 100 : 100 },
     rareThresholdPct: RARE_REACH_PCT,
-    termination, drivers, unwrittenInputs: [...unwrittenInputs].sort(), dryChoices, cancelled,
+    termination, drivers, unwrittenInputs: [...unwrittenInputs].sort(), dryChoices,
+    contentErrors: [...errorRuns.values()].sort((a, b) => b.runs - a.runs || a.node.localeCompare(b.node)),
+    cancelled,
   };
 }
 
@@ -645,6 +680,13 @@ export function renderCoverageText(
     out.push(`dry choices (fell through with nothing takeable - add a fallback or an unconditional option): ${report.dryChoices.length}`);
     for (const d of report.dryChoices) {
       out.push(`  ‼ ${String(d.runs).padStart(6)} run(s)  ${sceneName(d.scene)}  choice '${d.id}'`);
+    }
+  }
+  if (report.contentErrors.length) {
+    out.push("");
+    out.push(`content errors (a condition or effect failed and play went on without it - fix the expression): ${report.contentErrors.length}`);
+    for (const e of report.contentErrors) {
+      out.push(`  ‼ ${String(e.runs).padStart(6)} run(s)  ${sceneName(e.scene)}  ${e.kind} on '${e.node}'${e.source ? ` (${e.source})` : ""}: ${e.message}`);
     }
   }
   if (!report.beats.length) return out;

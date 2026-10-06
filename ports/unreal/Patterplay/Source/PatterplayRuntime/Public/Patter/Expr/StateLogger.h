@@ -19,8 +19,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k11805ede_STATELOGGER_H) && WILDWINTER_EXPR_KERNEL == 0x11805ede
-#define WILDWINTER_EXPR_k11805ede_STATELOGGER_H
+#if !defined(WILDWINTER_EXPR_k9821750c_STATELOGGER_H) && WILDWINTER_EXPR_KERNEL == 0x9821750c
+#define WILDWINTER_EXPR_k9821750c_STATELOGGER_H
 
 #include <cstdio>
 #include <functional>
@@ -35,7 +35,7 @@
 #include "PropertyBag.h"
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k11805ede
+namespace wildwinter { namespace expr { inline namespace k9821750c
 {
     /** A flattened snapshot: path -> value. */
     using StateSnapshot = OrderedMap<std::string, ExprValue>;

@@ -95,6 +95,16 @@ a click-through to the choice. Give such a choice a fallback option, or one unco
 option, to guarantee the player a way through. (Patterpad also warns about this statically, in
 the [Problems panel](/patterpad/structure-and-branching/).)
 
+### Conditions and effects that failed
+
+A condition or effect can fail while the story plays, in ways Patterpad can't see while you write: a
+division by zero, a game value of an unexpected type, or the story setting a `@world` value your game
+marks read-only. The engine never stops for one. A failing condition counts as false, so its line or
+option is skipped, and a failing effect is skipped while the rest of its list still runs. Because
+nothing stops, the test **lists each failure it saw**, with what failed, the scene, the error, and the
+number of runs it happened in; click one to jump to it. The Play window marks the same failures in
+its transcript as you play.
+
 ## World Properties and input drivers
 
 Some branches turn on values your **game** owns rather than the story, written as `@world.name`

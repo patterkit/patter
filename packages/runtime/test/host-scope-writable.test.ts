@@ -13,6 +13,7 @@
 // and its kin), which that container refuses itself. Three rules, and each says whose it is.
 import { describe, it, expect } from "vitest";
 import { Engine } from "@patterkit/runtime";
+import type { EngineOptions, PlayError } from "@patterkit/runtime";
 import { exportBundle } from "@patterkit/compiler";
 import type { ProjectFile, Scene, LocaleFile } from "@patterkit/model";
 
@@ -42,19 +43,24 @@ const en: LocaleFile = { schema: "patter/strings@0", scene: "s", locale: "en", s
 const bundle = exportBundle({ project, scenes: [scene], locales: [en] });
 
 describe.each([
-  ["self-backed", () => ({ engine: new Engine(bundle), store: undefined })],
-  ["bound", () => {
+  ["self-backed", (opts: EngineOptions = {}) => ({ engine: new Engine(bundle, opts), store: undefined })],
+  ["bound", (opts: EngineOptions = {}) => {
     // A bound scope has no defaults: the GAME owns its values and seeds them itself.
     const store = new Map<string, unknown>([["clock", "day"], ["known", false]]);
-    const engine = new Engine(bundle, { world: { get: (n) => store.get(n) as never, set: (n, v) => { store.set(n, v); } } });
+    const engine = new Engine(bundle, { ...opts, world: { get: (n) => store.get(n) as never, set: (n, v) => { store.set(n, v); } } });
     return { engine, store };
   }],
 ])("a writable:false host declaration, %s", (_label, make) => {
   it("refuses the story's write, with the family's sentence, and leaves the value alone", () => {
-    const { engine, store } = make();
+    const errors: PlayError[] = [];
+    const { engine, store } = make({ onError: (e) => errors.push(e) });
     // The refusal surfaces from openFlow: a flow settles into its first snippet on open and runs that
-    // snippet's effects there, before any advance.
-    expect(() => engine.openFlow("main", { scene: "s", block: "b" })).toThrow("'@world.clock' is read-only");
+    // snippet's effects there, before any advance. The story plays on past it (a refused write is a
+    // content error, skipped and reported, never a stop), and the report carries the family's sentence.
+    expect(() => engine.openFlow("main", { scene: "s", block: "b" })).not.toThrow();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ flow: "main", kind: "effect" });
+    expect(errors[0]!.message).toContain("'@world.clock' is read-only");
     expect(engine.getProperty("@world.clock")).toBe("day");
     if (store) expect(store.get("clock")).toBe("day");
   });

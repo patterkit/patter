@@ -163,21 +163,12 @@ func goto(scene: String, block: String = "") -> bool:
 		_stack = []
 		return true
 	# Resolve BOTH addresses before touching state, so a bad one is a no-op rather than a half-move.
-	var bundle: Dictionary = _host["bundle"]
-	var scene_id: String = ""
-	if _host["scene_gameid_to_id"].has(scene):
-		scene_id = _host["scene_gameid_to_id"][scene]
-	elif bundle["scenes"].has(scene):
-		scene_id = scene
+	var scene_id := resolve_scene(_host, scene)
 	if scene_id == "":
 		return false
 	var block_id: String = ""
 	if block != "":
-		var addrs: Dictionary = _host["block_gameid_to_id"].get(scene_id, {})
-		if addrs.has(block):
-			block_id = addrs[block]
-		elif _host["block_to_scene"].get(block, "") == scene_id:
-			block_id = block
+		block_id = resolve_block(_host, scene_id, block)
 		if block_id == "":
 			return false  # a block address is scene-scoped: unknown HERE is unknown
 	if not _started:
@@ -422,8 +413,10 @@ func set_property(ref: String, value) -> void:
 	_write_property(ref, value, true)
 
 
-## The write itself. `host` says WHO is writing, which is all "writable": false cares about.
-func _write_property(ref: String, value, host: bool) -> void:
+## The write itself. `host` says WHO is writing, which is all "writable": false cares about. Returns
+## "" when the write landed, else why it was refused (nothing written): an effect that gets a refusal
+## is a failed effect (see _run_effects).
+func _write_property(ref: String, value, host: bool) -> String:
 	var sp := split_host_ref(_host, ref)
 	var journal = _host["journal"]
 	if sp[0] == "patter":
@@ -437,17 +430,21 @@ func _write_property(ref: String, value, host: bool) -> void:
 					journal["undo"].append(Callable(_host["registry"], "set_value").bind("patter", sp[1], prev))
 				else:
 					journal["undo"].append(PatterFlow._undo_bag_set.bind(_local, sp[1], prev))
-		_patter_set(sp[1], value)
+		return _patter_set(sp[1], value)
 	elif sp[0] == "scene":
 		if _current_scene_id == "":
-			push_error("'%s': the flow has not entered a scene yet" % ref)
-			return
+			# A host write with nowhere to land errors, never silently vanishes; a story write reports it
+			# as a failed effect instead.
+			var msg := "'%s': the flow has not entered a scene yet" % ref
+			if host:
+				push_error(msg)
+			return msg
 		if journal != null:
 			var bag = _scene_bag_for(sp[1])
 			var prev = bag.get_value(sp[1]) if bag != null else null
 			if prev != null:
 				journal["undo"].append(PatterFlow._undo_bag_set.bind(bag, sp[1], prev))
-		_scene_set(sp[1], value)
+		return _scene_set(sp[1], value)
 	else:
 		# Host scopes and other engines' scopes. "writable": false is the STORY's promise, so the
 		# registry refuses a story write (push_error, no write) and lets the game's own through.
@@ -456,6 +453,7 @@ func _write_property(ref: String, value, host: bool) -> void:
 		# Recorded after the write: one a read-only host scope refused never happened, so has nothing to undo.
 		if journal != null and refused == "" and prev != null:
 			journal["undo"].append(Callable(_host["registry"], "set_value").bind(sp[0], sp[1], prev, {"host": true}))
+		return refused
 
 
 ## Undo helpers for a checkpoint's journal. Static, with what they act on bound in, so an undo never
@@ -486,11 +484,12 @@ func _patter_get(n: String):
 	return _local.get_value(n)
 
 
-func _patter_set(n: String, v) -> void:
+## Returns "" or the refusal, as _write_property does.
+func _patter_set(n: String, v) -> String:
 	if _host["patter_shared_names"].has(n):
-		_host["registry"].set_value("patter", n, v)
-	else:
-		_local.set_value(n, v)
+		return _host["registry"].set_value("patter", n, v)
+	var change: Dictionary = _local.set_value(n, v)
+	return str(change["error"]) if change.has("error") else ""
 
 
 ## The bag a `@scene` property of the current scene lives in (the scene's stage bag, or this flow's),
@@ -513,12 +512,16 @@ func _scene_get(n: String):
 	return bag.get_value(n) if bag != null else null
 
 
-func _scene_set(n: String, v) -> void:
+## Returns "" or the refusal, as _write_property does.
+func _scene_set(n: String, v) -> String:
 	var bag = _scene_bag_for(n)
 	if bag != null:
 		# Not silent: an engine write notifies subscribers and is audited, where a host
 		# write is silent but still audited. This is the engine's own write.
-		bag.set_value(n, v)
+		var change: Dictionary = bag.set_value(n, v)
+		if change.has("error"):
+			return str(change["error"])
+	return ""
 
 
 # -- settle / entry ------------------------------------------------------------
@@ -536,7 +539,7 @@ func _settle() -> void:
 		if _active_snippet != null:
 			if _beat_index < _active_snippet.get("beats", []).size():
 				return
-			_run_effects(_active_snippet.get("onExit", []))
+			_run_effects(_active_snippet.get("onExit", []), _active_snippet["id"])
 			var jump = _active_snippet.get("jump")
 			_active_snippet = null
 			_beat_index = 0
@@ -583,7 +586,7 @@ func _enter_scene_setup(scene_id: String) -> void:
 	_current_scene_id = scene_id
 	_enter(scene_id)
 	_seed_scene(scene)
-	_run_effects(scene.get("onEntry", []))
+	_run_effects(scene.get("onEntry", []), scene_id)
 
 
 func _enter_child(node: Dictionary) -> void:
@@ -614,7 +617,7 @@ func _children_of(container_id: String):
 
 
 func _begin_snippet(snippet: Dictionary) -> void:
-	_run_effects(snippet.get("onEnter", []))
+	_run_effects(snippet.get("onEnter", []), snippet["id"])
 	_active_snippet = snippet
 	_beat_index = 0
 
@@ -640,7 +643,10 @@ func _setup_choice(group: Dictionary) -> void:
 			opt["gameData"] = _norm_gamedata(child["gameData"])
 		options.append(opt)
 		by_id[child["id"]] = child
-	if not options.is_empty():
+	# A choice is offered only when the player can take something. One whose every remaining option is
+	# greyed out left the player stuck in front of it, so it runs dry instead, as a choice with no
+	# options does: the fallback follows if there is one, otherwise the flow moves on.
+	if options.any(func(o): return o["eligible"]):
 		# Including the ones a condition left ineligible: "why is that greyed out" is a
 		# question about the moment the choice was built.
 		var offered: Array = []
@@ -761,27 +767,37 @@ func _pick_sequential(eligible: Array, exhaust: String, st: Dictionary):
 func _pick_shuffle(eligible: Array, exhaust: String, st: Dictionary):
 	var ln := eligible.size()
 	var stick := exhaust == "stick"
+	var eligible_ids := {}
+	for c in eligible:
+		eligible_ids[c["id"]] = true
 	if not st.has("bag_init"):
 		st["bag"] = _fill_ids(eligible, stick, ln)
 		st["bag_init"] = true
-	if (st["bag"] as Array).is_empty():
+	# The bag was filled from the children eligible THEN. Draw only from those still eligible now, so a
+	# child whose condition has since gone false is never drawn (it used to be drawn, and the group then
+	# played nothing). If none of the bag is drawable, the pass is over, exactly as when the bag is empty.
+	if not (st["bag"] as Array).any(func(bid): return eligible_ids.has(bid)):
 		if exhaust == "once":
 			return null
 		if stick:
 			var last_node = eligible[ln - 1]
 			st["last"] = last_node["id"]
 			return last_node
-		st["bag"] = _fill_ids(eligible, stick, ln)
-	# Draw without replacement, never repeating the immediately-previous pick - allocation-free:
-	# find last's slot and draw into the reduced span skipping it, then erase the pick in place.
+		st["bag"] = _fill_ids(eligible, stick, ln)   # repeat: reshuffle
+		if (st["bag"] as Array).is_empty():
+			return null
+	# Draw without replacement, never repeating the immediately-previous pick when another is drawable.
+	# With every bag member still eligible the pool is the bag itself, in its order, so a seeded draw
+	# lands exactly where it always did.
 	var bag: Array = st["bag"] as Array
-	var p := (bag.find(st["last"]) if (st.has("last") and bag.size() > 1) else -1)
-	var span := (bag.size() - 1 if p >= 0 else bag.size())
+	var pool: Array = bag.filter(func(bid): return eligible_ids.has(bid))
+	var p := (pool.find(st["last"]) if (st.has("last") and pool.size() > 1) else -1)
+	var span := (pool.size() - 1 if p >= 0 else pool.size())
 	var i := int(floor(_rng() * span))
 	if p >= 0 and i >= p:
 		i += 1
-	var pick = bag[i]
-	bag.remove_at(i) # draw without replacement, in place
+	var pick = pool[i]
+	bag.remove_at(bag.find(pick)) # draw without replacement, in place
 	st["last"] = pick
 	for c in eligible:
 		if c["id"] == pick:
@@ -853,15 +869,19 @@ func _spec_score(node: Dictionary) -> int:
 	if not node.has("condition"):
 		return 0
 	var ctx := _context()
-	var truthy := func(n: Array) -> bool: return PatterValues.truthy(_spec_atom(n, ctx))
+	var truthy := func(n: Array) -> bool: return PatterValues.truthy(_spec_atom(n, ctx, node))
 	return PatterSpecificity.matched_specificity(node["condition"]["ast"], truthy)
 
 
-# One atom's value for specificity scoring. An eval error scores as false, the
-# same reading the JS scorer gives a throwing atom.
-static func _spec_atom(node: Array, ctx: Dictionary) -> Variant:
-	var v = PatterExpr.evaluate(node, ctx, PatterDialect.dialect())
-	return false if PatterExpr.is_error(v) else v
+# One atom's value for specificity scoring. The scorer walks every part, including an `or` branch
+# eligibility never evaluated, so a part can fail here that did not fail there: it scores as false,
+# the same reading the JS scorer gives a throwing atom, and is reported (see _report_error).
+func _spec_atom(atom: Array, ctx: Dictionary, owner: Dictionary) -> Variant:
+	var v = PatterExpr.evaluate(atom, ctx, _dialect)
+	if PatterExpr.is_error(v):
+		_report_error("best-match", owner["id"], owner["condition"], v.message)
+		return false
+	return v
 
 
 func _fill_ids(eligible: Array, stick: bool, ln: int) -> Array:
@@ -896,7 +916,10 @@ func _selector_state_for(group: Dictionary) -> Dictionary:
 
 # -- effects / expressions -----------------------------------------------------
 
-func _run_effects(effects: Array) -> void:
+## Run an effect list. `owner` is the snippet or scene it belongs to, for an error report. An effect
+## that fails (its value does not evaluate, or the write is refused) is skipped and reported, with no
+## `write` entry, and the rest of the list still runs.
+func _run_effects(effects: Array, owner: String) -> void:
 	for e in effects:
 		var v = _eval_expr(e["value"])
 		# An effect whose value does not evaluate writes NOTHING. Before the
@@ -904,18 +927,23 @@ func _run_effects(effects: Array) -> void:
 		# (0.0, or false) into the property, which is a corrupted save rather
 		# than a caught bug.
 		if PatterExpr.is_error(v):
-			push_error("effect on '%s' did not evaluate: %s" % [e["target"], v.message])
+			_report_error("effect", owner, e["value"], v.message)
 			continue
 		# `prev` read before the write, so a reader can say "0 -> 1" in one pass. Only
 		# paid for when the run asked for a log.
 		var prev = get_property(e["target"]) if _host["log_enabled"] else null
-		_write_property(e["target"], v, false)   # the STORY writes: a read-only host property refuses it
+		# The STORY writes: a read-only host property refuses it, and a refused write is a failed effect.
+		var refused := _write_property(e["target"], v, false)
+		if refused != "":
+			_report_error("effect", owner, e["value"], refused)
+			continue
 		var ev := {"type": "write", "target": e["target"], "value": v}
 		if prev != null:
 			ev["prev"] = prev
 		_emit(ev)
 
 
+## Whether a node's condition holds. A condition that fails to evaluate counts as false, and is reported.
 func _eligible(node: Dictionary) -> bool:
 	if not node.has("condition"):
 		return true
@@ -924,9 +952,31 @@ func _eligible(node: Dictionary) -> bool:
 	# diagnostic surfaces. truthy() would answer false for an EvalError anyway;
 	# this says it on purpose, and reports why.
 	if PatterExpr.is_error(v):
-		push_error("condition did not evaluate: %s" % v.message)
+		_report_error("condition", node["id"], node["condition"], v.message)
 		return false
 	return PatterValues.truthy(v)
+
+
+## Report a content error the engine is playing through: to the game's "on_error" Callable (or
+## push_warning when none is set, so it is never silent), and to the log as a `diagnostic` entry.
+## `node` is the snippet, group, or option whose condition failed, or the snippet or scene owning the
+## effect; `expr` the compiled expression, whose `src` rides along when the bundle carries it.
+func _report_error(kind: String, node: String, expr, message: String) -> void:
+	var source := ""
+	if expr is Dictionary and expr.get("src") != null:
+		source = str(expr["src"])
+	var err := {"flow": id, "kind": kind, "node": node, "message": message}
+	if source != "":
+		err["source"] = source
+	var on_error = _host.get("on_error")
+	if on_error is Callable and (on_error as Callable).is_valid():
+		(on_error as Callable).call(err)
+	else:
+		push_warning("Patterplay: %s on %s in flow '%s' failed, played through: %s" % [kind, node, id, message])
+	var ev := {"type": "diagnostic", "kind": kind, "node": node, "message": message}
+	if source != "":
+		ev["source"] = source
+	_emit(ev)
 
 
 func _eval_expr(expr: Dictionary):
@@ -1262,6 +1312,26 @@ static func key_flow_globals(flow_id: String) -> String:
 ## A flow's NOT-shared `@scene` props for one scene.
 static func key_flow_scene(flow_id: String, scene_id: String) -> String:
 	return key_flow(flow_id) + "scene/" + _esc(scene_id)
+
+
+## The ONE rule for resolving a scene address, used by open_flow, goto, and every engine lookup: its
+## gameId (the host-facing address, spec 6) first, then its internal id. "" when neither resolves.
+## open_flow used to try the internal id first and goto the gameId, so the two could land in different
+## scenes when one scene's id was another's gameId.
+static func resolve_scene(host: Dictionary, ref: String) -> String:
+	var by_game_id: Dictionary = host["scene_gameid_to_id"]
+	if by_game_id.has(ref):
+		return by_game_id[ref]
+	return ref if (host["bundle"]["scenes"] as Dictionary).has(ref) else ""
+
+
+## The one rule for a block address, always WITHIN a scene: its gameId there first, then the internal id
+## of a block in that scene. A real block of another scene does not resolve. "" when it does not.
+static func resolve_block(host: Dictionary, scene_id: String, ref: String) -> String:
+	var addrs: Dictionary = host["block_gameid_to_id"].get(scene_id, {})
+	if addrs.has(ref):
+		return addrs[ref]
+	return ref if host["block_to_scene"].get(ref, "") == scene_id else ""
 
 
 ## Split a ref into [scope, name] against the registry's current tokens (`@scene` is always the

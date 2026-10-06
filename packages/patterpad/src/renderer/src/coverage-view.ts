@@ -116,6 +116,24 @@ export function renderCoverage(
     host.append(list);
   }
 
+  // Conditions and effects that failed. The engine plays through them (a failing condition counts as false,
+  // a failing effect is skipped), so this list is the only place a coverage run shows them.
+  if (report.contentErrors.length) {
+    const n = report.contentErrors.length;
+    host.append(el("p", "cov-note cov-note-dry",
+      `${n} condition${n === 1 ? "" : "s"} or effect${n === 1 ? "" : "s"} failed during the runs, and play went on without ${n === 1 ? "it" : "them"}: a failing condition counts as false, and a failing effect is skipped. Fix the expression.`));
+    const list = el("div", "cov-dry-list");
+    for (const e of report.contentErrors) {
+      const row = el("button", "cov-dry-item");
+      row.append(el("span", "cov-dry-scene", sceneName(e.scene)), el("span", "cov-dry-id", clip(`${e.kind}: ${e.message}`, 48)));
+      row.append(el("span", "cov-dry-count", `${num(e.runs)} / ${num(report.runs)} runs`));
+      row.dataset.tip = `Reveal it. ${e.source ? `${e.source}: ` : ""}${e.message}, in ${num(e.runs)} of ${num(report.runs)} run${report.runs === 1 ? "" : "s"}.`;
+      row.addEventListener("click", () => onReveal(e.scene, e.node));
+      list.append(row);
+    }
+    host.append(list);
+  }
+
   if (!report.beats.length) {
     host.append(el("p", "cov-empty", "No content beats to measure yet."));
     return;

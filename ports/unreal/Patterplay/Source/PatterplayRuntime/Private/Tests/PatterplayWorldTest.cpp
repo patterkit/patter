@@ -114,7 +114,8 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("road opens once known"), PlayScene(Engine, TEXT("r2"), TEXT("road")), FString(TEXT("The road north.")));
 
 	// --- the game's read-only policy refuses the story, not the host ------------
-	// The refusal is logged as an error, which UE counts as a test failure unless declared.
+	// The refused write is a content error the engine plays through (OnError), logged as a Warning. The
+	// expectation is declared so the test insists on it (AddExpectedError matches a warning too).
 	AddExpectedError(TEXT("game's alone"), EAutomationExpectedErrorFlags::Contains, 1);
 	PlayScene(Engine, TEXT("w"), TEXT("rain"));
 	TestFalse(TEXT("weather untouched by the story"), World->Has(TEXT("weather")));
@@ -122,6 +123,7 @@ bool FPatterplayWorldTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("the host still writes it"), Engine->GetPropertyString(TEXT("@world.weather")), FString(TEXT("fog")));
 
 	// --- the STORY's own promise (writable: false) is refused by the engine ---------
+	// Played through and logged as a Warning, like the refusal above.
 	AddExpectedError(TEXT("is read-only"), EAutomationExpectedErrorFlags::Contains, 1);
 	PlayScene(Engine, TEXT("c"), TEXT("clock"));
 	TestEqual(TEXT("time_of_day untouched"), World->GetString(TEXT("time_of_day")), FString(TEXT("dusk")));

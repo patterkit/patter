@@ -187,6 +187,17 @@ function renderMarkup(parent: HTMLElement, text: string): void {
   lit(text.slice(last));
 }
 
+/** A condition or effect that failed: the engine played through it (a failing condition counts as false,
+ *  a failing effect is skipped), so the transcript says so where it happened rather than stopping. */
+function appendWarnings(batch: PlayBatch): void {
+  for (const w of batch.warnings ?? []) {
+    const div = document.createElement("div");
+    div.className = "pline pwarn";
+    div.textContent = `Played through a failing ${w}`;
+    transcriptEl.appendChild(div);
+  }
+}
+
 function appendStep(step: PlayStep): HTMLElement {
   const div = document.createElement("div");
   div.className = `pline ${step.kind}`;
@@ -294,6 +305,7 @@ async function advance(pending: Promise<PlayBatch>, paced = false): Promise<void
   const gen = runGen;
   const batch = await pending;
   if (gen !== runGen) return; // a restart / rewind / stale superseded this advance
+  appendWarnings(batch);
   if (paced) { await revealFrom(batch, gen, 0); return; } // Continue: a paced, pausable reveal
   // Single Step: reveal the beat at once (it still fades in); fire its clip if audio is on, don't block.
   for (const s of batch.steps) {

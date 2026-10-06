@@ -62,7 +62,9 @@ namespace patter
         std::vector<HostScopeSpec> scopes;
     };
 
-    struct Expression { AstPtr ast; };
+    // `src` is the expression's source text when the bundle carries it (empty when it does not): what a
+    // content error the engine plays through reports as its `source`.
+    struct Expression { AstPtr ast; std::string src; };
     struct Effect { std::string target; Expression value; };
 
     struct Beat

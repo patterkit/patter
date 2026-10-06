@@ -190,7 +190,11 @@ namespace Patterkit.Patterplay
             }
         }
 
-        private static Expression Expr(JToken e) => new Expression { Ast = ParseAst((JArray)e["ast"]) };
+        private static Expression Expr(JToken e) => new Expression
+        {
+            Ast = ParseAst((JArray)e["ast"]),
+            Src = e["src"] is JValue src && src.Type == JTokenType.String ? (string)src : null,
+        };
 
         private static List<Effect> Effects(JArray e)
         {
@@ -227,6 +231,11 @@ namespace Patterkit.Patterplay
             if (n["onExit"] is JArray oex) node.OnExit = Effects(oex);
             if (n["gameData"] is JObject gd) node.GameData = ParseGameData(gd);
             if (n["tags"] is JArray nt) node.Tags = ToStringList(nt);
+            // Option-position flags, on a bare snippet option as on an Option group. Read on groups only
+            // until 2026-10, so a snippet fallback was offered as an ordinary option.
+            node.Sticky = (bool?)n["sticky"] ?? false;
+            node.Fallback = (bool?)n["fallback"] ?? false;
+            node.SecretUntilEligible = (bool?)n["secretUntilEligible"] ?? false;
 
             if (node.IsGroup)
             {
@@ -234,9 +243,6 @@ namespace Patterkit.Patterplay
                 node.Children = new List<Node>();
                 if (n["children"] is JArray ch) foreach (var c in ch) node.Children.Add(ParseNode((JObject)c));
                 if (n["prompt"] is JObject pr) node.Prompt = ParseBeat(pr);
-                node.Sticky = (bool?)n["sticky"] ?? false;
-                node.Fallback = (bool?)n["fallback"] ?? false;
-                node.SecretUntilEligible = (bool?)n["secretUntilEligible"] ?? false;
                 node.Shared = (bool?)n["shared"] ?? false;
                 if (n["options"] is JObject op)
                     node.Options = new SelectorOptions { Order = (string)op["order"], Exhaust = (string)op["exhaust"] };

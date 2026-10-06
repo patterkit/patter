@@ -6,11 +6,58 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Content that fails at run time no longer stops the story.** A condition that fails to evaluate (a division
+  by zero, a host value of the wrong type) now counts as false, and an effect that fails, including a story
+  write to a read-only `@world` value, is skipped while the rest of its list still runs. Each used to throw an
+  `EvalError` out of `Advance()`, `OpenFlow()`, `Goto()`, or `Choose()`, ending the conversation. Each is now
+  reported instead (see Added). Misusing the API is still refused as before: choosing an option that is not
+  offered, opening an unknown scene, or a call a checkpoint does not allow.
+- **A selector evaluates each child's condition once.** The verdicts and the eligible list used to come from two
+  passes, so a condition calling `random()` drew twice and its verdict and the pick could disagree.
+- **A shuffle draws only from the members of its bag that are still eligible.** A child whose condition has gone
+  false since the bag was filled is never drawn. When none of the bag is eligible the pass is over, exactly as
+  when the bag is empty. While every member is still eligible the draw is the same as before, so seeded results
+  do not move.
+- **One address rule everywhere.** A scene address resolves by its gameId first, then by its internal id, in
+  `OpenFlow`, `Goto`, and every lookup by address (`TagsForScene`, `GameDataForBlock`, `CastForScene`, and the
+  rest). `OpenFlow` used to try the internal id first, so it and `Goto` could land in different scenes. A block
+  address is read within its scene: that scene's block gameId first, then the internal id of a block in it.
+- **An option's prompt beat carries tags.** It gets its own tags plus the option's, like any beat, so a replayed
+  prompt and the outline's prompt are no longer untagged.
+- **A choice whose every option is greyed out runs dry.** It is handled as a choice with no options: its
+  fallback follows if it has an eligible one, otherwise `OnDryChoice` fires and the flow moves on. It used to be
+  offered with nothing the player could take.
+- **`LoadGame` checks a save before it changes anything.** A save with no `Flows` is refused with
+  `malformed save: no flows` and leaves the engine as it was; it used to close every flow and load the registry
+  first, then fail. `PatterSave` also refuses a `version` that is not a whole number, where a cast read 3.9 as 4
+  and the string "3" as 3.
+
+### Added
+
+- **`EngineOptions.OnError` hears each content error the engine played through.** It is called with a
+  `PlayError` carrying the `Flow`, the `Kind` (`condition`, `effect`, or `best-match`), the `Node` whose
+  condition failed or that owns the effect (a scene, for its onEntry), the expression's `Source` text, and the
+  `Message`. Left unset, each goes to `Engine.DefaultOnError`, which the Unity layer points at
+  `Debug.LogWarning` (`PatterUnityLog.LogWarning`), so a content bug shows in the Console. With `Log = true`
+  each is also a `diagnostic` entry in the decision log (`Subject` is the node, `Detail` the message, plus the
+  new `LogEntry.Kind` and `LogEntry.Source`), and the Runtime State window shows them. `Expression.Src` holds
+  the source text when the bundle carries it.
+
+### Removed
+
+- **`PatterSave.DeserializeState` no longer reads a bare snapshot.** A save must be inside its `patter/save@0`
+  envelope, as the JS runtime already required. A version 2 save inside the envelope still loads.
+
 ### Fixed
 
-- **A shuffle no longer throws when it draws a child that has since become ineligible.** A shuffle fills its bag
-  from the children eligible on the first visit; if one of them later stops being eligible and is drawn, Unity
-  threw out of `Advance()`. It now plays nothing for that draw, as the other three runtimes do.
+- **A bare snippet option's `fallback`, `sticky`, and `secretUntilEligible` are read.** The bundle loader read
+  them on Option groups only, so a snippet fallback was offered as an ordinary option, a sticky snippet option
+  was once-only, and a secret one was shown greyed.
+- **A shuffle no longer throws when a child in its bag has since become ineligible.** A shuffle fills its bag
+  from the children eligible on the first visit; if one of them later stopped being eligible and was drawn,
+  Unity threw out of `Advance()`. Such a child is now never drawn (see Changed).
 - **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not
   standing in keeps its saved values waiting until the flow enters it. Entering it inside a checkpoint and then
   rolling back used to drop those values, so the next real entry found the defaults and the next save left them

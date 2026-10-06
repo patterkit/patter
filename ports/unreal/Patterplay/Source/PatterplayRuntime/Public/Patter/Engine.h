@@ -271,12 +271,21 @@ namespace patter
     // Storylet Engine had its own module: one scorer, six hand transliterations. It
     // takes truthiness as a callback, so it never needed to know a value type, a
     // dialect or a scope, which makes it the purest thing in the family to share.
-    inline int matchedSpec(const AstPtr& nodePtr, EvalContext& ctx, bool want)
+    // A part that fails to evaluate scores as false (a content error played through, see PlayError) and,
+    // when `onFail` is given, is reported through it with the evaluator's message. The scorer walks every
+    // part, including an `or` branch eligibility never evaluated, so a part can fail here that did not
+    // fail there.
+    inline int matchedSpec(const AstPtr& nodePtr, EvalContext& ctx, bool want,
+                           const std::function<void(const std::string&)>& onFail = nullptr)
     {
-        return MatchedSpecificity(nodePtr, [&ctx](const AstPtr& n)
+        return MatchedSpecificity(nodePtr, [&ctx, &onFail](const AstPtr& n)
         {
             try { return truthy(Evaluate(n, ctx, PatterDialect())); }
-            catch (const std::exception&) { return false; }   // an eval error scores as false
+            catch (const std::exception& ex)
+            {
+                if (onFail) onFail(ex.what());
+                return false;   // an eval error scores as false
+            }
         }, want);
     }
 
@@ -431,9 +440,31 @@ namespace patter
 
     // ----- the shared host context the Engine hands to every flow --------------
 
+    /// A content error the engine played through. Content can fail at run time in ways the compiler
+    /// cannot see: a division by zero, a host value of the wrong type, a story write to a read-only
+    /// `@world` value. The story never stops for one. A condition that fails counts as false; an effect
+    /// that fails is skipped and the rest of its list still runs; a part of a Best-match condition that
+    /// fails scores as false. Each is reported through EngineOptions::onError and, when the log is on,
+    /// as a `diagnostic` LogEntry. Parity with the JS runtime's PlayError.
+    struct PlayError
+    {
+        /// The flow it happened in.
+        std::string flow;
+        /// What failed: "condition", "effect", or "best-match" (a part of a condition being scored).
+        std::string kind;
+        /// The snippet, group, or option whose condition failed, or that owns the effect (a scene, for
+        /// its onEntry).
+        std::string node;
+        /// The expression's source text, when the bundle carries it; empty when it does not.
+        std::string source;
+        std::string message;
+    };
+
     /// One retained decision: what the engine CHOSE, not what it produced. `type` is
-    /// select | choice | chose | dry | jump | write; `seq` is monotonic across the flow and
-    /// survives clearLog. Parity with the JS runtime's LogEntry.
+    /// select | choice | chose | dry | jump | write | diagnostic; `seq` is monotonic across the flow
+    /// and survives clearLog. Parity with the JS runtime's LogEntry. A `diagnostic` (a content error
+    /// played through, see PlayError) carries the node in `subject`, the message in `detail`, and
+    /// `kind` and `source`.
     struct LogEntry
     {
         std::string type;
@@ -453,6 +484,10 @@ namespace patter
         PatterValue value;
         bool hasPrev = false;
         PatterValue prev;
+        /// A `diagnostic`'s PlayError kind: condition | effect | best-match. Empty on every other type.
+        std::string kind;
+        /// A `diagnostic`'s expression source text, when the bundle carries it.
+        std::string source;
     };
 
     struct FlowHost
@@ -468,6 +503,9 @@ namespace patter
         /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct
         /// from the log's `dry` entry.
         std::function<void(const std::string&)> onDryChoice;
+        /// Where a content error the engine played through is reported (see PlayError). Unset: nowhere
+        /// but the log, as a std-only core has no console of its own to warn on.
+        std::function<void(const PlayError&)> onError;
         const Bundle* bundle = nullptr;
         bool emitIds = false; // IDs-only build: emit beat IDs + omit character names (the game localises)
         std::map<std::string, std::string> strings;
@@ -531,6 +569,12 @@ namespace patter
         /// Fired with the choice's group id whenever a choice runs dry. Unaffected by `log`
         /// and useful with it off: live feedback, not an audit read afterwards.
         std::function<void(const std::string&)> onDryChoice;
+        /// Called with each content error the engine played through (see PlayError): a condition that
+        /// failed and counted as false, an effect that failed and was skipped, a Best-match part that
+        /// failed and scored as false. The story carries on either way. Unaffected by `log`, which also
+        /// records each as a `diagnostic` entry. Unset, the core reports nothing: the UE wrapper sets it
+        /// (a Warning in the log and UPatterEngine::OnError), and so should any other host.
+        std::function<void(const PlayError&)> onError;
         // Live game state per host-scope token ("world" -> your resolver): values the GAME keeps. Each
         // binding is registered in the registry as an external scope (read and written through, never
         // stored or saved there). Declared tokens you do not bind are self-backed by a standalone
@@ -545,6 +589,31 @@ namespace patter
         // self-backs declared host scopes, and saveGame() carries the registry's values too.
         std::shared_ptr<ScopeRegistry> registry;
     };
+
+    // The ONE rule for resolving a scene address, used by openFlow, goto, and every engine lookup: its gameId
+    // (the host-facing address, spec 6) first, then its internal id. Empty when it does not resolve.
+    // openFlow used to try the internal id first and goto the gameId, so the two could land in different
+    // scenes when one scene's id was another's gameId.
+    inline std::string resolveScene(const FlowHost& host, const std::string& ref)
+    {
+        auto it = host.sceneGameIdToId.find(ref);
+        if (it != host.sceneGameIdToId.end()) return it->second;
+        return host.bundle->scenes.count(ref) ? ref : std::string();
+    }
+
+    // The one rule for a block address, always WITHIN a scene: its gameId there first, then the internal
+    // id of a block in that scene. A real block of another scene does not resolve. Empty when it does not.
+    inline std::string resolveBlock(const FlowHost& host, const std::string& sceneId, const std::string& ref)
+    {
+        auto m = host.blockGameIdToId.find(sceneId);
+        if (m != host.blockGameIdToId.end())
+        {
+            auto it = m->second.find(ref);
+            if (it != m->second.end()) return it->second;
+        }
+        auto owner = host.blockToScene.find(ref);
+        return owner != host.blockToScene.end() && owner->second == sceneId ? ref : std::string();
+    }
 
     // Split a ref against the registry's current tokens (@scene is always Patter's). Memoised per ref;
     // the memo is dropped when the registry's set of scopes moves.
@@ -694,26 +763,13 @@ namespace patter
                 return true;
             }
             // Resolve BOTH addresses before touching state, so a bad one is a no-op, not a half-move.
-            std::string sceneId;
-            auto sit = host_->sceneGameIdToId.find(scene);
-            if (sit != host_->sceneGameIdToId.end()) sceneId = sit->second;
-            else if (host_->bundle->scenes.count(scene)) sceneId = scene;
+            const std::string sceneId = resolveScene(*host_, scene);
             if (sceneId.empty()) return false;
 
             std::string blockId;
             if (!block.empty())
             {
-                auto ait = host_->blockGameIdToId.find(sceneId);
-                if (ait != host_->blockGameIdToId.end())
-                {
-                    auto bit = ait->second.find(block);
-                    if (bit != ait->second.end()) blockId = bit->second;
-                }
-                if (blockId.empty())
-                {
-                    auto owner = host_->blockToScene.find(block);
-                    if (owner != host_->blockToScene.end() && owner->second == sceneId) blockId = block;
-                }
+                blockId = resolveBlock(*host_, sceneId, block);
                 if (blockId.empty()) return false; // a block address is scene-scoped: unknown HERE is unknown
             }
             if (!started_) { start(sceneId, blockId); return true; }
@@ -1344,7 +1400,7 @@ namespace patter
                 if (activeSnippet_)
                 {
                     if (beatIndex_ < static_cast<int>(activeSnippet_->beats.size())) return;
-                    runEffects(activeSnippet_->onExit);
+                    runEffects(activeSnippet_->onExit, activeSnippet_->id);
                     const Jump* jump = activeSnippet_->jump.get();
                     activeSnippet_ = nullptr;
                     beatIndex_ = 0;
@@ -1382,7 +1438,7 @@ namespace patter
             currentSceneId_ = sceneId;
             enter(sceneId);
             seedScene(it->second);
-            runEffects(it->second.onEntry);
+            runEffects(it->second.onEntry, it->second.id);
         }
 
         void enterChild(const Node* node)
@@ -1407,7 +1463,7 @@ namespace patter
 
         void beginSnippet(const Node* snippet)
         {
-            runEffects(snippet->onEnter);
+            runEffects(snippet->onEnter, snippet->id);
             activeSnippet_ = snippet;
             beatIndex_ = 0;
         }
@@ -1436,7 +1492,12 @@ namespace patter
                 options.push_back(opt);
                 byId[child->id] = child;
             }
-            if (!options.empty())
+            // A choice is offered only when the player can take something. One whose every remaining option
+            // is greyed out left the player stuck in front of it, so it runs dry instead, as a choice with no
+            // options does: the fallback follows if there is one, otherwise the flow moves on.
+            bool takeable = false;
+            for (const auto& o : options) if (o.eligible) { takeable = true; break; }
+            if (takeable)
             {
                 // Including options a condition left ineligible: "why is that greyed out" is a
                 // question about the moment the choice was built.
@@ -1449,6 +1510,8 @@ namespace patter
                 hasPendingChoice_ = true; pendingGroupId_ = group->id; pendingOptions_ = options; pendingById_ = byId;
                 return;
             }
+            // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition
+            // still applies).
             for (const Node* f : fallbacks) if (eligible(f)) { enterChild(f); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
             // past it. The behaviour is unchanged; this makes the silent fall-through observable.
@@ -1542,16 +1605,30 @@ namespace patter
                 for (int i = 0; i < upto; ++i) ids.push_back(elig[i]->id);
                 return ids;
             };
+            auto isEligible = [&](const std::string& id) {
+                for (const Node* c : elig) if (c->id == id) return true;
+                return false;
+            };
             if (!st.bagInit) { st.bag = fill(); st.bagInit = true; }
-            if (st.bag.empty())
+            // The bag was filled from the children eligible THEN. Draw only from those still eligible now, so
+            // a child whose condition has since gone false is never drawn (it used to be drawn, and the group
+            // then played nothing). If none of the bag is drawable, the pass is over, exactly as when the bag
+            // is empty.
+            bool anyDrawable = false;
+            for (const std::string& id : st.bag) if (isEligible(id)) { anyDrawable = true; break; }
+            if (!anyDrawable)
             {
                 if (exhaust == "once") return nullptr;
                 if (stick) { const Node* last = elig[len - 1]; st.hasLast = true; st.last = last->id; return last; }
-                st.bag = fill();
+                st.bag = fill();                       // repeat: reshuffle
+                if (st.bag.empty()) return nullptr;
             }
-            // Draw without replacement, never repeating the immediately-previous pick - allocation-free:
-            // find last's slot and draw into the reduced span skipping it, then erase the pick in place.
-            std::vector<std::string>& pool = st.bag;
+            // Draw without replacement, never repeating the immediately-previous pick when another is
+            // drawable. The pool keeps the bag's order, so when every member is still eligible the draw
+            // consumes the PRNG exactly as it always did.
+            std::vector<std::string> pool;
+            pool.reserve(st.bag.size());
+            for (const std::string& id : st.bag) if (isEligible(id)) pool.push_back(id);
             int p = -1;
             if (st.hasLast && pool.size() > 1)
                 for (size_t k = 0; k < pool.size(); ++k) if (pool[k] == st.last) { p = static_cast<int>(k); break; }
@@ -1559,7 +1636,7 @@ namespace patter
             int i = static_cast<int>(std::floor(rng() * span));
             if (p >= 0 && i >= p) ++i;
             std::string pick = pool[static_cast<size_t>(i)];
-            pool.erase(pool.begin() + i); // draw without replacement, in place
+            for (size_t k = 0; k < st.bag.size(); ++k) if (st.bag[k] == pick) { st.bag.erase(st.bag.begin() + k); break; }
             st.hasLast = true; st.last = pick;
             for (const Node* c : elig) if (c->id == pick) return c;
             return nullptr;
@@ -1614,7 +1691,11 @@ namespace patter
         // specificity. Scored against this flow's live eval context via the free matchedSpec.
         int specScore(const Node* node)
         {
-            return node->condition ? matchedSpec(node->condition->ast, context(), true) : 0;
+            if (!node->condition) return 0;
+            return matchedSpec(node->condition->ast, context(), true, [this, node](const std::string& message)
+            {
+                reportError("best-match", node->id, node->condition.get(), message);
+            });
         }
         SelectorState& selectorStateFor(const Node* group)
         {
@@ -1643,23 +1724,52 @@ namespace patter
         }
 
         // -- effects / expressions --
-        void runEffects(const std::vector<Effect>& effects)
+        // Run an effect list. `owner` is the snippet or scene it belongs to, for an error report.
+        void runEffects(const std::vector<Effect>& effects, const std::string& owner)
         {
             for (const auto& ef : effects)
             {
-                PatterValue value = evalExpr(ef.value);
-                // `prev` read before the write, so a reader can say "0 -> 7" in one pass.
-                LogEntry e; e.type = "write"; e.subject = ef.target; e.value = value;
-                if (host_->logEnabled)
-                    if (const PatterValue* pv = getProperty(ef.target)) { e.prev = *pv; e.hasPrev = true; }
-                writeProperty(ef.target, value, false);   // the STORY writes: a read-only host property refuses it
-                emit(std::move(e));
+                try
+                {
+                    PatterValue value = evalExpr(ef.value);
+                    // `prev` read before the write, so a reader can say "0 -> 7" in one pass.
+                    LogEntry e; e.type = "write"; e.subject = ef.target; e.value = value;
+                    if (host_->logEnabled)
+                        if (const PatterValue* pv = getProperty(ef.target)) { e.prev = *pv; e.hasPrev = true; }
+                    writeProperty(ef.target, value, false);   // the STORY writes: a read-only host property refuses it
+                    emit(std::move(e));
+                }
+                catch (const std::exception& ex)
+                {
+                    // Skipped, reported, and the rest of the list still runs (see PlayError). No `write`
+                    // entry: nothing was written.
+                    reportError("effect", owner, &ef.value, ex.what());
+                }
             }
         }
+        // Whether a node's condition holds. A condition that fails to evaluate counts as false (see PlayError).
         bool eligible(const Node* node)
         {
             if (!node->condition) return true;
-            return truthy(evalExpr(*node->condition));
+            try { return truthy(evalExpr(*node->condition)); }
+            catch (const std::exception& ex)
+            {
+                reportError("condition", node->id, node->condition.get(), ex.what());
+                return false;
+            }
+        }
+        // Report a content error the engine is playing through: to the host's onError, and to the log.
+        void reportError(const std::string& kind, const std::string& node, const Expression* expr, const std::string& message)
+        {
+            const std::string source = expr ? expr->src : std::string();
+            if (host_->onError)
+            {
+                PlayError err;
+                err.flow = id_; err.kind = kind; err.node = node; err.source = source; err.message = message;
+                host_->onError(err);
+            }
+            LogEntry e; e.type = "diagnostic"; e.kind = kind; e.subject = node; e.source = source; e.detail = message;
+            emit(std::move(e));
         }
         // A refusal from the evaluator is the kernel's ExprError, rethrown as Patterplay's EvalError.
         PatterValue evalExpr(const Expression& expr)
@@ -1892,6 +2002,7 @@ namespace patter
             // By POINTER, so a flow appends to the engine's stream without holding the engine.
             host_.engineLog = &engineLog_;
             host_.onDryChoice = options.onDryChoice;
+            host_.onError = options.onError;
             host_.emitIds = bundle.localisation.mode == "ids" && !bundle.localisation.sourceDebug;
             sourceDebug_ = bundle.localisation.mode == "ids" && bundle.localisation.sourceDebug;
             if (sourceDebug_) std::cerr << "[Patterplay] source-only DEBUG build: strings are the source language for debugging, not a shippable localised build.\n";
@@ -1904,7 +2015,6 @@ namespace patter
             for (const auto& kv : bundle.scenes)
             {
                 const std::string& sceneId = kv.first; const Scene& scene = kv.second;
-                sceneGameIdToId_[effectiveGameId(scene.gameId, scene.name)] = sceneId;
                 host_.sceneGameIdToId[effectiveGameId(scene.gameId, scene.name)] = sceneId;
                 std::map<std::string, std::string> blockAddrs;
                 // Author tags (#215): accumulate scene -> block -> node (own + ancestors), deduped, outermost-first.
@@ -1920,7 +2030,6 @@ namespace patter
                     walkNodes(block.children, [&](const Node* n) { host_.nodeIndex[n->id] = n; });
                     indexTags(block.children, blockTags);
                 }
-                blockGameIdToId_[sceneId] = blockAddrs;
                 host_.blockGameIdToId[sceneId] = blockAddrs;
             }
 
@@ -2678,8 +2787,6 @@ namespace patter
         // The public accessors still hand out `Flow*` (`.get()`), so existing C++ is unaffected;
         // `flowPtr` is the handle for anything that needs to OUTLIVE the map entry.
         std::map<std::string, std::shared_ptr<Flow>> flows_;
-        std::map<std::string, std::string> sceneGameIdToId_;
-        std::map<std::string, std::map<std::string, std::string>> blockGameIdToId_;
         std::string currentLocale_;
         // The live string-table source: the constructor's bundle, unless replaceStrings re-pointed it at a
         // pushed bundle's tables (whose lifetime the caller guarantees, same as the constructor's bundle).
@@ -2687,24 +2794,22 @@ namespace patter
         EngineOptions creationOptions_; // reused by hotSwap, on the same registry
         bool sourceDebug_ = false; // source-only DEBUG build: strings are the source language, not shippable
 
-        // openFlow's address as internal ids, or a throw when it does not resolve. With a scene, the block is
-        // scene-scoped exactly as Flow::gotoAddress resolves it (a gameId address in that scene, or the
-        // internal id of a block in that scene), so a block from another scene does not resolve. With no
-        // scene, the block is an internal id from any scene. Neither: the first scene. The same rule on
-        // every runtime.
+        // openFlow's address as internal ids, or a throw when it does not resolve. By the one address rule
+        // Flow::gotoAddress follows too (resolveScene / resolveBlock): a scene by its gameId first, then its
+        // internal id; with a scene, the block within that scene only, so a block from another scene does not
+        // resolve. With no scene, the block is an internal id from any scene. Neither: the first scene. The
+        // same rule on every runtime.
         void resolveOpenAddress(const std::string& scene, const std::string& block, std::string& sceneId, std::string& blockId)
         {
             sceneId.clear(); blockId.clear();
             if (!scene.empty())
             {
-                sceneId = resolveSceneRef(scene);
-                if (!host_.bundle->scenes.count(sceneId)) throw std::runtime_error("unknown scene: " + scene);
+                sceneId = resolveScene(host_, scene);
+                if (sceneId.empty()) throw std::runtime_error("unknown scene: " + scene);
                 if (block.empty()) return;
-                auto m = blockGameIdToId_.find(sceneId);
-                if (m != blockGameIdToId_.end()) { auto it = m->second.find(block); if (it != m->second.end()) { blockId = it->second; return; } }
-                auto owner = host_.blockToScene.find(block);
-                if (owner != host_.blockToScene.end() && owner->second == sceneId) { blockId = block; return; }
-                throw std::runtime_error("unknown block: " + block);
+                blockId = resolveBlock(host_, sceneId, block);
+                if (blockId.empty()) throw std::runtime_error("unknown block: " + block);
+                return;
             }
             if (!block.empty())
             {
@@ -2714,23 +2819,22 @@ namespace patter
             }
             if (host_.bundle->scenes.empty()) throw std::runtime_error("no scenes in bundle");
         }
+        // A scene reference to its internal id by the one address rule (resolveScene); an unknown one passes
+        // through, for the caller to find nothing.
         std::string resolveSceneRef(const std::string& r)
         {
             if (r.empty()) return "";
-            if (host_.bundle->scenes.count(r)) return r;
-            auto it = sceneGameIdToId_.find(r);
-            return it != sceneGameIdToId_.end() ? it->second : r;
+            const std::string id = resolveScene(host_, r);
+            return id.empty() ? r : id;
         }
+        // A block reference to its internal id by the one address rule (resolveBlock): with a scene, only a
+        // block IN that scene resolves, so a block of another scene is empty here and the caller finds nothing.
+        // With no scene, only an internal id resolves, since a block's gameId is only unique within its scene.
         std::string resolveBlockRef(const std::string& sceneId, const std::string& r)
         {
             if (r.empty()) return "";
-            if (host_.blockById.count(r)) return r;
-            if (!sceneId.empty())
-            {
-                auto m = blockGameIdToId_.find(sceneId);
-                if (m != blockGameIdToId_.end()) { auto it = m->second.find(r); if (it != m->second.end()) return it->second; }
-            }
-            return r;
+            if (sceneId.empty()) return r;
+            return resolveBlock(host_, sceneId, r);
         }
 
         // Author tags (#215): combine inherited + own, deduped, preserving first-seen order.
@@ -2742,13 +2846,17 @@ namespace patter
             for (const auto& t : own) if (seen.insert(t).second) out.push_back(t);
             return out;
         }
-        // Walk groups/snippets carrying the parent's accumulated tags; record each node's and each beat's.
+        // Walk groups/snippets carrying the parent's accumulated tags; record each node's and each beat's,
+        // an option's prompt beat included.
         void indexTags(const std::vector<NodePtr>& nodes, const std::vector<std::string>& inherited)
         {
             for (const auto& n : nodes)
             {
                 std::vector<std::string> acc = dedupeTags(n->tags, inherited);
                 host_.tagIndex[n->id] = acc;
+                // An option's prompt beat is a beat like any other: its own tags plus the option's. Left out,
+                // a replayed prompt and the outline's prompt lost every tag (all four runtimes, until 2026-10).
+                if (n->isGroup() && n->prompt) host_.tagIndex[n->prompt->id] = dedupeTags(n->prompt->tags, acc);
                 if (n->isGroup()) indexTags(n->children, acc);
                 else for (const auto& beat : n->beats) host_.tagIndex[beat.id] = dedupeTags(beat.tags, acc);
             }

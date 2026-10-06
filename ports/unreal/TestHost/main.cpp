@@ -63,7 +63,13 @@ static std::shared_ptr<GameData> parseGameData(const JsonValue& e)
 // checks the UE loader had and this one did not.
 static AstPtr parseAst(const JsonValue& e) { return DeserialiseAstFrom<JsonValue>(e); }
 
-static Expression parseExpr(const JsonValue& e) { Expression x; x.ast = parseAst(e.at("ast")); return x; }
+static Expression parseExpr(const JsonValue& e)
+{
+    Expression x;
+    x.ast = parseAst(e.at("ast"));
+    if (const JsonValue* src = e.find("src")) if (src->type == JsonValue::String) x.src = src->str;
+    return x;
+}
 
 static std::vector<Effect> parseEffects(const JsonValue& e)
 {
@@ -120,15 +126,16 @@ static NodePtr parseNode(const JsonValue& n)
     if (const JsonValue* ox = n.find("onExit")) node->onExit = parseEffects(*ox);
     if (const JsonValue* gd = n.find("gameData")) node->gameData = parseGameData(*gd);
     if (const JsonValue* tg = n.find("tags")) node->tags = strList(*tg);
+    // Option-position flags, on a bare snippet option as on an Option group.
+    if (const JsonValue* st = n.find("sticky")) node->sticky = st->b;
+    if (const JsonValue* fb = n.find("fallback")) node->fallback = fb->b;
+    if (const JsonValue* su = n.find("secretUntilEligible")) node->secretUntilEligible = su->b;
 
     if (node->isGroup())
     {
         if (const JsonValue* sel = n.find("selector")) node->selector = sel->str;
         if (const JsonValue* ch = n.find("children")) for (const auto& c : ch->arr) node->children.push_back(parseNode(c));
         if (const JsonValue* pr = n.find("prompt")) node->prompt = std::make_shared<Beat>(parseBeat(*pr));
-        if (const JsonValue* st = n.find("sticky")) node->sticky = st->b;
-        if (const JsonValue* fb = n.find("fallback")) node->fallback = fb->b;
-        if (const JsonValue* su = n.find("secretUntilEligible")) node->secretUntilEligible = su->b;
         if (const JsonValue* sh = n.find("shared")) node->shared = sh->b;
         if (const JsonValue* op = n.find("options"))
         {
@@ -856,9 +863,10 @@ static void runTraceLogSmoke()
 // default / enum values, and a live setProperty reflected on the next read.
 // A host-scope declaration's `writable: false` is refused by the ENGINE, whether the scope is bound by
 // the game or self-backed. The JS reference always did; this core let a bound scope's set straight
-// through until 2026-09-03 (from-storylets/unreal-wrapper-host-scopes). Not a corpus case: the script
-// grammar has no "this op must throw", so it is pinned here beside the other checks the corpus cannot
-// express. The refusal surfaces from openFlow, since a flow settles into its first snippet on open.
+// through until 2026-09-03 (from-storylets/unreal-wrapper-host-scopes). Not a corpus case: the corpus
+// cannot see an error report, so it is pinned here beside the other checks the corpus cannot express.
+// The refused write is a content error the engine plays through (PlayError): skipped, reported through
+// onError, and the rest of the effect list still runs. It used to throw out of openFlow.
 static void runHostScopeWritableSmoke()
 {
     const char* json = R"JSON({
@@ -869,8 +877,8 @@ static void runHostScopeWritableSmoke()
         { "name": "known", "type": "boolean", "default": false } ] } ] },
       "scenes": { "s": { "id": "s", "gameId": "s", "blocks": [ { "id": "b", "gameId": "b", "children": [
         { "id": "sn", "type": "snippet", "beats": [ { "id": "T", "kind": "text" } ],
-          "onEnter": [ { "kind": "set", "target": "@world.known", "value": { "src": "true", "ast": ["b", true] } },
-                       { "kind": "set", "target": "@world.clock", "value": { "src": "\"night\"", "ast": ["s", "night"] } } ],
+          "onEnter": [ { "kind": "set", "target": "@world.clock", "value": { "src": "\"night\"", "ast": ["s", "night"] } },
+                       { "kind": "set", "target": "@world.known", "value": { "src": "true", "ast": ["b", true] } } ],
           "jump": { "to": "END" } } ] } ] } } })JSON";
     Bundle bundle = parseBundle(JsonParser(json).parse());
     for (int pass = 0; pass < 2; ++pass)
@@ -888,12 +896,20 @@ static void runHostScopeWritableSmoke()
             scope.set = [store](const std::string& n, const PatterValue& v) { (*store)[n] = v; };
             opts.hostScopes["world"] = scope;
         }
+        std::vector<PlayError> errors;
+        opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
         Engine engine(bundle, opts);
         std::string message;
-        try { engine.openFlow("main", "s", "b")->advance(); }
+        StepResult first;
+        try { first = engine.openFlow("main", "s", "b")->advance(); }
         catch (const std::exception& ex) { message = ex.what(); }
-        if (message.find("'@world.clock' is read-only") == std::string::npos)
-            fail("host-scope", label, "a story write to a writable:false declaration was not refused (got: " + (message.empty() ? "no error" : message) + ")");
+        if (!message.empty()) fail("host-scope", label, "a refused story write still threw out of the flow: " + message);
+        if (first.type != StepType::Text || first.id != "T") fail("host-scope", label, "the flow did not play on past the refused write");
+        if (errors.size() != 1 || errors[0].kind != "effect" || errors[0].node != "sn" || errors[0].flow != "main"
+            || errors[0].source != "\"night\"" || errors[0].message.find("'@world.clock' is read-only") == std::string::npos)
+            fail("host-scope", label, "a story write to a writable:false declaration was not reported through onError as one effect error on sn");
+        const PatterValue* knownAfter = engine.getProperty("@world.known");
+        if (!knownAfter || !knownAfter->b) fail("host-scope", label, "the effect after the refused write did not run");
         if (bound && (*store)["clock"].s != "day")
             fail("host-scope", label, "the refused write still landed in the game's scope");
         const PatterValue* clock = engine.getProperty("@world.clock");
@@ -1333,8 +1349,13 @@ static void runOneRegistryCases()
                 scope.set = [store](const std::string& n, const PatterValue& v) { (*store)[n] = v; };
                 opts.hostScopes["rules"] = scope;
             }
+            // The story's refused write is a content error played through: reported, not thrown.
+            std::string reported;
+            opts.onError = [&reported](const PlayError& e) { reported += e.kind + " on " + e.node + ": " + e.message; };
             Engine engine(bundle, opts);
-            expectThrow([&] { engine.openFlow("main", "s", "b"); }, "'@rules.cap' is read-only", label + "the story's write to a read-only scope");
+            engine.openFlow("main", "s", "b");
+            need(reported.find("effect on sn: ") == 0 && reported.find("'@rules.cap' is read-only") != std::string::npos,
+                label + "the story's write to a read-only scope was not reported (got: " + reported + ")");
             expectNumber(engine.getProperty("@rules.open"), 5, label + "a declaration writable:true inside it");
             expectNumber(engine.getProperty("@rules.cap"), 1, label + "@rules.cap after the refused write");
             engine.setProperty("@rules.cap", PatterValue::Num(3)); // the game's own write
@@ -1547,12 +1568,48 @@ static void runSaveEnvelopeCases()
         registry->load(blobOf(R"({"another-engine/deck/inn":{"drawn":3}})")); // the game's own load, waiting for its engine
         EngineOptions opts; opts.registry = registry; opts.hasSeed = true; opts.seed = 0;
         Engine engine(envelopeBundle(), opts);
-        deserializeState(engine, kV2);
+        deserializeState(engine, std::string(R"({"schema":"patter/save@0","save":)") + kV2 + "}");
         need(engine.getFlow("f") != nullptr, "the flow did not come back");
         expectNumber(engine.getFlow("f")->getProperty("@scene.count"), 1, "@scene.count");
         expectJson(blobJson(registry->save()),
             R"({"patter":{"gold":7},"patter/flow/f/patter":{},"patter/flow/f/scene/s":{"count":1},"patter/scene/s":{"tally":2},"another-engine/deck/inn":{"drawn":3}})",
             "the game's registry");
+    });
+
+    // Everything a load reads is checked BEFORE anything changes. Each of these used to get further: a
+    // bare snapshot with no envelope loaded, a version of 3.9 was read as 3, and a save with no flows
+    // closed every flow before it was found wanting. Now each is refused and the engine is as it was:
+    // the same flow, still open, at the same place, with the same values.
+    regCase("save shape: refuses a bare snapshot, a version that is not exactly 2 or 3, and a save with no flows, changing nothing", []
+    {
+        const std::string wrap = R"({"schema":"patter/save@0","save":)";
+        const std::string v3Flows = R"("flows":{"f":{"rngState":0,"visits":{},"cursor":{"flowEnded":true,"currentSceneId":"s","stack":[],"activeSnippetId":null,"beatIndex":0,"pendingChoice":null,"pendingPromptOwnerId":null,"selectors":{}}}})";
+        const std::vector<std::pair<std::string, std::string>> refused = {
+            { kV2, "loadState: not a patter/save@0 envelope" },
+            { wrap + R"({"version":3.9,"registry":{},"sharedVisits":{},"sharedSelectors":{},)" + v3Flows + "}}", "unsupported save version: 3.9" },
+            { wrap + R"({"version":"3","registry":{},"sharedVisits":{},"sharedSelectors":{},)" + v3Flows + "}}", "unsupported save version: 3" },
+            { wrap + R"({"registry":{},"sharedVisits":{},"sharedSelectors":{},)" + v3Flows + "}}", "unsupported save version: undefined" },
+            { wrap + R"({"version":3,"registry":{"patter":{"gold":99}},"sharedVisits":{},"sharedSelectors":{}}})", "malformed save: no flows" },
+            { wrap + R"({"version":3,"registry":{"patter":{"gold":99}},"sharedVisits":{},"sharedSelectors":{},"flows":[]}})", "malformed save: no flows" },
+        };
+        std::string problems; // every refusal checked, so one that slips through does not hide the rest
+        for (const auto& c : refused)
+        {
+            try
+            {
+                auto engine = standalone(envelopeBundle(), 0);
+                Flow* f = engine->openFlow("f", "s");
+                playOut(f);
+                engine->setProperty("@gold", PatterValue::Num(4));
+                const std::string before = serializeState(*engine);
+                expectThrow([&] { deserializeState(*engine, c.first); }, c.second, "the save " + c.first);
+                need(engine->getFlow("f") == f && !f->isClosed(), "a refused save (" + c.second + ") replaced or closed the open flow");
+                expectNumber(engine->getProperty("@gold"), 4, "@gold after a refused save (" + c.second + ")");
+                need(serializeState(*engine) == before, "a refused save (" + c.second + ") changed the engine");
+            }
+            catch (const std::exception& ex) { problems += std::string(problems.empty() ? "" : "\n      ") + ex.what(); }
+        }
+        need(problems.empty(), problems);
     });
 }
 
@@ -1676,6 +1733,189 @@ static void runOneRegistry()
     runExternalScopeCases();
 }
 
+// Content errors play through (PlayError): a condition that fails counts as false, an effect that fails
+// is skipped and the rest of its list runs, a Best-match part that fails scores as false, and each is
+// REPORTED, to EngineOptions::onError and (log on) as a `diagnostic` entry. The corpus pins what plays;
+// it cannot see a report, so the reports are pinned here: kind, node, source, and message, the flow, the
+// log entry's shape, and that a skipped effect leaves no `write` entry.
+static int g_playErrPass = 0, g_playErrTotal = 0;
+
+static void playErrCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_playErrTotal;
+    try { body(); ++g_playErrPass; }
+    catch (const std::exception& ex) { fail("play-errors", name, ex.what()); }
+}
+
+static std::string describeErrors(const std::vector<PlayError>& errors)
+{
+    std::string out;
+    for (const auto& e : errors)
+        out += (out.empty() ? "" : "; ") + e.flow + "/" + e.kind + "/" + e.node + "/" + e.source + "/" + e.message;
+    return out.empty() ? "none" : out;
+}
+
+static void runPlayErrorCases()
+{
+    // One scene: its onEntry fails, a snippet's effects fail in the middle of the list, a branch child's
+    // condition fails, an option's condition fails, and a Best-match part fails while being scored.
+    static const Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},
+      "strings":{"en":{"T_vals":"a={@a} c={@c} d={@d}","T_bad":"bad","T_ok":"ok","O1":"one","O2":"two","X":"x","Y":"y"}},
+      "properties":[{"name":"zero","type":"number","default":0},{"name":"a","type":"number","default":0},{"name":"c","type":"number","default":0},{"name":"d","type":"number","default":0},{"name":"e","type":"number","default":0}],
+      "scenes":{"s":{"id":"s","type":"scene","name":"S","onEntry":[{"kind":"set","target":"@e","value":{"src":"1 / @zero","ast":["bin","/",["n",1],["sv","patter","zero"]]}}],
+        "blocks":[{"id":"b","type":"block","name":"B","children":[
+          {"id":"sn_set","type":"snippet","beats":[{"id":"T_vals","kind":"text"}],"onEnter":[
+            {"kind":"set","target":"@a","value":{"src":"1","ast":["n",1]}},
+            {"kind":"set","target":"@c","value":{"src":"10 / @zero","ast":["bin","/",["n",10],["sv","patter","zero"]]}},
+            {"kind":"set","target":"@d","value":{"src":"1","ast":["n",1]}}]},
+          {"id":"g_br","type":"group","selector":"branch","children":[
+            {"id":"sn_bad","type":"snippet","condition":{"src":"10 / @zero > 1","ast":["bin",">",["bin","/",["n",10],["sv","patter","zero"]],["n",1]]},"beats":[{"id":"T_bad","kind":"text"}]},
+            {"id":"sn_ok","type":"snippet","beats":[{"id":"T_ok","kind":"text"}]}]},
+          {"id":"g_ch","type":"group","selector":"choice","children":[
+            {"id":"sn_o1","type":"snippet","condition":{"src":"5 / @zero > 1","ast":["bin",">",["bin","/",["n",5],["sv","patter","zero"]],["n",1]]},"beats":[{"id":"O1","kind":"text"}]},
+            {"id":"sn_o2","type":"snippet","beats":[{"id":"O2","kind":"text"}]}]},
+          {"id":"g_bm","type":"group","selector":"sequence","options":{"order":"specificity","exhaust":"repeat"},"children":[
+            {"id":"sn_x","type":"snippet","condition":{"src":"@zero == 0 or 10 / @zero > 2","ast":["bin","or",["bin","==",["sv","patter","zero"],["n",0]],["bin",">",["bin","/",["n",10],["sv","patter","zero"]],["n",2]]]},"beats":[{"id":"X","kind":"text"}]},
+            {"id":"sn_y","type":"snippet","condition":{"src":"@a == 1 and @d == 1","ast":["bin","and",["bin","==",["sv","patter","a"],["n",1]],["bin","==",["sv","patter","d"],["n",1]]]},"beats":[{"id":"Y","kind":"text"}]}]},
+          {"id":"sn_end","type":"snippet","jump":{"to":"END"}}]}]}}})JSON"));
+
+    // Play the whole scene, taking the one takeable option, and return what the engine reported.
+    const auto play = [](Engine& engine, std::vector<std::string>& transcript)
+    {
+        Flow* flow = engine.openFlow("main", "s");
+        for (int i = 0; i < 20; ++i)
+        {
+            StepResult step = flow->advance();
+            if (step.type == StepType::End) break;
+            if (step.type == StepType::Choice) { transcript.push_back("choice"); flow->choose("sn_o2"); continue; }
+            transcript.push_back(step.text);
+        }
+    };
+
+    playErrCase("each failure is reported through onError with its kind, node, source, message, and flow", [&]
+    {
+        std::vector<PlayError> errors;
+        EngineOptions opts; opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
+        Engine engine(bundle, opts);
+        std::vector<std::string> transcript;
+        play(engine, transcript);
+        need(joined(transcript) == "[a=1 c=0 d=1, ok, choice, two, y]", "the scene did not play through its errors: " + joined(transcript));
+        const std::vector<std::vector<std::string>> want = {
+            { "effect", "s", "1 / @zero" },              // the scene's onEntry: its owner is the scene
+            { "effect", "sn_set", "10 / @zero" },        // the middle of the snippet's list; @d after it still landed
+            { "condition", "sn_bad", "10 / @zero > 1" }, // a branch child: counted false, sn_ok played
+            { "condition", "sn_o1", "5 / @zero > 1" },   // an option: greyed out, sn_o2 offered
+            { "best-match", "sn_x", "@zero == 0 or 10 / @zero > 2" }, // the `or` branch eligibility never evaluated
+        };
+        need(errors.size() == want.size(), "expected " + std::to_string(want.size()) + " reports, got " + describeErrors(errors));
+        for (size_t i = 0; i < want.size(); ++i)
+        {
+            const PlayError& e = errors[i];
+            if (e.flow != "main" || e.kind != want[i][0] || e.node != want[i][1] || e.source != want[i][2] || e.message != "division by zero")
+                throw std::runtime_error("report " + std::to_string(i) + " is wrong: " + describeErrors(errors));
+        }
+    });
+
+    playErrCase("with the log on, each failure is a diagnostic entry, and a skipped effect leaves no write entry", [&]
+    {
+        std::vector<PlayError> errors;
+        EngineOptions opts; opts.log = true; opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
+        Engine engine(bundle, opts);
+        std::vector<std::string> transcript;
+        play(engine, transcript);
+        std::vector<const LogEntry*> diagnostics;
+        std::vector<std::string> writes;
+        for (const LogEntry& e : engine.log())
+        {
+            if (e.type == "diagnostic") diagnostics.push_back(&e);
+            if (e.type == "write") writes.push_back(e.subject);
+        }
+        need(diagnostics.size() == errors.size() && !errors.empty(),
+            "expected one diagnostic entry per report (" + std::to_string(errors.size()) + "), got " + std::to_string(diagnostics.size()));
+        for (size_t i = 0; i < errors.size(); ++i)
+        {
+            const LogEntry& d = *diagnostics[i];
+            if (d.kind != errors[i].kind || d.subject != errors[i].node || d.source != errors[i].source || d.detail != errors[i].message
+                || d.flow != "main" || d.scene != "s")
+                throw std::runtime_error("diagnostic " + std::to_string(i) + " does not match its report: kind=" + d.kind + " subject=" + d.subject
+                    + " source=" + d.source + " detail=" + d.detail + " flow=" + d.flow);
+        }
+        // Only the two effects that landed are writes: @a and @d. Not @c, and not the scene's @e.
+        need(joined(writes) == "[@a, @d]", "the write entries should be @a and @d only, got " + joined(writes));
+        // The flow's own log carries the same diagnostics.
+        int own = 0;
+        for (const LogEntry& e : engine.getFlow("main")->log()) if (e.type == "diagnostic") ++own;
+        need(own == static_cast<int>(errors.size()), "the flow's own log has " + std::to_string(own) + " diagnostics");
+    });
+
+    playErrCase("with no onError set, the core plays through silently, and the log still records each", [&]
+    {
+        EngineOptions opts; opts.log = true;
+        Engine engine(bundle, opts);
+        std::vector<std::string> transcript;
+        play(engine, transcript); // must not throw
+        need(joined(transcript) == "[a=1 c=0 d=1, ok, choice, two, y]", "the scene did not play through: " + joined(transcript));
+        int diagnostics = 0;
+        for (const LogEntry& e : engine.log()) if (e.type == "diagnostic") ++diagnostics;
+        need(diagnostics == 5, "expected 5 diagnostic entries, got " + std::to_string(diagnostics));
+    });
+
+    playErrCase("a story write to a read-only @world is an effect error naming the value, and the list goes on", []
+    {
+        static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"T":"hi"}},
+          "properties":[{"name":"after","type":"number","default":0}],
+          "scopeRegistry":{"version":1,"scopes":[{"token":"world","declarations":[{"name":"clock","type":"string","default":"day","writable":false}]}]},
+          "scenes":{"s":{"id":"s","gameId":"s","blocks":[{"id":"b","gameId":"b","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],
+            "onExit":[{"kind":"set","target":"@world.clock","value":{"src":"\"night\"","ast":["s","night"]}},{"kind":"set","target":"@after","value":{"src":"2","ast":["n",2]}}],
+            "jump":{"to":"END"}}]}]}}})JSON"));
+        std::vector<PlayError> errors;
+        EngineOptions opts; opts.log = true; opts.onError = [&errors](const PlayError& e) { errors.push_back(e); };
+        Engine engine(b, opts);
+        playOut(engine.openFlow("door", "s"));
+        need(errors.size() == 1 && errors[0].flow == "door" && errors[0].kind == "effect" && errors[0].node == "sn"
+            && errors[0].source == "\"night\"" && errors[0].message.find("'@world.clock' is read-only") != std::string::npos,
+            "the refused write was reported as " + describeErrors(errors));
+        expectNumber(engine.getProperty("@after"), 2, "@after, the effect after the refused one");
+        const PatterValue* clock = engine.getProperty("@world.clock");
+        need(clock && clock->s == "day", "the refused write changed @world.clock");
+        for (const LogEntry& e : engine.log())
+            need(!(e.type == "write" && e.subject == "@world.clock"), "a refused write left a write entry");
+    });
+
+    std::cout << "  [play-errors] content errors played through and reported: " << g_playErrPass << "/" << g_playErrTotal << "\n";
+}
+
+// The one address rule, on the engine's lookups: a block address given with a scene resolves WITHIN that
+// scene only (its gameId there, then the internal id of a block in it), so a real block of another scene
+// gives nothing; with no scene, a block resolves by internal id. The corpus pins openFlow and goto; these
+// lookups answer no transcript, so they are pinned here.
+static void runAddressLookupCases()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"K":"k","G":"g"}},
+      "scenes":{"scn_cellar":{"id":"scn_cellar","type":"scene","name":"Kitchen","tags":["indoor"],"blocks":[{"id":"b_k","type":"block","name":"Stove","tags":["hot"],"gameData":{"heat":3},
+          "children":[{"id":"sn_k","type":"snippet","beats":[{"id":"K","kind":"text"}],"jump":{"to":"END"}}]}]},
+        "kitchen":{"id":"kitchen","type":"scene","name":"Garden","tags":["outdoor"],"blocks":[{"id":"b_g","type":"block","name":"Bench","tags":["seat"],
+          "children":[{"id":"sn_g","type":"snippet","beats":[{"id":"G","kind":"text"}],"jump":{"to":"END"}}]}]}}})JSON"));
+    Engine engine(b);
+    const auto tags = [&](const std::string& scene, const std::string& block) { return joined(engine.tagsForBlock(scene, block)); };
+    std::string problems;
+    const auto check = [&problems](bool ok, const std::string& what) { if (!ok) problems += (problems.empty() ? "" : "; ") + what; };
+    // "kitchen" is one scene's gameId and the other's internal id: the gameId wins.
+    check(joined(engine.tagsForScene("kitchen")) == "[indoor]", "tagsForScene(kitchen) read the internal id first: " + joined(engine.tagsForScene("kitchen")));
+    check(tags("kitchen", "stove") == "[indoor, hot]", "tagsForBlock(kitchen, stove) by gameIds: " + tags("kitchen", "stove"));
+    check(tags("kitchen", "b_k") == "[indoor, hot]", "tagsForBlock(kitchen, b_k) by internal id in the scene: " + tags("kitchen", "b_k"));
+    check(tags("garden", "b_k") == "[]", "tagsForBlock(garden, b_k) resolved a block of another scene: " + tags("garden", "b_k"));
+    check(tags("garden", "stove") == "[]", "tagsForBlock(garden, stove) resolved another scene's block gameId: " + tags("garden", "stove"));
+    check(tags("nowhere", "b_k") == "[]", "tagsForBlock(nowhere, b_k) resolved under an unknown scene: " + tags("nowhere", "b_k"));
+    check(tags("", "b_k") == "[indoor, hot]", "tagsForBlock with no scene did not take the internal id: " + tags("", "b_k"));
+    check(tags("", "stove") == "[]", "tagsForBlock with no scene took a block gameId: " + tags("", "stove"));
+    check(engine.gameDataForBlock("kitchen", "stove").size() == 1, "gameDataForBlock(kitchen, stove) found nothing");
+    check(engine.gameDataForBlock("garden", "b_k").empty(), "gameDataForBlock(garden, b_k) resolved a block of another scene");
+    check(engine.castForBlock("garden", "b_k").empty() && engine.castForBlock("kitchen", "b_k").empty(), "castForBlock");
+    if (!problems.empty()) fail("addresses", "engine lookups follow the one address rule", problems);
+    else std::cout << "  [addresses] engine lookups: a scene's gameId first, a block within its scene\n";
+}
+
 // ----- kernel errors -----------------------------------------------------------------------------------
 //
 // The kernel (wildwinter::expr, shared with the Storylet Engine since 2026-09-24) throws its own
@@ -1683,7 +1923,10 @@ static void runOneRegistry()
 // can refuse catches them and rethrows Patterplay's EvalError with the kernel's message, as the engine
 // threw before the kernel was shared, so a game's `catch (const patter::EvalError&)` still works and no
 // kernel exception crosses the plugin's API. One case per rethrow site in Engine.h, each of which fails
-// (the kernel's own type arrives instead) when that site's kernelCall is removed.
+// (the kernel's own type arrives instead) when that site's kernelCall is removed. A refusal while the
+// story evaluates its own content (a condition, an effect) is no longer thrown at all: the engine plays
+// through it and reports it (PlayError). Those cases pin that instead, and reach Flow::writeProperty's
+// rethrow through the game's own write.
 
 static int g_kernelPass = 0, g_kernelTotal = 0;
 
@@ -1719,14 +1962,26 @@ struct NoSetScope : IScopeResolver
 
 static void runKernelErrorCases()
 {
-    kernelCase("a story write the registry refuses is Patterplay's EvalError (Flow::writeProperty)", []
+    kernelCase("a write the registry refuses is Patterplay's EvalError (Flow::writeProperty), and the story's is played through", []
     {
         Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"T":"hi"}},"properties":[],
           "scopeRegistry":{"version":1,"scopes":[{"token":"world","declarations":[{"name":"clock","type":"string","default":"day","writable":false}]}]},
           "scenes":{"s":{"id":"s","gameId":"s","blocks":[{"id":"b","gameId":"b","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],
             "onEnter":[{"kind":"set","target":"@world.clock","value":{"src":"\"night\"","ast":["s","night"]}}],"jump":{"to":"END"}}]}]}}})JSON"));
-        Engine engine(bundle);
-        expectEvalError([&] { engine.openFlow("main", "s", "b")->advance(); }, "'@world.clock' is read-only", "the story's write to a read-only @world");
+        std::string reported;
+        EngineOptions storyOpts; storyOpts.onError = [&reported](const PlayError& e) { reported = e.message; };
+        Engine engine(bundle, storyOpts);
+        engine.openFlow("main", "s", "b")->advance();
+        need(reported.find("'@world.clock' is read-only") != std::string::npos,
+            "the story's write to a read-only @world was not reported with the registry's message (got: " + reported + ")");
+        // The game's own write goes through the same site, and a scope it lent with no setter refuses it.
+        auto registry = std::make_shared<ScopeRegistry>();
+        ForeignScopeOptions game; game.owner = "Game";
+        registry->defineForeign("clock", std::make_shared<NoSetScope>(), nullptr, game);
+        EngineOptions opts; opts.registry = registry;
+        Engine onRegistry(orBundle(), opts);
+        Flow* flow = onRegistry.openFlow("f", "s");
+        expectEvalError([&] { flow->setProperty("@clock.hour", PatterValue::Num(9)); }, "'@clock.hour' is read-only", "the game's write through a flow");
     });
 
     kernelCase("a flow's bag clashing with a key the game holds is Patterplay's EvalError (Flow::mount)", []
@@ -1739,14 +1994,18 @@ static void runKernelErrorCases()
         expectEvalError([&] { engine.openFlow("f", "s"); }, "scope '@patter/flow/f/patter' is already registered by Game", "a flow mount clash");
     });
 
-    kernelCase("an expression the evaluator refuses is Patterplay's EvalError (Flow::evalExpr)", []
+    kernelCase("an expression the evaluator refuses is played through and reported with its message (Flow::evalExpr)", []
     {
         Bundle bundle = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"strings":{"en":{"T":"hi"}},
           "properties":[{"name":"fame","type":"number","default":0,"shared":true}],
           "scenes":{"s":{"id":"s","gameId":"s","blocks":[{"id":"b","gameId":"b","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],
             "onEnter":[{"kind":"set","target":"@fame","value":{"src":"1 / 0","ast":["bin","/",["n",1],["n",0]]}}],"jump":{"to":"END"}}]}]}}})JSON"));
-        Engine engine(bundle);
-        expectEvalError([&] { engine.openFlow("f", "s")->advance(); }, "division by zero", "an evaluation refusal");
+        std::string reported;
+        EngineOptions opts; opts.onError = [&reported](const PlayError& e) { reported = e.kind + ": " + e.message; };
+        Engine engine(bundle, opts);
+        StepResult step = engine.openFlow("f", "s")->advance();
+        need(step.type == StepType::Text && step.id == "T", "the flow did not play on past an evaluation refusal");
+        need(reported == "effect: division by zero", "an evaluation refusal was not reported with the evaluator's message (got: " + reported + ")");
     });
 
     kernelCase("the game's write to a scope with no setter is Patterplay's EvalError (Engine::setProperty)", []
@@ -1768,7 +2027,7 @@ static void runKernelErrorCases()
         expectEvalError([&] { Engine engine(orBundle(), opts); }, "scope '@patter' is already registered by Game (wanted by Patter)", "a registration clash");
     });
 
-    std::cout << "  [kernel-errors] every kernel refusal reaches the game as Patterplay's EvalError: " << g_kernelPass << "/" << g_kernelTotal << "\n";
+    std::cout << "  [kernel-errors] every kernel refusal reaches the game as Patterplay's EvalError, or is played through and reported: " << g_kernelPass << "/" << g_kernelTotal << "\n";
 }
 
 static void runInspectorSmoke()
@@ -2079,6 +2338,8 @@ int main(int argc, char** argv)
     runOneRegistry();
     runKernelErrorCases();
     runHostScopeWritableSmoke();
+    runPlayErrorCases();
+    runAddressLookupCases();
     runTraceLogSmoke();
     runOutlineSmoke();
     runDescribeSmoke();

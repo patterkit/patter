@@ -23,8 +23,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k11805ede_VALUE_H) && WILDWINTER_EXPR_KERNEL == 0x11805ede
-#define WILDWINTER_EXPR_k11805ede_VALUE_H
+#if !defined(WILDWINTER_EXPR_k9821750c_VALUE_H) && WILDWINTER_EXPR_KERNEL == 0x9821750c
+#define WILDWINTER_EXPR_k9821750c_VALUE_H
 
 #include <algorithm>
 #include <cmath>
@@ -33,7 +33,7 @@
 #include <string>
 #include <vector>
 
-namespace wildwinter { namespace expr { inline namespace k11805ede
+namespace wildwinter { namespace expr { inline namespace k9821750c
 {
     enum class ExprKind { Bool, Number, Str, Flags };
 
@@ -146,38 +146,51 @@ namespace wildwinter { namespace expr { inline namespace k11805ede
         }
 
         /**
-         * Format a double the way JavaScript's String(n) does. This is the
-         * cross-runtime number-rendering contract, and it did NOT hold: five of
-         * the six ports got it wrong, in four different ways. Patterplay's C++
-         * used a 1e15 integral cutoff and a fixed `%.15g`, so 1e16 printed as
-         * "1e+16" and 0.1+0.2 as "0.3"; both families' C# cast to `long`, which
-         * overflows above 2^63, so 1e20 printed as "9223372036854775807"; both
-         * GDScript ports used String.num's 14-decimal default and its trailing
-         * ".0". Only the Storylet Engine's C++ was faithful, and this is it.
-         *
-         * Integral values below 1e21 print with no decimal point and no
-         * exponent. Everything else takes the SHORTEST representation that
-         * round-trips, which is what JS picks.
+         * Format a double the way JavaScript's String(n) does: the cross-runtime number-rendering contract.
+         * The shortest digits that round-trip, laid out by ECMAScript's Number::toString rules: plain digits
+         * from 1e-7 up to (not including) 1e21; outside that, an exponent with a lower-case "e" and its sign
+         * ("1.5e-7", "1e+21"); -0 as "0". %g alone printed "5e-05", "1.5e-07" and "-0", and a whole number
+         * past 2^53 printed exactly where JS prints its shortest digits padded with zeros.
          */
         static std::string JsNumber(double v)
         {
             if (std::isnan(v)) return "NaN";
             if (std::isinf(v)) return v > 0 ? "Infinity" : "-Infinity";
-            if (v == std::floor(v) && std::fabs(v) < 1e21)
+            if (v == 0) return "0"; // -0 included
+            if (v == std::floor(v) && std::fabs(v) < 9007199254740992.0)
             {
                 char buf[64];
-                std::snprintf(buf, sizeof(buf), "%.0f", v);   // not (long long): 1e20 is past int64
+                std::snprintf(buf, sizeof(buf), "%.0f", v);   // a whole number below 2^53 prints exactly
                 return std::string(buf);
             }
+            const double a = std::fabs(v);
+            char buf[64];
             for (int precision = 1; precision <= 17; ++precision)
             {
-                char buf[64];
-                std::snprintf(buf, sizeof(buf), "%.*g", precision, v);
-                if (std::strtod(buf, nullptr) == v) return std::string(buf);
+                std::snprintf(buf, sizeof(buf), "%.*e", precision - 1, a);   // "1.5e-07"
+                if (precision == 17 || std::strtod(buf, nullptr) == a) break;
             }
-            char buf[64];
-            std::snprintf(buf, sizeof(buf), "%.17g", v);
-            return std::string(buf);
+            // Split "d.ddde+XX" into its digits and exponent. Only digits are kept from the mantissa, so a
+            // locale's decimal separator never leaks in.
+            std::string digits;
+            const char* p = buf;
+            for (; *p && *p != 'e' && *p != 'E'; ++p) if (*p >= '0' && *p <= '9') digits += *p;
+            const int exp10 = *p ? std::atoi(p + 1) : 0;
+            while (digits.size() > 1 && digits.back() == '0') digits.pop_back();
+            return (v < 0 ? "-" : "") + JsLayout(digits, exp10 + 1);
+        }
+
+        /** ECMAScript's layout for digits d1..dk with the decimal point `point` places from the left (the
+         *  value is 0.d1..dk x 10^point). */
+        static std::string JsLayout(const std::string& d, int point)
+        {
+            const int k = static_cast<int>(d.size());
+            if (k <= point && point <= 21) return d + std::string(static_cast<size_t>(point - k), '0');
+            if (0 < point && point <= 21) return d.substr(0, static_cast<size_t>(point)) + "." + d.substr(static_cast<size_t>(point));
+            if (-6 < point && point <= 0) return "0." + std::string(static_cast<size_t>(-point), '0') + d;
+            const int e = point - 1;
+            const std::string exp = (e < 0 ? "-" : "+") + std::to_string(e < 0 ? -e : e);
+            return (k == 1 ? d : d.substr(0, 1) + "." + d.substr(1)) + "e" + exp;
         }
 
         /** A JSON string literal, escaped. */

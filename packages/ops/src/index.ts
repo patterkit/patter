@@ -30,7 +30,7 @@ export type { WebExport } from "./export-html.js";
 export { runPlay, renderPlay } from "./play.js";
 export type { PlayOptions, PlayResult, PlayEvent, PlayOutcome } from "./play.js";
 export { runCoverage, runCoverageAsync, renderCoverageText, proposeCoverageDrivers, leastReachedFirst, RARE_REACH_PCT } from "./coverage.js";
-export type { CoverageOptions, CoverageHooks, CoverageAsyncHooks, CoverageReport, CoverageBeat, CoverageOrder } from "./coverage.js";
+export type { CoverageOptions, CoverageHooks, CoverageAsyncHooks, CoverageReport, CoverageBeat, CoverageOrder, ContentError } from "./coverage.js";
 export { resolveStart } from "./loaded-helpers.js";
 export { runFormat } from "./format.js";
 export type { FormatResult } from "./format.js";

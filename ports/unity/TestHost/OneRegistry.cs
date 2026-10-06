@@ -345,7 +345,9 @@ namespace Patterkit.Patterplay.TestHost
                     msg != null && msg.Contains("unknown ast tag: zz") && _thrown == nameof(EvalError), $"{_thrown}: {msg ?? "no error"}");
             });
 
-            Case("An expression the kernel refuses is Patterplay's EvalError (evaluation)", () =>
+            // Evaluation is the one site that no longer throws: content the kernel refuses at run time is played
+            // through and reported (EngineOptions.OnError), with the kernel's message, never thrown out of a flow.
+            Case("An expression the kernel refuses is reported with the kernel's message (evaluation)", () =>
             {
                 var b = new Bundle { Schema = "patter/bundle@0" };
                 b.Locales.Default = "en";
@@ -361,10 +363,14 @@ namespace Patterkit.Patterplay.TestHost
                         Jump = new Jump { To = "END" } },
                 } });
                 b.Scenes["s"] = scene;
-                var (_, patter) = Game(b);
+                var errors = new List<PlayError>();
+                var registry = new ScopeRegistry().DefineOwned("world", WorldDecls, new OwnedScopeOptions { Owner = "Game" });
+                var patter = new Engine(b, new EngineOptions { Registry = registry, Seed = 1, OnError = errors.Add });
                 var msg = Throws(() => patter.OpenFlow("f", "s").Advance());
-                RegistryCheck("an evaluation refusal is an EvalError with the kernel's message",
-                    msg != null && msg.Contains("division by zero") && _thrown == nameof(EvalError), $"{_thrown}: {msg ?? "no error"}");
+                RegistryCheck("an evaluation refusal plays through", msg == null, $"{_thrown}: {msg}");
+                RegistryCheck("an evaluation refusal is reported with the kernel's message",
+                    errors.Count == 1 && errors[0].Kind == "effect" && errors[0].Message.Contains("division by zero"),
+                    string.Join(" | ", errors));
             });
 
             Case("The game's write to a scope with no setter is Patterplay's EvalError (Engine.SetProperty)", () =>

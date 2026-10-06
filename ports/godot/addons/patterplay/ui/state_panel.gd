@@ -25,9 +25,10 @@ var _value_widgets: Array = []   # of { "widget":, "type":, "engine":, "path": }
 
 ## The decision log's per-kind filters. The vocabulary is this engine's: `select` is a
 ## group choosing among its children, `chose` is the player answering a choice, `dry` is a
-## choice that fell through with nothing takeable.
-const LOG_KINDS := ["select", "choice", "chose", "dry", "jump", "write"]
-const LOG_KIND_LABELS := ["Select", "Choice", "Chose", "Dry", "Jump", "Write"]
+## choice that fell through with nothing takeable, `diagnostic` is content the engine could not
+## evaluate and played through.
+const LOG_KINDS := ["select", "choice", "chose", "dry", "jump", "write", "diagnostic"]
+const LOG_KIND_LABELS := ["Select", "Choice", "Chose", "Dry", "Jump", "Write", "Diagnostic"]
 var _log_kind_on: Dictionary = {}
 var _log_autoscroll := true
 var _log_boxes: Array = []       # of { "engine":, "scroll":, "text": }
@@ -363,6 +364,9 @@ static func _format_log_entry(e: Dictionary) -> String:
 		"write":
 			return "%swrite %s: %s -> %s" % [stamp, e.get("target", ""),
 				_show_log_value(e.get("prev")), _show_log_value(e.get("value"))]
+		"diagnostic":
+			var src := (" (%s)" % str(e["source"])) if e.has("source") else ""
+			return "%sdiagnostic %s on %s%s: %s" % [stamp, e.get("kind", ""), e.get("node", ""), src, e.get("message", "")]
 	return "%s(unknown)" % stamp
 
 

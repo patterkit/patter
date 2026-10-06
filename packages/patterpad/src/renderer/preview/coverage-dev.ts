@@ -20,6 +20,7 @@ const sample: CoverageResult = {
     drivers: [{ ref: "@world.mood", kind: "recurring", cadence: "sometimes", values: ["calm", "tense"] }],
     unwrittenInputs: ["@world.alarm"],
     dryChoices: [{ id: "grp_barmenu", scene: "bar", runs: 812 }],
+    contentErrors: [{ kind: "condition", node: "sn_tip", scene: "bar", source: "@gold / @patrons > 2", message: "division by zero", runs: 431 }],
     cancelled: false,
   },
 };
@@ -50,6 +51,7 @@ const partial = (done: number): CoverageResult => {
       termination: { ...sample.report.termination, ended: done },
       beats: sample.report.beats.map((b) => ({ ...b, hits: scale(b.hits), reachedRuns: scale(b.reachedRuns) })),
       dryChoices: sample.report.dryChoices.map((d) => ({ ...d, runs: scale(d.runs) })),
+      contentErrors: sample.report.contentErrors.map((e) => ({ ...e, runs: scale(e.runs) })),
     },
   };
 };

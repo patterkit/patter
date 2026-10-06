@@ -374,9 +374,11 @@ async function run(cmd: string, positionals: string[], flags: Record<string, str
         seed,
       });
       for (const line of renderPlay(result)) console.log(line);
-      // A playthrough that didn't reach the end (stalled choice / step bound)
-      // is a failure - `play` exists to drive flows to completion in CI.
-      return result.outcome === "end" ? 0 : 1;
+      // A playthrough that didn't reach the end (stalled choice / step bound), or
+      // that hit a condition or effect that failed, is a failure - `play` exists
+      // to drive flows to completion in CI, and the engine plays through a failing
+      // expression rather than stopping, so this is where CI hears about it.
+      return result.outcome === "end" && !result.events.some((e) => e.type === "error") ? 0 : 1;
     }
 
     case "coverage": {

@@ -63,6 +63,17 @@ Headless checks for the Godot addon. **Not part of the shipped addon zip** (only
   godot --headless --path ports/godot --script res://test/test_flow_lifetime.gd
   ```
 
+- `test_play_errors.gd` - content errors play through and are REPORTED: the `on_error` option gets
+  `{flow, kind, node, source, message}` for a failing condition, a failing effect, a refused read-only
+  `@world` write, and a failing Best-match part; the decision log gets a `diagnostic` entry for each and
+  no `write` entry for a skipped effect. Also the load refusals the corpus cannot express: a bare
+  snapshot with no envelope, a save with no flows, and a version that is not 2 or 3 are refused, and
+  leave the engine exactly as it was.
+
+  ```sh
+  godot --headless --path ports/godot --script res://test/test_play_errors.gd
+  ```
+
 - `tour_check.gd` - a smoke check that the bundled tour demo loads and steps:
 
   ```sh

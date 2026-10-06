@@ -33,6 +33,37 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **`EngineOptions.onError` and `PlayError`.** Each condition or effect that fails while the story plays is
+  reported to `onError` with the flow, what failed (`condition`, `effect`, or `best-match`), the node, the
+  expression's source, and the error. With no `onError`, each goes to `console.warn`. With the log on, each is
+  also a `diagnostic` entry in the decision log.
+
+### Changed
+
+- **A condition or effect that fails no longer stops the story.** A failing condition counts as false, and a
+  failing effect is skipped while the rest of its list still runs, including a story write a read-only `@world`
+  value refuses. This is the same on all four runtimes; JS used to throw out of `advance()`.
+- **A part of a Best-match condition that fails scores as false**, as on the other three runtimes. JS threw
+  while scoring.
+- **A selector evaluates each condition once.** It evaluated each child's condition twice, so a condition
+  calling `random(a, b)` drew twice and the logged verdict could disagree with the pick.
+- **A shuffle draws only from the children in its bag that are still eligible.** A child whose condition went
+  false after the bag was filled could be drawn, and the group then played nothing. When no child left in the
+  bag is eligible, the pass ends as if the bag were empty. Seeded results do not change while every child in the
+  bag stays eligible.
+- **`openFlow`, `goto` and the engine's lookups read an address the same way:** a scene's game id first, then
+  its internal id, and a block only within its scene. `openFlow` tried the internal id first, so the two could
+  land in different scenes when one scene's id was another's game id.
+- **A choice whose every remaining option is greyed out runs dry**, as a choice with no options does: the
+  fallback follows if there is one, otherwise the flow moves on and `onDryChoice` fires. It used to be offered
+  with nothing the player could take.
+- **An option's prompt beat carries tags**: its own and the option's. A replayed prompt and the outline lost
+  them.
+- **`loadGame` checks a save before changing anything.** A save missing its flows used to close every flow and
+  load the registry before failing, leaving the engine half-loaded.
+
 ### Fixed
 
 - **A rollback after a load keeps a scene's saved `@scene` values.** After a load, a scene the flow is not

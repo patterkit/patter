@@ -76,16 +76,16 @@ func _initialize() -> void:
 	var x_prng: Array = expr_root["prng"]
 	var x_expr: Array = expr_root["expressions"]
 	var xp := _run_expr_prng(x_prng)
-	var xe_result := _run_expr_expressions(x_expr)
-	var xe: int = xe_result[0]
-	var unrunnable: int = xe_result[1]
+	var xe := _run_expr_expressions(x_expr)
 	print("expr corpus v%d - prng: %d/%d  expressions: %d/%d" % [
-		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size() - unrunnable])
+		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size()])
+	_expect_all("expr corpus prng", xp, x_prng.size())
+	_expect_all("expr corpus expressions", xe, x_expr.size())
 
 	# The registry corpus sits beside it too, vendored from ../expr: the contract every
 	# copy of the ScopeRegistry runs, the `writable` rule included, here through
-	# PatterScopeRegistry, with the shared evaluator (which, unlike PatterExpr, reports
-	# a refusal). Absent is a failure, not a skip; the shared runner reports it as one.
+	# PatterScopeRegistry, with the shared evaluator. Absent is a failure, not a skip;
+	# the shared runner reports it as one.
 	var reg := RegistryCorpus.run(path.get_base_dir().path_join("registry-corpus.json"),
 		PatterScopeRegistry, PatterPropertyBag, ExprEval)
 	for f in reg["failures"]:
@@ -94,10 +94,6 @@ func _initialize() -> void:
 		_fail("registry", "(corpus)", "no cases ran")
 	_expect_all("registry", int(reg["passed"]), int(reg["cases"]))
 	print("registry corpus: %d/%d" % [int(reg["passed"]), int(reg["cases"])])
-	if unrunnable > 0:
-		print("  GAP: %d expectError cases cannot run here - PatterExpr has no is_error();" % unrunnable)
-		print("       it push_error()s and returns a fallback value, so a refusal is")
-		print("       indistinguishable from an answer. See _run_expr_expressions.")
 
 	print("ALL PASS" if _fails == 0 else ("%d FAILED" % _fails))
 	quit(0 if _fails == 0 else 1)
@@ -308,36 +304,13 @@ func _run_expr_prng(cases: Array) -> int:
 
 # The expr corpus's expression cases. Same shape as ours, with one addition:
 # `expectError` cases, which pin the TYPING contract - which operand combinations
-# the evaluator must REFUSE.
-#
-# This port cannot run those yet. PatterExpr signals a bad expression with
-# push_error() and then returns a FALLBACK VALUE (0.0 for a division by zero or a
-# mixed-type `+`, false for an unknown operator), so a caller cannot tell a
-# refusal from an answer, and neither can this runner. The other three Patterplay
-# runtimes raise. Storylets' GDScript port solved this years-equivalent ago with an
-# EvalError object and an is_error() predicate (runtime/expression.gd), which is the
-# shape to copy.
-#
-# So the gap is COUNTED AND PRINTED on every run rather than skipped quietly, and
-# the moment PatterExpr grows an is_error() the cases start running here with no
-# change to this file.
-func _run_expr_expressions(cases: Array) -> Array:
+# the evaluator must REFUSE. GDScript has no exceptions, so a refusal is a returned
+# EvalError, told from an answer by PatterExpr.is_error().
+func _run_expr_expressions(cases: Array) -> int:
 	var pass_count := 0
-	var unrunnable := 0
-	# Probed on an instance, and CALLED through call(): GDScript resolves a static
-	# call at parse time, so naming PatterExpr.is_error() directly would be a parse
-	# error today rather than a graceful gap. call() defers it to runtime, which is
-	# what lets this file compile now and start running the cases the moment the
-	# method lands.
-	var expr_probe := PatterExpr.new()
-	var can_detect_errors: bool = expr_probe.has_method("is_error")
-
 	for c in cases:
 		var name: String = c["name"]
 		var expect_error: bool = c.get("expectError", false)
-		if expect_error and not can_detect_errors:
-			unrunnable += 1
-			continue
 
 		var ctx := {"scopes": {}}
 		for token in c["scopes"].keys():
@@ -348,19 +321,19 @@ func _run_expr_expressions(cases: Array) -> Array:
 
 		var actual = PatterExpr.evaluate(c["ast"], ctx, _dialect)
 		if expect_error:
-			if expr_probe.call("is_error", actual):
+			if PatterExpr.is_error(actual):
 				pass_count += 1
 			else:
 				_fail("expr", name, "expected an eval error, got %s" % str(actual))
-		elif can_detect_errors and expr_probe.call("is_error", actual):
-			_fail("expr", name, "unexpected error: %s" % str(actual))
+		elif PatterExpr.is_error(actual):
+			_fail("expr", name, "unexpected error: %s" % actual.message)
 		else:
 			var expected = PatterValues.to_value(c["expected"])
 			if PatterValues.value_equals(actual, expected):
 				pass_count += 1
 			else:
 				_fail("expr", name, "expected %s, got %s" % [str(expected), str(actual)])
-	return [pass_count, unrunnable]
+	return pass_count
 
 
 # -- specificity ---------------------------------------------------------------

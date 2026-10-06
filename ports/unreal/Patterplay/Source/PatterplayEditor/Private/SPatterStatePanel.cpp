@@ -236,6 +236,9 @@ FString SPatterStatePanel::FormatLogEntry(const FPatterLogEntry& E)
 	if (E.Type == TEXT("write"))
 		return FString::Printf(TEXT("%swrite %s: %s -> %s"), *Stamp, *E.Subject,
 			E.bHasPrev ? *E.Prev : TEXT("<unset>"), *E.Value);
+	if (E.Type == TEXT("diagnostic"))
+		return FString::Printf(TEXT("%s%s on %s failed, played through: %s%s"), *Stamp, *E.Kind, *E.Subject, *E.Detail,
+			E.Source.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *E.Source));
 	return Stamp + TEXT("(unknown)");
 }
 

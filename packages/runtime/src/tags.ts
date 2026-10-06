@@ -19,7 +19,7 @@ function dedupe(tags: string[]): string[] {
 }
 
 /**
- * Map every node id (scene / block / group / snippet / beat) to its accumulated
+ * Map every node id (scene / block / group / snippet / beat, prompt beats included) to its accumulated
  * tags. Node ids are globally unique within a project (the validator enforces
  * it), so one flat map suffices. Nodes with no tags anywhere up the chain map to
  * an empty array.
@@ -30,6 +30,9 @@ export function buildTagIndex(bundle: Bundle): Map<string, string[]> {
   const visit = (node: CompiledGroup | CompiledSnippet, inherited: string[]): void => {
     const acc = dedupe([...inherited, ...(node.tags ?? [])]);
     index.set(node.id, acc);
+    // An option's prompt beat is a beat like any other: its own tags plus the option's. Left out, a
+    // replayed prompt and the outline's prompt lost every tag (all four runtimes, until 2026-10).
+    if (node.type === "group" && node.prompt) index.set(node.prompt.id, dedupe([...acc, ...(node.prompt.tags ?? [])]));
     if (node.type === "group") {
       for (const child of node.children) visit(child, acc);
     } else {

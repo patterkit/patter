@@ -82,6 +82,12 @@ namespace Patterkit.Patterplay
         /// whenever a choice runs dry. Unaffected by Log and useful with it off - it is live
         /// feedback, not an audit read afterwards.</summary>
         public Action<string> OnDryChoice;
+        /// <summary>Called with each content error the engine played through (see <see cref="PlayError"/>): a
+        /// condition that failed and counted as false, an effect that failed and was skipped, or a part of a
+        /// Best-match condition that failed and scored as false. Unset, each goes to
+        /// <see cref="Engine.DefaultOnError"/>, so a content bug is never silent. Parity with the JS
+        /// runtime's onError.</summary>
+        public Action<PlayError> OnError;
         /// <summary>Live game state per host-scope token (`"world"` -> your resolver). Each binding is
         /// registered in the registry as a foreign scope: the game keeps the values, and nothing saves them
         /// but the game. A standalone engine self-backs every token the bundle declares and you do not bind,
@@ -141,9 +147,38 @@ namespace Patterkit.Patterplay
         public Dictionary<string, Node> ById;
     }
 
+    /// <summary>
+    /// A content error the engine played through. Content can fail at run time in ways the compiler cannot
+    /// see: a division by zero, a host value of the wrong type, a story write to a read-only `@world` value.
+    /// The story never stops for one. A condition that fails counts as false; an effect that fails is
+    /// skipped and the rest of its list still runs; a part of a Best-match condition that fails scores as
+    /// false. Each is reported, through <see cref="EngineOptions.OnError"/> and as a `diagnostic` entry in
+    /// the decision log. The same rule holds on all four runtimes. Parity with the JS runtime's PlayError.
+    /// </summary>
+    public sealed class PlayError
+    {
+        /// <summary>The flow it happened in.</summary>
+        public string Flow;
+        /// <summary>What failed: "condition", "effect", or "best-match" (a part of a condition being scored
+        /// for Best match).</summary>
+        public string Kind;
+        /// <summary>The snippet, group, or option whose condition failed, or that owns the effect (a scene,
+        /// for its onEntry).</summary>
+        public string Node;
+        /// <summary>The expression's source text, when the bundle carries it; null otherwise.</summary>
+        public string Source;
+        public string Message;
+
+        /// <summary>One line for a console: what failed, where, and why.</summary>
+        public override string ToString()
+            => $"{Kind} on {Node} in flow '{Flow}' failed, played through: {Message}";
+    }
+
     /// <summary>One retained decision: what the engine chose and why, not what it produced.
     /// `Type` is select | choice | chose | dry | jump | write | diagnostic; `Seq` is monotonic
-    /// across the flow and survives ClearLog. Parity with the JS runtime's LogEntry.</summary>
+    /// across the flow and survives ClearLog. Parity with the JS runtime's LogEntry. A `diagnostic`
+    /// entry is a content error the engine played through (see <see cref="PlayError"/>): its node is the
+    /// Subject, its message the Detail, and Kind and Source say what failed.</summary>
     public sealed class LogEntry
     {
         public string Type;
@@ -162,6 +197,10 @@ namespace Patterkit.Patterplay
         public ExprValue Value;
         public ExprValue Prev;
         public string Detail;
+        /// <summary>A `diagnostic` entry's <see cref="PlayError.Kind"/>: condition | effect | best-match.</summary>
+        public string Kind;
+        /// <summary>A `diagnostic` entry's expression source, when the bundle carries it.</summary>
+        public string Source;
     }
 
     /// <summary>What an open checkpoint records: how to undo each change, newest last. Each piece of state
@@ -202,6 +241,8 @@ namespace Patterkit.Patterplay
         /// runtime's onDryChoice, which the three ports never had. Live feedback, distinct from
         /// the log's `dry` entry: a shipped game runs with the log off and this still wired.</summary>
         public Action<string> OnDryChoice;
+        /// <summary>The game's EngineOptions.OnError, or null to report through Engine.DefaultOnError.</summary>
+        public Action<PlayError> OnError;
         public Bundle Bundle;
         public bool EmitIds; // IDs-only build: emit beat IDs + omit character names (the game localises)
         public Dictionary<string, string> Strings;
@@ -273,6 +314,13 @@ namespace Patterkit.Patterplay
         // engine keeps the same seed source and settings.
         private readonly EngineOptions _creationOptions;
         private readonly bool _sourceDebug; // source-only DEBUG build: strings are the source language, not shippable
+
+        /// <summary>Where a content error goes when the engine was built without
+        /// <see cref="EngineOptions.OnError"/>. By default a "[Patterplay]" warning on standard error, as this
+        /// runtime's other warnings go; the Unity layer points it at Debug.LogWarning when it loads, so in a
+        /// Unity game the warning lands in the Console. Read at the moment of each report, so setting it
+        /// reaches engines already built.</summary>
+        public static Action<PlayError> DefaultOnError = e => System.Console.Error.WriteLine("[Patterplay] " + e);
 
         /// <summary>The run's ordered decision stream; see Log().</summary>
         private readonly List<LogEntry> _engineLog = new List<LogEntry>();
@@ -402,6 +450,7 @@ namespace Patterkit.Patterplay
                 LogEnabled = options.Log,
                 EngineLog = _engineLog,
                 OnDryChoice = options.OnDryChoice,
+                OnError = options.OnError,
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
@@ -1046,9 +1095,12 @@ namespace Patterkit.Patterplay
         {
             RefuseInCheckpoint("LoadGame");
             if (save.Version != 2 && save.Version != SaveVersion) throw new Exception($"unsupported save version: {save.Version}");
+            // Everything a load reads is checked BEFORE anything changes: a save missing its flows used to close
+            // every flow and load the registry, then fail, leaving the engine half-loaded.
+            if (save.Flows == null) throw new Exception("malformed save: no flows");
             AssertExternalScopes();
             var reg = _host.Registry;
-            var saved = save.Flows ?? new Dictionary<string, FlowSnapshot>();
+            var saved = save.Flows;
             // Flows the save does not have are over: their bags go. The rest are handed back with their
             // values, which is what a game that loaded its registry first has just laid the save's values over.
             foreach (var kv in _flows) { kv.Value.ReleaseBags(saved.ContainsKey(kv.Key)); kv.Value.Close(); }
@@ -1105,12 +1157,12 @@ namespace Patterkit.Patterplay
         {
             if (scene != null)
             {
-                string sceneId = ResolveSceneRef(scene);
-                if (!_host.Bundle.Scenes.ContainsKey(sceneId)) throw new Exception($"unknown scene: {scene}");
+                string sceneId = ResolveScene(_host, scene);
+                if (sceneId == null) throw new Exception($"unknown scene: {scene}");
                 if (block == null) return (sceneId, null);
-                if (_blockGameIdToId.TryGetValue(sceneId, out var addrs) && addrs.TryGetValue(block, out var bid)) return (sceneId, bid);
-                if (_host.BlockToScene.TryGetValue(block, out var owner) && owner == sceneId) return (sceneId, block);
-                throw new Exception($"unknown block: {block}");
+                string blockId = ResolveBlock(_host, sceneId, block);
+                if (blockId == null) throw new Exception($"unknown block: {block}");
+                return (sceneId, blockId);
             }
             if (block != null)
             {
@@ -1121,19 +1173,40 @@ namespace Patterkit.Patterplay
             return (null, null);
         }
 
+        /// <summary>A scene reference as its internal id by the one address rule (see ResolveScene); an unknown
+        /// one passes through, for the caller to find nothing.</summary>
         private string ResolveSceneRef(string r)
         {
             if (r == null) return null;
-            if (_host.Bundle.Scenes.ContainsKey(r)) return r;
-            return _sceneGameIdToId.TryGetValue(r, out var id) ? id : r;
+            return ResolveScene(_host, r) ?? r;
         }
 
+        /// <summary>A block reference as its internal id by the one address rule (see ResolveBlock). With no
+        /// scene, only an internal id resolves, since a block's gameId is only unique within its scene.</summary>
         private string ResolveBlockRef(string sceneId, string r)
         {
             if (r == null) return null;
-            if (_host.BlockById.ContainsKey(r)) return r;
-            if (sceneId != null && _blockGameIdToId.TryGetValue(sceneId, out var m) && m.TryGetValue(r, out var id)) return id;
-            return r;
+            if (sceneId == null) return r;
+            return ResolveBlock(_host, sceneId, r); // within its scene: another scene's block is not found here
+        }
+
+        /// <summary>The ONE rule for resolving a scene address, used by OpenFlow, Goto, and every engine lookup:
+        /// its gameId (the host-facing address, spec 6) first, then its internal id; null when neither.
+        /// OpenFlow used to try the internal id first and Goto the gameId, so the two could land in different
+        /// scenes when one scene's id was another's gameId.</summary>
+        internal static string ResolveScene(FlowHost host, string r)
+        {
+            if (host.SceneGameIdToId.TryGetValue(r, out var id)) return id;
+            return host.Bundle.Scenes.ContainsKey(r) ? r : null;
+        }
+
+        /// <summary>The one rule for a block address, always WITHIN a scene: its gameId there first, then the
+        /// internal id of a block in that scene; null when neither. A real block of another scene does not
+        /// resolve.</summary>
+        internal static string ResolveBlock(FlowHost host, string sceneId, string r)
+        {
+            if (host.BlockGameIdToId.TryGetValue(sceneId, out var m) && m.TryGetValue(r, out var id)) return id;
+            return host.BlockToScene.TryGetValue(r, out var owner) && owner == sceneId ? r : null;
         }
 
         // -- helpers ------------------------------------------------------------
@@ -1151,13 +1224,16 @@ namespace Patterkit.Patterplay
         }
 
         // Author tags (#215): walk groups/snippets carrying the parent's accumulated tags; record each
-        // node's and (for snippets) each beat's accumulated tags.
+        // node's and each beat's accumulated tags (a snippet's beats, and an option group's prompt beat).
         private static void IndexTags(List<Node> nodes, List<string> inherited, Dictionary<string, List<string>> index)
         {
             foreach (var n in nodes ?? new List<Node>())
             {
                 var acc = DedupeTags(n.Tags, inherited);
                 index[n.Id] = acc;
+                // An option's prompt beat is a beat like any other: its own tags plus the option's. Left out, a
+                // replayed prompt and the outline's prompt lost every tag (all four runtimes, until 2026-10).
+                if (n.IsGroup && n.Prompt != null) index[n.Prompt.Id] = DedupeTags(n.Prompt.Tags, acc);
                 if (n.IsGroup) IndexTags(n.Children, acc, index);
                 else foreach (var beat in n.Beats ?? new List<Beat>()) index[beat.Id] = DedupeTags(beat.Tags, acc);
             }

@@ -25,7 +25,9 @@ class PATTERPLAYRUNTIME_API UPatterFlow : public UObject
 	GENERATED_BODY()
 
 public:
-	// Run until the next line / text / gameEvent / choice / end.
+	// Run until the next line / text / gameEvent / choice / end. A content error on the way (a condition or
+	// an effect that fails to evaluate) does not stop the flow: the engine plays through it and reports it
+	// through UPatterEngine::OnError.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	FPatterStep Advance();
 
@@ -92,6 +94,9 @@ private:
 /** A choice ran dry: none of its options could be offered. Carries the choice group's id. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterDryChoiceEvent, const FString&, GroupId);
 
+/** A content error the engine played through: what failed, where, and why. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterErrorEvent, const FPatterPlayError&, Error);
+
 UCLASS(BlueprintType)
 class PATTERPLAYRUNTIME_API UPatterEngine : public UObject
 {
@@ -122,6 +127,13 @@ public:
 	// or not the log is on: live feedback for a writer testing the content.
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
 	FPatterDryChoiceEvent OnDryChoice;
+
+	// Fired with each content error the engine played through (see FPatterPlayError): a condition that
+	// failed and counted as false, an effect that failed and was skipped, a Best-match part that failed
+	// and scored as false. The story carries on either way. Each is also logged as a Warning, so a
+	// content bug is never silent, and, with the decision log on, recorded as a `diagnostic` entry.
+	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
+	FPatterErrorEvent OnError;
 
 	// C++ only: construct on the GAME's registry, the one registry a game holds for every engine and
 	// system that keeps properties in it, saved once by the game. The engine registers its scopes in it

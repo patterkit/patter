@@ -173,14 +173,12 @@ namespace Patterkit.Patterplay
                 return true;
             }
             // Resolve BOTH addresses before touching state, so a bad one is a no-op rather than a half-move.
-            string sceneId = _host.SceneGameIdToId.TryGetValue(scene, out var sid) ? sid
-                : (_host.Bundle.Scenes.ContainsKey(scene) ? scene : null);
+            string sceneId = Engine.ResolveScene(_host, scene);
             if (sceneId == null) return false;
             string blockId = null;
             if (block != null)
             {
-                if (_host.BlockGameIdToId.TryGetValue(sceneId, out var addrs) && addrs.TryGetValue(block, out var bid)) blockId = bid;
-                else if (_host.BlockToScene.TryGetValue(block, out var owner) && owner == sceneId) blockId = block;
+                blockId = Engine.ResolveBlock(_host, sceneId, block);
                 if (blockId == null) return false; // a block address is scene-scoped: unknown HERE is unknown
             }
             if (!_started) { Start(sceneId, blockId); return true; }
@@ -367,6 +365,7 @@ namespace Patterkit.Patterplay
                 Type = e.Type, Scene = e.Scene, Flow = Id, Seq = _host.EngineLogSeq++,
                 Subject = e.Subject, Considered = e.Considered, Picked = e.Picked,
                 Selector = e.Selector, Value = e.Value, Prev = e.Prev, Detail = e.Detail,
+                Kind = e.Kind, Source = e.Source,
             });
         }
 
@@ -468,7 +467,7 @@ namespace Patterkit.Patterplay
                 if (_activeSnippet != null)
                 {
                     if (_beatIndex < (_activeSnippet.Beats?.Count ?? 0)) return; // a beat is ready
-                    RunEffects(_activeSnippet.OnExit);
+                    RunEffects(_activeSnippet.OnExit, _activeSnippet.Id);
                     var jump = _activeSnippet.Jump;
                     _activeSnippet = null;
                     _beatIndex = 0;
@@ -506,7 +505,7 @@ namespace Patterkit.Patterplay
             _currentSceneId = sceneId;
             Enter(sceneId);
             SeedScene(scene);
-            RunEffects(scene.OnEntry);
+            RunEffects(scene.OnEntry, scene.Id);
         }
 
         private void EnterChild(Node node)
@@ -529,7 +528,7 @@ namespace Patterkit.Patterplay
 
         private void BeginSnippet(Node snippet)
         {
-            RunEffects(snippet.OnEnter);
+            RunEffects(snippet.OnEnter, snippet.Id);
             _activeSnippet = snippet;
             _beatIndex = 0;
         }
@@ -549,7 +548,10 @@ namespace Patterkit.Patterplay
                 options.Add(new ChoiceOption { Id = child.Id, Prompt = PromptFor(child), Eligible = eligible, GameData = child.GameData });
                 byId[child.Id] = child;
             }
-            if (options.Count > 0)
+            // A choice is offered only when the player can take something. One whose every remaining option is
+            // greyed out left the player stuck in front of it, so it runs dry instead, as a choice with no
+            // options does: the fallback follows if there is one, otherwise the flow moves on.
+            if (options.Any(o => o.Eligible))
             {
                 // Including the options a condition left ineligible: "why is that greyed out"
                 // is a question about the moment the choice was built.
@@ -558,6 +560,8 @@ namespace Patterkit.Patterplay
                 _pendingChoice = new ChoiceStateInternal { GroupId = group.Id, Options = options, ById = byId };
                 return;
             }
+            // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition
+            // still applies).
             var fallback = fallbacks.FirstOrDefault(Eligible);
             if (fallback != null) { EnterChild(fallback); return; }
             // Nothing takeable and no eligible fallback: the choice runs dry and the flow walks
@@ -603,8 +607,12 @@ namespace Patterkit.Patterplay
 
         private Node SelectChild(Node group)
         {
+            // Each condition is evaluated ONCE: the verdicts and the eligible list come from the same pass.
+            // Twice cost double, and a condition calling random() drew twice, so its verdict and the pick
+            // could disagree.
             var considered = group.Children.Select(c => (c.Id, Eligible(c))).ToList();
-            var eligible = group.Children.Where(Eligible).ToList();
+            var eligible = new List<Node>();
+            for (int k = 0; k < considered.Count; k++) if (considered[k].Item2) eligible.Add(group.Children[k]);
             string sel = group.Selector ?? "default";
             // The reasoning goes in the entry: every child looked at, with its verdict.
             Node Trace(Node picked)
@@ -647,25 +655,31 @@ namespace Patterkit.Patterplay
             bool stick = exhaust == "stick";
             Func<List<string>> fill = () => (stick ? eligible.Take(len - 1) : eligible).Select(c => c.Id).ToList();
 
+            var eligibleIds = new HashSet<string>(eligible.Select(c => c.Id));
+
             if (st.Bag == null) st.Bag = fill();
-            if (st.Bag.Count == 0)
+            // The bag was filled from the children eligible THEN. Draw only from those still eligible now, so a
+            // child whose condition has since gone false is never drawn (it used to be drawn, and the group
+            // then played nothing). If none of the bag is drawable, the pass is over, exactly as when the bag
+            // is empty.
+            if (!st.Bag.Any(eligibleIds.Contains))
             {
                 if (exhaust == "once") return null;
                 if (stick) { var last = eligible[len - 1]; st.Last = last.Id; return last; }
-                st.Bag = fill();
+                st.Bag = fill(); // repeat: reshuffle
+                if (st.Bag.Count == 0) return null;
             }
 
-            // Draw without replacement, never repeating the immediately-previous pick - allocation-free:
-            // find Last's slot and draw into the reduced span skipping it, then erase the pick in place.
-            var pool = st.Bag;
+            // Draw without replacement, never repeating the immediately-previous pick when another is
+            // drawable. The pool keeps the bag's order, so with every member still eligible the draw consumes
+            // the PRNG exactly as it always did.
+            var pool = st.Bag.Where(eligibleIds.Contains).ToList();
             int p = st.Last != null && pool.Count > 1 ? pool.IndexOf(st.Last) : -1;
             int i = (int)Math.Floor(Rng() * (p >= 0 ? pool.Count - 1 : pool.Count));
             if (p >= 0 && i >= p) i++;
             string pick = pool[i];
-            pool.RemoveAt(i); // draw without replacement, in place
+            st.Bag.Remove(pick); // draw without replacement, in place
             st.Last = pick;
-            // The bag was filled from the children eligible THEN; one may have gone ineligible since. That
-            // draw plays nothing, as in JS, Unreal and Godot. First() threw out of Advance() here.
             return eligible.Find(c => c.Id == pick);
         }
 
@@ -712,7 +726,11 @@ namespace Patterkit.Patterplay
         // A child's Best-match score: 0 with no condition (the filler tier), else its (passing) condition's specificity.
         private int SpecScore(Node node)
         {
-            return node.Condition != null ? MatchedSpec(node.Condition.Ast, Context(), true) : 0;
+            if (node.Condition == null) return 0;
+            // The scorer walks every part, including an `or` branch eligibility never evaluated, so a part can
+            // fail here that did not fail there: it scores as false (see PlayError), and is reported.
+            return MatchedSpec(node.Condition.Ast, Context(), true,
+                e => ReportError("best-match", node.Id, node.Condition, e));
         }
 
         // Matched-constraint specificity is the SHARED scorer (Expr/Specificity.cs,
@@ -720,12 +738,12 @@ namespace Patterkit.Patterplay
         // Storylet Engine had its own module: one scorer, six hand transliterations. It
         // takes truthiness as a callback, so it never needed to know a value type, a
         // dialect or a scope, which makes it the purest thing in the family to share.
-        internal static int MatchedSpec(ExprNode node, EvalContext ctx, bool want)
+        internal static int MatchedSpec(ExprNode node, EvalContext ctx, bool want, Action<Exception> onFail = null)
         {
             return Specificity.MatchedSpecificity(node, n =>
             {
                 try { return Truthy(Expr.Evaluate(n, ctx, PatterDialect.Instance)); }
-                catch (Exception e) when (e is EvalError || e is ExprError) { return false; }   // an eval error scores as false
+                catch (Exception e) { onFail?.Invoke(e); return false; }   // a part that fails scores as false
             }, want);
         }
 
@@ -751,23 +769,46 @@ namespace Patterkit.Patterplay
 
         // -- effects / expressions ----------------------------------------------
 
-        private void RunEffects(List<Effect> effects)
+        /// <summary>Run an effect list. `owner` is the snippet or scene it belongs to, for an error report.</summary>
+        private void RunEffects(List<Effect> effects, string owner)
         {
-            foreach (var e in effects ?? new List<Effect>())
+            if (effects == null) return;
+            foreach (var e in effects)
             {
-                var value = EvalExpr(e.Value);
-                // Prev read before the write, so a reader can say "0 -> 7" in one pass. Only
-                // paid for when the run asked for a log.
-                var prev = _host.LogEnabled ? GetProperty(e.Target) : null;
-                WriteProperty(e.Target, value, false);   // the STORY writes: a read-only host property refuses it
-                Emit(new LogEntry { Type = "write", Subject = e.Target, Value = value, Prev = prev });
+                try
+                {
+                    var value = EvalExpr(e.Value);
+                    // Prev read before the write, so a reader can say "0 -> 7" in one pass. Only
+                    // paid for when the run asked for a log.
+                    var prev = _host.LogEnabled ? GetProperty(e.Target) : null;
+                    WriteProperty(e.Target, value, false);   // the STORY writes: a read-only host property refuses it
+                    Emit(new LogEntry { Type = "write", Subject = e.Target, Value = value, Prev = prev });
+                }
+                catch (Exception err)
+                {
+                    // Skipped, reported, and the rest of the list still runs (see PlayError).
+                    ReportError("effect", owner, e.Value, err);
+                }
             }
         }
 
+        /// <summary>Whether a node's condition holds. A condition that fails to evaluate counts as false (see
+        /// PlayError).</summary>
         private bool Eligible(Node node)
         {
             if (node.Condition == null) return true;
-            return Truthy(EvalExpr(node.Condition));
+            try { return Truthy(EvalExpr(node.Condition)); }
+            catch (Exception err) { ReportError("condition", node.Id, node.Condition, err); return false; }
+        }
+
+        /// <summary>Report a content error the engine is playing through: to the game's OnError (or
+        /// Engine.DefaultOnError), and to the decision log.</summary>
+        private void ReportError(string kind, string node, Expression expr, Exception err)
+        {
+            string source = string.IsNullOrEmpty(expr?.Src) ? null : expr.Src;
+            var error = new PlayError { Flow = Id, Kind = kind, Node = node, Source = source, Message = err.Message };
+            (_host.OnError ?? Engine.DefaultOnError)?.Invoke(error);
+            Emit(new LogEntry { Type = "diagnostic", Kind = kind, Subject = node, Source = source, Detail = err.Message });
         }
 
         private ExprValue EvalExpr(Expression expr)

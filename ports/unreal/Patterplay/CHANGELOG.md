@@ -14,15 +14,59 @@ runtime behaviour.
   on choose, and closed captions. These are the options the other runtimes already offer. `CreateWithRegistry`
   takes the same options.
 - **An `OnDryChoice` event** on the engine, fired with the choice's group id whenever a choice runs dry.
+- **An `OnError` event on `UPatterEngine`, and `patter::EngineOptions::onError` in C++.** Each reports a
+  content error the engine played through (see Changed) as an `FPatterPlayError` (`patter::PlayError` in C++):
+  the flow, the `Kind` (`Condition`, `Effect`, or `BestMatch`), the `Node` whose condition failed or that owns
+  the effect (a scene, for its on-entry effects), the expression's `Source` when the bundle carries it, and the
+  `Message`. The UE wrapper also logs each as a Warning, so a content bug is never silent. With the decision log
+  on, each is a `diagnostic` entry too: `Subject` is the node, `Detail` the message, and the new `Kind` and
+  `Source` fields on `FPatterLogEntry` (`kind` and `source` on `patter::LogEntry`) say what failed.
+  `patter::Expression` carries the expression's source text as `src`.
 
 ### Changed
 
+- **Content errors play through.** A condition that fails to evaluate (a division by zero, a host value of the
+  wrong type) counts as false. An effect that fails, including a story write to a read-only `@world` value, is
+  skipped, leaves no `write` entry in the decision log, and the rest of its effect list still runs. A part of a
+  Best-match condition that fails while being scored still counts as false, and is now reported. Each is
+  reported through `OnError` (see Added). The C++ core used to throw out of `advance()`, and
+  `UPatterFlow::Advance` caught it and returned an End step, so the flow stopped. A host's own misuse (choosing
+  an unknown or greyed-out option, opening an unknown scene, misusing a checkpoint) is still refused as before.
+- **A shuffle draws only from members still eligible.** The bag is filled from the children eligible on the
+  first visit; a child whose condition has since gone false is no longer drawn (the group used to play nothing).
+  When none of the bag is still eligible the pass is over, exactly as when the bag is empty. When every member
+  is still eligible the draw is the same as before, so seeded runs do not move.
+- **One address rule for every lookup.** A scene address resolves by its Game ID first, then its internal id,
+  for `OpenFlow`, `Goto`, and every engine lookup alike. `OpenFlow` used to try the internal id first, so it and
+  `Goto` could land in different scenes when one scene's id was another's Game ID. A block address given with a
+  scene resolves within that scene only (its Game ID there, then the internal id of a block in it), so
+  `tagsForBlock`, `gameDataForBlock`, and `castForBlock` now find nothing for a block of another scene. With no
+  scene, a block resolves by its internal id.
+- **An option's prompt beat has tags,** its own plus the option's accumulated tags, outermost first. A replayed
+  prompt (`bReplayPromptOnChoose`) and the outline's prompt used to carry none.
+- **A choice whose every remaining option is greyed out runs dry,** as a choice with no options does: an
+  eligible fallback follows, otherwise `OnDryChoice` fires and the flow moves on. It used to be offered with
+  nothing the player could take.
+- **A load checks the save before changing anything.** A version must be exactly 2 or 3 (a version of 3.9 was
+  read as 3), and a save with no `flows` object is refused with `malformed save: no flows` instead of closing
+  every flow first. `LoadStateFromJson` returns false and leaves the engine as it was.
 - **Number properties are `double` in Blueprint.** `GetPropertyNumber` and `SetPropertyNumber` used `float`, so
   0.1 was stored as 0.10000000149 and showed that way in any line that read it. C++ code comparing the result
   with a `float` literal may need a `double` one.
+- **The release zip no longer carries the plugin's own automation tests** (`Private/Tests`). They are this
+  repository's tests, and one needs a test-only class that would otherwise compile into every game that
+  installs the plugin.
+
+### Removed
+
+- **Loading a bare snapshot with no `patter/save@0` envelope.** `deserializeState` and `LoadStateFromJson` now
+  refuse one, as every other Patterplay runtime does. A version 2 save inside the envelope still loads.
 
 ### Fixed
 
+- **A bare-snippet option can be sticky, a fallback, or secret until eligible.** The bundle loader read those
+  flags on an Option group only, so the same flags on a snippet option were lost. The corpus test host had the
+  same gap, so the corpus could not see it.
 - **The project's closed-caption settings now reach the game.** The plugin's bundle loader never read them, so a
   game always used the default `[` `]` delimiters and `SFX` caption character. The corpus test host has its own
   loader, which did read them, so the corpus could not see this.

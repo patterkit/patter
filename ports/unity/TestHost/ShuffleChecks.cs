@@ -1,6 +1,7 @@
-// Shuffle: the bag is filled from the children eligible on the first visit, so a later draw can land on
-// one whose condition has since gone false. JS, Unreal and Godot play nothing for that draw; Unity used
-// to throw InvalidOperationException out of Advance(), crashing the game's dialogue.
+// Shuffle: the bag is filled from the children eligible on the first visit, so one whose condition has
+// since gone false is still in it. Unity used to draw it and throw InvalidOperationException out of
+// Advance(), crashing the game's dialogue; then, like the other runtimes, it drew it and played nothing.
+// Since 2026-10-06 (the family's rule 4) a draw takes only bag members still eligible, so it is never drawn.
 
 using System;
 using System.Text.Json;

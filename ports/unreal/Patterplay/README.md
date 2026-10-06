@@ -66,7 +66,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   external) values from C++ or Blueprint - the game pushing state into the dialogue. Bind your
   own `@world` container with `UPatterEngine::Create(Bundle, World)`.
 - **Save and load**: `UPatterSave::SaveStateToJson` / `LoadStateFromJson` write and read the
-  whole run as one JSON string (save version 3; older saves still load).
+  whole run as one JSON string (save version 3; a version 2 save inside the same envelope still loads).
 - **One registry per game** (C++): every property lives in a `patter::ScopeRegistry`. An engine
   makes its own by default; `UPatterEngine::CreateWithRegistry` builds one on your game's registry,
   which your game then saves once with `patter::saveRegistry`. The registry is the shared kernel's

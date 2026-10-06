@@ -72,6 +72,11 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		# fall-through is observable. Parity with the JS runtime's onDryChoice, which the
 		# three ports never had. Live feedback, distinct from the log's `dry` entry.
 		"on_dry_choice": options.get("on_dry_choice"),
+		# Content errors the engine played through (a condition that failed and counted as false, an
+		# effect that failed and was skipped, a Best-match part that failed and scored as false): a
+		# Callable taking {flow, kind, node, source?, message}. Unset, each is push_warning'd, so a
+		# content bug is never silent. Parity with the JS runtime's onError.
+		"on_error": options.get("on_error"),
 		"bundle": bundle,
 		"all_strings": all_strings,                 # kept so set_locale() can re-point the active table live
 		"locale": locale,
@@ -280,12 +285,17 @@ func _index_nodes(nodes: Array) -> void:
 
 
 # Author tags (#215): walk groups/snippets carrying the parent's accumulated tags; record each node's and
-# (for snippets) each beat's accumulated tags into the tag index.
+# each beat's (a snippet's beats, and an option group's prompt beat) accumulated tags into the tag index.
 func _index_tags(nodes: Array, inherited: Array) -> void:
 	for n in nodes:
 		var acc: Array = _dedupe_tags(inherited + n.get("tags", []))
 		_host["tag_index"][n["id"]] = acc
 		if n.get("type", "") == "group":
+			# An option's prompt beat is a beat like any other: its own tags plus the option's. Left
+			# out, a replayed prompt and the outline's prompt lost every tag.
+			if n.get("prompt") is Dictionary:
+				var prompt: Dictionary = n["prompt"]
+				_host["tag_index"][prompt["id"]] = _dedupe_tags(acc + prompt.get("tags", []))
 			_index_tags(n.get("children", []), acc)
 		else:
 			for beat in n.get("beats", []):
@@ -363,24 +373,23 @@ func open_flow(id: String, scene: String = "", block: String = "", seed_value = 
 
 
 ## open_flow's address as internal ids: {"scene": id or "", "block": id or ""}, or {"error": message}
-## when it does not resolve. With a scene, the block is scene-scoped, exactly as goto() resolves it (a
-## gameId address in that scene, or the internal id of a block in that scene); a block from another
-## scene does not resolve. With no scene, the block is an internal id from any scene. Neither: the
-## first scene. The same rule on every runtime.
+## when it does not resolve. One address rule, the same as goto() and every lookup (see
+## PatterFlow.resolve_scene / resolve_block): a scene by its gameId first, then its internal id; with
+## a scene, the block is scene-scoped (that scene's block gameId first, then the internal id of a block
+## in that scene), so a block from another scene does not resolve. With no scene, the block is an
+## internal id from any scene. Neither: the first scene. The same rule on every runtime.
 func _resolve_open_address(scene: String, block: String) -> Dictionary:
 	var scenes: Dictionary = _host["bundle"]["scenes"]
 	if scene != "":
-		var scene_id := _resolve_scene_ref(scene)
-		if not scenes.has(scene_id):
+		var scene_id := PatterFlow.resolve_scene(_host, scene)
+		if scene_id == "":
 			return {"error": "unknown scene: " + scene}
 		if block == "":
 			return {"scene": scene_id, "block": ""}
-		var addrs: Dictionary = _block_gameid_to_id.get(scene_id, {})
-		if addrs.has(block):
-			return {"scene": scene_id, "block": addrs[block]}
-		if _host["block_to_scene"].get(block, "") == scene_id:
-			return {"scene": scene_id, "block": block}
-		return {"error": "unknown block: " + block}
+		var block_id := PatterFlow.resolve_block(_host, scene_id, block)
+		if block_id == "":
+			return {"error": "unknown block: " + block}
+		return {"scene": scene_id, "block": block_id}
 	if block != "":
 		if not _host["block_to_scene"].has(block):
 			return {"error": "unknown block: " + block}
@@ -791,8 +800,9 @@ func save_game() -> Dictionary:
 ## registry itself, before or after this call. Either order works: this engine's bags are handed back
 ## to the registry (values kept) and the restored flows claim them as they register.
 ##
-## Returns false (with push_error, and nothing changed) for a save version this engine cannot read,
-## or when the content names another engine's scope that nothing on this registry registered.
+## Returns false (with push_error, and nothing changed) for a save version this engine cannot read
+## (exactly 2 or 3), a save with no "flows" object, or when the content names another engine's scope
+## that nothing on this registry registered. Everything a load reads is checked before anything changes.
 func load_game(save: Dictionary) -> bool:
 	if _refused_in_checkpoint("load_game"):
 		return false
@@ -800,6 +810,11 @@ func load_game(save: Dictionary) -> bool:
 	var v := float(version) if (version is int or version is float) else -1.0
 	if v != 2.0 and v != float(SAVE_VERSION):
 		push_error("unsupported save version: %s" % (str(int(v)) if v == floorf(v) and v >= 0.0 else str(version)))
+		return false
+	# A save missing its flows used to close every flow and load the registry, and only then find
+	# nothing to restore, leaving the engine half-loaded. Refused up front now, as on every runtime.
+	if not (save.get("flows") is Dictionary):
+		push_error("malformed save: no flows")
 		return false
 	if _init_error != "":
 		push_error("load_game: this engine was refused its registration (%s)" % _init_error)
@@ -809,7 +824,7 @@ func load_game(save: Dictionary) -> bool:
 		push_error("load_game: " + unregistered)
 		return false
 	var reg = _host["registry"]
-	var saved_flows: Dictionary = save.get("flows", {}) if save.get("flows") is Dictionary else {}
+	var saved_flows: Dictionary = save["flows"]
 	# Flows the save does not have are over: their bags go. The rest are handed back with their values,
 	# which is what a game that loaded its registry first has just laid the save's values over.
 	for id in _flows:
@@ -844,24 +859,24 @@ func load_game(save: Dictionary) -> bool:
 
 # -- ref resolution ------------------------------------------------------------
 
+## A scene reference to its internal id by the one address rule (gameId first, then internal id; see
+## PatterFlow.resolve_scene). An unknown one passes through, for the caller to find nothing.
 func _resolve_scene_ref(r: String) -> String:
 	if r == "":
 		return ""
-	if _host["bundle"]["scenes"].has(r):
-		return r
-	return _scene_gameid_to_id.get(r, r)
+	var sid := PatterFlow.resolve_scene(_host, r)
+	return sid if sid != "" else r
 
 
+## A block reference to its internal id by the one address rule (see PatterFlow.resolve_block). With
+## no scene only an internal id resolves, since a block's gameId is only unique within its scene. An
+## unknown one passes through, for the caller to find nothing.
 func _resolve_block_ref(scene_id: String, r: String) -> String:
 	if r == "":
 		return ""
-	if _host["block_by_id"].has(r):
+	if scene_id == "":
 		return r
-	if scene_id != "" and _block_gameid_to_id.has(scene_id):
-		var m: Dictionary = _block_gameid_to_id[scene_id]
-		if m.has(r):
-			return m[r]
-	return r
+	return PatterFlow.resolve_block(_host, scene_id, r)   # within its scene: another scene's block is not found here
 
 
 # Author tags (#215): a beat's accumulated tags (own + every ancestor's), the same value its step carries.

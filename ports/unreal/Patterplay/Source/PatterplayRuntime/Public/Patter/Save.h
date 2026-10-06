@@ -17,8 +17,9 @@
 //
 // std-only, and deliberately self-contained: the core is JSON-library-agnostic (Bundle.h), so this
 // header carries its own compact JSON writer + reader for the SaveGame shape - which also makes the
-// envelope testable in the clang TestHost, where Unreal's FJson does not exist. Reading accepts a
-// bare snapshot (no envelope) for compatibility with files written before the envelope.
+// envelope testable in the clang TestHost, where Unreal's FJson does not exist. Reading refuses a
+// bare snapshot with no envelope, as every Patterplay runtime does; a version 2 snapshot inside the
+// envelope still loads.
 #pragma once
 
 #include <cstdio>
@@ -457,34 +458,47 @@ namespace patter
         }
     }
 
-    /// Parse + restore a serializeState string (version 3, or a version 2 save whose values move into
-    /// the registry, or a bare snapshot from before the envelope existed). Throws on malformed JSON, a
-    /// foreign envelope, or a save version this runtime does not read.
+    /// Parse + restore a serializeState string: version 3, or a version 2 save whose values move into the
+    /// registry, each inside the `patter/save@0` envelope. Throws on malformed JSON, anything that is not
+    /// that envelope (a bare snapshot with no envelope included), a save version this runtime does not
+    /// read (exactly 2 or 3: 3.9 is refused, not read as 3), or a save with no `flows` object. Every one of
+    /// those is checked before anything changes, so a refused save leaves the engine as it was.
     inline void deserializeState(Engine& engine, const std::string& json)
     {
         using namespace savedetail;
         JV root = JParse(json).parse();
-        const JV* saveObj = nullptr;
-        if (root.get("schema"))
+        const JV* saveObj = root.t == JV::T::Obj && root.str("schema") == SAVE_SCHEMA ? root.get("save") : nullptr;
+        if (!saveObj || saveObj->t != JV::T::Obj) throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
+
+        // The version as JS's String() writes it, for the refusal: the same message on every runtime.
+        const JV* version = saveObj->get("version");
+        if (!version || version->t != JV::T::Num || (version->n != 2 && version->n != SAVE_VERSION))
         {
-            if (root.str("schema") != SAVE_SCHEMA) throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
-            saveObj = root.get("save");
-            if (!saveObj) throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
+            std::string shown = "undefined";
+            if (version)
+                switch (version->t)
+                {
+                    case JV::T::Num: shown = PatterValue::JsNumber(version->n); break;
+                    case JV::T::Str: shown = version->s; break;
+                    case JV::T::Bool: shown = version->b ? "true" : "false"; break;
+                    case JV::T::Null: shown = "null"; break;
+                    case JV::T::Arr: shown = ""; break;
+                    case JV::T::Obj: shown = "[object Object]"; break;
+                }
+            throw std::runtime_error("unsupported save version: " + shown);
         }
-        else if (root.get("version")) saveObj = &root;  // bare snapshot (pre-envelope file)
-        else throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
+        const JV* flows = saveObj->get("flows");
+        if (!flows || flows->t != JV::T::Obj) throw std::runtime_error("malformed save: no flows");
 
         SaveGame s;
-        s.version = static_cast<int>(saveObj->num("version"));
+        s.version = static_cast<int>(version->n);
         if (const JV* reg = saveObj->get("registry")) if (reg->t == JV::T::Obj) s.registry = toRegistry(reg);
         s.sharedVisits = toIntMap(saveObj->get("sharedVisits"));
         s.sharedSelectors = toSelectorMap(saveObj->get("sharedSelectors"));
         // Version 2 only: the shared property sections (absent from a version 3 save).
         s.shared = toScope(saveObj->get("shared"));
         s.stageBags = toBagMap(saveObj->get("stageBags"));
-        if (const JV* flows = saveObj->get("flows"))
-            if (flows->t == JV::T::Obj)
-                for (const auto& kv : flows->obj) s.flows[kv.first] = toFlow(kv.second);
+        for (const auto& kv : flows->obj) s.flows[kv.first] = toFlow(kv.second);
         engine.loadGame(s);
     }
 

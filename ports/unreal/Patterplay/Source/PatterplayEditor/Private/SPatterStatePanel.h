@@ -20,8 +20,8 @@ public:
 	void Construct(const FArguments& InArgs);
 	virtual ~SPatterStatePanel() override;
 
-	// Save/Load the whole run to a .patterstate file (the tagged patter/save@0 envelope; loading
-	// also accepts a bare version-2 snapshot). Static: the buttons capture only a weak engine.
+	// Save/Load the whole run to a .patterstate file (the tagged patter/save@0 envelope; a version 2
+	// save inside it loads too). Static: the buttons capture only a weak engine.
 	static void SaveStateToFile(UPatterEngine* Engine);
 	static void LoadStateFromFile(UPatterEngine* Engine);
 

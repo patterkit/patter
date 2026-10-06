@@ -541,6 +541,9 @@ export interface PlayBatch {
   choiceId?: string;
   choiceScene?: string;
   error?: string;
+  /** Conditions or effects that failed since the last batch. The engine plays through them (a failing
+   *  condition counts as false, a failing effect is skipped), so the play window shows each as a warning. */
+  warnings?: string[];
 }
 
 /** The play WINDOW's bridge (window.patterPlay) - the interactive walk + the editor step-marker. */

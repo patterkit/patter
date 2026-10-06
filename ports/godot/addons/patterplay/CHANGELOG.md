@@ -6,6 +6,46 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Content errors are reported through a new `on_error` engine option.** Content can fail at run time in ways the
+  compiler cannot see: a division by zero, a host value of the wrong type, a story write to a read-only `@world`
+  value. The story already played through each one; now it says so. `on_error` is a Callable that receives
+  `{"flow", "kind", "node", "source", "message"}`, where `kind` is `"condition"`, `"effect"`, or `"best-match"`,
+  `node` is the snippet, group, or option whose condition failed (or the snippet or scene owning the effect), and
+  `source` is the expression's text when the bundle carries it. Left unset, each error is a `push_warning`, so a
+  content bug is never silent. With `{"log": true}`, each is also a `diagnostic` entry in the decision log
+  (`kind`, `node`, `source`, `message`), which the state panel shows under its own filter. The same rule holds on
+  all four runtimes.
+
+### Changed
+
+- **An effect that fails is skipped, with no `write` entry, and the rest of its list still runs.** A story write
+  to a read-only `@world` value now counts as a failed effect too, reported like the others. The log used to
+  record a `write` for an effect that never landed.
+- **A shuffle draws only from bag members that are still eligible.** The bag is filled from the children eligible
+  on the first visit; a child whose condition has since gone false used to be drawn, and the group then played
+  nothing. If none of the bag is eligible, the pass is over, exactly as when the bag is empty. While every bag
+  member is still eligible, a seeded shuffle draws exactly as before.
+- **One address rule for `open_flow`, `goto`, and every lookup by address.** A scene resolves by its gameId first,
+  then by its internal id; `open_flow` used to try the internal id first, so it and `goto` could land in different
+  scenes. A block resolves within its scene only, by that scene's block gameId and then by the internal id of a
+  block in that scene. `tags_for_block`, `game_data_for_block`, and `cast_for_block` follow the same rule.
+- **An option's prompt beat carries tags, like any beat.** Its own tags plus the option group's, outermost first
+  and deduplicated. A replayed prompt (`replay_prompt_on_choose`) and the outline's prompt used to carry none.
+- **A choice whose every remaining option is greyed out runs dry.** It used to be offered with nothing the player
+  could take. It now behaves as a choice with no options: an eligible fallback follows if there is one, otherwise
+  `on_dry_choice` fires and the flow moves on.
+- **`load_game` checks a save before changing anything.** A save whose `flows` is missing or not an object is
+  refused with `malformed save: no flows` and leaves the engine untouched. It used to close every flow and load
+  the registry first, leaving the engine half-loaded. The version must be exactly 2 or 3.
+
+### Removed
+
+- **A bare snapshot with no `patter/save@0` envelope no longer loads.** `PatterSave.load_state` and
+  `deserialize_state` used to accept a bare version 2 snapshot, from before the envelope existed. They now refuse
+  it, as every other runtime does. A version 2 save inside the envelope still loads.
+
 ### Fixed
 
 - **A greyed-out choice option can no longer be chosen.** `choose()` accepted an option whose condition was

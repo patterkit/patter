@@ -51,8 +51,12 @@ jobs:
           version="${PLAY_REF#play-unreal-v}"
           echo "ASSET=patterplay-unreal-${version}.zip" >> "$GITHUB_ENV"
           # Source-only, always: never ship engine build output, even if a checkout ever carries it.
+          # Nor the plugin's own automation tests (Private/Tests): they are this repo's, like the corpus
+          # and the TestHost, and one of them needs a test-only UCLASS that would otherwise compile into
+          # every game that installs the plugin, Shipping builds included.
           ( cd ports/unreal && zip -r "../../patterplay-unreal-${version}.zip" Patterplay PatterplayDemo \
               -x "*/Binaries/*" -x "*/Intermediate/*" -x "*/DerivedDataCache/*" -x "*/Saved/*" \
+              -x "*/Private/Tests/*" \
               -x "*/.vs/*" -x "*.sln" -x "*/.DS_Store" )
 
       - name: Release notes = this version's changelog section

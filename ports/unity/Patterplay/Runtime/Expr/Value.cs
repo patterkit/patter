@@ -110,21 +110,48 @@ namespace Wildwinter.Expr
         }
 
         /// <summary>Format a double the way JavaScript's String(n) does (the
-        /// cross-runtime number-rendering contract).</summary>
+        /// cross-runtime number-rendering contract): the shortest digits that
+        /// round-trip, laid out by ECMAScript's Number::toString rules. Plain
+        /// digits from 1e-7 up to (not including) 1e21; outside that, an
+        /// exponent with a lower-case "e" and its sign ("1.5e-7", "1e+21");
+        /// and -0 as "0". "R" alone printed "5E-05" and "-0".</summary>
         public static string JsNumber(double n)
         {
             if (double.IsNaN(n)) return "NaN";
             if (double.IsPositiveInfinity(n)) return "Infinity";
             if (double.IsNegativeInfinity(n)) return "-Infinity";
-            // Integral values below 1e21 print with no decimal point and no
-            // exponent, which is what JS does. NOT via (long): that overflows
-            // above 2^63, and both families printed 1e20 as
-            // "9223372036854775807" until 2026-09-01.
-            if (n == Math.Floor(n) && Math.Abs(n) < 1e21)
+            if (n == 0) return "0"; // -0 included
+            // A whole number below 2^53 prints exactly, and fast. Above that JS prints
+            // the shortest digits padded with zeros (12345678901234567000, not the
+            // exact ...568), which the general path below does.
+            if (n == Math.Floor(n) && Math.Abs(n) < 9007199254740992.0)
                 return n.ToString("F0", CultureInfo.InvariantCulture);
-            // Otherwise the shortest representation that round-trips, which is
-            // what JS picks. "R" is exactly that.
-            return n.ToString("R", CultureInfo.InvariantCulture);
+            double a = Math.Abs(n);
+            string digits = null;
+            int exp10 = 0;
+            for (int p = 1; p <= 17 && digits == null; p++)
+            {
+                string e = a.ToString("E" + (p - 1), CultureInfo.InvariantCulture); // "1.50E-007"
+                if (p < 17 && double.Parse(e, NumberStyles.Float, CultureInfo.InvariantCulture) != a) continue;
+                int at = e.IndexOf('E');
+                digits = e.Substring(0, at).Replace(".", "").TrimEnd('0');
+                exp10 = int.Parse(e.Substring(at + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+            }
+            if (digits.Length == 0) digits = "0";
+            return (n < 0 ? "-" : "") + JsLayout(digits, exp10 + 1);
+        }
+
+        /// <summary>ECMAScript's layout for digits d1..dk with the decimal point
+        /// `point` places from the left (the value is 0.d1..dk x 10^point).</summary>
+        private static string JsLayout(string d, int point)
+        {
+            int k = d.Length;
+            if (k <= point && point <= 21) return d + new string('0', point - k);
+            if (0 < point && point <= 21) return d.Substring(0, point) + "." + d.Substring(point);
+            if (-6 < point && point <= 0) return "0." + new string('0', -point) + d;
+            int e = point - 1;
+            string exp = (e < 0 ? "-" : "+") + Math.Abs(e).ToString(CultureInfo.InvariantCulture);
+            return (k == 1 ? d : d.Substring(0, 1) + "." + d.Substring(1)) + "e" + exp;
         }
 
         public static string JsonQuote(string s)

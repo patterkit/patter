@@ -122,7 +122,14 @@ namespace
 		return patter::DeserialiseAstFrom<TSharedPtr<FJsonValue>>(V);
 	}
 
-	patter::Expression ToExpr(const TSharedPtr<FJsonObject>& O) { patter::Expression E; E.ast = ToAst(O->Values.FindRef(TEXT("ast"))); return E; }
+	patter::Expression ToExpr(const TSharedPtr<FJsonObject>& O)
+	{
+		patter::Expression E;
+		E.ast = ToAst(O->Values.FindRef(TEXT("ast")));
+		FString Src;
+		if (O->TryGetStringField(TEXT("src"), Src)) E.src = Std(Src); // the source text, for an error report
+		return E;
+	}
 
 	std::vector<patter::Effect> ToEffects(const TSharedPtr<FJsonValue>& V)
 	{
@@ -190,15 +197,16 @@ namespace
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("onExit"))) N->onExit = ToEffects(*P);
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("gameData"))) N->gameData = ToGameData((*P)->AsObject());
 		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("tags"))) N->tags = StrList(*P);   // author tags (#215)
+		// Option-position flags, on a bare snippet option as on an Option group.
+		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("sticky"))) N->sticky = (*P)->AsBool();
+		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("fallback"))) N->fallback = (*P)->AsBool();
+		if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("secretUntilEligible"))) N->secretUntilEligible = (*P)->AsBool();
 
 		if (N->isGroup())
 		{
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("selector"))) N->selector = Std((*P)->AsString());
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("children"))) for (const auto& C : (*P)->AsArray()) N->children.push_back(ToNode(C->AsObject()));
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("prompt"))) N->prompt = std::make_shared<patter::Beat>(ToBeat((*P)->AsObject()));
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("sticky"))) N->sticky = (*P)->AsBool();
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("fallback"))) N->fallback = (*P)->AsBool();
-			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("secretUntilEligible"))) N->secretUntilEligible = (*P)->AsBool();
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("shared"))) N->shared = (*P)->AsBool();
 			if (const TSharedPtr<FJsonValue>* P = Field(O, TEXT("options")))
 			{

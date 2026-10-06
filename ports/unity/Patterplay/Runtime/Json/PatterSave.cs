@@ -15,11 +15,12 @@
 // registry's. A standalone engine's save carries its registry's values under `registry`; a game that
 // passed its own registry saves that once, beside this.
 //
-// Reading accepts four shapes. The canonical version 3 one; version 2, whose property sections
-// (`shared`, `stageBags`, each flow's `scopes` and `sceneBags`) the engine moves into the registry as it
-// loads; the shape this port wrote before 0.11.0 (PascalCase keys, flat `Shared` and `Scopes`, cursor
-// fields flat on the flow, `PendingOptions` + `PendingGroupId`), so a player's save on disk still loads;
-// and a bare snapshot with no envelope, as before. Lookups are case-insensitive, so one reader serves.
+// Reading accepts three shapes, each inside the envelope. The canonical version 3 one; version 2, whose
+// property sections (`shared`, `stageBags`, each flow's `scopes` and `sceneBags`) the engine moves into the
+// registry as it loads; and the shape this port wrote before 0.11.0 (PascalCase keys, flat `Shared` and
+// `Scopes`, cursor fields flat on the flow, `PendingOptions` + `PendingGroupId`), so a player's save on disk
+// still loads. A bare snapshot with no envelope is refused, as the JS reference refuses it. Lookups are
+// case-insensitive, so one reader serves.
 //
 // Pure (no UnityEngine), so it is corpus-verified in the dotnet TestHost too.
 
@@ -71,20 +72,16 @@ namespace Patterkit.Patterplay
         /// <summary>The tagged envelope as a JObject: `{ schema, save }`, the save in the family's shape.</summary>
         public static JObject Envelope(SaveGame s) => new JObject { ["schema"] = Schema, ["save"] = SaveToken(s) };
 
-        /// <summary>Restore a {@link SerializeState} string into an engine. Throws on a foreign envelope.</summary>
+        /// <summary>Restore a <see cref="SerializeState"/> string into an engine. Throws on anything but a
+        /// `patter/save@0` envelope (a bare snapshot with no envelope included), and on a save the engine
+        /// refuses; either way before the engine changes.</summary>
         public static void DeserializeState(Engine engine, string json)
         {
             var root = JObject.Parse(json);
-            JObject save;
             var schema = root["schema"];
-            if (schema != null)
-            {
-                if ((string)schema != Schema) throw new Exception($"PatterSave: not a {Schema} envelope");
-                save = root["save"] as JObject;
-                if (save == null) throw new Exception($"PatterSave: not a {Schema} envelope");
-            }
-            else if (Get(root, "version") != null) save = root; // bare snapshot (a file from before the envelope)
-            else throw new Exception($"PatterSave: not a {Schema} envelope");
+            if (schema == null || schema.Type != JTokenType.String || (string)schema != Schema)
+                throw new Exception($"PatterSave: not a {Schema} envelope");
+            if (!(root["save"] is JObject save)) throw new Exception($"PatterSave: not a {Schema} envelope");
             engine.LoadGame(ReadSave(save));
         }
 
@@ -244,12 +241,17 @@ namespace Patterkit.Patterplay
 
         private static SaveGame ReadSave(JObject o)
         {
-            var flows = new Dictionary<string, FlowSnapshot>();
+            // Missing, or not an object: null, which the engine refuses as a malformed save before it changes.
+            Dictionary<string, FlowSnapshot> flows = null;
             var fl = Obj(o, "flows");
-            if (fl != null) foreach (var p in fl.Properties()) flows[p.Name] = ReadFlow(p.Value as JObject ?? new JObject());
+            if (fl != null)
+            {
+                flows = new Dictionary<string, FlowSnapshot>();
+                foreach (var p in fl.Properties()) flows[p.Name] = ReadFlow(p.Value as JObject ?? new JObject());
+            }
             var save = new SaveGame
             {
-                Version = (int?)Get(o, "version") ?? 0,
+                Version = ReadVersion(Get(o, "version")),
                 Registry = ReadRegistry(Obj(o, "registry")),
                 SharedVisits = ReadIntMap(Obj(o, "sharedVisits")),
                 SharedSelectors = ReadSelectorMap(Obj(o, "sharedSelectors")),
@@ -260,6 +262,22 @@ namespace Patterkit.Patterplay
             save.StageBags = ReadBagMap(Obj(o, "stageBags"));
 #pragma warning restore CS0618
             return save;
+        }
+
+        /// <summary>The save's version, which must be a whole number: a string or a fraction is refused here with
+        /// the engine's own sentence, where a cast would have read "3" or 3.9 as a version it accepts.
+        /// Absent reads as 0, which the engine refuses.</summary>
+        private static int ReadVersion(JToken v)
+        {
+            if (v == null || v.Type == JTokenType.Null) return 0;
+            if (v.Type == JTokenType.Integer || v.Type == JTokenType.Float)
+            {
+                double d = (double)v;
+                if (d == Math.Floor(d) && d >= int.MinValue && d <= int.MaxValue) return (int)d;
+            }
+            string shown = v.Type == JTokenType.String ? (string)v
+                : v.ToString(Formatting.None);
+            throw new Exception($"unsupported save version: {shown}");
         }
 
         /// <summary>A version 3 save's `registry` section (registry key -> name -> value), in document

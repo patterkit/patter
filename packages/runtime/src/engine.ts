@@ -246,8 +246,29 @@ export type TraceEvent =
   | { type: "jump"; to: string; mode: "jump" | "call" }
   /** One landed effect; `prev` is the value it replaced, so a reader can say "0 -> 1". */
   | { type: "write"; target: string; value: ScalarValue; prev?: ScalarValue }
-  /** An expression that would not evaluate: never a silent pass, always visible. */
-  | { type: "diagnostic"; where: string; message: string };
+  /** Content the engine could not evaluate and played through (see {@link PlayError}): a condition
+   *  counted as false, an effect skipped, or a Best-match part scored as false. */
+  | { type: "diagnostic"; kind: PlayError["kind"]; node: string; source?: string; message: string };
+
+/**
+ * A content error the engine played through. Content can fail at run time in ways the compiler cannot
+ * see: a division by zero, a host value of the wrong type, a story write to a read-only `@world` value.
+ * The story never stops for one. A condition that fails counts as false; an effect that fails is skipped
+ * and the rest of its list still runs; a part of a Best-match condition that fails scores as false. Each
+ * is reported, through `EngineOptions.onError` and as a `diagnostic` entry in the decision log. The same
+ * rule holds on all four runtimes, including the two whose languages cannot throw.
+ */
+export interface PlayError {
+  /** The flow it happened in. */
+  flow: string;
+  /** What failed: a condition, an effect, or a part of a condition being scored for Best match. */
+  kind: "condition" | "effect" | "best-match";
+  /** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its onEntry). */
+  node: string;
+  /** The expression's source text, when the bundle carries it. */
+  source?: string;
+  message: string;
+}
 
 export type TraceHandler = (event: TraceEvent) => void;
 /** The engine-level tap: every flow's events, tagged with the flow id - one stream for tools. */
@@ -303,6 +324,10 @@ export interface EngineOptions {
    *  unchanged; this only makes the fall-through observable. The coverage harness uses it to flag choices
    *  that ran dry. Leave it unset in shipped games (zero cost). */
   onDryChoice?: (groupId: string) => void;
+  /** Called with each content error the engine played through (see {@link PlayError}): a condition
+   *  that failed and counted as false, an effect that failed and was skipped. Unset, each is written
+   *  to `console.warn`, so a content bug is never silent. */
+  onError?: (error: PlayError) => void;
   /** Retain a trace of the engine's DECISIONS (what it chose and why), readable through
    *  `engine.log()` and `flow.log()`. Off by default: a shipped game pays nothing for a
    *  debugging surface it never reads. `onDryChoice` above is unaffected and stays useful
@@ -426,6 +451,8 @@ interface FlowHost {
    *  fallback - so it falls through and the flow continues past it. Zero cost when unset; the coverage
    *  harness passes it to surface silent fall-throughs. Not a gameplay signal (the behaviour is unchanged). */
   onDryChoice?: (groupId: string) => void;
+  /** Where a content error the engine played through is reported (see PlayError). */
+  onError: (error: PlayError) => void;
   /** Memoised `splitRef` results (ref string -> {scope,name}). The split depends only on the registry's
    *  scope set, so the cache is dropped whenever that moves (`refSplitRevision`). */
   refSplitCache: Map<string, { scope: string; name: string }>;
@@ -568,6 +595,7 @@ export class Engine {
       journal: null,
       customRng: options.rng,
       onDryChoice: options.onDryChoice,
+      onError: options.onError ?? ((e) => console.warn(`Patterplay: ${e.kind} on ${e.node} in flow '${e.flow}' failed, played through: ${e.message}`)),
       replayPromptOnChoose: options.replayPromptOnChoose ?? false,
       captionsOn: options.closedCaptions ?? true, // captions shown by default (full text)
       captionOpen: (bundle.closedCaptions ?? DEFAULT_CAPTION_DELIMITERS).open,
@@ -764,11 +792,10 @@ export class Engine {
    */
   private resolveOpenAddress(scene?: string, block?: string): { sceneId?: string; blockId?: string } {
     if (scene !== undefined) {
-      const sceneId = this.resolveSceneRef(scene)!;
-      if (!this.host.bundle.scenes[sceneId]) throw new Error(`unknown scene: ${scene}`);
+      const sceneId = resolveScene(this.host, scene);
+      if (sceneId === undefined) throw new Error(`unknown scene: ${scene}`);
       if (block === undefined) return { sceneId };
-      const blockId = this.blockGameIdToId.get(sceneId)?.get(block)
-        ?? (this.host.blockIndex.get(block)?.sceneId === sceneId ? block : undefined);
+      const blockId = resolveBlock(this.host, sceneId, block);
       if (blockId === undefined) throw new Error(`unknown block: ${block}`);
       return { sceneId, blockId };
     }
@@ -780,19 +807,20 @@ export class Engine {
     return {};
   }
 
-  /** Resolve a scene reference (a gameId address OR an internal id) to its internal id. */
+  /** Resolve a scene reference to its internal id by the one address rule (see resolveScene); an
+   *  unknown one passes through, for the caller to find nothing. */
   private resolveSceneRef(ref?: string): string | undefined {
     if (ref == null) return undefined;
-    if (this.host.bundle.scenes[ref]) return ref;          // already an internal id
-    return this.sceneGameIdToId.get(ref) ?? ref;           // a gameId, else pass through (the caller checks)
+    return resolveScene(this.host, ref) ?? ref;
   }
 
-  /** Resolve a block reference (a scene-scoped gameId OR an internal id) to its internal id. */
+  /** Resolve a block reference to its internal id by the one address rule (see resolveBlock): within its
+   *  scene, so a block of another scene resolves to nothing. With no scene, only an internal id resolves,
+   *  since a block's gameId is only unique within its scene. */
   private resolveBlockRef(sceneId: string | undefined, ref?: string): string | undefined {
     if (ref == null) return undefined;
-    if (this.host.blockById.has(ref)) return ref;          // already an internal id
-    if (sceneId != null) { const id = this.blockGameIdToId.get(sceneId)?.get(ref); if (id) return id; }
-    return ref;                                            // pass through (the caller checks)
+    if (sceneId == null) return ref;
+    return resolveBlock(this.host, sceneId, ref);
   }
 
   /** The host-facing address (gameId) of a scene / block by internal id, or undefined if unknown.
@@ -1220,6 +1248,10 @@ export class Engine {
     this.refuseInCheckpoint("loadGame");
     const version: unknown = (save as { version?: unknown }).version;
     if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported save version: ${String(version)}`);
+    // Everything a load reads is checked BEFORE anything changes: a save missing its flows used to close
+    // every flow and load the registry, then fail, leaving the engine half-loaded.
+    const flows: unknown = (save as { flows?: unknown }).flows;
+    if (typeof flows !== "object" || flows === null || Array.isArray(flows)) throw new Error("malformed save: no flows");
     this.assertExternalScopes();
     const reg = this.host.registry;
     // Flows the save does not have are over: their bags go. The rest are handed back with their values,
@@ -1467,12 +1499,11 @@ export class Flow {
       return true;
     }
     // Resolve BOTH addresses before touching any state, so a bad one is a no-op rather than a half-move.
-    const sceneId = this.host.sceneGameIdToId.get(scene) ?? (this.host.bundle.scenes[scene] ? scene : undefined);
+    const sceneId = resolveScene(this.host, scene);
     if (sceneId === undefined) return false;
     let blockId: string | undefined;
     if (block !== undefined) {
-      blockId = this.host.blockGameIdToId.get(sceneId)?.get(block)
-        ?? (this.host.blockIndex.get(block)?.sceneId === sceneId ? block : undefined);
+      blockId = resolveBlock(this.host, sceneId, block);
       if (blockId === undefined) return false; // a block address is scene-scoped: unknown HERE is unknown
     }
     // Never started: start() does the same landing plus the one-time per-flow setup.
@@ -1578,7 +1609,7 @@ export class Flow {
 
       if (this.activeSnippet) {
         if (this.beatIndex < (this.activeSnippet.beats?.length ?? 0)) return; // a beat is ready
-        this.runEffects(this.activeSnippet.onExit);
+        this.runEffects(this.activeSnippet.onExit, this.activeSnippet.id);
         const jump = this.activeSnippet.jump;
         this.activeSnippet = null;
         this.beatIndex = 0;
@@ -1842,7 +1873,7 @@ export class Flow {
     this.currentSceneId = sceneId;
     this.enter(sceneId);
     this.seedScene(scene);           // seeds @scene defaults (per-flow on first entry; shared once globally)
-    this.runEffects(scene.onEntry);  // on-entry effects still fire every entry (spec §4)
+    this.runEffects(scene.onEntry, scene.id);  // on-entry effects still fire every entry (spec §4)
   }
 
   /**
@@ -1875,7 +1906,7 @@ export class Flow {
   }
 
   private beginSnippet(snippet: CompiledSnippet): void {
-    this.runEffects(snippet.onEnter);
+    this.runEffects(snippet.onEnter, snippet.id);
     this.activeSnippet = snippet;
     this.beatIndex = 0;
   }
@@ -1900,7 +1931,10 @@ export class Flow {
       options.push({ id: child.id, prompt: this.promptFor(child), eligible, gameData: child.gameData });
       byId.set(child.id, child);
     }
-    if (options.length > 0) {
+    // A choice is offered only when the player can take something. One whose every remaining option is
+    // greyed out left the player stuck in front of it, so it runs dry instead, as a choice with no
+    // options does: the fallback follows if there is one, otherwise the flow moves on.
+    if (options.some((o) => o.eligible)) {
       // The offered set, including options a condition left ineligible: an author asking
       // "why is that option greyed?" is asking about this moment, and a log of the taken
       // option alone cannot answer it. Options hidden by secretUntilEligible are absent
@@ -1909,7 +1943,7 @@ export class Flow {
       this.pendingChoice = { groupId: group.id, options, byId };
       return;
     }
-    // No normal option survives. Auto-follow the fallback if it is eligible (its own condition still
+    // No normal option can be taken. Auto-follow the fallback if it is eligible (its own condition still
     // applies); otherwise the choice GATHERS - it contributes nothing and the run continues past it
     // (a dry choice falls through rather than deadlocking; the validator warns about choices that can
     // run dry with no fallback).
@@ -1967,8 +2001,10 @@ export class Flow {
   // -- Selectors ------------------------------------------------------------
 
   private selectChild(group: CompiledGroup): SelectableNode | null {
+    // Each condition is evaluated ONCE: the verdicts and the eligible list come from the same pass. Twice
+    // cost double, and a condition calling random() drew twice, so its verdict and the pick could disagree.
     const verdicts = group.children.map((c) => ({ id: c.id, eligible: this.eligible(c) }));
-    const eligible = group.children.filter((c) => this.eligible(c));
+    const eligible = group.children.filter((_, i) => verdicts[i]!.eligible);
     const order = group.options?.order ?? "sequential";
     const exhaust = group.options?.exhaust ?? "once";
     // The reasoning goes in the entry, not just the outcome: every child this looked at,
@@ -2023,26 +2059,30 @@ export class Flow {
     const len = eligible.length;
     const stick = exhaust === "stick";
     const fill = (): string[] => (stick ? eligible.slice(0, len - 1) : eligible).map((c) => c.id);
+    const eligibleIds = new Set(eligible.map((c) => c.id));
 
     if (st.bag === undefined) st.bag = fill();
-    if (st.bag.length === 0) {                 // a full pass just completed
+    // The bag was filled from the children eligible THEN. Draw only from those still eligible now, so a
+    // child whose condition has since gone false is never drawn (it used to be drawn, and the group then
+    // played nothing). If none of the bag is drawable, the pass is over, exactly as when the bag is empty.
+    if (!st.bag.some((id) => eligibleIds.has(id))) {
       if (exhaust === "once") return null;
       if (stick) { const last = eligible[len - 1]!; st.last = last.id; return last; }
       st.bag = fill();                          // repeat: reshuffle
+      if (st.bag.length === 0) return null;
     }
 
-    // Draw without replacement, never repeating the immediately-previous pick. Done allocation-free:
-    // rather than materialise a filtered pool, find last's slot `p` and draw into the reduced span,
-    // skipping that slot - identical distribution to filtering it out, then erase the pick in place.
-    const pool = st.bag;
+    // Draw without replacement, never repeating the immediately-previous pick when another is drawable.
+    const pool = st.bag.filter((id) => eligibleIds.has(id));
     const p = st.last !== undefined && pool.length > 1 ? pool.indexOf(st.last) : -1;
     let i = Math.floor(this.rng() * (p >= 0 ? pool.length - 1 : pool.length));
     if (p >= 0 && i >= p) i++;
     const id = pool[i]!;
-    pool.splice(i, 1);
+    st.bag.splice(st.bag.indexOf(id), 1);
     st.last = id;
     return eligible.find((c) => c.id === id)!;
   }
+
 
   /**
    * `sequence` with `order: "specificity"` - **Best match**: score every eligible child by how
@@ -2094,7 +2134,7 @@ export class Flow {
   /** A child's Best-match score against the current state: 0 when it has no condition (the filler
    *  tier), else the specificity of its (already-passing) condition. */
   private specScore(node: SelectableNode): number {
-    return node.condition ? this.matchedSpec(this.conditionAst(node.condition), true) : 0;
+    return node.condition ? this.matchedSpec(this.conditionAst(node.condition), true, node) : 0;
   }
 
   /**
@@ -2105,11 +2145,16 @@ export class Flow {
    * to hold?" (true at the root). Only `and`/`or`/`not`/`check_flags` are structural; every other
    * node (comparisons, scoped vars, literals, other calls) is an atom, evaluated whole.
    */
-  private matchedSpec(node: ExprNode, want: boolean): number {
+  private matchedSpec(node: ExprNode, want: boolean, owner: SelectableNode): number {
     // Delegates to the shared @wildwinter/expr-specificity scorer (same walk,
     // shared with Storylet Studio). We supply Patter's truthiness rule and keep
-    // check_flags counting via the package's default counting call.
-    const evalTruthy: EvalTruthy = (n) => truthy(evaluate(n, this.context(), patterDialect));
+    // check_flags counting via the package's default counting call. The scorer walks every part,
+    // including an `or` branch eligibility never evaluated, so a part can fail here that did not fail
+    // there: it scores as false (see PlayError), as on the other three runtimes.
+    const evalTruthy: EvalTruthy = (n) => {
+      try { return truthy(evaluate(n, this.context(), patterDialect)); }
+      catch (err) { this.reportError("best-match", owner.id, owner.condition, err); return false; }
+    };
     return scoreSpecificity(node, evalTruthy, { want });
   }
 
@@ -2136,21 +2181,38 @@ export class Flow {
 
   // -- Effects + expressions ------------------------------------------------
 
-  private runEffects(effects: CompiledEffect[] | undefined): void {
+  /** Run an effect list. `owner` is the snippet or scene it belongs to, for an error report. */
+  private runEffects(effects: CompiledEffect[] | undefined, owner: string): void {
     // SET-ONLY (spec §15): an effect mutates a property. Host events ride on gameData, not effects.
     for (const e of effects ?? []) {
-      const value = this.evalExpr(e.value);
-      // `prev` read before the write, so a reader can say "0 -> 1" without a second pass.
-      // Only paid for when the run asked for a log.
-      const prev = this.host.logEnabled ? this.getProperty(e.target) : undefined;
-      this.writeProperty(e.target, value, false); // the STORY writes: a read-only host property refuses it
-      this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
+      let value: ScalarValue;
+      try {
+        value = this.evalExpr(e.value);
+        // `prev` read before the write, so a reader can say "0 -> 1" without a second pass.
+        // Only paid for when the run asked for a log.
+        const prev = this.host.logEnabled ? this.getProperty(e.target) : undefined;
+        this.writeProperty(e.target, value, false); // the STORY writes: a read-only host property refuses it
+        this.emit({ type: "write", target: e.target, value, ...(prev !== undefined ? { prev } : {}) });
+      } catch (err) {
+        // Skipped, reported, and the rest of the list still runs (see PlayError).
+        this.reportError("effect", owner, e.value, err);
+      }
     }
   }
 
+  /** Whether a node's condition holds. A condition that fails to evaluate counts as false (see PlayError). */
   private eligible(node: SelectableNode): boolean {
     if (!node.condition) return true;
-    return truthy(this.evalExpr(node.condition));
+    try { return truthy(this.evalExpr(node.condition)); }
+    catch (err) { this.reportError("condition", node.id, node.condition, err); return false; }
+  }
+
+  /** Report a content error the engine is playing through: to the host's onError, and to the log. */
+  private reportError(kind: PlayError["kind"], node: string, expr: Expression | undefined, err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    const source = expr?.src;
+    this.host.onError({ flow: this.id, kind, node, ...(source ? { source } : {}), message });
+    this.emit({ type: "diagnostic", kind, node, ...(source ? { source } : {}), message });
   }
 
   private evalExpr(expr: Expression): ScalarValue {
@@ -2517,6 +2579,22 @@ function selfBackedDecl(decl: HostScopeDecl, scopeWritable: boolean | undefined)
 
 /** Split a ref into scope + name against the registry's current tokens (`@scene` is always Patter's).
  *  Memoised per ref; the memo is dropped when the registry's set of scopes moves. */
+/**
+ * The ONE rule for resolving a scene address, used by openFlow, goto, and every engine lookup: its gameId
+ * (the host-facing address, spec §6) first, then its internal id. openFlow used to try the internal id
+ * first and goto the gameId, so the two could land in different scenes when one scene's id was another's
+ * gameId.
+ */
+function resolveScene(host: FlowHost, ref: string): string | undefined {
+  return host.sceneGameIdToId.get(ref) ?? (host.bundle.scenes[ref] ? ref : undefined);
+}
+
+/** The one rule for a block address, always WITHIN a scene: its gameId there first, then the internal id
+ *  of a block in that scene. A real block of another scene does not resolve. */
+function resolveBlock(host: FlowHost, sceneId: string, ref: string): string | undefined {
+  return host.blockGameIdToId.get(sceneId)?.get(ref) ?? (host.blockIndex.get(ref)?.sceneId === sceneId ? ref : undefined);
+}
+
 function splitHostRef(host: FlowHost, ref: string): { scope: string; name: string } {
   if (host.refSplitRevision !== host.registry.revision) {
     host.refSplitCache.clear();

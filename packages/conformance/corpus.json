@@ -7095,6 +7095,868 @@
           "type": "end"
         }
       ]
+    },
+    {
+      "name": "rule: a failing effect is skipped and the rest run; a failing condition counts as false",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1t59vlw",
+          "structureHash": "1hydzi3"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "a",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "c",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "d",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "met",
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_set",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T_vals",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@a",
+                        "value": {
+                          "src": "1",
+                          "ast": [
+                            "n",
+                            1
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@c",
+                        "value": {
+                          "src": "10 / @zero",
+                          "ast": [
+                            "bin",
+                            "/",
+                            [
+                              "n",
+                              10
+                            ],
+                            [
+                              "sv",
+                              "patter",
+                              "zero"
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@d",
+                        "value": {
+                          "src": "1",
+                          "ast": [
+                            "n",
+                            1
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_br",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_bad",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "10 / @zero > 1",
+                          "ast": [
+                            "bin",
+                            ">",
+                            [
+                              "bin",
+                              "/",
+                              [
+                                "n",
+                                10
+                              ],
+                              [
+                                "sv",
+                                "patter",
+                                "zero"
+                              ]
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "T_bad",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_ok",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "T_ok",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T_vals": "a={@a} c={@c} d={@d}",
+            "T_bad": "bad",
+            "T_ok": "ok"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "T_vals",
+          "text": "a=1 c=0 d=1"
+        },
+        {
+          "type": "text",
+          "id": "T_ok",
+          "text": "ok"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "rule: a Best-match part that fails scores as false",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "18squ6n",
+          "structureHash": "0qk2h7m"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "a",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "c",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "d",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "met",
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_init",
+                    "type": "snippet",
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@a",
+                        "value": {
+                          "src": "1",
+                          "ast": [
+                            "n",
+                            1
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@d",
+                        "value": {
+                          "src": "1",
+                          "ast": [
+                            "n",
+                            1
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_bm",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "specificity",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_x",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@zero == 0 or 10 / @zero > 2",
+                          "ast": [
+                            "bin",
+                            "or",
+                            [
+                              "bin",
+                              "==",
+                              [
+                                "sv",
+                                "patter",
+                                "zero"
+                              ],
+                              [
+                                "n",
+                                0
+                              ]
+                            ],
+                            [
+                              "bin",
+                              ">",
+                              [
+                                "bin",
+                                "/",
+                                [
+                                  "n",
+                                  10
+                                ],
+                                [
+                                  "sv",
+                                  "patter",
+                                  "zero"
+                                ]
+                              ],
+                              [
+                                "n",
+                                2
+                              ]
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "X",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_y",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@a == 1 and @d == 1",
+                          "ast": [
+                            "bin",
+                            "and",
+                            [
+                              "bin",
+                              "==",
+                              [
+                                "sv",
+                                "patter",
+                                "a"
+                              ],
+                              [
+                                "n",
+                                1
+                              ]
+                            ],
+                            [
+                              "bin",
+                              "==",
+                              [
+                                "sv",
+                                "patter",
+                                "d"
+                              ],
+                              [
+                                "n",
+                                1
+                              ]
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "Y",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_end",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "X": "x",
+            "Y": "y"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "Y",
+          "text": "y"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "rule: numbers interpolate as JS writes them (small, large, and negative zero)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1msegte",
+          "structureHash": "1yix1cj"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "small",
+            "type": "number",
+            "default": 0.00005
+          },
+          {
+            "name": "tiny",
+            "type": "number",
+            "default": 1.5e-7
+          },
+          {
+            "name": "huge",
+            "type": "number",
+            "default": 1e+21
+          },
+          {
+            "name": "big",
+            "type": "number",
+            "default": 123456789012
+          },
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "negz",
+            "type": "number",
+            "default": 1
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "N",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@negz",
+                        "value": {
+                          "src": "-@zero",
+                          "ast": [
+                            "u",
+                            "neg",
+                            [
+                              "sv",
+                              "patter",
+                              "zero"
+                            ]
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "N": "{@small}|{@tiny}|{@huge}|{@big}|{@negz}"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "N",
+          "text": "0.00005|1.5e-7|1e+21|123456789012|0"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "rule: a replayed prompt carries its tags and the option's",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0h53usi",
+          "structureHash": "1ylyneo"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_ch",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_ask",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_ans",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "A",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "tags": [
+                          "polite"
+                        ],
+                        "prompt": {
+                          "id": "P_ask",
+                          "kind": "line",
+                          "character": "PC",
+                          "tags": [
+                            "question"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "P_ask": "Where am I?",
+            "A": "Home."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_ask"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "choice",
+          "groupId": "g_ch",
+          "options": [
+            {
+              "id": "o_ask",
+              "eligible": true,
+              "prompt": {
+                "kind": "line",
+                "text": "Where am I?",
+                "character": "PC"
+              }
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "P_ask",
+          "text": "Where am I?",
+          "character": "PC",
+          "tags": [
+            "polite",
+            "question"
+          ]
+        },
+        {
+          "type": "text",
+          "id": "A",
+          "text": "Home.",
+          "tags": [
+            "polite"
+          ]
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "rule: a choice with every option greyed out runs dry (fallback, else move on)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0a8hhkx",
+          "structureHash": "0fzipmm"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "a",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "c",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "d",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "met",
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_fb",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "sn_l1",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@met",
+                          "ast": [
+                            "sv",
+                            "patter",
+                            "met"
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "L1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_l2",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@met",
+                          "ast": [
+                            "sv",
+                            "patter",
+                            "met"
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "L2",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_fb",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "FB",
+                            "kind": "text"
+                          }
+                        ],
+                        "fallback": true
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_none",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "sn_l3",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@met",
+                          "ast": [
+                            "sv",
+                            "patter",
+                            "met"
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "L3",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_after",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "AFTER",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L1": "one",
+            "L2": "two",
+            "L3": "three",
+            "FB": "nothing for it",
+            "AFTER": "moving on"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "text",
+          "id": "FB",
+          "text": "nothing for it"
+        },
+        {
+          "type": "text",
+          "id": "AFTER",
+          "text": "moving on"
+        },
+        {
+          "type": "end"
+        }
+      ]
     }
   ],
   "scripted": [
@@ -14205,6 +15067,657 @@
           "expect": [
             {
               "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rule: a selector evaluates each condition once (random draws once per child)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0fce5sj",
+          "structureHash": "1r8k8z8"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "a",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "c",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "d",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "met",
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_rand",
+                    "type": "group",
+                    "selector": "branch",
+                    "children": [
+                      {
+                        "id": "sn_r1",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "random(1, 2) == 1",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "call",
+                              "random",
+                              [
+                                "n",
+                                1
+                              ],
+                              [
+                                "n",
+                                2
+                              ]
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "R1",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_r2",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "random(1, 2) == 1",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "call",
+                              "random",
+                              [
+                                "n",
+                                1
+                              ],
+                              [
+                                "n",
+                                2
+                              ]
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "R2",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_r3",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "R3",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_loop",
+                    "type": "snippet",
+                    "jump": {
+                      "to": "b_s"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "R1": "one",
+            "R2": "two",
+            "R3": "three"
+          }
+        }
+      },
+      "seed": 3,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "R2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "R1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "R2",
+              "text": "two"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "R1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "R1",
+              "text": "one"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "R1",
+              "text": "one"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rule: a shuffle never draws a bag member that has gone ineligible",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "08gqp0f",
+          "structureHash": "1dieh8n"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "zero",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "a",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "c",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "d",
+            "type": "number",
+            "default": 0
+          },
+          {
+            "name": "met",
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "s",
+            "blocks": [
+              {
+                "id": "b_s",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "g_sh",
+                    "type": "group",
+                    "selector": "sequence",
+                    "options": {
+                      "order": "shuffle",
+                      "exhaust": "repeat"
+                    },
+                    "children": [
+                      {
+                        "id": "sn_a",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "SA",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_b",
+                        "type": "snippet",
+                        "condition": {
+                          "src": "@met == false",
+                          "ast": [
+                            "bin",
+                            "==",
+                            [
+                              "sv",
+                              "patter",
+                              "met"
+                            ],
+                            [
+                              "b",
+                              false
+                            ]
+                          ]
+                        },
+                        "beats": [
+                          {
+                            "id": "SB",
+                            "kind": "text"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "sn_c",
+                        "type": "snippet",
+                        "beats": [
+                          {
+                            "id": "SC",
+                            "kind": "text"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn_set",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "SET",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@met",
+                        "value": {
+                          "src": "true",
+                          "ast": [
+                            "b",
+                            true
+                          ]
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "b_s"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "SA": "a",
+            "SB": "b",
+            "SC": "c",
+            "SET": "set"
+          }
+        }
+      },
+      "seed": 5,
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SC",
+              "text": "c"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SET",
+              "text": "set"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SA",
+              "text": "a"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SET",
+              "text": "set"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SC",
+              "text": "c"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SET",
+              "text": "set"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SA",
+              "text": "a"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SET",
+              "text": "set"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SC",
+              "text": "c"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "SET",
+              "text": "set"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rule: openFlow and goto read an address the same way (gameId first, block within its scene)",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0xfr3f7",
+          "structureHash": "00slehz"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "scn_cellar": {
+            "id": "scn_cellar",
+            "type": "scene",
+            "name": "Kitchen",
+            "blocks": [
+              {
+                "id": "b_k",
+                "type": "block",
+                "name": "Stove",
+                "children": [
+                  {
+                    "id": "sn_k",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "K",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "kitchen": {
+            "id": "kitchen",
+            "type": "scene",
+            "name": "Garden",
+            "blocks": [
+              {
+                "id": "b_g",
+                "type": "block",
+                "name": "Bench",
+                "children": [
+                  {
+                    "id": "sn_g",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "G",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "K": "kitchen",
+            "G": "garden"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "f",
+          "scene": "kitchen"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "K",
+              "text": "kitchen"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "garden",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "G",
+              "text": "garden"
+            }
+          ]
+        },
+        {
+          "op": "goto",
+          "scene": "kitchen",
+          "expectResult": true
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "K",
+              "text": "kitchen"
+            }
+          ]
+        },
+        {
+          "op": "openFlow",
+          "flow": "g",
+          "scene": "garden",
+          "block": "stove",
+          "expectResult": false
+        },
+        {
+          "op": "openFlow",
+          "flow": "g",
+          "scene": "kitchen",
+          "block": "stove"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "K",
+              "text": "kitchen"
             }
           ]
         }

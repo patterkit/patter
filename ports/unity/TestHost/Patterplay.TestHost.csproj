@@ -20,8 +20,11 @@
     <Compile Include="OneRegistry.cs" />
     <!-- Checkpoints from the host's side: refusals, @world written back, live Restore (ports of the JS tests). -->
     <Compile Include="Checkpoints.cs" />
-    <!-- A shuffle draw that lands on a child gone ineligible: plays nothing, never throws. -->
+    <!-- A shuffle never draws a bag member gone ineligible, and never throws. -->
     <Compile Include="ShuffleChecks.cs" />
+    <!-- Content errors play through and are reported (OnError, the log's diagnostic entry); a bare
+         snapshot and a save with no flows are refused before anything changes. -->
+    <Compile Include="PlayErrorChecks.cs" />
     <!-- The registry corpus runner, vendored from expr/ports/unity/testing. -->
     <Compile Include="RegistryCorpus.cs" />
     <Compile Include="../Patterplay/Runtime/**/*.cs" />

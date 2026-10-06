@@ -45,12 +45,24 @@ enum class EPatterValueKind : uint8
 	Flags
 };
 
+/** What failed in a content error the engine played through (FPatterPlayError). */
+UENUM(BlueprintType)
+enum class EPatterPlayErrorKind : uint8
+{
+	/** A condition that failed to evaluate. It counted as false. */
+	Condition,
+	/** An effect whose value failed to evaluate, or whose write was refused. It was skipped. */
+	Effect,
+	/** A part of a Best-match condition that failed while being scored. It scored as false. */
+	BestMatch
+};
+
 /** A Patter value crossing the Blueprint boundary: what a UPatterWorld holds and reports. Shaped
  *  like the Storylet Engine's FStoryletValue, so a project running both reads one shape. `Display`
  *  is the stringified rendering ("true", a JS-stable number, the raw string, flags comma-joined). */
 /** How an engine plays, set when it is made (UPatterEngine::CreateWithOptions). The same choices the JS
  *  runtime's EngineOptions, Unity's EngineOptions and Godot's options dictionary offer; the dry-choice
- *  callback is the engine's OnDryChoice event instead, the Blueprint way. */
+ *  and error callbacks are the engine's OnDryChoice and OnError events instead, the Blueprint way. */
 USTRUCT(BlueprintType)
 struct FPatterEngineOptions
 {
@@ -182,7 +194,9 @@ struct FPatterLogEntry
 {
 	GENERATED_BODY()
 
-	/** select | choice | chose | dry | jump | write */
+	/** select | choice | chose | dry | jump | write | diagnostic. A diagnostic is a content error the
+	 *  engine played through (see FPatterPlayError): Subject is the node, Detail the message, and Kind and
+	 *  Source say what failed. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Type;
 
@@ -210,7 +224,7 @@ struct FPatterLogEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Selector;
 
-	/** The jump's mode, where the type is `jump`. */
+	/** The jump's mode, where the type is `jump`; the error message, where it is `diagnostic`. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Detail;
 
@@ -222,6 +236,44 @@ struct FPatterLogEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasPrev = false;
+
+	/** A diagnostic's kind: condition | effect | best-match. Empty for every other type. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Kind;
+
+	/** A diagnostic's expression source text, when the bundle carries it. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Source;
+};
+
+/** A content error the engine played through, as UPatterEngine::OnError reports it. Content can fail at
+ *  run time in ways the compiler cannot see: a division by zero, a host value of the wrong type, a story
+ *  write to a read-only @world value. The story never stops for one: a condition that fails counts as
+ *  false, an effect that fails is skipped and the rest of its list still runs, and a part of a Best-match
+ *  condition that fails scores as false. The same rule holds on every Patterplay runtime. */
+USTRUCT(BlueprintType)
+struct FPatterPlayError
+{
+	GENERATED_BODY()
+
+	/** The flow it happened in. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Flow;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	EPatterPlayErrorKind Kind = EPatterPlayErrorKind::Condition;
+
+	/** The snippet, group, or option whose condition failed, or that owns the effect (a scene, for its
+	 *  on-entry effects). */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Node;
+
+	/** The expression's source text, when the bundle carries it; empty when it does not. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Source;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Message;
 };
 
 USTRUCT(BlueprintType)

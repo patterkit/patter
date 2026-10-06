@@ -69,7 +69,7 @@ describe("the coverage meta line", () => {
     runs: 6, maxSteps: 200, seed: 4, start: {}, beats: [],
     totals: { beats: 10, covered: 8, neverHit: 2, rare: 0, coveragePct: 80 }, rareThresholdPct: 5,
     termination: { ended: 4, capped: 1, stalled: 1, evalError },
-    drivers: [], unwrittenInputs: [], dryChoices: [], cancelled: false,
+    drivers: [], unwrittenInputs: [], dryChoices: [], contentErrors: [], cancelled: false,
   });
   it("draws the run parameters and the endings as two metaLines, no typed dot", () => {
     const h = document.createElement("div");

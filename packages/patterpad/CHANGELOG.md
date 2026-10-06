@@ -6,6 +6,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **The Play window marks a condition or effect that failed.** Patterplay now plays on past one (a failing
+  condition counts as false, and a failing effect is skipped) instead of stopping, so the Play window shows
+  each as a warning line in the transcript, where it happened, rather than ending the run with an error.
+- **The Coverage window lists conditions and effects that failed**, with the scene, the error, and how many
+  runs hit it. Click one to jump to it.
+- **A choice whose every option is greyed out no longer stops play.** It runs dry, as a choice with no options
+  does: the fallback plays if there is one, otherwise play moves on.
+
 ### Fixed
 
 - **No stray "Replaced across the project".** Reimporting an editable script, and accepting or rejecting

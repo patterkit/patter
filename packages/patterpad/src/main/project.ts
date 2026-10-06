@@ -1104,6 +1104,10 @@ let flow: Flow | null = null;
 let engine: Engine | null = null; // kept so a live toggle (closed captions) reaches the running run without a restart
 let playBundle: import("@patterkit/model").Bundle | null = null; // the bundle the run plays - compared on live refresh
 let playError: string | null = null;
+/** Content errors the play engine played through since the last batch was handed to the play window. */
+let playWarnings: string[] = [];
+/** Hand a batch over with any content errors gathered since the last one. */
+const withWarnings = (b: PlayBatch): PlayBatch => (playWarnings.length ? { ...b, warnings: playWarnings.splice(0) } : b);
 // The registry the run is built on when it stands other engines in (a game scopes folder, and a bundle
 // naming someone else's scope); null when the engine made its own, as it always did before.
 let playRegistry: ScopeRegistry | null = null;
@@ -1124,7 +1128,7 @@ export function setPlaySource(src: { sceneId: string; flow: string; loc: string 
 
 /** Clear the interactive play session, so opening a DIFFERENT project can't replay the previous one's flow
  *  / stashed source / error (the play state is keyed by the old project's scene ids). Called by openProject. */
-function resetPlaySession(): void { flow = null; engine = null; playBundle = null; playError = null; playLiveSource = null; playRegistry = null; }
+function resetPlaySession(): void { flow = null; engine = null; playBundle = null; playError = null; playLiveSource = null; playRegistry = null; playWarnings = []; }
 
 // `scene` is the flow's CURRENT scene (Flow.currentScene), captured right after the advance that
 // produced this beat - the runtime sets it when a jump crosses scenes, so it is the authority on
@@ -1187,7 +1191,11 @@ export function startPlay(sceneId: string, blockId?: string): void {
     playBundle = runExportFull(fresh);
     // Playing alone: a scope the story names that another tool owns is stood in from the game's scopes folder.
     playRegistry = previewRegistry(loaded.gameScopes, playBundle) ?? null;
-    engine = new Engine(playBundle, { ...(locale ? { locale } : {}), closedCaptions: playCaptionsOn, ...(playRegistry ? { registry: playRegistry } : {}) });
+    playWarnings = [];
+    engine = new Engine(playBundle, {
+      ...(locale ? { locale } : {}), closedCaptions: playCaptionsOn, ...(playRegistry ? { registry: playRegistry } : {}),
+      onError: (e) => { playWarnings.push(`${e.kind} on ${e.node}${e.source ? ` (${e.source})` : ""}: ${e.message}`); },
+    });
     flow = engine.openFlow("main", { scene: sceneId, ...(blockId ? { block: blockId } : {}) });
     playError = null;
   } catch (e) {
@@ -1281,30 +1289,30 @@ export function playAddress(sceneId: string, blockId?: string): string {
 
 /** Advance ONE beat (Step). */
 export function playStep(): PlayBatch {
-  if (!flow) return { steps: [], stop: "error", error: playError ?? "no play session" };
+  if (!flow) return withWarnings({ steps: [], stop: "error", error: playError ?? "no play session" });
   try {
     const r = flow.advance();
-    if (r.type === "choice") return { steps: [], stop: "choice", options: mapOptions(r.options), choiceId: r.groupId, choiceScene: flow.currentScene ?? undefined };
-    if (r.type === "end") return { steps: [], stop: "end" };
-    return { steps: [toStep(r, flow.currentScene)!], stop: "continue" };
-  } catch (e) { return errBatch(e); }
+    if (r.type === "choice") return withWarnings({ steps: [], stop: "choice", options: mapOptions(r.options), choiceId: r.groupId, choiceScene: flow.currentScene ?? undefined });
+    if (r.type === "end") return withWarnings({ steps: [], stop: "end" });
+    return withWarnings({ steps: [toStep(r, flow.currentScene)!], stop: "continue" });
+  } catch (e) { return withWarnings(errBatch(e)); }
 }
 
 /** Advance until the next choice / end (Continue), collecting every beat on the way. We loop `advance()`
  *  ourselves (rather than `advanceToStop`) so we can read `flow.currentScene` after each beat - a batch
  *  may cross scenes, and each beat must report the scene it actually played in. */
 export function playToStop(): PlayBatch {
-  if (!flow) return { steps: [], stop: "error", error: playError ?? "no play session" };
+  if (!flow) return withWarnings({ steps: [], stop: "error", error: playError ?? "no play session" });
   try {
     const steps: PlayStep[] = [];
     for (;;) {
       const r = flow.advance();
-      if (r.type === "choice") return { steps, stop: "choice", options: mapOptions(r.options), choiceId: r.groupId, choiceScene: flow.currentScene ?? undefined };
-      if (r.type === "end") return { steps, stop: "end" };
+      if (r.type === "choice") return withWarnings({ steps, stop: "choice", options: mapOptions(r.options), choiceId: r.groupId, choiceScene: flow.currentScene ?? undefined });
+      if (r.type === "end") return withWarnings({ steps, stop: "end" });
       const s = toStep(r, flow.currentScene);
       if (s) steps.push(s);
     }
-  } catch (e) { return errBatch(e); }
+  } catch (e) { return withWarnings(errBatch(e)); }
 }
 
 /** Pick an eligible option; the next step / toStop plays the chosen branch. */

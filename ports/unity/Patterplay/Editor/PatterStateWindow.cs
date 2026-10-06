@@ -80,8 +80,8 @@ namespace Patterkit.Patterplay.Editor
         /// <summary>The engine's per-kind log filters. The vocabulary is this engine's: `select`
         /// is a group choosing among its children, `chose` is the player answering a choice,
         /// `dry` is a choice that fell through with nothing takeable.</summary>
-        private static readonly string[] LogKinds = { "select", "choice", "chose", "dry", "jump", "write" };
-        private static readonly string[] LogKindLabels = { "Select", "Choice", "Chose", "Dry", "Jump", "Write" };
+        private static readonly string[] LogKinds = { "select", "choice", "chose", "dry", "jump", "write", "diagnostic" };
+        private static readonly string[] LogKindLabels = { "Select", "Choice", "Chose", "Dry", "Jump", "Write", "Errors" };
         private readonly Dictionary<string, bool> _logKindOn = new Dictionary<string, bool>();
         private Vector2 _logScroll;
 
@@ -152,6 +152,12 @@ namespace Patterkit.Patterplay.Editor
                 case "dry":    return $"{stamp}dry {e.Subject} (nothing takeable, no eligible fallback)";
                 case "jump":   return $"{stamp}jump {e.Subject} ({e.Detail})";
                 case "write":  return $"{stamp}write {e.Subject}: {ShowLogValue(e.Prev)} -> {ShowLogValue(e.Value)}";
+                // A content error the engine played through: a condition counted as false, an effect skipped.
+                case "diagnostic":
+                {
+                    string source = e.Source != null ? " (" + e.Source + ")" : "";
+                    return $"{stamp}{e.Kind} failed on {e.Subject}{source}, played through: {e.Detail}";
+                }
             }
             return stamp + "(unknown)";
         }

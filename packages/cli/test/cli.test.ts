@@ -83,15 +83,14 @@ describe("main exit codes", () => {
       locales: { default: "en", all: ["en"] },
       properties: [{ name: "never", type: "boolean", shared: true, default: false }],
     }));
-    // A choice whose only option is greyed (ineligible, NOT hidden): the host
-    // sees it but the auto-runner has nothing pickable - a stall.
+    // A block that jumps back to itself for ever: the run hits the step bound and never ends. (This
+    // used to be a choice whose only option was greyed, which stalled; such a choice now runs dry and
+    // play moves on, so it can no longer stop a playthrough.)
     writeFileSync(join(dir, "scenes", "stall.patterflow"), JSON.stringify({
       schema: "patter/flow@0",
       scene: { id: "s", type: "scene", name: "S", blocks: [
         { id: "b", type: "block", name: "B", children: [
-          { id: "g", type: "group", selector: "choice", children: [
-            { id: "locked", type: "snippet", condition: "@never", choiceText: "C", jump: { to: "END" } },
-          ] },
+          { id: "loop", type: "snippet", beats: [{ id: "T", kind: "text" }], jump: { to: "b" } },
         ] },
       ] },
     }));

@@ -818,6 +818,196 @@ const scriptedMultiFlow = {
   ],
 } satisfies ScriptedFixture;
 
+// ----- The family's play rules, settled 2026-10-06 after a cross-runtime review -----------------------
+// Each case pins one rule on all four runtimes, where they had disagreed or all done something wrong.
+
+const rulesProject = project({ properties: [
+  { name: "zero", type: "number", default: 0 },
+  { name: "a", type: "number", default: 0 },
+  { name: "c", type: "number", default: 0 },
+  { name: "d", type: "number", default: 0 },
+  { name: "met", type: "boolean", default: false },
+] });
+const oneBlock = (sceneId: string, children: unknown[], extra: Record<string, unknown> = {}) =>
+  ({ id: sceneId, type: "scene", name: sceneId, ...extra, blocks: [{ id: `b_${sceneId}`, type: "block", name: "B", children }] }) as never;
+
+// Rule 1: content that fails at run time never stops the story. A condition that fails counts as false; an
+// effect that fails is skipped and the rest of its list still runs. (Each is also reported to the game, which
+// each runtime's own tests check.) Here a division by zero, in an effect and in a condition.
+const ruleErrorsPlayThrough = {
+  name: "rule: a failing effect is skipped and the rest run; a failing condition counts as false",
+  project: rulesProject,
+  scenes: [oneBlock("s", [
+    { id: "sn_set", type: "snippet",
+      onEnter: [
+        { kind: "set", target: "@a", value: "1" },
+        { kind: "set", target: "@c", value: "10 / @zero" },
+        { kind: "set", target: "@d", value: "1" },
+      ],
+      beats: [{ id: "T_vals", kind: "text" }] },
+    { id: "g_br", type: "group", selector: "branch", children: [
+      { id: "sn_bad", type: "snippet", condition: "10 / @zero > 1", beats: [{ id: "T_bad", kind: "text" }] },
+      { id: "sn_ok", type: "snippet", beats: [{ id: "T_ok", kind: "text" }] },
+    ] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { T_vals: "a={@a} c={@c} d={@d}", T_bad: "bad", T_ok: "ok" })],
+  expectedTranscript: [{ type: "text", id: "T_vals", text: "a=1 c=0 d=1" }, { type: "text", id: "T_ok", text: "ok" }, { type: "end" }],
+} satisfies RuntimeFixture;
+
+// Rule 2: a selector evaluates each child's condition ONCE. With random(a, b) in a condition, evaluating twice
+// draws twice, so a runtime that did would pick differently from one that did not.
+const ruleConditionOnce = {
+  name: "rule: a selector evaluates each condition once (random draws once per child)",
+  project: rulesProject, seed: 3,
+  scenes: [oneBlock("s", [
+    { id: "g_rand", type: "group", selector: "branch", children: [
+      { id: "sn_r1", type: "snippet", condition: "random(1, 2) == 1", beats: [{ id: "R1", kind: "text" }] },
+      { id: "sn_r2", type: "snippet", condition: "random(1, 2) == 1", beats: [{ id: "R2", kind: "text" }] },
+      { id: "sn_r3", type: "snippet", beats: [{ id: "R3", kind: "text" }] },
+    ] },
+    { id: "sn_loop", type: "snippet", jump: { to: "b_s" } },
+  ])],
+  locales: [loc("s", { R1: "one", R2: "two", R3: "three" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "R2", text: "two" }] }, { op: "advance", expect: [{ type: "text", id: "R1", text: "one" }] }, { op: "advance", expect: [{ type: "text", id: "R2", text: "two" }] },
+    { op: "advance", expect: [{ type: "text", id: "R1", text: "one" }] }, { op: "advance", expect: [{ type: "text", id: "R1", text: "one" }] }, { op: "advance", expect: [{ type: "text", id: "R1", text: "one" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// Rule 3: Best match scores every part of a condition, including an `or` branch eligibility never evaluated.
+// A part that fails scores as false. Here sn_x is eligible by its left side and its right side divides by
+// zero: it scores 1, so sn_y (2 parts holding) wins.
+const ruleBestMatchFailingPart = {
+  name: "rule: a Best-match part that fails scores as false",
+  project: rulesProject,
+  scenes: [oneBlock("s", [
+    { id: "sn_init", type: "snippet", onEnter: [{ kind: "set", target: "@a", value: "1" }, { kind: "set", target: "@d", value: "1" }] },
+    { id: "g_bm", type: "group", selector: "sequence", options: { order: "specificity", exhaust: "repeat" }, children: [
+      { id: "sn_x", type: "snippet", condition: "@zero == 0 or 10 / @zero > 2", beats: [{ id: "X", kind: "text" }] },
+      { id: "sn_y", type: "snippet", condition: "@a == 1 and @d == 1", beats: [{ id: "Y", kind: "text" }] },
+    ] },
+    { id: "sn_end", type: "snippet", jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { X: "x", Y: "y" })],
+  expectedTranscript: [{ type: "text", id: "Y", text: "y" }, { type: "end" }],
+} satisfies RuntimeFixture;
+
+// Rule 4: a shuffle draws only from bag members still eligible. The bag fills on the first visit, while
+// @met is false; sn_set then sets it, so sn_b may still be in the bag but must never be drawn again.
+const ruleShuffleDrawsEligible = {
+  name: "rule: a shuffle never draws a bag member that has gone ineligible",
+  project: rulesProject, seed: 5,
+  scenes: [oneBlock("s", [
+    { id: "g_sh", type: "group", selector: "sequence", options: { order: "shuffle", exhaust: "repeat" }, children: [
+      { id: "sn_a", type: "snippet", beats: [{ id: "SA", kind: "text" }] },
+      { id: "sn_b", type: "snippet", condition: "@met == false", beats: [{ id: "SB", kind: "text" }] },
+      { id: "sn_c", type: "snippet", beats: [{ id: "SC", kind: "text" }] },
+    ] },
+    { id: "sn_set", type: "snippet", onEnter: [{ kind: "set", target: "@met", value: "true" }],
+      beats: [{ id: "SET", kind: "text" }], jump: { to: "b_s" } },
+  ])],
+  locales: [loc("s", { SA: "a", SB: "b", SC: "c", SET: "set" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "SC", text: "c" }] }, { op: "advance", expect: [{ type: "text", id: "SET", text: "set" }] }, { op: "advance", expect: [{ type: "text", id: "SA", text: "a" }] },
+    { op: "advance", expect: [{ type: "text", id: "SET", text: "set" }] }, { op: "advance", expect: [{ type: "text", id: "SC", text: "c" }] }, { op: "advance", expect: [{ type: "text", id: "SET", text: "set" }] },
+    { op: "advance", expect: [{ type: "text", id: "SA", text: "a" }] }, { op: "advance", expect: [{ type: "text", id: "SET", text: "set" }] }, { op: "advance", expect: [{ type: "text", id: "SC", text: "c" }] },
+    { op: "advance", expect: [{ type: "text", id: "SET", text: "set" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// Rule 5: one address rule for openFlow and goto: a scene's gameId first, then its internal id; a block
+// within its scene. Scene "scn_cellar" is named Kitchen (gameId "kitchen"), and another scene's INTERNAL id
+// is "kitchen": the address "kitchen" means the Kitchen. openFlow used to read it as the internal id.
+const ruleOneAddressRule = {
+  name: "rule: openFlow and goto read an address the same way (gameId first, block within its scene)",
+  project: project({}),
+  scenes: [
+    { id: "scn_cellar", type: "scene", name: "Kitchen", blocks: [{ id: "b_k", type: "block", name: "Stove", children: [
+      { id: "sn_k", type: "snippet", beats: [{ id: "K", kind: "text" }], jump: { to: "END" } } ] }] },
+    { id: "kitchen", type: "scene", name: "Garden", blocks: [{ id: "b_g", type: "block", name: "Bench", children: [
+      { id: "sn_g", type: "snippet", beats: [{ id: "G", kind: "text" }], jump: { to: "END" } } ] }] },
+  ],
+  locales: [loc("scn_cellar", { K: "kitchen" }), loc("kitchen", { G: "garden" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "kitchen" },
+    { op: "advance", expect: [{ type: "text", id: "K", text: "kitchen" }] },
+    { op: "goto", scene: "garden", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "G", text: "garden" }] },
+    { op: "goto", scene: "kitchen", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "K", text: "kitchen" }] },
+    // A block is found within its scene only: the Stove is the Kitchen's, not the Garden's.
+    { op: "openFlow", flow: "g", scene: "garden", block: "stove", expectResult: false },
+    { op: "openFlow", flow: "g", scene: "kitchen", block: "stove" },
+    { op: "advance", expect: [{ type: "text", id: "K", text: "kitchen" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// Rule 6: a number shows in text the way JS writes it: no exponent between 1e-7 and 1e21, a lower-case
+// "e" with its sign outside that, and -0 as 0.
+const ruleNumberText = {
+  name: "rule: numbers interpolate as JS writes them (small, large, and negative zero)",
+  project: project({ properties: [
+    { name: "small", type: "number", default: 0.00005 },
+    { name: "tiny", type: "number", default: 1.5e-7 },
+    { name: "huge", type: "number", default: 1e21 },
+    { name: "big", type: "number", default: 123456789012 },
+    { name: "zero", type: "number", default: 0 },
+    { name: "negz", type: "number", default: 1 },
+  ] }),
+  scenes: [oneBlock("s", [
+    { id: "sn", type: "snippet", onEnter: [{ kind: "set", target: "@negz", value: "-@zero" }],
+      beats: [{ id: "N", kind: "text" }], jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { N: "{@small}|{@tiny}|{@huge}|{@big}|{@negz}" })],
+  expectedTranscript: [{ type: "text", id: "N", text: "0.00005|1.5e-7|1e+21|123456789012|0" }, { type: "end" }],
+} satisfies RuntimeFixture;
+
+// Rule 7: an option's prompt beat carries tags like any beat: its own plus the option's (outermost first).
+// Spoken back with replayPromptOnChoose, the prompt step shows them.
+const rulePromptTags = {
+  name: "rule: a replayed prompt carries its tags and the option's",
+  project: project({}),
+  engineOptions: { replayPromptOnChoose: true },
+  scenes: [oneBlock("s", [
+    { id: "g_ch", type: "group", selector: "choice", children: [
+      { id: "o_ask", type: "group", tags: ["polite"], prompt: { id: "P_ask", kind: "line", character: "PC", tags: ["question"] }, children: [
+        { id: "sn_ans", type: "snippet", beats: [{ id: "A", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ])],
+  locales: [loc("s", { P_ask: "Where am I?", A: "Home." })],
+  choices: ["o_ask"],
+  expectedTranscript: [
+    { type: "choice", groupId: "g_ch", options: [{ id: "o_ask", eligible: true, prompt: { kind: "line", text: "Where am I?", character: "PC" } }] },
+    { type: "line", id: "P_ask", text: "Where am I?", character: "PC", tags: ["polite", "question"] },
+    { type: "text", id: "A", text: "Home.", tags: ["polite"] },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// Rule 8: a choice whose every remaining option is greyed out runs dry, as one with no options does: the
+// fallback follows if there is one, otherwise the flow moves on. It used to be offered with nothing to take.
+const ruleAllGreyedRunsDry = {
+  name: "rule: a choice with every option greyed out runs dry (fallback, else move on)",
+  project: rulesProject,
+  scenes: [oneBlock("s", [
+    { id: "g_fb", type: "group", selector: "choice", children: [
+      { id: "sn_l1", type: "snippet", condition: "@met", choiceText: "Locked one", beats: [{ id: "L1", kind: "text" }] },
+      { id: "sn_l2", type: "snippet", condition: "@met", choiceText: "Locked two", beats: [{ id: "L2", kind: "text" }] },
+      { id: "sn_fb", type: "snippet", fallback: true, beats: [{ id: "FB", kind: "text" }] },
+    ] },
+    { id: "g_none", type: "group", selector: "choice", children: [
+      { id: "sn_l3", type: "snippet", condition: "@met", choiceText: "Locked three", beats: [{ id: "L3", kind: "text" }] },
+    ] },
+    { id: "sn_after", type: "snippet", beats: [{ id: "AFTER", kind: "text" }], jump: { to: "END" } },
+  ])],
+  locales: [loc("s", { L1: "one", L2: "two", L3: "three", FB: "nothing for it", AFTER: "moving on" })],
+  expectedTranscript: [{ type: "text", id: "FB", text: "nothing for it" }, { type: "text", id: "AFTER", text: "moving on" }, { type: "end" }],
+} satisfies RuntimeFixture;
+
 // The default start scene is the first AUTHORED scene (the bundle's key order, which is the project's
 // nav order), never the first by id. Scene ids are random, so a runtime that sorts them opens a game on
 // an arbitrary scene: Unreal kept its scenes in a sorted map and did exactly that (2026-10-06). The ids
@@ -2285,13 +2475,13 @@ export const cases: Fixtures = {
     characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
-  ],
+  ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
   scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
-    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad],
+    scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

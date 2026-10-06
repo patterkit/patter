@@ -27,7 +27,7 @@ const report: CoverageReport = {
   runs: 1000, maxSteps: 200, seed: 1, start: {}, beats,
   totals: { beats: 5, covered: 4, neverHit: 1, rare: 1, coveragePct: 80 }, rareThresholdPct: 5,
   termination: { ended: 900, capped: 100, stalled: 0, evalError: 0 },
-  drivers: [], unwrittenInputs: [], dryChoices: [], cancelled: false,
+  drivers: [], unwrittenInputs: [], dryChoices: [], contentErrors: [], cancelled: false,
 };
 const names: Record<string, string> = { s1: "Scene one", s2: "Scene two" };
 

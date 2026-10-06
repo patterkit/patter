@@ -53,7 +53,8 @@ In `demo/` (delete the folder freely):
 
 - **Save / load**: `PatterSave.serialize_state(engine)` / `deserialize_state(engine, json)` (or
   `engine.save_game()` / `engine.load_game(blob)` for the bare dictionary) snapshot and restore the
-  whole run. Saves are the shared `patter/save@0` format, version 3; older saves still load.
+  whole run. Saves are the shared `patter/save@0` format, version 3; a version 2 save in its envelope
+  still loads.
 - **Your game's state and one registry per game**: bind `@world` to your own store with the
   `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`
   option so every engine in the game shares one set of properties and one save. Without a registry
