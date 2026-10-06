@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { type Dir, type Dirent, existsSync, opendirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parseSource } from "@patterkit/core";
@@ -36,22 +36,35 @@ export function findPairedStorylets(patterRoot: string): string | undefined {
       return typeof project.patter === "string" && resolve(dir, project.patter) === target;
     } catch { return false; }
   };
-  let budget = 400;   // folders read, at most: the search is a convenience, never a crawl
+  // The search is a convenience, never a crawl: at most this many folders read and entries looked
+  // at. Entries count too, since one huge folder (a system temp folder holds tens of thousands) is
+  // a single read, and a miss would otherwise look at all of it.
+  let folders = 400;
+  let looks = 5000;
   const search = (dir: string, depth: number): string | undefined => {
-    if (--budget < 0) return undefined;
-    let entries: string[];
-    try { entries = readdirSync(dir); } catch { return undefined; }
-    for (const name of entries) {
-      if (name.startsWith(".") || name === "node_modules") continue;
-      const full = join(dir, name);
-      try { if (!statSync(full).isDirectory()) continue; } catch { continue; }
-      if (name.endsWith(".storylets") && pointsHere(full)) return full;
-      if (depth > 0 && !name.endsWith(".storylets") && !name.endsWith(".patter")) {
-        const hit = search(full, depth - 1);
-        if (hit) return hit;
+    if (--folders < 0 || looks <= 0) return undefined;
+    let handle: Dir;
+    try { handle = opendirSync(dir); } catch { return undefined; }
+    try {
+      // Streamed, not readdirSync: a huge folder is left part-read once the budget runs out
+      for (let entry: Dirent | null; (entry = readEntry(handle)) !== null;) {
+        if (--looks < 0) return undefined;
+        const name = entry.name;
+        if (name.startsWith(".") || name === "node_modules") continue;
+        const full = join(dir, name);
+        if (entry.isSymbolicLink()) {
+          try { if (!statSync(full).isDirectory()) continue; } catch { continue; }
+        } else if (!entry.isDirectory()) continue;
+        if (name.endsWith(".storylets") && pointsHere(full)) return full;
+        if (depth > 0 && !name.endsWith(".storylets") && !name.endsWith(".patter")) {
+          const hit = search(full, depth - 1);
+          if (hit) return hit;
+        }
       }
+      return undefined;
+    } finally {
+      handle.closeSync();
     }
-    return undefined;
   };
   let base = dirname(target);
   for (let up = 0; up < 2; up++) {
@@ -62,6 +75,11 @@ export function findPairedStorylets(patterRoot: string): string | undefined {
     base = parent;
   }
   return undefined;
+}
+
+/** The next entry of an open folder, or null at its end or on a read error. */
+function readEntry(handle: Dir): Dirent | null {
+  try { return handle.readSync(); } catch { return null; }
 }
 
 /** The executable inside a macOS app bundle, or the path itself for anything else. */
