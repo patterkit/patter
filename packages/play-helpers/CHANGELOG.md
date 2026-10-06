@@ -1,5 +1,12 @@
 # @patterkit/play-helpers
 
+## 0.7.10
+
+### Patch Changes
+
+- 6a30def: Uses `@patterkit/runtime` 0.19.0, the Patterplay 0.19.0 release.
+- e49e5e3: The debug link no longer queues messages once the editor is gone: with no editor running it kept one message per step for the rest of the game. The property helpers (`getProperty`, `setProperty`, `setProperties`) now take a flow as well as the engine, which `@scene` properties need, since each flow has its own. The documented `setProperties(engine, { "@scene.locked": false })` threw.
+
 ## 0.7.9
 
 ### Patch Changes
