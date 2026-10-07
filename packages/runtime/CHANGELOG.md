@@ -35,9 +35,17 @@ version number always means the same runtime behaviour. This package is versione
 
 ### Changed
 
+- **A new `Engine` on a bundle another engine already uses no longer rebuilds the tag index.** It is built once
+  per bundle and shared, so a tool that starts a fresh engine for every run (coverage does) starts each in about
+  a third of the time: 0.5 ms rather than 1.6 ms on a 100-scene project.
 - **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the
   audio resolver's joins, `listProperties`, what a checkpoint refuses while it is open, a save taken inside one,
   and a block named under another scene.
+
+### Fixed
+
+- **Tags handed out are the caller's own.** `tagsForBeat`, `tagsForScene`, `tagsForBlock`, and a delivered
+  line's `tags` are copies, so a game that edits one changes nothing the engine says afterwards.
 
 ## [0.20.0] - 2026-10-06
 
