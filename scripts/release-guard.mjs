@@ -136,15 +136,25 @@ const readChangeset = (f) => head === "HEAD"
   ? readFileSync(join(root, ".changeset", f), "utf8")
   : out(`git show ${head}:.changeset/${f}`);
 
+/** An EMPTY changeset (`npm run changeset -- --empty`: front matter naming no package) added in this
+ *  range is the author saying the range ships nothing, which is the fix this guard itself prints for a
+ *  comment or a refactor. It covers every package the range touched. One that was already pending
+ *  before the range says nothing about these commits, so only a new one counts. (Until 2026-10-07 the
+ *  guard read an empty changeset as naming nothing, and refused the very fix it suggested.) */
+const pendingAtBase = new Set(listAt(base));
+let emptyAdded = false;
 for (const f of changesetFiles) {
   if (!f.endsWith(".md") || f === "README.md") continue;
   const text = readChangeset(f);
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  // The closing fence may follow the opening one directly: `---\n---` is what `--empty` writes.
+  const fm = /^---\r?\n([\s\S]*?)^---/m.exec(text);
   if (!fm) continue;
+  let names = 0;
   for (const line of fm[1].split("\n")) {
     const named = /^\s*["']?(@?[^"':]+)["']?\s*:\s*(major|minor|patch)\s*$/.exec(line);
-    if (named) covered.add(named[1].trim());
+    if (named) { covered.add(named[1].trim()); names++; }
   }
+  if (names === 0 && !fm[1].trim() && !pendingAtBase.has(f)) emptyAdded = true;
 }
 
 // --- report -----------------------------------------------------------------
@@ -153,7 +163,7 @@ let lockstepChanged = false;
 for (const dir of [...touched].sort()) {
   const name = published.get(dir);
   if (LOCKSTEP.has(name)) { lockstepChanged = true; continue; }
-  if (!covered.has(name)) missing.push({ dir, name });
+  if (!covered.has(name) && !emptyAdded) missing.push({ dir, name });
 }
 
 const problems = [];
