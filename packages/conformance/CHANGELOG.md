@@ -1,5 +1,12 @@
 # @patterkit/conformance
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [caaf755]
+  - @patterkit/model@0.10.0
+
 ## 0.1.5
 
 ### Patch Changes
