@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-07
+
 ### Security
 
 - **Live Link refuses web pages.** While Live Link was on, a web page open in any browser could connect to it
