@@ -32,8 +32,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   totals, as it already did for each scene's status.
 - **The voice script includes spoken choice prompts,** so they get recorded.
 - **A loop of jumps with nothing in between is a warning,** in the writer's words, rather than a run that never ends.
-- **Coverage Test no longer blames a write that ran,** follows gated jumps for its "may need an input" hint,
-  and leaves out empty lines that never ship.
+- **Coverage Test no longer blames a write that ran,** follows gated jumps for both its "may need an input"
+  hint and its "written only by" line (saying when the gate is on the way in), and leaves out empty lines
+  that never ship.
 
 - **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a
   moment after you stop typing, and a quit inside that moment used to close without saving. It now finishes

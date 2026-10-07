@@ -265,7 +265,8 @@ export function renderCoverage(
         a.addEventListener("click", (e) => { e.stopPropagation(); onFindUsage(bg.ref); });
         line.append(a);
       } else line.append(document.createTextNode(bg.ref));
-      line.append(document.createTextNode(", written only by "));
+      // A gate on the jump INTO this beat's block, not on the beat: the place to look is the jump.
+      line.append(document.createTextNode(`${bg.onTheWayIn ? " on the way in" : ""}, written only by `));
       bg.writers.forEach((w, i) => {
         if (i) line.append(document.createTextNode(", "));
         const target = report.beats.find((x) => x.id === w);

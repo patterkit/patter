@@ -72,11 +72,14 @@ A beat marked **? (dead at one remove)** is gated on a value your story *does* s
 beat that never played either. The row names the gate and the beat that would have to happen first,
 so two mysteries become one. Open that beat and ask why *it* never came up. A gate on a single flag
 is named as the flag (`@world.mood:armed`), not the whole property, because a property half the
-story writes always looks well fed.
+story writes always looks well fed. The gate can also be on the way in: when every jump into the
+beat's block passes a condition, that condition gates the beat too, and the row says *gated on @x
+on the way in*, so the place to look is the jump. A writer with no line of its own (a scene's
+entry, a snippet that only jumps) is named by its scene or node.
 
-That last one is deliberately cautious. Where the test can't be sure a writer never ran (the effect
-sits on a beat-less snippet, or the property is assigned wholesale rather than a flag at a time), it
-says nothing at all rather than guess. A wrong *"this can never happen"* is worse than silence.
+That last one is deliberately cautious. Where the test can't be sure a writer never ran (the
+property is assigned wholesale rather than a flag at a time), it says nothing at all rather than
+guess. A wrong *"this can never happen"* is worse than silence.
 
 ### Rarely reached
 

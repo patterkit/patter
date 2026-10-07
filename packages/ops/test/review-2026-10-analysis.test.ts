@@ -227,3 +227,46 @@ describe("26: the may-need-an-input hint", () => {
     expect(beat(maybe, "L_late").needsInput).toEqual(["@world.x"]);
   });
 });
+
+describe("the second hop follows gated jumps (ruled 2026-10-07)", () => {
+  const world = [{ name: "alarm", type: "boolean", default: false }, { name: "mood", type: "flags", values: ["armed", "hurt"], default: [] }];
+  // b2 is reached only past a jump gated on @world.alarm, whose one writer is a scene nothing enters.
+  const shut = (extraWay?: Node) => project("jump-hop", [
+    { id: "s1", blocks: [
+      { id: "b1", children: [
+        line("L_intro"),
+        { id: "n_go", type: "snippet", condition: "@world.alarm", jump: { to: "b2" } },
+        ...(extraWay ? [extraWay] : []),
+      ] },
+      { id: "b2", children: [line("L_far")] },
+    ] },
+    { id: "hall", onEntry: [{ kind: "set", target: "@world.alarm", value: "true" }], blocks: [{ id: "b_hall", children: [line("L_hall")] }] },
+  ], { world });
+
+  it("names the jump's gate and its writer that never ran, marked as on the way in", () => {
+    const r = runCoverage(loadProject(shut()), { runs: 10, seed: 3 });
+    expect(beat(r, "L_far").blockedBy).toEqual([{ ref: "@world.alarm", writers: ["hall"], onTheWayIn: true }]);
+    expect(renderCoverageText(r, (id) => (id === "hall" ? "The Hall" : id)).join("\n"))
+      .toContain("gated on @world.alarm on the way in, written only by: The Hall");
+  });
+
+  it("says nothing when another way in needs no such gate", () => {
+    const r = runCoverage(loadProject(shut({ id: "n_also", type: "snippet", condition: "@never", jump: { to: "b2" } })), { runs: 10, seed: 3 });
+    expect(beat(r, "L_far").reachedRuns).toBe(0);
+    expect(beat(r, "L_far").blockedBy).toBeUndefined();
+  });
+
+  it("follows a jump gated on one flag to that flag's writer", () => {
+    const dir = project("jump-flag", [{ id: "s1", blocks: [
+      { id: "b1", children: [
+        line("L_intro"),
+        { id: "n_go", type: "snippet", condition: "check_flags(@world.mood, +armed)", jump: { to: "b2" } },
+        { id: "n_end", type: "snippet", jump: { to: "END" } },
+      ] },
+      { id: "b2", children: [line("L_far")] },
+      { id: "b3", children: [line("L_arm", { onEnter: [{ kind: "set", target: "@world.mood", value: "set_flags(@world.mood, +armed)" }] })] },
+    ] }], { world });
+    const r = runCoverage(loadProject(dir), { runs: 10, seed: 3 });
+    expect(beat(r, "L_far").blockedBy).toEqual([{ ref: "@world.mood:armed", writers: ["L_arm"], onTheWayIn: true }]);
+  });
+});

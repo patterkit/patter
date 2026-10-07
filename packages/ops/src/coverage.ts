@@ -97,6 +97,9 @@ export interface BlockedGate {
    *  own is named by its beats; one without (a scene's entry effects, a snippet that only jumps, an option
    *  with only a prompt) by its own node id. */
   writers: string[];
+  /** The gate is on the way INTO the beat's block (a jump or call taken only past it), not on the beat
+   *  itself: the place to look is the jump. */
+  onTheWayIn?: true;
 }
 
 /** A choice that ran DRY during the coverage run: at some point it had no takeable option and no eligible
@@ -222,7 +225,7 @@ interface HostScopeAnalysis {
 }
 
 /** One way into a block other than the start: a jump or call to a scene (its first block) or a block. */
-interface Route { from: string; to: string; gate: Set<string> }
+interface Route { from: string; to: string; gate: Set<string>; fine: Set<string> }
 
 /** Walk an ExprNode, collecting host-scope refs (`@token.name` for a declared token) and, for any
  *  comparison against a literal, proposing nearby values for that ref. */
@@ -362,7 +365,7 @@ function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAn
           gatesByBeat.set(id, here); fineGatesByBeat.set(id, hereFine); blockOfBeat.set(id, blockId);
           if (shadow) shadowed.add(id);
         }
-        if (node.jump && node.jump.to !== "END" && !shadow) routes.push({ from: blockId, to: node.jump.to, gate: here });
+        if (node.jump && node.jump.to !== "END" && !shadow) routes.push({ from: blockId, to: node.jump.to, gate: here, fine: hereFine });
       }
     }
   };
@@ -374,35 +377,43 @@ function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAn
   return empty;
 }
 
+/** The host refs gating every way into a block: coarse (`@world.door`) and, where a condition reads one,
+ *  per flag (`@world.mood:armed`), as a beat's own gates are kept. */
+interface EntryGate { gate: Set<string>; fine: Set<string> }
+
 /**
  * The host refs gating every way into each block, from the start point: a block reached only past a jump
  * gated on `@world.door` is gated on it too, though nothing in the block says so. Intersection across the
  * ways in, never union: one ungated way in is enough to reach the block, so only a ref every way passes
  * gates it. A block no way reaches has no entry here (its beats keep only their own gates).
  */
-function entryGates(bundle: Bundle, routes: Route[], start: { scene?: string; block?: string }): Map<string, Set<string>> {
+function entryGates(bundle: Bundle, routes: Route[], start: { scene?: string; block?: string }): Map<string, EntryGate> {
   // A jump to a scene enters its first block; the runtime starts at the first scene when nothing says.
   const firstBlock = (sceneId: string | undefined): string | undefined =>
     sceneId === undefined ? undefined : bundle.scenes[sceneId]?.blocks[0]?.id;
   const blockOf = (to: string): string | undefined => (bundle.scenes[to] ? firstBlock(to) : to);
   const startBlock = start.block ?? firstBlock(start.scene ?? Object.keys(bundle.scenes)[0]);
   if (startBlock === undefined) return new Map();
+  const none = (): EntryGate => ({ gate: new Set(), fine: new Set() });
+  const meet = (a: Set<string>, b: Set<string>): Set<string> => new Set([...a].filter((g) => b.has(g)));
 
   // A must-analysis, solved by iterating to a fixpoint: a block's gate is only ever narrowed once known,
   // and the set of blocks known only grows, so this ends.
-  let entry = new Map<string, Set<string>>([[startBlock, new Set()]]);
+  let entry = new Map<string, EntryGate>([[startBlock, none()]]);
   for (;;) {
-    const next = new Map<string, Set<string>>([[startBlock, new Set()]]);
+    const next = new Map<string, EntryGate>([[startBlock, none()]]);
     for (const r of routes) {
       const from = entry.get(r.from);
       const to = blockOf(r.to);
       if (from === undefined || to === undefined) continue;
-      const via = new Set([...from, ...r.gate]);
+      const via: EntryGate = { gate: new Set([...from.gate, ...r.gate]), fine: new Set([...from.fine, ...r.fine]) };
       const had = next.get(to);
-      next.set(to, had === undefined ? via : new Set([...had].filter((g) => via.has(g))));
+      next.set(to, had === undefined ? via : { gate: meet(had.gate, via.gate), fine: meet(had.fine, via.fine) });
     }
-    const same = next.size === entry.size
-      && [...next].every(([k, v]) => { const was = entry.get(k); return was !== undefined && was.size === v.size; });
+    const same = next.size === entry.size && [...next].every(([k, v]) => {
+      const was = entry.get(k);
+      return was !== undefined && was.gate.size === v.gate.size && was.fine.size === v.fine.size;
+    });
     entry = next;
     if (same) return entry;
   }
@@ -427,9 +438,13 @@ function blockedGates(
   analysis: HostScopeAnalysis,
   drivenRefs: Set<string>,
   siteRuns: Map<string, number>,
+  entry: EntryGate | undefined,
 ): BlockedGate[] {
   const out: BlockedGate[] = [];
-  const gates = new Set([...(analysis.gatesByBeat.get(beatId) ?? []), ...(analysis.fineGatesByBeat.get(beatId) ?? [])]);
+  // The beat's own gates, and every gate on the way into its block: a block entered only past a jump gated
+  // on a flag whose one writer never ran is dead at one remove just the same.
+  const own = new Set([...(analysis.gatesByBeat.get(beatId) ?? []), ...(analysis.fineGatesByBeat.get(beatId) ?? [])]);
+  const gates = new Set([...own, ...(entry?.gate ?? []), ...(entry?.fine ?? [])]);
   for (const ref of [...gates].sort()) {
     const coarse = ref.includes(":") ? ref.slice(0, ref.indexOf(":")) : ref;
     if (drivenRefs.has(coarse)) continue;              // a driver feeds it; the story's writers are moot
@@ -445,7 +460,7 @@ function blockedGates(
     // only a site never entered at all is one that provably never wrote.
     if (sites.some((s) => (siteRuns.get(s) ?? 0) > 0)) continue; // some writer did run
     const writers = [...new Set(sites.flatMap((s) => analysis.siteBeats.get(s) ?? [s]))].sort();
-    out.push({ ref, writers });
+    out.push({ ref, writers, ...(own.has(ref) ? {} : { onTheWayIn: true as const }) });
   }
   return out;
 }
@@ -660,10 +675,11 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     // A beat a branch sibling always wins over gets neither hint: no input or writer can reach it.
     if (reached === 0 && !analysis.shadowed.has(id)) {
       const block = analysis.blockOfBeat.get(id);
-      const all = new Set([...(analysis.gatesByBeat.get(id) ?? []), ...(block !== undefined ? entered.get(block) ?? [] : [])]);
+      const way = block !== undefined ? entered.get(block) : undefined;
+      const all = new Set([...(analysis.gatesByBeat.get(id) ?? []), ...(way?.gate ?? [])]);
       const gates = [...all].filter((r) => !analysis.written.has(r) && !drivenRefs.has(r));
       if (gates.length) { needsInput = gates; for (const g of gates) unwrittenInputs.add(g); }
-      const blocked = blockedGates(id, analysis, drivenRefs, siteRuns);
+      const blocked = blockedGates(id, analysis, drivenRefs, siteRuns, way);
       if (blocked.length) blockedBy = blocked;
     }
     const reachPct = executed ? (reached / executed) * 100 : 0;
@@ -803,7 +819,7 @@ export function renderCoverageText(
         const target = report.beats.find((x) => x.id === w);
         return target ? clip(target.preview || target.id, 28) : sceneName(w); // a scene's entry, or a node id
       });
-      out.push(`           gated on ${bg.ref}, written only by: ${names.join(", ")} (never played either)`);
+      out.push(`           gated on ${bg.ref}${bg.onTheWayIn ? " on the way in" : ""}, written only by: ${names.join(", ")} (never played either)`);
     }
   };
 
