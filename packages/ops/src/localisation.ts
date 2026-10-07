@@ -18,7 +18,7 @@
 
 import { basename, dirname, join, sep } from "node:path";
 import { canonicalStringify } from "@patterkit/core";
-import { walkNodes, castStringKey, PROJECT_LOCALE_SCENE } from "@patterkit/model";
+import { walkNodes, castStringKey, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
@@ -128,10 +128,7 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
   return { project: loaded.project.project.id, defaultLocale, locale: targetLocale, entries };
 }
 
-const layoutOf = (loaded: LoadedProject): { strings: string; authoring: string } => ({
-  strings: loaded.project.layout?.strings ?? "loc/",
-  authoring: loaded.project.layout?.authoring ?? "authoring/",
-});
+const layoutOf = (loaded: LoadedProject): { strings: string; authoring: string } => projectLayout(loaded.project);
 
 /** Path of the existing (scene, locale) loc shard, or null. */
 export function existingLocPath(loaded: LoadedProject, scene: string, locale: string): string | null {
@@ -222,7 +219,7 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     // Count only strings whose translation actually CHANGED (not every string in the sheet), so a
     // re-import of an unedited file honestly reads "0 updated" instead of "N updated".
     for (const [id, text] of strings) { if (merged[id] !== text) updated++; merged[id] = text; }
-    const file: LocaleFile = { schema: existing?.schema ?? "patter/strings@0", scene, locale, strings: merged };
+    const file: LocaleFile = { schema: existing?.schema ?? STRINGS_SCHEMA, scene, locale, strings: merged };
     writes.push({ path, content: canonicalStringify(file) });
 
     // Authoring shard: stamp localisedAt[locale] for the FRESH ids only (staleness reconciliation).
@@ -232,7 +229,7 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
     const aExisting = findFile<AuthoringFile>(loaded.authoringFiles, loaded.authoring, aPath);
     const authoring: AuthoringFile = aExisting
       ? { ...aExisting, edits: { ...aExisting.edits } }
-      : { schema: "patter/authoring@0" };
+      : { schema: AUTHORING_SCHEMA };
     const editsMap = { ...(authoring.edits ?? {}) };
     for (const id of fresh) editsMap[id] = { ...editsMap[id], localisedAt: { ...editsMap[id]?.localisedAt, [locale]: now } };
     authoring.edits = editsMap;

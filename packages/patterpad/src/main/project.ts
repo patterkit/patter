@@ -16,7 +16,7 @@ import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterki
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
-import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
@@ -113,14 +113,14 @@ let vcShardsMemo: ShardRef[] | null = null;
 function loadAuthoring(authoringPath: string): AuthoringFile {
   let mtimeMs: number;
   try { mtimeMs = statSync(authoringPath).mtimeMs; }
-  catch { return { schema: "patter/authoring@0" }; } // missing -> fresh
+  catch { return { schema: AUTHORING_SCHEMA }; } // missing -> fresh
   const hit = authoringCache.get(authoringPath);
   if (hit && hit.mtimeMs === mtimeMs) return structuredClone(hit.af);
   try {
     const af = parseSource(readFileSync(authoringPath, "utf8")) as AuthoringFile;
     authoringCache.set(authoringPath, { mtimeMs, af });
     return structuredClone(af);
-  } catch { return { schema: "patter/authoring@0" }; } // corrupt -> start fresh
+  } catch { return { schema: AUTHORING_SCHEMA }; } // corrupt -> start fresh
 }
 
 /** A planned write that MERGES a mutation into a scene's authoring shard, preserving every other block
@@ -2002,7 +2002,7 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     const trimmed = name.trim();
     if (!trimmed) return { ok: false, error: "a scene needs a name" };
 
-    const layout = { flow: "scenes/", strings: "loc/", ...loaded.project.layout };
+    const layout = projectLayout(loaded.project);
     const defaultLocale = loaded.project.locales.default;
     let stem = slug(trimmed) || "scene";
     for (let n = 2; existsSync(join(loaded.root, layout.flow, `${stem}.patterflow`)); n++) stem = `${slug(trimmed) || "scene"}-${n}`;
@@ -2014,8 +2014,8 @@ export function createScene(name: string, kit: SceneKit = "blank", speaker?: str
     if (kitNeedsSpeaker(kit) && !who) return { ok: false, error: "this kit needs someone to speak its lines" };
     const { scene, strings } = buildSceneKit(kit, trimmed, who);
     const sceneId = scene.id;
-    const flow: FlowFile = { schema: "patter/flow@0", scene };
-    const locale: LocaleFile = { schema: "patter/strings@0", scene: sceneId, locale: defaultLocale, default: true, strings };
+    const flow: FlowFile = { schema: FLOW_SCHEMA, scene };
+    const locale: LocaleFile = { schema: STRINGS_SCHEMA, scene: sceneId, locale: defaultLocale, default: true, strings };
 
     const cast = [...(loaded.project.cast ?? [])];
     const addToCast = kitNeedsSpeaker(kit) && who !== undefined && !cast.some((c) => c.name === who);

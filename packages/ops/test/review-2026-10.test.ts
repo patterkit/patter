@@ -5,11 +5,11 @@
 
 import { describe, it, expect } from "vitest";
 import { dirname, join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { canonicalStringify } from "@patterkit/core";
 import {
-  loadProject, runExport, runExportHtml, runValidate, runFormat, applyWrites, bundleOutputPath, besideBundlePath, exportBlockers, planBuild, runInit, currentBundlePosture, runReport, runCoverage,
+  loadProject, runExport, runExportHtml, runValidate, runFormat, applyWrites, bundleOutputPath, besideBundlePath, exportBlockers, planBuild, runInit, currentBundlePosture, runReport, runCoverage, runVoiceScript, loadProjectLanding,
 } from "../src/index.js";
 
 type Obj = Record<string, unknown>;
@@ -205,5 +205,34 @@ describe("a beat of a kind the runtime does not know", () => {
   it("is a structural error, since it would never play", () => {
     const loaded = loadProject(makeProject({ extra: [{ id: "nOdd", type: "snippet", beats: [{ id: "L4", kind: "narration" }] }], strings: { L4: "Odd." } }));
     expect(runValidate(loaded).structural.map((i) => i.message)).toContain("beat 'L4' has an unknown kind 'narration' (line, text, or gameEvent)");
+  });
+});
+
+describe("a cut branch, in the report and the voice script alike", () => {
+  it("cuts the lines inside a cut snippet in the report, as the voice script leaves them out", () => {
+    const dir = makeProject({
+      project: { voiced: true },
+      extra: [{ id: "nCut", type: "snippet", beats: [{ id: "L5", kind: "line", character: "A" }] }],
+      strings: { L5: "Gone." },
+    });
+    mkdirSync(join(dir, "authoring"), { recursive: true });
+    writeFileSync(join(dir, "authoring/one.patterx"), canonicalStringify({ schema: "patter/authoring@0", cut: { nCut: true } }));
+    const loaded = loadProject(dir);
+    const report = runReport(loaded);
+    expect(report.scenes[0]!.voiced.count).toBe(0);
+    expect(report.cut.voicedLines).toBe(1);
+    expect(runVoiceScript(loaded, { everything: true }).lines).toEqual([]);
+  });
+});
+
+describe("the landing load (item 46)", () => {
+  it("takes only the source language's strings for the landing scene", () => {
+    const dir = makeProject({ project: { locales: { default: "en", all: ["en", "fr"] } } });
+    // Off the conventional name, so the load has to scan: French first, then English.
+    rmSync(join(dir, "loc/en/strings.patterloc"));
+    mkdirSync(join(dir, "loc/aa"), { recursive: true });
+    writeFileSync(join(dir, "loc/aa/fr.patterloc"), canonicalStringify({ schema: "patter/strings@0", scene: "s1", locale: "fr", strings: { L1: "Bonjour." } }));
+    writeFileSync(join(dir, "loc/en/zz.patterloc"), canonicalStringify({ schema: "patter/strings@0", scene: "s1", locale: "en", strings: { L1: "Hello." } }));
+    expect(loadProjectLanding(dir).locales.map((l) => l.locale)).toEqual(["en"]);
   });
 });

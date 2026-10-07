@@ -21,6 +21,7 @@ import type { Random } from "./handoff.js";
 import { sourceStrings } from "./loaded-helpers.js";
 import { authoringPath } from "./localisation.js";
 import { applySuggestionDecisions, indexPlaces } from "./suggestions.js";
+import { AUTHORING_SCHEMA } from "@patterkit/model";
 
 export interface ImportOptions {
   /** Who is importing (the import log). */
@@ -334,7 +335,7 @@ export function planEditableImport(loaded: LoadedProject, returned: ReturnedDoc,
     let af = shards.get(path);
     if (!af) {
       const i = loaded.authoringFiles.indexOf(path);
-      af = i >= 0 ? structuredClone(loaded.authoring[i]!) : { schema: "patter/authoring@0" };
+      af = i >= 0 ? structuredClone(loaded.authoring[i]!) : { schema: AUTHORING_SCHEMA };
       shards.set(path, af);
     }
     return af;

@@ -96,7 +96,11 @@ export function gameScopesSnapshot(root: string, project: ProjectFile): Array<{ 
   if (!found.dir) return [];
   let names: string[] = [];
   try { names = readdirSync(found.dir).filter((n) => n.endsWith(SCOPES_FILE_SUFFIX)).sort(); } catch { /* an unreadable folder packs as none */ }
-  return names.map((fileName) => ({ fileName, text: readFileSync(join(found.dir!, fileName), "utf8") }));
+  // One file that can't be read (a permissions slip, a file removed under us) is left out rather than
+  // failing the whole pack: the snapshot is a courtesy to the recipient, not part of the project.
+  return names.flatMap((fileName) => {
+    try { return [{ fileName, text: readFileSync(join(found.dir!, fileName), "utf8") }]; } catch { return []; }
+  });
 }
 
 /** Patter's scopes file for a project: its shared `@patter` properties, in declaration order. */

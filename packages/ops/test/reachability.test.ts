@@ -399,3 +399,24 @@ describe("the scope the header claims", () => {
     expect(r).toEqual([]);
   });
 });
+
+describe("a @patter property the game shares with its other engines (CLI review 2026-10, item 27)", () => {
+  /** The Village's fault, in a project whose game keeps a game scopes folder. */
+  const sharedProject = (decls: Node[]) => {
+    const dir = build(decls, VILLAGE);
+    mkdirSync(join(dir, "game-scopes"), { recursive: true });
+    writeFileSync(join(dir, "game-scopes", "other.scopes.json"), JSON.stringify({ version: 1, owner: "other", scopes: [] }));
+    return loadProject(dir);
+  };
+  const shared = (decls: Node[]) => reachabilityIssues(sharedProject(decls));
+
+  it("is no latch: another engine on the game's registry may set it back", () => {
+    expect(sharedProject(LATCHES).gameScopes).toBeDefined();
+    expect(shared(LATCHES)).toEqual([]);
+  });
+
+  it("still is one when the project keeps it to itself", () => {
+    const own = LATCHES.map((d) => ({ ...d, shared: false }));
+    expect(shared(own).map((i) => i.nodeId)).toEqual(["n_dead"]);
+  });
+});

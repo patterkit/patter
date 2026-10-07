@@ -62,6 +62,11 @@ function tagIndexFor(bundle: Bundle): Map<string, string[]> {
   if (!index) { index = buildTagIndex(bundle); tagIndexCache.set(bundle, index); }
   return index;
 }
+/** A node's tags as a COPY: the index is shared by every engine on the bundle, so a host that edits an
+ *  array it was given (a step's tags, `tagsForBeat`) must not change the answer for all of them. */
+function tagsOf(host: { tagIndex: Map<string, string[]> }, id: string): string[] | undefined {
+  return host.tagIndex.get(id)?.slice();
+}
 
 // The save shape is the FAMILY's contract and lives in @patterkit/model (`SaveGame` and friends, with
 // the reasoning). Re-exported here so `import type { SaveGame } from "@patterkit/runtime"` keeps
@@ -870,18 +875,18 @@ export class Engine {
    * delivered step carries. Empty array for an unknown id or a beat with no tags anywhere up the chain.
    */
   tagsForBeat(beatId: string): string[] {
-    return this.host.tagIndex.get(beatId) ?? [];
+    return tagsOf(this.host, beatId) ?? [];
   }
   /** A scene's own tags (by internal id or gameId address). Empty when none / unknown. */
   tagsForScene(sceneRef: string): string[] {
     const id = this.resolveSceneRef(sceneRef);
-    return (id != null ? this.host.tagIndex.get(id) : undefined) ?? [];
+    return (id != null ? tagsOf(this.host, id) : undefined) ?? [];
   }
   /** A block's accumulated tags (scene + block), by scene + block ref (id or gameId). Empty when none / unknown. */
   tagsForBlock(sceneRef: string, blockRef: string): string[] {
     const sceneId = this.resolveSceneRef(sceneRef);
     const id = this.resolveBlockRef(sceneId, blockRef);
-    return (id != null ? this.host.tagIndex.get(id) : undefined) ?? [];
+    return (id != null ? tagsOf(this.host, id) : undefined) ?? [];
   }
 
   /**
@@ -1010,7 +1015,7 @@ export class Engine {
 
   /** One beat's static data (source locale), the same shape a delivered step carries. */
   private beatInfo(beat: Beat): BeatInfo {
-    const tags = this.host.tagIndex.get(beat.id);
+    const tags = tagsOf(this.host, beat.id);
     const info: BeatInfo = { id: beat.id, kind: beat.kind };
     if (beat.kind === "line") {
       if (beat.character !== undefined) {
@@ -1031,7 +1036,7 @@ export class Engine {
 
   /** A `{ tags }` fragment for an id, present only when the id has accumulated tags (keeps output tidy). */
   private tagsField(id: string): { tags?: string[] } {
-    const tags = this.host.tagIndex.get(id);
+    const tags = tagsOf(this.host, id);
     return tags && tags.length ? { tags } : {};
   }
 
@@ -2323,7 +2328,7 @@ export class Flow {
   private beatResult(beat: Beat): StepResult {
     // Accumulated author tags (#215): the beat's own tags unioned with every
     // ancestor's. Omitted from the step when empty (parity with `gameData`).
-    const tags = this.host.tagIndex.get(beat.id);
+    const tags = tagsOf(this.host, beat.id);
     const withTags = tags && tags.length ? { tags } : {};
     // Inline `{@ref}` interpolation (spec §16): text beats always interpolate;
     // line beats interpolate only in a non-voiced project (voiced lines are
@@ -2406,7 +2411,7 @@ export class Flow {
   /** A replayed prompt as a step: the beat's id, gameData, and tags, and the text and speaker fields the
    *  choice showed. */
   private promptResult(beat: LineBeat | TextBeat, shown: ChoicePrompt): StepResult {
-    const tags = this.host.tagIndex.get(beat.id);
+    const tags = tagsOf(this.host, beat.id);
     const withTags = tags && tags.length ? { tags } : {};
     if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, gameData: beat.gameData, ...withTags };
     return {

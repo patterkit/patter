@@ -1288,3 +1288,18 @@ export interface SaveGameV2 {
   stageBags: Record<string, Record<string, ScalarValue>>;
   flows: Record<string, FlowSnapshotV2>;
 }
+
+/** Where a project keeps its shards unless its `layout` says otherwise, relative to the project root. */
+export const DEFAULT_LAYOUT = { flow: "scenes/", strings: "loc/", authoring: "authoring/" } as const;
+
+/** A project's layout with the defaults filled in: the one place they are written down (the loader,
+ *  validate, localisation, the scene scaffold, and Patterpad each had a copy). */
+export function projectLayout(project: { layout?: { flow?: string; strings?: string; authoring?: string } }): { flow: string; strings: string; authoring: string } {
+  return { ...DEFAULT_LAYOUT, ...project.layout };
+}
+
+/** The source shards' schema tags (spec §10), written by every tool that makes one. */
+export const FLOW_SCHEMA = "patter/flow@0";
+export const PROJECT_SCHEMA = "patter/project@0";
+export const STRINGS_SCHEMA = "patter/strings@0";
+export const AUTHORING_SCHEMA = "patter/authoring@0";

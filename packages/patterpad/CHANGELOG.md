@@ -31,6 +31,7 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **The production report counts a writing status that isn't on the ladder as the lowest rung** in its
   totals, as it already did for each scene's status.
 - **The voice script includes spoken choice prompts,** so they get recorded.
+- **A loop of jumps with nothing in between is a warning,** in the writer's words, rather than a run that never ends.
 - **Coverage Test no longer blames a write that ran,** follows gated jumps for its "may need an input" hint,
   and leaves out empty lines that never ship.
 

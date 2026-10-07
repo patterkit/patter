@@ -90,3 +90,16 @@ describe("engine tag accessors", () => {
     expect(eng.tagsForBlock("s", "nope")).toEqual([]);
   });
 });
+
+describe("tags handed out are the caller's own", () => {
+  it("editing one changes nothing for another engine on the same bundle", () => {
+    // The index is built once per bundle and shared by every engine on it.
+    const shared = bundle();
+    const a = new Engine(shared), b = new Engine(shared);
+    a.tagsForBeat("L1").push("edited");
+    const step = a.openFlow("f", { scene: "s" }).advance();
+    if (step.type === "text") step.tags?.push("edited");
+    expect(b.tagsForBeat("L1")).toEqual(["chapter1", "hub", "intro", "barked"]);
+    expect(a.tagsForBeat("L1")).toEqual(["chapter1", "hub", "intro", "barked"]);
+  });
+});

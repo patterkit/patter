@@ -14,6 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { FlowFile, Group, LocaleFile, ProjectFile, Scene, Snippet } from "@patterkit/model";
+import { projectLayout, FLOW_SCHEMA, PROJECT_SCHEMA, STRINGS_SCHEMA } from "@patterkit/model";
 import { slug } from "./handle.js";
 import { newId } from "./ids.js";
 import { canonicalStringify } from "./serialize.js";
@@ -55,7 +56,7 @@ const trimSlash = (p: string): string => p.replace(/\/+$/, "");
 export function planProject(opts: { name: string; locale?: string }): { path: string; content: string } {
   const locale = opts.locale ?? "en";
   const project: ProjectFile = {
-    schema: "patter/project@0",
+    schema: PROJECT_SCHEMA,
     project: { id: newId("proj"), name: opts.name },
     locales: { default: locale, all: [locale] },
     voiced: true,
@@ -105,10 +106,10 @@ export function planScene(target: ScenePlanTarget, scaffold: SceneScaffold): Sce
     id: sceneId, type: "scene", name: scaffold.name, gameId: scaffold.gameId,
     blocks: [{ id: newId("blk"), type: "block", name: "Main", children }],
   };
-  const flow: FlowFile = { schema: "patter/flow@0", scene };
-  const locale: LocaleFile = { schema: "patter/strings@0", scene: sceneId, locale: target.locale, default: true, strings };
-  const flowDir = trimSlash(target.layout?.flow ?? "scenes/");
-  const stringsDir = trimSlash(target.layout?.strings ?? "loc/");
+  const flow: FlowFile = { schema: FLOW_SCHEMA, scene };
+  const locale: LocaleFile = { schema: STRINGS_SCHEMA, scene: sceneId, locale: target.locale, default: true, strings };
+  const flowDir = trimSlash(projectLayout(target).flow);
+  const stringsDir = trimSlash(projectLayout(target).strings);
   return {
     sceneId,
     writes: [

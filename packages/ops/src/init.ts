@@ -12,6 +12,7 @@ import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { newId, slug, canonicalStringify } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile } from "@patterkit/model";
 import type { PlannedWrite } from "./write.js";
+import { FLOW_SCHEMA, PROJECT_SCHEMA, STRINGS_SCHEMA } from "@patterkit/model";
 
 export type InitVcs = "git" | "perforce" | "plastic" | "svn";
 
@@ -55,14 +56,14 @@ export function runInit(opts: InitOptions): InitResult {
   const sceneId = newId("scn");
   const beatId = newId("T");
   const project: ProjectFile = {
-    schema: "patter/project@0",
+    schema: PROJECT_SCHEMA,
     project: { id: newId("proj"), name },
     locales: { default: "en", all: ["en"] },
     ...(opts.vcs ? { vcs: opts.vcs } : {}), // record the chosen VCS so it can be read / switched later
     voiced: true,
   };
   const flow: FlowFile = {
-    schema: "patter/flow@0",
+    schema: FLOW_SCHEMA,
     scene: {
       id: sceneId, type: "scene", name: "Start",
       blocks: [{
@@ -76,7 +77,7 @@ export function runInit(opts: InitOptions): InitResult {
     },
   };
   const locale: LocaleFile = {
-    schema: "patter/strings@0", scene: sceneId, locale: "en", default: true,
+    schema: STRINGS_SCHEMA, scene: sceneId, locale: "en", default: true,
     // The starter line is STORY content the writer replaces, so it must read the same however the
     // project was made: no file paths, no commands. (Front-ends give their own next step - `patter init`
     // prints "try: patter play <dir>" on the terminal, and Patterpad just opens the scene for editing.)

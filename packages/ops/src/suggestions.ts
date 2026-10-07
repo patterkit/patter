@@ -15,7 +15,7 @@
 
 import { readFileSync } from "node:fs";
 import { canonicalStringify, parseSource } from "@patterkit/core";
-import { walkNodes } from "@patterkit/model";
+import { walkNodes, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, Beat, FlowFile, Group, LineBeat, LocaleFile, Scene, Snippet, Suggestion } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
@@ -113,7 +113,7 @@ class Working {
     if (!af) {
       const i = this.loaded.authoringFiles.indexOf(path);
       const existing = i >= 0 ? this.loaded.authoring[i] : undefined;
-      af = existing ? structuredClone(existing) : { schema: "patter/authoring@0" };
+      af = existing ? structuredClone(existing) : { schema: AUTHORING_SCHEMA };
       this.authoring.set(path, af);
     }
     return af;

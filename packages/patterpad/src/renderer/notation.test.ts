@@ -98,7 +98,7 @@ describe("the coverage meta line", () => {
 describe("the problems bar's copy", () => {
   const problem = (over: Partial<Problem>): Problem => ({ category: "structure", severity: "error", message: "x", ...over });
   const CODES = ["missing-prompt", "invalid-prompt", "unknown-character", "empty-snippet", "empty-container", "empty-scene",
-    "missing-name", "choice-can-empty", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
+    "missing-name", "choice-can-empty", "jump-cycle", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
     "duplicate-gameid", "stale-build", "merge-conflict"];
 
   it("has an entry for every code Patterpad raises, each a sentence", () => {

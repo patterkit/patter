@@ -162,9 +162,20 @@ export function reachabilityIssues(loaded: LoadedProject, compiled?: Bundle): Co
   // host's, a list that missed `@story` whenever no game scopes folder named it, so a story setting
   // `@story.met` read as the only writer. Naming what the project owns needs no such list, and one answer
   // at the classification boundary means no guard at each use site to drift apart.
+  //
+  // And `@patter` is the project's alone only while the game does not share it. Where the game keeps a
+  // game scopes folder, Patter's file there publishes every SHARED property (`shared` is the default) to
+  // the family's other engines, which may write it on the same registry (the Storylet Engine compiles a
+  // family token's writes unchecked). Nothing in this bundle can then refute a reset, so a shared
+  // `@patter` property is no latch either; an unshared one, and every `@scene` one, still is.
+  const sharedWithGame = new Set(loaded.gameScopes
+    ? (loaded.project.properties ?? []).filter((p) => p.shared ?? true).map((p) => `@patter.${p.name}`)
+    : []);
   const projectOwned = (key: string): boolean => {
     const bare = key.includes(SEP) ? key.slice(key.indexOf(SEP) + 1) : key;
-    return bare.startsWith("@patter.") || bare.startsWith("@scene.");
+    const prop = bare.includes(":") ? bare.slice(0, bare.indexOf(":")) : bare;
+    if (bare.startsWith("@patter.")) return !sharedWithGame.has(prop);
+    return bare.startsWith("@scene.");
   };
   const monotonic = (key: string): boolean =>
     latched.has(key) && !broken.has(key) && !preset.has(key) && projectOwned(key);

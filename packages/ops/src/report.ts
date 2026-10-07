@@ -28,7 +28,7 @@
 // separately.
 // ---------------------------------------------------------------------------
 
-import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS } from "@patterkit/model";
+import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS } from "@patterkit/model";
 import type { Group, Snippet, EditRecord } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { stringsByLocale, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
@@ -204,27 +204,39 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
 
     // Gather this scene's content units (line/text beats + choice labels) and count its choice points.
     const units: Unit[] = [];
+    // Units inside a cut block, group, or snippet: cut with it, as the voice script and the screenplay
+    // leave the whole branch out. Only a unit's own id was checked, so a cut branch's lines counted as
+    // live here and as cut there.
+    const underCut = new Set<string>();
     let choices = 0;
     for (const block of scene.blocks) {
-      walkNodes<Group | Snippet>(block.children, (node) => {
-        if (node.type === "group") {
-          if (node.selector === "choice") choices++;
-          if (node.prompt) units.push({ id: node.prompt.id, voiced: node.prompt.kind === "line", words: wordsOf(node.prompt.id),
-            character: node.prompt.kind === "line" ? node.prompt.character : undefined });
-          return;
+      const blockCut = cutSet.has(block.id);
+      const visit = (nodes: (Group | Snippet)[], inCut: boolean): void => {
+        for (const node of nodes) {
+          const nodeCut = inCut || cutSet.has(node.id);
+          const add = (u: Unit): void => { units.push(u); if (nodeCut) underCut.add(u.id); };
+          if (node.type === "group") {
+            if (node.selector === "choice") choices++;
+            if (node.prompt) add({ id: node.prompt.id, voiced: node.prompt.kind === "line", words: wordsOf(node.prompt.id),
+              character: node.prompt.kind === "line" ? node.prompt.character : undefined });
+            visit((node.children ?? []) as (Group | Snippet)[], nodeCut);
+            continue;
+          }
+          for (const beat of node.beats ?? []) {
+            if (beat.kind === "gameEvent") continue;
+            add({ id: beat.id, voiced: beat.kind === "line", words: wordsOf(beat.id),
+              character: beat.kind === "line" ? beat.character : undefined });
+          }
         }
-        for (const beat of node.beats ?? []) {
-          if (beat.kind === "gameEvent") continue;
-          units.push({ id: beat.id, voiced: beat.kind === "line", words: wordsOf(beat.id),
-            character: beat.kind === "line" ? beat.character : undefined });
-        }
-      });
+      };
+      visit(block.children as (Group | Snippet)[], blockCut);
     }
+    const isCut = (id: string): boolean => cutSet.has(id) || underCut.has(id);
 
     // Cut content: count it and drop out (a whole cut scene never enters the scene list).
-    for (const u of units) if (sceneCut || cutSet.has(u.id)) { cut.writtenLines++; if (u.voiced) cut.voicedLines++; }
+    for (const u of units) if (sceneCut || isCut(u.id)) { cut.writtenLines++; if (u.voiced) cut.voicedLines++; }
     if (sceneCut) { cut.scenes++; continue; }
-    const live = units.filter((u) => !cutSet.has(u.id));
+    const live = units.filter((u) => !isCut(u.id));
     for (const u of live) if (sourceStrings[u.id]) localeIds.push(u.id);
 
     // Scene status = the lowest-rung live beat; eligibility for estimating = the HIGHEST is at/below threshold.

@@ -14,7 +14,7 @@ import { validateConditions, validateInterpolation, hostScopesToSpec, projectSco
 import { compileLoaded, bundleOutputPath } from "./compile.js";
 import type { ConditionIssue } from "@patterkit/compiler";
 import type { Bundle } from "@patterkit/model";
-import { PROJECT_LOCALE_SCENE } from "@patterkit/model";
+import { PROJECT_LOCALE_SCENE, projectLayout } from "@patterkit/model";
 import { reachabilityIssues } from "./reachability.js";
 import { walkFilesByExt } from "./load.js";
 import { SHARD_EXTENSIONS } from "./pack.js";
@@ -186,7 +186,7 @@ export function orphanShards(loaded: LoadedProject, tree: Map<string, string[]> 
   // (the Hamlet demo, 2026-09-03). The loader collects by folder, so the folder is the rule.
   // The message names the file, relative to the project, and the folder this project reads that kind
   // from: "this file" with no file was the one thing a reader could not act on.
-  const layout = { flow: "scenes/", strings: "loc/", authoring: "authoring/", ...loaded.project.layout };
+  const layout = projectLayout(loaded.project);
   const kind: Record<string, { what: string; home: string | null }> = {
     ".patterflow": { what: "scene", home: layout.flow },
     ".patterloc": { what: "strings", home: layout.strings },

@@ -22,7 +22,7 @@
 // ---------------------------------------------------------------------------
 
 import { canonicalStringify } from "@patterkit/core";
-import { walkNodes, PROJECT_LOCALE_SCENE } from "@patterkit/model";
+import { walkNodes, PROJECT_LOCALE_SCENE, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { Group, Snippet, LocaleFile, AuthoringFile } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
@@ -128,7 +128,7 @@ export function runReplace(loaded: LoadedProject, opts: ReplaceOptions): Replace
       let af = stamped.get(aPath);
       if (!af) {
         const ai = loaded.authoringFiles.indexOf(aPath);
-        af = ai >= 0 ? structuredClone(loaded.authoring[ai]!) : { schema: "patter/authoring@0" };
+        af = ai >= 0 ? structuredClone(loaded.authoring[ai]!) : { schema: AUTHORING_SCHEMA };
         stamped.set(aPath, af);
       }
       const edits = { ...af.edits };

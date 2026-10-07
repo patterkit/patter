@@ -34,6 +34,10 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
     next: "Once each option is used up and there's no fallback, it has nothing left to show.",
   }),
   "multiple-fallbacks": () => ({ text: "A choice can have at most one fallback option." }),
+  "jump-cycle": () => ({
+    text: "These jumps go round in a loop with nothing in between.",
+    next: "Add a line, a choice, or a condition somewhere in the loop, or the story gets stuck here.",
+  }),
   "dangling-jump": () => ({ text: "This doesn't point anywhere valid.", next: "Choose where it goes." }),
   "jump-into-non-addressable": () => ({ text: "This doesn't point anywhere valid.", next: "Choose where it goes." }),
   "invalid-gameid": (p) => ({

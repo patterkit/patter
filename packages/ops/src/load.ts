@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { parseSource } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene } from "@patterkit/model";
-import { isCaseOnlyPropertyName } from "@patterkit/model";
+import { isCaseOnlyPropertyName, projectLayout } from "@patterkit/model";
 import { discoverGameScopes } from "./game-scopes.js";
 import type { GameScopes } from "./game-scopes.js";
 
@@ -210,7 +210,7 @@ export function sceneIdForShard(shardPath: string): string | undefined {
     if (p.endsWith(".patterx")) {
       const projectFile = findProjectFile(p);
       const project = parseFile<ProjectFile>(projectFile, "patter/project", "project");
-      const flowDir = join(dirname(projectFile), project.layout?.flow ?? "scenes/");
+      const flowDir = join(dirname(projectFile), projectLayout(project).flow);
       const flowPath = join(flowDir, basename(p).replace(/\.patterx$/, ".patterflow"));
       return (parseSource(readFileSync(flowPath, "utf8")) as FlowFile).scene?.id;
     }
@@ -232,7 +232,7 @@ export function loadProjectLanding(startPath: string, opts?: { launchPath?: stri
   const projectFile = findProjectFile(startPath);
   const root = dirname(projectFile);
   const project = parseFile<ProjectFile>(projectFile, "patter/project", "project");
-  const layout = { flow: "scenes/", strings: "loc/", authoring: "authoring/", ...project.layout };
+  const layout = projectLayout(project);
 
   const flowFiles = walkFiles(join(root, layout.flow), ".patterflow");
   const launchPath = opts?.launchPath ? resolve(opts.launchPath) : undefined;
@@ -275,9 +275,11 @@ export function loadProjectLanding(startPath: string, opts?: { launchPath?: stri
     if (!found) {
       for (const f of walkFiles(strings, ".patterloc")) {
         const loc = parseFile<LocaleFile>(f, "patter/strings", "strings");
-        if (loc.scene !== landingScene.id) continue;
+        // The source language only: Patterpad edits nothing else, and another language's shard taken here
+        // (met first in the scan) sat in the landing view as though it were the scene's strings.
+        if (loc.scene !== landingScene.id || loc.locale !== defaultLocale) continue;
         locales.push(loc); localeFiles.push(f);
-        if (loc.locale === defaultLocale || loc.default) break; // got the source-language shard; stop scanning
+        break;
       }
     }
   }
@@ -306,7 +308,7 @@ export function loadProject(startPath: string): LoadedProject {
   const root = dirname(projectFile);
   const project = parseFile<ProjectFile>(projectFile, "patter/project", "project");
 
-  const layout = { flow: "scenes/", strings: "loc/", authoring: "authoring/", ...project.layout };
+  const layout = projectLayout(project);
 
   const scenes: Scene[] = [];
   const sceneFiles: Record<string, string> = {};
