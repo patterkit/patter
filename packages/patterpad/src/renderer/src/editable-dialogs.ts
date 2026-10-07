@@ -6,7 +6,9 @@
 // the last pick. Reimport plans first (nothing is written), shows what the file holds, re-plans when an
 // option changes, and only writes when the person chooses how.
 
-import { dialogFrame, metaLine, toast } from "@wildwinter/app-shell";
+import { dialogFrame, metaLine, toast, labelledToggle } from "@wildwinter/app-shell";
+import { plural } from "@wildwinter/app-shell/util";
+import { landed } from "./results.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary } from "../../shared/api.js";
 import { el } from "./dom.js";
 
@@ -30,16 +32,11 @@ const remembered = (): "scene" | "project" => {
 };
 const remember = (r: "scene" | "project"): void => { try { localStorage.setItem(RANGE_KEY, r); } catch { /* private window */ } };
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
-/** A checkbox row in the settings style: a label and a small explanation. */
-function toggleRow(label: string, hint: string, checked = false): { row: HTMLLabelElement; input: HTMLInputElement } {
-  const row = el("label", "settings-toggle");
-  const input = el("input"); input.type = "checkbox"; input.checked = checked;
-  const text = el("span", undefined, label);
-  text.append(el("small", undefined, hint));
-  row.append(input, text);
-  return { row, input };
+/** A checkbox row in the settings style: the family's `labelledToggle` (ruling C), a label and a small
+ *  explanation underneath. */
+function toggleRow(label: string, hint: string, checked = false): { row: HTMLElement; input: HTMLInputElement } {
+  return labelledToggle(label, { checked, hint });
 }
 
 /** Review ▸ Export Editable Script…: choose the range and options, then save the .docx in main. */
@@ -97,7 +94,7 @@ export async function openEditableExport(ctx: EditableDialogContext): Promise<vo
     frame.close();
     const res = await ctx.withJob("Exporting the editable script…", () => window.patter.exportEditable(req));
     if (res.ok) toast(`Editable script exported\n${ctx.rel(res.path) ?? ""}\nHandoff ${res.handoffId ?? ""}`, "ok");
-    else if (!res.canceled) toast(res.error ? `Export failed: ${res.error}` : "Export failed", "error");
+    else if (!res.canceled) landed({ ok: false, ...(res.error ? { error: res.error } : {}) }, "Couldn't export the editable script");
   });
   frame.actions.append(cancel, go);
   frame.open();
@@ -129,6 +126,7 @@ export async function openEditableReimport(ctx: EditableDialogContext): Promise<
   frame.actions.append(close, direct, asSuggestions);
 
   let current: EditableImportSummary | undefined;
+  let applying = false; // a re-plan landing during the apply must not repaint and re-enable the buttons
   const request = (isDirect: boolean): EditableImportRequest => ({ ...(as.value.trim() ? { as: as.value.trim() } : {}), strictQuotes: quotes.input.checked, direct: isDirect });
   const plan = async (isDirect = false): Promise<EditableImportSummary> => {
     const s = await window.patter.planEditableImport(path, request(isDirect));
@@ -136,6 +134,7 @@ export async function openEditableReimport(ctx: EditableDialogContext): Promise<
     return s;
   };
   const paint = (s: EditableImportSummary): void => {
+    if (applying) return;
     current = s;
     summary.replaceChildren(...renderSummary(s, ctx, () => frame.close()));
     const canImport = !s.refused && !!s.planId;
@@ -146,15 +145,20 @@ export async function openEditableReimport(ctx: EditableDialogContext): Promise<
   };
 
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const replan = (): void => { clearTimeout(timer); timer = setTimeout(async () => paint(await plan()), 250); };
+  const replan = (): void => { clearTimeout(timer); timer = setTimeout(async () => { timer = undefined; paint(await plan()); }, 250); };
   as.addEventListener("input", replan);
   quotes.input.addEventListener("change", replan);
 
   const apply = async (isDirect: boolean): Promise<void> => {
     error.hidden = true;
     direct.disabled = asSuggestions.disabled = true;
-    const s = isDirect ? await plan(true) : (current ?? await plan());
-    if (!s.planId) { paint(s); return; }
+    applying = true;
+    // A re-plan still waiting (a name typed into "Edits by" a moment ago) would be lost: plan afresh then,
+    // rather than apply the plan from before the edit.
+    const pending = timer !== undefined;
+    clearTimeout(timer); timer = undefined;
+    const s = isDirect || pending || !current ? await plan(isDirect) : current;
+    if (!s.planId) { applying = false; paint(s); return; }
     const res = await window.patter.applyEditableImport(s.planId);
     if (res.ok) {
       frame.close();
@@ -162,6 +166,7 @@ export async function openEditableReimport(ctx: EditableDialogContext): Promise<
     } else {
       error.textContent = res.error ?? "The import couldn't be written.";
       error.hidden = false;
+      applying = false;
       direct.disabled = asSuggestions.disabled = false;
     }
   };
@@ -181,7 +186,8 @@ function renderSummary(s: EditableImportSummary, ctx: EditableDialogContext, clo
     out.push(el("p", "editable-refused", s.refused));
     return out;
   }
-  const sent = s.sentAt ? new Date(s.sentAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+  // The reader's own date order, as the suggestion popover shows it.
+  const sent = s.sentAt ? new Date(s.sentAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
   out.push(el("p", "editable-summary-line", `Handoff ${s.handoffId ?? ""}${s.recipient ? `, sent to ${s.recipient}` : ""}${sent ? ` on ${sent}` : ""}${s.sentBy ? ` by ${s.sentBy}` : ""}.`));
   const c = s.counts;
   const bits = [

@@ -13,7 +13,7 @@ import { Plugin, PluginKey } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import { createGutterOverlay } from "./gutterlayer.js";
-import { findBeatById, findBeatsByIds } from "../src/zoneutil.js";
+import { findBeatById, findBeatsByIds, editsInsideTextblocks } from "../src/zoneutil.js";
 
 /** One open suggestion to surface on a beat: its id, the beat it anchors to, a hover preview, and whether
  *  it's STALE (its baseline no longer matches the live text - the line changed since it was suggested). */
@@ -49,7 +49,18 @@ export function startSuggestion(view: EditorView, beatId: string, fallbackAnchor
   openHandler({ nodeId: beatId, create: true, anchor: dom instanceof HTMLElement ? dom : fallbackAnchor });
 }
 
-const key = new PluginKey<SuggestionMark[]>("patterSuggestions");
+/** The marks, plus their decoration set cached alongside (rebuilt only on a push or an edit, as the
+ *  problems plugin does), so a caret move never re-walks the doc for them (review 2026-10). */
+interface SuggestionState { marks: SuggestionMark[]; deco: DecorationSet }
+const key = new PluginKey<SuggestionState>("patterSuggestions");
+
+function suggestionDecos(doc: import("prosemirror-model").Node, marks: SuggestionMark[]): DecorationSet {
+  if (!marks.length) return DecorationSet.empty;
+  const beats = findBeatsByIds(doc, new Set(marks.map((m) => m.nodeId))); // one walk for all marked beats
+  const decos: Decoration[] = [];
+  for (const [, beat] of beats) decos.push(Decoration.node(beat.pos, beat.pos + beat.node.nodeSize, { class: "has-suggestion" }));
+  return DecorationSet.create(doc, decos);
+}
 const SUGGESTION_GAP = 52; // px from the column's right edge - the OUTERMOST lane (comments 8, notes 30)
 
 // A filled pencil glyph (inherits currentColor - no colour emoji, matching the app's icons).
@@ -66,32 +77,29 @@ function marker(nodeId: string, group: SuggestionMark[]): HTMLElement {
   return b;
 }
 
-export function suggestionsPlugin(): Plugin<SuggestionMark[]> {
-  return new Plugin<SuggestionMark[]>({
+export function suggestionsPlugin(): Plugin<SuggestionState> {
+  return new Plugin<SuggestionState>({
     key,
     state: {
-      init: () => [],
-      apply: (tr, value) => (tr.getMeta(key) as SuggestionMark[] | undefined) ?? value,
-    },
-    props: {
-      decorations(state) {
-        const marks = key.getState(state) ?? [];
-        if (!marks.length) return null;
-        const beats = findBeatsByIds(state.doc, new Set(marks.map((m) => m.nodeId))); // one walk for all marked beats
-        const decos: Decoration[] = [];
-        for (const [, beat] of beats) decos.push(Decoration.node(beat.pos, beat.pos + beat.node.nodeSize, { class: "has-suggestion" }));
-        return DecorationSet.create(state.doc, decos);
+      init: () => ({ marks: [], deco: DecorationSet.empty }),
+      apply: (tr, value) => {
+        const meta = tr.getMeta(key) as SuggestionMark[] | undefined;
+        if (meta) return { marks: meta, deco: suggestionDecos(tr.doc, meta) };
+        // Typing inside a line moves no node: map the set. Anything structural rebuilds it.
+        if (tr.docChanged && value.marks.length) return { marks: value.marks, deco: editsInsideTextblocks(tr) ? value.deco.map(tr.mapping, tr.doc) : suggestionDecos(tr.doc, value.marks) };
+        return value;
       },
     },
+    props: { decorations: (state) => key.getState(state)?.deco ?? null },
     // Gutter overlay (a sibling of the doc on the scroll container - escapes bubble/block paint containment,
     // like the note / comment overlays). One pencil per beat with open suggestion(s).
     view(editorView) {
       return createGutterOverlay(editorView, {
         className: "suggestion-gutter",
         gap: SUGGESTION_GAP,
-        active: (view) => suggestionsEnabled() && (key.getState(view.state) ?? []).length > 0,
+        active: (view) => suggestionsEnabled() && (key.getState(view.state)?.marks ?? []).length > 0,
         paint: ({ view, topOf, add }) => {
-          const marks = key.getState(view.state) ?? [];
+          const marks = key.getState(view.state)?.marks ?? [];
           const byBeat = new Map<string, SuggestionMark[]>();
           for (const m of marks) { const a = byBeat.get(m.nodeId) ?? []; a.push(m); byBeat.set(m.nodeId, a); }
           const beats = findBeatsByIds(view.state.doc, new Set(byBeat.keys())); // one walk, not one per beat-group

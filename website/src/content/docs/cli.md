@@ -102,7 +102,7 @@ content reached in fewer than 5% of runs (`~`). The table lists each beat's **re
 runs that played it) and **played** (times it played in all runs), least reached first; `--order
 script` lists them in the script's order instead, scene by scene. `--runs N` · `--max-steps M` ·
 `--seed S` · `--scene id` · `--block id`. `--json` for pipelines; `--fail-on-gap` exits **1** if any
-beat is never reached (a CI gate). `--propose` prints auto-proposed `@world` input drivers instead
+beat is never reached (a CI gate). `--propose` prints auto-proposed `@world` coverage drivers instead
 of running. The same check has a window in Patterpad (**Review ▸ Coverage Test…**); see
 [Coverage testing](/production/coverage-testing/) for how to read it.
 

@@ -9,7 +9,7 @@ import type { WritingStatusDecl, RecordingStatusDecl, RecordingFolder } from "@p
 import { deriveRecordingFolders } from "@patterkit/model";
 import { PALETTE_SIZE } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
-import { iconBtn, moveItem, focusNewRow } from "@wildwinter/app-shell";
+import { iconBtn, moveItem, focusNewRow, labelledToggle } from "@wildwinter/app-shell";
 
 export interface WritingStatusHandle { value(): WritingStatusDecl[]; }
 export interface AudioHandle { value(): { trackAudioStatus: boolean; recordingStatuses: RecordingStatusDecl[]; audioFolders: boolean; audioRoot: string | null; scratchStatus: string | null }; }
@@ -179,16 +179,13 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
     
     host.replaceChildren();
 
-    // Master gate (#206): "Track Audio Status?" at the very top. The tab itself is already disabled unless the
+    // Master gate (#206): "Track audio status" at the very top. The tab itself is already disabled unless the
     // project is Voiced (syncAudioSettingsTab), so this is the second, opt-out switch WITHIN a voiced project.
     // Off => everything below is inert, and nothing downstream (inspector, report, .xlsx) shows audio status.
-    const trackRow = el("label", "settings-toggle");
-    const tcb = el("input") as HTMLInputElement; tcb.type = "checkbox"; tcb.checked = trackAudioStatus;
-    const tcap = el("span"); tcap.append(document.createTextNode("Track Audio Status?"));
-    tcap.append(el("small", undefined, "Shows each voiced line's recording progress in the inspector, reports, and exports."));
-    tcb.addEventListener("change", () => { trackAudioStatus = tcb.checked; render(); });
-    trackRow.append(tcb, tcap);
-    host.append(trackRow);
+    host.append(labelledToggle("Track audio status", {
+      checked: trackAudioStatus, hint: "Shows each voiced line's recording progress in the inspector, reports, and exports.",
+      onChange: (on) => { trackAudioStatus = on; render(); },
+    }).row);
 
     // Everything below (the ladder, Audio Folders, scratch) is inert + dimmed until tracking is on.
     const body = el("div", "sp-audio-body");
@@ -216,19 +213,16 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
 
     // The Audio Folders toggle sits BELOW the ladder: off = manual recording status (set per line in the
     // inspector); on = derive each dialogue line's status from which derived folder holds its <beatId>.wav (#206).
-    const modeRow = el("label", "settings-toggle");
-    const cb = el("input") as HTMLInputElement; cb.type = "checkbox"; cb.checked = audioFolders;
-    cb.addEventListener("change", () => {
-      audioFolders = cb.checked;
-      // Turning folder mode ON: guarantee the "not recorded" fallback, and seed a sensible default audio root
-      // (../audio) so the derived subfolders are immediately meaningful. Never clobber an existing root.
-      if (audioFolders) { ensureSentinel(); if (!audioRoot.trim()) audioRoot = "../audio"; }
-      render();
-    });
-    const cap = el("span"); cap.append(document.createTextNode("Use Audio Folders"));
-    const sub = el("small", undefined, "Derive each dialogue line's recording status from audio files on disk."); cap.append(sub);
-    modeRow.append(cb, cap);
-    body.append(modeRow);
+    body.append(labelledToggle("Use Audio Folders", {
+      checked: audioFolders, hint: "Derive each dialogue line's recording status from audio files on disk.",
+      onChange: (on) => {
+        audioFolders = on;
+        // Turning folder mode ON: guarantee the "not recorded" fallback, and seed a sensible default audio
+        // root (../audio) so the derived subfolders are immediately meaningful. Never clobber an existing root.
+        if (audioFolders) { ensureSentinel(); if (!audioRoot.trim()) audioRoot = "../audio"; }
+        render();
+      },
+    }).row);
 
     // Scratch recording (#224, folder mode only): a toggle + a picker for which rung's derived folder receives
     // in-app scratch takes. The picker lists only rungs that have a derived folder (needs an audio root).
@@ -236,15 +230,13 @@ export function mountAudio(host: HTMLElement, initial: { trackAudioStatus: boole
       const rungs = folderRungs();
       if (scratchStatus && !rungs.some((r) => r.name.trim() === scratchStatus)) scratchStatus = null; // its folder went away
       const scratchOn = scratchStatus != null;
-      const row = el("label", "settings-toggle");
-      const cb2 = el("input") as HTMLInputElement; cb2.type = "checkbox"; cb2.checked = scratchOn; cb2.disabled = rungs.length === 0;
-      const cap2 = el("span"); cap2.append(document.createTextNode("Enable scratch recording"));
-      const sub2 = el("small", undefined, rungs.length === 0
-        ? "Set an audio root first. Scratch takes record into a status folder."
-        : "Record scratch takes in Patterpad, straight into a status folder."); cap2.append(sub2);
-      cb2.addEventListener("change", () => { scratchStatus = cb2.checked ? (scratchStatus ?? rungs[0]?.name.trim() ?? null) : null; render(); });
-      row.append(cb2, cap2);
-      body.append(row);
+      body.append(labelledToggle("Enable scratch recording", {
+        checked: scratchOn, disabled: rungs.length === 0,
+        hint: rungs.length === 0
+          ? "Set an audio root first. Scratch takes record into a status folder."
+          : "Record scratch takes in Patterpad, straight into a status folder.",
+        onChange: (on) => { scratchStatus = on ? (scratchStatus ?? rungs[0]?.name.trim() ?? null) : null; render(); },
+      }).row);
       if (scratchOn) {
         const pick = el("label", "sp-folder");
         pick.append(el("span", "sp-folder-cap", "Records into"));

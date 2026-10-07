@@ -13,11 +13,11 @@ const handlers: InspectorHandlers = {
   reveal: noop, editNote: noop, hasNotes: () => false,
   editCondition: noop, editGameId: noop, editGroupProps: noop, editJump: noop,
   editEffects: noop, condPreview: () => document.createElement("span"), effectsPreview: () => document.createElement("span"),
-  jumpLabel: () => "", addOption: noop, removeChunk: noop, moveChunk: noop,
+  jumpLabel: () => "",
   // These three arrived after this stub was written and it never followed. Nothing failed, because a
   // missing handler is only reached by the branch that calls it: the gap surfaced when this file came
   // inside the typecheck, not when the tests ran.
-  setJumpMode: noop, textMode: () => false, setTags: noop,
+  setJumpMode: noop, setTags: noop,
   gameDataFields: () => [], setGameData: noop, sceneProps: () => [], editSceneProps: noop,
   writingStatuses: () => [], lineStatus: () => null, setLineStatus: noop,
   recordingStatuses: () => [], recordingStatus: () => null, setRecordingStatus: noop,

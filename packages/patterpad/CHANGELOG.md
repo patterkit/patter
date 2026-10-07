@@ -14,12 +14,57 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   and version control would then run what that file names. Patterpad now writes only scenes, strings,
   authoring, the project file, the game's scopes, and handoff records, and refuses a pack with a hidden file
   or folder in it.
+- **Only the editor window can reach the editor's controls.** The play, search, and coverage windows each get
+  their own controls and nothing else, and removing a dictionary checks it is one you imported.
 - **Importing a translation can't write outside the project.** A file naming a scene the project doesn't
   have, or a language it doesn't declare, is refused and nothing is written.
 
 ### Fixed
 
-- **Build Bundle and Auto Rebuild refuse a project with errors in it,** listing them, rather than building a
+- **Merging a returned patterpack no longer undoes itself.** The open scene kept its text from before the
+  merge, and the next save wrote it back over what had just merged; the scene now reloads, and anything you
+  hadn't saved is saved first. Close Project afterwards closes the project, as it does after New Project.
+- **Deleting a scene that version control won't let go of says so,** and leaves the scene whole, rather than
+  reporting it deleted with its strings left behind.
+- **A save that is refused says so.** Project Settings, Notes, comments, suggestions, a new or deleted scene,
+  and a quick fix only reported a refusal (a file locked in version control) to the developer console, and
+  Project Settings closed with your edits gone; it now stays open with them in it.
+- **Back and Forward stay within the project you're in,** rather than leading into places from the last one.
+- **Ticking Needs re-record opens Notes on the VO note,** where the reason travels with the voice script.
+- **Following a run in the editor no longer shows the scene twice,** with typing in one copy never saved.
+- **A scene with no strings file of its own saves what you type** into a new one, rather than reporting the
+  save done and keeping nothing.
+- **Live Link stops when you close the project,** and Play ▸ Live Link can't start it with nothing open.
+- **Esc leaves Writing View,** as the docs said it did, and closing the project leaves it too.
+- **The problems bar keeps your place** as you type, rather than going back to the first problem, and both
+  bottom bars come back after you visit the overview or the Properties page.
+- **Review Feedback finds the project's feedback from the Properties page,** rather than saying there is none.
+- **Quality properties keep their stages in the condition editor** after you save the settings.
+- **The Scene properties dialog refuses two properties with one name,** as the other property editors do.
+- **The search window's Replace preview is the new project's** after you open another one.
+- **Publish ▸ Update Audio Manifest is available only under Audio Folders,** the one case it can work in.
+- **Coverage Test marks a Runs or Max steps value it can't use** and holds Run, rather than quietly running
+  5,000.
+- **Editing keeps what it should.** Setting a jump on a bubble holding only a game event kept the jump and
+  deleted the event; it keeps both now. A new option's choice text survives clicking into the inspector.
+  Bold and italic survive joining lines and switching a line between dialogue and narration.
+- **An edit that would lose a condition, effects, a jump, or a whole choice is refused,** with a note saying
+  what to move first. Joining two bubbles, deleting across them, and typing or pasting over a selection
+  used to drop the second bubble's logic without a word.
+- **Paste works.** Several paragraphs become lines of their own, a copied dialogue line pastes as its words
+  without the speaker, a copy across lines no longer fails, and a paste from Google Docs is no longer all
+  bold.
+- **Backspace on a selected block heading asks before deleting the block,** as its menu does, and the last
+  block of a scene can't be deleted.
+- **A locked scene can't be changed through the editor's menus, grips, or add buttons,** as it already
+  couldn't by typing.
+- **Smaller editing fixes:** ungrouping a choice leaves plain groups without choice text; Wrap in is not
+  offered for options; right-clicking a choice's text opens the option's menu; Delete at the end of a line
+  joins the next line to it rather than removing it; Enter replaces a selection; a duplicated fallback option
+  is no longer a second fallback; Esc in the scene title or a block's name puts back what was there, and the
+  title follows Undo; Tab stays in the editor; a speaker's name can be typed with an input method.
+- **Typing in a long scene with spell-check on is quicker:** only the lines you change are checked again.
+- **Publish Bundle and Auto Rebuild refuse a project with errors in it,** listing them, rather than building a
   bundle the game then fails on. Auto Rebuild keeps the last good build until the errors are fixed, which is
   what it always meant to do, and Live Link no longer pushes a broken build to a running game.
 - **Merging a returned patterpack keeps comment replies and resolves from both sides,** and never brings back a
@@ -35,7 +80,6 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 - **Coverage Test no longer blames a write that ran,** follows gated jumps for both its "may need an input"
   hint and its "written only by" line (saying when the gate is on the way in), and leaves out empty lines
   that never ship.
-
 - **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a
   moment after you stop typing, and a quit inside that moment used to close without saving. It now finishes
   writing first. Leaving the window for another app also saves.
@@ -47,8 +91,6 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   restores the value the field had when you clicked into it, as Storyletter's fields do. A half-typed tag is
   dropped rather than added when you click away.
 - **Help ▸ PatterKit Documentation Home** is named for the suite. It said "Patter".
-- **The Autosave setting describes what it does:** it saves a moment after you stop typing, not every
-  30 seconds.
 - **The About box says "licence"**, in UK English like the rest of Patterpad.
 - **Pressing Enter at Merge Returned Patterpack's confirmation cancels.** It used to merge. The confirmation
   now uses Patterpad's own dialog, matching its other confirmations, with Cancel selected to begin with.
@@ -58,9 +100,26 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - **An error in the problems bar is shown in red,** and a warning in the warning colour, as Storyletter shows
   them, so the colour says how serious the problem in view is.
-- **Build Bundle writes the same files as `patter export`,** which now uses the same `patter-dist/` folder beside
-  the project. Auto Rebuild also brings the game's shared scopes file up to date.
-
+- **Publish Bundle writes the same files as `patter export`,** which now uses the same `patter-dist/` folder
+  beside the project. Auto Rebuild also brings the game's shared scopes file up to date.
+- **Patterpad always saves as you work,** a moment after you stop typing, as Storyletter does. The Autosave
+  setting is gone: turned off, it only stopped the timer, and every scene switch, play, and window change
+  still saved.
+- **Auto Rebuild is your own setting,** kept with Patterpad rather than in the project file, so turning it on
+  no longer turns it on for everyone on the project. It's on the Publish menu, as in Storyletter.
+- **Share Scopes with Other Tools goes straight to choosing the folder,** as Storyletter's does.
+- **One name for each thing:** the setting for where Publish Bundle writes is **Bundle path** in both Project
+  Settings and New Project; the audio tab is **Recording status**, the Review menu's submenu **Writing
+  Status**, the Coverage window's button **Run coverage**, and its drivers **coverage drivers**; Game Data is
+  capitalised as the feature's name.
+- **The health chip's clean answer names the project,** since it checks the whole project, and the
+  version-control chip's tip names the system.
+- **Save As and Open an Example add their copy to version control** when it lands in a working copy, as
+  opening a patterpack does.
+- **Project Settings rows look like Storyletter's:** the caption to the left, the control beside it, and any
+  explanation underneath. The Notes editor is the family's too, and Notes now saves when you close it.
+- **Smaller wording fixes** to confirmations ("You can't undo this."), tooltips, and messages, following the
+  family's house style, and the topbar Play button is the family's button.
 - **The Live Link control says "Live Link"** beside its plug icon in the bottom corner, as Storyletter's does.
 - **The welcome screen offers a kit to start from,** above the finished projects, as Storyletter's does.
   Clicking it opens New Project with that kit chosen.

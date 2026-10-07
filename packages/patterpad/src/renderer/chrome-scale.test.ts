@@ -48,7 +48,7 @@ describe("chrome scale: no rem in chrome rules", () => {
   });
 
   it("the Play window's controls are px; its rendered walk keeps the reading scale", () => {
-    for (const sel of [".play-bar", ".play-from", ".play-addr", ".play-locale", ".play-speed", ".play-rewind", ".padv", ".play-stop", ".pnote", ".plive", ".pchoice.restart"]) {
+    for (const sel of [".play-bar", ".play-from", ".play-addr", ".play-locale", ".play-speed", ".play-rewind", ".padv", ".play-stop", ".pnote", ".pchoice.restart"]) {
       expect(rule(play, sel), sel).not.toMatch(REM);
     }
     expect(rule(play, "body.play")).toContain("1rem/1.6 var(--font-read)");

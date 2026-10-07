@@ -18,6 +18,7 @@
 import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState, Transaction } from "prosemirror-state";
 import { newId } from "@patterkit/core";
+import { isChoiceGroup } from "./zoneutil.js";
 
 /** old id -> new id for every node in a duplicated subtree. */
 export type IdMap = Record<string, string>;
@@ -142,7 +143,14 @@ export function duplicateChunk(state: EditorState, pos: number): { tr: Transacti
   const node = state.doc.nodeAt(pos);
   if (!node || !DUPLICABLE_KINDS.has(node.type.name)) return null;
   const idMap: IdMap = {};
-  const copy = cloneWithNewIds(node, idMap, node.type.name === "block" ? blockNames(state.doc) : null);
+  let copy = cloneWithNewIds(node, idMap, node.type.name === "block" ? blockNames(state.doc) : null);
+  // A choice allows ONE fallback option. A duplicated option lands in the same choice, so a copy of the
+  // fallback must not be a second one (the original keeps the role). Options inside a duplicated CHOICE
+  // are a new choice of their own, so they keep theirs.
+  if (node.type.name === "group" && isChoiceGroup(state.doc.resolve(pos).parent)) {
+    const raw = parseObj(copy.attrs.raw as string);
+    if (raw && "fallback" in raw) { delete raw.fallback; copy = copy.type.create({ ...copy.attrs, raw: JSON.stringify(raw) }, copy.content, copy.marks); }
+  }
   const tr = state.tr.insert(pos + node.nodeSize, copy);
   return { tr, idMap };
 }

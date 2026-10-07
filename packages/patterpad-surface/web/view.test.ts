@@ -36,7 +36,8 @@ describe("EditorView renders the real shard in the zone model (jsdom)", () => {
     expect(dom.querySelectorAll(".beat.kind-prose:not(.option-prompt .beat.kind-prose)").length).toBe(9);
     // The game event carries its gameData inline (#48): which event, at a glance, no inspector.
     expect(dom.querySelector(".beat.kind-gameEvent .atom-glyph svg")).not.toBeNull(); // the drawn mark, never a typed glyph
-    expect(dom.querySelector(".beat.kind-gameEvent .atom-fields")?.textContent).toBe("cue: camera_focus · target: barkeep");
+    const fields = [...dom.querySelectorAll(".beat.kind-gameEvent .atom-fields .shell-meta-part")].map((p) => p.textContent);
+    expect(fields).toEqual(["cue: camera_focus", "target: barkeep"]); // a drawn metadata line, no typed "·"
     expect(dom.querySelector(".bubble.has-jump .bubble-jump")?.textContent).toBe("↪ menu");   // read-only snippet jump chip
     // the choice is a real recursive group, rendered as a rail (its options live inside it)
     const choice = dom.querySelector(".group-rail.is-choice");

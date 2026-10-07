@@ -18,19 +18,31 @@ export function groupRole(raw: Record<string, unknown>): GroupRole {
   return raw.condition ? "conditional" : "group"; // run-group: a conditional block, else a plain run
 }
 
-/** The always-visible structural label for a group's rail header (spec / groups §3). Sentence case:
- *  the rail reads as a caption in words, never a tracked all-caps eyebrow (design-language §4). */
-export function groupLabel(raw: Record<string, unknown>): string {
+/** An option's label parts: the word, then "secret" when it hides until eligible. The rail and the
+ *  inspector both read this, so they never disagree about what an option is called (review 2026-10).
+ *  The option's diamond marker is drawn on its prompt cell (CSS), not typed into the label. */
+export function optionLabelParts(raw: Record<string, unknown>): string[] {
+  return raw.secretUntilEligible ? ["Option", "secret"] : ["Option"];
+}
+
+/** The always-visible structural label for a group's rail header (spec / groups §3), as its PARTS:
+ *  the kind first, then its qualifiers. Sentence case: the rail reads as a caption in words, never a
+ *  tracked all-caps eyebrow (design-language §4). The parts are drawn as a metadata line (the shell's
+ *  `metaLine`), never joined with a typed "·" (design-language §4, "separators are drawn"). */
+export function groupLabelParts(raw: Record<string, unknown>): string[] {
   switch (groupRole(raw)) {
-    case "option": return "◇ Option";
-    case "choice": return "Choice";
-    case "branch": return "Branch · first match";
+    case "option": return optionLabelParts(raw);
+    case "choice": return ["Choice"];
+    case "branch": return ["Branch", "first match"];
     case "sequence": {
       const o = (raw.options as { order?: string; exhaust?: string } | undefined) ?? {};
       const order = o.order === "specificity" ? "best match" : (o.order ?? "sequential");
-      return `Sequence · ${order} · ${o.exhaust ?? "once"}`;
+      return ["Sequence", order, o.exhaust ?? "once"];
     }
-    case "conditional": return "Conditional";
-    default: return "Group";
+    case "conditional": return ["Conditional"];
+    default: return ["Group"];
   }
 }
+
+/** The label as one plain string (for text-only contexts: a tooltip, an accessible name). */
+export const labelText = (parts: string[]): string => parts.join(", ");

@@ -19,7 +19,7 @@ import type { Node as PMNode } from "prosemirror-model";
 import type { Jump, Effect, GameData } from "@patterkit/model";
 import { effectiveGameId } from "@patterkit/model";
 import { cueText, zoneText, sayText, isChoiceGroup, rawAttr } from "./zoneutil.js";
-import { groupLabel, groupRole, type GroupRole } from "./grouplabel.js";
+import { groupLabelParts, optionLabelParts, labelText, groupRole, type GroupRole } from "./grouplabel.js";
 import { multiSelectPositions } from "./multiselect.js";
 
 export type LeafKind = "line" | "prose" | "gameEvent";
@@ -72,7 +72,11 @@ export interface GroupLevel {
   kind: "group";
   id: string | null;
   role: GroupRole;
-  /** The same human label the rail header shows (e.g. "Sequence · shuffle · once"). */
+  /** The same label the rail header shows, as parts: the kind, then its qualifiers (e.g. ["Sequence",
+   *  "shuffle", "once"], ["Option", "secret"]). Draw them with the shell's `metaLine`; never join them
+   *  with a typed separator (design-language §4). */
+  labelParts: string[];
+  /** The label as one plain string, the parts joined with ", " (for text-only uses). */
   label: string;
   condition?: string;
   selector?: string;
@@ -140,7 +144,7 @@ export interface InspectorContext {
 
 const EMPTY: InspectorContext = { levels: [] };
 
-/** Parse a node's `raw` attr (the round-tripped model object minus rebuilt parts); {} on failure. */
+/** A beat's id attr, or null for a node that keeps its id in `raw`. */
 const idAttr = (node: PMNode): string | null => (typeof node.attrs.id === "string" ? node.attrs.id : null);
 const rawId = (raw: Record<string, unknown>): string | null => (typeof raw.id === "string" ? raw.id : null);
 const gd = (raw: Record<string, unknown>): GameData | undefined =>
@@ -181,9 +185,8 @@ function groupLevel(node: PMNode, parent: PMNode | null): GroupLevel {
   const raw = rawAttr(node);
   // An option is recognised by its CONTAINER being a choice group (the bridge strips `prompt` from raw).
   const option = isChoiceGroup(parent);
-  const level: GroupLevel = option
-    ? { kind: "group", id: rawId(raw) ?? idAttr(node), role: "option", label: "◇ Option" }
-    : { kind: "group", id: rawId(raw) ?? idAttr(node), role: groupRole(raw), label: groupLabel(raw) };
+  const labelParts = option ? optionLabelParts(raw) : groupLabelParts(raw);
+  const level: GroupLevel = { kind: "group", id: rawId(raw) ?? idAttr(node), role: option ? "option" : groupRole(raw), labelParts, label: labelText(labelParts) };
   if (typeof raw.condition === "string" && raw.condition) level.condition = raw.condition;
   if (typeof raw.selector === "string") level.selector = raw.selector;
   const opts = raw.options as { order?: string; exhaust?: string } | undefined;
@@ -254,7 +257,7 @@ function sceneLevel(doc: PMNode): SceneLevel {
 
 /**
  * Build the container chain for the current selection, innermost-first. Climbs the
- * caret's ancestor depths (leaf -> snippet -> group(s) -> block); when an action
+ * caret's ancestor depths (leaf -> snippet -> group(s) -> block); when a game-event
  * atom is node-selected (no caret inside it) the leaf is taken from the selected
  * node and the chain from its position's ancestors.
  */

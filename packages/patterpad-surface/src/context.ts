@@ -1,17 +1,18 @@
 // ---------------------------------------------------------------------------
 // The selection -> zone context (Z2), rebuilt for the zone model. Resolves the
 // cursor to its zone (cue / paren / say), the enclosing beat (line / prose /
-// action), and the snippet / block, with caret metrics and the structural flags
+// game event), and the snippet / block, with caret metrics and the structural flags
 // the keystroke + navigation layers need. This is the single state model the
 // key-dispatch AND the hint bar read (spec section 16) - never a second, drifting
 // table. (A snippet's jump is a snippet attr, not a beat - never under the caret.)
 //
-// Doc shape: doc > block > snippet > (line > cue|paren|say | prose > say |
-// action). A caret in a zone's text sits at the zone's depth.
+// Doc shape: doc > block > (group >)* snippet > (line > cue|paren?|say | prose > say |
+// gameEvent). A caret in a zone's text sits at the zone's depth.
 // ---------------------------------------------------------------------------
 
 import { NodeSelection, type EditorState } from "prosemirror-state";
 import type { Node as PMNode, ResolvedPos } from "prosemirror-model";
+import { BEAT_TYPES, ZONE_TYPES } from "./zoneutil.js";
 
 export type ZoneRole = "cue" | "paren" | "say";
 export type BeatKind = "line" | "prose" | "gameEvent";
@@ -41,7 +42,7 @@ export interface BeatCtx extends NodeCtx {
 }
 
 export interface ZoneState {
-  zone: ZoneCtx | null;          // null when a non-zone node (action/jump atom) is selected
+  zone: ZoneCtx | null;          // null when a non-zone node (a game-event atom) is selected
   beat: BeatCtx | null;
   snippet: NodeCtx | null;
   block: NodeCtx | null;
@@ -54,8 +55,6 @@ export interface ZoneState {
   inPrompt: boolean;
 }
 
-const BEAT_TYPES = new Set(["line", "prose", "gameEvent"]);
-const ZONE_TYPES = new Set(["cue", "paren", "say"]);
 
 function ancestorWhere($pos: ResolvedPos, pred: (n: PMNode) => boolean): NodeCtx | null {
   for (let d = $pos.depth; d >= 1; d--) {

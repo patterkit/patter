@@ -18,7 +18,7 @@ import type { EditorState } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import { createGutterOverlay } from "./gutterlayer.js";
-import { modelIdOf, sayStartOf, sayText, findBeatById, findBeatsByIds } from "../src/zoneutil.js";
+import { modelIdOf, sayStartOf, sayText, findBeatById, findBeatsByIds, editsInsideTextblocks } from "../src/zoneutil.js";
 import { iconNode } from "@wildwinter/app-shell";
 
 /** One visible thread to surface: its id, the beat it anchors to, an optional span (plain-text offsets
@@ -80,7 +80,9 @@ const COMMENT_GAP = 8; // px from the column's right edge - the INNER gutter lan
 
 /** A thread resolved against the live doc: its mark + current PM span (null = whole-beat or orphaned). */
 interface Resolved { mark: CommentMark; from: number | null; to: number | null }
-interface PluginState { byId: Map<string, Resolved> }
+/** The threads, plus their decoration set cached alongside (rebuilt only on a push or an edit, as the
+ *  problems plugin does), so a caret move never re-walks the doc for them (review 2026-10). */
+interface PluginState { byId: Map<string, Resolved>; deco: DecorationSet }
 
 /** Resolve a mark's stored offsets + quote to a live PM span, or null (whole-beat / orphaned). The quote
  *  is authoritative: if it isn't at the stored offsets, search the say text for it (offsets disambiguate
@@ -134,53 +136,56 @@ function sayContextAt(state: EditorState): { nodeId: string; sayStart: number } 
   return null;
 }
 
+/** The threads' decorations against `doc`: a live range highlights its span; a whole-beat or orphaned
+ *  thread tags its beat (the beats resolved in ONE doc walk). */
+function commentDecos(doc: import("prosemirror-model").Node, byId: Map<string, Resolved>): DecorationSet {
+  if (!byId.size) return DecorationSet.empty;
+  const wholeBeatIds = new Set<string>();
+  for (const [, r] of byId) if (!(r.from != null && r.to != null && r.from < r.to)) wholeBeatIds.add(r.mark.nodeId);
+  const beats = findBeatsByIds(doc, wholeBeatIds);
+  const decos: Decoration[] = [];
+  for (const [, r] of byId) {
+    if (r.from != null && r.to != null && r.from < r.to) {
+      // A live range: highlight the span in place (hover reads the thread; click opens it). The
+      // clickable speech-bubble itself lives out in the gutter overlay (see view()).
+      decos.push(Decoration.inline(r.from, r.to, { class: r.mark.resolved ? "comment-range resolved" : "comment-range", "data-tip": tooltipOf(r.mark, false) }));
+    } else {
+      // Whole-beat thread, OR a range whose quote was edited away (orphaned): just tag the beat (its
+      // gutter bubble is drawn by the overlay).
+      const beat = beats.get(r.mark.nodeId);
+      if (beat) decos.push(Decoration.node(beat.pos, beat.pos + beat.node.nodeSize, { class: "has-comment" }));
+    }
+  }
+  return DecorationSet.create(doc, decos);
+}
+
 export function commentsPlugin(): Plugin<PluginState> {
   return new Plugin<PluginState>({
     key,
     state: {
-      init: () => ({ byId: new Map() }),
+      init: () => ({ byId: new Map(), deco: DecorationSet.empty }),
       apply(tr, value, _old, newState) {
         const meta = tr.getMeta(key) as CommentMark[] | undefined;
         if (meta) {
           // Host pushed a fresh set: re-resolve every thread from its offsets + quote.
           const byId = new Map<string, Resolved>();
           for (const mark of meta) { const span = resolveSpan(newState.doc, mark); byId.set(mark.id, { mark, from: span?.from ?? null, to: span?.to ?? null }); }
-          return { byId };
+          return { byId, deco: commentDecos(newState.doc, byId) };
         }
-        if (tr.docChanged) {
+        if (tr.docChanged && value.byId.size) {
           // Live-map spans through the edit so a highlight tracks typing within the session.
           const byId = new Map<string, Resolved>();
           for (const [id, r] of value.byId) {
             byId.set(id, { mark: r.mark, from: r.from == null ? null : tr.mapping.map(r.from), to: r.to == null ? null : tr.mapping.map(r.to, -1) });
           }
-          return { byId };
+          // Typing inside a line moves no node, and the inline ranges map exactly as the spans just did.
+          return { byId, deco: editsInsideTextblocks(tr) ? value.deco.map(tr.mapping, tr.doc) : commentDecos(newState.doc, byId) };
         }
         return value;
       },
     },
     props: {
-      decorations(state) {
-        const ps = key.getState(state);
-        if (!ps || !ps.byId.size) return null;
-        // The whole-beat / orphaned threads tag their beat node; resolve all those beats in ONE doc walk.
-        const wholeBeatIds = new Set<string>();
-        for (const [, r] of ps.byId) if (!(r.from != null && r.to != null && r.from < r.to)) wholeBeatIds.add(r.mark.nodeId);
-        const beats = findBeatsByIds(state.doc, wholeBeatIds);
-        const decos: Decoration[] = [];
-        for (const [, r] of ps.byId) {
-          if (r.from != null && r.to != null && r.from < r.to) {
-            // A live range: highlight the span in place (hover reads the thread; click opens it). The
-            // clickable speech-bubble itself lives out in the gutter overlay (see view()).
-            decos.push(Decoration.inline(r.from, r.to, { class: r.mark.resolved ? "comment-range resolved" : "comment-range", "data-tip": tooltipOf(r.mark, false) }));
-          } else {
-            // Whole-beat thread, OR a range whose quote was edited away (orphaned): just tag the beat (its
-            // gutter bubble is drawn by the overlay).
-            const beat = beats.get(r.mark.nodeId);
-            if (beat) decos.push(Decoration.node(beat.pos, beat.pos + beat.node.nodeSize, { class: "has-comment" }));
-          }
-        }
-        return DecorationSet.create(state.doc, decos);
-      },
+      decorations: (state) => key.getState(state)?.deco ?? null,
       // Click anywhere on a commented span opens its thread (the natural "what does this say?" gesture).
       // Not consumed (caret still places) and the popover does not steal focus from the editor.
       handleClick(view, pos, event) {

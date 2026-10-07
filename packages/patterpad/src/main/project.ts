@@ -3,7 +3,8 @@
 // create a new project. Writes go through @wildwinter/simple-vc-lib (lock-aware checkout-on-write for
 // Perforce/Plastic; a plain write for git/none), falling back to a direct write if the VC layer throws.
 
-import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
@@ -20,8 +21,9 @@ import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFA
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
-import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync,
+import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWriteFilesAsync,
   setProvider, GitProvider, PerforceProvider, PlasticProvider, SvnProvider, FilesystemProvider } from "@wildwinter/simple-vc-lib";
+import { fileSafeName } from "../shared/file-name.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
@@ -57,11 +59,16 @@ let hydrated = true;
  *  is broken (e.g. duplicate scene ids) - the same failure the eager open used to raise. */
 function ensureHydrated(): void {
   if (hydrated || !loaded) return;
-  loaded = loadProject(loaded.root);
+  // A project that will not load whole fails the same way every time until it is reopened, so the failure
+  // is kept rather than re-parsing the whole project on every call: validate runs at each typing pause.
+  if (hydrateError) throw hydrateError;
+  try { loaded = loadProject(loaded.root); }
+  catch (e) { hydrateError = e instanceof Error ? e : new Error(String(e)); throw hydrateError; }
   shards = buildShards(loaded);
   authoringCache.clear();
   hydrated = true;
 }
+let hydrateError: Error | null = null;
 
 /** A shallow working copy whose `scenes` / `locales` arrays can be element-swapped (by applyLiveSource)
  *  without corrupting the cached `loaded` truth. The scene / locale OBJECTS are shared - callers only
@@ -73,19 +80,21 @@ function workingCopy(p: LoadedProject): LoadedProject {
 function buildShards(p: LoadedProject): Map<string, SceneShards> {
   const map = new Map<string, SceneShards>();
   const defaultLocale = p.project.locales.default;
-  const authoringDir = join(p.root, p.project.layout?.authoring ?? "authoring");
+  const authoringDir = join(p.root, projectLayout(p.project).authoring);
   for (const scene of p.scenes) {
     let locPath: string | null = null;
-    let fallback: string | null = null;
     p.locales.forEach((loc, i) => {
-      if (loc.scene !== scene.id) return;
-      fallback ??= p.localeFiles[i] ?? null;
-      if (loc.locale === defaultLocale || loc.default) locPath = p.localeFiles[i] ?? null;
+      if (loc.scene === scene.id && (loc.locale === defaultLocale || loc.default)) locPath = p.localeFiles[i] ?? null;
     });
     const flowPath = p.sceneFiles[scene.id] ?? "";
+    const stem = basename(flowPath).replace(/\.patterflow$/, "");
     // The authoring shard mirrors the flow shard's stem (scenes/foo.patterflow -> authoring/foo.patterx).
-    const authoringPath = join(authoringDir, basename(flowPath).replace(/\.patterflow$/, ".patterx"));
-    map.set(scene.id, { flowPath, locPath: locPath ?? fallback, authoringPath, name: scene.name });
+    const authoringPath = join(authoringDir, `${stem}.patterx`);
+    // A scene with no source-language strings file (made by hand, or merged in without one) gets one where
+    // it belongs, written on its first save. Before, typing into it saved nothing while reporting success;
+    // and another language's file stood in for it, which put a translation in the editor as the source.
+    locPath ??= join(p.root, projectLayout(p.project).strings, defaultLocale, `${stem}.patterloc`);
+    map.set(scene.id, { flowPath, locPath, authoringPath, name: scene.name });
   }
   sourceMirror.clear(); // the shard set changed - drop the source mirror + the vcStatus path memo
   vcShardsMemo = null;
@@ -211,7 +220,6 @@ function summarise(p: LoadedProject): OpenedProject {
     name: p.project.project.name,
     root: p.root,
     formatting: p.project.formatting ?? true,
-    autosave: p.project.autosave ?? true,
     voiced: p.project.voiced ?? false,
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
@@ -268,6 +276,15 @@ function enqueueWrite<T>(op: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/** `enqueueWrite` for a write that belongs to the project open when it was ASKED for. The queue runs in
+ *  order, so an edit, a quick fix, or a dictionary word queued behind a slow write could otherwise run after
+ *  Open Recent had swapped the project, and land in the wrong one. Refused, saying why, when the project
+ *  has changed; a reload of the same project is not a change. */
+function enqueueForProject<T extends SaveResult>(op: () => Promise<T>): Promise<T> {
+  const owner = lastOpened;
+  return enqueueWrite(async () => (owner !== null && owner === lastOpened ? op() : { ok: false, error: "A different project was opened before this could be saved." } as T));
+}
+
 // Land a batch of writes through the VC layer OFF the main thread (lock-aware checkout-on-write); fall back
 // to a direct write when no VC tooling is present. Always called from inside an enqueueWrite section.
 async function commitWrites(writes: { path: string; content: string }[], opts: { allOrNothing?: boolean } = {}): Promise<SaveResult> {
@@ -282,12 +299,10 @@ async function commitWrites(writes: { path: string; content: string }[], opts: {
     const why = opts.allOrNothing ? batch.results.filter((r) => r.status === "locked" || r.status === "outOfDate").map((r) => r.message) : [];
     return { ok: false, error: (why.length ? `Nothing was written. ${why.join("; ")}` : failed.join("; ")) || "write failed" };
   } catch {
-    if (opts.allOrNothing) {
-      // No VC layer: an ordinary write is all-or-nothing enough here (no locks to refuse it).
-      try { applyWrites(writes); return ok(); }
-      catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
-    }
-    try { applyWrites(writes); return ok(); } // VC layer unavailable -> direct write
+    // The VC layer itself is unavailable (no tooling): write directly. That is sequential and does not roll
+    // back, so an all-or-nothing batch is only as all-or-nothing as the disk; there are no locks to refuse
+    // it part way, which is what all-or-nothing guards against.
+    try { applyWrites(writes); return ok(); }
     catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
   }
 }
@@ -306,11 +321,9 @@ let audioListener: (snap: AudioSnapshot) => void = () => {};
 export function onAudioSnapshot(cb: (snap: AudioSnapshot) => void): void { audioListener = cb; }
 /** The current folder-derived snapshot (for the renderer's initial load + ops overrides). */
 export function audioCurrentSnapshot(): AudioSnapshot { return audioSnapshot; }
-/** beatId -> derived recording status when Audio Folders is on (else undefined, so ops fall back to the
- *  manual per-line recording map). Used to override `runStatusBrowse` / `runReport` in folder mode. */
 /** Whether the project tracks audio/recording status at all (#206): a voiced project that hasn't opted out
  *  via `trackAudioStatus`. Gates the inspector's Audio row, the recording status menu/search, folders +
- *  scratch. Absent `trackAudioStatus` follows `voiced` (voiced projects track by default). */
+ *  scratch. Opt-in: a voiced project tracks only once `trackAudioStatus` is set. */
 export function isAudioTracked(): boolean {
   const p = loaded?.project;
   return !!p?.voiced && (p.trackAudioStatus ?? false);
@@ -320,6 +333,8 @@ export function isAudioTracked(): boolean {
  *  back on restores the setup. Every audio behaviour here gates on this, not on `audioFolders` alone. */
 function audioActive(): boolean { return isAudioTracked() && !!loaded?.project.audioFolders; }
 
+/** beatId -> derived recording status when Audio Folders is on (else undefined, so ops fall back to the
+ *  manual per-line recording map). Used to override `runStatusBrowse` / `runReport` in folder mode. */
 function recordingOverride(): Map<string, string> | undefined {
   if (!audioActive()) return undefined;
   const m = new Map<string, string>();
@@ -334,11 +349,11 @@ export function audioFoldersEnabled(): boolean { return audioActive(); }
 /** The audio bytes for a dialogue beat in Audio Folders mode (the file the indexer resolved), or null if
  *  there's no file / not in folder mode. Read on demand for playback (editor inspector + play window). The
  *  renderer wraps the bytes in a Blob to play - avoids a custom protocol + keeps file access in main. */
-export function audioBytesForBeat(beatId: string): { bytes: Buffer; mime: string } | null {
+export async function audioBytesForBeat(beatId: string): Promise<{ bytes: Buffer; mime: string } | null> {
   const entry = audioActive() ? audioSnapshot[beatId] : undefined;
   if (!entry) return null;
   try {
-    const bytes = readFileSync(entry.path);
+    const bytes = await readFile(entry.path); // a take can be megabytes: off the main thread's back
     return { bytes, mime: entry.path.toLowerCase().endsWith(".mp3") ? "audio/mpeg" : "audio/wav" };
   } catch { return null; } // file vanished between scan + read
 }
@@ -355,10 +370,18 @@ export function saveScratchAudio(beatId: string, bytes: Uint8Array): Promise<Sav
     const folders = deriveRecordingFolders(p.audioRoot, p.recordingStatuses ?? DEFAULT_RECORDING_STATUSES);
     const folder = folders.find((r) => r.name === p.scratchStatus)?.folder;
     if (!folder) return { ok: false, error: "the scratch status has no derived folder (set an audio root)" };
+    // The id names the file, so it must be an id: one carrying `../` from the renderer wrote outside the folder.
+    if (!/^[A-Za-z0-9_-]+$/.test(beatId)) return { ok: false, error: "not a line id" };
     const dir = resolve(loaded!.root, folder);
     const path = join(dir, `${beatId}.wav`);
     try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
-    try { await writeBinaryFileAsync(path, Buffer.from(bytes)); audioIndex?.rescan(); return { ok: true }; }
+    try {
+      // A refused write (a lock, a file out of date) comes back as a result, not a throw.
+      const res = await writeBinaryFileAsync(path, Buffer.from(bytes));
+      if (!res.success) return { ok: false, error: `Couldn't save the take: ${res.message}` };
+      audioIndex?.rescan();
+      return { ok: true };
+    }
     catch {
       try { writeFileSync(path, Buffer.from(bytes)); audioIndex?.rescan(); return { ok: true }; } // VC layer unavailable -> direct write
       catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
@@ -382,10 +405,6 @@ function syncAudioIndex(): void {
   else audioIndex = startAudioIndex(loaded!.root, rungs, onSnap, scratch);
 }
 
-/** Open a project LANDING-FIRST (#171): parse only the scene the editor is about to paint (the launch
- *  shard, else `preferLanding`, else the first scene) so the window comes up fast; the rest streams in on
- *  the renderer's `hydrate()` call (or the first whole-project operation). `path` may be the project root,
- *  the `.patter` package, or an internal shard - either way the enclosing `.patterproj` is resolved. */
 /** Pin simple-vc-lib to the project's CONFIGURED version control, so it never auto-detects one the author
  *  didn't pick. Without this, the lib walks UP the tree from each file and treats any enclosing `.git` as
  *  the project's VCS: a "none" project living inside a larger git checkout would then have its status poll
@@ -405,21 +424,36 @@ function pinVcProvider(vcs: VcsKind | undefined): void {
   }
 }
 
+/** Open a project LANDING-FIRST (#171): parse only the scene the editor is about to paint (the launch
+ *  shard, else `preferLanding`, else the first scene) so the window comes up fast; the rest streams in on
+ *  the renderer's `hydrate()` call (or the first whole-project operation). `path` may be the project root,
+ *  the `.patter` package, or an internal shard - either way the enclosing `.patterproj` is resolved. */
 export function openProject(path: string, preferLanding?: string): OpenedProject {
-  loaded = loadProjectLanding(path, { launchPath: path, preferId: preferLanding });
+  const next = loadProjectLanding(path, { launchPath: path, preferId: preferLanding });
+  resetProjectState();
+  loaded = next;
   pinVcProvider(loaded.project.vcs); // honour the configured VCS; never auto-detect an enclosing repo (#26)
   shards = buildShards(loaded);
-  playLocale = null;           // a fresh project starts in its own source language (#195)
-  playCaptionsOn = true;       // closed captions default ON in the play window (#214)
   hydrated = false;            // landing-only; the rest is parsed on hydrate() / first whole-project op
-  resetShardStatus(); // a new project's lock/out-of-date state must be re-queried, not inherited
-  resetPlaySession();          // and no stale play state from the project we just left
-  authoringCache.clear();      // and no parsed shards cached from the previous project
-  if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // drop a pending rebuild for the old project
-  lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
   syncAudioIndex();            // start / stop the Audio Folders watcher for the new project (#206)
   lastOpened = summarise(loaded);
   return lastOpened;
+}
+
+/** Everything held for ONE project, let go: shared by open (for the next project) and close (for none),
+ *  so the two cannot drift apart. They had: close left the captions setting, the source mirror, and the
+ *  editable-import plans behind, so an import planned in one project could be applied in the next. */
+function resetProjectState(): void {
+  playLocale = null;           // a fresh project starts in its own source language (#195)
+  playCaptionsOn = true;       // closed captions default ON in the play window (#214)
+  hydrateError = null;         // a broken project's failure is that project's
+  resetShardStatus();          // lock/out-of-date state must be re-queried, not inherited
+  resetPlaySession();          // no play state from the project being left
+  authoringCache.clear();      // no parsed shards cached from it
+  sourceMirror.clear();        // nor its scenes' bytes
+  importPlans.clear();         // nor an editable-script import planned against it
+  if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; } // a pending rebuild was for it
+  lastBuiltHash = undefined;   // the Auto-Rebuild dedup must not carry across projects
 }
 
 /** The summary `openProject` last handed out: the shell keeps it as the session object, and hands it
@@ -442,16 +476,11 @@ export function isCurrent(session: OpenedProject): boolean {
  *  from `loaded` and every one of them would otherwise keep answering for a project the author closed -
  *  starting with "is a project open?", which the menu reads to enable this very item. */
 export function closeProject(): void {
+  resetProjectState();
   loaded = null;
   lastOpened = null;
   shards = new Map();
   hydrated = false;
-  playLocale = null;
-  resetShardStatus();
-  resetPlaySession();
-  authoringCache.clear();
-  if (autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; }
-  lastBuiltHash = undefined;
   syncAudioIndex(); // stops the Audio Folders watcher, since there is nothing to watch
 }
 
@@ -474,7 +503,7 @@ export function currentRoot(): string | null {
  *  takes, in-app scratch recordings, and the generated `patteraudio.json`), and a compiled bundle
  *  pinned INSIDE the project (the default build output is a SIBLING `patter-dist/`, never reached by a copy
  *  of the root). A skipped directory takes its whole subtree with it (cpSync doesn't recurse past it). */
-export function duplicateTo(dest: string): void {
+export async function duplicateTo(dest: string): Promise<void> {
   if (!loaded) throw new Error("no project open");
   const root = loaded.root;
   const excluded = new Set<string>();
@@ -486,7 +515,34 @@ export function duplicateTo(dest: string): void {
     // Only when it lands inside the project: exclude its build directory, or just the file if it sits in root.
     if (abs.startsWith(root + sep)) excluded.add(dirname(abs) === root ? abs : dirname(abs));
   }
-  cpSync(root, dest, { recursive: true, filter: (src) => !excluded.has(resolve(src)) });
+  await copyTreeThroughVc(root, dest, (src) => !excluded.has(resolve(src)));
+}
+
+/**
+ * Copy a folder through the version-control layer, file by file: a copy made inside a working copy is
+ * added, as `unpackTo` adds an unpacked pack, rather than appearing beside version control's back. Save As
+ * and Open an Example both copied with `cpSync`. The project's own dot-files (`.gitattributes`,
+ * `.editorconfig`, the ignore file) travel, as they did; a nested `.git` and Finder's `.DS_Store` do not.
+ * Throws on the first refused write, naming the file.
+ */
+export async function copyTreeThroughVc(src: string, dest: string, keep: (path: string) => boolean = () => true): Promise<void> {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === ".git" || e.name === ".DS_Store") continue;
+      const path = join(dir, e.name);
+      if (!keep(path)) continue;
+      if (e.isDirectory()) walk(path);
+      else if (e.isFile()) files.push(path);
+    }
+  };
+  walk(src);
+  for (const from of files) {
+    const to = join(dest, relative(src, from));
+    mkdirSync(dirname(to), { recursive: true });
+    const res = await writeBinaryFileAsync(to, readFileSync(from));
+    if (!res.success) throw new Error(`Couldn't copy ${relative(src, from)}: ${res.message}`);
+  }
 }
 
 /** Export as Patterpack: zip the open project's source shards into a single `.patterpack` document,
@@ -567,7 +623,8 @@ export async function planPackMerge(returnedPath: string, basePath: string): Pro
  *
  * A full reload rather than the shard-swap `applyReplace` does. Replace rewrites known locale shards and
  * can put each one back in its slot; a returned pack may have touched the project file, added scenes, or
- * changed anything else, so there is no reliable in-place patch and re-opening is both correct and cheap.
+ * changed anything else, so there is no reliable in-place patch and re-reading the whole project is both
+ * correct and cheap.
  *
  * The sidecars go through the same VC path as the shards, deliberately: a `.patterconflict` is a real file
  * the author will want to commit or ignore on purpose, not scratch output.
@@ -575,15 +632,16 @@ export async function planPackMerge(returnedPath: string, basePath: string): Pro
 export function commitPackMerge(plan: PackMergePlan): Promise<SaveResult & { project?: OpenedProject }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
-    const root = loaded.root;
     // Sidecars first: a merged shard whose sidecar never landed is a conflict resolved to ours without a word.
     const all = [...plan.sidecars, ...plan.writes];
     if (all.length === 0) return { ok: true, project: summarise(loaded) }; // nothing came back that we do not already have
     const res = await commitWrites(all);
     if (!res.ok) return res;
-    const project = openProject(root); // re-read from disk; the merge may have touched anything
-    ensureHydrated();
-    return { ok: true, project };
+    // Re-read from disk, since the merge may have touched anything, but as a RELOAD of the project that is
+    // open, not a fresh open: `openProject` made a new session object, so the shell no longer knew this
+    // project (Close Project then left it loaded) and the play session and version-control state reset.
+    reloadFromDisk();
+    return { ok: true, project: summarise(loaded) };
   });
 }
 
@@ -756,7 +814,7 @@ export function readScene(sceneId: string): SceneSource {
   if (!s) throw new Error(`unknown scene: ${sceneId}`);
   let src = sourceMirror.get(sceneId);
   if (!src) { // first read of this scene this session - hit disk once, then serve from the mirror
-    src = { flow: readFileSync(s.flowPath, "utf8"), loc: s.locPath ? readFileSync(s.locPath, "utf8") : "" };
+    src = { flow: readFileSync(s.flowPath, "utf8"), loc: s.locPath && existsSync(s.locPath) ? readFileSync(s.locPath, "utf8") : "" };
     sourceMirror.set(sceneId, src);
   }
   return {
@@ -769,7 +827,7 @@ export function readScene(sceneId: string): SceneSource {
 }
 
 export function saveScene(sceneId: string, flowSource: string, locSource: string, author?: string): Promise<SaveResult> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     const s = shards.get(sceneId);
     if (!s) return { ok: false, error: `unknown scene: ${sceneId}` };
     // Only write the shards whose content actually changed. An unchanged save must NOT rewrite the files
@@ -850,7 +908,6 @@ export async function vcStatus(): Promise<VcStatusDto | null> {
   };
 }
 
-/** Read a scene's typed documentation map (spec §18) from its authoring shard: node id -> notes. */
 /** Read one block of a scene's authoring shard (its docs / comments / writing / suggestions), with an empty
  *  default when the scene or field is absent. */
 function readAuthoringField<T>(sceneId: string, pick: (af: AuthoringFile) => T | undefined, empty: T): T {
@@ -862,13 +919,14 @@ function readAuthoringField<T>(sceneId: string, pick: (af: AuthoringFile) => T |
  *  are untouched). `mutate` sets the already-pruned value onto the AuthoringFile. Serialised + keeps the
  *  in-memory model current via commitAuthoring. */
 function saveAuthoringField(sceneId: string, mutate: (af: AuthoringFile) => void): Promise<SaveResult> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     const s = shards.get(sceneId);
     if (!s) return { ok: false, error: `unknown scene: ${sceneId}` };
     return commitAuthoring(s, authoringWrite(s, mutate));
   });
 }
 
+/** Read a scene's typed documentation map (spec §18) from its authoring shard: node id -> notes. */
 export function readSceneDocs(sceneId: string): Record<string, DocLine[]> {
   return readAuthoringField(sceneId, (af) => af.documentation, {});
 }
@@ -978,10 +1036,20 @@ export function reviewFeedback(scope?: { resolvedComments?: boolean; resolvedSug
 
 // --- editable script handoff (patterkit/design/proposals/editable-script-handoff.md) -----------------------
 
+/** Write the project file and, only once it has landed, make `next` the open project's: the model never
+ *  says something the file does not. Inside an `enqueueWrite`, like every write. */
+async function commitProjectFile(next: ProjectFile): Promise<SaveResult> {
+  if (!loaded) return { ok: false, error: "no project open" };
+  const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+  if (res.ok) loaded.project = next;
+  return res;
+}
+
 /** Re-read the whole project from disk after a write that touched many shards (an import, a bulk accept),
  *  rather than patching each into the working copy. Drops every cache that holds pre-write bytes. */
 function reloadFromDisk(): void {
   if (!loaded) return;
+  hydrateError = null;
   loaded = loadProject(loaded.root);
   shards = buildShards(loaded); // also clears the source mirror
   authoringCache.clear();
@@ -1008,8 +1076,7 @@ export async function editableScript(req: EditableExportRequest, by: string): Pr
   });
   const sceneName = scenes ? loaded.scenes.find((sc) => sc.id === scenes[0])?.name : undefined;
   const stem = scriptStem() ?? "script";
-  const fileSafe = (n: string): string => n.replace(/[/\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
-  const defaultName = `${stem}${sceneName ? ` - ${fileSafe(sceneName)}` : ""} (editable).docx`;
+  const defaultName = `${stem}${sceneName ? ` - ${fileSafeName(sceneName)}` : ""} (editable).docx`;
   return { docx: out.docx, handoffId: out.handoff.id, writes: out.writes, defaultName };
 }
 
@@ -1390,8 +1457,10 @@ function sceneIndex(p: LoadedProject): Map<string, string> {
  *  track edits live, not just on save). */
 export function validate(live?: { sceneId: string; flow: string; loc: string }): ProblemsDto {
   if (!loaded) return { ok: true, problems: [] };
-  ensureHydrated(); // the checks span every scene (dangling jumps, duplicate ids, ...)
   try {
+    // Inside the try: a project that will not load whole (two files claiming one scene) is a problem to
+    // show in the bar, not an error thrown at the renderer at every typing pause.
+    ensureHydrated(); // the checks span every scene (dangling jumps, duplicate ids, ...)
     const fresh = workingCopy(loaded);
     if (live) applyLiveSource(fresh, live);
     const r = runValidate(fresh);
@@ -1461,14 +1530,12 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
 
 /** Apply a problem's one-click quick-fix (spec §4), persist it, and refresh the loaded project. */
 export function applyFix(fix: QuickFix): Promise<SaveResult> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     if (fix.kind === "add-to-cast") {
       const cast = [...(loaded.project.cast ?? [])];
       if (!cast.some((c) => c.name === fix.character)) cast.push({ name: fix.character });
-      const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify({ ...loaded.project, cast }) }]);
-      if (res.ok) loaded.project = { ...loaded.project, cast }; // reflect the new cast in the cached project
-      return res;
+      return commitProjectFile({ ...loaded.project, cast }); // and the cached project shows the new cast
     }
     if (fix.kind === "declare-property") {
       const properties = [...(loaded.project.properties ?? [])];
@@ -1501,7 +1568,7 @@ export function currentBuildHash(): string | null {
   try { ensureHydrated(); return compileLoaded(loaded).content.hash ?? null; } catch { return null; }
 }
 
-/** Live bundle refresh over the debug link: compile the game-facing bundle (same shape `Build Bundle`
+/** Live bundle refresh over the debug link: compile the game-facing bundle (same shape `Publish Bundle`
  *  ships, honouring the project's localisation mode) for a push to a connected game. Null when nothing
  *  is open or the project doesn't compile (mid-edit); the push is simply skipped then. */
 export function compileForDebugPush(): { hash: string; json: string } | null {
@@ -1557,7 +1624,7 @@ export function proposeCoverageDrivers(): CoverageDriver[] {
  *  which breaks a `file:` URL origin), collapsing the gaps to single spaces. Falls back to `fallback`. */
 function safeStem(fallback: string): string {
   if (!loaded) return fallback;
-  return loaded.project.project.name.replace(/[/\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim() || fallback;
+  return fileSafeName(loaded.project.project.name) || fallback;
 }
 
 /** The production report rendered as a producer spreadsheet (xlsx), plus a suggested filename. The main
@@ -1602,16 +1669,22 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
   if (!locale) return { ok: false, error: "Couldn't tell which language this file is for. Pick a target language first." };
   if (locale === loaded.project.locales.default) return { ok: false, error: `'${locale}' is the source language, so there's nothing to import.` };
 
-  let planned;
-  try { planned = applyLoc(loaded, { ...catalog, locale }); }
-  catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; } // a scene or language the project lacks
-  const { writes, stats } = planned;
-  if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0 };
-  const res = await enqueueWrite(() => commitWrites(writes));
-  if (!res.ok) return { ok: false, error: res.error };
-  try { loaded = loadProject(loaded.root); shards = buildShards(loaded); }
-  catch (e) { console.warn("patterpad: localisation import committed, but reloading the project failed - the in-memory strings are stale until reopen:", e); }
-  return { ok: true, locale, updated: stats.updated, files: stats.files };
+  // Plan, commit, and reload as ONE queued write. `applyLoc` rebuilds each authoring shard it stamps whole
+  // from the model, so planned outside the queue, a comments or status save already queued landed first
+  // and was then overwritten by the stale copy.
+  return enqueueWrite(async () => {
+    if (!loaded) return { ok: false, error: "no project open" };
+    let planned;
+    try { planned = applyLoc(loaded, { ...catalog, locale }); }
+    catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; } // a scene or language the project lacks
+    const { writes, stats } = planned;
+    if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0 };
+    const res = await commitWrites(writes);
+    if (!res.ok) return { ok: false, error: res.error };
+    try { reloadFromDisk(); }
+    catch (e) { console.warn("patterpad: localisation import committed, but reloading the project failed - the in-memory strings are stale until reopen:", e); }
+    return { ok: true, locale, updated: stats.updated, files: stats.files };
+  });
 }
 
 /** Render the voice (VO) recording script (spec §16) as a producer spreadsheet (xlsx) + a filename. */
@@ -1652,8 +1725,9 @@ export function playableHtml(): { content: string; defaultName: string } | null 
 /** Publish the story to a FOLDER, Inky-style (design decision in patterpad/publishing docs): the
  *  writer's harness (`index.html` + `style.css`) is written once and then LEFT ALONE so their
  *  customisations survive, while `story.js` + `patterplay.js` are refreshed on every publish.
- *  Delete a kept file to get a fresh copy. Plain fs writes - the target is outside the project. */
-export function publishWebTo(dir: string): SaveResult & { kept?: string[] } {
+ *  Delete a kept file to get a fresh copy. Through the version-control layer, like every export: the
+ *  folder the author picks is often inside the game's repository, where a raw write meets a locked file. */
+export async function publishWebTo(dir: string): Promise<SaveResult & { kept?: string[] }> {
   if (!loaded) return { ok: false, error: "no project open" };
   ensureHydrated(); // the player needs the whole project
   const out = runExportWeb(loaded);
@@ -1664,15 +1738,15 @@ export function publishWebTo(dir: string): SaveResult & { kept?: string[] } {
     { name: "story.js", content: out.storyJs, keep: false },
   ];
   const kept: string[] = [];
-  try {
-    mkdirSync(dir, { recursive: true });
-    for (const f of files) {
-      const path = join(dir, f.name);
-      if (f.keep && existsSync(path)) { kept.push(f.name); continue; }
-      writeFileSync(path, f.content);
-    }
-  } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
-  return { ok: true, kept };
+  const writes: PlannedWrite[] = [];
+  for (const f of files) {
+    const path = join(dir, f.name);
+    if (f.keep && existsSync(path)) { kept.push(f.name); continue; }
+    writes.push({ path, content: f.content });
+  }
+  try { mkdirSync(dir, { recursive: true }); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  const res = await commitWrites(writes);
+  return res.ok ? { ok: true, kept } : res;
 }
 
 /** The DEFAULT compiled-bundle output path (relative to the project root), shown in Project Settings ▸
@@ -1680,7 +1754,7 @@ export function publishWebTo(dir: string): SaveResult & { kept?: string[] } {
  *  folder (the CLI writes there too). */
 const defaultBundleRel = defaultBundlePath;
 
-/** The ABSOLUTE path Build Bundle writes to: the pinned `export.bundle` (relative-to-root or absolute),
+/** The ABSOLUTE path Publish Bundle writes to: the pinned `export.bundle` (relative-to-root or absolute),
  *  else the sibling-`patter-dist/` default. The same path `patter export` writes. */
 const resolveBundleOut = bundleOutputPath;
 
@@ -1698,7 +1772,7 @@ function buildExport(p: LoadedProject, buildBundle: string, localisation: "embed
   return Object.keys(next).length ? next : undefined;
 }
 
-/** Build Bundle (Build menu): compile the whole project to its runtime `.patterc` and write it to the
+/** Publish Bundle (Publish menu): compile the whole project to its runtime `.patterc` and write it to the
  *  configured output path (Project Settings ▸ Build, else the dist/ default). Lock-aware - the bundle
  *  often lives inside the project's own repo. Returns where it landed, or an error to surface.
  *
@@ -1750,28 +1824,29 @@ let autoRebuildTimer: ReturnType<typeof setTimeout> | null = null;
 // bytes is skipped - no redundant write, no VCS churn. Reset (undefined) when a different project opens.
 let lastBuiltHash: string | undefined;
 
-/** Whether Auto Rebuild is on for the open project (drives the Build-menu checkbox). */
-export function autoRebuildEnabled(): boolean { return loaded?.project.autoRebuild === true; }
+/** Whether the author has Auto Rebuild on (drives the Publish-menu checkbox). */
+export function autoRebuildEnabled(): boolean { return autoRebuildOn; }
 
-/** Flip ProjectFile.autoRebuild, persist it, and return the new state. The Build-menu checkbox and the
- *  Project Settings ▸ General toggle share this; turning it on kicks an immediate rebuild. */
-export function toggleAutoRebuild(): Promise<boolean> {
-  return enqueueWrite(async () => {
-    if (!loaded) return false;
-    const on = loaded.project.autoRebuild !== true;
-    loaded.project = { ...loaded.project, autoRebuild: on ? true : undefined };
-    await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(loaded.project) }]);
-    if (on) scheduleAutoRebuild();
-    return on;
-  });
+/** Auto Rebuild is the author's working habit, kept per person in app state (ruling B of the October 2026
+ *  review), as Storyletter keeps it: it lived in the project file, committed and shared, so turning it on
+ *  turned it on for everyone on the project. Main sets it at boot and when the Publish menu flips it;
+ *  turning it on kicks a rebuild now. A project file's old `autoRebuild` is no longer read. */
+let autoRebuildOn = false;
+export function setAutoRebuild(on: boolean): void {
+  autoRebuildOn = on;
+  if (on && loaded) scheduleAutoRebuild();
+  else if (!on && autoRebuildTimer) { clearTimeout(autoRebuildTimer); autoRebuildTimer = null; }
 }
 
 /** Called after every write (from commitWrites): when Auto Rebuild is on and the write was NOT the build's
  *  own output, schedule a debounced rebuild. The bundle-path guard is what stops a rebuild from looping. */
 function maybeScheduleAutoRebuild(writes: { path: string; content: string }[]): void {
-  if (!loaded?.project.autoRebuild) return;
+  if (!autoRebuildOn || !loaded) return;
   const out = resolve(resolveBundleOut(loaded));
   if (writes.some((w) => resolve(w.path) === out)) return; // the build's own write - don't loop
+  // Authoring shards (status, notes, comments, suggestions) and handoff records are not compiled, so a write
+  // of only those changes nothing a build would: each was costing a whole compile for the hash to discard.
+  if (writes.every((w) => w.path.endsWith(".patterx") || w.path.endsWith(".patterconflict") || /[\\/]handoffs[\\/][^\\/]+\.json$/.test(w.path))) return;
   scheduleAutoRebuild();
 }
 
@@ -1785,7 +1860,7 @@ function scheduleAutoRebuild(): void {
  *  the last good build. Serialised with saves via enqueueWrite so it always compiles the latest bytes. */
 async function runAutoRebuild(): Promise<void> {
   await enqueueWrite(async () => {
-    if (!loaded?.project.autoRebuild) return;
+    if (!autoRebuildOn || !loaded) return;
     ensureHydrated();
     let plan: ReturnType<typeof planBuild>;
     // Temporarily invalid (half-written condition, dangling jump): export refuses it, and the last good build stays.
@@ -1824,8 +1899,6 @@ export function readSettings(): ProjectSettingsDto | null {
     // Track audio status (#206): default OFF (opt-in even for a voiced project); stored only when ticked on.
     trackAudioStatus: p.trackAudioStatus ?? false,
     formatting: p.formatting ?? true,
-    autosave: p.autosave ?? true,
-    autoRebuild: p.autoRebuild ?? false,
     localeDefault: p.locales.default,
     locales: p.locales.all,
     gameDataFields: p.gameDataFields ?? {},
@@ -1837,7 +1910,7 @@ export function readSettings(): ProjectSettingsDto | null {
     coverageDrivers: p.coverageDrivers,
     cast: p.cast ?? [],
     // Build output (Build tab): the pinned `export.bundle`, else the sibling default - so the field always
-    // shows where Build Bundle will write, and saveSettings drops it back to undefined when left default.
+    // shows where Publish Bundle will write, and saveSettings drops it back to undefined when left default.
     buildBundle: p.export?.bundle ?? defaultBundleRel(loaded),
     // Localisation mode (Build tab): "embedded" (strings inside the bundle, default) or "ids" (no strings,
     // the game localises from beat IDs); `buildSourceDebug` embeds the source language for debug playback.
@@ -1919,9 +1992,11 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       // Track audio status (#206): default OFF, so store only when ticked ON (keeps a clean file).
       trackAudioStatus: s.trackAudioStatus ? true : undefined,
       formatting: s.formatting,
-      autosave: s.autosave,
-      // Auto Rebuild: default OFF, so store only when ticked ON (keeps a clean file).
-      autoRebuild: s.autoRebuild ? true : undefined,
+      // Autosave and Auto Rebuild are no longer project settings (rulings A and B of the October 2026
+      // review): the family always saves, and Auto Rebuild is per person. A file that still names either
+      // has it dropped on the next save.
+      autosave: undefined,
+      autoRebuild: undefined,
       // The locale list is editable (Language tab); keep `default` a member of `all`.
       locales: { default: s.locales.includes(s.localeDefault) ? s.localeDefault : (s.locales[0] ?? "en"), all: s.locales.length ? s.locales : [s.localeDefault] },
       // Drop empty collections entirely, so a clean project file stays clean.
@@ -1949,7 +2024,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       // Closed captions (#214): store only when delimiters / caption character differ from the defaults.
       closedCaptions: captionConfig(s.closedCaptions),
       // Build settings (Build tab): pin `export.bundle` only when it's NOT the sibling default (keeping a
-      // clean file) + `export.locales` only when "external", preserving any other export fields (e.g. targets).
+      // clean file) + `export.localisation` only when IDs-only, preserving any other export fields (e.g. targets).
       export: buildExport(loaded, s.buildBundle, s.buildLocalisation, s.buildSourceDebug, loaded.project.export),
     };
     const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
@@ -1979,12 +2054,11 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
 /** Set just the project start point (ProjectFile.start), lock-aware: for the "set where your story starts"
  *  prompt (Play from Start / Coverage). Returns the refreshed project summary. */
 export function setStart(start: { scene: string; block?: string }): Promise<SaveResult & { project?: OpenedProject }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const next: ProjectFile = { ...loaded.project, start: start.scene ? start : undefined };
-    const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+    const res = await commitProjectFile(next);
     if (!res.ok) return res;
-    loaded.project = next;
     return { ok: true, project: summarise(loaded) };
   });
 }
@@ -1996,7 +2070,7 @@ export function setStart(start: { scene: string; block?: string }): Promise<Save
  *  not the kit's. The filename stem is the slugged name, de-collided (`-2`, `-3`, …) against existing
  *  shards. Returns the refreshed summary + the new id. */
 export function createScene(name: string, kit: SceneKit = "blank", speaker?: string): Promise<SaveResult & { project?: OpenedProject; sceneId?: string }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // the stem de-collides against ALL shards, not the landing-only view
     const trimmed = name.trim();
@@ -2102,7 +2176,7 @@ export function sceneDeleteInfo(sceneId: string): SceneDeleteInfo | null {
  *  pointed at it. Refuses the last scene (the loader assumes one exists). Not undoable in-app -
  *  the VCS is the safety net, which is why the renderer's confirm carries the weight it does. */
 export function deleteScene(sceneId: string): Promise<SaveResult & { project?: OpenedProject }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated();
     const p = loaded; // ensureHydrated may swap the object; re-pin for narrowing across the awaits
@@ -2113,14 +2187,29 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
     const locIdx: number[] = [];
     p.locales.forEach((loc, i) => { if (loc.scene === sceneId) locIdx.push(i); });
     const authoringPath = shards.get(sceneId)?.authoringPath;
+    // The flow shard LAST: it is what makes the scene exist, so a delete stopped part way leaves a scene that
+    // is still there (missing some strings or notes) rather than strings and notes for a scene that is gone.
     const files = [
-      p.sceneFiles[sceneId],
-      ...locIdx.map((i) => p.localeFiles[i]),
       authoringPath && existsSync(authoringPath) ? authoringPath : undefined,
+      ...locIdx.map((i) => p.localeFiles[i]),
+      p.sceneFiles[sceneId],
     ].filter((f): f is string => !!f);
+    // Ask version control first, so a file someone else holds stops the delete before anything goes.
+    const prep = await prepareToWriteFilesAsync(files);
+    if (!prep.success) {
+      const refused = prep.results.filter((r) => !r.success);
+      return { ok: false, error: `Couldn't delete the scene: ${refused.map((r) => `${basename(r.filePath)} (${r.message})`).join(", ")}.` };
+    }
+    // A refused delete comes back as a result, not a throw, so each one is checked: once this ignored it,
+    // reported the scene deleted, and left its strings on disk for a scene that no longer existed.
     for (const f of files) {
-      try { await deleteFileAsync(f); }
-      catch (e) { return { ok: false, error: `could not delete ${basename(f)}: ${e instanceof Error ? e.message : String(e)}` }; }
+      let res: { success: boolean; message: string };
+      try { res = await deleteFileAsync(f); }
+      catch (e) { res = { success: false, message: e instanceof Error ? e.message : String(e) }; }
+      if (!res.success) {
+        reloadFromDisk(); // whatever did go is gone: the model follows the disk
+        return { ok: false, error: `Couldn't delete ${basename(f)}: ${res.message}`, project: summarise(loaded!) };
+      }
     }
 
     // Project-file cleanup rides the same operation: the order entry + a start point that now dangles.
@@ -2148,7 +2237,7 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
  *  in-memory list to match. Ids must all be scenes of the open project (a stale drag after an
  *  external change is refused rather than silently dropping scenes). Returns the refreshed summary. */
 export function reorderScenes(ids: string[]): Promise<SaveResult & { project?: OpenedProject }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     ensureHydrated(); // ordering is a whole-project fact - never validate against the landing-only list
     const known = new Set(loaded.scenes.map((s) => s.id));
@@ -2156,9 +2245,8 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { project?: O
       return { ok: false, error: "The scene list changed, so the reorder was ignored." };
     }
     const next: ProjectFile = { ...loaded.project, sceneOrder: ids };
-    const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+    const res = await commitProjectFile(next);
     if (!res.ok) return res;
-    loaded.project = next;
     const rank = new Map(ids.map((id, i) => [id, i]));
     loaded.scenes.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
     return { ok: true, project: summarise(loaded) };
@@ -2168,16 +2256,15 @@ export function reorderScenes(ids: string[]): Promise<SaveResult & { project?: O
 /** Append a word to the project's custom dictionary (#177 "Add to dictionary") and save. Returns the
  *  refreshed word list so the renderer can rebuild the spell engine. */
 export function addDictionaryWord(word: string): Promise<SaveResult & { words?: string[] }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const w = word.trim();
     const cur = loaded.project.dictionary?.words ?? [];
     if (!w || cur.includes(w)) return { ok: true, words: cur };
     const words = [...cur, w];
     const next: ProjectFile = { ...loaded.project, dictionary: { ...loaded.project.dictionary, words } };
-    const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+    const res = await commitProjectFile(next);
     if (!res.ok) return res;
-    loaded.project = next;
     return { ok: true, words };
   });
 }
@@ -2186,16 +2273,15 @@ export function addDictionaryWord(word: string): Promise<SaveResult & { words?: 
  *  custom word list - silences the squiggle without claiming the token is real vocabulary. Returns the
  *  refreshed ignore list so the renderer rebuilds the engine + problems panel. */
 export function addIgnoreWord(word: string): Promise<SaveResult & { ignore?: string[] }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const w = word.trim();
     const cur = loaded.project.dictionary?.ignore ?? [];
     if (!w || cur.includes(w)) return { ok: true, ignore: cur };
     const ignore = [...cur, w];
     const next: ProjectFile = { ...loaded.project, dictionary: { ...loaded.project.dictionary, ignore } };
-    const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+    const res = await commitProjectFile(next);
     if (!res.ok) return res;
-    loaded.project = next;
     return { ok: true, ignore };
   });
 }
@@ -2210,7 +2296,7 @@ export function dictionarySettings(): { enabled: boolean; language: string } | n
 /** Set spell-check on/off and/or the active dictionary (Review ▸ Spelling, mirroring the Dictionary tab) and
  *  save. Returns the refreshed dictionary so the renderer rebuilds the engine. */
 export function setDictionary(patch: { enabled?: boolean; language?: string }): Promise<SaveResult & { dictionary?: { language: string; words: string[]; ignore: string[]; enabled: boolean } }> {
-  return enqueueWrite(async () => {
+  return enqueueForProject(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const cur = loaded.project.dictionary ?? {};
     const d: ProjectDictionary = { ...cur };
@@ -2218,14 +2304,12 @@ export function setDictionary(patch: { enabled?: boolean; language?: string }): 
     if (patch.language !== undefined) { if (patch.language === deriveDictLanguage(loaded.project.locales.default)) delete d.language; else d.language = patch.language; }
     const dictionary = Object.keys(d).length ? d : undefined;
     const next: ProjectFile = { ...loaded.project, dictionary };
-    const res = await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(next) }]);
+    const res = await commitProjectFile(next);
     if (!res.ok) return res;
-    loaded.project = next;
     return { ok: true, dictionary: resolveDictionary(next) };
   });
 }
 
-/** Scaffold a new project into `dir` (runInit), commit the shards, then open it. */
 /** For File > Share Scopes with Other Tools: the folder the project already shares through, or where
  *  the command suggests creating one (the version-control root above the project, else beside it). */
 export function shareScopesInfo(): { shared?: string; suggested: string } | null {
@@ -2258,20 +2342,30 @@ export function shareScopes(dir: string): Promise<SaveResult & { dir?: string }>
   });
 }
 
-export function createProject(dir: string, name?: string, vcs?: VcsKind, buildBundle?: string): Promise<OpenedProject> {
+/**
+ * Write a new project to `dir` and return its root, opening nothing: the New Project dialog opens it
+ * through the shell's session afterwards, as every other open goes. Opening it here as well went round the
+ * session, so Close Project then did nothing and main's per-project state still described the previous
+ * project. The build output chosen in the dialog is pinned in the project file as it is written, rather
+ * than in a second write after the open.
+ */
+export function scaffoldProject(dir: string, name?: string, vcs?: VcsKind, buildBundle?: string): Promise<string> {
   return enqueueWrite(async () => {
     const init = runInit({ dir, name, vcs: vcs && vcs !== "none" ? vcs : undefined });
-    const res = await commitWrites(init.writes);
+    const writes = init.writes.map((w) => {
+      if (w.path !== init.projectFile || !buildBundle) return w;
+      const pf = parseSource(w.content) as ProjectFile;
+      const nextExport = buildExport({ projectFile: init.projectFile } as LoadedProject, buildBundle, "embedded", false, pf.export);
+      return nextExport?.bundle ? { ...w, content: canonicalStringify({ ...pf, export: nextExport }) } : w;
+    });
+    const res = await commitWrites(writes);
     if (!res.ok) throw new Error(res.error ?? "could not write the new project");
-    const opened = openProject(dir);
-    // Pin the chosen build output (asked in the New-project dialog) when it isn't the dist/ default.
-    if (loaded && buildBundle) {
-      const nextExport = buildExport(loaded, buildBundle, "embedded", false, loaded.project.export);
-      if (nextExport?.bundle) {
-        loaded.project = { ...loaded.project, export: nextExport };
-        await commitWrites([{ path: loaded.projectFile, content: canonicalStringify(loaded.project) }]);
-      }
-    }
-    return opened;
+    return dirname(init.projectFile);
   });
+}
+
+/** Scaffold a project and open it directly, outside any shell session: for tests and tools that drive
+ *  this module alone. The app opens through the session (`scaffoldProject`, then `openAndRecord`). */
+export async function createProject(dir: string, name?: string, vcs?: VcsKind, buildBundle?: string): Promise<OpenedProject> {
+  return openProject(await scaffoldProject(dir, name, vcs, buildBundle));
 }

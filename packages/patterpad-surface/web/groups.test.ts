@@ -54,8 +54,11 @@ describe("Phase B: recursive groups", () => {
 
     // the sequence rail, labelled with its order x exhaust, containing a nested branch rail
     const seq = [...dom.querySelectorAll(".group-rail")].find((r) => r.querySelector(".group-rail-label")?.textContent?.startsWith("Sequence"))!;
-    expect(seq.querySelector(".group-rail-label")?.textContent).toBe("Sequence · shuffle · repeat");
-    expect(seq.querySelector(".group-rail-body > .group-rail .group-rail-label")?.textContent).toBe("Branch · first match");
+    // The label's parts are drawn as a metadata line (the shell's metaLine), never joined with a typed "·".
+    const parts = (el: Element | null | undefined): string[] => [...(el?.querySelectorAll(".shell-meta-part") ?? [])].map((p) => p.textContent ?? "");
+    expect(parts(seq.querySelector(".group-rail-label"))).toEqual(["Sequence", "shuffle", "repeat"]);
+    expect(parts(seq.querySelector(".group-rail-body > .group-rail .group-rail-label"))).toEqual(["Branch", "first match"]);
+    expect(seq.querySelector(".group-rail-label")?.textContent).not.toContain("·");
 
     // the choice rail holds its two Option groups (rails), not bare bubbles
     const choice = dom.querySelector(".group-rail.is-choice")!;

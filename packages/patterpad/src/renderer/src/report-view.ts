@@ -9,6 +9,7 @@
 import type { ReportData } from "../../shared/api.js";
 import { el } from "./dom.js";
 import { formatCount as num, metaLine } from "@wildwinter/app-shell"; // the grouped count, the family's; the drawn separator
+import { plural } from "@wildwinter/app-shell/util";
 
 /** A horizontal distribution: one bar per ladder rung, widths proportional to the largest count. So a
  *  reader sees at a glance where the work sits (lots of "stub", little "locked"). Zero-count rungs show
@@ -72,7 +73,7 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
   // Summary line: project name, scene count, voiced/text-only badge.
   const summary = el("div", "rpt-summary");
   summary.append(el("span", "rpt-summary-name", data.project.name));
-  summary.append(el("span", "rpt-summary-scenes", `${data.scenes.length} scene${data.scenes.length === 1 ? "" : "s"}`));
+  summary.append(el("span", "rpt-summary-scenes", plural(data.scenes.length, "scene")));
   summary.append(el("span", `rpt-badge${data.voiced ? " voiced" : ""}`, data.voiced ? "Voiced" : "Text-only"));
   host.append(summary);
 
@@ -99,9 +100,9 @@ export function renderReport(host: HTMLElement, data: ReportData): void {
   if (data.estimating) {
     const c = data.coverage;
     const estLines = data.scenes.reduce((n, s) => n + (s.estimated ? (s.estimate ?? 0) : 0), 0);
-    notes.append(el("p", "rpt-note", `Estimating on: ${c.estimated}/${c.totalScenes} scene${c.totalScenes === 1 ? "" : "s"} estimated (${num(estLines)} projected lines).`));
+    notes.append(el("p", "rpt-note", `Estimating on: ${c.estimated}/${plural(c.totalScenes, "scene")} estimated (${num(estLines)} projected lines).`));
   }
-  if (data.cut.writtenLines > 0) notes.append(el("p", "rpt-note", `Cut (excluded above): ${data.cut.scenes} scene${data.cut.scenes === 1 ? "" : "s"}, ${data.cut.writtenLines} written / ${data.cut.voicedLines} voiced line${data.cut.voicedLines === 1 ? "" : "s"}.`));
+  if (data.cut.writtenLines > 0) notes.append(el("p", "rpt-note", `Cut (excluded above): ${plural(data.cut.scenes, "scene")}, ${data.cut.writtenLines} written / ${plural(data.cut.voicedLines, "voiced line")}.`));
   if (notes.childElementCount) host.append(notes);
 
   // Per-scene table. The Status column is text (a rung name), so the numeric styling starts at column 2.

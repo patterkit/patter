@@ -104,30 +104,6 @@ body.play {
 }
 .play-stop:hover { border-color: var(--danger); color: var(--danger); }
 .pnote { color: var(--muted); font: 13.5px var(--font-ui); text-align: center; padding: 5px; }
-.pnote.error { color: var(--accent); }
+.pnote.error { color: var(--danger); } /* an error in the danger colour, as the problems bar shows one */
 /* `.pnote.stale` is gone: the stale session draws the shell's `staleBar` banner now (stale.css). */
 
-/* Live-refresh toast (live-bundle-refresh, phase 1): a quiet, self-dismissing pill confirming the
-   editor's edit just landed in this running session. Removed by JS after the fade completes. */
-.plive {
-  position: fixed; top: 41.5px; left: 50%; transform: translateX(-50%);
-  z-index: 10; pointer-events: none;
-  background: color-mix(in oklab, var(--ok, var(--accent)) 14%, var(--surface));
-  border: 1px solid var(--ok, var(--accent)); border-radius: var(--radius-pill, 999px);
-  color: var(--ok, var(--accent)); font: 600 11.5px var(--font-ui);
-  padding: 3.5px 11px;
-  animation: plive-fade 2.2s var(--ease-standard, ease) forwards;
-}
-@keyframes plive-fade {
-  0% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-  10%, 75% { opacity: 1; transform: translateX(-50%) translateY(0); }
-  100% { opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .plive { animation: none; opacity: 1; }
-}
-
-/* Never a window-drag region, even over one: in Electron a click inside a drag area (the topbar's
-   titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
-   layers (app-shell dialog.css has the whole story, 2026-09-28); these are ours. */
-.plive, .plive * { -webkit-app-region: no-drag; }

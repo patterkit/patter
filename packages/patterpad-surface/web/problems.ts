@@ -10,7 +10,7 @@ import { Plugin, PluginKey } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import type { Node as PMNode } from "prosemirror-model";
-import { modelIdOf } from "../src/zoneutil.js";
+import { modelIdOf, editsInsideTextblocks } from "../src/zoneutil.js";
 
 export interface ProblemMark { id: string; severity: "error" | "warning" }
 
@@ -40,7 +40,8 @@ export function problemsPlugin(): Plugin<ProblemState> {
       apply: (tr, value) => {
         const meta = tr.getMeta(key) as ProblemMark[] | undefined;
         if (meta) return { marks: meta, deco: computeProblemDecos(tr.doc, meta) };
-        if (tr.docChanged) return { marks: value.marks, deco: computeProblemDecos(tr.doc, value.marks) };
+        // Typing inside a line moves no node: map the set. Anything structural rebuilds it.
+        if (tr.docChanged) return { marks: value.marks, deco: editsInsideTextblocks(tr) ? value.deco.map(tr.mapping, tr.doc) : computeProblemDecos(tr.doc, value.marks) };
         return value; // pure caret / selection move -> reuse the cached set
       },
     },

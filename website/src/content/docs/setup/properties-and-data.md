@@ -52,7 +52,7 @@ One thing to know now is that because the game sets `@world` values while it run
 [coverage test](/production/coverage-testing/) can't know them, so a branch gated on
 `@world.threat` shows up as *needs input* until you give the test stand-in values. Those
 stand-ins, **coverage drivers**, live in the same World Properties tab and are covered with
-the test itself under [Input drivers](/production/coverage-testing/#input-drivers).
+the test itself under [Coverage drivers](/production/coverage-testing/#coverage-drivers).
 
 ## Sharing scopes with the game's other tools
 
@@ -105,7 +105,7 @@ stays the truth. If they changed World properties, the merge writes their change
 [Handing the project to someone](/setup/building-and-shipping/#the-games-shared-scopes-travel-too)).
 
 A project with no folder works alone, exactly as before. **File ▸ Share Scopes with Other Tools**
-creates the folder (at your version-control root, unless you choose another place) with Patter's
+creates the folder where you choose (the picker opens at your version-control root, the usual place) with Patter's
 file and a `game.scopes.json` holding your World properties. An `@story` you imported under World
 properties before the folder existed is superseded once Storyletter writes its file there, and
 `validate` asks you to remove it.

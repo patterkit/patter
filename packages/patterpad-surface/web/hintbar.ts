@@ -1,7 +1,6 @@
-// The contextual hint bar (spec section 16), for the harness. A live render of
-// hintsFor(context(state)) - the same ZoneState the key-dispatch reads - so it
-// shows the 2-4 relevant transitions for wherever the cursor is. Grows as the
-// zone slices add states.
+// The contextual hint bar (spec section 16). A live render of hintsFor(context(state))
+// - the same ZoneState the key-dispatch reads - so it shows the 2-4 relevant
+// transitions for wherever the cursor is, in the host's footer element.
 //
 // The chips are the shell's (`hintBar`, keys.css): a keycap drawn platform-true
 // from the hint's portable combo ("Shift+Enter" is one "⇧↩" cap on a Mac and

@@ -5,7 +5,7 @@
 
 import type { DictionaryInfo } from "../../shared/api.js";
 import { el } from "./dom.js";
-import { iconBtn, focusNewRow } from "@wildwinter/app-shell";
+import { iconBtn, focusNewRow, labelledToggle } from "@wildwinter/app-shell";
 
 /** Display order: alphabetical (case-insensitive), blanks last so a freshly-added empty row sits at the
  *  bottom (where it's focused). Returns source indices, so edits / deletes map back to the array. */
@@ -46,13 +46,10 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
     host.replaceChildren();
 
     // On/off.
-    const toggle = el("label", "settings-toggle");
-    const cb = el("input") as HTMLInputElement; cb.type = "checkbox"; cb.checked = enabled;
-    cb.addEventListener("change", () => { enabled = cb.checked; });
-    const span = el("span"); span.append(document.createTextNode("Spell-check"));
-    const small = el("small", undefined, "Underline misspelled words and report them in the problems panel."); span.append(small);
-    toggle.append(cb, span);
-    host.append(toggle);
+    host.append(labelledToggle("Spell-check", {
+      checked: enabled, hint: "Underline misspelled words and report them in the problems panel.",
+      onChange: (on) => { enabled = on; },
+    }).row);
 
     // Language picker + Import / Remove.
     host.append(el("div", "gd-statuscap", "Dictionary"));
@@ -121,7 +118,7 @@ export function mountDictionary(host: HTMLElement, opts: DictionaryOpts): Dictio
         dicts.sort((a, b) => Number(b.builtin) - Number(a.builtin) || a.label.localeCompare(b.label));
         language = r.info.id;
         render();
-      } else if (r.error && r.error !== "canceled") {
+      } else if (r.error) { // a cancel says so with `canceled`, as every other dialog does, and carries no error
         err.textContent = r.error; err.hidden = false;
       }
     }

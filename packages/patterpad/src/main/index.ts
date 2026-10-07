@@ -7,10 +7,11 @@ import { app, autoUpdater, BrowserWindow, dialog, ipcMain, screen, shell, system
 import { findPairedStorylets, findStoryletter, launchStoryletter } from "./storyletter.js";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cpSync, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { userInfo } from "node:os";
-import { currentUserAsync, writeBinaryFile, writeTextFile } from "@wildwinter/simple-vc-lib";
+import { currentUserAsync, writeBinaryFileAsync, writeTextFileAsync } from "@wildwinter/simple-vc-lib";
 import * as project from "./project.js";
+import { fileSafeName } from "../shared/file-name.js";
 import * as dictionaries from "./dictionaries.js";
 import { createStore, type ToolWindowName } from "./store.js";
 import { applyMenu } from "./menu.js";
@@ -57,6 +58,7 @@ function ensureDebugServer(): DebugServer {
 // The shell names the settings file; we hand it the directory. It folds in the old
 // `patterpad-session.json` sitting beside it on the first run after the change.
 const store = createStore(app.getPath("userData"));
+project.setAutoRebuild(store.read().autoRebuild); // the author's own Auto Rebuild, from app state
 
 // Long jobs: the coverage sweep, and every export / publish / pack / merge (parity row 20). COOPERATIVE,
 // not parallel: the work still runs here, it just hands the event loop back every few milliseconds, so
@@ -126,7 +128,7 @@ function refreshMenu(): void {
   // The "Live Link" checkbox is ticked while the localhost link is up (listening / connected).
   const dbg = debugServer?.status().state;
   const debugActive = dbg === "listening" || dbg === "connected";
-  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined);
+  if (win) applyMenu(win, s.recents, s.panes, s.theme, lineStatuses, spelling, project.isVoiced(), debugActive, project.isAudioTracked(), project.autoRebuildEnabled(), pairedStorylets !== undefined, project.audioFoldersEnabled());
 }
 
 // Ask the editor window to flush its open scene to disk, and resolve once it confirms (or after a short
@@ -138,7 +140,10 @@ function flushEditorScene(): Promise<void> {
     if (!win || win.isDestroyed()) return resolve();
     flushWaiters.push(resolve);
     win.webContents.send("editor:flush");
-    setTimeout(() => { const i = flushWaiters.indexOf(resolve); if (i >= 0) { flushWaiters.splice(i, 1); resolve(); } }, 1500);
+    // As long as the close-flush allows, for the same reason: the save goes through the VC layer, and a
+    // first edit can mean a Perforce checkout. Giving up sooner ran Replace, an import, or a merge over a
+    // scene whose save had not landed, and the late save then wrote over what they changed.
+    setTimeout(() => { const i = flushWaiters.indexOf(resolve); if (i >= 0) { flushWaiters.splice(i, 1); resolve(); } }, 10_000);
   });
 }
 
@@ -219,6 +224,10 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     searchFocus = undefined; // and the search window's ranking anchor belongs to that project too
     lastCoverageResult = null;
     pendingMerge = null;     // a merge planned against it is no answer for the next (Storyletter drops its own here too)
+    // Live Link is a project facility, as Storyletter has it: a game linked to this project would otherwise
+    // go on receiving it, and Play ▸ Live Link would show ticked with nothing open.
+    clearTimeout(debugPushTimer);
+    debugServer?.stop();
   },
   open: (path) => {
     // Resolve the remembered scene FIRST (cheap root walk) so the landing-first open (#171) parses the
@@ -232,7 +241,7 @@ const session = createProjectSession<OpenedProject, OpenResult>({
     // and passes it to `forgetProject`. The error is the sentence the welcome shows after the name.
     if (!existsSync(path)) return { error: "It has moved or been deleted, so it is no longer in your recent projects." };
     try { proj = project.openProject(path, remembered); }
-    catch (e) { return { error: `Patterpad could not read it: ${e instanceof Error ? e.message : String(e)}` }; }
+    catch (e) { return { error: `Patterpad couldn't read it: ${e instanceof Error ? e.message : String(e)}` }; }
     currentRoot = proj.root; // this project is now the one shown (see the second-instance jump-in-place guard)
     pairedStorylets = findPairedStorylets(proj.root); // Show Card in Storyletter, when a project there pairs with this one
     // A file-association launch onto a specific scene shard (Finder / argv) lands ON that scene;
@@ -402,9 +411,10 @@ function boot(): BootState {
 
 /** Land an exported file through simple-vc-lib, so a read-only / VC-locked target is checked out (or its
  *  refusal surfaced) rather than choking a raw write. The target is wherever the producer chose to save -
- *  often inside the project's own repo - so it must honour the same lock-aware path as every other write. */
-function writeExport(filePath: string, data: Buffer | string): ExportResult {
-  const res = typeof data === "string" ? writeTextFile(filePath, data) : writeBinaryFile(filePath, data);
+ *  often inside the project's own repo - so it must honour the same lock-aware path as every other write.
+ *  The async calls: the sync ones spawned `p4 edit` and the like on the main thread. */
+async function writeExport(filePath: string, data: Buffer | string): Promise<ExportResult> {
+  const res = typeof data === "string" ? await writeTextFileAsync(filePath, data) : await writeBinaryFileAsync(filePath, data);
   return res.success ? { ok: true, path: filePath } : { ok: false, error: res.message || res.status };
 }
 
@@ -467,7 +477,7 @@ async function exportEditable(req: EditableExportRequest): Promise<ExportResult 
     filters: [{ name: "Word document", extensions: ["docx"] }],
   });
   if (r.canceled || !r.filePath) return { ok: false, canceled: true };
-  const saved = writeExport(r.filePath, out.docx);
+  const saved = await writeExport(r.filePath, out.docx);
   if (!saved.ok) return saved;
   const committed = await project.commitHandoff(out.writes);
   if (!committed.ok) return { ok: false, path: r.filePath, error: `The document was saved, but its handoff record wasn't: ${committed.error ?? "write failed"}` };
@@ -523,7 +533,7 @@ async function exportWeb(): Promise<ExportResult & { kept?: string[] }> {
   });
   const dir = r.filePaths[0];
   if (r.canceled || !dir) return { ok: false, canceled: true };
-  const res = project.publishWebTo(dir);
+  const res = await project.publishWebTo(dir);
   return res.ok ? { ok: true, path: dir, kept: res.kept } : { ok: false, error: res.error };
 }
 
@@ -557,7 +567,7 @@ async function importLoc(fallbackLocale?: string): Promise<LocImportResult> {
 
 /** Import a custom Hunspell spell-check dictionary (#177): pick the `.dic`; its matching `.aff` sibling
  *  (same base name, same folder) comes with it. Stored per-machine in userData under that base name. */
-async function importDictionaryDialog(): Promise<{ ok: boolean; error?: string; info?: dictionaries.DictionaryInfo }> {
+async function importDictionaryDialog(): Promise<{ ok: boolean; error?: string; canceled?: boolean; info?: dictionaries.DictionaryInfo }> {
   if (!win) return { ok: false, error: "no window" };
   const r = await dialog.showOpenDialog(win, {
     title: "Import a Hunspell dictionary",
@@ -567,7 +577,7 @@ async function importDictionaryDialog(): Promise<{ ok: boolean; error?: string; 
     filters: [{ name: "Hunspell dictionary", extensions: ["dic"] }],
   });
   const dic = r.filePaths[0];
-  if (r.canceled || !dic) return { ok: false, error: "canceled" };
+  if (r.canceled || !dic) return { ok: false, canceled: true };
   const aff = dic.replace(/\.dic$/i, ".aff");
   if (!existsSync(aff)) return { ok: false, error: "No matching .aff file beside the .dic (a Hunspell pair shares one name)." };
   const base = dic.replace(/^.*[\\/]/, "").replace(/\.dic$/i, "");
@@ -604,7 +614,7 @@ function examplePath(file: string): string | undefined {
 async function openExample(file: string): Promise<OpenResult | null> {
   if (!win) return null;
   const refuse = async (message: string): Promise<null> => {
-    await tellInWindow("The example could not be opened", message);
+    await tellInWindow("The example couldn't be opened", message);
     return null;
   };
   const source = EXAMPLES.some((x) => x.file === file) ? examplePath(file) : undefined;
@@ -620,9 +630,9 @@ async function openExample(file: string): Promise<OpenResult | null> {
   const target = join(parent, basename(source));
   if (existsSync(target)) return refuse(`There is already something called "${basename(source)}" in that folder.`);
   try {
-    cpSync(source, target, { recursive: true });
+    await project.copyTreeThroughVc(source, target); // added to version control when it lands inside a working copy
   } catch (e) {
-    return refuse(`It could not be copied: ${e instanceof Error ? e.message : String(e)}`);
+    return refuse(`It couldn't be copied: ${e instanceof Error ? e.message : String(e)}`);
   }
   return openAndRecord(target);
 }
@@ -647,8 +657,9 @@ async function openDialog(): Promise<OpenResult | null> {
 
 /** Turn a project name into a safe `.patter` folder name (drop path separators; keep it readable). */
 function patterFolderName(name: string): string {
-  const clean = name.trim().replace(/[/\\]+/g, "-").replace(/\s+/g, " ");
-  return `${clean || "Untitled"}.patter`;
+  // Every character a filename may not hold, not only the separators: a ':' or '?' passed through into a
+  // folder Windows cannot create, and macOS shows a ':' as '/'.
+  return `${fileSafeName(name) || "Untitled"}.patter`;
 }
 
 /** Save As: duplicate the open project's `.patter` folder to a new name / location the user picks, then
@@ -672,7 +683,7 @@ async function saveAsDialog(): Promise<OpenResult | null> {
   // Never duplicate onto the source itself, or into a path inside it (which would recurse).
   if (resolve(dest) === resolve(src) || resolve(dest).startsWith(resolve(src) + sep)) return null;
   if (existsSync(dest)) return null; // the picker confirms overwrite of a FILE, but our target is a folder - don't clobber
-  project.duplicateTo(dest); // copy the authoring shards, skipping audio + build output (derived artefacts)
+  await project.duplicateTo(dest); // copy the authoring shards, skipping audio + build output (derived artefacts)
   return openAndRecord(dest); // open + record the copy; the renderer switches the editor to it
 }
 
@@ -725,6 +736,9 @@ async function planPatterpackMerge(): Promise<{ summary: PackMergeSummary } | { 
   if (!win) return null;
   const root = project.currentRoot();
   if (!root) return { error: "no project open" };
+  // The open scene's unsaved edits are "ours": the merge reads ours from disk, and the editor reloads the
+  // merged scene afterwards, so anything still inside the save debounce has to land first.
+  await flushEditorScene();
 
   const returned = await dialog.showOpenDialog(win, {
     title: "Merge a Returned Patterpack",
@@ -761,6 +775,9 @@ async function commitPatterpackMerge(): Promise<{ project: OpenedProject; summar
   if (!samePath(project.currentRoot(), held.root)) return { error: "a different project is open now" };
   const res = await project.commitPackMerge(held.plan);
   if (!res.ok || !res.project) return { error: res.error ?? "merge failed" };
+  // New content landed underneath the tool windows: the coverage report and a running play are of the
+  // project as it was.
+  session.invalidateSatellites();
   return { project: res.project, summary: held.plan.summary };
 }
 
@@ -776,32 +793,20 @@ async function shareScopesDialog(): Promise<{ dir: string } | { shared: string }
   const info = project.shareScopesInfo();
   if (!info) return { error: "no project open" };
   if (info.shared) return { shared: info.shared };
-  const ask = await askInWindow({
-    title: "Share this project's scopes with the game's other tools?",
-    body: [
-      `Patterpad will create ${info.suggested} and write this project's shared properties and its World properties there.`,
-      "The game's other editing tools (Storyletter, and any others) find the folder by walking up from their projects, so they can check the names this project declares, and this project can check theirs. The project keeps its own copy of the World properties, so it still works on its own.",
-    ],
-    buttons: ["Cancel", "Choose another folder…", "Share"],
-    defaultId: 2,
-    cancelId: 0,
+  // Straight to the folder, with one line saying what it is for (ruling H of the October 2026 review), as
+  // Storyletter's is: a three-button question with two paragraphs stood in front of the same choice.
+  const r = await dialog.showOpenDialog(win, {
+    title: "Share scopes with other tools",
+    message: "Patterpad will create “game-scopes” here, for the game's editing tools to share their scopes through. The version-control root is the usual place.",
+    buttonLabel: "Create Here",
+    defaultPath: dirname(info.suggested),
+    properties: ["openDirectory", "createDirectory"],
   });
-  if (ask === 0) return null;
-  let dir = info.suggested;
-  if (ask === 1) {
-    const r = await dialog.showOpenDialog(win, {
-      title: "Choose where the game's scopes folder goes",
-      message: "Patterpad will create a “game-scopes” folder here.",
-      buttonLabel: "Create here",
-      defaultPath: dirname(info.suggested),
-      properties: ["openDirectory", "createDirectory"],
-    });
-    const parent = r.filePaths[0];
-    if (r.canceled || !parent) return null;
-    dir = join(parent, "game-scopes");
-  }
+  const parent = r.filePaths[0];
+  if (r.canceled || !parent) return null;
+  const dir = join(parent, "game-scopes");
   const res = await project.shareScopes(dir);
-  return res.ok ? { dir } : { error: res.error ?? "could not share the scopes" };
+  return res.ok ? { dir } : { error: res.error ?? "couldn't share the scopes" };
 }
 
 /** Unpack a `.patterpack` (menu-chosen OR double-clicked) into a NEW `.patter` folder, ALWAYS asking where
@@ -825,7 +830,7 @@ async function unpackAndOpen(packPath: string): Promise<OpenResult | null> {
   }
   const res = await project.unpackTo(packPath, dest);
   if (!res.ok) {
-    await tellInWindow("Could not unpack the Patterpack", res.error ?? "Something went wrong while unpacking it.");
+    await tellInWindow("Couldn't unpack the Patterpack", res.error ?? "Something went wrong while unpacking it.");
     return null;
   }
   return openAndRecord(dest); // open + record the unpacked project; the renderer switches the editor to it
@@ -857,10 +862,8 @@ async function createDialog(name: string, vcs: VcsKind, buildBundle?: string): P
   const parent = r.filePaths[0];
   if (r.canceled || !parent) return null;
   const root = join(parent, patterFolderName(name));
-  const proj = await project.createProject(root, name.trim(), vcs, buildBundle);
-  store.recordOpen(root, proj.name);
-  refreshMenu();
-  return { project: proj };
+  // Written here, opened through the session like any other project, which records it and refreshes the menu.
+  return openAndRecord(await project.scaffoldProject(root, name.trim(), vcs, buildBundle));
 }
 
 // --- the tool windows: open / focus ------------------------------------------
@@ -988,7 +991,13 @@ function registerIpc(): void {
     return r;
   }));
   ipcMain.handle("project:audioManifest", () => project.writeAudioManifest());
-  ipcMain.handle("project:toggleAutoRebuild", async () => { const on = await project.toggleAutoRebuild(); refreshMenu(); return on; }); // keep the Build-menu checkbox in sync
+  ipcMain.handle("project:toggleAutoRebuild", () => {
+    const on = !store.read().autoRebuild; // the author's own setting, not the project's
+    store.setAutoRebuild(on);
+    project.setAutoRebuild(on);
+    refreshMenu(); // keep the Publish-menu checkbox in sync
+    return on;
+  });
   ipcMain.handle("project:exportVoiceScript", (_e, everything: boolean) => publishJob(() => exportVoiceScript(everything)));
   ipcMain.handle("project:exportPlayableHtml", () => publishJob(exportPlayableHtml));
   ipcMain.handle("project:exportWeb", () => publishJob(exportWeb));
@@ -1170,15 +1179,12 @@ function registerIpc(): void {
   });
   ipcMain.handle("play:setFollow", (_e, on: boolean) => { store.setPlayFollow(on); });
   ipcMain.handle("play:resetMarks", () => { win?.webContents.send("play:reset"); });
-  // Live debug link (#181): a localhost WS server an external game streams its cursor into. Frames for the
-  // followed flow reuse the SAME play:mark path the in-app Play window uses, so the editor follows the live
-  // playhead. Observe-only; the editor never drives the game.
   // Show Card in Storyletter: the storylet card the open scene plays, in the paired Storyletter project.
   ipcMain.handle("storyletter:show", async (_e, sceneId: string): Promise<{ ok: boolean; error?: string; canceled?: boolean }> => {
     if (!pairedStorylets) return { ok: false, error: "No Storyletter project nearby is paired with this one." };
     const name = project.cardNameFor(sceneId);
     if (!name) return { ok: false, error: "Open a scene first." };
-    let executable = findStoryletter(store.storyletterPath());
+    let executable = await findStoryletter(store.storyletterPath());
     if (executable === undefined) {
       const answer = await askInWindow({
         title: "Patterpad can't find Storyletter", sub: "Point to it once and Patterpad will remember where it is.",
@@ -1193,13 +1199,16 @@ function registerIpc(): void {
       });
       const chosen = picked.filePaths[0];
       if (picked.canceled || chosen === undefined) return { ok: false, canceled: true };
-      executable = findStoryletter(chosen);
+      executable = await findStoryletter(chosen);
       if (executable === undefined) return { ok: false, error: "That isn't Storyletter." };
       store.setStoryletterPath(chosen);
     }
     try { launchStoryletter(executable, pairedStorylets, name); return { ok: true }; }
     catch (e) { return { ok: false, error: `couldn't start Storyletter: ${e instanceof Error ? e.message : String(e)}` }; }
   });
+  // Live debug link (#181): a localhost WS server an external game streams its cursor into. Frames for the
+  // followed flow reuse the SAME play:mark path the in-app Play window uses, so the editor follows the live
+  // playhead. Observe-only; the editor never drives the game.
   ipcMain.handle("debug:start", () => { ensureDebugServer().start(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:status", () => ensureDebugServer().status());
@@ -1228,12 +1237,12 @@ function registerIpc(): void {
     if (r.ok) win?.webContents.send("replace:applied");
     return r;
   });
-  // Project-wide Replace (the Find counterpart). Preview is read-only; Apply flushes the editor's open scene
-  // to disk first (so unsaved edits are included + not clobbered), commits the rewritten shards through VC,
-  // then tells the editor to reload its open scene with the new text.
   ipcMain.handle("app:promptReply", (_e, id: number, i: number) => { promptWaiters.get(id)?.(i); });
   ipcMain.handle("app:close-flushed", () => { const w = closeFlushWaiters; closeFlushWaiters = []; for (const r of w) r(); }); // the editor wrote what it held; the close may go on
   ipcMain.handle("editor:flushed", () => { const w = flushWaiters; flushWaiters = []; for (const r of w) r(); }); // the editor saved its open scene
+  // Project-wide Replace (the Find counterpart). Preview is read-only; Apply flushes the editor's open scene
+  // to disk first (so unsaved edits are included + not clobbered), commits the rewritten shards through VC,
+  // then tells the editor to reload its open scene with the new text.
   ipcMain.handle("searchWin:replacePreview", (_e, opts: import("@patterkit/ops").ReplaceOptions) => project.replacePreview(opts));
   ipcMain.handle("searchWin:replaceApply", async (_e, opts: import("@patterkit/ops").ReplaceOptions) => {
     await flushEditorScene();
@@ -1391,12 +1400,12 @@ function launchLocationFromArgv(argv: string[]): string | null {
   return null;
 }
 
-// Single instance: double-clicking a .patterflow while Patterpad is already open should hand the file to
 // Windows ties a running window to its Start Menu shortcut (and so its taskbar icon, pinning, and
 // notifications) via the AppUserModelID; electron-builder stamps the shortcut with the appId, and we
 // must claim the same one or the taskbar shows a blank icon. No-op on the other platforms.
 app.setAppUserModelId("com.patterkit.patterpad");
 
+// Single instance: double-clicking a .patterflow while Patterpad is already open should hand the file to
 // the RUNNING window (second-instance), not spawn a rival. The non-primary launch quits immediately.
 // Forward this process's argv to the primary instance via additionalData. On Windows the `argv` Chromium
 // delivers to the 'second-instance' event can drop or reorder user switches (it owns that array), so the

@@ -5,23 +5,76 @@
 // module) keeps the position arithmetic consistent and auditable.
 // ---------------------------------------------------------------------------
 
-import type { Node as PMNode } from "prosemirror-model";
-import { TextSelection, type Selection } from "prosemirror-state";
+import { Fragment, type Node as PMNode } from "prosemirror-model";
+import { TextSelection, type Selection, type Transaction } from "prosemirror-state";
+import { AddMarkStep, RemoveMarkStep, ReplaceStep } from "prosemirror-transform";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 
-const ZONE_TYPES = new Set(["cue", "paren", "say"]);
-const BEAT_TYPES = new Set(["line", "prose", "gameEvent"]);
+/** The zone textblocks (where a caret rests) and the beat kinds, in one place for every module. */
+export const ZONE_TYPES: ReadonlySet<string> = new Set(["cue", "paren", "say"]);
+export const BEAT_TYPES: ReadonlySet<string> = new Set(["line", "prose", "gameEvent"]);
+
+/** What a beat is built from. `say` is a Fragment so inline bold / italic marks survive whatever
+ *  rebuilt the beat (a merge, a split, a line-type toggle); a plain string is accepted for brevity. */
+export interface BeatParts {
+  id?: string;
+  raw?: string;
+  speaker?: string;
+  direction?: string;
+  say?: Fragment | string;
+}
+
+const sayFragment = (say: Fragment | string | undefined): Fragment =>
+  say == null ? Fragment.empty : typeof say === "string" ? (say ? Fragment.from(S.text(say)) : Fragment.empty) : say;
+
+/**
+ * Build a beat of `kind`: a dialogue `line` (cue, an optional direction, say) or a text `prose` (say
+ * only). The single source of the line / prose node shape, so every command that makes or rebuilds a
+ * beat agrees on it. A fresh id is minted unless one is supplied (a toggle or a merge keeps its own).
+ */
+export function beatNode(kind: "line" | "prose", parts: BeatParts = {}): PMNode {
+  const id = parts.id ?? newId("L");
+  const raw = parts.raw ?? "{}";
+  const say = S.node("say", null, sayFragment(parts.say));
+  if (kind === "prose") return S.node("prose", { id, raw }, [say]);
+  const kids = [S.node("cue", null, parts.speaker ? [S.text(parts.speaker)] : [])];
+  if (parts.direction) kids.push(S.node("paren", null, [S.text(parts.direction)]));
+  kids.push(say);
+  return S.node("line", { id, raw }, kids);
+}
 
 /**
  * A fresh empty beat of `kind` - a dialogue `line` (optionally carrying a speaker) or a text
- * `prose`. The single source for "make a blank beat", shared by every creation command (groups,
- * special), so the cue/say node shape lives in exactly one place. A fresh id is minted per call
+ * `prose`. Shared by every creation command (groups, special, lines). A fresh id is minted per call
  * unless one is supplied (a split / jump carries its own).
  */
 export function emptyBeatNode(kind: "line" | "prose", speaker = "", id: string = newId("L")): PMNode {
-  if (kind === "prose") return S.node("prose", { id, raw: "{}" }, [S.node("say", null, [])]);
-  return S.node("line", { id, raw: "{}" }, [S.node("cue", null, speaker ? [S.text(speaker)] : []), S.node("say", null, [])]);
+  return beatNode(kind, { id, speaker });
+}
+
+/** The `raw` overlay of a brand-new snippet: a fresh id and nothing else. Every command that mints a
+ *  bubble (a split's tail, a seeded group's bubble, a jump's continuation) uses this, so a new snippet
+ *  never inherits another's condition or effects by accident. */
+export const freshSnippetRaw = (): string => JSON.stringify({ id: newId("sn"), type: "snippet" });
+
+/** A fresh snippet holding `beats` (none = an un-entered bubble showing the add-a-line ghost). */
+export const freshSnippet = (beats: PMNode[] = [], jump = ""): PMNode => S.node("snippet", { raw: freshSnippetRaw(), jump }, beats);
+
+/**
+ * Is this beat BLANK - a line or text beat with nothing in it that would be lost by removing it? No
+ * typed text in any zone (character, direction, or words) and no game data or tags. A game event is
+ * never blank: it is an atom with no text, and its whole content is what it is. The one emptiness rule,
+ * shared by the blur sweep and by a jump collapsing an empty bubble, so neither deletes what the other
+ * would keep.
+ */
+export function isBlankBeat(node: PMNode): boolean {
+  if (node.type.name !== "line" && node.type.name !== "prose") return false;
+  if (node.textContent.trim() !== "") return false;
+  const raw = rawAttr(node);
+  const hasGameData = !!raw.gameData && typeof raw.gameData === "object" && Object.keys(raw.gameData as object).length > 0;
+  const hasTags = Array.isArray(raw.tags) && raw.tags.length > 0;
+  return !hasGameData && !hasTags;
 }
 
 export interface ZoneRef { node: PMNode; pos: number }
@@ -166,16 +219,6 @@ export function adjacentBeat(doc: PMNode, pos: number, dir: -1 | 1): BeatRef | n
   return dir === 1 ? after : before;
 }
 
-/** All beat-level nodes (line/prose/gameEvent) in document order. (A jump is a snippet attr, not a beat.) */
-export function beatList(doc: PMNode): BeatRef[] {
-  const out: BeatRef[] = [];
-  doc.descendants((node, pos) => {
-    if (BEAT_TYPES.has(node.type.name)) { out.push({ node, pos }); return false; }
-    return true;
-  });
-  return out;
-}
-
 export const isZoneBeat = (n: PMNode): boolean => n.type.name === "line" || n.type.name === "prose";
 
 /**
@@ -197,4 +240,24 @@ export function prevBeatKind(doc: PMNode, beforePos: number): "line" | "prose" {
     return true;
   });
   return kind;
+}
+
+/**
+ * Does every step of `tr` stay inside one textblock (typing, a word deleted, a mark toggled)? Then no
+ * node was added, removed, or replaced, so a decoration keyed to a node can simply be MAPPED through the
+ * transaction instead of rebuilt by a document walk - the common keystroke. Anything else (a split, a
+ * merge, an attribute change) answers false and the caller rebuilds.
+ */
+export function editsInsideTextblocks(tr: Transaction): boolean {
+  return tr.steps.every((step, i) => {
+    if (step instanceof AddMarkStep || step instanceof RemoveMarkStep) return true;
+    if (!(step instanceof ReplaceStep)) return false;
+    const { from, to, slice } = step as unknown as { from: number; to: number; slice: import("prosemirror-model").Slice };
+    let inline = slice.openStart === 0 && slice.openEnd === 0;
+    slice.content.forEach((n) => { if (!n.isInline) inline = false; });
+    if (!inline) return false;
+    const doc = tr.docs[i]!;
+    const $from = doc.resolve(from), $to = doc.resolve(to);
+    return $from.sameParent($to) && $from.parent.inlineContent;
+  });
 }

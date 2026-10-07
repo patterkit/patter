@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
-// Special-line insertion (Z8, spec section 10). Jumps and actions are
+// Special-line insertion (Z8, spec section 10). Jumps and game events are
 // INSERTED at an empty line via the slash menu - never reached by toggling - and
-// removed only via their per-line delete affordance.
+// removed only via their own affordance (a game event's ×, the inspector's jump row).
 //
 //   insertJump(target) - set the current snippet's terminal jump (a snippet-
 //                  level value, not a beat); the triggering empty line is dropped
@@ -10,7 +10,7 @@
 //                  directly (the bottom-right chrome control), no bubble churn.
 //   insertGameEvent    - the current empty line becomes a game-event beat; it does
 //                  NOT end the bubble; a fresh line follows with the caret in it.
-//                  (The game-event details UI is deferred to the shell.)
+//                  (Its details are edited in the host's inspector.)
 //   deleteAtomAt(pos)  - remove a game-event node (the UI affordance). The jump is
 //                  removed via setSnippetJump(.., null) instead.
 //
@@ -22,7 +22,7 @@ import { Fragment, type Node as PMNode } from "prosemirror-model";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
-import { cueText, prevBeatKind, emptyBeatNode, findBeatById, findByModelId, zoneContentEnd } from "./zoneutil.js";
+import { cueText, prevBeatKind, emptyBeatNode, findBeatById, findByModelId, zoneContentEnd, isBlankBeat, freshSnippet } from "./zoneutil.js";
 import { landOnBeat } from "./lines.js";
 
 /**
@@ -77,7 +77,7 @@ export function insertJump(state: EditorState, target: string): Transaction | nu
   if (after.length > 0) {
     // Mid-bubble SPLIT: the trailing beats become snippet B, inheriting the OLD jump; land on its
     // first content beat so the author can keep editing the continuation.
-    const newB = S.node("snippet", { raw: JSON.stringify({ id: newId("sn"), type: "snippet" }), jump: oldJump }, Fragment.fromArray(after));
+    const newB = freshSnippet(after, oldJump);
     const tr = state.tr.replaceWith(c.snippet.pos, c.snippet.pos + A.nodeSize, Fragment.fromArray([newA, newB]));
     const landId = (after.find((b) => b.type.name === "line" || b.type.name === "prose")?.attrs.id as string) ?? "";
     if (landId) landOnBeat(tr, landId);
@@ -110,9 +110,13 @@ export function setSnippetJump(state: EditorState, snippetPos: number, target: s
   const jump = target ? JSON.stringify(next) : ""; // "" clears the jump entirely
   const tr = state.tr.setNodeMarkup(snippetPos, undefined, { ...snip.attrs, jump });
   // Adding a jump to an EMPTY bubble makes it a jump-only snippet - drop the placeholder beat(s) so it
-  // collapses to the slim divert row (a beat-less snippet + jump). Only when the content is wholly empty;
-  // a bubble with any real text keeps its beats. The "add a line" ghost can re-grow it later.
-  if (target && snip.content.size > 0 && snip.textContent.trim() === "") {
+  // collapses to the slim divert row (a beat-less snippet + jump). Only when EVERY beat is blank by the
+  // blur sweep's own rule (isBlankBeat): a game event has no text but is not blank, and nor is an empty
+  // line carrying game data or tags, so "no text" alone used to delete them (review 2026-10, HIGH 6).
+  // The "add a line" ghost can re-grow a collapsed bubble later.
+  let allBlank = snip.childCount > 0;
+  snip.forEach((b) => { if (!isBlankBeat(b)) allBlank = false; });
+  if (target && allBlank) {
     tr.delete(snippetPos + 1, snippetPos + 1 + snip.content.size);
   }
   return tr.scrollIntoView();

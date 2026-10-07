@@ -20,20 +20,23 @@ import { navKeymap } from "../src/navigation.js";
 import { openDirection, closeDirection } from "../src/direction.js";
 import { enter, endBubble, insertLineBefore } from "../src/lines.js";
 import { selectAllInBeat } from "../src/selectall.js";
-import { backspace, deleteSelectionGuarded } from "../src/delete.js";
+import { backspace, forwardDelete } from "../src/delete.js";
 import { toggleLineType, flipToFreeText, promoteToDialogue } from "../src/linetype.js";
 import { context } from "../src/context.js";
 import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js";
 import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
-import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
+import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, deleteBlock, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
+import { structureGuard, refusal } from "../src/guard.js";
+import { clipboardText, pasteParagraphs } from "../src/paste.js";
+import { clipboardParagraphs } from "./clipboard.js";
 import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
 import { setSnippetJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
 import { setPlayBlockHandler } from "./actionmenu.js";
-import { confirmDialog } from "./confirm.js";
-import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf, offCue } from "../src/zoneutil.js";
+import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
+import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
-import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu } from "./views.js";
+import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu, destroyActionMenu } from "./views.js";
 import { problemsPlugin, setProblemMarks, type ProblemMark } from "./problems.js";
 import { docNotesPlugin, setDocNotes, setNoteHandler, type DocNote, type DocNoteMap } from "./docnotes.js";
 import { commentsPlugin, setComments, setCommentHandler, commentRanges, type CommentMark, type CommentOpenRequest } from "./comments.js";
@@ -118,11 +121,15 @@ export interface MountOptions {
    *  name - the host registers it in the project master cast (ProjectFile.cast) so it persists beyond this
    *  session. Omit and a new character lives only in the surface's session cast. */
   onAddCharacter?: (name: string) => void;
+  /** Called when the surface REFUSES an edit and the author should hear why, with one short sentence
+   *  to show as a toast: a merge or range edit that would drop a snippet's condition, effects, or jump,
+   *  or remove a whole group (review 2026-10, ruling D); a keyboard delete of a scene's only block. The
+   *  edit itself has already been declined. Omit and refusals are silent (nothing is lost either way). */
+  onRefuse?: (message: string) => void;
 }
 
 export interface SurfaceHandle {
   view: EditorView;
-  /** Round-trip the current document back to canonical `.patterflow` + `.patterloc` source. */
   /** Serialize the doc to `.patterflow` + `.patterloc` source. Pass `{ prune: true }` on a real SAVE to
    *  tidy stray blank text lines (a snippet's lone / leading / trailing blank text beat) - never on the
    *  live mirror, where a just-created blank line is valid. */
@@ -295,11 +302,6 @@ function caretMidY(v: EditorView): number | null {
  * The speaker is a TOKEN, not editable text: a caret must never rest INSIDE a populated cue. If one
  * lands there (a click, an arrow step), select the whole name - the popup then opens to replace it.
  */
-/** A key that would insert a character: one printable key, no command modifier. */
-function isPrintableKey(e: KeyboardEvent): boolean {
-  return e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
-}
-
 function normalizeCueSelection(state: EditorState): EditorState {
   const c = context(state);
   if (state.selection.empty && c.zone?.role === "cue" && c.zone.textLen > 0) {
@@ -331,10 +333,12 @@ export function sweepEmptyBeats(state: EditorState): Transaction | null {
   let keepSnippet: number | null = null; // the snippet holding the swept beat the caret was in
   state.doc.descendants((node, pos) => {
     const k = node.type.name;
+    // A choice PROMPT's beat is the option's own text cell, never a stray line: a fresh option's prompt
+    // is empty until the author types it, and sweeping it (say, on clicking the inspector to set the
+    // option's condition) left the option with no prompt at all (review 2026-10, HIGH 8).
+    if (k === "optionprompt") return false;
     if (k === "line" || k === "prose") {
-      let hasData = false;
-      try { const raw = JSON.parse((node.attrs.raw as string) || "{}"); hasData = !!(raw.gameData && Object.keys(raw.gameData).length) || !!(raw.tags && raw.tags.length); } catch { /* no raw data */ }
-      if (node.textContent.trim() === "" && !hasData) {
+      if (isBlankBeat(node)) { // the one emptiness rule (zoneutil): no text, no game data, no tags
         spans.push({ from: pos, to: pos + node.nodeSize });
         if (head > pos && head < pos + node.nodeSize) keepSnippet = snippetHolding(state, pos);
       }
@@ -376,42 +380,48 @@ function snippetHolding(state: EditorState, pos: number): number | null {
 }
 
 /**
- * Backspace / Delete on an EXPLICITLY SELECTED chunk (a snippet or group NodeSelection) deletes it -
- * through the same themed confirm + deleteChunk path as the action menu's Delete (groups §7), so a
+ * Backspace / Delete on an EXPLICITLY SELECTED chunk (a snippet or group NodeSelection) or BLOCK deletes
+ * it - through the same themed confirm + delete command as the action menu's Delete (groups §7), so a
  * keyboard delete can't silently destroy content. An empty chunk (nothing typed inside) is removed
- * without a prompt, matching the menu. Returns false for any other selection so the normal
- * backspace / range-delete commands still run.
+ * without a prompt, matching the menu. A block goes through deleteBlock, which refuses a scene's only
+ * block (review 2026-10, HIGH 7: the keyboard used to delete it outright, with no confirm, and leave a
+ * block with no id or name behind). Returns false for any other selection so the normal backspace /
+ * range-delete commands still run.
  */
-const deleteSelectedChunk: Command = (state, _dispatch, view) => {
+const deleteSelectedChunk: Command = (state, dispatch, view) => {
   if (!view) return false;
+  if (!view.editable) return false; // a locked scene: nothing to confirm, the delete could not happen
   // A multi-select set (shift run OR a Cmd-click set, groups §6): one themed confirm, then delete every
   // chunk in the set (gather - they may be discontiguous, e.g. [1,2,4]).
   const positions = multiSelectPositions(state);
   if (positions.length >= 2) {
-    const n = positions.length;
     const removeSet = (): void => { const tr = deleteChunksAt(view.state, multiSelectPositions(view.state)); if (tr) view.dispatch(tr); view.focus(); };
-    void confirmDialog({
-      title: `Delete these ${n} items?`,
-      body: `${n} items and everything inside them will be removed. You can undo this.`,
-      confirmLabel: `Delete ${n} items`,
-    }).then((ok) => { if (ok) removeSet(); });
+    void confirmDeleteSet(positions.length).then((ok) => { if (ok) removeSet(); });
     return true;
   }
   const sel = state.selection;
-  if (!(sel instanceof NodeSelection) || (sel.node.type.name !== "snippet" && sel.node.type.name !== "group")) return false;
+  if (!(sel instanceof NodeSelection)) return false;
   const node = sel.node;
   const pos = sel.from;
+  if (node.type.name === "block") {
+    if (!deleteBlock(state, pos)) { dispatch?.(refusal(state, "A scene needs at least one block, so its last one can't be deleted.")); return true; }
+    const name = typeof rawAttr(node).name === "string" && (rawAttr(node).name as string) ? (rawAttr(node).name as string) : "this block";
+    void confirmDeleteBlock(name).then((ok) => { if (ok) { const tr = deleteBlock(view.state, pos); if (tr) view.dispatch(tr); } view.focus(); });
+    return true;
+  }
+  if (node.type.name !== "snippet" && node.type.name !== "group") return false;
   const isOption = node.type.name === "group" && isChoiceGroup(state.doc.resolve(pos).parent);
   const noun = isOption ? "option" : node.type.name === "group" ? "group" : "snippet";
   const remove = (): void => { const tr = deleteChunkCmd(view.state, pos); if (tr) view.dispatch(tr); view.focus(); };
   if (chunkIsEmpty(node)) { remove(); return true; } // nothing lost -> no prompt (matches the action menu)
-  void confirmDialog({
-    title: `Delete this ${noun}?`,
-    body: `The ${noun} and everything inside it will be removed. You can undo this.`,
-    confirmLabel: `Delete ${noun}`,
-  }).then((ok) => { if (ok) remove(); });
+  void confirmDeleteChunk(noun).then((ok) => { if (ok) remove(); });
   return true;
 };
+
+/** A key that would insert a character: one printable key, no command modifier. */
+function isPrintableKey(e: KeyboardEvent): boolean {
+  return e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+}
 
 export function mountSurface(opts: MountOptions): SurfaceHandle {
   const editorEl = opts.editor;
@@ -420,7 +430,18 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // die with view.destroy(), but routing them here too keeps the rule uniform).
   const listeners = new AbortController();
   const sig = listeners.signal;
+  // Set by destroy(). A frame callback queued before it (a coalesced change / inspector notification, a
+  // recentre) must not then run against a torn-down view and a host that has moved on (review 2026-10).
+  let destroyed = false;
+  const nextFrame = (fn: () => void): void => { requestAnimationFrame(() => { if (!destroyed) fn(); }); };
   let titleEl: HTMLElement | null = null;
+  /** Show the doc's own scene name in the title, unless the author is typing in it: an undo / redo of a
+   *  rename changes the doc and nothing else would tell the title (review 2026-10, MEDIUM 38). */
+  const syncTitle = (): void => {
+    if (!titleEl || document.activeElement === titleEl) return;
+    const n = handle.sceneName();
+    if (titleEl.textContent !== n) titleEl.textContent = n;
+  };
   let formattingEnabled = opts.formatting ?? true;
   const opened = openScene(opts.flowSource, opts.locSource, formattingEnabled);
 
@@ -528,7 +549,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   const scheduleChange = (): void => {
     if (!opts.onChange || changeScheduled) return;
     changeScheduled = true;
-    requestAnimationFrame(() => { changeScheduled = false; opts.onChange?.(handle); });
+    nextFrame(() => { changeScheduled = false; opts.onChange?.(handle); });
   };
 
   // Selection-context (inspector) notifications, likewise coalesced. Fires when the selection OR the
@@ -542,7 +563,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   const scheduleSelect = (): void => {
     if (!opts.onSelect || selectScheduled) return;
     selectScheduled = true;
-    requestAnimationFrame(() => {
+    nextFrame(() => {
       selectScheduled = false;
       opts.onSelect?.(scenePinned ? inspectScene(view.state) : inspect(view.state));
     });
@@ -572,9 +593,26 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     (state, dispatch) => { if (formattingEnabled) toggleMark(mark)(state, dispatch); return true; };
 
   // Read-only gate (#145): when the scene is locked by another author the host flips this off, so
-  // ProseMirror blocks typing / drag / paste. Programmatic edits (inspector commands) are gated by the
-  // host dimming the inspector; this covers the direct-typing surface.
+  // ProseMirror blocks typing / drag / paste. The surface's own chrome (menus, grips, the "+" controls,
+  // a block rename, a game event's ×, the scene title, a spelling fix) is hidden and checks
+  // `view.editable` too, and as the backstop dispatchTransaction drops every doc change while it is off
+  // (review 2026-10, MEDIUM 33), whichever route it came by.
   let isEditable = true;
+  /** Transaction meta: a doc change allowed on a read-only scene (only setFormatting's mark strip, so
+   *  the page keeps showing what the project setting says ships). */
+  const READ_ONLY_OK = "patterReadOnlyOk";
+  const say = (message: string): void => opts.onRefuse?.(message);
+
+  // Backspace and Delete in all their platform variants (Mod-, Alt-, Shift-, Ctrl-h / Ctrl-d on a Mac)
+  // go through the zone spine; baseKeymap's join commands would otherwise run for the variants and
+  // join zones and beats in ways no command here designed. Only the keys baseKeymap itself binds on
+  // this platform are taken, so nothing the browser or the OS owns is captured. Mid-zone the spine
+  // returns false and the key keeps its native meaning (a word or a line deleted).
+  const spineKeys: Record<string, Command> = {};
+  for (const k of Object.keys(baseKeymap)) {
+    if (/(^|-)Backspace$/.test(k) || k === "Ctrl-h") spineKeys[k] = backspace;
+    else if (/(^|-)Delete$/.test(k) || k === "Ctrl-d" || k === "Alt-d") spineKeys[k] = forwardDelete;
+  }
 
   const view = new EditorView(editorEl, {
     editable: () => isEditable,
@@ -592,6 +630,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       // dialogue line would otherwise select the name and raise the cast picker as soon as it had focus.
       selection: offCue(opened.doc, Selection.atStart(opened.doc)),
       plugins: [
+        // First, so nothing else sees a transaction it is going to refuse (ruling D).
+        structureGuard(say),
         history(),
         keymap({ "Mod-z": undo, "Mod-y": redo, "Mod-Shift-z": redo }),
         // An explicitly selected chunk (snippet / group NodeSelection) deletes via the themed confirm,
@@ -599,7 +639,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         keymap({ Backspace: deleteSelectedChunk, Delete: deleteSelectedChunk }),
         keymap({
           Enter: enter, "Shift-Enter": endBubble, "Mod-Enter": endBubble,
-          Backspace: backspace, Delete: deleteSelectionGuarded,
+          ...spineKeys,
           "Mod-t": toggleLineType, "Alt-t": toggleLineType, // Cmd-T is browser new-tab; Alt-T in the harness
         }),
         keymap({ "Mod-b": fmtKey(patterSchema.marks.strong), "Mod-i": fmtKey(patterSchema.marks.em) }),
@@ -618,7 +658,20 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       ],
     }),
     nodeViews,
+    // Copy writes the spoken words, one beat to a line, never the speaker or direction (src/paste.ts).
+    clipboardTextSerializer: (slice) => clipboardText(slice),
     handleDOMEvents: {
+      // Paste is taken over whole (ruling E): ProseMirror's own parse has no rule for any node in this
+      // schema, so it glued paragraphs, pasted speakers as words, and threw on a copy across beats.
+      paste: (v, event) => {
+        event.preventDefault();
+        if (!isEditable) return true;
+        const data = event.clipboardData;
+        const paras = clipboardParagraphs(data?.getData("text/html"), data?.getData("text/plain"));
+        const tr = pasteParagraphs(v.state, paras, formattingEnabled);
+        if (tr) v.dispatch(tr.setMeta("uiEvent", "paste"));
+        return true;
+      },
       mousedown: (_v, event) => {
         const t = event.target as Element | null;
         lastInputWasPointer = true;
@@ -648,8 +701,10 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       // edited: in Chrome a keydown preventDefault does not cancel `beforeinput`, so without this the
       // typed letter would leak in and overwrite the selected cue token, stranding the caret. (Invisible
       // to jsdom, which fires no beforeinput - hence the unit tests passed while the live editor broke.)
-      if (popup.isOpen()) return true;
-      return false;
+      // Text that arrives with no printable keydown at all - an IME composition, dictation - is the
+      // author typing a name too: it goes into the popup's buffer, which typeText opens if need be, and
+      // so an IME can type a cue name (review 2026-10). typeText is true whenever the caret is in a cue.
+      return popup.typeText(v, text);
     },
     handleKeyDown: (v, event) => {
       lastInputWasPointer = false;
@@ -673,14 +728,21 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (popup.handleKeyDown(v, event)) return true;
       if (event.key === " ") { const tr = flipToFreeText(v.state); if (tr) { v.dispatch(tr); popup.close(); return true; } }
       if (event.key === "Tab") {
-        if (closeDirection(v.state, v.dispatch)) return true;
-        return promoteToDialogue(v.state, v.dispatch);
+        // Tab is the script's own key (close a direction, promote a text line to dialogue) and is never
+        // handed to the browser: it moved focus out of the editor to the next control (review 2026-10).
+        if (!event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && !closeDirection(v.state, v.dispatch)) promoteToDialogue(v.state, v.dispatch);
+        return true;
       }
       return false;
     },
     dispatchTransaction(tr) {
+      // A locked scene takes no doc change from any route (see isEditable).
+      if (!isEditable && tr.docChanged && !tr.getMeta(READ_ONLY_OK)) return;
       const fromStrayClick = lastInputWasPointer && !lastPointerOnCue;
-      const applied = view.state.apply(tr);
+      // A refused transaction (the structure guard's filter) leaves nothing to do: no change to
+      // announce, no popup to move.
+      const { state: applied, transactions } = view.state.applyTransaction(tr);
+      if (!transactions.length) return;
       const next = fromStrayClick ? applied : normalizeCueSelection(applied);
       // Point the jump-label resolver at the NEW doc BEFORE the repaint: node views that resolve a jump /
       // condition label DURING updateState (e.g. a condition tag re-humanizing `visits(block)`, or a recreated
@@ -690,7 +752,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       liveDoc = next.doc;
       view.updateState(next);
       const ctx = context(next);
-      if (tr.docChanged) scheduleChange();
+      if (tr.docChanged) { scheduleChange(); syncTitle(); }
       if (tr.selectionSet) scenePinned = false; // a real selection move (beat / block / group) un-pins the scene
       if (tr.selectionSet || tr.docChanged) { slash.close(); scheduleSelect(); }
       // A vertical (Up/Down) move only passes THROUGH a cue, so it must not raise the cast popup; a
@@ -714,7 +776,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         lastBeatPos = beatPos;
         if (!tr.scrolledIntoView && !recenterScheduled) {
           recenterScheduled = true;
-          requestAnimationFrame(() => { recenterScheduled = false; recenterCaret(view); });
+          nextFrame(() => { recenterScheduled = false; recenterCaret(view); });
         }
       }
     },
@@ -727,14 +789,29 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     const title = document.createElement("div"); title.className = "scene-title";
     title.textContent = opened.flow.scene.name;
     // The scene name is author-editable here (the title IS the edit surface); commit on blur / Enter.
-    title.setAttribute("contenteditable", "plaintext-only");
+    title.setAttribute("contenteditable", isEditable ? "plaintext-only" : "false");
     title.spellcheck = false;
-    title.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); title.blur(); } }, { signal: sig });
+    // Only a title the author actually typed in commits on blur. It used to commit whatever it showed,
+    // so after an undo of a rename (the doc's name reverted, the title not) the next blur wrote the
+    // stale name straight back (review 2026-10, MEDIUM 38). Esc puts back the name the title had when
+    // it was focused and leaves without committing (family ruling N, MEDIUM 31).
+    let titleDirty = false;
+    let titleAtFocus = "";
+    title.addEventListener("input", () => { titleDirty = true; }, { signal: sig });
+    title.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); title.blur(); }
+      else if (e.key === "Escape") { e.preventDefault(); title.textContent = titleAtFocus; titleDirty = false; title.blur(); }
+    }, { signal: sig });
     // The title sits OUTSIDE the editable flow, so clicking it can't move the caret; focusing it instead
     // PINS the inspector to the whole scene (until the next editor selection move clears it - see
     // scheduleSelect), so editing scene fields in the inspector doesn't snap back to the last beat.
-    title.addEventListener("focus", () => { scenePinned = true; opts.onSelect?.(inspectScene(view.state)); }, { signal: sig });
-    title.addEventListener("blur", () => { const n = (title.textContent ?? "").trim(); if (n) handle.setSceneName(n); else title.textContent = handle.sceneName(); }, { signal: sig });
+    title.addEventListener("focus", () => { titleAtFocus = title.textContent ?? ""; titleDirty = false; scenePinned = true; opts.onSelect?.(inspectScene(view.state)); }, { signal: sig });
+    title.addEventListener("blur", () => {
+      if (!titleDirty || !isEditable) { title.textContent = handle.sceneName(); return; }
+      titleDirty = false;
+      const n = (title.textContent ?? "").trim();
+      if (n && n !== handle.sceneName()) handle.setSceneName(n); else title.textContent = handle.sceneName();
+    }, { signal: sig });
     // Right-click the scene header -> a scene menu: add / edit a scene-level note (#148) + set the writing
     // status of the whole scene (#196). The scene id rides in the doc.
     title.addEventListener("contextmenu", (e) => {
@@ -761,6 +838,23 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
 
   // Find the document position of the node carrying this model id (beat id attr, or a chunk's raw.id).
   const findNodePos = (id: string): number | null => findByModelId(view.state.doc, id)?.pos ?? null;
+
+  /**
+   * Edit the `raw` model JSON of the scene (when `id` is the scene's) or of the node with this id, in one
+   * dispatch. The one path for the inspector's per-node field setters (gameId, game data, tags), which
+   * were three hand-copied versions of it. `accept` narrows which node kinds may be edited.
+   */
+  const editRaw = (id: string, edit: (raw: Record<string, unknown>) => void, accept: (n: PMNode) => boolean = () => true): boolean => {
+    const docRaw = rawAttr(view.state.doc);
+    if (docRaw.id === id) { edit(docRaw); view.dispatch(view.state.tr.setDocAttribute("raw", JSON.stringify(docRaw))); return true; }
+    const at = findNodePos(id);
+    const node = at == null ? null : view.state.doc.nodeAt(at);
+    if (at == null || !node || !accept(node)) return false;
+    const raw = rawAttr(node);
+    edit(raw);
+    view.dispatch(view.state.tr.setNodeMarkup(at, undefined, { ...node.attrs, raw: JSON.stringify(raw) }));
+    return true;
+  };
 
   let markedEl: HTMLElement | null = null; // the beat the playhead is currently on
   const visitedEls = new Set<HTMLElement>(); // beats the playhead has passed through this run
@@ -802,7 +896,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     playPointer.style.left = `${a.left}px`;
     if (!playPointer.classList.contains("is-active")) {
       playPointer.classList.add("is-active"); // fade in at the placed spot (no position transition yet)
-      requestAnimationFrame(() => { if (markedEl) playPointer.classList.add("gliding"); }); // glide subsequent moves
+      nextFrame(() => { if (markedEl) playPointer.classList.add("gliding"); }); // glide subsequent moves
     }
   };
 
@@ -823,7 +917,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     setFormatting(on) {
       if (on === formattingEnabled) return;
       if (!on) { // disabling strips existing marks so the doc matches the plain strings that ship
-        const tr = view.state.tr;
+        const tr = view.state.tr.setMeta(READ_ONLY_OK, true);
         tr.removeMark(0, view.state.doc.content.size, patterSchema.marks.strong);
         tr.removeMark(0, view.state.doc.content.size, patterSchema.marks.em);
         if (tr.docChanged) view.dispatch(tr);
@@ -836,6 +930,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (on === isEditable) return;
       isEditable = on;
       view.setProps({ editable: () => isEditable }); // re-evaluate so the DOM contentEditable updates now
+      titleEl?.setAttribute("contenteditable", on ? "plaintext-only" : "false");
+      if (!on) popup.close();
     },
     isEditable: () => isEditable,
     revealNode(id, opts) {
@@ -902,20 +998,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     },
     setGameId(id, gameId) {
       const g = gameId.trim();
-      const docRaw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;
-      if (docRaw.id === id) { // the scene (the doc node)
-        if (g) docRaw.gameId = g; else delete docRaw.gameId;
-        view.dispatch(view.state.tr.setDocAttribute("raw", JSON.stringify(docRaw)));
-        return true;
-      }
-      const at = findNodePos(id);
-      if (at == null) return false;
-      const node = view.state.doc.nodeAt(at);
-      if (node?.type.name !== "block") return false;
-      const raw = JSON.parse(node.attrs.raw as string) as Record<string, unknown>;
-      if (g) raw.gameId = g; else delete raw.gameId;
-      view.dispatch(view.state.tr.setNodeMarkup(at, undefined, { ...node.attrs, raw: JSON.stringify(raw) }));
-      return true;
+      return editRaw(id, (raw) => { if (g) raw.gameId = g; else delete raw.gameId; }, (n) => n.type.name === "block");
     },
     setGroupProps(id, patch) {
       const at = findNodePos(id);
@@ -927,46 +1010,16 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       return true;
     },
     setGameData(id, key, value) {
-      // Edit `gameData[key]` inside the node's `raw` model JSON (sparse: drop the key, and the whole
-      // `gameData` object, when emptied). Mirrors setGameId; works for the scene (doc node) + any node.
-      const apply = (rawStr: string): string => {
-        const raw = JSON.parse(rawStr) as Record<string, unknown>;
+      // Sparse: drop the key, and the whole `gameData` object, when emptied.
+      return editRaw(id, (raw) => {
         const gd = (raw.gameData && typeof raw.gameData === "object" ? { ...(raw.gameData as Record<string, unknown>) } : {});
         if (value === undefined) delete gd[key]; else gd[key] = value;
         if (Object.keys(gd).length) raw.gameData = gd; else delete raw.gameData;
-        return JSON.stringify(raw);
-      };
-      const docRaw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;
-      if (docRaw.id === id) { // the scene is the doc node
-        view.dispatch(view.state.tr.setDocAttribute("raw", apply(view.state.doc.attrs.raw as string)));
-        return true;
-      }
-      const at = findNodePos(id);
-      if (at == null) return false;
-      const node = view.state.doc.nodeAt(at);
-      if (!node) return false;
-      view.dispatch(view.state.tr.setNodeMarkup(at, undefined, { ...node.attrs, raw: apply(node.attrs.raw as string) }));
-      return true;
+      });
     },
     setTags(id, tags) {
-      // Replace `raw.tags` (author tags #215); drop the key when empty. Mirrors setGameData - works for the
-      // scene (doc node) + any node (block / group / snippet / beat).
-      const apply = (rawStr: string): string => {
-        const raw = JSON.parse(rawStr) as Record<string, unknown>;
-        if (tags.length) raw.tags = tags; else delete raw.tags;
-        return JSON.stringify(raw);
-      };
-      const docRaw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;
-      if (docRaw.id === id) { // the scene is the doc node
-        view.dispatch(view.state.tr.setDocAttribute("raw", apply(view.state.doc.attrs.raw as string)));
-        return true;
-      }
-      const at = findNodePos(id);
-      if (at == null) return false;
-      const node = view.state.doc.nodeAt(at);
-      if (!node) return false;
-      view.dispatch(view.state.tr.setNodeMarkup(at, undefined, { ...node.attrs, raw: apply(node.attrs.raw as string) }));
-      return true;
+      // Author tags (#215); drop the key when empty.
+      return editRaw(id, (raw) => { if (tags.length) raw.tags = tags; else delete raw.tags; });
     },
     sceneProps() {
       const raw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;
@@ -1157,7 +1210,13 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     // The hint bar is the HOST's element, filled by us: emptying it belongs here, or its last hints
     // outlive the editor they describe. Patterpad's welcome screen showed "Tab -> dialogue" with
     // nothing to type into (from-storylets/welcome-screen-shape, spotted in a screenshot).
-    destroy: () => { cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setJumpNavHandler(null); pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); opts.hintbar?.replaceChildren(); view.destroy(); },
+    // The floating menus are body-level, so they outlive the editor unless removed here (review 2026-10).
+    destroy: () => {
+      destroyed = true;
+      cancelPendingMark?.(); listeners.abort(); closeTargetPicker(); setPlayBlockHandler(null); setJumpNavHandler(null);
+      popup.destroy(); slash.destroy(); destroyActionMenu();
+      pointerResize.disconnect(); playPointer.remove(); titleEl?.remove(); opts.hintbar?.replaceChildren(); view.destroy();
+    },
   };
   opts.onChange?.(handle); // initial mirror
   opts.onSelect?.(inspect(view.state)); // initial inspector context

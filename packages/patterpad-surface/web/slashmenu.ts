@@ -1,11 +1,12 @@
-// The special-insert ("/") menu (for the harness). At an empty line, "/" opens a
-// two-section menu: "This line" (act on the current line - Insert action, Jump,
-// Split here) and "Follow with" (add a sibling chunk after this snippet - Snippet,
-// Branch, Choice, ...). The wording mirrors the right-click action menu (Branch, not
-// "If / Else"). The first item is highlighted, Up/Down move it (skipping headings),
-// Enter selects, Esc closes. Jump leads to a target picker over the injected
-// scene/block ids. Mutually exclusive with the cast popup (main.ts closes the popup
-// when this opens and swallows keys while open). Wired via EditorView props.
+// The special-insert ("/") menu. At an empty line, "/" opens a two-section menu:
+// "This line" (act on the current line - Insert game event, Jump, Split here) and
+// "Follow with" (add a sibling chunk after this snippet - Snippet, Branch, Choice,
+// ...). The wording mirrors the right-click action menu (Branch, not "If / Else").
+// The first item is highlighted, Up/Down move it (skipping headings), Enter selects,
+// Esc closes, and each item's underlined letter jumps to it. Jump leads to the
+// target picker over the injected scene/block ids. Mutually exclusive with the cast
+// popup (surface.ts closes the popup when this opens and swallows keys while open).
+// Wired via EditorView props.
 
 import type { EditorView } from "prosemirror-view";
 import { canInsertSpecial, insertGameEvent } from "../src/special.js";
@@ -33,6 +34,8 @@ export interface SlashMenu {
   handleKeyDown(view: EditorView, event: KeyboardEvent): boolean;
   isOpen(): boolean;
   close(): void;
+  /** Close and take the menu's element out of the page (the surface's destroy). */
+  destroy(): void;
 }
 
 /** `openJump` opens the shared jump target picker at the caret (the surface wires it to insertJump). */
@@ -119,7 +122,8 @@ export function createSlashMenu(openJump: (view: EditorView) => void): SlashMenu
     const thisLine: Entry[] = [
       { kind: "head", label: "This line" },
       { kind: "item", label: "Insert game event", key: "a", run: () => { const tr = insertGameEvent(view.state); if (tr) view.dispatch(tr); close(); view.focus(); } },
-      { kind: "item", label: "Jump", key: "d", run: () => { close(); openJump(view); } },
+      // The access key is a letter of the label, so the underline shows it (review 2026-10: "d" was not).
+      { kind: "item", label: "Jump", key: "j", run: () => { close(); openJump(view); } },
     ];
     if (canSplit) thisLine.push({ kind: "item", label: "Split here", key: "p", run: () => { const tr = splitSnippetHere(view.state, snippetPos!); if (tr) view.dispatch(tr); close(); view.focus(); } });
     const followWith: Entry[] = [
@@ -160,5 +164,6 @@ export function createSlashMenu(openJump: (view: EditorView) => void): SlashMenu
     },
     isOpen: () => open,
     close,
+    destroy: () => { close(); floating.el.remove(); },
   };
 }

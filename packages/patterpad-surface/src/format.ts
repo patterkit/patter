@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Inline formatting <-> markup tags. The editor carries bold / italic as ProseMirror
-// marks (strong / em) on the say + paren zones; on disk they live INSIDE the stored
+// marks (strong / em) on the say zone (a direction and a name are never formatted); on disk they live INSIDE the stored
 // string as a CLOSED three-tag vocabulary - <b>bold</b>, <i>italic</i>, <bi>both</bi>.
 // Literal text is stored AS-IS: a bare `&`, `<` or `>` is just itself. We deliberately do
 // NOT HTML-entity-escape (no &amp; / &lt; / &gt;) - the vocabulary is tiny and closed, so a
@@ -19,12 +19,12 @@
 import type { Node as PMNode } from "prosemirror-model";
 import { patterSchema as S } from "./schema.js";
 
-/** Back-compat ONLY: decode the entity escaping older files used, so a legacy string normalises
- *  to clean literals on read (and writes back clean - we never emit entities again). `&amp;` LAST
- *  so an escaped `&lt;` doesn't double-decode. */
-function decodeLegacyEntities(s: string): string {
-  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-}
+// Entities are NEVER decoded (review 2026-10). Decoding `&amp;` / `&lt;` / `&gt;` on read used to happen
+// only with formatting on, so the same stored string read differently by project setting, and a save
+// then rewrote it: an author who had typed "&amp;" as text (a line about markup, a pasted URL) lost it
+// to "&" without touching that line. Never decoding is the one rule that cannot change what the author
+// typed. A string escaped by a pre-release build shows its entity literally, where it can be seen and
+// fixed, which is the honest outcome for a format that has stored literals since its first release.
 
 const TAG = /<(b|i|bi)>([\s\S]*?)<\/\1>/g;
 
@@ -33,8 +33,7 @@ export function parseMarkup(text: string): PMNode[] {
   if (!text) return [];
   const out: PMNode[] = [];
   const push = (raw: string, marks: ReturnType<typeof S.mark>[]): void => {
-    const t = decodeLegacyEntities(raw);
-    if (t.length > 0) out.push(S.text(t, marks));
+    if (raw.length > 0) out.push(S.text(raw, marks));
   };
   const marksFor = (tag: string): ReturnType<typeof S.mark>[] =>
     tag === "b" ? [S.mark("strong")] : tag === "i" ? [S.mark("em")] : [S.mark("strong"), S.mark("em")];

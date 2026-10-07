@@ -1,8 +1,12 @@
 // Node views for the zone-model surface (DOM-dependent, under web/). Renders the
 // zones inline as script - CHARACTER: (direction) content - with the cue tinted
-// by character colour and the parens/colon as chrome. Functional baseline for the
-// re-model; the fully themed set is the shell's, and richer fidelity returns as
-// the zone slices land.
+// by character colour and the parens/colon as chrome; snippets as bubbles, groups
+// as rails, blocks as headed sections, each with its quiet controls.
+//
+// Every control that edits checks `view.editable` first: on a locked scene the
+// chrome is hidden by CSS (.ProseMirror[contenteditable="false"]) and does nothing
+// if reached anyway (review 2026-10, MEDIUM 33). The surface also refuses doc
+// changes while read-only, so this is belt and braces.
 
 import type { NodeViewConstructor, EditorView } from "prosemirror-view";
 import { NodeSelection } from "prosemirror-state";
@@ -13,11 +17,11 @@ import { colourFor } from "../src/colour.js";
 import { deleteAtomAt } from "../src/special.js";
 import { setBlockName, insertBlock, insertOptionAfter, seedSnippet, seedBeatInSnippet } from "../src/groups.js";
 import { insertLineBefore } from "../src/lines.js";
-import { groupLabel } from "../src/grouplabel.js";
+import { groupLabelParts, optionLabelParts } from "../src/grouplabel.js";
 import { createActionMenu } from "./actionmenu.js";
 import { makeDragHandle } from "./dnd.js";
 import { modelIdOf, isChoiceGroup, rawAttr } from "../src/zoneutil.js";
-import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set: no typed glyphs in the script surface
+import { iconNode, metaLine } from "@wildwinter/app-shell"; // the family's drawn icons and drawn separators: no typed glyphs in the script surface
 
 type View = import("prosemirror-view").EditorView;
 type GetPos = () => number | undefined;
@@ -49,6 +53,8 @@ export const humanizeCondition = (c: string): string => humanizeNodeRefs(c, reso
 // One shared structural action menu (⋯ / right-click), created lazily on first use.
 let actionMenu: ReturnType<typeof createActionMenu> | null = null;
 const menu = (): ReturnType<typeof createActionMenu> => (actionMenu ??= createActionMenu());
+/** Take the shared action menu out of the page (the surface's destroy); the next use makes a new one. */
+export function destroyActionMenu(): void { actionMenu?.destroy(); actionMenu = null; }
 
 /** Open the shared action menu for a SCENE (the title right-click, surface.ts): a note-only menu carrying
  *  the scene id, so it offers "Note…" and the writing-status submenu (which ripples to the whole scene). */
@@ -87,7 +93,9 @@ function wireNoteMenu(el: HTMLElement, view: View, getPos: GetPos): void {
 
 /** Wire right-click on a BEAT to open the full structural menu of its ENCLOSING SNIPPET (so split /
  *  follow-with / delete still act on the bubble - room for beat-level structural actions later), but
- *  with "Note…" re-targeted to THIS beat (beat-aware notes, #148/§18). */
+ *  with "Note…" re-targeted to THIS beat (beat-aware notes, #148/§18). A choice PROMPT has no snippet
+ *  around it: its menu is its OPTION's (review 2026-10, MEDIUM 36), not a Snippet menu whose actions
+ *  had no snippet to act on. */
 function wireBeatMenu(el: HTMLElement, view: View, getPos: GetPos): void {
   el.addEventListener("contextmenu", (e) => {
     e.preventDefault(); e.stopPropagation();
@@ -97,7 +105,11 @@ function wireBeatMenu(el: HTMLElement, view: View, getPos: GetPos): void {
     const snippetPos: GetPos = () => {
       const p = getPos(); if (p == null) return undefined;
       const $p = view.state.doc.resolve(p);
-      for (let d = $p.depth; d >= 1; d--) if ($p.node(d).type.name === "snippet") return $p.before(d);
+      for (let d = $p.depth; d >= 1; d--) {
+        const t = $p.node(d).type.name;
+        if (t === "snippet") return $p.before(d);
+        if (t === "optionprompt") return $p.before(d - 1); // the option group holding the prompt
+      }
       return p;
     };
     menu().open(view, snippetPos, { x: e.clientX, y: e.clientY }, "full", note);
@@ -116,7 +128,7 @@ function ghostSnippet(
   const g = document.createElement("div"); g.className = "ghost-snippet"; g.contentEditable = "false"; g.dataset.tip = title;
   const plus = document.createElement("span"); plus.className = "ghost-plus"; plus.textContent = "+";
   g.appendChild(plus);
-  g.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); const pos = getPos(); if (pos == null) return; const tr = seed(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
+  g.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); if (!view.editable) return; const pos = getPos(); if (pos == null) return; const tr = seed(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return g;
 }
 
@@ -126,7 +138,7 @@ function addAfterButton(view: View, getPos: GetPos): HTMLButtonElement {
   // No "+" text glyph: the cross is drawn with CSS pseudo-bars (.bubble-after::before/::after)
   // so it is GEOMETRICALLY centred, not subject to a font's math-axis offset.
   const b = document.createElement("button"); b.className = "snippet-ctl add-after"; b.dataset.tip = "Follow with"; b.setAttribute("aria-label", "Follow with"); b.contentEditable = "false";
-  b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); menu().open(view, getPos, b, "add"); });
+  b.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); if (view.editable) menu().open(view, getPos, b, "add"); });
   return b;
 }
 
@@ -160,7 +172,7 @@ export function remeasureCues(): void {
 }
 if (typeof document !== "undefined" && document.fonts) void document.fonts.ready.then(remeasureCues);
 
-export const cueView: NodeViewConstructor = (node) => {
+const cueView: NodeViewConstructor = (node) => {
   const dom = document.createElement("span"); dom.className = "zone cue";
   const content = document.createElement("span"); content.className = "cue-text";
   const colon = document.createElement("span"); colon.className = "cue-colon"; colon.contentEditable = "false"; colon.textContent = ":";
@@ -185,7 +197,7 @@ export const cueView: NodeViewConstructor = (node) => {
   } };
 };
 
-export const parenView: NodeViewConstructor = () => {
+const parenView: NodeViewConstructor = () => {
   // Real "(" ")" siblings (not ::before/::after), so the caret sits BETWEEN them
   // in the editable content rather than in front of a generated pseudo-element.
   const dom = document.createElement("span"); dom.className = "zone paren";
@@ -196,7 +208,7 @@ export const parenView: NodeViewConstructor = () => {
   return { dom, contentDOM: content };
 };
 
-export const sayView: NodeViewConstructor = () => {
+const sayView: NodeViewConstructor = () => {
   // An inner `.say-text` (like cue/paren) is the editable contentDOM, so an EMPTY
   // say can be made inline-block with a min-width caret target while the trailing
   // <br> is hidden - giving the caret a real box at the content start (right of the
@@ -209,7 +221,7 @@ export const sayView: NodeViewConstructor = () => {
 
 // --- beats -------------------------------------------------------------------
 
-export const lineView: NodeViewConstructor = (_node, view, getPos) => {
+const lineView: NodeViewConstructor = (_node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "beat kind-line";
   // Right-click opens the enclosing snippet's structural menu, with "Note…" re-targeted to this beat.
   // The cue observer writes --cue-w onto this beat; tell PM an attribute mutation here is our chrome.
@@ -217,7 +229,7 @@ export const lineView: NodeViewConstructor = (_node, view, getPos) => {
   return { dom, contentDOM: dom, ignoreMutation: (m) => m.type === "attributes" };
 };
 
-export const proseView: NodeViewConstructor = (_node, view, getPos) => {
+const proseView: NodeViewConstructor = (_node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "beat kind-prose";
   // As with lineView: ignore attribute mutations (play marker / squiggles); the snippet's structural
   // menu on right-click, with a beat-targeted "Note…".
@@ -227,20 +239,21 @@ export const proseView: NodeViewConstructor = (_node, view, getPos) => {
 
 /** A choice option's PROMPT cell (groups §13.10): the tied choice-text line, in distinct chrome
  *  so it reads as "the label, content expected below". Holds one line / prose beat. */
-export const optionpromptView: NodeViewConstructor = () => {
+const optionpromptView: NodeViewConstructor = () => {
   const dom = document.createElement("div"); dom.className = "option-prompt";
   const body = document.createElement("div"); body.className = "option-prompt-body";
   dom.append(body);
   return { dom, contentDOM: body };
 };
 
-// --- the action atom, with a delete affordance (spec §10) --------------------
+// --- the game-event atom, with a delete affordance (spec §10) ----------------
 
 function atomDeleteButton(view: import("prosemirror-view").EditorView, getPos: () => number | undefined): HTMLButtonElement {
   const del = document.createElement("button"); del.className = "atom-del"; del.append(iconNode("close", 12));
   del.dataset.tip = "Delete game event"; del.setAttribute("aria-label", "Delete game event"); // was swallowed by a trailing comment before
   del.addEventListener("mousedown", (e) => {
     e.preventDefault();
+    if (!view.editable) return;
     const pos = getPos();
     if (pos != null) { const tr = deleteAtomAt(view.state, pos); if (tr) view.dispatch(tr); }
   });
@@ -249,19 +262,17 @@ function atomDeleteButton(view: import("prosemirror-view").EditorView, getPos: (
 
 /** A game event's inline label (#48): its `gameData` fields, so the script reads WHICH event this is
  *  without opening the inspector. Sparse by design - exactly what the author set on this beat (the
- *  type's field defaults are the inspector's business); the plain "game event" when nothing is set.
- *  Value-less fields (empty string / null) show as the bare key. */
-function gameEventFields(node: PMNode): string {
+ *  type's field defaults are the inspector's business); empty when nothing is set (the plain "game
+ *  event" label then). Value-less fields (empty string / null) show as the bare key. The fields are
+ *  drawn as a metadata line, never joined with a typed "·" (design-language §4). */
+function gameEventFields(node: PMNode): string[] {
   const gd = rawAttr(node).gameData;
-  if (gd && typeof gd === "object" && !Array.isArray(gd)) {
-    const parts = Object.entries(gd as Record<string, unknown>).map(([k, v]) =>
-      v == null || v === "" ? k : `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
-    if (parts.length) return parts.join(" · ");
-  }
-  return "game event";
+  if (!gd || typeof gd !== "object" || Array.isArray(gd)) return [];
+  return Object.entries(gd as Record<string, unknown>).map(([k, v]) =>
+    v == null || v === "" ? k : `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
 }
 
-export const gameEventView: NodeViewConstructor = (node, view, getPos) => {
+const gameEventView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "beat kind-gameEvent"; dom.contentEditable = "false";
   const glyph = document.createElement("span"); glyph.className = "atom-glyph"; glyph.append(iconNode("settings", 15));
   const fields = document.createElement("span"); fields.className = "atom-fields";
@@ -269,9 +280,10 @@ export const gameEventView: NodeViewConstructor = (node, view, getPos) => {
   // comment-chip idiom): a long event stays one quiet row and still answers in full on approach. No
   // gameData = the plain "game event" label and NO tip - a tooltip repeating visible text is noise.
   const setFields = (n: PMNode): void => {
-    const label = gameEventFields(n);
-    fields.textContent = label;
-    if (label === "game event") delete fields.dataset.tip; else fields.dataset.tip = label;
+    const parts = gameEventFields(n);
+    if (!parts.length) { fields.textContent = "game event"; delete fields.dataset.tip; return; }
+    fields.replaceChildren(metaLine(parts));
+    fields.dataset.tip = parts.join("\n"); // the hover lists the fields one to a line
   };
   setFields(node);
   dom.append(glyph, fields, atomDeleteButton(view, getPos));
@@ -303,7 +315,7 @@ function selectNodeOnClick(e: MouseEvent, view: EditorView, getPos: () => number
   if (node.type.name === "snippet" || node.type.name === "group") {
     selectChunkAt(view, pos, { shift: e.shiftKey, toggle: e.metaKey || e.ctrlKey });
   } else {
-    view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos))); // e.g. an action atom
+    view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos))); // e.g. a game-event atom
     view.focus();
   }
 }
@@ -322,7 +334,7 @@ const idOf = (n: PMNode): string => modelIdOf(n) ?? "";
  * only when set; the bottom space appears with it). Editing that data is the inspector
  * pane's job; right-click or the ⋯ open the same structural menu.
  */
-export const snippetView: NodeViewConstructor = (node, view, getPos) => {
+const snippetView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "bubble"; dom.dataset.id = idOf(node);
   const drag = makeDragHandle(view, getPos); drag.classList.add("bubble-drag"); // left gutter, hover-revealed
   const dots = menuButton(view, getPos); dots.classList.add("bubble-menu");       // ⋯ rides the first text line, top-right
@@ -341,6 +353,7 @@ export const snippetView: NodeViewConstructor = (node, view, getPos) => {
   const abovePlus = document.createElement("span"); abovePlus.className = "ghost-plus"; abovePlus.textContent = "+"; above.appendChild(abovePlus);
   above.addEventListener("mousedown", (e) => {
     e.preventDefault(); e.stopPropagation();
+    if (!view.editable) return;
     const pos = getPos(); if (pos == null) return;
     const tr = insertLineBefore(view.state, pos + 1); // the first beat's position
     if (tr) { view.dispatch(tr); view.focus(); }
@@ -411,7 +424,7 @@ function isChoiceOption(view: View, pos: number | undefined): boolean {
  * an "+ Option" control on the choice; their condition / secret flag is edited from the
  * rail's "edit" popover (the choice text lives in the option's prompt cell, §14.8).
  */
-export const groupView: NodeViewConstructor = (node, view, getPos) => {
+const groupView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "group-rail";
   const head = document.createElement("div"); head.className = "group-rail-head"; head.contentEditable = "false";
   const drag = makeDragHandle(view, getPos); drag.classList.add("rail-drag"); // to the LEFT of the type label
@@ -440,11 +453,11 @@ export const groupView: NodeViewConstructor = (node, view, getPos) => {
     dom.dataset.id = idOf(n);
     const raw = rawAttr(n);
     const option = isChoiceOption(view, getPos());
-    // An option's choice text lives in its prompt CELL (the optionprompt node, §13.10), so the
-    // rail label is just the marker (+ a secret flag).
-    // The ◇ marker now lives on the option's PROMPT cell (CSS .option-prompt::before), not the rail
-    // label - so the diamond sits with the choice text it marks.
-    label.textContent = option ? `Option${raw.secretUntilEligible ? "  · secret" : ""}` : groupLabel(raw);
+    // An option's choice text lives in its prompt CELL (the optionprompt node, §13.10), so the rail
+    // label is just "Option" (+ "secret"); the diamond marker is drawn on the prompt cell by CSS
+    // (.option-prompt::before), so it sits with the choice text it marks. The same parts reach the
+    // inspector through inspect(), so the two read alike.
+    label.replaceChildren(metaLine(option ? optionLabelParts(raw) : groupLabelParts(raw)));
     const c = typeof raw.condition === "string" ? raw.condition : "";
     cond.textContent = c ? `if ${humanizeCondition(c)}` : "";  // surface the condition (read-only, ids->titles); inspector edits it
     cond.style.display = c ? "" : "none";
@@ -470,12 +483,12 @@ export const groupView: NodeViewConstructor = (node, view, getPos) => {
 /** Add an option AFTER this one (groups §8) - centred in the gap below each option (CSS). */
 function addOptionButton(view: View, getPos: GetPos): HTMLButtonElement {
   const b = document.createElement("button"); b.className = "group-ctl add-option"; b.textContent = "+ Option"; b.dataset.tip = "Add a choice option";
-  b.addEventListener("mousedown", (e) => { e.preventDefault(); const pos = getPos(); if (pos == null) return; const tr = insertOptionAfter(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
+  b.addEventListener("mousedown", (e) => { e.preventDefault(); if (!view.editable) return; const pos = getPos(); if (pos == null) return; const tr = insertOptionAfter(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return b;
 }
 
 /** Unknown chunk the surface does not model yet - a quiet opaque card. */
-export const rawnodeView: NodeViewConstructor = (node) => {
+const rawnodeView: NodeViewConstructor = (node) => {
   const dom = document.createElement("div"); dom.className = "rawnode"; dom.contentEditable = "false";
   const g = JSON.parse(node.attrs.json) as { type?: string };
   dom.append(iconNode("more", 12), String(g.type ?? "node"));
@@ -487,7 +500,7 @@ export const rawnodeView: NodeViewConstructor = (node) => {
 /** New block after this one (the outline-level create, groups §3). */
 function addBlockButton(view: View, getPos: GetPos): HTMLButtonElement {
   const b = document.createElement("button"); b.className = "block-ctl add"; b.textContent = "+ Block"; b.dataset.tip = "New block after this one";
-  b.addEventListener("mousedown", (e) => { e.preventDefault(); const pos = getPos(); if (pos == null) return; const tr = insertBlock(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
+  b.addEventListener("mousedown", (e) => { e.preventDefault(); if (!view.editable) return; const pos = getPos(); if (pos == null) return; const tr = insertBlock(view.state, pos); if (tr) view.dispatch(tr); view.focus(); });
   return b;
 }
 
@@ -496,7 +509,7 @@ function addBlockButton(view: View, getPos: GetPos): HTMLButtonElement {
  * jump-target label) + its content, FLAT (no indent - groups §1). Reorder /
  * create controls are quiet; the heading is always visible structure.
  */
-export const blockView: NodeViewConstructor = (node, view, getPos) => {
+const blockView: NodeViewConstructor = (node, view, getPos) => {
   const dom = document.createElement("div"); dom.className = "block";
   const head = document.createElement("div"); head.className = "block-head"; head.contentEditable = "false";
   const drag = makeDragHandle(view, getPos); drag.classList.add("block-drag"); // to the LEFT of the title
@@ -518,7 +531,11 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
     if (name.contains(t)) { e.stopPropagation(); return; } // let the rename input focus; just keep PM out
     e.preventDefault(); e.stopPropagation(); selectBlock(); view.focus();
   });
-  name.addEventListener("focus", selectBlock); // focusing the rename field also shows the block in the inspector
+  // Focusing the rename field also shows the block in the inspector. It remembers the name it had, for
+  // Esc, and is read-only on a locked scene (a node view is not rebuilt when editability changes, so the
+  // flag is read at focus).
+  let atFocus = "";
+  name.addEventListener("focus", () => { atFocus = name.value; name.readOnly = !view.editable; selectBlock(); });
   const body = document.createElement("div"); body.className = "block-body";
   const ghost = ghostSnippet(view, getPos); // shown only when the block is empty (CSS)
   // "+ Block" lives in the SPACE after the block (the inter-block gap), not in the header.
@@ -531,8 +548,14 @@ export const blockView: NodeViewConstructor = (node, view, getPos) => {
     const raw = rawAttr(n) as { name?: string }; if (document.activeElement !== name) name.value = raw.name ?? "";
     dom.classList.toggle("is-empty", n.childCount === 0); // empty block -> ghost
   };
-  name.addEventListener("change", () => { const pos = getPos(); if (pos == null) return; const tr = setBlockName(view.state, pos, name.value); if (tr) { view.dispatch(tr); refreshJumpLabels(); } }); // renaming a block updates every jump chip that targets it
-  name.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); name.blur(); } });
+  name.addEventListener("change", () => { if (!view.editable) return; const pos = getPos(); if (pos == null) return; const tr = setBlockName(view.state, pos, name.value); if (tr) { view.dispatch(tr); refreshJumpLabels(); } }); // renaming a block updates every jump chip that targets it
+  // Enter commits (by blurring, which fires `change`). Esc puts back the name the field had when it was
+  // focused and leaves without committing (family ruling N, review 2026-10 MEDIUM 31): with the value
+  // restored before the blur, `change` does not fire, so the next blur commits nothing.
+  name.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); name.blur(); }
+    else if (e.key === "Escape") { e.preventDefault(); name.value = atFocus; name.blur(); }
+  });
   // The rename field is a plain <input> sitting INSIDE the contentEditable surface, so the browser's
   // native drag-and-drop treats it as a drop target: dragging across the title to select it could end up
   // DROPPING the editor's current selection (a whole block's worth of lines) into the name. Nothing here

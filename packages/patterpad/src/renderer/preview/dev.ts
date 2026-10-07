@@ -184,7 +184,16 @@ const stub = {
   onJobProgress: () => undefined,        // and report no progress
   recents: async () => recents,
   clearRecents: async () => { recents.splice(1); return recents; }, // the open project stays, as main keeps it
-  buildBundle: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/dist/the_tavern.patterc" }),
+  buildBundle: async () => ({ ok: true, path: "/Users/ian/Projects/patter-dist/the_tavern.patterc" }),
+  // Stubs the renderer calls that the preview has no main process for: an edit, an example tile, and the
+  // File-menu acts the menu bridge can reach. Each answers as main does when nothing comes of it.
+  playEdited: () => {},
+  openExample: async () => null,
+  shareScopes: async () => null,
+  showInStoryletter: async () => ({ ok: false, canceled: true }),
+  mergePatterpackPlan: async () => null,
+  mergePatterpackCommit: async () => ({ error: "the preview cannot merge" }),
+  mergePatterpackDrop: async () => {},
   toggleAutoRebuild: async () => true,
   buildAudioManifest: async () => ({ ok: true, path: "/Users/ian/Projects/the-tavern.patter/audio/patteraudio.json" }),
   exportVoiceScript: async (everything: boolean) => ({ ok: true, path: `The Tavern - voice script${everything ? " (all)" : ""}.xlsx` }),
@@ -241,7 +250,7 @@ const stub = {
   openCoverageWindow: async () => undefined,
   onCoverageNavigate: () => undefined,
   onOpenWorldSettings: () => undefined,
-  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, autosave: true, autoRebuild: false, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
+  readSettings: async () => ({ name: "The Tavern", vcs: "git", start: { scene: "scn_tavern" }, voiced: true, trackAudioStatus: true, formatting: true, buildBundle: "../patter-dist/the_tavern.patterc", buildLocalisation: "embedded", buildSourceDebug: false, localeDefault: "en", locales: ["en", "fr"],
     gameDataFields: {
       scene: [{ name: "music", type: "text", default: "tavern-loop", purpose: "Background music cue id for this scene." }],
       line: [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"], purpose: "Facial-animation mood for this line." }],

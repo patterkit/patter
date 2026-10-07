@@ -90,9 +90,6 @@ export function flowFromSource(flowSource: string): FlowFile {
   return obj as unknown as FlowFile;
 }
 
-/** The scene inside a `.patterflow` (convenience over {@link flowFromSource}). */
-export const sceneFromSource = (flowSource: string): Scene => flowFromSource(flowSource).scene;
-
 /** Parse `.patterloc` source into a LocaleFile envelope. Throws on the wrong shape/schema. */
 export function localeFromSource(locSource: string): LocaleFile {
   const obj = asObject(parseSource(locSource), ".patterloc file");

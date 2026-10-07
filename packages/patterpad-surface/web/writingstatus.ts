@@ -5,7 +5,7 @@
 // the surface only DISPLAYS and OFFERS to set it, two ways:
 //   - the "Status" context-menu submenu (set one beat, or RIPPLE a container / selection's beats),
 //   - an optional LEFT-gutter colour badge (View > Show line status; hidden in Writing View).
-// Only LINE + PROSE beats carry a status - action atoms are never tracked (they carry no recordable
+// Only LINE + PROSE beats carry a status - game events are never tracked (they carry no recordable
 // line, mirroring the production report, which already skips them).
 // ---------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ export function writingStatusEnabled(): boolean { return statusHandler !== null 
 export function applyWritingStatus(ids: string[], status: string | null): void { if (ids.length) statusHandler?.(ids, status); }
 
 /** The palette slot (0-11) declared for a status name, or undefined (unknown / no colour). */
-export function statusColourSlot(name: string): number | undefined { return ladder.find((r) => r.name === name)?.colour; }
+function statusColourSlot(name: string): number | undefined { return ladder.find((r) => r.name === name)?.colour; }
 
 /** Collect the ids of every LINE / PROSE beat at or under `node` (so a container / selection ripples to
  *  its descendant beats). Action atoms carry no status, so they're never collected. */

@@ -11,26 +11,20 @@
 //                split after the current line; the new bubble gets a fresh
 //                mirrored line (or the following beats), caret there.
 //
-// In the zone model the jump is a node, so it moves with the tail on a split -
-// no raw jump bookkeeping needed. New snippets get a fresh id.
+// A snippet's jump is an attr, not a beat, so a split clears it on the first
+// half and the tail keeps it (it stays terminal). New snippets get a fresh id.
+// Enter with a selection replaces the selection first, as in any editor.
 // ---------------------------------------------------------------------------
 
-import { TextSelection, NodeSelection, type Command, type EditorState } from "prosemirror-state";
+import { TextSelection, NodeSelection, Selection, type Command, type EditorState, type Transaction } from "prosemirror-state";
 import type { Node as PMNode } from "prosemirror-model";
-import { newId } from "@patterkit/core";
-import { patterSchema as S } from "./schema.js";
 import { context, type ZoneState } from "./context.js";
-import { cueText, zoneContentStart, zoneContentEnd, findBeatById, emptyBeatNode, prevBeatKind } from "./zoneutil.js";
+import { cueText, zoneContentStart, zoneContentEnd, findBeatById, emptyBeatNode, beatNode, prevBeatKind, freshSnippetRaw } from "./zoneutil.js";
+import { deleteSelectionGuarded } from "./delete.js";
 
-/** A fresh beat mirroring the current one, plus the caret offset to its say content. */
-function mirroredBeat(c: ZoneState): { node: PMNode; sayOffset: number } {
-  if (c.beat!.kind === "line") {
-    const cue = S.node("cue", null, cueText(c.beat!.node) ? [S.text(cueText(c.beat!.node))] : []);
-    const say = S.node("say", null, []);
-    return { node: S.node("line", { id: newId("L"), raw: "{}" }, [cue, say]), sayOffset: 1 + cue.nodeSize + 1 };
-  }
-  return { node: S.node("prose", { id: newId("L"), raw: "{}" }, [S.node("say", null, [])]), sayOffset: 2 };
-}
+/** A fresh, empty beat mirroring the current one: same kind, and for dialogue the same speaker. */
+const mirroredBeat = (c: ZoneState): PMNode =>
+  emptyBeatNode(c.beat!.kind === "line" ? "line" : "prose", c.beat!.kind === "line" ? cueText(c.beat!.node) : "");
 
 
 /**
@@ -70,7 +64,38 @@ export function replaceSayText(state: EditorState, beatId: string, text: string)
   return tr;
 }
 
+/**
+ * Enter with a SELECTION replaces it, then does what Enter does at the caret it leaves (review 2026-10:
+ * it used to ignore the selection and split at its head, so the selected words stayed). The delete goes
+ * through deleteSelectionGuarded (which refuses to take a game event with it) and the structure guard;
+ * the follow-up's steps are replayed onto the same transaction, so it is one undo step.
+ */
+function enterOverSelection(state: EditorState, dispatch: Parameters<Command>[1]): boolean {
+  let del: Transaction | null = null;
+  deleteSelectionGuarded(state, (tr) => { del = tr; });
+  if (!del) return true; // refused (a game event in the range): leave it all alone
+  const deleted = del as Transaction;
+  const after = state.apply(deleted);
+  if (!after.selection.empty) return true;
+  let follow: Transaction | null = null;
+  enter(after, (tr) => { follow = tr; });
+  if (!dispatch) return true;
+  if (follow) {
+    const f = follow as Transaction;
+    for (const step of f.steps) deleted.step(step);
+    deleted.setSelection(Selection.fromJSON(deleted.doc, f.selection.toJSON()));
+  }
+  dispatch(deleted.scrollIntoView());
+  return true;
+}
+
 export const enter: Command = (state, dispatch) => {
+  if (!state.selection.empty && !(state.selection instanceof NodeSelection)) {
+    // In the cue the selection IS the speaker token, and Enter there means "accept the name" (the cast
+    // popup takes it before this runs); never delete the name for it.
+    if (state.selection.$from.parent.type.name === "cue") return false;
+    return enterOverSelection(state, dispatch);
+  }
   const c = context(state);
   if (c.inPrompt) return true; // a choice prompt is a single line: swallow Enter (no split, no new beat)
   // A SELECTED game-event atom: Enter adds a type-following line after it, as Enter at the end of a
@@ -99,7 +124,7 @@ export const enter: Command = (state, dispatch) => {
   // A mirrored new line in the SAME bubble - Enter never ends the bubble (that is
   // Shift-Enter). In the cue, the web layer handles Enter as "confirm the name"
   // before this command runs, so Enter here always means "next line".
-  const { node } = mirroredBeat(c);
+  const node = mirroredBeat(c);
   const insertAt = c.beat.pos + c.beat.node.nodeSize;
   const tr = state.tr.insert(insertAt, node);
   landOnBeat(tr, node.attrs.id as string);
@@ -127,7 +152,7 @@ export function insertLineBefore(state: EditorState, beatPos: number): import("p
 /**
  * Insert a fresh dialogue line at the TOP of a snippet (the hover "+" affordance).
  * This is the only way to add a line ABOVE a snippet's first beat - and so the only
- * way to add a line to a snippet that holds just a jump or an action (you can't
+ * way to add a line to a snippet that holds just a jump or a game event (you can't
  * type past a terminal / atom beat). Lands like a new line: in the cue, with the
  * carried speaker SELECTED (the first dialogue line's speaker, if the snippet has one).
  */
@@ -136,8 +161,7 @@ export function prependLine(state: EditorState, snippetPos: number): import("pro
   if (!snip || snip.type.name !== "snippet") return null;
   let speaker = "";
   snip.forEach((b) => { if (!speaker && b.type.name === "line") speaker = cueText(b); });
-  const cue = S.node("cue", null, speaker ? [S.text(speaker)] : []);
-  const line = S.node("line", { id: newId("L"), raw: "{}" }, [cue, S.node("say", null, [])]);
+  const line = emptyBeatNode("line", speaker);
   const tr = state.tr.insert(snippetPos + 1, line); // start of the snippet's content
   landOnBeat(tr, line.attrs.id as string);
   return tr.scrollIntoView();
@@ -146,22 +170,14 @@ export function prependLine(state: EditorState, snippetPos: number): import("pro
 /** Split the current say at the caret, carrying the tail into a fresh sibling beat. */
 function splitSayAtCaret(state: EditorState, c: ZoneState): import("prosemirror-state").Transaction {
   const beat = c.beat!;
-  const tail = c.zone!.node.content.cut(c.zone!.offset); // say text after the caret
-  let newBeat: PMNode; let sayOffset: number;
-  if (beat.kind === "line") {
-    const name = cueText(beat.node);
-    const cue = S.node("cue", null, name ? [S.text(name)] : []);
-    newBeat = S.node("line", { id: newId("L"), raw: "{}" }, [cue, S.node("say", null, tail)]);
-    sayOffset = 1 + cue.nodeSize + 1;
-  } else {
-    newBeat = S.node("prose", { id: newId("L"), raw: "{}" }, [S.node("say", null, tail)]);
-    sayOffset = 2;
-  }
+  const tail = c.zone!.node.content.cut(c.zone!.offset); // say content after the caret (marks kept)
+  const isLine = beat.kind === "line";
+  const newBeat = beatNode(isLine ? "line" : "prose", { speaker: isLine ? cueText(beat.node) : "", say: tail });
   const sayEnd = zoneContentEnd(beat.node, beat.pos, "say");
   const tr = state.tr.delete(state.selection.from, sayEnd); // drop the tail from this line
   const insertAt = tr.mapping.map(beat.pos + beat.node.nodeSize);
   tr.insert(insertAt, newBeat);
-  return tr.setSelection(TextSelection.create(tr.doc, insertAt + sayOffset)); // caret at the new content start
+  return tr.setSelection(TextSelection.create(tr.doc, zoneContentStart(newBeat, insertAt, "say"))); // caret at the new content start
 }
 
 export const endBubble: Command = (state, dispatch) => {
@@ -188,7 +204,7 @@ export const endBubble: Command = (state, dispatch) => {
   // SELECTED (popup open) - a new bubble is otherwise just a new line. An empty B
   // (the split was after the last beat) gets a fresh mirrored line.
   if (!first) {
-    const { node } = mirroredBeat(c);
+    const node = mirroredBeat(c);
     tr.insert(bPos + 1, node);
     landOnBeat(tr, node.attrs.id as string);
   } else {
@@ -235,6 +251,6 @@ function splitSnippetPair(tr: import("prosemirror-state").Transaction, snippetPo
   // the gating or the state changes (a copied condition silently re-gates the new bubble; copied effects
   // would fire twice). Give B a fresh snippet raw and nothing else. The terminal `jump` is a separate
   // attr and DOES belong to B - endBubble clears it on A.
-  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: JSON.stringify({ id: newId("sn"), type: "snippet" }) });
+  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: freshSnippetRaw() });
   return { aPos, bPos };
 }

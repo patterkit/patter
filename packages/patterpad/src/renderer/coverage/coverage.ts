@@ -2,7 +2,7 @@
 // sweep (random playthroughs that tally which beats get reached), see the results grouped by scene, and
 // click a flagged row to jump the editor to it. The main process caches the last result for the session,
 // so reopening the window shows it again. "World Properties…" opens Project Settings ▸ External
-// Properties (declare @world properties + edit the input drivers the sweep feeds them).
+// Properties (declare @world properties + edit the coverage drivers the sweep feeds them).
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are the family's `.btn`, the order switch its `.seg`
@@ -12,9 +12,10 @@ import "@wildwinter/app-shell/job.css";
 import "@fontsource/newsreader/400.css";
 import "@fontsource-variable/inter";
 
-import { mountJobProgress, pinButton, toolWindowHead, toast, plural } from "@wildwinter/app-shell";
+import { mountJobProgress, pinButton, toolWindowHead, plural } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
 import { applyTheme } from "../src/apply-theme.js";
+import { landed } from "../src/results.js";
 import { initTooltips } from "@wildwinter/app-shell";
 import { renderCoverage, type CoverageOrder } from "../src/coverage-view.js";
 import type { CoverageResult } from "../../shared/api.js";
@@ -55,9 +56,24 @@ const saveOrder = (order: CoverageOrder): void => {
   try { localStorage.setItem(ORDER_KEY, order); } catch { /* not remembered; nothing else depends on it */ }
 };
 
-const numOr = (input: HTMLInputElement, fallback: number): number => {
-  const n = Number(input.value); return Number.isFinite(n) && n > 0 ? n : fallback;
+/** A whole number of at least 1, or undefined. Runs and max steps take nothing else: a blank or a 0 was
+ *  quietly run as the default, so the run was not the one asked for. Storyletter marks the field and
+ *  holds Run, and so does this window. */
+const wholeAtLeastOne = (input: HTMLInputElement): number | undefined => {
+  const n = Number(input.value);
+  return input.value.trim() !== "" && Number.isInteger(n) && n >= 1 ? n : undefined;
 };
+function syncRunnable(): void {
+  let ok = true;
+  for (const input of [runsInput, maxStepsInput]) {
+    const bad = wholeAtLeastOne(input) === undefined;
+    input.classList.toggle("invalid", bad);
+    input.setAttribute("aria-invalid", String(bad));
+    if (bad) ok = false;
+  }
+  runBtn.disabled = !ok;
+  if (ok) delete runBtn.dataset["tip"]; else runBtn.dataset["tip"] = "Runs and max steps must be whole numbers, 1 or more.";
+}
 
 function showResult(result: CoverageResult): void {
   sceneNames = result.sceneNames;
@@ -79,13 +95,14 @@ async function boot(): Promise<void> {
     ? "No project open."
     : info.driverCount
       ? `${plural(info.driverCount, "input driver")} configured (World properties…).`
-      : "No input drivers, so branches gated on @world will read as needing input (World properties…).";
+      : "No coverage drivers, so branches gated on @world will read as needing input (World properties…).";
   if (info.last) showResult(info.last);
   else { host.hidden = true; host.replaceChildren(); }
 }
 
 /** Run a sweep with the bar's options and render it. The result is cached in the main process. */
 async function run(): Promise<void> {
+  if (wholeAtLeastOne(runsInput) === undefined || wholeAtLeastOne(maxStepsInput) === undefined) return;
   runBtn.disabled = true;
   statusEl.hidden = true;
   // The previous results are DIMMED rather than hidden: the sweep now runs beside you, and a stale
@@ -94,18 +111,18 @@ async function run(): Promise<void> {
   jobView.begin("Running coverage…");
   try {
     const result = await cov.run({
-      runs: numOr(runsInput, 5000), maxSteps: numOr(maxStepsInput, 200),
+      runs: wholeAtLeastOne(runsInput)!, maxSteps: wholeAtLeastOne(maxStepsInput)!,
       seed: Math.max(0, Math.floor(Number(seedInput.value) || 0)),
       scene: sceneSel.value || undefined,
     });
     if (!result) { statusEl.hidden = false; statusEl.textContent = "No project open."; return; }
     showResult(result);
   } catch (e) {
-    toast(`Coverage failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    landed({ ok: false, error: e instanceof Error ? e.message : String(e) }, "Couldn't run coverage");
   } finally {
     jobView.end();
     host.classList.remove("stale");
-    runBtn.disabled = false;
+    syncRunnable();
   }
 }
 
@@ -118,6 +135,7 @@ cov.onPin((on) => pin.set(on));
 cov.onTheme((t) => applyTheme(t));
 
 runBtn.addEventListener("click", () => void run());
+for (const input of [runsInput, maxStepsInput]) input.addEventListener("input", syncRunnable);
 worldBtn.addEventListener("click", () => cov.openWorld());
 // A different project was opened under the window: clear stale results + re-fetch.
 cov.onProject(() => { host.replaceChildren(); host.hidden = true; statusEl.hidden = true; void boot(); });

@@ -51,8 +51,8 @@ You set a status in one of three ways:
 
 ## Seeing status in the script
 
-While you write, the status stays out of sight. Turn on **View ▸ Show Line Status** for a
-small **colour badge in the left gutter** beside each line, tinted by its stage. It's a quiet,
+While you write, the status stays out of sight. Pick the stages to show from **Review ▸ Writing
+Status** for a small **colour badge in the left gutter** beside each line, tinted by its stage. It's a quiet,
 optional overview: flip it off for a clean page again, and it hides itself in **Writing View**.
 
 <figure class="doc-shot">

@@ -94,7 +94,7 @@ describe("project session: create -> open -> read -> save -> play", () => {
     mkdirSync(join(root, "dist"), { recursive: true }); writeFileSync(join(root, "dist", "game.patterc"), "bundle");
 
     const dest = join(dirname(root), "SaveAs Copy.patter");
-    project.duplicateTo(dest);
+    await project.duplicateTo(dest);
 
     // Derived output is skipped...
     expect(existsSync(join(dest, "audio"))).toBe(false);
@@ -351,7 +351,7 @@ describe("project session: create -> open -> read -> save -> play", () => {
     await project.createProject(dir, "Webby");
     const site = join(dir, "site");
 
-    const first = project.publishWebTo(site);
+    const first = await project.publishWebTo(site);
     expect(first.ok).toBe(true);
     expect(first.kept).toEqual([]); // fresh folder: everything written
     for (const f of ["index.html", "style.css", "patterplay.js", "story.js"]) expect(existsSync(join(site, f))).toBe(true);
@@ -359,7 +359,7 @@ describe("project session: create -> open -> read -> save -> play", () => {
     // The writer customises the harness; a republish must leave it alone but refresh the story.
     writeFileSync(join(site, "index.html"), "<!-- mine now -->");
     writeFileSync(join(site, "story.js"), "stale");
-    const again = project.publishWebTo(site);
+    const again = await project.publishWebTo(site);
     expect(again.ok).toBe(true);
     expect(again.kept).toEqual(["index.html", "style.css"]);
     expect(readFileSync(join(site, "index.html"), "utf8")).toBe("<!-- mine now -->");

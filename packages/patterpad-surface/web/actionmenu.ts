@@ -7,6 +7,9 @@
 // open SUBMENU flyouts (a right-hand panel of kinds) on hover / click - the conventional
 // idiom, not embedded button rows. Writes through insertAfter / wrapChunk / insertOption /
 // insertOptionAfter / unwrapGroup / splitSnippetHere / joinSnippet / deleteChunk.
+//
+// On a read-only (locked) scene the menu keeps only what does not edit the scene: Play block, Note…,
+// comments, suggestions, and writing status. The structural items are not offered at all.
 
 import type { EditorView } from "prosemirror-view";
 import { insertAfter, wrapChunk, wrapChunksAt, insertOption, insertOptionAfter, unwrapGroup, deleteChunk, deleteChunksAt, deleteBlock, joinSnippet, chunkIsEmpty, type GroupKind } from "../src/groups.js";
@@ -14,8 +17,8 @@ import { duplicateChunk, notifyDuplicated } from "../src/duplicate.js";
 import { multiSelectPositions } from "../src/multiselect.js";
 import { splitSnippetHere } from "../src/lines.js";
 import { createFloating } from "./floating.js";
-import { confirmDialog } from "./confirm.js";
-import { isChoiceGroup, modelIdOf } from "../src/zoneutil.js";
+import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
+import { isChoiceGroup, modelIdOf, rawAttr } from "../src/zoneutil.js";
 import { notesEnabled, openNoteFor } from "./docnotes.js";
 import { commentsEnabled, hasSaySelection, startComment } from "./comments.js";
 import { suggestionsEnabled, startSuggestion } from "./suggestions.js";
@@ -46,6 +49,8 @@ export interface NoteTarget { id: string; kind?: string }
 export interface ActionMenu {
   open(view: EditorView, getPos: GetPos, at: At, mode?: Mode, note?: NoteTarget | null): void;
   close(): void;
+  /** Close and take the menu's elements out of the page (the surface's destroy). */
+  destroy(): void;
 }
 
 // Host hook for "Play block" (opens the play window entering that block). Null = no Play-block item.
@@ -100,9 +105,11 @@ export function createActionMenu(): ActionMenu {
     closeSub(); // a reposition (scroll) dismisses any open flyout - it would otherwise float away
   };
 
-  /** Run a structural command, then refocus the surface and dismiss the menu. */
+  /** Run a structural command, then refocus the surface and dismiss the menu. Never on a read-only scene
+   *  (the items are not offered there; this is the backstop). */
   const act = (cmd: Cmd): void => {
-    if (!ctx) return; const pos = ctx.getPos(); if (pos == null) return;
+    if (!ctx) return; if (!ctx.view.editable) { close(); return; }
+    const pos = ctx.getPos(); if (pos == null) return;
     const tr = cmd(ctx.view.state, pos); if (tr) ctx.view.dispatch(tr);
     ctx.view.focus(); close();
   };
@@ -163,7 +170,7 @@ export function createActionMenu(): ActionMenu {
   };
 
   /** Whether "Suggest rewrite" applies: suggestions are wired AND the target is a say / prose beat
-   *  (whole-beat proposals only - no rewriting a container or an action atom). */
+   *  (whole-beat proposals only - no rewriting a container or a game event). */
   const canSuggest = (): boolean => suggestionsEnabled() && commentBeat() !== null;
   /** The "Suggest rewrite…" item: start a rewrite proposal on the targeted beat (host opens a prefilled
    *  modal). */
@@ -286,7 +293,7 @@ export function createActionMenu(): ActionMenu {
       // A BLOCK heading's note menu also carries Delete (the only place a whole block can be removed).
       // Refused when it is the scene's last block - the doc must keep at least one - so it is hidden then.
       const bPos = ctx.getPos();
-      const bNode = bPos != null ? ctx.view.state.doc.nodeAt(bPos) : null;
+      const bNode = bPos != null && ctx.view.editable ? ctx.view.state.doc.nodeAt(bPos) : null; // read-only: no Duplicate / Delete
       if (bNode?.type.name === "block") {
         // Duplicate the whole block + everything in it. Always available (unlike Delete, which is
         // refused on the last block): the copy is named "<name> copy" and takes fresh ids throughout.
@@ -299,10 +306,9 @@ export function createActionMenu(): ActionMenu {
         onPick(del, () => {
           if (!ctx) return; const view = ctx.view; const at = ctx.getPos(); close();
           if (at == null) return;
-          let name = "this block";
-          try { name = (JSON.parse(view.state.doc.nodeAt(at)?.attrs.raw as string)?.name as string) || name; } catch { /* keep default */ }
-          confirmDialog({ title: `Delete "${name}"?`, body: "The block and everything inside it will be removed. You can undo this.", confirmLabel: "Delete block" })
-            .then((ok) => { if (ok) { const tr = deleteBlock(view.state, at); if (tr) view.dispatch(tr); view.focus(); } });
+          const blockNode = view.state.doc.nodeAt(at);
+          const name = (blockNode && typeof rawAttr(blockNode).name === "string" && (rawAttr(blockNode).name as string)) || "this block";
+          void confirmDeleteBlock(name).then((ok) => { if (ok) { const tr = deleteBlock(view.state, at); if (tr) view.dispatch(tr); view.focus(); } });
         });
         el.appendChild(del);
       }
@@ -318,30 +324,37 @@ export function createActionMenu(): ActionMenu {
     const setPositions = ctx.mode === "full" ? multiSelectPositions(ctx.view.state) : [];
     if (setPositions.length >= 2 && setPositions.includes(pos)) {
       const n = setPositions.length;
+      const editable = ctx.view.editable;
       el.replaceChildren();
       el.appendChild(headEl(`${n} selected`));
-      el.appendChild(parent("Wrap in", WRAP_KINDS.map((k) => ({ label: k.label, cmd: ((s) => wrapChunksAt(s, multiSelectPositions(s), k.kind)) as Cmd }))));
+      // A set of choice OPTIONS cannot be wrapped (wrapChunksAt refuses it: the wrapper would sit in the
+      // choice as a child that is not an option), so the item is not offered for one.
+      const optionSet = isChoiceGroup(ctx.view.state.doc.resolve(setPositions[0]!).parent);
+      if (editable && !optionSet) el.appendChild(parent("Wrap in", WRAP_KINDS.map((k) => ({ label: k.label, cmd: ((s) => wrapChunksAt(s, multiSelectPositions(s), k.kind)) as Cmd }))));
       // Status ripples across the whole selection: every line / prose beat under each selected chunk.
       appendStatus(el, () => setPositions.flatMap((p) => { const sn = ctx?.view.state.doc.nodeAt(p); return sn ? collectBeatIds(sn) : []; }));
-      el.appendChild(sepEl());
-      const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete";
-      del.addEventListener("mouseenter", closeSub);
-      onPick(del, () => {
-        if (!ctx) return; const view = ctx.view; close();
-        confirmDialog({ title: `Delete these ${n} items?`, body: `${n} items and everything inside them will be removed. You can undo this.`, confirmLabel: `Delete ${n} items` })
-          .then((ok) => { if (ok) { const tr = deleteChunksAt(view.state, multiSelectPositions(view.state)); if (tr) view.dispatch(tr); view.focus(); } });
-      });
-      el.appendChild(del);
+      if (editable) {
+        el.appendChild(sepEl());
+        const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete";
+        del.addEventListener("mouseenter", closeSub);
+        onPick(del, () => {
+          if (!ctx) return; const view = ctx.view; close();
+          void confirmDeleteSet(n).then((ok) => { if (ok) { const tr = deleteChunksAt(view.state, multiSelectPositions(view.state)); if (tr) view.dispatch(tr); view.focus(); } });
+        });
+        el.appendChild(del);
+      }
       floating.show(place); return;
     }
 
     const isGroup = node.type.name === "group";
     const isOption = isGroup && isChoiceGroup(ctx.view.state.doc.resolve(pos).parent);
     const isChoice = isChoiceGroup(node);
+    const editable = ctx.view.editable;
     el.replaceChildren();
 
     // The discreet "+" add control: a flat list of the add-after kinds, nothing structural.
     if (ctx.mode === "add") {
+      if (!editable) return close();
       el.appendChild(headEl("Follow with"));
       for (const k of ADD_KINDS) el.appendChild(leaf(k.label, "", (s, p) => insertAfter(s, p, k.kind)));
       floating.show(place); return;
@@ -349,7 +362,9 @@ export function createActionMenu(): ActionMenu {
 
     el.appendChild(headEl(isOption ? "Option" : isChoice ? "Choice" : isGroup ? "Group" : "Snippet"));
 
-    if (isOption) {
+    if (!editable) {
+      // read-only: no structural items at all (Play block, notes, comments, and status follow)
+    } else if (isOption) {
       el.appendChild(leaf("Add option", "", (s, p) => insertOptionAfter(s, p)));
     } else {
       el.appendChild(parent("Follow with", ADD_KINDS.map((k) => ({ label: k.label, cmd: ((s, p) => insertAfter(s, p, k.kind)) as Cmd }))));
@@ -365,7 +380,7 @@ export function createActionMenu(): ActionMenu {
 
     // Duplicate: the chunk AND everything inside it, dropped in as the next sibling with fresh ids
     // throughout (an option duplicates too - a quick way to add a variant of a choice).
-    el.appendChild(leaf("Duplicate", "", duplicateCmd));
+    if (editable) el.appendChild(leaf("Duplicate", "", duplicateCmd));
 
     // Play Block: start an interactive run ENTERING this node's block (not the whole scene). A host
     // action (opens the play window), not a doc edit - gated on the host wiring a handler.
@@ -388,19 +403,21 @@ export function createActionMenu(): ActionMenu {
       appendStatus(el, statusTargets);
     }
 
-    el.appendChild(sepEl());
-    const noun = isOption ? "option" : isGroup ? "group" : "snippet";
-    const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete";
-    del.addEventListener("mouseenter", closeSub);
-    onPick(del, () => {
-      if (!ctx) return; const view = ctx.view, getPos = ctx.getPos; close();
-      const remove = (): void => { const p = getPos(); if (p == null) return; const tr = deleteChunk(view.state, p); if (tr) view.dispatch(tr); view.focus(); };
-      // No confirmation when nothing is lost - an empty bubble, or a group of only empty bubbles.
-      if (chunkIsEmpty(node)) { remove(); return; }
-      confirmDialog({ title: `Delete this ${noun}?`, body: `The ${noun} and everything inside it will be removed. You can undo this.`, confirmLabel: `Delete ${noun}` })
-        .then((ok) => { if (ok) remove(); });
-    });
-    el.appendChild(del);
+    if (editable) {
+      el.appendChild(sepEl());
+      const noun = isOption ? "option" : isGroup ? "group" : "snippet";
+      const del = document.createElement("button"); del.className = "action-mi del"; del.textContent = "Delete";
+      del.addEventListener("mouseenter", closeSub);
+      onPick(del, () => {
+        if (!ctx) return; const view = ctx.view, getPos = ctx.getPos; close();
+        const remove = (): void => { const p = getPos(); if (p == null) return; const tr = deleteChunk(view.state, p); if (tr) view.dispatch(tr); view.focus(); };
+        // No confirmation when nothing is lost - an empty bubble, or a group of only empty bubbles.
+        if (chunkIsEmpty(node)) { remove(); return; }
+        void confirmDeleteChunk(noun).then((ok) => { if (ok) remove(); });
+      });
+      el.appendChild(del);
+    }
+    if (!el.querySelector(".action-mi")) return close(); // nothing left to offer (read-only, no host actions)
 
     floating.show(place);
   };
@@ -413,5 +430,6 @@ export function createActionMenu(): ActionMenu {
     render(); // builds the menu, then floating.show(place) positions + follows on scroll
     window.setTimeout(() => floating.dismissOnOutside(close, insideMenu), 0); // arm click-away after the opening click
   };
-  return { open, close };
+  const destroy = (): void => { close(); floating.el.remove(); sub.remove(); };
+  return { open, close, destroy };
 }

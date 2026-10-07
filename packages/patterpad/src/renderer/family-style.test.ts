@@ -118,10 +118,7 @@ describe("family style: icons are drawn", () => {
 
   it("types no icon glyph into a string the renderer shows", () => {
     const hits = lineHits(GLYPH).filter((h) => GLYPH.test(withoutMenuPaths(h.key)));
-    hold("typed icon glyph", hits, [
-      { file: "patterpad-surface/src/grouplabel.ts", match: '"◇ Option"', why: "the diamond option marker: the option's structural label on the rail, the one non-icon mark the surface keeps (the same diamond is drawn on the prompt cell by CSS)" },
-      { file: "patterpad-surface/src/inspect.ts", match: '"◇ Option"', why: "the same label handed to the inspector through the surface's inspect contract (GroupLevel.label)" },
-    ], []);
+    hold("typed icon glyph", hits, [], []);
   });
 
   it("draws nothing from a symbol font in CSS content either", () => {
@@ -146,18 +143,9 @@ describe("family style: separators and key hints are drawn", () => {
 
   it("types no separator or key notation into a string", () => {
     const hits = TYPED.flatMap(([re, why]) => lineHits(re).map((h) => ({ ...h, key: `${h.key}  [${why}]` })));
-    // The reading-surface strings that flow through the surface's inspect contract: the group rail's
-    // structural label is prose the writer reads inside the script column ("Sequence · shuffle ·
-    // once"), the same string the inspector receives as GroupLevel.label. They are the surface's
-    // notation, not chrome, and they are listed here by file so that the day they move to a drawn
-    // form the entries go with them.
-    hold("typed separator", hits, [
-      { file: "patterpad-surface/src/grouplabel.ts", match: /"Branch · first match"/, why: "the branch rail label on the reading surface, through the inspect contract" },
-      { file: "patterpad-surface/src/grouplabel.ts", match: /`Sequence · /, why: "the sequence rail label (order · exhaust) on the reading surface, through the inspect contract" },
-      { file: "patterpad-surface/web/views.ts", match: /parts\.join\(" · "\)/, why: "a game event's field summary on the reading surface (key: value · key: value), the same text the inspect contract carries" },
-      { file: "patterpad-surface/web/views.ts", match: /"  · secret"/, why: "the option rail's secret flag beside its marker, on the reading surface" },
-      { file: "patterpad/src/renderer/src/inspector.ts", match: /replace\(\/\^Sequence · \/, ""\)/, why: "the inspector STRIPPING the surface's label prefix it received through the inspect contract; the literal is never shown" },
-    ], []);
+    // The reading surface's group labels were the last exceptions; they draw their separators with the
+    // shell's metaLine now (October 2026 review), so nothing is excepted.
+    hold("typed separator", hits, [], []);
   });
 
   it("hard-codes no modifier: the shell helper writes ⌘ on macOS and Ctrl elsewhere", () => {

@@ -8,10 +8,10 @@
 // Snippet.jump). Spoken / narration content lives in the `say` zone, bridging to
 // the locale string.
 //
-// `fmt` (the project's `formatting` setting) decides whether the say + paren text
-// carries inline bold / italic: ON, it is parsed from / serialized to the <b><i><bi>
-// markup tags (format.ts); OFF, the string is byte-literal (what you type ships).
-// The cue (a speaker name) is never formatted.
+// `fmt` (the project's `formatting` setting) decides whether the say text carries
+// inline bold / italic: ON, it is parsed from / serialized to the <b><i><bi> markup
+// tags (format.ts); OFF, the string is byte-literal (what you type ships). The cue
+// (a speaker name) and the paren (a direction) are never formatted.
 // ---------------------------------------------------------------------------
 
 import type { Node as PMNode } from "prosemirror-model";

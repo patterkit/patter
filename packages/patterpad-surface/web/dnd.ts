@@ -150,6 +150,8 @@ export function makeDragHandle(view: View, getPos: GetPos): HTMLElement {
     // Shift / Cmd on the grip SELECTS rather than drags (the grip is the primary way to grab a chunk,
     // so modifier-grabbing must extend / toggle the multi-set, groups §6).
     if (e.shiftKey || e.metaKey || e.ctrlKey) { selectChunkAt(view, from, { shift: e.shiftKey, toggle: e.metaKey || e.ctrlKey }); return; }
+    // A locked scene cannot be rearranged: the grip only selects (it is hidden by CSS there anyway).
+    if (!view.editable) { view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, from))); view.focus(); return; }
     const node = view.state.doc.nodeAt(from); if (!node) return;
     const draggingBlock = node.type.name === "block";
     // Multi-drag (groups §6): if this chunk is part of the multi-select set, drag the WHOLE set as one

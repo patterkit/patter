@@ -168,6 +168,13 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
     }
   };
 
+  // The effective address of a scene or block, read safely. `effectiveGameId` slugs the name, and a
+  // hand-edited (or editor-damaged) node can arrive with no name at all; that is already reported as
+  // `missing-name` above, so here it simply has no derived address rather than throwing a TypeError
+  // out of the whole validation and taking every other report with it.
+  const addressOf = (node: { gameId?: string; name?: unknown }): string =>
+    effectiveGameId({ gameId: node.gameId, name: typeof node.name === "string" ? node.name : "" });
+
   // An id must be a non-empty string; a missing one gets located by context so
   // the author can find the hand-edited node that lost it.
   const seeId = (id: unknown, kind: string, where: string): id is string => {
@@ -197,7 +204,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
     if (scene.gameId && !isValidGameId(scene.gameId)) {
       issues.push({ code: "invalid-gameid", message: `${where} address '${scene.gameId}' is invalid (lowercase letters, digits, hyphens; no leading/trailing hyphen)`, id: scene.id });
     }
-    const sgid = effectiveGameId(scene);
+    const sgid = addressOf(scene);
     if (sgid) {
       const prev = sceneGameIds.get(sgid);
       if (prev && prev !== scene.id) issues.push({ code: "duplicate-gameid", message: `${where} address '${sgid}' is already used by scene '${prev}'`, id: scene.id });
@@ -231,7 +238,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
       if (block.gameId && !isValidGameId(block.gameId)) {
         issues.push({ code: "invalid-gameid", message: `block '${block.id}' address '${block.gameId}' is invalid (lowercase letters, digits, hyphens; no leading/trailing hyphen)`, id: block.id });
       }
-      const bgid = effectiveGameId(block);
+      const bgid = addressOf(block);
       if (bgid) {
         const prev = blockGameIds.get(bgid);
         if (prev && prev !== block.id) issues.push({ code: "duplicate-gameid", message: `block '${block.id}' address '${bgid}' is already used by block '${prev}' in ${where}`, id: block.id });

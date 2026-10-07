@@ -9,7 +9,10 @@
 //                       snippet, drop its empty line and insert after) with a new
 //                       snippet / group, caret in its first seeded bubble.
 //
-// Wrap / unwrap / move / delete land in later slices. Pure over EditorState.
+// Then wrap / unwrap, delete, join, move (single, run, and set), and the
+// per-node property setters. Pure over EditorState. A command that removes
+// structure on purpose marks its transaction ALLOW_STRUCTURE so the structure
+// guard (guard.ts) lets it through; a join that would drop logic is refused.
 // ---------------------------------------------------------------------------
 
 import { Selection, TextSelection, type EditorState, type Transaction } from "prosemirror-state";
@@ -17,7 +20,8 @@ import { type Node as PMNode } from "prosemirror-model";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
-import { cueText, prevBeatKind, emptyBeatNode, isChunk, isChoiceGroup, modelIdOf } from "./zoneutil.js";
+import { cueText, prevBeatKind, emptyBeatNode, isChunk, isChoiceGroup, modelIdOf, freshSnippet, rawAttr } from "./zoneutil.js";
+import { ALLOW_STRUCTURE, refusal, snippetLogic, snippetLossMessage } from "./guard.js";
 import { landOnBeat } from "./lines.js";
 import { canInsertSpecial } from "./special.js";
 import { SET_MULTI } from "./multiselect.js";
@@ -29,22 +33,21 @@ export type GroupKind = "choice" | "if" | "sequence" | "cycle" | "shuffle" | "be
  * Marks a transaction as a STRUCTURAL move (reorder / reparent) rather than a caret
  * navigation. A move drops the selection onto the moved node so it stays visible and
  * the next move keeps working - but if that lands in a cue it must NOT be read as
- * "entered a cue", which would pop the cast popup. The harness checks this meta and
+ * "entered a cue", which would pop the cast popup. The surface checks this meta and
  * closes the popup instead of opening it. See moveChunk / moveNodeTo.
  */
 export const STRUCTURAL_MOVE = "patterStructuralMove";
 
-/** A fresh empty beat of the given kind, FOLLOWING the flow (text after text, dialogue after
- *  dialogue; see prevBeatKind). Delegates to the one shared builder (zoneutil.emptyBeatNode). */
+/** A fresh empty beat of the given kind (the one shared builder, zoneutil.emptyBeatNode). Callers pick
+ *  the kind with prevBeatKind so it FOLLOWS the flow (text after text, dialogue after dialogue). */
 const emptyBeat = emptyBeatNode;
-const bubbleWith = (line: PMNode): PMNode => S.node("snippet", { raw: JSON.stringify({ id: newId("sn"), type: "snippet" }) }, [line]);
-/** A fresh snippet with NO beats - an "un-entered" bubble (e.g. a branch's else leaf). It shows a
- *  generic click-to-add ghost and injects a type-following line on first click (seedBeatInSnippet). */
-const emptyBubble = (): PMNode => S.node("snippet", { raw: JSON.stringify({ id: newId("sn"), type: "snippet" }) }, []);
+/** A fresh bubble holding one line. (A fresh bubble with NO beats is an "un-entered" one, e.g. a
+ *  branch's else leaf: it shows the click-to-add ghost, see seedBeatInSnippet.) */
+const bubbleWith = (line: PMNode): PMNode => freshSnippet([line]);
 const groupNode = (raw: object, children: PMNode[]): PMNode => S.node("group", { raw: JSON.stringify(raw) }, children);
 /** A fresh option PROMPT cell (groups §13.10): defaults to an empty TEXT beat - the choice text.
  *  Accepts the inner beat's id so a caller can land the caret on the prompt it just made. */
-const optionPromptNode = (id: string = newId("L")): PMNode => S.node("optionprompt", null, [S.node("prose", { id, raw: "{}" }, [S.node("say", null, [])])]);
+const optionPromptNode = (id: string = newId("L")): PMNode => S.node("optionprompt", null, [emptyBeatNode("prose", "", id)]);
 /** An Option group: the prompt cell first, then the option's content run (§8 / §13.10). */
 const optionGroup = (content: PMNode, promptId: string = newId("L")): PMNode => groupNode({ id: newId("opt"), type: "group" }, [optionPromptNode(promptId), content]);
 
@@ -72,12 +75,11 @@ function buildGroup(kind: GroupKind, lineKind: "line" | "prose", speaker = ""): 
     // Land the caret in the option's PROMPT cell (the player-facing choice text - written first), not
     // the option BODY line, so the author types the choice label straight away (§8 / §13.10).
     const promptId = newId("L");
-    const option = groupNode({ id: newId("opt"), type: "group" }, [optionPromptNode(promptId), bubble]);
-    return { node: groupNode(raw, [option]), lineId: promptId };
+    return { node: groupNode(raw, [optionGroup(bubble, promptId)]), lineId: promptId };
   }
   // A branch (seeded, caret lands here) + an UN-ENTERED else: a beat-less bubble that shows a
   // click-to-add ghost and injects a type-following line on first click (§9).
-  if (kind === "if") return { node: groupNode(raw, [bubble, emptyBubble()]), lineId };
+  if (kind === "if") return { node: groupNode(raw, [bubble, freshSnippet()]), lineId };
   return { node: groupNode(raw, [bubble]), lineId };
 }
 
@@ -117,10 +119,12 @@ export function insertChunk(state: EditorState, kind: "snippet" | GroupKind): Tr
   const at = c.snippet.pos;
   const end = at + c.snippet.node.nodeSize;
   let tr: Transaction;
-  if (isLoneEmptyBubble(c.snippet.node)) {
+  // A lone empty bubble is replaced wholesale - unless it carries logic (a condition, effects, a jump),
+  // which replacing it would drop: then only its empty line goes, as in a bubble with other lines.
+  if (isLoneEmptyBubble(c.snippet.node) && snippetLogic(c.snippet.node).length === 0) {
     tr = state.tr.replaceWith(at, end, node); // the whole bubble was just the empty line
   } else {
-    // Drop the empty triggering line (like /jump, /action do), then drop the chunk in
+    // Drop the empty triggering line (as /jump and the game event do), then drop the chunk in
     // as the next sibling - never leave a stray empty line behind in the old snippet.
     tr = state.tr.delete(c.beat.pos, c.beat.pos + c.beat.node.nodeSize);
     tr.insert(tr.mapping.map(end), node);
@@ -130,26 +134,47 @@ export function insertChunk(state: EditorState, kind: "snippet" | GroupKind): Tr
   return tr.scrollIntoView();
 }
 
+/** The option-only fields of a group's raw (spec §5): meaningless once the group is not in a choice. */
+const OPTION_FIELDS = ["secretUntilEligible", "sticky", "fallback"] as const;
+
+/** A former choice OPTION as a plain group: its prompt cell and option-only fields gone, its id,
+ *  condition, and content kept (so the gating it carried still applies to what it holds). */
+function optionAsPlainGroup(option: PMNode): PMNode {
+  const raw = rawAttr(option);
+  for (const k of OPTION_FIELDS) delete raw[k];
+  const kids: PMNode[] = [];
+  option.forEach((ch) => { if (ch.type.name !== "optionprompt") kids.push(ch); });
+  return S.node("group", { ...option.attrs, raw: JSON.stringify(raw) }, kids);
+}
+
 /**
  * Unwrap (remove) a group, KEEPING its content: splice its children up into the
  * parent in place (groups §7). Non-destructive; its inverse is wrapping. Net
  * parent child-count never drops, so a block can't be emptied this way.
+ *
+ * Ungrouping a CHOICE leaves its options outside any choice, where a prompt is dead text the runtime
+ * never shows and the editor cannot reach (review 2026-10, MEDIUM 34). So each option becomes a plain
+ * group: the prompt and the option-only fields go, the condition and the content stay.
  */
 export function unwrapGroup(state: EditorState, pos: number): Transaction | null {
   const node = state.doc.nodeAt(pos);
   if (!node || node.type.name !== "group" || node.childCount === 0) return null;
-  const tr = state.tr.replaceWith(pos, pos + node.nodeSize, node.content);
-  return tr.setSelection(Selection.near(tr.doc.resolve(Math.min(pos + 1, tr.doc.content.size)))).scrollIntoView();
+  const kids: PMNode[] = [];
+  const choice = isChoiceGroup(node);
+  node.forEach((ch) => kids.push(choice && ch.type.name === "group" ? optionAsPlainGroup(ch) : ch));
+  const tr = state.tr.replaceWith(pos, pos + node.nodeSize, kids);
+  tr.setSelection(Selection.near(tr.doc.resolve(Math.min(pos + 1, tr.doc.content.size))));
+  return tr.setMeta(ALLOW_STRUCTURE, true).scrollIntoView();
 }
 
 /**
  * Is a chunk "effectively empty" - deleting it would destroy nothing the author typed?
- * True when its whole subtree has NO text (no cue / say content), NO action atoms, and NO
+ * True when its whole subtree has NO text (no cue / say content), NO game events, and NO
  * jump - i.e. a blank snippet, or a group whose children recurse down to only blank
  * snippets / empty groups. The action menu skips the delete confirmation for these (§7).
  */
 export function chunkIsEmpty(node: PMNode): boolean {
-  // ONE pass: any typed cue / say text, an action atom, or a terminal jump all count as content.
+  // ONE pass: any typed cue / say text, a game event, or a terminal jump all count as content.
   let content = node.type.name === "snippet" && !!node.attrs.jump; // a terminal jump is content
   if (content) return false;
   node.descendants((n) => {
@@ -170,7 +195,7 @@ export function deleteChunk(state: EditorState, pos: number): Transaction | null
   if (!node || (node.type.name !== "group" && node.type.name !== "snippet")) return null;
   const tr = state.tr.delete(pos, pos + node.nodeSize);
   tr.setSelection(Selection.near(tr.doc.resolve(Math.min(pos, tr.doc.content.size))));
-  return tr.scrollIntoView();
+  return tr.setMeta(ALLOW_STRUCTURE, true).scrollIntoView();
 }
 
 /**
@@ -184,7 +209,7 @@ export function deleteBlock(state: EditorState, pos: number): Transaction | null
   if (state.doc.childCount <= 1) return null; // never leave a scene with zero blocks
   const tr = state.tr.delete(pos, pos + node.nodeSize);
   tr.setSelection(Selection.near(tr.doc.resolve(Math.min(pos, tr.doc.content.size))));
-  return tr.scrollIntoView();
+  return tr.setMeta(ALLOW_STRUCTURE, true).scrollIntoView();
 }
 
 /**
@@ -192,6 +217,10 @@ export function deleteBlock(state: EditorState, pos: number): Transaction | null
  * "Join") - the inverse of a split. The two bubbles' beats merge into one; the leading
  * snippet's id / raw is kept and the terminal jump becomes the trailing snippet's (the
  * only terminal one). A no-op (null) unless the adjacent sibling is also a snippet.
+ *
+ * The merged bubble keeps only the leading snippet's raw, so a join that would drop the trailing one's
+ * condition or effects, or the leading one's jump, is REFUSED (ruling D): the returned transaction is a
+ * refusal carrying the sentence the host toasts (guard.ts), never a silent loss.
  */
 export function joinSnippet(state: EditorState, pos: number, dir: "up" | "down"): Transaction | null {
   const node = state.doc.nodeAt(pos);
@@ -204,11 +233,17 @@ export function joinSnippet(state: EditorState, pos: number, dir: "up" | "down")
   const aIsThis = dir === "down";              // A = the LEADING snippet (kept), B = the trailing one
   const aNode = aIsThis ? node : other, bNode = aIsThis ? other : node;
   const aPos = aIsThis ? pos : pos - other.nodeSize;
+  if (aNode.attrs.jump) return refusal(state, `${aIsThis ? "This" : "The previous"} bubble ends in a jump. Move or clear it first.`);
+  // B's jump is carried onto the merged bubble; its condition and effects would not be.
+  const lose = snippetLossMessage(aIsThis ? "The next bubble" : "This bubble", bNode.type.create({ ...bNode.attrs, jump: "" }));
+  if (lose) return refusal(state, lose);
   const beats: PMNode[] = [];
   aNode.forEach((bt) => beats.push(bt)); bNode.forEach((bt) => beats.push(bt));
   const merged = S.node("snippet", { ...aNode.attrs, jump: bNode.attrs.jump }, beats); // tail's jump is terminal
   const tr = state.tr.replaceWith(aPos, aPos + aNode.nodeSize + bNode.nodeSize, merged);
-  return tr.setSelection(Selection.near(tr.doc.resolve(Math.min(aPos + 1, tr.doc.content.size)))).scrollIntoView();
+  tr.setSelection(Selection.near(tr.doc.resolve(Math.min(aPos + 1, tr.doc.content.size))));
+  // B's id goes, but its jump is carried and the checks above cleared it of anything else.
+  return tr.setMeta(ALLOW_STRUCTURE, true).scrollIntoView();
 }
 
 /** Materialise a fresh bubble in an EMPTY container - the ghost-snippet "+" (D1). Lands
@@ -305,6 +340,7 @@ export function wrapInGroup(state: EditorState, kind: GroupKind): Transaction | 
   const cr = chunkRange(state);
   if (!cr) return null;
   const { range, chunks } = cr;
+  if (isChoiceGroup(range.parent)) return null; // a choice's children are options: wrapping them breaks the choice
   if (kind === "choice") {
     const node = groupNode(groupRaw("choice"), chunks.map((c) => optionGroup(c)));
     const tr = state.tr.replaceWith(range.start, range.end, node);
@@ -321,6 +357,7 @@ export function wrapChunk(state: EditorState, pos: number, kind: GroupKind): Tra
   const node = state.doc.nodeAt(pos);
   if (!node || (node.type.name !== "snippet" && node.type.name !== "group")) return null;
   const $from = state.doc.resolve(pos);
+  if (isChoiceGroup($from.parent)) return null; // an option: wrapping it would leave the choice a non-option child
   const $to = state.doc.resolve(pos + node.nodeSize);
   const range = $from.blockRange($to, (p) => p.type.name === "block" || p.type.name === "group");
   if (!range) return null;
@@ -331,7 +368,7 @@ export function wrapChunk(state: EditorState, pos: number, kind: GroupKind): Tra
   }
   // tr.wrap KEEPS the existing caret - which may be far from this chunk (you wrap from its ⋯ menu
   // while the caret sits elsewhere, e.g. up the script). scrollIntoView would then yank the viewport
-  // to that caret (the "scrolls back to the top" bug). Omit it: the caret-beat recentre (main.ts)
+  // to that caret (the "scrolls back to the top" bug). Omit it: the caret-beat recentre (surface.ts)
   // still gently follows the caret when it IS in the wrapped chunk; otherwise the viewport stays put.
   return state.tr.wrap(range, [{ type: S.nodes.group, attrs: { raw: JSON.stringify(groupRaw(kind)) } }]);
 }
@@ -381,7 +418,7 @@ export function setSnippetEffects(
 /** Editable group properties (the header access-UI, groups §9). */
 export interface GroupPropsPatch {
   selector?: "run" | "branch" | "sequence" | "choice";
-  order?: "sequential" | "shuffle";
+  order?: "sequential" | "shuffle" | "specificity";
   exhaust?: "once" | "repeat" | "stick";
   condition?: string;
   /** Option-position field (a choice's child, groups §8). The option's `prompt` (the
@@ -467,20 +504,25 @@ export function insertAfter(state: EditorState, pos: number, kind: "snippet" | G
   return tr.scrollIntoView();
 }
 
+/**
+ * Insert a fresh Option (a prompt cell + a seeded content bubble, §13.10) at `at`, inside the choice at
+ * `choicePos`. The option's CONTENT follows the flow BEFORE the whole choice - not a prompt (always text,
+ * so unhelpful) nor a sibling option's content. The caret lands in the PROMPT, as in a new choice's
+ * first option: the choice text is what an author writes first, then what follows it.
+ */
+function insertFreshOption(state: EditorState, choicePos: number, at: number): Transaction {
+  const promptId = newId("L");
+  const option = optionGroup(bubbleWith(emptyBeat(prevBeatKind(state.doc, choicePos))), promptId);
+  const tr = state.tr.insert(at, option);
+  landOnBeat(tr, promptId);
+  return tr.scrollIntoView();
+}
+
 /** Append a fresh Option group (a seeded bubble) to a choice (groups §8). */
 export function insertOption(state: EditorState, choicePos: number): Transaction | null {
   const node = state.doc.nodeAt(choicePos);
   if (!node || !isChoiceGroup(node)) return null;
-  // The option's CONTENT follows the snippet BEFORE the whole choice - not the option prompt (always
-  // text, so unhelpful) nor a sibling option's content. Measure from the choice's own position.
-  const line = emptyBeat(prevBeatKind(state.doc, choicePos));
-  const promptId = newId("L");
-  const option = optionGroup(bubbleWith(line), promptId); // prompt cell + a seeded content bubble (§13.10)
-  const tr = state.tr.insert(choicePos + node.nodeSize - 1, option); // just inside the choice's end
-  // The caret lands in the PROMPT, as it does in a new choice's first option: the choice text is what an
-  // author writes first, then what follows it.
-  landOnBeat(tr, promptId);
-  return tr.scrollIntoView();
+  return insertFreshOption(state, choicePos, choicePos + node.nodeSize - 1); // just inside the choice's end
 }
 
 /** Insert a fresh Option group right AFTER the given option (the per-option "+ option",
@@ -490,13 +532,7 @@ export function insertOptionAfter(state: EditorState, optionPos: number): Transa
   if (!node || node.type.name !== "group") return null;
   const $opt = state.doc.resolve(optionPos);
   if (!isChoiceGroup($opt.parent)) return null;
-  // Follow the snippet BEFORE the whole choice (its position), not the prompt or a sibling option.
-  const line = emptyBeat(prevBeatKind(state.doc, $opt.before($opt.depth)));
-  const promptId = newId("L");
-  const option = optionGroup(bubbleWith(line), promptId); // prompt cell + a seeded content bubble (§13.10)
-  const tr = state.tr.insert(optionPos + node.nodeSize, option); // after this option
-  landOnBeat(tr, promptId); // the choice text first, as insertOption
-  return tr.scrollIntoView();
+  return insertFreshOption(state, $opt.before($opt.depth), optionPos + node.nodeSize);
 }
 
 /**
@@ -518,7 +554,7 @@ export function moveChunk(state: EditorState, pos: number, dir: "up" | "down"): 
     : tr.mapping.map(pos + node.nodeSize + $pos.parent.child(index + 1).nodeSize);  // after the next sibling
   tr.insert(insertAt, node);
   tr.setSelection(Selection.near(tr.doc.resolve(insertAt + 1))).scrollIntoView();
-  return tr.setMeta(STRUCTURAL_MOVE, true);
+  return tr.setMeta(STRUCTURAL_MOVE, true).setMeta(ALLOW_STRUCTURE, true);
 }
 
 /**
@@ -576,7 +612,7 @@ export function moveNodeTo(state: EditorState, fromPos: number, toSeam: number):
   const insertAt = tr.mapping.map(toSeam);
   tr.insert(insertAt, content);
   tr.setSelection(Selection.near(tr.doc.resolve(Math.min(insertAt + 1, tr.doc.content.size)))).scrollIntoView();
-  return tr.setMeta(STRUCTURAL_MOVE, true);
+  return tr.setMeta(STRUCTURAL_MOVE, true).setMeta(ALLOW_STRUCTURE, true);
 }
 
 /**
@@ -605,7 +641,7 @@ export function moveRangeTo(state: EditorState, fromStart: number, fromEnd: numb
   // boundary positions (TextSelection.create wouldn't search and would warn on a node boundary).
   const reselect = rangeAcrossChunks(tr.doc, insertAt, insertAt + total - nodes[nodes.length - 1]!.nodeSize);
   if (reselect) tr.setSelection(reselect);
-  return tr.setMeta(STRUCTURAL_MOVE, true).scrollIntoView();
+  return tr.setMeta(STRUCTURAL_MOVE, true).setMeta(ALLOW_STRUCTURE, true).scrollIntoView();
 }
 
 // --- discontiguous multi-select (a Cmd-click set, possibly with gaps) operations (groups §6) -------
@@ -625,7 +661,7 @@ export function deleteChunksAt(state: EditorState, positions: number[]): Transac
     if (n && isChunk(n)) tr.delete(p, p + n.nodeSize);
   }
   const at = Math.min(positions[0]!, tr.doc.content.size);
-  return tr.setSelection(Selection.near(tr.doc.resolve(at))).scrollIntoView();
+  return tr.setSelection(Selection.near(tr.doc.resolve(at))).setMeta(ALLOW_STRUCTURE, true).scrollIntoView();
 }
 
 /** Wrap the set in a new group of `kind`, gathered at the lowest position (gaps are left behind). */
@@ -633,6 +669,9 @@ export function wrapChunksAt(state: EditorState, positions: number[], kind: Grou
   const sorted = [...positions].sort((a, b) => a - b);
   const nodes = chunkNodesAt(state.doc, sorted);
   if (nodes.length < 2) return null;
+  // A set of choice OPTIONS cannot be wrapped: the wrapping group would sit in the choice as a child that
+  // is not an option, and the options inside it would be options of nothing (review 2026-10, MEDIUM 35).
+  if (isChoiceGroup(state.doc.resolve(sorted[0]!).parent)) return null;
   const at = sorted[0]!;
   const tr = state.tr;
   for (const p of [...sorted].sort((a, b) => b - a)) { const n = state.doc.nodeAt(p); if (n) tr.delete(p, p + n.nodeSize); }
@@ -655,7 +694,7 @@ export function moveChunksAt(state: EditorState, positions: number[], toSeam: nu
   const insertAt = tr.mapping.map(toSeam);
   tr.insert(insertAt, nodes);
   tr.setSelection(Selection.near(tr.doc.resolve(Math.min(insertAt + 1, tr.doc.content.size)))).scrollIntoView();
-  return tr.setMeta(STRUCTURAL_MOVE, true).setMeta(SET_MULTI, { ids: nodes.map((n) => modelIdOf(n) ?? ""), anchor: (modelIdOf(nodes[0]!) ?? "") });
+  return tr.setMeta(STRUCTURAL_MOVE, true).setMeta(ALLOW_STRUCTURE, true).setMeta(SET_MULTI, { ids: nodes.map((n) => modelIdOf(n) ?? ""), anchor: (modelIdOf(nodes[0]!) ?? "") });
 }
 
 /** Rename a block (its name is the H1 heading AND the jump-target label). */

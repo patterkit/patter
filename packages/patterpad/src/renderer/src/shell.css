@@ -29,8 +29,8 @@
 .scene-suffix.shown { opacity: 1; }
 
 /* the topbar Play affordance: quiet chrome, the accent on hover */
-.topbtn { display: inline-flex; align-items: center; gap: 4px; font: 600 12px var(--font-ui); color: var(--muted); background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 10px; cursor: pointer; white-space: nowrap; }
-.topbtn:hover { color: var(--accent); border-color: var(--accent); }
+/* The topbar Play affordance: the shell's `.btn`, sized for the bar, as Storyletter's is. */
+.topbtn { padding: 2px 10px; }
 .topbtn[hidden] { display: none; }
 
 /* The three-pane frame (navigator | editor | inspector, Patterpad.md §4) is the shell's `mountPaneShell`
@@ -55,7 +55,7 @@
    sub-list sets min-height:0 for its accordion - so rows crush to clipped, unreadable slivers before
    the scrollbar ever engages. Pinning children to flex:none makes the content overflow instead, which
    is what the pane's own scrollbar is for. Same hazard + same fix on every capped flex column of
-   buttons: see .jump-list and .settings-tabs. (#30) */
+   buttons: see .value-list and .settings-tabs. (#30) */
 .nav-list > * { flex: none; }
 /* The editor's column holds the script scroller, or the Properties document in its place. */
 .pane-centre { display: flex; flex-direction: column; }
@@ -263,10 +263,12 @@
 /* The panel CHROME (position, border, shadow, header, body, enter/exit motion) is
    the shell's `.shell-anchored` now: see panel.ts. What stays here is only what is
    this app's, which is the z-index it sits at above the editor surface, and the
-   body being a plain block rather than the shell's gapped column, because these
-   panels mount editors that do their own spacing. */
+   body being a plain block rather than the shell's gapped column for THIS app's
+   panels, which mount editors that do their own spacing. Scoped to them: applied to
+   every anchored panel, it flattened the shell's own comments popover too (its quote,
+   list, and composer touching where Storyletter spaces them). */
 .shell-anchored { z-index: 900; }
-.shell-anchored-body { display: block; padding: 9.5px; }
+.shell-anchored:is(.cond-editor, .effects-editor, .value-picker, .suggestion-popover) .shell-anchored-body { display: block; padding: 9.5px; }
 /* effects editor: one section per phase (On enter / On exit) */
 .effects-section + .effects-section { margin-top: 11px; padding-top: 9.5px; border-top: 1px solid var(--line); }
 .effects-section-cap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-bottom: 5.5px; }
@@ -348,10 +350,8 @@
 .scratch-next-text { font: 1rem/1.4 var(--font-read); color: var(--ink); }
 /* Saved-state action buttons: replay / re-record / record next / finish (mouse-driven). */
 .scratch-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
-.scratch-btn { display: inline-flex; align-items: center; gap: 5.5px; font: 600 13px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 6.5px 12px; cursor: pointer; }
-.scratch-btn:hover { border-color: var(--accent); color: var(--accent); }
-.scratch-btn-primary { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
-.scratch-btn-primary:hover { color: var(--on-accent); background: color-mix(in oklab, var(--accent) 85%, black); }
+/* The recorder's buttons are the family's `.btn` / `.btn.primary` (ruling L, October 2026): the overlay is a
+   mode of its own, its controls are not. */
 .scratch-cue[hidden], .scratch-bar[hidden], .scratch-next[hidden], .scratch-actions[hidden] { display: none; }
 @keyframes scratch-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 /* editable gameData field value (text / number input) */
@@ -375,17 +375,15 @@
 .insp-gd-section { display: flex; flex-direction: column; gap: 2.5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid color-mix(in oklab, var(--line) 65%, transparent); }
 .insp-gd-cap { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); margin-bottom: 1.5px; }
 .insp-check { accent-color: var(--accent); cursor: pointer; }
-.jump-list { display: flex; flex-direction: column; gap: 1.5px; max-height: 60vh; overflow: auto; }
-/* THE #30 fix. One row per scene/block, so a big project overflows the 60vh cap - and flex then
+.value-list { display: flex; flex-direction: column; gap: 1.5px; max-height: 60vh; overflow: auto; }
+/* THE #30 fix (from when this list was the jump picker's). A long list overflows the 60vh cap - and flex then
    SHRINKS the rows rather than scrolling, because <button> flex items have no automatic minimum size.
    Every option crushed to an unreadable (still clickable) sliver. flex:none restores natural heights,
    letting the overflow reach this list's own scrollbar. (Same fix on .nav-list and .settings-tabs.) */
-.jump-list > * { flex: none; }
-.jump-list .exed-opt { font: 13px var(--font-ui); padding: 5px 7px; border-radius: var(--radius-sm); cursor: pointer; background: none; border: 0; text-align: left; color: var(--ink); }
-.jump-list .exed-opt:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
-.jump-list .exed-opt.sel { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
-.jump-list .exed-opt.danger { color: var(--muted); }
-.jump-list .exed-opt.danger:hover { color: var(--accent); }
+.value-list > * { flex: none; }
+.value-list .exed-opt { font: 13px var(--font-ui); padding: 5px 7px; border-radius: var(--radius-sm); cursor: pointer; background: none; border: 0; text-align: left; color: var(--ink); }
+.value-list .exed-opt:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+.value-list .exed-opt.sel { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; }
 
 /* The two bottom bars are the shell's `.stepbar` (stepper.css): count, ‹ ›, position, the current entry
    as a button, an action slot. The parallel `.problembar-*` / `.reviewbar-*` class sets this app kept
@@ -502,18 +500,17 @@
 .sp-audio-body.is-disabled { opacity: 0.45; }
 /* Closed Captions: the open/close delimiter pair side by side, centred single-glyph inputs. */
 .caption-delims { display: flex; gap: 13px; align-items: flex-end; flex-wrap: wrap; }
-.caption-delims .identity-field { flex: 0 0 auto; }
+.caption-delims .shell-labelled, .caption-delims .shell-field { flex: 0 0 auto; }
 .caption-delims input { text-align: center; width: 72px; font-family: var(--font-mono); }
 .caption-delims-note { flex: 1 1 224px; min-width: 192px; align-self: center; }
 /* Guardrail note shown when the caption start is "(" (which opens a direction at a line start). */
 .caption-delims-warn { flex: 1 1 100%; color: var(--danger); }
 /* A checkbox option that hangs off the control above it (e.g. the IDs-only source-debug toggle under the
    Localisation select): indented with a hairline so it reads as a sub-option, not a peer field. */
-.settings-suboption { margin-left: 14.5px; padding-left: 13px; border-left: 2px solid var(--line); }
-.settings-toggle { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; }
-.settings-toggle input { margin-top: 2.5px; }
-.settings-toggle span { display: flex; flex-direction: column; gap: 1.5px; font: 600 13.5px var(--font-ui); color: var(--ink); }
-.settings-toggle small { font: 12px var(--font-ui); font-weight: 400; color: var(--muted); }
+/* Settings rows and toggles are the shell's labelled / labelledToggle now (ruling C, October 2026). */
+/* A text field in a settings row takes the row's width, as Storyletter's do (the shell scopes its own rule to
+   Storyletter's panel class): the bundle path was clipped to a few characters. */
+.settings-panel .shell-labelled > input:not([type=checkbox]):not([type=radio]) { flex: 1; min-width: 0; }
 .settings-note { margin: 0; color: var(--muted); font-size: 12px; }
 
 /* Placeholder text everywhere: faded well below real input so a prompt can't read as content. The
@@ -528,13 +525,6 @@ input::placeholder, textarea::placeholder {
 }
 
 /* Documentation Notes modal (one text area per class). */
-.doc-dialog { --dialog-width: 544px; }
-.doc-host { display: flex; flex-direction: column; gap: 11px; max-height: 60vh; overflow: auto; }
-.doc-class { display: flex; flex-direction: column; gap: 3px; }
-.doc-class-label { font: 600 12.5px/1.2 var(--font-ui); color: var(--muted); }
-.doc-text { font: 14.5px var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 6.5px 8px; resize: vertical; min-height: 54.5px; }
-.doc-text:focus-visible { border-color: var(--accent); outline-offset: 0; }
-.doc-add { align-self: flex-start; font: 13px var(--font-ui); }
 
 /* Localisation modal: format + language pickers side by side. */
 .loc-dialog { --dialog-width: 512px; }
@@ -545,7 +535,7 @@ input::placeholder, textarea::placeholder {
 .editable-dialog { width: 92vw; max-width: 528px; }
 /* `hidden` must win over the flex / inline-flex these controls set (a refused file hides its options). */
 .editable-dialog [hidden] { display: none !important; }
-.editable-dialog .settings-toggle { margin-top: 2px; }
+.editable-dialog .shell-field, .editable-dialog .shell-labelled { margin-top: 2px; }
 .editable-range { display: flex; width: 100%; margin-bottom: 13px; }
 .editable-range .seg-opt { flex: 1 1 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 9.5px 13px; text-align: left; min-width: 0; }
 .editable-range .seg-opt:disabled { opacity: .5; cursor: default; }
@@ -577,7 +567,7 @@ input::placeholder, textarea::placeholder {
 .report-scroll { position: relative; min-height: 0; }
 .report-scroll::before, .report-scroll::after {
   content: ""; position: absolute; left: 0; right: 0; height: 41.5px; z-index: 1;
-  pointer-events: none; opacity: 0; transition: opacity 0.18s var(--ease-standard, ease);
+  pointer-events: none; opacity: 0; transition: opacity var(--dur-settle) var(--ease-standard, ease);
 }
 .report-scroll::before { top: 0; background: linear-gradient(var(--surface), transparent); }
 .report-scroll::after { bottom: 0; background: linear-gradient(transparent, var(--surface)); }
@@ -588,7 +578,7 @@ input::placeholder, textarea::placeholder {
   display: grid; place-items: center; width: 27px; height: 27px;
   color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line);
   border-radius: 50%; padding: 0; cursor: pointer; box-shadow: var(--shadow-1);
-  opacity: 0; pointer-events: none; transition: opacity 0.18s var(--ease-standard, ease);
+  opacity: 0; pointer-events: none; transition: opacity var(--dur-settle) var(--ease-standard, ease);
 }
 .report-scroll.has-below .report-more { opacity: 1; pointer-events: auto; }
 .report-more:hover { color: var(--accent); border-color: color-mix(in oklab, var(--accent) 40%, var(--line)); }

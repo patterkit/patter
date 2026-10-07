@@ -46,9 +46,15 @@ export function listDictionaries(): DictionaryInfo[] {
   return [...BUILTINS, ...imported];
 }
 
+/** A dictionary id as `importDictionary` accepts one. The id names a folder, and remove and read join it
+ *  onto the dictionaries folder: an id of `""` or `"../.."` sent from a renderer named somewhere else
+ *  entirely, and remove deletes recursively. */
+const ID = /^[A-Za-z][A-Za-z0-9_-]*$/;
+
 /** The aff/dic text for a dictionary id (built-in or imported), or null if it isn't installed - e.g. a
  *  project picked a custom language this machine hasn't imported (the renderer shows a quiet notice). */
 export function readDictionary(id: string): DictionaryData | null {
+  if (!ID.test(id)) return null;
   const dir = isBuiltin(id) ? join(builtinDir(), id) : join(userDir(), id);
   const affPath = join(dir, "index.aff"), dicPath = join(dir, "index.dic");
   if (!existsSync(affPath) || !existsSync(dicPath)) return null;
@@ -58,10 +64,10 @@ export function readDictionary(id: string): DictionaryData | null {
 /** Import a Hunspell pair (already-read paths) to userData under `id`, after validating it loads in
  *  nspell. Built-in ids and bad pairs are rejected. */
 export function importDictionary(affPath: string, dicPath: string, id: string, label: string): { ok: true; info: DictionaryInfo } | { ok: false; error: string } {
-  if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) return { ok: false, error: "Dictionary id must be letters / digits / - / _ and start with a letter." };
+  if (!ID.test(id)) return { ok: false, error: "A dictionary's id is letters, digits, hyphens, and underscores, and starts with a letter." };
   if (isBuiltin(id)) return { ok: false, error: `'${id}' is a built-in dictionary.` };
   let aff: string, dic: string;
-  try { aff = readFileSync(affPath, "utf8"); dic = readFileSync(dicPath, "utf8"); } catch { return { ok: false, error: "Could not read the chosen .aff / .dic files." }; }
+  try { aff = readFileSync(affPath, "utf8"); dic = readFileSync(dicPath, "utf8"); } catch { return { ok: false, error: "Couldn't read the chosen .aff and .dic files." }; }
   try { if (typeof nspell(aff, dic).correct !== "function") throw new Error("invalid"); } catch { return { ok: false, error: "That isn't a valid Hunspell .aff / .dic pair." }; }
   try {
     const dir = join(userDir(), id);
@@ -70,11 +76,12 @@ export function importDictionary(affPath: string, dicPath: string, id: string, l
     writeFileSync(join(dir, "index.dic"), dic, "utf8");
     writeFileSync(join(dir, "label"), label.trim() || id, "utf8");
     return { ok: true, info: { id, label: label.trim() || id, builtin: false } };
-  } catch { return { ok: false, error: "Could not save the dictionary." }; }
+  } catch { return { ok: false, error: "Couldn't save the dictionary." }; }
 }
 
 /** Remove an imported dictionary (built-ins can't be removed). */
 export function removeDictionary(id: string): { ok: boolean; error?: string } {
   if (isBuiltin(id)) return { ok: false, error: "Built-in dictionaries can't be removed." };
-  try { rmSync(join(userDir(), id), { recursive: true, force: true }); return { ok: true }; } catch { return { ok: false, error: "Could not remove the dictionary." }; }
+  if (!ID.test(id) || !listDictionaries().some((d) => d.id === id && !d.builtin)) return { ok: false, error: "There's no such dictionary to remove." };
+  try { rmSync(join(userDir(), id), { recursive: true, force: true }); return { ok: true }; } catch { return { ok: false, error: "Couldn't remove the dictionary." }; }
 }

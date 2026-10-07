@@ -61,6 +61,8 @@ import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are ma
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
 import { toast } from "@wildwinter/app-shell";
+import { landed } from "./results.js";
+import { fileSafeName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
 // (plural / formatCount / debounce) are the shell's (ui-review-2026-09, shell step 6).
 import { EXAMPLES } from "../../shared/examples.js";
@@ -69,7 +71,7 @@ import { iconNode } from "@wildwinter/app-shell"; // the family's drawn icon set
 import "@wildwinter/app-shell/keys.css"; // the keycaps every hint in this window draws
 // Key hints come from ONE helper that writes "⌘" on a Mac and "Ctrl" elsewhere, and metadata is a drawn
 // line, never joined with a typed dot (design-language §4): no "⌘" and no " · " in a string in this file.
-import { keyHint, tipWithKey, metaLine } from "@wildwinter/app-shell";
+import { keyHint, tipWithKey, metaLine, labelled, labelledToggle } from "@wildwinter/app-shell";
 import { problemLineFor } from "./problem-copy.js";
 import { PATTERKIT_WORDMARK } from "./wordmark.js";
 import { gameIdify, isValidGameId } from "@patterkit/core";
@@ -83,15 +85,15 @@ import { mountEstimating } from "./settings-estimating.js";
 import { mountDictionary } from "./settings-dictionary.js";
 import { mountLanguages } from "./settings-languages.js";
 import { renderReport } from "./report-view.js";
-import { mountDocEditor } from "./doc-editor.js";
 // The comment popover is the shell's. Aliased because this module already has an
 // `openComments` of its own, which is the thing that decides WHICH threads it gets.
-import { openComments as shellComments } from "@wildwinter/app-shell";
+import { openComments as shellComments, openNotesEditor } from "@wildwinter/app-shell";
+import "@wildwinter/app-shell/notes-editor.css"; // the family's Notes editor (ruling I)
 import "@wildwinter/app-shell/comments.css"; // a shared module carries its own CSS
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
-import { openJumpPicker } from "./jump-picker.js";
+import { openValuePicker } from "./value-picker.js";
 import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
@@ -214,9 +216,6 @@ const welcome = mountWelcome(welcomeEl, {
 function setWelcomeRecents(recents: RecentProject[]): void {
   welcome.setRecents(recents.map((r) => ({ name: r.name, path: r.path, onOpen: () => void openPath(r.path) })));
 }
-// Conditions / effects always render as pills in the inspector. (The old View > "Expressions as Text"
-// toggle, which swapped them for name-form code, has been removed.)
-const preferText = false;
 let lastInspectorCtx: InspectorContext | null = null;
 let lastInspectorSig: string | null = null; // signature of the last-rendered inspector (skip identical rebuilds)
 
@@ -370,8 +369,8 @@ saveInd.el.classList.add("no-drag"); // it answers clicks, so it opts out of the
 saveIndicatorHost.replaceWith(saveInd.el);
 // `write` returns false on refusal, which keeps the controller "unsaved" so the
 // next touch or flush tries again rather than reporting a success that did not
-// happen. Autosave on/off is the project's setting (ProjectFile.autosave) and
-// stops the CLOCK only: every transition below still flushes.
+// happen. There is no off switch: the family always saves (ruling A of the October 2026 review), and
+// the switch that was here only stopped the clock while every transition below still saved.
 const saver = createSaveController({ write: writeScene, onStatus: saveInd.set });
 
 // Open-where-you-left-off, to the LINE: the node id the caret is on, persisted (debounced) alongside the
@@ -555,7 +554,7 @@ function renderNav(): void {
   // The quiet foot of the list: add a scene right where scenes live.
   const add = document.createElement("button");
   add.className = "nav-add-scene"; add.type = "button";
-  add.append(Object.assign(document.createElement("span"), { textContent: "+ New Scene" }));
+  add.append(Object.assign(document.createElement("span"), { textContent: "+ New scene" }));
   add.addEventListener("click", () => newScenePrompt());
   navListEl.appendChild(add);
   paintNavBadges(); // re-apply VC badges after a list rebuild
@@ -621,7 +620,7 @@ function newScenePrompt(): void {
       const who = needsSpeaker(kit) ? speaker.value.trim() : undefined;
       void (async () => {
         const res = await window.patter.createScene(name, kit, who);
-        if (!res.ok || !res.project || !res.sceneId) return;
+        if (!landed(res, "Couldn't add the scene") || !res.project || !res.sceneId) return;
         project = res.project;
         renderNav();
         await loadScene(res.sceneId);
@@ -699,7 +698,9 @@ async function deleteScenePrompt(sceneId?: string): Promise<void> {
   const warnBits = [
     info.referrers.length ? "Those references will dangle and show as problems until you repoint them." : "",
     info.startsHere ? "The project's start point will be cleared." : "",
-    info.vcs ? "" : "This cannot be undone.",
+    // Ruling F of the October 2026 review: one sentence for what cannot be undone, and under version
+    // control the truth, which is that the files can come back from there.
+    info.vcs ? "Version control keeps its files, so you can bring the scene back from there." : "You can't undo this.",
   ].filter(Boolean);
   if (warnBits.length) body.push(el("p", "confirm-body del-warn", warnBits.join(" ")));
 
@@ -719,7 +720,7 @@ async function doDeleteScene(id: string): Promise<void> {
   const at = order.indexOf(id);
   const neighbour = order[at - 1] ?? order.find((sid) => sid !== id);
   const res = await window.patter.deleteScene(id);
-  if (!res.ok || !res.project) return;
+  if (!landed(res, "Couldn't delete the scene") || !res.project) return;
   project = res.project;
   renderNav();
   if (currentSceneId === id) {
@@ -828,6 +829,9 @@ function paintNavBadges(): void {
 
 /** Reflect the CURRENT scene's VC state: read-only the surface + dim the inspector when locked by
  *  another, and show a topbar chip naming the holder (or an out-of-date notice). */
+/** The open project's version control by name, for the chip's tip. */
+let vcSystemName = "version control";
+
 function applySceneVc(): void {
   const st = currentSceneId ? vcMap.get(currentSceneId) : undefined;
   const ro = isReadOnly(st);
@@ -845,6 +849,10 @@ function applySceneVc(): void {
     : st?.outOfDate ? ["down", "Out of date"] : null;
   vcsSceneEl.replaceChildren(...(chip ? [iconNode(chip[0], 12), chip[1]] : []));
   vcsSceneEl.hidden = !chip;
+  // The tip names the version control the state comes from, as Storyletter's chip does.
+  const tip = chip ? `${chip[1]} (${vcSystemName})` : "";
+  if (tip) { vcsSceneEl.dataset["tip"] = tip; vcsSceneEl.setAttribute("aria-label", tip); }
+  else { delete vcsSceneEl.dataset["tip"]; vcsSceneEl.removeAttribute("aria-label"); }
   vcsSceneEl.classList.toggle("locked", !!st?.lockedBy?.length);
 }
 
@@ -854,6 +862,7 @@ async function refreshVcStatus(): Promise<void> {
   if (!project) return;
   const dto = await window.patter.vcStatus();
   if (!dto || !project) return; // project may have closed while we awaited
+  vcSystemName = VCS_OPTIONS.find(([v]) => v === dto.vcs)?.[1] ?? dto.system;
   vcMap = new Map(dto.scenes.map((s) => [s.sceneId, { key: s.sceneId, ...s }]));
   // The project shard rides in the same map: the Properties row is badged from it, because the
   // declarations that page edits live in the project file.
@@ -897,7 +906,7 @@ function resetView(): void {
 // A pure presentation mode: a body class hides ALL chrome (both panes, both bottom bars, the topbar,
 // and the surface's review gutters + tints) and eases the editor full-bleed - see the CSS in shell.css.
 // It mutates NO state, so leaving restores the EXACT prior layout (open/pinned panes, Review mode,
-// visible bars) for free. Esc or the bottom-left pill exits. Only available with a project open.
+// visible bars) for free. Esc or the exit pill (bottom right) leaves it. Only available with a project open.
 let writingView = false;
 function setWritingView(on: boolean): void {
   if (on === writingView || (on && panesEl.hidden)) return; // no Writing View on the welcome screen
@@ -971,7 +980,13 @@ function rewriteEnumValue(src: string, bad: string, chosen: string): string {
 let problemFixEl: HTMLButtonElement | null = null;
 
 /** Draw the problems bar from `problems` + `problemAt`. Idempotent: called again on every change. */
+/** The two bottom bars belong to the workspace. The overview and the Properties page hide them, and a
+ *  repaint while either is up (a validation after a Properties edit, F8) must leave them hidden there,
+ *  or the bar appears over a page that has no scene to step through. */
+const barsBelongHere = (): boolean => !panesEl.hidden && propsDocEl.hidden && overviewEl.hidden;
+
 function paintProblems(): void {
+  if (!barsBelongHere()) { problembarEl.hidden = true; return; }
   const cur = problems[problemAt];
   const fix = cur?.fix;
   problemFixEl = null;
@@ -995,7 +1010,7 @@ function paintProblems(): void {
     at: problemAt,
     // The tone follows the CURRENT problem, not the worst one, which is what the old `.warning` class on
     // the host did: an advisory issue reads softer than a hard error while you are standing on it.
-    tone: cur?.severity === "warning" ? "warn" : "accent",
+    tone: cur?.severity === "warning" ? "warn" : "danger", // an error in the danger colour, count and tag alike, as Storyletter shows it
     tips: { prev: "Previous problem", next: "Next problem", go: "Go to issue" },
     onStep: (next) => {
       problemAt = next;
@@ -1021,8 +1036,8 @@ function paintHealth(): void {
   healthEl.setAttribute("aria-label", tip);
 }
 function healthCleanLine(): string {
-  const scene = currentSceneId ? project?.scenes.find((sc) => sc.id === currentSceneId)?.name : undefined;
-  return `No problems in ${scene ?? project?.name ?? "this project"}`;
+  // The check covers the whole project, so the clean answer names the project, as Storyletter's does.
+  return `No problems in ${project?.name ?? "this project"}`;
 }
 healthEl.addEventListener("click", () => {
   if (problems.length > 0) { problemAt = 0; paintProblems(); void goToProblem(problems[0]); return; }
@@ -1066,22 +1081,25 @@ async function applyCurrentFix(): Promise<void> {
     return;
   }
   if (fix.kind === "pick-enum-value") {
-    // Surface edit: pick a valid value (the jump picker doubles as a generic chooser), rewrite the
-    // condition, save, re-validate. Uses the problem's node id (the snippet / group / option).
+    // Surface edit: pick a valid value, rewrite the condition, save, re-validate. Uses the problem's node
+    // id (the snippet / group / option).
     const nodeId = problems[problemAt]?.nodeId;
     if (!nodeId) return;
-    openJumpPicker({
-      anchor, current: "", targets: fix.options.map((v) => ({ id: v, label: v })),
-      // The picker's "No jump" row passes null. It means nothing when the picker is standing in as an
-      // enum chooser, and without this guard it rewrote the condition to the literal "null".
-      onPick: async (v) => { if (v && surface?.setCondition(nodeId, rewriteEnumValue(fix.src, fix.bad, v))) { await save(); await refreshProblems(); } },
+    openValuePicker({
+      anchor, title: `Instead of “${fix.bad}”`, values: fix.options,
+      onPick: async (v) => { if (surface?.setCondition(nodeId, rewriteEnumValue(fix.src, fix.bad, v))) { await save(); await refreshProblems(); } },
     });
     return;
   }
   const res = await window.patter.applyFix(fix); // add-to-cast / declare-property (project-file writes)
-  if (fix.kind === "declare-property") void refreshPatterProps(); // the navigator's count just moved
-  if (res.ok) await refreshProblems(); // re-validate: the fixed problem (and its squiggle) drops out
-  else console.error("Quick-fix failed:", res.error);
+  if (!landed(res, "Couldn't apply the fix")) return;
+  if (fix.kind === "declare-property") {
+    void refreshPatterProps(); // the navigator's count just moved
+    // And the condition and effects editors learn the new property now, not at the next scene load.
+    const st = await window.patter.readSettings();
+    if (st) sceneProps = [...st.properties.map((d) => declToConditionProperty("patter", d)), ...sceneProps.filter((p) => p.scope === "scene")];
+  }
+  await refreshProblems(); // re-validate: the fixed problem (and its squiggle) drops out
 }
 
 /** Register a brand-new character (from the cue popup's "+ Add") in the project master cast, so it persists
@@ -1093,7 +1111,7 @@ async function registerCharacter(name: string): Promise<void> {
   if (!project || !n) return;
   if (project.cast.some((c) => c.toLowerCase() === n.toLowerCase())) return; // already in the master cast
   const res = await window.patter.applyFix({ kind: "add-to-cast", character: n });
-  if (!res.ok) { console.error("Add character to cast failed:", res.error); return; }
+  if (!landed(res, `Couldn't add ${n} to the cast`)) return;
   project.cast = [...project.cast, n]; // keep castSeed / spell-check in sync without a reload
   await buildSpellcheck();
   await refreshProblems();
@@ -1118,8 +1136,14 @@ function spellingProblems(): Problem[] {
 function renderProblems(dto: ProblemsDto): void {
   // Flow-validation problems (from the validator) + the open scene's spelling issues (#177), combined for
   // the problems bar. Spelling is editorial (info) and never blocks a build.
-  problems = [...dto.problems, ...spellingProblems()];
-  problemAt = 0;
+  // Stay on the problem being looked at: this runs at every typing pause and every save, and starting
+  // again from the first sent anyone stepping through the list back to the top each time they typed.
+  // The same problem is the same node and message; when it has gone (fixed), the one now in its place.
+  const was = problems[problemAt];
+  const next = [...dto.problems, ...spellingProblems()];
+  const same = was ? next.findIndex((q) => q.nodeId === was.nodeId && q.message === was.message) : -1;
+  problems = next;
+  problemAt = same >= 0 ? same : Math.min(problemAt, Math.max(0, problems.length - 1));
   applyProblemMarks(); // inline squiggles at the offending sites
   paintProblems();     // hides itself when the list is empty
 }
@@ -1163,7 +1187,7 @@ async function persistDocs(): Promise<void> {
   if (!docsDirty || !currentSceneId) return;
   docsDirty = false;
   const res = await window.patter.saveDocs(currentSceneId, docMap);
-  if (!res.ok) { docsDirty = true; console.error("Save notes failed:", res.error); }
+  if (!landed(res, "Couldn't save the notes")) docsDirty = true;
 }
 
 // Which documentation CLASSES the editor surfaces (View > Documentation). "everyone" + untyped are always
@@ -1171,31 +1195,23 @@ async function persistDocs(): Promise<void> {
 let docHidden = new Set<string>();
 const docVisible = (cls: string): boolean => cls === "" || cls === "everyone" || !docHidden.has(cls);
 
-/** Open the documentation-note editor (modal) for a node - from the surface note icon or a right-click
- *  "Note…". `kind` (the node kind) narrows which classes are offered. Persists + re-surfaces on close. */
-function openNoteEditor(id: string, _anchor: HTMLElement, kind?: string): void {
-  // A modal rather than a cramped anchored popover, so there is room to type; a text area per class.
-  const frame = dialogFrame({
-    title: "Notes", className: "doc-dialog",
-    onClose: () => {
+/** Open the Notes editor (modal) for a node: the family's, the shell's `openNotesEditor` (ruling I of the
+ *  October 2026 review), which was taken from this app's own and had drifted from it. `kind` (the node kind)
+ *  narrows which classes are offered; `focus` opens on one class (Needs re-record asks for a VO note). The
+ *  edit commits once, on close, and re-surfaces in the script and the inspector. */
+function openNoteEditor(id: string, _anchor: HTMLElement, kind?: string, focus?: string): void {
+  openNotesEditor({
+    sub: "A VO note travels with the voice script, a Localisers note with the localisation handoff, and an Editors note with an editable script. An untyped note stays in Patterpad.",
+    notes: { own: docMap[id] ?? [], classes: docClassesForKind(kind).map((c) => c.name) },
+    ...(focus !== undefined ? { focus } : {}),
+    save: (lines) => {
+      if (lines.length) docMap[id] = lines; else delete docMap[id];
+      docsDirty = true;
       pushDocNotes();   // reflect the edit in the script (the note icon appears / updates / clears)
       lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // flip the inspector note icon
       void persistDocs();
     },
   });
-  const host = el("div", "doc-host");
-  frame.body.append(
-    el("p", "settings-note", "A VO note travels with the voice script and a Localisation note with the localisation handoff. An untyped note stays in the editor."),
-    host,
-  );
-  mountDocEditor(host, {
-    lines: docMap[id] ?? [], classes: docClassesForKind(kind),
-    onChange: (lines) => { if (lines.length) docMap[id] = lines; else delete docMap[id]; docsDirty = true; },
-  });
-  const done = dialogButton("Done", true);
-  done.addEventListener("click", () => frame.close());
-  frame.actions.append(done);
-  frame.open();
 }
 
 /** Build the surface's visible-notes map from the scene's docMap, applying the class filter. */
@@ -1233,7 +1249,7 @@ async function persistComments(): Promise<void> {
   commentsDirty = false;
   syncCommentRanges();
   const res = await window.patter.saveComments(currentSceneId, comments);
-  if (!res.ok) { commentsDirty = true; console.error("Save comments failed:", res.error); }
+  if (!landed(res, "Couldn't save the comments")) commentsDirty = true;
 }
 
 /** Push the comment threads to the surface (range threads highlight + fly a bubble; whole-beat threads
@@ -1535,7 +1551,7 @@ function setNeedsRerecord(id: string, on: boolean): void {
   void window.patter.saveRerecord(currentSceneId, rerecordMap);
   const ctx = lastInspectorCtx;
   if (ctx && ctx.levels.some((l) => (l as { id?: string }).id === id)) { lastInspectorSig = null; showInspector(ctx); }
-  if (on && !hasVoNote(id)) openNoteEditor(id, document.body, "line"); // prompt for the "why", pre-focused on VO
+  if (on && !hasVoNote(id)) openNoteEditor(id, document.body, "line", "vo"); // prompt for the "why", opened on the VO note
 }
 
 // --- "suggest a rewrite" proposals (review flow) -----------------------------
@@ -1551,7 +1567,7 @@ async function persistSuggestions(): Promise<void> {
   if (!suggestionsDirty || !currentSceneId) return;
   suggestionsDirty = false;
   const res = await window.patter.saveSuggestions(currentSceneId, suggestions);
-  if (!res.ok) { suggestionsDirty = true; console.error("Save suggestions failed:", res.error); }
+  if (!landed(res, "Couldn't save the suggestions")) suggestionsDirty = true;
 }
 
 /** Push the visible proposals to the surface: a beat with an open (or, when toggled, resolved) proposal
@@ -1661,7 +1677,9 @@ async function flushReview(): Promise<void> {
 /** Read every comment + suggestion across the script for the walk (disk is current - flushReview flushed).
  *  The "Show Resolved" toggles ride along, so resolved items join the loop exactly when they are shown. */
 async function gatherReview(): Promise<void> {
-  reviewItems = currentSceneId
+  // Feedback is project-wide, so it is gathered whenever a project is open: asked only with a scene open,
+  // the walk said "No open comments or suggestions" on the Properties page however many there were.
+  reviewItems = project
     ? await window.patter.reviewFeedback({ resolvedComments: showResolved, resolvedSuggestions: showResolvedSuggestions })
     : [];
   if (reviewAt >= reviewItems.length) reviewAt = 0;
@@ -1669,7 +1687,7 @@ async function gatherReview(): Promise<void> {
 }
 
 function renderReviewBar(): void {
-  if (!showReviewFeedback) { reviewbarEl.hidden = true; return; }
+  if (!showReviewFeedback || !barsBelongHere()) { reviewbarEl.hidden = true; return; }
   renderStepperBar(reviewbarEl, {
     items: reviewItems.map((item) => ({
       kind: item.kind === "comment" ? "Comment" : "Rewrite",
@@ -1746,9 +1764,8 @@ function showInspector(ctx: InspectorContext): void {
   lastInspectorCtx = ctx; // so the global pills/text toggle can re-render this same view in place
   // onSelect fires on every selection move AND every doc edit (typing). The inspector only shows a
   // projection of the caret's container stack, so skip the (pill-rebuilding) teardown when nothing it
-  // displays has changed - e.g. typing dialogue text doesn't touch the shown fields. preferText is in
-  // the signature so the pills/text toggle still forces a re-theme.
-  const sig = `${preferText ? "t" : "p"}|${JSON.stringify(ctx.levels)}`;
+  // displays has changed - e.g. typing dialogue text doesn't touch the shown fields.
+  const sig = JSON.stringify(ctx.levels);
   if (sig === lastInspectorSig) return;
   lastInspectorSig = sig;
   const nodeLabel = (nid: string): string => surface?.jumpTargets().find((t) => t.id === nid)?.label ?? nid;
@@ -1756,9 +1773,8 @@ function showInspector(ctx: InspectorContext): void {
     reveal: (id) => { surface?.revealNode(id); },
     editNote: (id, anchor, kind) => openNoteEditor(id, anchor, kind), // title-bar note icon -> notes modal
     hasNotes: (id) => (docMap[id]?.length ?? 0) > 0,                   // filled vs outline note icon
-    textMode: () => preferText,
     editCondition: (id, src, anchor) => openConditionEditor({
-      anchor, src, properties: sceneProps, text: preferText,
+      anchor, src, properties: sceneProps,
       pickNode: (a, current, onPick) => surface?.pickNode({ anchor: a, current, onPick }),
       nodeLabel,
       onChange: (next) => { surface?.setCondition(id, next); },
@@ -1769,14 +1785,11 @@ function showInspector(ctx: InspectorContext): void {
     editGroupProps: (id, patch) => { surface?.setGroupProps(id, patch); },
     editJump: (id, _current, anchor) => surface?.editJump(id, anchor),
     setJumpMode: (id, mode) => { surface?.setJumpMode(id, mode); },
-    editEffects: (id, onEnter, onExit, anchor, phase) => openEffectsEditor({ anchor, onEnter, onExit, ...(phase ? { phase } : {}), properties: sceneProps, text: preferText, // The editor's effect union still carries `emit`; Patter's does not (effects are set-only, and host
+    editEffects: (id, onEnter, onExit, anchor, phase) => openEffectsEditor({ anchor, onEnter, onExit, ...(phase ? { phase } : {}), properties: sceneProps, // The editor's effect union still carries `emit`; Patter's does not (effects are set-only, and host
 // events ride gameData), so narrow rather than cast. Nothing in this dialect can produce an emit, so
 // the filter is a no-op at runtime and the types stop lying about it.
 onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e.kind === "set")); } }),
     jumpLabel: (id) => surface?.jumpTargets().find((t) => t.id === id)?.label ?? id,
-    addOption: (choiceId) => { surface?.addOption(choiceId); },
-    removeChunk: (id) => { surface?.deleteChunk(id); },
-    moveChunk: (id, dir) => { surface?.moveChunk(id, dir); },
     gameDataFields: (kind) => project?.gameDataFields[kind] ?? [],
     setGameData: (id, key, value) => { surface?.setGameData(id, key, value); },
     setTags: (id, tags) => { surface?.setTags(id, tags); }, // author tags (#215)
@@ -1824,18 +1837,36 @@ async function save(): Promise<void> { await saver.flush(); }
  *  skips the scene already open, and would save the stale surface over the rewrite on its way out, so the
  *  surface is dropped WITHOUT saving: the caller had the editor flush before main wrote, so there is
  *  nothing in it the files do not already hold. The caret comes back where it was. */
-async function reloadOpenScene(): Promise<void> {
-  const sceneId = currentSceneId;
-  if (!sceneId) return;
-  const caret = caretNodeId ?? undefined;
-  saver.cancel();
-  surface?.destroy();
-  surface = null;
-  currentSceneId = null;
-  await loadScene(sceneId, caret ? { restoreCaret: caret } : undefined);
+function reloadOpenScene(): Promise<void> {
+  return queueScene(async () => {
+    const sceneId = currentSceneId;
+    if (!sceneId) return;
+    const caret = caretNodeId ?? undefined;
+    saver.cancel();
+    surface?.destroy();
+    surface = null;
+    currentSceneId = null;
+    await loadSceneNow(sceneId, caret ? { restoreCaret: caret } : undefined);
+  });
 }
 
-async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
+// Every scene load, and the reload, runs one at a time. A load takes several IPC round trips before it
+// sets `currentSceneId`, and two started together (Play's mark and its "Follow in the editor" arrive from
+// one handler; two quick navigator clicks) both reached `mountSurface`: the scene showed twice, the first
+// surface leaked, and what was typed into it was never saved. Queued, the second finds its scene already
+// open and returns. Nothing a load runs may call `loadScene` itself, or the queue would wait on itself.
+let sceneQueue: Promise<void> = Promise.resolve();
+function queueScene(run: () => Promise<void>): Promise<void> {
+  const next = sceneQueue.then(run, run);
+  sceneQueue = next.catch(() => {}); // a failed load must not wedge every load after it
+  return next;
+}
+
+function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
+  return queueScene(() => loadSceneNow(sceneId, opts));
+}
+
+async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): Promise<void> {
   if (!project || sceneId === currentSceneId) return;
   // Opening a scene is the one funnel every route into the editor goes through (the navigator, a
   // search jump, play-follow, the restore), so it is where the Properties document gets left - and
@@ -1860,16 +1891,27 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
   editorEl.replaceChildren();
   lastInspectorSig = null; // force the first selection in the new scene to render (don't match the old scene's)
 
-  const { flowSource, locSource, properties, hostScopes } = await window.patter.readScene(sceneId);
+  // The scene's reads are independent, so they go out together rather than one round trip after another.
+  const [scene, docs, sceneComments, sceneSuggestions, writing, recording, rerecord, audio] = await Promise.all([
+    window.patter.readScene(sceneId),
+    window.patter.readDocs(sceneId),           // typed documentation for this scene
+    window.patter.readComments(sceneId),       // threaded comments for this scene
+    window.patter.readSuggestions(sceneId),    // rewrite proposals for this scene
+    window.patter.readWriting(sceneId),        // per-beat writing status for this scene (#196)
+    window.patter.readRecording(sceneId),      // per-beat manual recording status (#206)
+    window.patter.readRerecord(sceneId),       // per-line "needs re-record" flags (#227)
+    project.audioFolders ? window.patter.audioCurrent() : Promise.resolve(undefined), // folder-derived status (#206)
+  ]);
+  const { flowSource, locSource, properties, hostScopes } = scene;
   sceneProps = properties; // referenceable properties for this scene's condition editor
   setHostScopeTokens(hostScopes); // the editors' parser knows @world, an imported @story, and the rest
-  docMap = await window.patter.readDocs(sceneId); docsDirty = false; // typed documentation for this scene
-  comments = await window.patter.readComments(sceneId); commentsDirty = false; // threaded comments for this scene
-  suggestions = await window.patter.readSuggestions(sceneId); suggestionsDirty = false; // rewrite proposals for this scene
-  writingMap = await window.patter.readWriting(sceneId); // per-beat writing status for this scene (#196)
-  recordingMap = await window.patter.readRecording(sceneId); // per-beat manual recording status (#206)
-  rerecordMap = await window.patter.readRerecord(sceneId);    // per-line "needs re-record" flags (#227)
-  if (project?.audioFolders) audioIndex = await window.patter.audioCurrent(); // folder-derived status (#206)
+  docMap = docs; docsDirty = false;
+  comments = sceneComments; commentsDirty = false;
+  suggestions = sceneSuggestions; suggestionsDirty = false;
+  writingMap = writing;
+  recordingMap = recording;
+  rerecordMap = rerecord;
+  if (audio !== undefined) audioIndex = audio;
   sceneEdited = false;  // fresh scene: not edited until the user touches it
   mountingScene = true; // the mount's initial-mirror onChange is not a user edit
   surface = mountSurface({
@@ -1895,6 +1937,9 @@ async function loadScene(sceneId: string, opts?: { restoreCaret?: string }): Pro
     onSetWritingStatus: (ids, status) => setLineStatus(ids, status), // "Status" submenu sets the writing status (#196)
     onDuplicate: (idMap) => carryDuplicatedMetadata(idMap), // Duplicate: carry status + notes to the copies
     onAddCharacter: (name) => void registerCharacter(name), // "+ Add" in the cue popup persists to the master cast
+    // An edit the surface refused because it would lose structure (a condition, effects, a jump, a whole
+    // choice): one finished sentence saying what and what to do instead (ruling D, October 2026 review).
+    onRefuse: (message) => toast(message, "info"),
   });
   mountingScene = false; // any onChange from here on is a real edit
   currentSceneId = sceneId;
@@ -2004,12 +2049,14 @@ function openTagBrowse(): void {
 async function showProject(open: OpenResult): Promise<void> {
   project = open.project;
   debugLink.setVisible(true); // the bottom-right live-debug-link control is available once a project is open
-  saver.setAuto(project.autosave); // the project's setting (default on); off stops the clock, not the flushes
   projectNameEl.textContent = project.name;
   // Two projects can share a name; the disk path is what tells them apart. The topbar name carries it
   // as a tooltip, and the overview shows it in full (with a click-to-reveal).
   projectNameEl.dataset.tip = project.root;
   currentSceneId = null;
+  // Back and Forward are journeys inside ONE project: carried over, Back landed on this project's overview
+  // or Properties page, places never visited in it.
+  history.clear(); paintHistory();
   await buildSpellcheck(); // build the spell engine before the first scene mounts (#177); it pushes on mount
   await refreshPatterProps(); // the navigator's Properties row carries a count, from the first paint
   // A project opened with a remembered scene drops straight into it; a never-opened one lands on the
@@ -2048,6 +2095,10 @@ function showSceneChrome(): void {
   toggleInspectorEl.hidden = false;
   playTopEl.hidden = false;
   healthEl.hidden = false;
+  // The two bars too: the overview and the Properties page hide them, and nothing brought them back until
+  // an edit happened to revalidate. Painting from what is already known shows them as they were.
+  paintProblems();
+  renderReviewBar();
 }
 
 // --- project overview (#3a) --------------------------------------------------
@@ -2072,8 +2123,11 @@ async function showOverview(): Promise<void> {
   renderOverview();
   paintHistory();
   signalReady();          // the overview (scene index) is up - safe to reveal the window (no-op if already)
+  const asked = project.root; // the project, by its folder: the summary object is replaced by ordinary saves
   const data = await window.patter.report();
-  if (data && !overviewEl.hidden) fillOverviewStats(data); // ignore if we already navigated away
+  // Ignore it if we navigated away, or if a different project opened while the report was being made:
+  // its numbers are the old project's.
+  if (data && project?.root === asked && !overviewEl.hidden) fillOverviewStats(data);
 }
 
 // --- the Properties document -------------------------------------------------
@@ -2110,8 +2164,10 @@ async function savePropsDoc(): Promise<void> {
   if (sig === propsSavedSig) return; // nothing settled that was not already saved
   const s = await window.patter.readSettings();
   if (!s) return;
+  // Only the properties changed, so only what reads them is refreshed: rebuilding the spell checker and
+  // the writing-status ladder after every settled edit on this page cost a dictionary build each time.
+  if (!(await saveProjectSettings({ ...s, properties: next }, { propertiesOnly: true }))) return; // refused: try again next edit
   propsSavedSig = sig;
-  await saveProjectSettings({ ...s, properties: next });
   patterProps = next;
   paintPropsCount();
 }
@@ -2162,6 +2218,9 @@ async function leavePropertiesDoc(): Promise<void> {
   editorEl.hidden = false;
   shell.holdClosed("inspector", false); // back to whatever was remembered
   navListEl.querySelector(".nav-doc")?.classList.remove("active");
+  // The page hid the bars; with it gone they come back (each stays hidden if the workspace isn't up yet).
+  paintProblems();
+  renderReviewBar();
 }
 
 /** Build the scene index + a placeholder stats line (the real counts arrive async from the report). */
@@ -2229,19 +2288,16 @@ async function hydrateProject(): Promise<void> {
  *  (from-storylets/close-project). The window stays: this is Close PROJECT, not the Close Window
  *  neither app offers.
  *
- *  What the welcome is FOR here is Open, New and recents. It offers no examples and no tour: the
- *  brief this came from was written around Storyletter's three shipped example projects, and the
- *  wording followed it across when this app has no such row (from-storylets/welcome-screen-shape).
- *
- *  Boot state is re-read rather than reused, so the welcome's recents list carries the project just
- *  closed at the top - the point of closing is usually to open something else. */
+ *  The recents are re-read rather than reused, so the welcome's list carries the project just closed at
+ *  the top - the point of closing is usually to open something else. Read with `recents()`, not
+ *  `boot()`, which would also take a pending launch path and open a project nobody shows. */
 async function closeProject(): Promise<void> {
   if (!project) return;
   if (surface) await save();      // files are the truth - flush before letting go of the project
   await persistDocs(); await persistComments();
   flushRemember();                // and record where the author was, for when they come back
   await window.patter.closeProject();
-  showWelcome(await window.patter.boot());
+  showWelcome({ recents: await window.patter.recents() });
 }
 
 function showWelcome(state: Pick<BootState, "recents">): void {
@@ -2251,11 +2307,13 @@ function showWelcome(state: Pick<BootState, "recents">): void {
   surface?.destroy(); surface = null; project = null; currentSceneId = null;
   debugLink.setVisible(false); // no project -> hide the live-debug-link control
   titleObserver?.disconnect(); titleObserver = null; sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene -> no suffix
-  vcMap.clear(); vcsSceneEl.hidden = true; panesEl.classList.remove("vcs-readonly"); shell.centre.querySelector(":scope > .vc-lock")?.remove(); // no project -> no VC state
+  vcMap.clear(); vcsSceneEl.hidden = true; shell.centre.querySelector(":scope > .vc-lock")?.remove(); // no project -> no VC state
   comments = []; commentsDirty = false; // no project -> no comments
   suggestions = []; suggestionsDirty = false; // no project -> no suggestions
   reviewItems = []; reviewbarEl.hidden = true; // no project -> no feedback walk
   void leavePropertiesDoc();
+  setWritingView(false); // the mode belongs to a project: left on, the welcome kept the dimmed title bar and the exit pill
+  history.clear(); paintHistory(); // and the journey belongs to it too: with nothing open, there is nowhere to go back to
   panesEl.hidden = true; overviewEl.hidden = true; welcomeEl.hidden = false;
   problembarEl.hidden = true; inspectorStackEl.replaceChildren(); lastInspectorCtx = null; lastInspectorSig = null; // no script -> nothing to inspect
   toggleNavEl.hidden = true; toggleInspectorEl.hidden = true; playTopEl.hidden = true; healthEl.hidden = true;
@@ -2327,7 +2385,7 @@ async function openReport(): Promise<void> {
   more.type = "button";
   more.setAttribute("aria-label", "Scroll for more");
   more.dataset.tip = "More below";
-  more.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 6 L8 11 L13 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  more.append(iconNode("down", 14)); // the family's drawn chevron, not one of our own
   scroll.append(host, more);
   frame.body.append(scroll);
   renderReport(host, data);
@@ -2362,12 +2420,7 @@ function openVoiceScript(): void {
   if (!project.voiced) { toast("Voice scripts are only available for a voiced project (Project Settings ▸ Voiced)."); return; } // #206
   // A recording spreadsheet (spec §16).
   const frame = dialogFrame({ title: "Export voice script", sub: "One row per spoken line, with its scope and VO notes.", className: "vo-dialog" });
-  const everything = el("input");
-  everything.type = "checkbox";
-  const toggle = el("label", "settings-toggle");
-  const words = el("span", undefined, "Export everything");
-  words.append(el("small", undefined, "Includes lines not yet marked ready to record."));
-  toggle.append(everything, words);
+  const { row: toggle, input: everything } = labelledToggle("Export everything", { hint: "Includes lines not yet marked ready to record." });
   const status = el("p", "settings-note");
   frame.body.append(toggle, status);
   const cancel = dialogButton("Cancel");
@@ -2378,7 +2431,7 @@ function openVoiceScript(): void {
     const res = await withJob("Exporting the voice script…", () => window.patter.exportVoiceScript(everything.checked));
     if (res.ok) { frame.close(); toast(`Voice script exported to ${res.path}`, "ok"); } // done -> close, confirm via toast
     else if (res.canceled) status.textContent = "";
-    else status.textContent = `Export failed: ${res.error ?? "unknown error"}`;
+    else status.textContent = `Couldn't export. ${res.error ?? "Try again, and check the file isn't locked in version control."}`;
   })());
   frame.actions.append(cancel, go);
   frame.open();
@@ -2416,7 +2469,7 @@ async function openLocalisation(): Promise<void> {
     const res = await withJob("Exporting localisation…", () => window.patter.exportLoc({ format, locale }));
     if (res.ok) status.textContent = `Exported to ${res.path}`;
     else if (res.canceled) status.textContent = "";
-    else status.textContent = `Export failed: ${res.error ?? "unknown error"}`;
+    else status.textContent = `Couldn't export. ${res.error ?? "Try again, and check the file isn't locked in version control."}`;
   })());
   importBtn.addEventListener("click", () => void (async () => {
     const fallback = localeSel.value || undefined; // used when the file carries no locale (Excel)
@@ -2442,7 +2495,7 @@ async function exportProductionInfo(btn?: HTMLButtonElement): Promise<void> {
   if (res.ok) {
     if (btn) { const prev = btn.textContent; btn.replaceChildren("Exported", iconNode("tick", 12)); btn.disabled = true;
       setTimeout(() => { btn.textContent = prev; btn.disabled = false; }, 1600); }
-  } else if (res.error) console.error("Export production info failed:", res.error);
+  } else if (res.error) landed(res, "Couldn't export the production information");
 }
 
 /** Edit > Show Card in Storyletter: the storylet card the open scene plays, in the paired project. */
@@ -2468,7 +2521,7 @@ async function buildBundle(): Promise<void> {
     const where = relToProject(res.path);
     const pinned = res.pinned ? `\nPinned ${plural(res.pinned, "Game ID")} that followed a name` : "";
     toast(`Bundle published\n${where}${pinned}`, "ok");
-  } else toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
+  } else landed({ ok: false, ...(res.error ? { error: res.error } : {}) }, "Couldn't publish");
 }
 
 /** Production ▸ Update Audio Manifest (#206): rewrite the sidecar patteraudio.json from the audio folders. */
@@ -2489,7 +2542,7 @@ async function exportScript(): Promise<void> {
   if (res.ok) {
     const where = relToProject(res.path);
     toast(`Script published\n${where}`, "ok");
-  } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
+  } else if (!res.canceled) landed({ ok: false, ...(res.error ? { error: res.error } : {}) }, "Couldn't publish");
 }
 
 /** What the editable-script dialogs need from the editor. */
@@ -2518,7 +2571,7 @@ async function exportPatterpack(): Promise<void> {
   if (res.ok) {
     const where = relToProject(res.path);
     toast(`Patterpack exported\n${where}`, "ok");
-  } else if (!res.canceled) toast(res.error ? `Export failed: ${res.error}` : "Export failed", "error");
+  } else if (!res.canceled) landed({ ok: false, ...(res.error ? { error: res.error } : {}) }, "Couldn't export");
 }
 
 /** File ▸ Open Patterpack: pick a `.patterpack` file, choose a destination folder, unpack, and switch to
@@ -2554,7 +2607,7 @@ function confirmPackMerge(summary: PackMergeSummary): Promise<boolean> {
     gameScopes?.error
       ? `They changed the World properties, but ${gameScopes.path} won't parse, so their change will not be written there: ${gameScopes.error}`
       : gameScopes ? `They changed the World properties, so ${gameScopes.path}, which the game's other tools share, will take their change too.` : "",
-    "It cannot be undone from the Edit menu.",
+    "You can't undo this.",
   ].filter(Boolean);
   const evidence = el("div", "merge-evidence");
   evidence.append(...lines.map((t) => el("p", "confirm-body", t)));
@@ -2595,8 +2648,12 @@ async function mergePatterpack(): Promise<void> {
 
   project = r.project;
   renderNav();
-  if (currentSceneId && project.scenes.some((sc) => sc.id === currentSceneId)) await loadScene(currentSceneId);
+  // The open scene RE-READ, sidecars and all: `loadScene` returns at once for the scene already open, so
+  // the editor kept the pre-merge text and comments, and the first edit autosaved them over the merge.
+  if (currentSceneId && project.scenes.some((sc) => sc.id === currentSceneId)) await reloadOpenScene();
   else if (project.scenes[0]) await loadScene(project.scenes[0].id); // their pack deleted the scene we were in
+  void refreshProblems();
+  void refreshVcStatus();
 
   const added = r.summary.shards.filter((sh) => sh.added).length;
   const merged = r.summary.shards.length - added;
@@ -2620,7 +2677,7 @@ async function exportWeb(): Promise<void> {
   const res = await withJob("Publishing for the web…", () => window.patter.exportWeb());
   if (res.ok) {
     toast(res.kept?.length ? `Story updated\nKept your ${res.kept.join(" + ")}` : `Web page published\n${res.path ?? ""}`, "ok");
-  } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
+  } else if (!res.canceled) landed({ ok: false, ...(res.error ? { error: res.error } : {}) }, "Couldn't publish");
 }
 
 /** Publish ▸ Publish Playable HTML: write a single self-contained `.html` (runtime + story inlined) that
@@ -2631,7 +2688,7 @@ async function exportPlayableHtml(): Promise<void> {
   if (res.ok) {
     const where = relToProject(res.path);
     toast(`Playable HTML published\n${where}`, "ok");
-  } else if (!res.canceled) toast(res.error ? `Publish failed: ${res.error}` : "Publish failed", "error");
+  } else if (!res.canceled) landed({ ok: false, ...(res.error ? { error: res.error } : {}) }, "Couldn't publish");
 }
 
 // --- Project Settings (File > Project Settings…) -------------------------------
@@ -2645,7 +2702,7 @@ let settingsRead: SettingsRead | null = null;
 /** The controls and editors of the OPEN dialog, filled by each section's mount() and read by Save. */
 interface LiveSettings {
   name: HTMLInputElement; start: HTMLSelectElement;
-  voiced: HTMLInputElement; formatting: HTMLInputElement; autosave: HTMLInputElement; autoRebuild: HTMLInputElement;
+  voiced: HTMLInputElement; formatting: HTMLInputElement;
   build: HTMLInputElement; buildLocales: HTMLSelectElement; buildSourceDebug: HTMLInputElement;
   vcs: HTMLSelectElement;
   ccOpen: HTMLInputElement; ccClose: HTMLInputElement; ccCharacter: HTMLInputElement;
@@ -2658,16 +2715,13 @@ let live: Partial<LiveSettings> = {};
 
 // The small field kit the static markup used to spell out: a captioned field, a checkbox row with its
 // sub-line, and the two kinds of note.
-const sField = (caption: string, control: HTMLElement, ...notes: HTMLElement[]): HTMLLabelElement => {
-  const l = el("label", "identity-field"); l.append(caption, control, ...notes); return l;
-};
-const sToggle = (label: string, sub: string, checked: boolean, cls = "settings-toggle"): { row: HTMLLabelElement; input: HTMLInputElement } => {
-  const row = el("label", cls);
-  const input = el("input"); input.type = "checkbox"; input.checked = checked;
-  const cap = el("span"); cap.append(label, el("small", undefined, sub));
-  row.append(input, cap);
-  return { row, input };
-};
+// The family's settings rows (ruling C of the October 2026 review): the shell's `labelled` and
+// `labelledToggle`, as Storyletter's settings use, so the two apps' dialogs look the same. Caption on the
+// left, control inline, any explanation underneath.
+const sField = (caption: string, control: HTMLElement, ...notes: HTMLElement[]): HTMLElement =>
+  labelled(caption, control, notes.length ? notes.flatMap((n) => [...n.childNodes]) : undefined);
+const sToggle = (label: string, sub: string, checked: boolean, cls = "settings-toggle"): { row: HTMLElement; input: HTMLInputElement } =>
+  labelledToggle(label, { checked, hint: sub, sub: cls.includes("settings-suboption") });
 const sNote = (cls: string, ...parts: Array<string | Node>): HTMLElement => { const n = el(cls === "settings-note" ? "p" : "small", cls); n.append(...parts); return n; };
 const code = (text: string): HTMLElement => el("code", undefined, text);
 const bold = (text: string): HTMLElement => el("b", undefined, text);
@@ -2678,6 +2732,12 @@ const sSelect = (options: Array<[string, string]>, value: string, cls?: string):
   return sel;
 };
 const VCS_OPTIONS: Array<[string, string]> = [["git", "Git"], ["perforce", "Perforce"], ["plastic", "Plastic SCM"], ["svn", "Subversion (SVN)"], ["none", "None"]];
+/** The bundle path's explanation, said once for both places that ask for it (Project Settings and New
+ *  Project), under the name Storyletter gives the same setting. */
+const bundlePathHint = (): (string | HTMLElement)[] => [
+  "Where Publish ▸ Publish Bundle writes the ", code(".patterc"), ", relative to the project folder. The default is a ",
+  code("patter-dist/"), " folder beside it.",
+];
 const DUP_MESSAGE = "Two entries share a name. Names must be unique.";
 
 const settingsDlg = mountSettingsDialog({
@@ -2693,11 +2753,9 @@ const settingsDlg = mountSettingsDialog({
       // below), and flipping it here updates the tab without reopening.
       voiced.input.addEventListener("change", () => settingsDlg.refreshTabs());
       const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and narration.", s.formatting);
-      const autosave = sToggle("Autosave", "Saves the open scene a moment after you stop typing.", s.autosave);
-      const autoRebuild = sToggle("Auto rebuild", "Recompiles the .patterc bundle as your edits settle.", s.autoRebuild);
       host.append(sField("Project name", name), sField("Start", start, sNote("settings-fieldnote", "The scene Play from Start opens.")),
-        voiced.row, formatting.row, autosave.row, autoRebuild.row);
-      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input, autosave: autosave.input, autoRebuild: autoRebuild.input });
+        voiced.row, formatting.row);
+      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input });
       // A blank name used to close the dialog and drop every other edit with it (parity row 7); now it
       // is the fault the gate names.
       return { firstInvalid: () => name.value.trim() ? null : { el: name, message: "Give the project a name." } };
@@ -2711,7 +2769,7 @@ const settingsDlg = mountSettingsDialog({
       const syncRows = (): void => { sourceDebug.row.hidden = buildLocales.value !== "ids"; };
       buildLocales.addEventListener("change", syncRows); syncRows();
       host.append(
-        sField("Build output", build, sNote("identity-hint", "Where Publish ▸ Publish Bundle writes the ", code(".patterc"), ", relative to the project root. The default is a sibling ", code("patter-dist/"), " folder.")),
+        sField("Bundle path", build, sNote("identity-hint", ...bundlePathHint())),
         sField("Localisation", buildLocales, sNote("identity-hint", bold("Embedded"), " ships every language in the bundle and the runtime returns the right string. ", bold("IDs only"), " ships no text, so the runtime returns the line ID and your game looks it up.")),
         sourceDebug.row);
       Object.assign(live, { build, buildLocales, buildSourceDebug: sourceDebug.input });
@@ -2734,10 +2792,10 @@ const settingsDlg = mountSettingsDialog({
       // a capital is folded away); the field's own rollover says which fault, so the line repeats it.
       return { firstInvalid: () => {
         const dup = world.firstDuplicate(); if (dup) return { el: dup, message: DUP_MESSAGE };
-        const bad = world.firstIllegalName(); return bad ? { el: bad, message: bad.title || "That property name cannot be used in an expression." } : null;
+        const bad = world.firstIllegalName(); return bad ? { el: bad, message: bad.title || "That property name can't be used in an expression." } : null;
       } };
     } },
-    { id: "gamedata", label: "Game data", mount: (host): SettingsSectionHandle => {
+    { id: "gamedata", label: "Game Data", mount: (host): SettingsSectionHandle => {
       host.append(sNote("settings-note", "Fields your game reads from a scene, block, snippet, or line. Define them here and fill them in from the inspector."));
       const gdHost = el("div"); host.append(gdHost);
       const gd = mountGameDataFields(gdHost, settingsRead!.s.gameDataFields);
@@ -2762,7 +2820,7 @@ const settingsDlg = mountSettingsDialog({
       live.estimating = mountEstimating(estHost, s.estimating, s.writingStatuses);
       return {};
     } },
-    { id: "recording-status", label: "Audio status", mount: (host): SettingsSectionHandle => {
+    { id: "recording-status", label: "Recording status", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       const audioHost = el("div"); host.append(audioHost);
       live.audio = mountAudio(audioHost, { trackAudioStatus: s.trackAudioStatus, statuses: s.recordingStatuses, audioFolders: s.audioFolders, audioRoot: s.audioRoot, scratchStatus: s.scratchStatus });
@@ -2808,7 +2866,7 @@ const settingsDlg = mountSettingsDialog({
       return {};
     } },
   ],
-  onSave: () => saveSettingsFromDialog(),
+  onSave: () => saveSettingsFromDialog(), // false (a refused write) keeps the dialog open with the edits in it
 });
 
 /** File > Project Settings: read the project-level settings, open the dialog on a tab (General by default;
@@ -2823,15 +2881,15 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   if (initialTab === "general") setTimeout(() => live.name?.focus(), 0);
 }
 
-/** Save is clicked and every section's gate passed: read the sections back and persist. */
-async function saveSettingsFromDialog(): Promise<void> {
+/** Save is clicked and every section's gate passed: read the sections back and persist. False when the
+ *  write was refused, which keeps the dialog open with the edits in it. */
+async function saveSettingsFromDialog(): Promise<boolean> {
   const read = settingsRead;
   const l = live as LiveSettings; // every section mounted on open(), so every handle is set
-  if (!read || !l.name) return;
-  await saveProjectSettings({
+  if (!read || !l.name) return true;
+  return saveProjectSettings({
     name: l.name.value.trim(), vcs: l.vcs.value as VcsKind, ...(l.start.value ? { start: { scene: l.start.value } } : {}),
-    voiced: l.voiced.checked, formatting: l.formatting.checked, autosave: l.autosave.checked,
-    autoRebuild: l.autoRebuild.checked,
+    voiced: l.voiced.checked, formatting: l.formatting.checked,
     closedCaptions: { open: l.ccOpen.value, close: l.ccClose.value, character: l.ccCharacter.value.trim() },
     buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
     ...l.langs.value(), gameDataFields: l.gd.value(),
@@ -2842,11 +2900,13 @@ async function saveSettingsFromDialog(): Promise<void> {
   });
 }
 
-async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
+/** Save the project's settings; false (after saying why) when the write was refused, so the Settings dialog
+ *  can stay open with the author's edits in it. */
+async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly?: boolean } = {}): Promise<boolean> {
   const res = await window.patter.saveSettings(s);
-  if (!res.ok) { console.error("Save settings failed:", res.error); return; }
+  if (!landed(res, "Couldn't save the project settings")) return false;
   if (res.project) {
-    project = res.project; projectNameEl.textContent = project.name; saver.setAuto(project.autosave);
+    project = res.project; projectNameEl.textContent = project.name;
     // The project's @patter properties may have changed (added / renamed / re-typed / enum values edited):
     // rebuild the condition-editor catalogue so they're selectable immediately, without a scene reload or a
     // restart. Mirrors openSceneProps for the scene scope; keeps the load-time order (@patter first). New
@@ -2854,16 +2914,19 @@ async function saveProjectSettings(s: ProjectSettingsDto): Promise<void> {
     // The host scopes (#159) may have changed too, and with a game scopes folder so may the shared file:
     // rebuild their properties, and the editors' dialect.
     sceneProps = [
-      ...s.properties.map((d): ConditionProperty => ({ scope: "patter", name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) })),
+      ...s.properties.map((d) => declToConditionProperty("patter", d)),
       ...sceneProps.filter((p) => p.scope === "scene"),
     ];
     await refreshEditorScopes();
     void refreshVcStatus(); // the PROJECT shard just changed on disk: re-badge the Properties row
-    await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
-    void refreshProblems();  // refresh the spelling entries in the problems panel for the new setup
-    pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
+    if (!opts.propertiesOnly) {
+      await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
+      pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
+    }
+    void refreshProblems();  // revalidate against the new declarations (and, after a full save, the new spelling setup)
     lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // refresh the status dropdown + condition pills
   }
+  return true;
 }
 
 /** Rebuild the editors' other scopes from the main process, the one place that knows them all: the
@@ -2886,8 +2949,8 @@ async function shareScopes(): Promise<void> {
   if (!project) return;
   const r = await window.patter.shareScopes();
   if (!r) return; // cancelled
-  if ("error" in r) { toast(`Could not share scopes: ${r.error}`, "error"); return; }
-  if ("shared" in r) { toast(`This project already shares its scopes\n${r.shared}`, "ok"); return; }
+  if ("error" in r) { landed({ ok: false, error: r.error }, "Couldn't share the scopes"); return; }
+  if ("shared" in r) { toast(`This project already shares its scopes.\nThey're in ${r.shared}.`, "ok"); return; }
   await refreshEditorScopes();
   void refreshProblems();
   lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx);
@@ -2909,7 +2972,19 @@ function openSceneProps(): HTMLElement | null {
   const cancel = dialogButton("Cancel");
   const saveBtn = dialogButton("Save", true);
   cancel.addEventListener("click", () => frame.close());
-  saveBtn.addEventListener("click", () => { apply(); frame.close(); });
+  saveBtn.addEventListener("click", () => {
+    // The same gate the Properties page and Project Settings apply: two properties of one name, or a name
+    // no expression can reach, are refused rather than saved.
+    const dup = handle.firstDuplicate();
+    const bad = dup ? null : handle.firstIllegalName();
+    if (dup || bad) {
+      (dup ?? bad)!.focus();
+      toast(dup ? DUP_MESSAGE : bad!.title || "That property name can't be used in an expression.", "error");
+      return;
+    }
+    apply();
+    frame.close();
+  });
   frame.actions.append(cancel, saveBtn);
   frame.open();
   return host;
@@ -2920,16 +2995,22 @@ function openSceneProps(): HTMLElement | null {
     surface.setSceneProps(next); // dispatches a doc edit -> the surface's onChange marks dirty + revalidates
     sceneProps = [
       ...sceneProps.filter((p) => p.scope !== "scene"),
-      ...next.map((d): ConditionProperty => ({ scope: "scene", name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) })),
+      ...next.map((d) => declToConditionProperty("scene", d)),
     ];
     lastInspectorSig = null; // the count isn't in the level signature - force the Scene row to re-render
     if (lastInspectorCtx) showInspector(lastInspectorCtx);
   }
 }
 
+/** A property declaration as the condition and effects editors take it: one conversion, because three
+ *  hand-written copies had drifted and two left out `stages`, which withheld a quality's ordering
+ *  operators and its stage picker until the next scene load. Main's `sceneProperties` says the same. */
+function declToConditionProperty(scope: "patter" | "scene", d: PropertyDecl): ConditionProperty {
+  return { scope, name: d.name, type: d.type, ...(d.values ? { enumValues: d.values } : {}), ...(d.stages ? { stages: d.stages } : {}), ...(d.purpose ? { purpose: d.purpose } : {}) };
+}
+
 /** The folder a project name will be saved as (mirrors the main process's patterFolderName, for preview). */
-const patterFolderPreview = (name: string): string =>
-  `${name.trim().replace(/[/\\]+/g, "-").replace(/\s+/g, " ") || "your-project"}.patter`;
+const patterFolderPreview = (name: string): string => `${fileSafeName(name) || "your-project"}.patter`;
 
 /** The default Build output for a project name (mirrors the main process's sibling-`patter-dist/`
  *  default + ops `slug`), so the New-project field prefills the same path Project Settings would show.
@@ -2961,7 +3042,7 @@ async function openExample(file: string): Promise<void> {
 
 function createDialog(initial?: string): void {
   const vcs = el("select", "insp-select");
-  for (const [value, label] of [["git", "Git"], ["perforce", "Perforce"], ["plastic", "Plastic SCM"], ["svn", "Subversion (SVN)"], ["none", "None"]] as const) {
+  for (const [value, label] of VCS_OPTIONS) { // the one list Project Settings offers too
     const o = el("option", undefined, label);
     o.value = value;
     o.selected = value === "none";
@@ -2977,8 +3058,8 @@ function createDialog(initial?: string): void {
   const details = el("div", "create-details");
   details.append(
     el("label", "kit-gallery-label", "Version control"), vcs,
-    el("label", "kit-gallery-label", "Publish output"), build,
-    el("small", "identity-hint", "Where Publish \u25B8 Publish Bundle writes the .patterc. The default is a sibling patter-dist/ folder."),
+    el("label", "kit-gallery-label", "Bundle path"), build,
+    el("small", "identity-hint", ...bundlePathHint()),
     saved);
   // The publish path prefills (and tracks the name) until the author edits it themselves.
   let buildTouched = false;
@@ -3111,8 +3192,15 @@ projectNameEl.style.cursor = "pointer";
 // Find (⌘/Ctrl-F) and Replace (⌘⌥F on macOS, Ctrl-H elsewhere) open the detached search window via the
 // Edit-menu accelerators (relayed through onMenu below as "find" / "replace"), so they fire regardless of
 // focus - no renderer keydown needed.
-// Writing View toggles via the View-menu accelerator (Cmd/Ctrl-M), relayed through onMenu below - a
-// native accelerator fires regardless of focus, so it works inside the editor too.
+// Writing View toggles via the View-menu accelerator (Shift+Cmd/Ctrl+M), relayed through onMenu below - a
+// native accelerator fires regardless of focus, so it works inside the editor too. Esc leaves it, as the
+// docs and the exit pill say: but only an Esc nothing else used (a dialog, an anchored panel, the editor's
+// own popups all take theirs first), so closing a popup never throws the writer out of the mode as well.
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !writingView || e.defaultPrevented) return;
+  if (document.querySelector("dialog[open], .shell-anchored:not([hidden]), .cue-ac:not([hidden]), .slash-menu:not([hidden]), .spell-menu:not([hidden])")) return;
+  setWritingView(false);
+});
 
 // Native-menu commands (File / Run / Edit / View) relayed from the main process.
 window.patter.onMenu((cmd) => {

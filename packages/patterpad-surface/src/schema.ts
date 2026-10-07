@@ -18,7 +18,8 @@
 // structural node carries a `raw` attr (the original Patter object minus the
 // parts rebuilt from the tree). character/direction live in the cue/paren zones
 // and bridge to LineBeat.character/.direction (flow); say-zone text bridges to
-// the locale string keyed by beat id. Opaque groups still ride as `rawnode`.
+// the locale string keyed by beat id. Groups are real nodes (`group`); only a
+// chunk kind the surface does not model rides opaque as `rawnode`.
 // ---------------------------------------------------------------------------
 
 import { Schema } from "prosemirror-model";
@@ -103,9 +104,27 @@ export const patterSchema = new Schema({
   },
   // Inline formatting (project-gated, §formatting). Only two marks - bold and italic; bold+italic is
   // simply both on a range. toDOM renders the effect (the author never sees the markup); parseDOM lets
-  // a paste of real <b>/<i>/<strong>/<em> come in as marks too.
+  // a paste of real <b>/<i>/<strong>/<em> come in as marks too (web/clipboard.ts reads the same rules).
+  // Google Docs wraps every copy in `<b style="font-weight:normal">`, so a `<b>` whose own style says
+  // normal is not bold, and an explicit normal weight / style CLEARS a mark an outer element set.
   marks: {
-    strong: { parseDOM: [{ tag: "strong" }, { tag: "b" }, { style: "font-weight=bold" }], toDOM: () => ["strong", 0] },
-    em: { parseDOM: [{ tag: "em" }, { tag: "i" }, { style: "font-style=italic" }], toDOM: () => ["em", 0] },
+    strong: {
+      parseDOM: [
+        { tag: "strong" },
+        { tag: "b", getAttrs: (dom) => dom.style.fontWeight !== "normal" && null },
+        { style: "font-weight=400", clearMark: (m) => m.type.name === "strong" },
+        { style: "font-weight=normal", clearMark: (m) => m.type.name === "strong" },
+        { style: "font-weight", getAttrs: (v) => /^(bold(er)?|[5-9]\d{2,})$/.test(v as string) && null },
+      ],
+      toDOM: () => ["strong", 0],
+    },
+    em: {
+      parseDOM: [
+        { tag: "em" }, { tag: "i" },
+        { style: "font-style=normal", clearMark: (m) => m.type.name === "em" },
+        { style: "font-style=italic" },
+      ],
+      toDOM: () => ["em", 0],
+    },
   },
 });

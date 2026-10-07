@@ -1,9 +1,14 @@
 // The detached FIND tool window (#205): a small, frameless, always-on-top helper over the project-wide
 // index. It STAYS OPEN while you step through hits - choosing a result jumps the editor (which stays live
 // underneath) but keeps this window up and focused, so you can navigate across matches and explore.
-// Two modes, switchable in-window:
-//   - "content": find by Game ID / title / dialogue-text, OR paste an opaque id (the folded-in "Go to ID").
-//   - "status":  pick a writing-status rung and browse every line at it (unset = lowest); the box filters.
+// Its modes, switchable in-window:
+//   - "content":     find by Game ID / title / dialogue text, OR paste an opaque id (the folded-in "Go to ID").
+//   - "replace":     find and replace in the source text, previewed before anything is written.
+//   - "status":      pick a writing-status rung and browse every line at it (unset = lowest); the box filters.
+//   - "recording":   the same over the recording ladder, in a project that tracks audio status.
+//   - "property":    every place a property is used (conditions, effects, interpolated text).
+//   - "tag":         every node carrying a tag.
+//   - "suggestions": the open suggestions, to accept or reject.
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
 import "@wildwinter/app-shell/controls.css"; // the segmented mode control is the family's `.seg`
@@ -229,7 +234,7 @@ const applyReplace = async (onlyId?: string): Promise<void> => {
       title: `Replace ${plural(n, "occurrence")} across ${plural(scenes, "scene")}?`,
       // House style rule 30: a confirmation ends with what undo does. Here, nothing: main rewrites the
       // shards and the open scene is remounted from disk, so its editor history starts again.
-      body: `Replace “${input.value}” with “${replaceInput.value}”. This cannot be undone from the Edit menu.`,
+      body: `Replace “${input.value}” with “${replaceInput.value}”. You can't undo this.`,
       confirmLabel: "Replace",
     });
     if (!ok) return;
@@ -272,10 +277,10 @@ const suggestionRow = (s: OpenSuggestionDto): HTMLElement => {
   if (s.proposedDirection !== undefined) what.append(part("swin-slabel", "Direction"), part("swin-before", s.baselineDirection || "(none)"), arrow(), part("swin-after", s.proposedDirection || "(none)"));
   const meta = document.createElement("span"); meta.className = "swin-loc";
   meta.append(locationCrumbs(s.sceneName ? [s.sceneName] : []), part("swin-sauthor", s.author));
-  if (s.stale.length) { const st = part("swin-stale", "Out of date"); st.dataset.tip = `${s.stale.join(" and ")} changed since this was suggested`; meta.append(st); }
+  if (s.stale.length) { const st = part("swin-stale", "Out of date"); st.dataset.tip = `${s.stale.join(" and ")} changed since this was suggested.`; meta.append(st); }
   const accept = document.createElement("button"); accept.type = "button"; accept.className = "swin-rone"; accept.textContent = "Accept";
   accept.disabled = s.stale.length > 0;
-  if (accept.disabled) accept.dataset.tip = "Out of date: open the line and review it there";
+  if (accept.disabled) accept.dataset.tip = "It's out of date. Open the line and review it there.";
   const reject = document.createElement("button"); reject.type = "button"; reject.className = "swin-rone"; reject.textContent = "Reject";
   accept.addEventListener("click", (ev) => { ev.stopPropagation(); void decide([{ id: s.id, accept: true }]); });
   reject.addEventListener("click", (ev) => { ev.stopPropagation(); void decide([{ id: s.id, accept: false }]); });
@@ -321,8 +326,9 @@ const acceptAllClean = async (): Promise<void> => {
   const stale = suggShown.length - clean.length;
   const ok = await confirmDialog({
     title: `Accept ${plural(clean.length, "suggestion")}?`,
-    body: `Every suggestion shown that still applies cleanly.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""}`,
-    confirmLabel: "Accept",
+    // A sentence, the action on the button, and what undo does (house style rules 29 and 30).
+    body: `This accepts every suggestion shown that still applies cleanly.${stale ? ` ${plural(stale, "out-of-date one")} ${stale === 1 ? "stays" : "stay"} open for review.` : ""} You can't undo this.`,
+    confirmLabel: "Accept suggestions",
   });
   if (!ok) return;
   await decide(clean.map((s) => ({ id: s.id, accept: true })));
@@ -427,7 +433,9 @@ search.onProject(() => void (async () => {
   const info = await search.info();
   voiced = info.voiced; hasProject = info.hasProject; reflectVoiced();
   if (mode === "recording" && !voiced) { void setMode("status"); return; }
-  if (chipMode(mode)) void setMode(mode); else if (mode === "property") void runProperty(); else void runContent();
+  // `rerun` knows every mode, Replace included: falling through to the content search left Replace's
+  // previous-project hits behind its "Replace all (n)" button.
+  if (chipMode(mode)) void setMode(mode); else rerun();
 })());
 
 // Boot: read the initial mode + pin state (+ any seeded query), then render.

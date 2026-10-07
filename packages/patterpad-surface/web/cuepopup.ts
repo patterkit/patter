@@ -19,8 +19,14 @@ export interface CuePopup {
    *  already-shut popup stays shut (#20). Defaults to true. */
   update(view: EditorView, ctx?: ZoneState, mayOpen?: boolean): void;
   handleKeyDown(view: EditorView, event: KeyboardEvent): boolean;
+  /** Text that reached the cue WITHOUT a printable keydown - an IME composition, dictation, or an
+   *  input method's beforeinput - goes into the search buffer like typed keys, opening the popup if
+   *  needed. True when the caret is in a cue (the text is then never written into the document). */
+  typeText(view: EditorView, text: string): boolean;
   isOpen(): boolean;
   close(): void;
+  /** Close and take the popup's element out of the page (the surface's destroy). */
+  destroy(): void;
 }
 
 type Row = { kind: "pick"; name: string } | { kind: "add"; name: string };
@@ -172,5 +178,18 @@ export function createCuePopup(getCast: () => readonly string[], addToCast: (nam
     return false;
   };
 
-  return { update, handleKeyDown, isOpen: () => open, close };
+  const typeText = (view: EditorView, text: string): boolean => {
+    viewRef = view;
+    const c = context(view.state);
+    if (c.zone?.role !== "cue" || !c.beat) return open; // not in a cue: an open popup still swallows it
+    const filtered = text.replace(/[()/]/g, ""); // the structural punctuation is never part of a name
+    if (!open) { activeBeat = c.beat.id; open = true; query = ""; }
+    query += filtered; highlight = 0; computeRows();
+    present(view);
+    return true;
+  };
+
+  const destroy = (): void => { close(); floating.el.remove(); };
+
+  return { update, handleKeyDown, typeText, isOpen: () => open, close, destroy };
 }

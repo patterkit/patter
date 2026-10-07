@@ -7,7 +7,7 @@
 // The engine already accepts cast names + project words, so proper nouns never flag.
 // ---------------------------------------------------------------------------
 
-import { Plugin, PluginKey } from "prosemirror-state";
+import { Plugin, PluginKey, type Transaction } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import type { EditorView } from "prosemirror-view";
 import type { Node as PMNode } from "prosemirror-model";
@@ -34,31 +34,71 @@ const key = new PluginKey<SpellState>("patterSpellcheck");
 const WORD_RE = /\p{L}[\p{L}’']*/gu;
 const ignored = (set: Set<string>, w: string): boolean => set.has(w) || set.has(w.toLowerCase());
 
+type Miss = { word: string; from: number; to: number };
+
+/** The misspelled words of ONE say zone at `pos`, as document ranges. */
+function sayMisspellings(node: PMNode, pos: number, checker: SpellChecker, ignore: Set<string>, out: Miss[]): void {
+  node.forEach((child, childOffset) => {
+    if (!child.isText || !child.text) return;
+    const base = pos + 1 + childOffset; // say content begins at pos+1; childOffset is within that content
+    for (const m of child.text.matchAll(WORD_RE)) {
+      const w = m[0];
+      if (w.length < 2 || ignored(ignore, w) || checker.check(w)) continue;
+      const from = base + (m.index ?? 0);
+      out.push({ word: w, from, to: from + w.length });
+    }
+  });
+}
+
 /** Every misspelled word in the say zones, as document ranges (exported for tests). Walks say nodes,
  *  tokenizes their text, and skips words that are correct / ignored / too short. */
-export function misspellings(doc: PMNode, checker: SpellChecker, ignore: Set<string>): Array<{ word: string; from: number; to: number }> {
-  const out: Array<{ word: string; from: number; to: number }> = [];
+export function misspellings(doc: PMNode, checker: SpellChecker, ignore: Set<string>): Miss[] {
+  const out: Miss[] = [];
   doc.descendants((node, pos) => {
-    if (node.type.name !== "say") return;
-    node.forEach((child, childOffset) => {
-      if (!child.isText || !child.text) return;
-      const base = pos + 1 + childOffset; // say content begins at pos+1; childOffset is within that content
-      for (const m of child.text.matchAll(WORD_RE)) {
-        const w = m[0];
-        if (w.length < 2 || ignored(ignore, w) || checker.check(w)) continue;
-        const from = base + (m.index ?? 0);
-        out.push({ word: w, from, to: from + w.length });
-      }
-    });
+    if (node.type.name !== "say") return true;
+    sayMisspellings(node, pos, checker, ignore, out);
+    return false;
   });
   return out;
 }
 
-/** Decorate every misspelled word in the say zones with a wavy underline. */
+const decoFor = (m: Miss): Decoration => Decoration.inline(m.from, m.to, { class: "spell-error" });
+
+/** Decorate every misspelled word in the say zones with a wavy underline (a full pass: a new engine or
+ *  ignore list, where every word's verdict may have changed). */
 function computeDecos(doc: PMNode, checker: SpellChecker | null, ignore: Set<string>): DecorationSet {
   if (!checker) return DecorationSet.empty;
-  const decos = misspellings(doc, checker, ignore).map((m) => Decoration.inline(m.from, m.to, { class: "spell-error" }));
-  return DecorationSet.create(doc, decos);
+  return DecorationSet.create(doc, misspellings(doc, checker, ignore).map(decoFor));
+}
+
+/**
+ * An edit's decorations, incrementally (review 2026-10, MEDIUM 39: every keystroke re-checked the whole
+ * scene, 6 ms at 3,000 beats). The old set is mapped through the transaction, then only the say zones
+ * the steps touched are cleared and checked again. A step's changed range is taken in the FINAL doc
+ * (mapped through the steps after it), and widened by one so a zone the range merely abuts counts.
+ */
+export function updateDecos(tr: Transaction, old: DecorationSet, checker: SpellChecker, ignore: Set<string>): DecorationSet {
+  let deco = old.map(tr.mapping, tr.doc);
+  const doc = tr.doc;
+  const touched = new Map<number, PMNode>(); // say pos -> say node, in the final doc
+  tr.mapping.maps.forEach((map, i) => {
+    const after = tr.mapping.slice(i + 1);
+    map.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+      const from = Math.max(0, after.map(newStart, -1) - 1);
+      const to = Math.min(doc.content.size, after.map(newEnd, 1) + 1);
+      doc.nodesBetween(from, to, (node, pos) => {
+        if (node.type.name === "say") { touched.set(pos, node); return false; }
+        return true;
+      });
+    });
+  });
+  if (!touched.size) return deco;
+  const fresh: Miss[] = [];
+  for (const [pos, node] of touched) {
+    deco = deco.remove(deco.find(pos, pos + node.nodeSize));
+    sayMisspellings(node, pos, checker, ignore, fresh);
+  }
+  return fresh.length ? deco.add(doc, fresh.map(decoFor)) : deco;
 }
 
 /** The misspelled word straddling document position `pos` (for the right-click menu), or null. */
@@ -89,7 +129,7 @@ export function spellcheckPlugin(): Plugin<SpellState> {
           const ignore = meta.ignore ?? value.ignore;
           return { checker, ignore, deco: computeDecos(tr.doc, checker, ignore) };
         }
-        if (tr.docChanged) return { ...value, deco: computeDecos(tr.doc, value.checker, value.ignore) };
+        if (tr.docChanged) return value.checker ? { ...value, deco: updateDecos(tr, value.deco, value.checker, value.ignore) } : value;
         return value;
       },
     },
@@ -109,7 +149,7 @@ export function spellcheckPlugin(): Plugin<SpellState> {
         openMenu(editorView, floating, st.checker, hit);
       };
       editorView.dom.addEventListener("contextmenu", onContext, true);
-      return { destroy: () => { editorView.dom.removeEventListener("contextmenu", onContext, true); floating.close(); } };
+      return { destroy: () => { editorView.dom.removeEventListener("contextmenu", onContext, true); floating.close(); floating.el.remove(); } };
     },
   });
 }
@@ -123,10 +163,14 @@ function openMenu(view: EditorView, floating: ReturnType<typeof createFloating>,
   };
   const head = (text: string): HTMLElement => { const h = document.createElement("div"); h.className = "action-head"; h.textContent = text; return h; };
 
-  const suggestions = checker.suggest(hit.word).slice(0, 5);
-  if (suggestions.length) for (const s of suggestions) el.appendChild(item(s, "spell-suggest", () => view.dispatch(view.state.tr.insertText(s, hit.from, hit.to))));
-  else el.appendChild(head("No suggestions"));
-  const sep = document.createElement("div"); sep.className = "action-sep"; el.appendChild(sep);
+  // A replacement edits the scene, so a locked scene offers none: only the dictionary actions, which
+  // change the project's word lists, not this file (review 2026-10, MEDIUM 33).
+  if (view.editable) {
+    const suggestions = checker.suggest(hit.word).slice(0, 5);
+    if (suggestions.length) for (const s of suggestions) el.appendChild(item(s, "spell-suggest", () => { if (view.editable) view.dispatch(view.state.tr.insertText(s, hit.from, hit.to)); }));
+    else el.appendChild(head("No suggestions"));
+    const sep = document.createElement("div"); sep.className = "action-sep"; el.appendChild(sep);
+  }
   el.appendChild(item("Add to dictionary", "", () => addHandler?.(hit.word)));
   el.appendChild(item("Ignore", "", () => {
     // Instant feedback: drop the squiggle now via the session set. The host handler (when wired) then

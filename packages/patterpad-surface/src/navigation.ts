@@ -2,7 +2,7 @@
 // The horizontal navigation spine (Z2, spec section 6). Left/Right step the zone
 // sequence (cue -> paren? -> say) and, at a line's edges, WRAP to the adjacent
 // line - the one sanctioned cross-line horizontal move, symmetric in both
-// directions. Atoms (action / jump) are stepped onto as node selections.
+// directions. A game-event atom is stepped onto as a node selection.
 // Within a zone, the commands return false so the default per-character movement
 // applies; only at a zone boundary do they take over.
 // ---------------------------------------------------------------------------

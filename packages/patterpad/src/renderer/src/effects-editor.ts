@@ -28,16 +28,6 @@ export function renderEffectsPills(effects: ModelEffect[], properties: Condition
 }
 
 let active: AnchoredPanel | null = null;
-let handles: EffectsEditorHandle[] = [];
-
-export function closeEffectsEditor(): void {
-  active?.close();
-}
-
-/** Flip an open effects editor's inline value editors between pills and raw text (global toggle). */
-export function setEffectsEditorText(on: boolean): void {
-  for (const h of handles) h.setText(on);
-}
 
 export function openEffectsEditor(opts: {
   anchor: HTMLElement;
@@ -46,8 +36,6 @@ export function openEffectsEditor(opts: {
   properties: ConditionProperty[];
   /** Scope the panel to a single phase (the inspector opens On enter / On exit separately). Omit for both. */
   phase?: Phase;
-  /** Start each inline value editor in raw-text mode (the inspector's global toggle drives this). */
-  text?: boolean;
   /** Persist a phase's edited effect list (the renderer saves + re-validates). */
   onChange: (phase: Phase, effects: EditorEffect[]) => void;
 }): void {
@@ -56,17 +44,15 @@ export function openEffectsEditor(opts: {
   const fns = patterFunctions(cat);
 
   const title = opts.phase === "onEnter" ? "On begin" : opts.phase === "onExit" ? "On end" : "Effects";
-  // The global pills/text toggle (.insp-textmode-toggle) flips the value editors in place (setEffectsEditorText), so a click on it must not close the panel.
   const myHandles: EffectsEditorHandle[] = [];
   const panel = openPanel({
     anchor: opts.anchor, className: "effects-editor", title, width: 380,
-    ignoreDown: ".exed-pop, .insp-textmode-toggle", deferEscape: ".exed-pop",
+    ignoreDown: ".exed-pop", deferEscape: ".exed-pop",
     // Runs AFTER the exit fade; guard the singletons so a panel opened meanwhile isn't clobbered.
-    onClose: () => { for (const h of myHandles) h.destroy(); if (handles === myHandles) handles = []; if (active === panel) active = null; },
+    onClose: () => { for (const h of myHandles) h.destroy(); if (active === panel) active = null; },
   });
   if (!panel) return; // re-clicked the same row: toggled closed
   active = panel;
-  handles = myHandles;
 
   const section = (label: string, phase: Phase, effects: ModelEffect[]): void => {
     const sec = el("div", "effects-section");
@@ -79,7 +65,6 @@ export function openEffectsEditor(opts: {
       schema, dialect: editorDialect(), otherEngineScopes: OTHER_ENGINE_SCOPES, catalogue: cat, scopeOrder: SCOPE_ORDER, functions: fns,
       allowEmit: false, // patter effects are set-only; emission rides on gameData (spec §15)
       propertyActions, // right-click a property (a target pill included): go to definition / find usages
-      text: opts.text ?? false,
       onChange: (next) => opts.onChange(phase, next),
     }));
   };

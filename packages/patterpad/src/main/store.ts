@@ -33,6 +33,8 @@ export interface SessionState {
   theme: ThemePrefs;
   /** "Follow in the editor" on the play window (default off). */
   playFollow: boolean;
+  /** Publish ▸ Auto Rebuild (default off): per person, as Storyletter keeps it. */
+  autoRebuild: boolean;
 }
 
 /** The three helper windows, by the key each remembers its bounds and pin under. */
@@ -58,6 +60,8 @@ interface AppSlice {
   /** Where Storyletter is, when Patterpad couldn't find it and the author pointed at it (Show Card in
    *  Storyletter). Per person: where an app is installed differs from one machine to the next. */
   storyletterPath?: string;
+  /** Publish ▸ Auto Rebuild: a working habit, so per person rather than in the shared project file. */
+  autoRebuild: boolean;
 }
 
 /** The old hand-rolled file, kept only for the one-time fold-in below. */
@@ -92,6 +96,7 @@ export interface Store {
   setPanes(panes: PaneState): void;
   setTheme(theme: ThemePrefs): void;
   setPlayFollow(on: boolean): void;
+  setAutoRebuild(on: boolean): void;
   /** Storyletter's location, as the author pointed at it (undefined = look for it). */
   storyletterPath(): string | undefined;
   setStoryletterPath(path: string): void;
@@ -145,7 +150,7 @@ function foldInLegacySession(dir: string): void {
       search: { ...old.search },
       coverage: { ...old.coverage },
     },
-    app: { theme: migrateTheme({ ...DEFAULT_THEME, ...old.theme }), playFollow: false },
+    app: { theme: migrateTheme({ ...DEFAULT_THEME, ...old.theme }), playFollow: false, autoRebuild: false },
   };
   try {
     mkdirSync(dir, { recursive: true });
@@ -162,7 +167,7 @@ export function createStore(dir: string): Store {
   const app = createAppStore<Place, AppSlice>({
     dir,
     fileName: SETTINGS_FILE,
-    defaults: { theme: { ...DEFAULT_THEME }, playFollow: false },
+    defaults: { theme: { ...DEFAULT_THEME }, playFollow: false, autoRebuild: false },
     panes: { ...DEFAULT_PANES },
   });
 
@@ -191,6 +196,7 @@ export function createStore(dir: string): Store {
       panes: { ...DEFAULT_PANES, ...(s.panes as PaneState) },
       theme: migrateTheme({ ...DEFAULT_THEME, ...s.app.theme }),
       playFollow: s.app.playFollow ?? false,
+      autoRebuild: s.app.autoRebuild ?? false,
     };
   };
 
@@ -223,6 +229,9 @@ export function createStore(dir: string): Store {
     },
     setPlayFollow(on) {
       app.patchApp({ playFollow: on });
+    },
+    setAutoRebuild(on) {
+      app.patchApp({ autoRebuild: on });
     },
     storyletterPath() {
       return app.get().app.storyletterPath;

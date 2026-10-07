@@ -16,9 +16,8 @@ sidebar:
 
 The **General** tab holds the project name, the **Start** scene (where the story begins,
 used by **Play ▸ Play from Start** and the coverage test), your version-control system,
-the **voiced** flag, the **formatting** (bold/italic) toggle, **autosave**, **Auto
-Rebuild** (recompile the bundle as you edit, see [below](#building-a-bundle)), the
-**Build output** path, and how strings are handled (the **localisation mode**, Embedded
+the **voiced** flag, the **formatting** (bold/italic) toggle, the
+**Bundle path**, and how strings are handled (the **localisation mode**, Embedded
 or IDs-only, with a source-debug option).
 
 The **Language** tab lists the languages your project supports and which one is the
@@ -31,7 +30,7 @@ The **World Properties** tab holds the `@world` values your game owns and your s
 reads (declaring them is covered in
 [Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)), plus
 the **coverage drivers** that stand in for them during a
-[coverage test](/production/coverage-testing/#input-drivers). Where the game shares its scopes
+[coverage test](/production/coverage-testing/#coverage-drivers). Where the game shares its scopes
 with its other editing tools, the tab says so: saving writes the game's `game.scopes.json`
 first, then keeps a copy in the project (see
 [Sharing scopes with the game's other tools](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools)).
@@ -104,10 +103,10 @@ CI pipeline without opening the app. See [Automation: the CLI](/cli/).
 
 ### Auto Rebuild
 
-Turn on **Auto Rebuild** (the **Publish** menu's checkbox, or **Project Settings ▸ General**) and
-Patterpad recompiles the bundle for you a moment after you stop editing, so the `.patterc` on disk
+Turn on **Auto Rebuild** (the **Publish** menu's checkbox) and Patterpad recompiles the bundle for you a moment after you stop editing, so the `.patterc` on disk
 stays current without you pressing **Publish Bundle**. Handy when your game reads the bundle straight
-from disk and you want to see changes without a manual build.
+from disk and you want to see changes without a manual build. It's your own setting, not the
+project's: turning it on doesn't turn it on for everyone else working on the project.
 
 It's careful about it: the rebuild only writes when the compiled bundle actually **changed** (so it
 won't churn the file on cosmetic edits), and if the project is momentarily invalid mid-edit (a

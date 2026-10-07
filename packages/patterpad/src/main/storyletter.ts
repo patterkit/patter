@@ -14,7 +14,10 @@
 // cold `open` delivers the project through open-file and drops `--at`.
 // ---------------------------------------------------------------------------
 
-import { execFileSync, spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 import { type Dir, type Dirent, existsSync, opendirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -87,15 +90,13 @@ export function storyletterExecutable(path: string, platform: NodeJS.Platform = 
   return platform === "darwin" && path.endsWith(".app") ? join(path, "Contents", "MacOS", "Storyletter") : path;
 }
 
-/** Where Storyletter is on this machine, or undefined. `remembered` is the author's own answer. */
-export function findStoryletter(remembered?: string, platform: NodeJS.Platform = process.platform): string | undefined {
+/** Where Storyletter is on this machine, or undefined. `remembered` is the author's own answer. The fixed
+ *  places are tried first and Spotlight only after, asynchronously: `mdfind` ran synchronously on the main
+ *  thread with a three-second timeout, freezing the app while it looked. */
+export async function findStoryletter(remembered?: string, platform: NodeJS.Platform = process.platform): Promise<string | undefined> {
   const candidates: string[] = [];
   if (remembered) candidates.push(storyletterExecutable(remembered, platform));
   if (platform === "darwin") {
-    try {
-      const found = execFileSync("mdfind", [`kMDItemCFBundleIdentifier == '${STORYLETTER_BUNDLE_ID}'`], { encoding: "utf8", timeout: 3000 });
-      for (const app of found.split("\n").map((l) => l.trim()).filter((l) => l.endsWith(".app"))) candidates.push(storyletterExecutable(app, platform));
-    } catch { /* Spotlight off or slow: the fixed places below still count */ }
     candidates.push(
       storyletterExecutable("/Applications/Storyletter.app", platform),
       storyletterExecutable(join(homedir(), "Applications", "Storyletter.app"), platform),
@@ -104,7 +105,12 @@ export function findStoryletter(remembered?: string, platform: NodeJS.Platform =
     const local = process.env["LOCALAPPDATA"];
     if (local) candidates.push(join(local, "Programs", "Storyletter", "Storyletter.exe"));
   }
-  return candidates.find((c) => existsSync(c));
+  const fixed = candidates.find((c) => existsSync(c));
+  if (fixed || platform !== "darwin") return fixed;
+  try {
+    const { stdout } = await execFileAsync("mdfind", [`kMDItemCFBundleIdentifier == '${STORYLETTER_BUNDLE_ID}'`], { encoding: "utf8", timeout: 3000 });
+    return stdout.split("\n").map((l) => l.trim()).filter((l) => l.endsWith(".app")).map((app) => storyletterExecutable(app, platform)).find((c) => existsSync(c));
+  } catch { return undefined; } // Spotlight off or slow
 }
 
 /** Start Storyletter on `project`, at the card named `address`. Detached: it outlives Patterpad. */

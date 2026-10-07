@@ -44,7 +44,9 @@ export interface SpellingMenu { hasProject: boolean; enabled: boolean; language:
 
 export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: PaneState, theme: ThemePrefs, lineStatuses: string[] = [], spelling?: SpellingMenu, voiced = false, debugActive = false, audioTracked = false, autoRebuild = false,
   /** A Storyletter project nearby is paired with this one, so Show Card in Storyletter has somewhere to go. */
-  storyletter = false): void {
+  storyletter = false,
+  /** Audio Folders is on (and an audio root set), the one case Update Audio Manifest can do anything in. */
+  audioFolders = false): void {
   const send = (cmd: string): void => win.webContents.send("menu", cmd);
   const shownStatuses = panes.lineStatusShown ?? [];
   // One rule, the family's (Storyletter's review, 2026-10): every item that acts on a project is disabled
@@ -161,13 +163,14 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
     {
       label: "Play",
       submenu: [
-        { label: "Play Scene", accelerator: "CmdOrCtrl+P", enabled: hasProject, click: () => send("play") },
+        { label: "Play Scene", ...PLAY_MENU.play, enabled: hasProject, click: () => send("play") }, // Cmd+P, the family's play key (ruling O)
         { label: "Play from Start", accelerator: "CmdOrCtrl+Shift+P", enabled: hasProject, click: () => send("play-from-start") },
         { type: "separator" },
         // Checked while the link is active (listening / connected); toggles it (the bottom-right connect icon
         // mirrors the same state). Follows a running game's cursor (#181).
         // "Live Link" = live bundle refresh INTO the game + the debugger-style cursor follow OUT of it.
-        { ...PLAY_MENU.liveLink, type: "checkbox", checked: debugActive, click: () => send("debug-link") },
+        // Needs a project to link, but stays live while the link is on, so it can always be turned off.
+        { ...PLAY_MENU.liveLink, type: "checkbox", checked: debugActive, enabled: hasProject || debugActive, click: () => send("debug-link") },
       ],
     },
     {
@@ -202,7 +205,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
           // Which writing-status rungs show their per-beat gutter pill. Per-rung check/uncheck, plus
           // Show All / Show None; remembered in panes.lineStatusShown (default none). Empty when no
           // project / no ladder is open - just the All / None actions.
-          label: "Line Status",
+          label: "Writing Status",
           submenu: [
             { label: "Show All", enabled: lineStatuses.length > 0, click: () => send("line-status:all") },
             { label: "Show None", enabled: hasProject, click: () => send("line-status:none") },
@@ -244,7 +247,7 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { type: "separator" },
         { label: "Export Production Info…", enabled: hasProject, click: () => send("export-production-info") },
         { label: "Export Voice Script…", enabled: voiced, click: () => send("voice-script") }, // VO script only for a voiced project (#206)
-        { label: "Update Audio Manifest…", enabled: voiced, click: () => send("audio-manifest") }, // #206: rewrite patteraudio.json from the audio folders
+        { label: "Update Audio Manifest…", enabled: audioFolders, click: () => send("audio-manifest") }, // #206: rewrite patteraudio.json from the audio folders
         { label: "Export / Import Localisation…", enabled: hasProject, click: () => send("localisation") },
       ],
     },
@@ -262,9 +265,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { label: "Publish Readable Script…", enabled: hasProject, click: () => send("export-script") },
         { type: "separator" },
         { ...PUBLISH_MENU.bundle, enabled: hasProject, click: () => send("build-bundle") },
-        // Auto Rebuild: recompile the bundle after edits (debounced + deduped). Mirrors the same project
-        // setting as the Project Settings ▸ General toggle.
-        { ...PUBLISH_MENU.autoRebuild, type: "checkbox", checked: autoRebuild, enabled: hasProject, click: () => send("toggle-auto-rebuild") },
+        { type: "separator" }, // a setting, not an act, set apart as Storyletter's is
+        // Auto Rebuild: recompile the bundle after edits (debounced + deduped). The author's own setting,
+        // kept in app state, so it can be set with no project open, as in Storyletter.
+        { ...PUBLISH_MENU.autoRebuild, type: "checkbox", checked: autoRebuild, click: () => send("toggle-auto-rebuild") },
       ],
     },
     {

@@ -1,7 +1,8 @@
 // The play WINDOW renderer. A separate window that walks the script interactively over the runtime
 // (the main process holds the Engine; this window drives it via window.patterPlay). You drive the
-// walk with two buttons - **Step** (one beat) and **Continue** (advance to the next choice / end) -
-// and as each beat plays it tells the EDITOR window to move the playhead, leaving a visited trail.
+// walk with one button, **Step** (one beat) or, with the head's Continue toggle on, **Continue** (to the
+// next choice or the end), and as each beat plays it tells the EDITOR window to move the playhead,
+// leaving a visited trail.
 // Choices are buttons; the trail + playhead reset on a fresh run.
 
 import "@patterkit/patterpad-surface/theme.css"; // app-wide design tokens (same look as the editor)
@@ -15,7 +16,7 @@ import "@fontsource/newsreader/400-italic.css";
 import "@fontsource/newsreader/600.css";
 import "@fontsource-variable/inter";
 
-import { staleBar, el } from "@wildwinter/app-shell";
+import { staleBar, el, toast } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips, pinButton, followButton, toolWindowHead, iconNode, type IconName } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
@@ -35,6 +36,7 @@ const continueEl = document.getElementById("play-continue") as HTMLButtonElement
 // go-there arrow.
 continueEl.prepend(iconNode("arrowRight", 12));
 const audioEl = document.getElementById("play-audio") as HTMLButtonElement;
+audioEl.prepend(iconNode("speaker", 12)); // the family's drawn speaker (app-shell 0.47.0), in place of one drawn in the markup
 
 // "Play with audio" (#206 P3): in Audio Folders mode, Continue becomes a time-paced table-read - each line
 // plays its clip and the next beat waits for it to finish; a line with no file (or a text beat) is faked at
@@ -287,15 +289,6 @@ function showStale(): void {
 // is left alone (clobbering a paced reveal's Stop would break the reveal).
 let trayShown = false;
 
-/** A quiet, self-dismissing toast: the editor's edit just landed in this running session. */
-function flashLive(text: string): void {
-  document.querySelector(".plive")?.remove(); // rapid edits: replace, don't stack
-  const t = document.createElement("div");
-  t.className = "plive";
-  t.textContent = text;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2200); // matches the CSS fade
-}
 
 /** Run an advance (step / toStop): append its beats, move the editor playhead through each, then
  *  render the next controls (more to play / choices / end). */
@@ -382,11 +375,13 @@ async function chooseThen(optionId: string): Promise<void> {
 }
 
 async function startRun(): Promise<void> {
-  runGen++; // cancel any in-flight table-read from the previous run
+  const gen = ++runGen; // cancel any in-flight table-read from the previous run
   stopRequested = false; skipFire?.(); stopClip?.(); resumeState = null; // stop any sounding clip / pending delay / paused reveal
   transcriptEl.replaceChildren();
   play.resetMarks();
   await play.start();
+  // A second Restart while this one was starting has begun its own run: two first advances played twice.
+  if (gen !== runGen) return;
   await advance(firstAdvance(), continueMode); // always take the first Advance automatically (start / restart / rewind)
 }
 
@@ -456,7 +451,8 @@ play.onStale(showStale); // editor edited the scene mid-run AND the swap failed:
 // must not stay clickable; a dissolved choice falls back to the Step control). An in-flight paced
 // reveal keeps playing its already-fetched batch (best-effort); the next fetch reads the new script.
 play.onRefreshed((kind, options) => {
-  flashLive(kind === "text" ? "Edits applied live" : "Scene updated live");
+  // The shell's toast, as every other remark in the family is made: this window drew its own pill.
+  toast(kind === "text" ? "Edits applied live." : "Scene updated live.", "ok");
   if (trayShown && kind === "structure") {
     if (options.length > 0) showChoices(options); else showAdvance();
   }

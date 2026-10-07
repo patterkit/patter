@@ -18,7 +18,13 @@ const legacy = (dir: string, session: object): string => {
 
 describe("session store", () => {
   it("starts empty and tolerates a missing file", () => {
-    expect(createStore(tmpDir()).read()).toEqual({ lastScene: {}, lastCaret: {}, recents: [], panes: { nav: false, inspector: false }, theme: { colour: "system", font: "newsreader" }, playFollow: false });
+    expect(createStore(tmpDir()).read()).toEqual({ lastScene: {}, lastCaret: {}, recents: [], panes: { nav: false, inspector: false }, theme: { colour: "system", font: "newsreader" }, playFollow: false, autoRebuild: false });
+  });
+
+  it("keeps Auto Rebuild per person, off until turned on (ruling B, October 2026)", () => {
+    const dir = tmpDir();
+    createStore(dir).setAutoRebuild(true);
+    expect(createStore(dir).read().autoRebuild).toBe(true);
   });
 
   it("remembers the side-pane (slide/pin) state", () => {

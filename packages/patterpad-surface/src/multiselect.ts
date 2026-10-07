@@ -24,7 +24,7 @@ export interface MultiSelectState {
 }
 const EMPTY: MultiSelectState = { ids: [], anchor: null };
 
-export const multiSelectKey = new PluginKey<MultiSelectState>("patterMultiSelect");
+const multiSelectKey = new PluginKey<MultiSelectState>("patterMultiSelect");
 /** Transaction meta carrying the new set (or null to clear). Set ALONGSIDE the selection it mirrors. */
 export const SET_MULTI = "patterSetMultiSelect";
 

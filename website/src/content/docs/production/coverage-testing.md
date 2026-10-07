@@ -66,7 +66,7 @@ taken, or a condition that's never true.
 
 A beat marked **? (needs input)** turns on a value your game owns (`@world.*`) that nothing in the
 story sets, so the test can't reach it on its own. The row reads *gated on @x*; click that name to
-see everywhere `@x` is used. Add a [driver](#input-drivers) and the test can reach it.
+see everywhere `@x` is used. Add a [driver](#coverage-drivers) and the test can reach it.
 
 A beat marked **? (dead at one remove)** is gated on a value your story *does* set, but only on a
 beat that never played either. The row names the gate and the beat that would have to happen first,
@@ -108,7 +108,7 @@ nothing stops, the test **lists each failure it saw**, with what failed, the sce
 number of runs it happened in; click one to jump to it. The Play window marks the same failures in
 its transcript as you play.
 
-## World Properties and input drivers
+## World Properties and coverage drivers
 
 Some branches turn on values your **game** owns rather than the story, written as `@world.name`
 and declared up front in **Project Settings ▸ World Properties**. Declaring them is part of
@@ -121,7 +121,7 @@ the test also stands in the other editing tools' scopes a line names, such as th
 Engine's `@story`, from the defaults their files declare, so a story that reads them runs rather
 than being refused.
 
-### Input drivers
+### Coverage drivers
 
 Since your game sets these while it runs, the coverage test can't know them, so a branch that
 turns on `@world.alarm` reads as *needs input*. To exercise it, add a **coverage driver** in the

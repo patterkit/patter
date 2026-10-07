@@ -798,3 +798,19 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
    titlebar strip) goes to the OS as a window drag before the page sees it. The shell exempts its own
    layers (app-shell dialog.css has the whole story, 2026-09-28); these are ours. */
 .target-picker, .target-picker *, .action-submenu, .action-submenu * { -webkit-app-region: no-drag; }
+
+/* A LOCKED scene (read-only, #145; review 2026-10 MEDIUM 33): ProseMirror marks the root
+   contenteditable="false", and every control that would edit the script goes with it - the drag grips,
+   the "+" ghosts and gap controls, the line-above strip, a game event's delete. The ⋯ menu stays: on a
+   locked scene it offers only what does not edit it (notes, comments, status, Play block). The specificity
+   is deliberate, to beat each control's own hover / state rule. */
+.ProseMirror[contenteditable="false"] .drag-handle,
+.ProseMirror[contenteditable="false"] .ghost-snippet,
+.ProseMirror[contenteditable="false"] .bubble > .bubble-above,
+.ProseMirror[contenteditable="false"] .bubble > .bubble-after,
+.ProseMirror[contenteditable="false"] .block > .block-after,
+.ProseMirror[contenteditable="false"] .group-rail > .option-after,
+.ProseMirror[contenteditable="false"] .atom-del { display: none !important; }
+.block-name[readonly] { cursor: default; }
+/* A game event's fields are a drawn metadata line that, like the text before it, never wraps the row. */
+.beat.kind-gameEvent .atom-fields .shell-meta { flex-wrap: nowrap; }

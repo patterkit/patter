@@ -30,9 +30,8 @@ export type EditEffects = (id: string, onEnter: EffectLike[], onExit: EffectLike
  *  property mutation; host event emission rides on gameData, not effects. */
 export interface EffectLike { kind: "set"; target?: string; value?: string; }
 
-// Condition / effect rows show PILLS by default (the visual format non-coders read). One global
-// toggle (under the inspector name, owned by the renderer) flips ALL rows to name-form text; the
-// inspector reads that preference via `h.textMode()` and the renderer also flips any open editor.
+// Condition / effect rows show PILLS (the visual format non-coders read); the editors they open show
+// name-form text on request, inside the editor.
 
 /** A label : value row. Returns null for an empty value so callers can skip blanks cheaply. */
 /** The same row with nothing in it: a muted "None" in the value column. A typed dash for "nothing"
@@ -80,7 +79,7 @@ function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData
   const rows = gameDataFieldRows(kind, id, gd, h);
   if (!rows.length) return null;
   const sec = el("div", "insp-gd-section");
-  sec.append(el("div", "insp-gd-cap", "Game data"), ...rows);
+  sec.append(el("div", "insp-gd-cap", "Game Data"), ...rows);
   return sec;
 }
 
@@ -309,7 +308,7 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
   const box = el("div", "insp-tags");
 
   const input = el("input", "insp-tag-input") as HTMLInputElement;
-  input.type = "text"; input.placeholder = current.length ? "" : "add tag…";
+  input.type = "text"; input.placeholder = current.length ? "" : "Add tag…";
   input.setAttribute("aria-label", "add a tag");
   input.spellcheck = false; input.autocapitalize = "off"; (input as HTMLInputElement).autocomplete = "off";
 
@@ -326,7 +325,7 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
       chip.append(x);
       box.insertBefore(chip, input);
     }
-    input.placeholder = current.length ? "" : "add tag…";
+    input.placeholder = current.length ? "" : "Add tag…";
   };
 
   const add = (rawText: string): void => {
@@ -356,12 +355,8 @@ function tagsRow(id: string | null, tags: string[] | undefined, h: InspectorHand
   return r;
 }
 
-function effectText(e: EffectLike): string {
-  return `${e.target} = ${e.value}`;
-}
-
 /** One effect-phase row (On enter / On exit), shown directly under Condition in the snippet body. A
- *  summary of that phase's effects (or "+ add"); clicking opens the effects editor scoped to the phase.
+ *  summary of that phase's effects (or "+ Add"); clicking opens the effects editor scoped to the phase.
  *  Both lists are passed so the editor can still show context, but `phase` focuses it on this one. */
 function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit", onEnter: EffectLike[], onExit: EffectLike[], h: InspectorHandlers): HTMLElement {
   const mine = phase === "onEnter" ? onEnter : onExit;
@@ -370,8 +365,7 @@ function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit",
   r.append(el("span", "insp-key", label));
   const btn = el("button", `insp-cond${mine.length ? "" : " muted"}`);
   btn.type = "button";
-  if (!mine.length) btn.textContent = "+ add";
-  else if (h.textMode()) btn.replaceChildren(metaLine([...mine.slice(0, 2).map(effectText), mine.length > 2 ? `+${mine.length - 2}` : undefined])); // drawn separators, never a typed dot
+  if (!mine.length) btn.textContent = "+ Add";
   else btn.append(h.effectsPreview(mine)); // pills (inert → click opens editor)
   if (id) { btn.dataset.tip = `Edit ${label.toLowerCase()} effects`; btn.setAttribute("aria-label", `Edit ${label.toLowerCase()} effects`); btn.addEventListener("click", () => h.editEffects(id, onEnter, onExit, btn, phase)); }
   else btn.disabled = true;
@@ -379,16 +373,15 @@ function phaseRow(id: string | null, label: string, phase: "onEnter" | "onExit",
   return r;
 }
 
-/** An editable Condition row: clicking opens the visual expression editor (or "+ add condition"). The
- *  current condition shows as PILLS by default (a `</>` toggle switches to name-form text). */
+/** An editable Condition row: clicking opens the visual expression editor (or "+ Add condition"). The
+ *  current condition shows as PILLS. */
 function condRow(id: string | null, src: string | undefined, h: InspectorHandlers): HTMLElement {
   // Stacked (value UNDER the label) so the pills get the row's full width to breathe.
   const r = el("div", "insp-row insp-row-stack");
   r.append(el("span", "insp-key", "Condition"));
   const btn = el("button", `insp-cond${src ? "" : " muted"}`);
   btn.type = "button";
-  if (!src) btn.textContent = "+ add condition";
-  else if (h.textMode()) btn.textContent = `if ${src}`;
+  if (!src) btn.textContent = "+ Add condition";
   else { btn.append(el("span", "insp-if", "if "), h.condPreview(src)); } // pills (inert → click opens editor)
   if (id) { btn.dataset.tip = "Edit condition"; btn.setAttribute("aria-label", "Edit condition"); btn.addEventListener("click", () => h.editCondition(id, src ?? "", btn)); }
   else btn.disabled = true;
@@ -423,14 +416,14 @@ function toggleRow(label: string, on: boolean, onChange: (on: boolean) => void):
   return r;
 }
 
-/** An editable Jump row: a chip showing the target's READABLE label (or "+ set jump"); click
+/** An editable Jump row: a chip showing the target's READABLE label (or "+ Set jump"); click
  *  opens the picker. Storage is the internal id; `h.jumpLabel` resolves it to a name / gameId. */
 function jumpRow(id: string | null, jump: SnippetLevel["jump"], h: InspectorHandlers): HTMLElement {
   const r = el("div", "insp-row");
   r.append(el("span", "insp-key", "Jump"));
   const btn = el("button", `insp-cond${jump ? "" : " muted"}`);
   btn.type = "button";
-  btn.textContent = jump ? `${jump.mode === "call" ? "⤳" : "↪"} ${h.jumpLabel(jump.to)}` : "+ set jump";
+  btn.textContent = jump ? `${jump.mode === "call" ? "⤳" : "↪"} ${h.jumpLabel(jump.to)}` : "+ Set jump";
   if (id) { btn.dataset.tip = "Set jump target"; btn.setAttribute("aria-label", "Set jump target"); btn.addEventListener("click", () => h.editJump(id, jump?.to ?? "", btn)); }
   else btn.disabled = true;
   const val = el("div", "insp-jumpval");
@@ -476,7 +469,7 @@ const GROUP_HEAD: Record<GroupLevel["role"], string> = {
 
 // The "copy" glyph: a clean front sheet with only the back sheet's top-right corner peeking out behind it
 // (stroke-only, so no lines cross the front sheet's interior - theme-proof). A tick replaces it on copy.
-const COPY_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><rect x="3" y="9" width="12" height="12" rx="2"/><path d="M9 9V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4"/></svg>';
+const COPY_SVG = iconHtml("copy", 13); // the family's drawn copy icon (app-shell 0.47.0), not one of our own
 const COPY_CHECK = iconHtml("tick", 13); // the vocabulary's tick, at the copy glyph's size
 
 /** A quiet "click to copy" button. `text` is the value copied (a string, or a getter read at click
@@ -572,7 +565,7 @@ function scenePropsRow(h: InspectorHandlers): HTMLElement {
   const n = h.sceneProps().length;
   const btn = el("button", `insp-cond${n ? "" : " muted"}`);
   btn.type = "button"; btn.dataset.tip = "Scene-local @scene properties"; btn.setAttribute("aria-label", "Scene-local @scene properties");
-  btn.textContent = n ? `${n} scene ${n === 1 ? "property" : "properties"}, edit` : "+ add scene properties";
+  btn.textContent = n ? `${n} scene ${n === 1 ? "property" : "properties"}, edit` : "+ Add scene properties";
   btn.addEventListener("click", () => h.editSceneProps());
   r.append(btn);
   return r;
@@ -602,12 +595,12 @@ function multiLevelView(lv: MultiLevel): HTMLElement {
 function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   if (lv.kind === "multi") return multiLevelView(lv);
   let head: string;
-  let sub = "";
+  let sub: string | HTMLElement = "";
   let body: HTMLElement[];
   switch (lv.kind) {
     case "leaf": head = LEAF_HEAD[lv.beat]; body = leafBody(lv, h); break;
     case "snippet": head = "Snippet"; body = snippetBody(lv, h); break; // always "Snippet" - a jump is a snippet property, not its identity (the body notes a jump-only snippet)
-    case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" ? lv.label.replace(/^Sequence · /, "") : ""; body = groupBody(lv, h); break;
+    case "group": head = GROUP_HEAD[lv.role]; sub = lv.role === "sequence" && lv.labelParts.length > 1 ? metaLine(lv.labelParts.slice(1)) : ""; body = groupBody(lv, h); break; // a sequence's sub: its order and exhaust, drawn separators
     case "block": head = "Block"; sub = lv.name; body = addressBody(lv, h); break;
     case "scene": head = "Scene"; sub = lv.name; body = addressBody(lv, h); break;
   }
@@ -617,7 +610,7 @@ function levelView(lv: InspectLevel, h: InspectorHandlers): HTMLElement {
   const header = el("button", "insp-head");
   (header as HTMLButtonElement).type = "button";
   header.append(el("span", "insp-head-name", head));
-  if (sub) header.append(el("span", "insp-head-sub", sub));
+  if (sub) { const subEl = el("span", "insp-head-sub"); subEl.append(sub); header.append(subEl); }
   if (lv.id) {
     header.dataset.tip = `Reveal this ${head.toLowerCase()} in the script`; // no opaque id surfaced (spec §6)
     header.addEventListener("click", () => h.reveal(lv.id!));
@@ -656,20 +649,12 @@ export interface InspectorHandlers {
   /** Set an existing jump's mode: "jump" (one-way) or "call" (jump-and-return), keeping its target. */
   setJumpMode: (id: string, mode: "jump" | "call") => void;
   editEffects: EditEffects;
-  /** The global pills/text preference (owned by the renderer's single toggle). true = name-form text. */
-  textMode: () => boolean;
   /** Render a condition (name-form `src`) as a read-only PILL strip for the inspector row. */
   condPreview: (src: string) => HTMLElement;
   /** Render an effects list as a read-only PILL strip for the inspector row. */
   effectsPreview: (effects: EffectLike[]) => HTMLElement;
   /** Resolve a jump target id to its readable label (block / scene name or gameId). */
   jumpLabel: (id: string) => string;
-  /** Append an option to the choice `choiceId`. */
-  addOption: (choiceId: string) => void;
-  /** Delete the chunk (option / snippet / group) `id`. */
-  removeChunk: (id: string) => void;
-  /** Reorder the chunk `id` up / down within its container. */
-  moveChunk: (id: string, dir: "up" | "down") => void;
   /** The author-defined gameData fields for a node type (the project's Game Data schema). */
   gameDataFields: (kind: GameDataNodeKind) => GameDataField[];
   /** Set (or clear, with `undefined`) one gameData field value on a node by id. */
@@ -710,15 +695,6 @@ export interface InspectorHandlers {
   scratchStale: (id: string) => boolean;
   /** Replace the author tags (#215) on a node by id (an empty list clears them). */
   setTags: (id: string, tags: string[]) => void;
-}
-
-/** The host-facing Game ID address for the caret's location: `<scene>` or `<scene>.<block>` (spec §6).
- *  Shown right-aligned in the inspector title bar for quick reference. "" when nothing is selected. */
-export function inspectorAddress(ctx: InspectorContext): string {
-  const scene = ctx.levels.find((l): l is SceneLevel => l.kind === "scene");
-  const block = ctx.levels.find((l): l is BlockLevel => l.kind === "block");
-  if (!scene) return "";
-  return block ? `${scene.address}.${block.address}` : scene.address;
 }
 
 /** Render the whole stack into `host`. Empty selection -> a muted placeholder. */

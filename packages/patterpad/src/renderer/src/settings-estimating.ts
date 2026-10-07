@@ -5,7 +5,7 @@
 
 import type { EstimatingConfig, WritingStatusDecl } from "@patterkit/model";
 import { el } from "./dom.js";
-import { iconBtn, labelled, focusNewRow } from "@wildwinter/app-shell";
+import { iconBtn, labelled, labelledToggle, focusNewRow } from "@wildwinter/app-shell";
 
 export interface EstimatingHandle { value(): EstimatingConfig; }
 
@@ -19,11 +19,9 @@ export function mountEstimating(host: HTMLElement, initial: EstimatingConfig, la
   const rungs = ladder.map((s) => s.name);
 
   // The enable toggle: everything below is greyed (but still editable) until it's on.
-  const enable = el("input") as HTMLInputElement; enable.type = "checkbox"; enable.checked = state.enabled;
-  const toggle = el("label", "settings-toggle");
-  const label = el("span"); label.append(document.createTextNode("Enable estimating"));
-  const desc = el("small", undefined, "Counts an estimate instead of the placeholder lines for a scene that is still a sketch."); label.append(desc);
-  toggle.append(enable, label);
+  const { row: toggle, input: enable } = labelledToggle("Enable estimating", {
+    checked: state.enabled, hint: "Counts an estimate instead of the placeholder lines for a scene that is still a sketch.",
+  });
 
   const config = el("div", "est-config");
   enable.addEventListener("change", () => { state.enabled = enable.checked; config.classList.toggle("est-off", !state.enabled); });

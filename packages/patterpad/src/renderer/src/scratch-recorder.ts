@@ -109,7 +109,7 @@ function buildOverlay(): Overlay {
   const lead = (text: string): HTMLElement => el("span", "scratch-hint-lead", text);
   // `icon` is a leading drawn icon (record / play); a text button never carries a trailing glyph.
   const btn = (label: string, cls: string, fn: () => void, icon?: IconName): HTMLButtonElement => {
-    const b = el("button", `scratch-btn ${cls}`.trim()) as HTMLButtonElement; b.type = "button";
+    const b = el("button", `btn ${cls}`.trim()) as HTMLButtonElement; b.type = "button";
     if (icon) b.append(iconNode(icon, 12)); b.append(label);
     b.addEventListener("click", fn);
     return b;
@@ -127,7 +127,7 @@ function buildOverlay(): Overlay {
       stage.className = "scratch-stage scratch-ready"; stage.textContent = "Ready?";
       actions.hidden = false;
       actions.replaceChildren();
-      actions.append(btn("Record", "scratch-btn-primary", a.onRecord, "record"));
+      actions.append(btn("Record", "primary", a.onRecord, "record"));
       if (hasNext && a.onSkip) actions.append(btn("Skip", "", a.onSkip));
       if (hasNeeded && a.onNeeded) actions.append(btn("Next needed", "", a.onNeeded));
       actions.append(btn("Finish", "", a.onFinish));
@@ -148,7 +148,7 @@ function buildOverlay(): Overlay {
       actions.hidden = false;
       actions.replaceChildren();
       actions.append(btn("Replay", "", a.onReplay, "play"), btn("Re-record", "", a.onRerecord, "record"));
-      if (a.onNext) actions.append(btn("Record next", "scratch-btn-primary", a.onNext));
+      if (a.onNext) actions.append(btn("Record next", "primary", a.onNext));
       if (a.onNeeded) actions.append(btn("Next needed", "", a.onNeeded));
       actions.append(btn("Finish", "", a.onFinish));
       hint.replaceChildren(nextLine

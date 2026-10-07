@@ -53,11 +53,11 @@ describe("findStoryletter", () => {
     expect(storyletterExecutable("/Applications/Storyletter.app", "darwin")).toBe("/Applications/Storyletter.app/Contents/MacOS/Storyletter");
   });
 
-  it("takes the place the author pointed at, and on Linux nothing else", () => {
+  it("takes the place the author pointed at, and on Linux nothing else", async () => {
     const dir = tempRoot("storyletter-");
     const image = join(dir, "Storyletter.AppImage");
     writeFileSync(image, "");
-    expect(findStoryletter(image, "linux")).toBe(image);
-    expect(findStoryletter(undefined, "linux")).toBeUndefined();
+    expect(await findStoryletter(image, "linux")).toBe(image);
+    expect(await findStoryletter(undefined, "linux")).toBeUndefined();
   });
 });

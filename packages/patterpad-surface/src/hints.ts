@@ -42,7 +42,9 @@ export function hintsFor(s: ZoneState): Hint[] {
   // affordance, not a key
   if (!s.zone) return [{ key: "type", label: "line above" }, { key: "Enter", label: "line below" }, { key: "", icon: "close", label: "delete game event" }];
 
-  const hints = zoneHints(s);
+  // A choice prompt is a single field: Enter and Shift-Enter do nothing there (lines.ts swallows them),
+  // so they are never offered (review 2026-10).
+  const hints = s.inPrompt ? zoneHints(s).filter((h) => h.key !== "Enter" && h.key !== "Shift+Enter") : zoneHints(s);
   // At the LEFT edge of a group's first bubble, Backspace is a no-op (it never
   // merges out across the group seam, §10) - a soft cue says why.
   const atLeftEdge = s.zone.atStart && (s.zone.role === "cue" || (s.beat.kind === "prose" && s.zone.role === "say"));

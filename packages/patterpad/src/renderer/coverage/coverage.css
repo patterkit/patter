@@ -98,3 +98,6 @@ body.coverage-win {
 .cov-scene-rare { font: 600 12.5px/1.2 var(--font-ui); color: var(--warn, var(--accent)); }
 /* In the least-reached list, which scene a row belongs to (only when there are several). */
 .cov-row-scene { display: block; margin-top: 1.5px; font: 11.5px var(--font-ui); color: var(--muted); }
+
+/* A Runs or Max steps value the sweep cannot take: marked, and Run held until it is fixed. */
+.cov-opt input.invalid { border-color: var(--danger); }

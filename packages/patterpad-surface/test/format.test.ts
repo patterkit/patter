@@ -33,9 +33,10 @@ describe("format: markup <-> marks", () => {
     expect(parseMarkup("rock & roll")[0]!.text).toBe("rock & roll");
   });
 
-  it("decodes legacy entity-escaped strings to clean literals on read (back-compat, then writes clean)", () => {
-    expect(roundTrip("less &lt; more &amp; on")).toBe("less < more & on");
-    expect(parseMarkup("a &lt;b&gt; b")[0]!.text).toBe("a <b> b");
+  it("never decodes entities: text the author typed as '&amp;' survives a read and a save (review 2026-10)", () => {
+    expect(roundTrip("less &lt; more &amp; on")).toBe("less &lt; more &amp; on");
+    expect(parseMarkup("a &lt;b&gt; b")[0]!.text).toBe("a &lt;b&gt; b");
+    expect(roundTrip("<b>R&amp;D</b>")).toBe("<b>R&amp;D</b>");
   });
 
   it("treats an unknown / malformed tag as literal text (degrades, never throws)", () => {

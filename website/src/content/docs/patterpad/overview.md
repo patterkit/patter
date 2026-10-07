@@ -44,7 +44,7 @@ so the project plays the moment it opens. Under the description you fill in:
 - **Version control**: git, Perforce, Plastic, SVN, or none. Patterpad sets up the
   right config for whichever you pick, and you can switch it later in Project
   Settings.
-- **Publish output**: where **Publish Bundle** writes the finished file. It starts at a
+- **Bundle path**: where **Publish Bundle** writes the finished file. It starts at a
   sibling `../patter-dist/<name>.patterc` and leaves the name alone once you type
   your own path.
 
@@ -157,9 +157,8 @@ bottom bars away, leaving just the script and the hint bar. See [Reading & focus
 
 **File ▸ Save** (`⌘S`) saves the current scene. If a teammate has the file locked,
 Patterpad respects that and tells you who's holding it, rather than overwriting their
-work. **Autosave** is on by default (about every 30 seconds; toggle it in Project
-Settings), and Patterpad also saves before switching scenes, playing, or installing an
-update.
+work. Patterpad saves for you a moment after you stop typing, and also when you switch
+scenes, play, leave the window, or quit.
 
 ## The rest of the tour
 
