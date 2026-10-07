@@ -1,5 +1,16 @@
 # @patterkit/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 873585e: `ValidationIssue` gains `severity: "warning"` for issues that still build: a choice that can run dry is now one, and a new `jump-cycle` warning flags snippets that jump to each other with nothing to deliver. A beat of a kind the runtime does not know is a `malformed-node` error.
+
+### Patch Changes
+
+- Updated dependencies [caaf755]
+  - @patterkit/model@0.10.0
+
 ## 0.3.2
 
 ### Patch Changes

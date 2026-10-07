@@ -1,5 +1,16 @@
 # @patterkit/compiler
 
+## 0.4.6
+
+### Patch Changes
+
+- 873585e: `validateInterpolation` looks each string up once per language rather than once per shard: 5 ms rather than 182 ms on a 100-scene project.
+- Updated dependencies [873585e]
+- Updated dependencies [caaf755]
+  - @patterkit/core@0.4.0
+  - @patterkit/model@0.10.0
+  - @patterkit/dialect@0.2.6
+
 ## 0.4.5
 
 ### Patch Changes
