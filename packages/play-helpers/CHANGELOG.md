@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 0.8.2
+
+### Patch Changes
+
+- aba7994: Uses `@patterkit/runtime` 0.21.0, the Patterplay 0.21.0 release.
+
 ## 0.8.1
 
 ### Patch Changes
