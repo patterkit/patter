@@ -1,5 +1,11 @@
 # @patterkit/core
 
+## 0.4.1
+
+### Patch Changes
+
+- b4a4a39: `validateProject` reports a block or scene with no id or no name (`missing-id`, `missing-name`) rather than throwing a TypeError on it.
+
 ## 0.4.0
 
 ### Minor Changes

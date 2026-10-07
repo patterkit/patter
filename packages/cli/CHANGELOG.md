@@ -1,5 +1,13 @@
 # @patterkit/cli
 
+## 0.9.2
+
+### Patch Changes
+
+- Updated dependencies [b4a4a39]
+  - @patterkit/core@0.4.1
+  - @patterkit/ops@0.14.2
+
 ## 0.9.1
 
 ### Patch Changes
