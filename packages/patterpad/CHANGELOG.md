@@ -56,6 +56,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Changed
 
+- **An error in the problems bar is shown in red,** and a warning in the warning colour, as Storyletter shows
+  them, so the colour says how serious the problem in view is.
 - **Build Bundle writes the same files as `patter export`,** which now uses the same `patter-dist/` folder beside
   the project. Auto Rebuild also brings the game's shared scopes file up to date.
 

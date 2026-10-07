@@ -15,32 +15,19 @@
 
 import { WebSocketServer, type WebSocket } from "ws";
 import type { DebugStatus } from "../shared/api.js";
+import { isLocalOrigin } from "@wildwinter/app-shell/util";
 
 const DEFAULT_PORT = 4471;
 
 /**
- * Whether a connection's `Origin` header belongs to a client on this machine.
- *
- * Binding to loopback keeps other machines out, but not web pages: a page open in any browser can dial
- * `ws://127.0.0.1:4471`, take the one slot, and receive the compiled bundle on every save. A browser
- * always says which page is dialling, so the check is on that.
- *
- * Accepted: no Origin at all (Unity's ClientWebSocket, Godot, and Node send none), and an Origin whose
- * host is loopback. The second is needed twice over. Unreal's libwebsockets client sends the address it
- * dialled as a bare `127.0.0.1`, and a browser game under development on a local server
- * (`http://localhost:5173`) is a documented use of the JS link. Refused: every other site, and `null`,
- * which a file:// page sends but so does a sandboxed frame on any site. The host is matched literally,
- * so a rebinding domain that resolves to 127.0.0.1 is still refused by name.
+ * Whether a connection's `Origin` header belongs to a client on this machine: the family's one rule,
+ * now the app-shell's, so Patterpad and Storyletter cannot drift. Binding to loopback keeps other
+ * machines out but not web pages, which can dial `ws://127.0.0.1:4471` from any browser. Accepted: no
+ * Origin (Unity, Godot, Node), or a literal loopback host with or without a scheme (Unreal's
+ * libwebsockets sends the bare address; a browser game on a local dev server sends its page). Refused:
+ * every other site, and `null`. Re-exported so the tests and any caller keep their import.
  */
-export function isLocalOrigin(origin: string | undefined): boolean {
-  if (origin === undefined || origin === "") return true;
-  let host: string;
-  try {
-    // A browser sends scheme://host[:port]; Unreal sends a bare host, which URL would misread as a scheme.
-    host = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(origin) ? origin : `http://${origin}`).hostname;
-  } catch { return false; }
-  return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
-}
+export { isLocalOrigin };
 
 /** A position frame for one flow. */
 export interface DebugFrame { flow: string; sceneId: string | null; beatId: string | null; type: string; choiceId?: string }

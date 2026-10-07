@@ -400,8 +400,10 @@
   padding-top: 0; padding-bottom: 0; border-width: 0; pointer-events: none;
 }
 
-/* Severity, which the bar deliberately knows nothing about: it takes `kindClass` and paints nothing. */
-.stepbar-cat.sev-error { color: var(--accent); }
+/* Severity, which the bar deliberately knows nothing about: it takes `kindClass` and paints nothing. An
+   error is in the danger colour, as Storyletter's bar shows one, so the colour says how serious the problem
+   in view is (an error red, a warning the warn tone), where the accent said only that it was there. */
+.stepbar-cat.sev-error { color: var(--danger); }
 .stepbar-cat.sev-warning { color: var(--warn); }
 .stepbar-cat.sev-info { color: var(--muted); }
 /* A resolved thread in the review walk reads as done rather than as live feedback. */
