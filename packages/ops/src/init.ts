@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { join, basename, resolve } from "node:path";
-import { readdirSync, existsSync } from "node:fs";
+import { readdirSync, existsSync, readFileSync } from "node:fs";
 import { newId, slug, canonicalStringify } from "@patterkit/core";
 import type { ProjectFile, FlowFile, LocaleFile } from "@patterkit/model";
 import type { PlannedWrite } from "./write.js";
@@ -85,12 +85,14 @@ export function runInit(opts: InitOptions): InitResult {
 
   const bundle: BundlePosture = opts.bundle ?? "commit";
   const projectFile = join(dir, `${fileSlug}.patterproj`);
+  // The project file LAST: it is what makes the folder a project, and what a second `init` refuses on,
+  // so an init that fails part way (a lock, a full disk) must leave the folder able to take a rerun.
   const writes: PlannedWrite[] = [
-    { path: projectFile, content: canonicalStringify(project) },
     { path: join(dir, "scenes", "start.patterflow"), content: canonicalStringify(flow) },
     { path: join(dir, "loc", "en", "start.patterloc"), content: canonicalStringify(locale) },
     { path: join(dir, ".editorconfig"), content: EDITORCONFIG },
     ...vcsConfigWrites(dir, opts.vcs, bundle),
+    { path: projectFile, content: canonicalStringify(project) },
   ];
 
   // A non-empty directory without a project file can still collide with the
@@ -115,6 +117,19 @@ export function vcsConfigWrites(dir: string, vcs: InitVcs | undefined, bundle: B
   const ignore = ignoreFileFor(vcs);
   if (ignore) writes.push({ path: join(dir, ignore), content: ignoreContent(bundle) });
   return writes;
+}
+
+/**
+ * The bundle posture a project was set up with, read back from the files `init` wrote: the VCS's ignore
+ * file naming `*.patterc`, else `vcs-setup.md` saying the project ignores it (svn keeps its ignore list in
+ * a property). "commit" when neither says so. Switching VCS re-emits these files, and always writing
+ * "commit" lost the ignore rule of a project made with `init --bundle ignore`.
+ */
+export function currentBundlePosture(dir: string, vcs: InitVcs | undefined): BundlePosture {
+  const read = (name: string): string => { try { return readFileSync(join(dir, name), "utf8"); } catch { return ""; } };
+  const ignore = ignoreFileFor(vcs);
+  if (ignore && read(ignore).split(/\r?\n/).some((l) => l.trim() === "*.patterc")) return "ignore";
+  return read("vcs-setup.md").includes("This project IGNORES the compiled") ? "ignore" : "commit";
 }
 
 // --- emitted file bodies (spec §10/§12 hygiene + merge config) ---------------
@@ -199,13 +214,13 @@ drivers once per clone (git config is not repo-tracked) - until then git falls
 back to a normal text merge for those files:
 
     git config merge.patter.name "Patter structured merge"
-    git config merge.patter.driver "patter merge %O %A %B -o %A"
+    git config merge.patter.driver "patter merge %O %A %B -o %A --path %P"
     git config merge.ours.driver true
 
 git invokes the per-path driver directly (no \`mergetool\` wrapper needed). \`%O %A
-%B\` are base / ours / theirs; the merged result is written back to \`%A\`. On a
-conflict \`patter merge\` exits non-zero and writes a \`.patterconflict\` sidecar
-beside the file, so the merge stays unresolved.
+%B\` are base / ours / theirs; the merged result is written back to \`%A\`, and
+\`%P\` is the file's real path. On a conflict \`patter merge\` exits non-zero and
+writes a \`.patterconflict\` sidecar beside that file, so the merge stays unresolved.
 `,
     perforce: `## Perforce
 

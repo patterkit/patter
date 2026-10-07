@@ -521,7 +521,7 @@ export interface ReplaceHitDto {
 export interface PlayResultDto {
   /** Human-readable transcript lines (renderPlay). */
   transcript: string[];
-  /** "end" | "stalled" | "max-steps". */
+  /** "end" | "max-steps" | "error" (the engine stopped the run). */
   outcome: string;
   error?: string;
 }

@@ -174,7 +174,8 @@ const findFile = <T>(files: string[], items: T[], path: string): T | undefined =
 };
 
 /**
- * Write a catalog's translations back. Produces the loc-shard writes (one per scene touched) and stamps
+ * Write a catalog's translations back. Throws, writing nothing, when the catalogue names a locale the
+ * project does not declare or a scene it does not have. Produces the loc-shard writes (one per scene touched) and stamps
  * `localisedAt[locale]` into the per-scene authoring shards (skipped when importing the default locale -
  * staleness is tracked against the source, not for it). Caller commits the returned writes.
  *
@@ -185,6 +186,17 @@ export function applyLoc(loaded: LoadedProject, catalog: LocCatalog, opts: { now
   const locale = catalog.locale;
   if (!locale || locale === loaded.project.locales.default) {
     return { writes: [], stats: { updated: 0, files: 0 } }; // nothing to import into the source language
+  }
+  // The catalogue is a file from outside (a translator, a vendor), and the target paths are built from
+  // its own scene and locale names: refuse any the project does not have before planning a write, or a
+  // scene of `../../x` writes outside the project and an unknown one gets a shard nothing reads.
+  if (!loaded.project.locales.all.includes(locale)) {
+    throw new Error(`'${locale}' is not one of the project's languages (${loaded.project.locales.all.join(", ")}); add it to the project first`);
+  }
+  const known = new Set([...loaded.scenes.map((sc) => sc.id), PROJECT_LOCALE_SCENE]);
+  const unknown = [...new Set(catalog.entries.filter((e) => e.translation.trim() && !known.has(e.scene)).map((e) => e.scene))];
+  if (unknown.length) {
+    throw new Error(`the file names scene(s) this project does not have: ${unknown.map((u) => `'${u}'`).join(", ")}; nothing was imported`);
   }
   const now = opts.now ?? new Date().toISOString();
 

@@ -700,7 +700,7 @@ export interface ProjectFile {
   audio?: { scratchStore: string };
   layout?: { flow?: string; strings?: string; authoring?: string };
   /** `bundle`: the compiled `.patterc` output path (relative to the project root,
-   *  or absolute); default `dist/<project-file-stem>.patterc` (spec §11).
+   *  or absolute); default `../patter-dist/<project-file-stem>.patterc`, beside the project (spec §11).
    *  `localisation`: how strings ship + are resolved (spec §11).
    *    - "embedded" (default): every locale's strings live INSIDE the `.patterc`; the runtime resolves
    *      them and can switch locale live (`setLocale`).

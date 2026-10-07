@@ -268,10 +268,11 @@ function parsePropertyQuery(query: string): { regexes: RegExp[]; value?: string 
 }
 
 // Memoize the project index: it's pure over `loaded.scenes` + `loaded.locales`, yet the editor rebuilds
-// it on every ⌘K keystroke (a full O(nodes) walk). Cache it, invalidating when
-// the project is replaced (a fresh `loaded`) or any scene / locale shard is swapped in place - applyLiveSource
-// (save / live edit) replaces the element OBJECT, so a shallow element-identity check catches every edit.
-let indexCache: { loaded: LoadedProject; scenes: readonly unknown[]; locales: readonly unknown[]; entries: ResolveEntry[] } | null = null;
+// it on every ⌘K keystroke (a full O(nodes) walk). Cache it per project, invalidating when any scene /
+// locale shard is swapped in place - applyLiveSource (save / live edit) replaces the element OBJECT, so a
+// shallow element-identity check catches every edit. Weakly held, so a project Patterpad has closed is not
+// kept alive by its index.
+const indexCache = new WeakMap<LoadedProject, { scenes: readonly unknown[]; locales: readonly unknown[]; entries: ResolveEntry[] }>();
 function sameRefs(a: readonly unknown[], b: readonly unknown[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -280,11 +281,12 @@ function sameRefs(a: readonly unknown[], b: readonly unknown[]): boolean {
 
 /** Index every scene / block / group / snippet / beat with its Game ID, text, and location. */
 function indexProject(loaded: LoadedProject): ResolveEntry[] {
-  if (indexCache && indexCache.loaded === loaded && sameRefs(indexCache.scenes, loaded.scenes) && sameRefs(indexCache.locales, loaded.locales)) {
-    return indexCache.entries; // read-only by every caller (runSearch / runResolve map+filter into fresh arrays)
+  const hit = indexCache.get(loaded);
+  if (hit && sameRefs(hit.scenes, loaded.scenes) && sameRefs(hit.locales, loaded.locales)) {
+    return hit.entries; // read-only by every caller (runSearch / runResolve map+filter into fresh arrays)
   }
   const entries = buildIndex(loaded);
-  indexCache = { loaded, scenes: [...loaded.scenes], locales: [...loaded.locales], entries };
+  indexCache.set(loaded, { scenes: [...loaded.scenes], locales: [...loaded.locales], entries });
   return entries;
 }
 

@@ -193,7 +193,11 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
   const estimatedScenes: Array<{ report: SceneReport; voicedShare: number }> = []; // 2nd pass fills derived words
   let actualWrittenLines = 0, actualWords = 0; // for the words-per-line average estimates lean on
 
-  const rungIdxOf = (id: string): number => writingIndex.get(writingOf.get(id) ?? stub) ?? 0;
+  // A status the ladder does not hold (validate flags it) counts as the lowest rung, everywhere: it was the
+  // lowest rung for scene status but "done" in the totals, since only the lowest rung's name counted as
+  // remaining.
+  const wsOf = (id: string): string => { const w = writingOf.get(id); return w !== undefined && writingIndex.has(w) ? w : stub; };
+  const rungIdxOf = (id: string): number => writingIndex.get(wsOf(id)) ?? 0;
 
   for (const scene of loaded.scenes) {
     const sceneCut = cutSet.has(scene.id);
@@ -262,7 +266,7 @@ export function runReport(loaded: LoadedProject, recordingOverride?: Map<string,
     const voiced = emptyVoiced(writingLadder, recordingLadder);
     const written = emptyWritten(writingLadder);
     for (const u of live) {
-      const ws = writingOf.get(u.id) ?? stub;
+      const ws = wsOf(u.id);
       written.count++; written.words += u.words; written.byWriting[ws] = (written.byWriting[ws] ?? 0) + 1;
       actualWrittenLines++; actualWords += u.words;
       if (!u.voiced) continue;

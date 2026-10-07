@@ -5,17 +5,21 @@
 // catches it before it churns diffs). Pure - returns issue lists, prints nothing.
 // ---------------------------------------------------------------------------
 
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, isAbsolute, join, relative } from "node:path";
 import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
-import { validateConditions, validateInterpolation, exportBundle, hostScopesToSpec, projectScopes } from "@patterkit/compiler";
+import { validateConditions, validateInterpolation, hostScopesToSpec, projectScopes } from "@patterkit/compiler";
+import { compileLoaded, bundleOutputPath } from "./compile.js";
 import type { ConditionIssue } from "@patterkit/compiler";
+import type { Bundle } from "@patterkit/model";
+import { PROJECT_LOCALE_SCENE } from "@patterkit/model";
 import { reachabilityIssues } from "./reachability.js";
-import { walkFiles } from "./load.js";
+import { walkFilesByExt } from "./load.js";
+import { SHARD_EXTENSIONS } from "./pack.js";
 import type { LoadedProject } from "./load.js";
-import { patterScopesStale } from "./game-scopes.js";
+import { patterScopesStale, previewRegistry } from "./game-scopes.js";
 
 /** A raw-bytes hygiene problem in one source file (repairable by `format`). */
 export interface HygieneIssue {
@@ -53,6 +57,10 @@ export interface ValidateResult {
   /** The game's shared scopes folder: its files, and how the project stands against them. Only the
    *  errors count against `ok`. Empty when the project has no folder. */
   gameScopes: GameScopesIssue[];
+  /** The loc shards against each other and the project: a key two shards give different text (an
+   *  error: the compile refuses it), and as warnings a shard for a scene the project lacks, one in a
+   *  language it does not declare, or two shards for one scene and language. */
+  localisation: GameScopesIssue[];
   /** Only ERRORS count: a warning (another tool's scope, say) never fails a build. */
   ok: boolean;
 }
@@ -72,12 +80,22 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged });
   const gameScopes = gameScopesIssues(loaded, scopes.notes);
   const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles]);
-  const staleBundles = checkBundles(loaded);
-  const unresolvedMerges = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
-  const orphans = orphanShards(loaded);
+  // One walk of the tree for every kind of file the checks below look for.
+  const tree = walkFilesByExt(loaded.root, [...SHARD_EXTENSIONS, CONFLICT_SIDECAR, ".patterc"]);
+  const localisation = locIssues(loaded);
+  // ONE compile, the one export makes, inside a try: a project the compiler refuses has its cause told
+  // above (a clash between loc shards, a broken condition), and must not throw out of validate.
+  let compiled: Bundle | undefined;
+  try { compiled = compileLoaded(loaded); } catch { compiled = undefined; }
+  const staleBundles = checkBundles(loaded, compiled, tree.get(".patterc")!);
+  if (compiled) gameScopes.push(...unplayableScopes(loaded, compiled));
+  const unresolvedMerges = sidecarIssues(tree.get(CONFLICT_SIDECAR)!);
+  const orphans = orphanShards(loaded, tree);
   // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
-  // breakage, and the real errors are already being told.
-  const reachability = structural.length === 0 && !conditions.some(isError) ? reachabilityIssues(loaded) : [];
+  // breakage, and the real errors are already being told. A structural WARNING (a choice that can run
+  // dry) compiles, and once switched this off, hiding real latch faults behind an advisory.
+  const structuralErrors = structural.filter((i) => i.severity !== "warning");
+  const reachability = compiled && structuralErrors.length === 0 && !conditions.some(isError) ? reachabilityIssues(loaded, compiled) : [];
   return {
     structural,
     conditions,
@@ -88,13 +106,33 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
     unresolvedMerges,
     orphans,
     gameScopes,
-    ok: structural.length === 0 && !conditions.some(isError) && !interpolation.some(isError)
+    localisation,
+    ok: !localisation.some(isError) && structuralErrors.length === 0 && !conditions.some(isError) && !interpolation.some(isError)
       && hygiene.length === 0 && staleBundles.length === 0 && unresolvedMerges.length === 0
       && orphans.length === 0 && !gameScopes.some(isError),
   };
 }
 
 const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
+
+/**
+ * The content errors a bundle may not be built over, one line each: structural errors (not warnings),
+ * condition and interpolation errors, and loc shards that disagree. Not hygiene, staleness, orphans or
+ * reachability: those say nothing about whether the bundle works. `runExport` refuses on these.
+ */
+export function exportBlockers(loaded: LoadedProject): string[] {
+  const { project, scenes, locales } = loaded;
+  const merged = loaded.gameScopes?.merged;
+  const foreignScopes = hostScopesToSpec(projectScopes(project, merged).host);
+  const structural = validateProject({ project, scenes, authoring: loaded.authoring }).filter((i) => i.severity !== "warning");
+  const conditions = validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged }).filter(isError);
+  const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged }).filter(isError);
+  return [
+    ...structural.map((i) => `[${i.code}] ${i.message}`),
+    ...[...conditions, ...interpolation].map((i) => `[${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`),
+    ...locIssues(loaded).filter(isError).map((i) => `[localisation] ${i.file}: ${i.message}`),
+  ];
+}
 
 /**
  * The game scopes folder's own problems (a file that won't parse, a token two files claim), an override
@@ -114,6 +152,20 @@ function gameScopesIssues(loaded: LoadedProject, notes: { file: string; message:
 }
 
 /**
+ * Content naming another engine's scope (`@story.act`) that no game scopes folder declares: the game
+ * plays it, with that engine on its registry, but `play`, coverage, and Patterpad's Play window cannot,
+ * since Patter is playing alone with nothing to stand that engine in from. A warning, said here because
+ * the only other place it was said was the runtime's refusal, whose advice is for a game's code.
+ */
+function unplayableScopes(loaded: LoadedProject, compiled: Bundle): GameScopesIssue[] {
+  const registry = previewRegistry(loaded.gameScopes, compiled);
+  return (compiled.externalScopes ?? []).filter((t) => !registry?.has(t)).map((t) => ({
+    file: loaded.projectFile, severity: "warning" as const,
+    message: `the content names @${t}, another engine's scope, and no game scopes folder declares it: the game can play it, but play, coverage, and the Play window cannot until the game shares its scopes (patter share-scopes)`,
+  }));
+}
+
+/**
  * Patter source files that are NOT part of the project.
  *
  * The loader is strict about every file it READS - a bad parse, a wrong shape, two files claiming one
@@ -126,7 +178,7 @@ function gameScopesIssues(loaded: LoadedProject, notes: { file: string; message:
  * This is the cheap half of a warnings channel: strictness stays, and the one state it cannot see
  * becomes a question the author can answer.
  */
-export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
+export function orphanShards(loaded: LoadedProject, tree: Map<string, string[]> = walkFilesByExt(loaded.root, SHARD_EXTENSIONS)): HygieneIssue[] {
   // Decided from PATHS, not from what happens to be in memory. This first compared the disk walk with
   // the loaded file lists, which is only right while those lists track every file: a shard that
   // appeared under its folder after the project was opened (another tool, a checkout, a colleague's
@@ -147,7 +199,7 @@ export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
   };
   const out: HygieneIssue[] = [];
   for (const [ext, { what, home }] of Object.entries(kind)) {
-    for (const file of walkFiles(loaded.root, ext)) {
+    for (const file of tree.get(ext) ?? []) {
       if (home ? inside(file, join(loaded.root, home)) : file === loaded.projectFile) continue;
       const rel = relative(loaded.root, file);
       const message = home
@@ -164,29 +216,29 @@ export function orphanShards(loaded: LoadedProject): HygieneIssue[] {
  * hash of its source inputs; if it no longer matches a fresh compile of the
  * committed source, the bundle is stale and must be regenerated. This is what
  * makes a committed-and-`merge=ours` bundle safe after a merge. Posture-agnostic
- * - it only checks bundles that are actually present in the tree.
+ * - it only checks bundles that are actually present: every `.patterc` in the
+ * tree, and the project's own bundle wherever it is written (`export.bundle`, or
+ * the sibling `patter-dist/` default, outside the tree).
+ *
+ * The bundle is read with `JSON.parse`, as every runtime reads it: a bundle a
+ * JSON5 reader accepts and a game's stock parser refuses is not a fresh bundle.
  */
-function checkBundles(loaded: LoadedProject): HygieneIssue[] {
+function checkBundles(loaded: LoadedProject, compiled: Bundle | undefined, inTree: string[]): HygieneIssue[] {
   const issues: HygieneIssue[] = [];
-  const bundles = walkFiles(loaded.root, ".patterc");
-  if (bundles.length === 0) return issues;
-
-  let fresh: unknown;
-  try {
-    fresh = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged }).content.hash;
-  } catch {
-    // The compile itself failed (e.g. a broken condition); validateConditions
-    // already reports the cause - don't double-report by failing staleness too.
-    return issues;
-  }
+  const own = bundleOutputPath(loaded);
+  const bundles = [...new Set([...inTree, ...(existsSync(own) ? [own] : [])])];
+  // The compile itself failed (a broken condition, a loc clash): its cause is reported elsewhere, so
+  // staleness says nothing rather than reporting the same thing twice.
+  if (bundles.length === 0 || !compiled) return issues;
+  const fresh = compiled.content.hash;
 
   for (const file of bundles) {
     let hash: unknown;
     try {
-      const parsed = parseSource(readFileSync(file, "utf8")) as { content?: { hash?: unknown } };
+      const parsed = JSON.parse(readFileSync(file, "utf8")) as { content?: { hash?: unknown } };
       hash = parsed?.content?.hash;
     } catch {
-      issues.push({ file, message: "compiled bundle is unparseable - run `patter export`" });
+      issues.push({ file, message: "compiled bundle is not strict JSON, so no game can read it - run `patter export`" });
       continue;
     }
     if (hash !== fresh) {
@@ -196,11 +248,38 @@ function checkBundles(loaded: LoadedProject): HygieneIssue[] {
   return issues;
 }
 
+/** The loc shards against each other and the project (see `ValidateResult.localisation`). */
+function locIssues(loaded: LoadedProject): GameScopesIssue[] {
+  const out: GameScopesIssue[] = [];
+  const scenes = new Set([...loaded.scenes.map((sc) => sc.id), PROJECT_LOCALE_SCENE]);
+  const declared = new Set(loaded.project.locales.all);
+  const bySlot = new Map<string, string>();
+  const byKey = new Map<string, { file: string; text: string }>();
+  loaded.locales.forEach((l, i) => {
+    const file = loaded.localeFiles[i] ?? "";
+    if (!scenes.has(l.scene)) out.push({ file, severity: "warning", message: `strings for scene '${l.scene}', which the project does not have: nothing reads them` });
+    if (!declared.has(l.locale)) out.push({ file, severity: "warning", message: `strings in '${l.locale}', which is not one of the project's languages (${[...declared].join(", ")})` });
+    const slot = `${l.scene}|${l.locale}`;
+    const first = bySlot.get(slot);
+    if (first) out.push({ file, severity: "warning", message: `a second file of '${l.locale}' strings for scene '${l.scene}' (the first is ${first})` });
+    else bySlot.set(slot, file);
+    for (const [key, text] of Object.entries(l.strings)) {
+      const seen = byKey.get(`${l.locale}|${key}`);
+      if (!seen) { byKey.set(`${l.locale}|${key}`, { file, text }); continue; }
+      if (seen.text !== text) out.push({ file, severity: "error", message: `'${key}' has different '${l.locale}' text here and in ${seen.file}; the project will not build until one is removed` });
+    }
+  });
+  return out;
+}
+
 // Cache the per-file hygiene result by mtime: patterpad re-runs validate on every debounced keystroke, but
 // the on-disk source bytes don't change between saves - so a cheap stat lets us skip re-reading every file.
+// Pruned to the files of the latest call, so a project closed in Patterpad leaves nothing behind.
 const hygieneCache = new Map<string, { mtimeMs: number; issues: HygieneIssue[] }>();
 
 function checkHygiene(files: string[]): HygieneIssue[] {
+  const wanted = new Set(files);
+  for (const file of hygieneCache.keys()) if (!wanted.has(file)) hygieneCache.delete(file);
   const issues: HygieneIssue[] = [];
   for (const file of files) {
     let mtimeMs: number;

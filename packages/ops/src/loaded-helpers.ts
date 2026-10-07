@@ -4,8 +4,8 @@
 // `.find()` would only see the first scene). These are the one place that merge happens.
 
 import type { LoadedProject } from "./load.js";
-import type { DocLine, EditRecord } from "@patterkit/model";
-import { RERECORD_STATUS } from "@patterkit/model";
+import type { Block, DocLine, EditRecord, Scene } from "@patterkit/model";
+import { RERECORD_STATUS, effectiveGameId } from "@patterkit/model";
 
 /** The effective recording status of a dialogue line: the reserved `rerecord` status when the line is
  *  flagged needs-re-record (it masks everything, so a "recorded" take still reads as work), else the
@@ -28,14 +28,36 @@ export function sourceStrings(loaded: LoadedProject): Record<string, string> {
 }
 
 /** Resolve where a flow starts: an explicit override, else the project's authored `start`, else `{}`
- *  (the runtime's first-scene default). Shared by `runPlay` and `runCoverage`. */
+ *  (the runtime's first-scene default). Shared by `runPlay` and `runCoverage`. A block named with no scene
+ *  is looked for in every scene (see `findBlockAnywhere`), so it is never silently dropped for the
+ *  project's own start; that search throws when the block is in no scene, or in more than one. */
 export function resolveStart(
   loaded: LoadedProject,
   override?: { scene?: string; block?: string },
 ): { scene?: string; block?: string } {
   if (override?.scene) return { scene: override.scene, block: override.block };
+  if (override?.block) return findBlockAnywhere(loaded, override.block);
   if (loaded.project.start) return { scene: loaded.project.start.scene, block: loaded.project.start.block };
   return {};
+}
+
+/** The scene and block (internal ids) a scene-less block reference names. An id is unique project-wide, so
+ *  an id match wins outright; otherwise the reference is a block's name or address, which are unique only
+ *  within a scene, so a match in two scenes is ambiguous and the error names them. */
+function findBlockAnywhere(loaded: LoadedProject, ref: string): { scene: string; block: string } {
+  const matches: Array<{ scene: Scene; block: Block }> = [];
+  for (const scene of loaded.scenes) {
+    for (const block of scene.blocks) {
+      if (block.id === ref) return { scene: scene.id, block: block.id };
+      if (block.name === ref || effectiveGameId(block) === ref) matches.push({ scene, block });
+    }
+  }
+  if (matches.length === 0) throw new Error(`no scene has a block "${ref}"`);
+  if (matches.length > 1) {
+    const scenes = [...new Set(matches.map((m) => `"${m.scene.name}" (${m.scene.id})`))].join(", ");
+    throw new Error(`more than one block is called "${ref}" (in ${scenes}): name the scene as well`);
+  }
+  return { scene: matches[0]!.scene.id, block: matches[0]!.block.id };
 }
 
 /** Every locale's merged table (locale -> id -> text), for ops that report across all locales. */

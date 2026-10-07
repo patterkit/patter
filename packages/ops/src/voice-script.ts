@@ -4,7 +4,8 @@
 // actor can tell when lines run together (a snippet) vs branch. Pure data out; the
 // xlsx renderer (voice-script-xlsx.ts) is a view, like report / loc.
 //
-//   - VOICED lines only (line beats). By default only lines at/past the writing
+//   - VOICED lines only (line beats, and an option's prompt when it is a line, as
+//     the report counts them). By default only lines at/past the writing
 //     ladder's `readyToRecord` threshold; `everything: true` emits them all.
 //   - Each row carries its SCOPE (a readable container trail) so a flat sheet still
 //     reads as structured, and a COMMENTS column: the line's own `vo` notes, plus -
@@ -14,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
-import type { Block, Group, Snippet } from "@patterkit/model";
+import type { Beat, Block, Group, Snippet } from "@patterkit/model";
 import { sourceStrings, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
 import { classesForChannel } from "./documentation.js";
 import type { LoadedProject } from "./load.js";
@@ -94,12 +95,36 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
 
   const lines: VoiceLine[] = [];
 
+  // One row for a spoken beat, or nothing when it is cut, not a line, or not yet ready to record. Shared by
+  // the line beats of a run and an option's prompt, so the two can never disagree on what gets recorded.
+  // Returns whether a row was emitted, so a run knows when its leading line has been used.
+  const emitLine = (beat: Beat, scope: string[], leadingVo: string[] | undefined): boolean => {
+    if (beat.kind !== "line" || cutSet.has(beat.id)) return false;
+    const ws = writingOf.get(beat.id) ?? stub;
+    if (!everything && recordThreshold !== -1 && (writingIndex.get(ws) ?? 0) < recordThreshold) return false; // not ready to record
+    const own = ownVo(beat.id);
+    lines.push({
+      scope: scope.join(" › "),
+      id: beat.id,
+      character: beat.character ?? "",
+      actor: beat.character ? actorOf.get(beat.character) : undefined,
+      text: plainVoice(source[beat.id] ?? ""),
+      comments: leadingVo ? [...leadingVo, ...own] : own, // first line of the run gets the enclosing context
+      recordingStatus: recordingOf(beat.id),
+    });
+    return true;
+  };
+
   const walkNode = (node: Group | Snippet, scope: string[], ancestorVo: string[]): void => {
     if (node.type === "group") {
       if (cutSet.has(node.id)) return; // a cut branch is excluded wholesale
       const label = groupLabel(node, source);
       const childScope = label ? [...scope, label] : scope; // a `choice` adds nothing - its options do
       const childVo = [...ancestorVo, ...ownVo(node.id)];
+      // An option's prompt, when it is a line, is spoken: the report counts it as a voiced line and the
+      // runtime says it under prompt replay. It is recorded as a run of its own, in the option's scope and
+      // ahead of the option's content, carrying the option's context as any run-leading line does.
+      if (node.prompt) emitLine(node.prompt, childScope, childVo);
       for (const child of node.children ?? []) walkNode(child as Group | Snippet, childScope, childVo);
       return;
     }
@@ -107,20 +132,7 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
     if (cutSet.has(node.id)) return;
     let leading = true;
     for (const beat of node.beats ?? []) {
-      if (beat.kind !== "line" || cutSet.has(beat.id)) continue;
-      const ws = writingOf.get(beat.id) ?? stub;
-      if (!everything && recordThreshold !== -1 && (writingIndex.get(ws) ?? 0) < recordThreshold) continue; // not ready to record
-      const own = ownVo(beat.id);
-      lines.push({
-        scope: scope.join(" › "),
-        id: beat.id,
-        character: beat.character ?? "",
-        actor: beat.character ? actorOf.get(beat.character) : undefined,
-        text: plainVoice(source[beat.id] ?? ""),
-        comments: leading ? [...ancestorVo, ...own] : own, // first line of the run gets the enclosing context
-        recordingStatus: recordingOf(beat.id),
-      });
-      leading = false;
+      if (emitLine(beat, scope, leading ? ancestorVo : undefined)) leading = false;
     }
   };
 

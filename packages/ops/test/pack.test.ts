@@ -82,11 +82,12 @@ describe("pack / unpack round-trip", () => {
     // that is open today. If this test ever fails, they stop being belt-and-braces and start earning
     // their keep, and the refusal path below them needs a test of its own.
     const zip = new JSZip();
+    zip.file("game.patterproj", "{}");
     zip.file("../escape.patterflow", "{}");
     const bytes = await zip.generateAsync({ type: "nodebuffer" });
-    const target = scaffold();
+    const target = mkdtempSync(join(tmpdir(), "patter-pack-into-"));
     const { shards: writes } = await runUnpack(bytes, target);
-    expect(writes.map((w) => w.path)).toEqual([join(target, "escape.patterflow")]);
+    expect(writes.map((w) => w.path)).toEqual([join(target, "escape.patterflow"), join(target, "game.patterproj")]);
   });
 
   it("every path runUnpack plans lands inside the target directory", async () => {
@@ -94,7 +95,7 @@ describe("pack / unpack round-trip", () => {
     // cannot know where that name resolves to once joined; containment of the resolved path can, and is
     // what the op now checks at the point each write path is formed.
     const src = scaffold();
-    const target = scaffold();
+    const target = mkdtempSync(join(tmpdir(), "patter-pack-into-"));
     const { shards: writes } = await runUnpack(await runPack(src), target);
     expect(writes.length).toBeGreaterThan(0);
     for (const w of writes) expect(w.path.startsWith(target + "/")).toBe(true);
@@ -311,5 +312,74 @@ describe("an unresolved merge cannot be packed or exported", () => {
     expect(() => runExport(loadProject(dir))).not.toThrow(); // clean tree first, or the test proves nothing
     writeFileSync(join(dir, "scenes", "start.patterflow.patterconflict"), "{}");
     expect(() => runExport(loadProject(dir))).toThrow(/unresolved merge conflict/i);
+  });
+});
+
+describe("unpack writes only what a pack of ours carries (CLI review 2026-10, item 1)", () => {
+  /** A pack of `src` with extra entries added, as an attacker or another tool would build one. */
+  async function withEntries(src: string, extra: Record<string, string>): Promise<Buffer> {
+    const zip = await JSZip.loadAsync(await runPack(src));
+    for (const [name, text] of Object.entries(extra)) zip.file(name, text);
+    return zip.generateAsync({ type: "nodebuffer" });
+  }
+  const empty = (): string => mkdtempSync(join(tmpdir(), "patter-unpack-into-"));
+
+  it("refuses a dot-folder entry, whatever its case, before anything is planned", async () => {
+    // `.git/config` is inside the target, so containment passes it; git would run its fsmonitor command
+    // on the VC layer's next `git add`.
+    for (const name of [".git/config", ".GIT/config", "scenes/.hidden/x.patterflow", ".gitattributes"]) {
+      await expect(runUnpack(await withEntries(scaffold(), { [name]: "x" }), empty())).rejects.toThrow(/dot-file or dot-folder/);
+    }
+  });
+
+  it("refuses the same entry in a returned pack being merged", async () => {
+    const ours = mkProject({ A: "a" });
+    const base = await runPack(ours);
+    await expect(runUnpackMerge(await withEntries(mkProject({ A: "b" }), { ".git/hooks/post-merge": "x" }), base, ours))
+      .rejects.toThrow(/dot-file or dot-folder/);
+  });
+
+  it("returns an entry that is not a shard, scopes file or handoff record, and plans no write for it", async () => {
+    const target = empty();
+    const res = await runUnpack(await withEntries(scaffold(), { "run.sh": "echo hi", "notes/readme.txt": "x" }), target);
+    expect(res.other).toEqual(["notes/readme.txt", "run.sh"]);
+    expect([...res.shards, ...res.scopes].some((w) => w.path.endsWith("run.sh") || w.path.endsWith("readme.txt"))).toBe(false);
+  });
+
+  it("says a file is not a pack, rather than a zip library's error", async () => {
+    await expect(runUnpack(Buffer.from("not a zip"), empty())).rejects.toThrow(/not a \.patterpack/);
+    const zip = new JSZip();
+    zip.file("scenes/a.patterflow", "{}");
+    await expect(runUnpack(await zip.generateAsync({ type: "nodebuffer" }), empty())).rejects.toThrow(/holds no project file/);
+  });
+
+  it("refuses a folder holding a different project, and allows the same one", async () => {
+    const src = scaffold();
+    await expect(runUnpack(await runPack(src), scaffold())).rejects.toThrow(/already holds a different project/);
+    const again = await runUnpack(await runPack(src), src);
+    expect(again.shards.length).toBeGreaterThan(0);
+  });
+});
+
+describe("unpack --merge skips what nobody changed (CLI review 2026-10, items 17 and 38)", () => {
+  it("does not bring back a shard the recipient deleted after sending", async () => {
+    const ours = mkProject({ A: "a" });
+    mkdirSync(join(ours, "scenes"), { recursive: true });
+    writeFileSync(join(ours, "scenes", "gone.patterflow"), "{}");
+    const base = await runPack(ours);
+    const theirs = join(mkdtempSync(join(tmpdir(), "patter-um-")), "theirs");
+    applyWrites((await runUnpack(base, theirs)).shards);
+    rmSync(join(ours, "scenes", "gone.patterflow"));
+    const res = await runUnpackMerge(await runPack(theirs), base, ours);
+    expect(res.writes.some((w) => w.path.endsWith("gone.patterflow"))).toBe(false);
+    expect(res.shards.some((s) => s.path.endsWith("gone.patterflow"))).toBe(false);
+  });
+
+  it("plans no write for a shard returned unchanged, or merged to what we already have", async () => {
+    const ours = mkProject({ A: "a" });
+    const base = await runPack(ours);
+    const res = await runUnpackMerge(base, base, ours);
+    expect(res.writes).toEqual([]);
+    expect(res.shards.every((s) => !s.changed)).toBe(true);
   });
 });

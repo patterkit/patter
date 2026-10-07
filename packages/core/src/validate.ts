@@ -46,10 +46,14 @@ export interface ValidationIssue {
     | "invalid-status-value"
     | "unknown-doc-class"
     | "invalid-tag"
-    | "invalid-gamedata-field";
+    | "invalid-gamedata-field"
+    | "jump-cycle";
   message: string;
   /** Id of the offending node/beat, where applicable. */
   id?: string;
+  /** Absent means an error: the project should not be built. A warning still compiles and plays (a choice
+   *  that can run dry gathers or falls through at runtime), and every front end shows it as one. */
+  severity?: "warning";
 }
 
 export interface ProjectInput {
@@ -79,6 +83,69 @@ function isContentlessNode(node: Group | Snippet): boolean {
   if (node.type === "snippet") return (node.beats?.length ?? 0) === 0 && !node.jump;
   if (node.prompt) return false;
   return Array.isArray(node.children) && node.children.every(isContentlessNode);
+}
+
+/**
+ * Jump cycles with nothing to deliver: blocks whose run can only ever jump straight on, round a loop that
+ * comes back to where it began. The engine walks such a loop until its transition guard throws, so a
+ * playthrough that reaches one stops there. Conditions gate jumps, which is why the engine cannot rule
+ * this out statically, and why this reports only what is PROVABLE: a block counts only when its first
+ * thing to run, taken unconditionally, is a snippet with no beats that jumps (or calls), reached through
+ * nothing but empty snippets and plain run groups with no condition. Any condition, beat, prompt, choice,
+ * or other selector on the way, and the block is left out. A warning, since the project still builds.
+ */
+function contentlessJumpCycles(scenes: Scene[]): ValidationIssue[] {
+  const firstBlock = new Map<string, string>();
+  for (const scene of scenes) {
+    const first = Array.isArray(scene.blocks) ? scene.blocks[0] : undefined;
+    if (typeof scene.id === "string" && typeof first?.id === "string") firstBlock.set(scene.id, first.id);
+  }
+  /** Where a run of these children provably goes next without delivering anything: a jump (its snippet
+   *  and the block it enters), "through" when every child is empty and the run gathers, or undefined
+   *  when nothing can be proved. */
+  type Leads = { via: string; to: string } | "through" | undefined;
+  const leads = (children: unknown): Leads => {
+    if (!Array.isArray(children)) return undefined;
+    for (const n of children as Array<Group | Snippet>) {
+      if (!n || typeof n !== "object" || n.condition) return undefined;
+      if (n.type === "snippet") {
+        if ((n.beats?.length ?? 0) > 0) return undefined;
+        if (!n.jump) continue; // an empty bubble: walked past
+        if (n.jump.to === "END") return undefined;
+        const to = firstBlock.get(n.jump.to) ?? n.jump.to;
+        return { via: n.id, to };
+      }
+      if (n.type !== "group" || n.prompt || (n.selector !== undefined && n.selector !== "run")) return undefined;
+      const inner = leads(n.children);
+      if (inner !== "through") return inner;
+    }
+    return "through";
+  };
+  const next = new Map<string, { via: string; to: string }>();
+  for (const scene of scenes) {
+    for (const block of Array.isArray(scene.blocks) ? scene.blocks : []) {
+      const l = leads(block.children);
+      if (l && l !== "through" && typeof block.id === "string") next.set(block.id, l);
+    }
+  }
+  // Each block leads to at most one other, so a cycle is found by following the chain until it repeats.
+  const issues: ValidationIssue[] = [];
+  const settled = new Set<string>();
+  for (const startId of next.keys()) {
+    const path: string[] = [];
+    let at: string | undefined = startId;
+    while (at !== undefined && !settled.has(at) && !path.includes(at)) { path.push(at); at = next.get(at)?.to; }
+    if (at !== undefined && path.includes(at)) {
+      const loop = path.slice(path.indexOf(at));
+      const via = loop.map((b) => next.get(b)!.via);
+      issues.push({
+        code: "jump-cycle", severity: "warning", id: via[0],
+        message: `${via.length === 1 ? `snippet '${via[0]}' jumps` : `snippets ${via.map((v) => `'${v}'`).join(", ")} jump`} round a loop with nothing to deliver (blocks ${[...loop, at].map((b) => `'${b}'`).join(" -> ")}); play reaching it never gets out`,
+      });
+    }
+    for (const b of path) settled.add(b);
+  }
+  return issues;
 }
 
 /** Validate a project's structural invariants. Returns an empty array when valid. */
@@ -246,9 +313,9 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
             //      empties out on re-entry. (A choice whose options jump away is fine being all-once-only.)
             const hasUnconditionalEscape = (node.children ?? []).some((opt) => !opt.condition);
             if ((node.children?.length ?? 0) > 0 && !hasUnconditionalEscape) {
-              issues.push({ code: "choice-can-empty", message: `choice '${node.id}' in ${inBlock} has no unconditional option or fallback - it runs dry (falls through) if every condition fails`, id: node.id });
+              issues.push({ code: "choice-can-empty", message: `choice '${node.id}' in ${inBlock} has no unconditional option or fallback - it runs dry (falls through) if every condition fails`, id: node.id, severity: "warning" });
             } else if (!hasSticky && fallbacks === 0 && choiceLoopsBack(node, block.id, bgid, scene.id, sgid)) {
-              issues.push({ code: "choice-can-empty", message: `choice '${node.id}' in ${inBlock} can be re-entered but every option is once-only with no fallback - it will run dry`, id: node.id });
+              issues.push({ code: "choice-can-empty", message: `choice '${node.id}' in ${inBlock} can be re-entered but every option is once-only with no fallback - it will run dry`, id: node.id, severity: "warning" });
             }
           }
           return;
@@ -258,6 +325,12 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
         for (const beat of node.beats ?? []) {
           seeId(beat.id, "beat", `snippet '${node.id}'`);
           checkTags(beat.tags, `beat '${beat.id}'`, beat.id);
+          // A kind the runtime does not know delivers nothing, silently: the beat is in the script and
+          // never plays. (Found writing a test that used "narration", which is a `text` beat.)
+          const kind: string = beat.kind;
+          if (kind !== "line" && kind !== "text" && kind !== "gameEvent") {
+            issues.push({ code: "malformed-node", message: `beat '${beat.id}' has an unknown kind '${kind}' (line, text, or gameEvent)`, id: beat.id });
+          }
           if (beat.kind === "line" && beat.character && !castNames.has(beat.character)) {
             issues.push({
               code: "unknown-character",
@@ -272,6 +345,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
   }
 
   if (input.authoring) validateAuthoring(input.authoring, project, allIds, issues);
+  issues.push(...contentlessJumpCycles(scenes));
 
   // Resolve jumps once all ids are known.
   for (const d of jumps) {

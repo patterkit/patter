@@ -127,6 +127,15 @@ describe("applyLoc", () => {
     expect(applyLoc(loaded, sourceCat).writes).toEqual([]);
   });
 
+  it("refuses a scene the project does not have, or a language it does not declare, writing nothing", () => {
+    // CLI review 2026-10, item 4: the target path is built from the file's own names.
+    const cat = extractLoc(loaded, { locale: "fr" });
+    const one = { ...cat.entries[0]!, translation: "x" };
+    expect(() => applyLoc(loaded, { ...cat, entries: [{ ...one, scene: "../../outside" }] })).toThrow(/does not have: '\.\.\/\.\.\/outside'/);
+    expect(() => applyLoc(loaded, { ...cat, entries: [{ ...one, scene: "scn_nope" }] })).toThrow(/does not have/);
+    expect(() => applyLoc(loaded, { ...cat, locale: "../../x" })).toThrow(/not one of the project's languages/);
+  });
+
   it("counts only strings whose translation actually changed (a no-op re-import reads 0 updated)", () => {
     const fresh = loadProject(dir); // current on-disk state
     const cat = extractLoc(fresh, { locale: "fr" });

@@ -6,7 +6,7 @@
 // Patterpad dialog are thin front-ends over runCoverage - the same one-engine,
 // two-front-ends shape as report / voice-export / loc.
 //
-// The unit tallied is the deliverable BEAT (line / text / action) only; choice-
+// The unit tallied is the deliverable BEAT (line / text / game event) only; choice-
 // option prompts are excluded ("covered when offered / eligible / taken?" is
 // ambiguous), but the content reached THROUGH an option is tallied normally, so
 // a never-taken branch still reads 0%. The harness owns a single seeded PRNG
@@ -14,10 +14,10 @@
 // `--seed` makes the whole coverage run bit-for-bit reproducible.
 // ---------------------------------------------------------------------------
 
-import { exportBundle } from "@patterkit/compiler";
+import { compileLoaded } from "./compile.js";
 import { Engine } from "@patterkit/runtime";
 import type { PlayError } from "@patterkit/runtime";
-import { walkNodes } from "@patterkit/model";
+import { isContentlessBeat, walkNodes } from "@patterkit/model";
 import type {
   Group, Snippet, Bundle, CompiledGroup, CompiledSnippet, CompiledEffect, Expression,
   CoverageDriver, ScalarValue,
@@ -76,7 +76,10 @@ export interface CoverageBeat {
    *  (one of several random picks is rare by design). Absent on a never-reached beat. */
   rare?: true;
   /** Set on a never-reached beat that is gated on a host-scope ref (`@world.x`) nothing writes and no
-   *  driver provides, i.e. it may just need an input, not be truly dead. Lists the offending refs. */
+   *  driver provides, i.e. it may just need an input, not be truly dead. Lists the offending refs. The
+   *  gate is the beat's own conditions and its ancestors', plus any ref that every jump into its block
+   *  passes (a block reached only past a gated jump is gated too). Absent on a beat a branch sibling
+   *  before it always wins over: no input can help that one. */
   needsInput?: string[];
   /** Set on a never-reached beat gated on a ref that IS written, but ONLY by content that was itself
    *  never reached: the beat is dead at one remove, and the gate is not the real question. Names the
@@ -90,7 +93,9 @@ export interface BlockedGate {
   /** The gating ref, at the granularity the condition reads it: `@world.alarm`, or `@world.mood:armed`
    *  for a single flag of a flags property. */
   ref: string;
-  /** Beat ids witnessing the writers: content that would have to play for this gate to be written. */
+  /** The writers: content that would have to run for this gate to be written. A writer with beats of its
+   *  own is named by its beats; one without (a scene's entry effects, a snippet that only jumps, an option
+   *  with only a prompt) by its own node id. */
   writers: string[];
 }
 
@@ -101,9 +106,11 @@ export interface BlockedGate {
 /** A condition or effect that failed during the runs. The engine plays through these (a failing condition
  *  counts as false, a failing effect is skipped), so without this list they would pass unseen. */
 export interface ContentError {
-  /** What failed: a condition, an effect, or a part of a condition scored for Best match. */
-  kind: PlayError["kind"];
-  /** The snippet, group, or option whose condition failed, or the snippet or scene owning the effect. */
+  /** What failed: a condition, an effect, or a part of a condition scored for Best match; or "stopped",
+   *  when the engine threw and the run ended there (a jump cycle with nothing to deliver). */
+  kind: PlayError["kind"] | "stopped";
+  /** The snippet, group, or option whose condition failed, or the snippet or scene owning the effect. For
+   *  "stopped", the scene the run was in when it stopped. */
   node: string;
   /** The scene the node lives in. */
   scene: string;
@@ -134,7 +141,9 @@ export interface CoverageReport {
   totals: { beats: number; covered: number; neverHit: number; rare: number; coveragePct: number };
   /** The reach % below which a reached beat counts as rare ({@link RARE_REACH_PCT}). */
   rareThresholdPct: number;
-  /** How each run ended, for the summary header. */
+  /** How each run ended, for the summary header. `evalError` counts the runs the engine stopped, each
+   *  with its cause in `contentErrors` (kind "stopped"). `stalled` is always 0 now (a choice with nothing
+   *  to pick runs dry and play moves on), and stays only because Patterpad's Coverage window reads it. */
   termination: { ended: number; capped: number; stalled: number; evalError: number };
   /** The input drivers actually applied this run (empty when none). */
   drivers: CoverageDriver[];
@@ -190,14 +199,30 @@ interface HostScopeAnalysis {
    *  hop. Keyed coarsely, a property half the project writes always looks written, and the hop finds
    *  nothing; keyed by the individual flag, the one writer that matters is visible. */
   fineGatesByBeat: Map<string, Set<string>>;
-  /** Per gate key (fine or coarse), the sites that write it. A site is a set of beat ids that WITNESS it
-   *  running: a snippet's own beats for its `onEnter` / `onExit`, a scene's beats for its `onEntry`. */
-  writerSites: Map<string, string[][]>;
+  /** Per gate key (fine or coarse), the sites that write it: the id of the node whose effects do, a
+   *  snippet for its `onEnter` / `onExit` (an option is one too), a scene for its `onEntry`. Each site is
+   *  witnessed by its OWN visit count, read from the engine after every run. Witnessing it by the beats it
+   *  holds blamed the wrong gate: a scene entered and left through a prompt-only choice plays none of its
+   *  beats, so its entry effects read as never run when they had. */
+  writerSites: Map<string, string[]>;
+  /** Per site, the beats that name it to a person (a snippet's own beats); absent for a site with none. */
+  siteBeats: Map<string, string[]>;
   /** Coarse refs written by something the flag analysis cannot read as a per-flag delta (a whole-list
    *  assignment, a computed value). Any such write makes every flag of that property unrefutable, so the
    *  hop drops it rather than guessing. */
   opaqueWrites: Set<string>;
+  /** Beats that a `branch` sibling before them always wins over (one with no condition): never reached,
+   *  whatever any input does, so no hint about an input applies to them. */
+  shadowed: Set<string>;
+  /** The block each beat is in, for the gates its block's way in adds. */
+  blockOfBeat: Map<string, string>;
+  /** Every jump and call, from the block it is in, with the host refs gating the snippet that takes it.
+   *  A shadowed snippet's jump is left out: it never runs. */
+  routes: Route[];
 }
+
+/** One way into a block other than the start: a jump or call to a scene (its first block) or a block. */
+interface Route { from: string; to: string; gate: Set<string> }
 
 /** Walk an ExprNode, collecting host-scope refs (`@token.name` for a declared token) and, for any
  *  comparison against a literal, proposing nearby values for that ref. */
@@ -270,9 +295,15 @@ function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAn
   const gatesByBeat = new Map<string, Set<string>>();
   const fineGatesByBeat = new Map<string, Set<string>>();
   const proposals = new Map<string, Set<ScalarValue>>();
-  const writerSites = new Map<string, string[][]>();
+  const writerSites = new Map<string, string[]>();
+  const siteBeats = new Map<string, string[]>();
   const opaqueWrites = new Set<string>();
-  const empty: HostScopeAnalysis = { written, gatesByBeat, proposals, fineGatesByBeat, writerSites, opaqueWrites };
+  const shadowed = new Set<string>();
+  const blockOfBeat = new Map<string, string>();
+  const routes: Route[] = [];
+  const empty: HostScopeAnalysis = {
+    written, gatesByBeat, proposals, fineGatesByBeat, writerSites, siteBeats, opaqueWrites, shadowed, blockOfBeat, routes,
+  };
   if (hostTokens.size === 0) return empty;
 
   const refsIn = (expr?: Expression): Set<string> => {
@@ -285,55 +316,96 @@ function analyzeHostScopes(bundle: Bundle, hostTokens: Set<string>): HostScopeAn
     if (expr) fineRefsIn(deserialiseAst(expr.ast), hostTokens, refs);
     return refs;
   };
-  const addSite = (key: string, witnesses: string[]): void => {
-    (writerSites.get(key) ?? writerSites.set(key, []).get(key)!).push(witnesses);
+  const addSite = (key: string, site: string): void => {
+    const sites = writerSites.get(key) ?? writerSites.set(key, []).get(key)!;
+    if (!sites.includes(site)) sites.push(site);
   };
-  /** `witnesses` are the beats whose being reached proves these effects ran. */
-  const scanEffects = (effects: CompiledEffect[] | undefined, witnesses: string[]): void => {
+  /** `site` is the node whose visit count says whether these effects ran. */
+  const scanEffects = (effects: CompiledEffect[] | undefined, site: string): void => {
     for (const e of effects ?? []) {
       const target = targetHostRef(e.target, hostTokens);
       if (target) {
         written.add(target);
-        addSite(target, witnesses);
+        addSite(target, site);
         // A `set_flags(@world.mood, +armed)` write is readable per flag; anything else assigns the whole
         // property, so no per-flag claim about it can be refuted.
         const flags = e.value ? flagKeys(deserialiseAst(e.value.ast), hostTokens, "set_flags") : [];
-        if (flags.length) for (const k of flags) addSite(k, witnesses);
+        if (flags.length) for (const k of flags) addSite(k, site);
         else opaqueWrites.add(target);
       }
       refsIn(e.value); // RHS refs feed proposals
     }
   };
 
-  const walk = (nodes: Array<CompiledGroup | CompiledSnippet>, gate: Set<string>, fine: Set<string>): void => {
+  const walk = (
+    nodes: Array<CompiledGroup | CompiledSnippet>, blockId: string, gate: Set<string>, fine: Set<string>,
+    branch: boolean, dead: boolean,
+  ): void => {
+    // In a `branch`, the first eligible child wins, so once a child with no condition has been passed,
+    // every later sibling is never picked. Nothing else shadows: a run skips what is ineligible and goes
+    // on, a sequence moves along, and a choice offers every option.
+    let won = false;
     for (const node of nodes) {
+      const shadow = dead || won;
+      if (branch && !node.condition) won = true;
       const here = new Set([...gate, ...refsIn(node.condition)]);
       const hereFine = new Set([...fine, ...fineIn(node.condition)]);
       if (node.type === "group") {
-        walk(node.children, here, hereFine); // a group's prompt carries no expression
+        // a group's prompt carries no expression
+        walk(node.children, blockId, here, hereFine, node.selector === "branch", shadow);
       } else {
-        const witnesses = (node.beats ?? []).map((b) => b.id);
-        scanEffects(node.onEnter, witnesses);
-        scanEffects(node.onExit, witnesses);
-        for (const beat of node.beats ?? []) { gatesByBeat.set(beat.id, here); fineGatesByBeat.set(beat.id, hereFine); }
+        const beats = (node.beats ?? []).map((b) => b.id);
+        if (beats.length) siteBeats.set(node.id, beats);
+        scanEffects(node.onEnter, node.id);
+        scanEffects(node.onExit, node.id);
+        for (const id of beats) {
+          gatesByBeat.set(id, here); fineGatesByBeat.set(id, hereFine); blockOfBeat.set(id, blockId);
+          if (shadow) shadowed.add(id);
+        }
+        if (node.jump && node.jump.to !== "END" && !shadow) routes.push({ from: blockId, to: node.jump.to, gate: here });
       }
     }
   };
 
   for (const scene of Object.values(bundle.scenes)) {
-    // A scene's entry effects are witnessed by every beat in it: if any of them played, entry ran.
-    const sceneBeats: string[] = [];
-    const collect = (nodes: Array<CompiledGroup | CompiledSnippet>): void => {
-      for (const n of nodes) {
-        if (n.type === "group") collect(n.children);
-        else for (const b of n.beats ?? []) sceneBeats.push(b.id);
-      }
-    };
-    for (const block of scene.blocks) collect(block.children);
-    scanEffects(scene.onEntry, sceneBeats);
-    for (const block of scene.blocks) walk(block.children, new Set(), new Set());
+    scanEffects(scene.onEntry, scene.id);
+    for (const block of scene.blocks) walk(block.children, block.id, new Set(), new Set(), false, false);
   }
   return empty;
+}
+
+/**
+ * The host refs gating every way into each block, from the start point: a block reached only past a jump
+ * gated on `@world.door` is gated on it too, though nothing in the block says so. Intersection across the
+ * ways in, never union: one ungated way in is enough to reach the block, so only a ref every way passes
+ * gates it. A block no way reaches has no entry here (its beats keep only their own gates).
+ */
+function entryGates(bundle: Bundle, routes: Route[], start: { scene?: string; block?: string }): Map<string, Set<string>> {
+  // A jump to a scene enters its first block; the runtime starts at the first scene when nothing says.
+  const firstBlock = (sceneId: string | undefined): string | undefined =>
+    sceneId === undefined ? undefined : bundle.scenes[sceneId]?.blocks[0]?.id;
+  const blockOf = (to: string): string | undefined => (bundle.scenes[to] ? firstBlock(to) : to);
+  const startBlock = start.block ?? firstBlock(start.scene ?? Object.keys(bundle.scenes)[0]);
+  if (startBlock === undefined) return new Map();
+
+  // A must-analysis, solved by iterating to a fixpoint: a block's gate is only ever narrowed once known,
+  // and the set of blocks known only grows, so this ends.
+  let entry = new Map<string, Set<string>>([[startBlock, new Set()]]);
+  for (;;) {
+    const next = new Map<string, Set<string>>([[startBlock, new Set()]]);
+    for (const r of routes) {
+      const from = entry.get(r.from);
+      const to = blockOf(r.to);
+      if (from === undefined || to === undefined) continue;
+      const via = new Set([...from, ...r.gate]);
+      const had = next.get(to);
+      next.set(to, had === undefined ? via : new Set([...had].filter((g) => via.has(g))));
+    }
+    const same = next.size === entry.size
+      && [...next].every(([k, v]) => { const was = entry.get(k); return was !== undefined && was.size === v.size; });
+    entry = next;
+    if (same) return entry;
+  }
 }
 
 /**
@@ -354,7 +426,7 @@ function blockedGates(
   beatId: string,
   analysis: HostScopeAnalysis,
   drivenRefs: Set<string>,
-  reachedRuns: Map<string, number>,
+  siteRuns: Map<string, number>,
 ): BlockedGate[] {
   const out: BlockedGate[] = [];
   const gates = new Set([...(analysis.gatesByBeat.get(beatId) ?? []), ...(analysis.fineGatesByBeat.get(beatId) ?? [])]);
@@ -368,11 +440,11 @@ function blockedGates(
     if (ref === coarse && [...gates].some((g) => g !== ref && g.startsWith(`${ref}:`))) continue;
     const sites = analysis.writerSites.get(ref) ?? [];
     if (!sites.length) continue;
-    // Unwitnessed site = a write whose running we cannot observe (a snippet with no beats of its own).
-    // It might well have run, so nothing here is refutable.
-    if (sites.some((s) => !s.length || s.some((w) => !reachedRuns.has(w)))) continue;
-    if (!sites.every((s) => s.every((w) => reachedRuns.get(w) === 0))) continue; // some writer did play
-    const writers = [...new Set(sites.flat())].sort();
+    // A site entered in any run may have written the gate. Entered is a little wider than ran (a run
+    // capped part-way through a snippet never reaches its onExit), and wider is the safe direction here:
+    // only a site never entered at all is one that provably never wrote.
+    if (sites.some((s) => (siteRuns.get(s) ?? 0) > 0)) continue; // some writer did run
+    const writers = [...new Set(sites.flatMap((s) => analysis.siteBeats.get(s) ?? [s]))].sort();
     out.push({ ref, writers });
   }
   return out;
@@ -385,7 +457,7 @@ function blockedGates(
  * writes are skipped (they are covered for free). The author edits + saves the result as `coverageDrivers`.
  */
 export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] {
-  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
+  const bundle = compileLoaded(loaded);
   // The bundle's host scopes (the project's, as a game scopes folder leaves them): World properties,
   // where proposals are edited, holds only those.
   const hostScopes = bundle.scopeRegistry?.scopes ?? [];
@@ -458,6 +530,9 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
         }
         for (const beat of (node as Snippet).beats ?? []) {
           if (meta.has(beat.id)) continue;
+          // A beat export strips (no text, there only to carry a jump) never ships, so it is not content
+          // the sweep can miss: counted, it read as never reached on every run.
+          if (isContentlessBeat(beat, !!src[beat.id])) continue;
           order.push(beat.id);
           meta.set(beat.id, {
             scene: scene.id,
@@ -475,8 +550,9 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
   const dryRuns = new Map<string, number>(); // choice group id -> distinct runs it ran dry in
   const errorRuns = new Map<string, ContentError>(); // kind|node|message -> the error, with its run count
   const termination = { ended: 0, capped: 0, stalled: 0, evalError: 0 };
+  const siteRuns = new Map<string, number>(); // write site (snippet or scene id) -> distinct runs it was entered in
 
-  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
+  const bundle = compileLoaded(loaded);
   const rng = mulberry32(seed);
 
   // Host-scope (`@world`) drivers + the static analysis behind the unwritten-input hint. Only drivers
@@ -491,6 +567,8 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
   const recurringDrivers = drivers.filter((d) => d.kind === "recurring");
   const drivenRefs = new Set(drivers.map((d) => d.ref));
   const pick = <T>(vals: T[]): T => vals[Math.floor(rng() * vals.length)]!;
+  const sites = [...new Set([...analysis.writerSites.values()].flat())];
+  const entered = entryGates(bundle, analysis.routes, start);
 
   let executed = 0;
   let cancelled = false;
@@ -537,16 +615,27 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
           flow.choose(eligible[Math.floor(rng() * eligible.length)]!.id);
           continue;
         }
-        // line / text / action: a delivered content beat
+        // line / text / game event: a delivered content beat
         if (hitCount.has(r.id)) {
           hitCount.set(r.id, hitCount.get(r.id)! + 1);
           seenThisRun.add(r.id);
         }
       }
-    } catch {
-      term = "evalError"; // a condition / effect that threw: counted, never fatal
+    } catch (err) {
+      // The engine plays through a failing condition or effect, so a throw here means the run could not go
+      // on (a jump cycle with nothing to deliver). Counted, never fatal to the sweep, and its cause kept
+      // with the content errors: a bare count of errored runs gave the author nothing to look at.
+      term = "evalError";
+      const node = flow.currentScene ?? start.scene ?? "";
+      const message = err instanceof Error ? err.message : String(err);
+      errorsThisRun.set(`stopped|${node}|${message}`, { kind: "stopped", node, message });
     }
 
+    // Each write site by its own visit count: whether its effects ran, whether or not it delivered a beat.
+    if (sites.length) {
+      const visits = engine.getVisitCounts();
+      for (const id of sites) if ((visits[id] ?? 0) > 0) siteRuns.set(id, (siteRuns.get(id) ?? 0) + 1);
+    }
     for (const id of seenThisRun) reachedRuns.set(id, reachedRuns.get(id)! + 1);
     for (const id of dryThisRun) dryRuns.set(id, (dryRuns.get(id) ?? 0) + 1);
     for (const [key, e] of errorsThisRun) {
@@ -568,10 +657,13 @@ function* sweep(loaded: LoadedProject, options: CoverageOptions = {}, hooks: Cov
     // need an input: flag it so the author can add a driver rather than assume it is dead.
     let needsInput: string[] | undefined;
     let blockedBy: BlockedGate[] | undefined;
-    if (reached === 0) {
-      const gates = [...(analysis.gatesByBeat.get(id) ?? [])].filter((r) => !analysis.written.has(r) && !drivenRefs.has(r));
+    // A beat a branch sibling always wins over gets neither hint: no input or writer can reach it.
+    if (reached === 0 && !analysis.shadowed.has(id)) {
+      const block = analysis.blockOfBeat.get(id);
+      const all = new Set([...(analysis.gatesByBeat.get(id) ?? []), ...(block !== undefined ? entered.get(block) ?? [] : [])]);
+      const gates = [...all].filter((r) => !analysis.written.has(r) && !drivenRefs.has(r));
       if (gates.length) { needsInput = gates; for (const g of gates) unwrittenInputs.add(g); }
-      const blocked = blockedGates(id, analysis, drivenRefs, reachedRuns);
+      const blocked = blockedGates(id, analysis, drivenRefs, siteRuns);
       if (blocked.length) blockedBy = blocked;
     }
     const reachPct = executed ? (reached / executed) * 100 : 0;
@@ -686,9 +778,10 @@ export function renderCoverageText(
   }
   if (report.contentErrors.length) {
     out.push("");
-    out.push(`content errors (a condition or effect failed and play went on without it - fix the expression): ${report.contentErrors.length}`);
+    out.push(`content errors (a condition or effect failed and play went on without it, or a run stopped - fix the content): ${report.contentErrors.length}`);
     for (const e of report.contentErrors) {
-      out.push(`  ‼ ${String(e.runs).padStart(6)} run(s)  ${sceneName(e.scene)}  ${e.kind} on '${e.node}'${e.source ? ` (${e.source})` : ""}: ${e.message}`);
+      const what = e.kind === "stopped" ? "run stopped" : `${e.kind} on '${e.node}'${e.source ? ` (${e.source})` : ""}`;
+      out.push(`  ‼ ${String(e.runs).padStart(6)} run(s)  ${sceneName(e.scene)}  ${what}: ${e.message}`);
     }
   }
   if (!report.beats.length) return out;
@@ -708,7 +801,7 @@ export function renderCoverageText(
     for (const bg of b.blockedBy ?? []) {
       const names = bg.writers.map((w) => {
         const target = report.beats.find((x) => x.id === w);
-        return target ? clip(target.preview || target.id, 28) : w;
+        return target ? clip(target.preview || target.id, 28) : sceneName(w); // a scene's entry, or a node id
       });
       out.push(`           gated on ${bg.ref}, written only by: ${names.join(", ")} (never played either)`);
     }

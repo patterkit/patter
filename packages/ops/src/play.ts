@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
-// The play op: compile a loaded project and play it headlessly through the
-// reference runtime. Returns STRUCTURED events + an outcome (Patterpad's
+// The play op: compile a loaded project and play it headlessly through
+// Patterplay's JS runtime. Returns STRUCTURED events + an outcome (Patterpad's
 // playthrough runner consumes the events; CI can gate on the outcome) -
 // string rendering is the separate `renderPlay`, used by the CLI.
 // ---------------------------------------------------------------------------
 
-import { exportBundle } from "@patterkit/compiler";
+import { compileLoaded } from "./compile.js";
 import { Engine } from "@patterkit/runtime";
 import type { StepResult, ChoiceOption, PlayError } from "@patterkit/runtime";
 import type { GameData } from "@patterkit/model";
@@ -33,10 +33,15 @@ export type PlayEvent =
   | { type: "gameEvent"; id: string; gameData?: GameData }
   | { type: "choice"; options: ChoiceOption[]; picked?: string }
   /** A condition or effect that failed; the engine played through it (see the runtime's PlayError). */
-  | { type: "error"; error: PlayError };
+  | { type: "error"; error: PlayError }
+  /** The run could not go on, and this is why: the engine stopped (a jump cycle with nothing to deliver,
+   *  a jump to a target the bundle lacks), or a scripted choice named an option the choice did not offer.
+   *  Always the last event, and the outcome is then "error". */
+  | { type: "error"; fatal: true; message: string };
 
-/** "end" = the flow finished; "stalled" = a choice with no pickable option; "max-steps" = bound hit. */
-export type PlayOutcome = "end" | "stalled" | "max-steps";
+/** "end" = the flow finished; "max-steps" = bound hit; "error" = the run stopped, and the last event says
+ *  why. (There is no "stalled": a choice with nothing to pick runs dry and play moves on.) */
+export type PlayOutcome = "end" | "max-steps" | "error";
 
 export interface PlayResult {
   events: PlayEvent[];
@@ -48,9 +53,14 @@ export interface PlayResult {
  * runtime. At each choice point it consumes the next scripted choice id, else
  * picks the first eligible option - so it always runs to an outcome. The whole
  * pipeline in one call: load -> export -> Engine playthrough.
+ *
+ * A run the engine stops part-way still returns its transcript: the throw is
+ * caught and becomes the last event, with outcome "error". It used to escape,
+ * so a playthrough that went wrong lost everything that led up to it, which is
+ * exactly what the author needs to see.
  */
 export function runPlay(loaded: LoadedProject, opts: PlayOptions = {}): PlayResult {
-  const bundle = exportBundle({ project: loaded.project, scenes: loaded.scenes, locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
+  const bundle = compileLoaded(loaded);
   const events: PlayEvent[] = [];
   // Playing alone: another engine's scope the story names is stood in from the game's scopes files.
   const registry = previewRegistry(loaded.gameScopes, bundle);
@@ -61,17 +71,37 @@ export function runPlay(loaded: LoadedProject, opts: PlayOptions = {}): PlayResu
   const scripted = [...(opts.choices ?? [])];
   const maxSteps = opts.maxSteps ?? 1000;
 
-  for (let i = 0; i < maxSteps; i++) {
-    const r: StepResult = flow.advance();
-    if (r.type === "end") return { events, outcome: "end" };
-    if (r.type === "choice") {
-      const picked = scripted.shift() ?? r.options.find((o) => o.eligible)?.id;
-      events.push({ type: "choice", options: r.options, picked });
-      if (picked === undefined) return { events, outcome: "stalled" };
-      flow.choose(picked);
-    } else {
-      events.push(r);
+  const failed = (message: string): PlayResult => {
+    events.push({ type: "error", fatal: true, message });
+    return { events, outcome: "error" };
+  };
+  try {
+    for (let i = 0; i < maxSteps; i++) {
+      const r: StepResult = flow.advance();
+      if (r.type === "end") return { events, outcome: "end" };
+      if (r.type === "choice") {
+        const wanted = scripted.shift();
+        // A scripted id is checked against what is on offer BEFORE choosing, so the message can name both
+        // the id and the options. The engine's own refusal names only the id, and a `--choices` list one
+        // step out of line is the commonest way to get here.
+        if (wanted !== undefined) {
+          const offered = r.options.find((o) => o.id === wanted);
+          if (!offered || !offered.eligible) {
+            events.push({ type: "choice", options: r.options });
+            const onOffer = r.options.filter((o) => o.eligible).map((o) => o.id).join(", ");
+            return failed(`scripted choice '${wanted}' is ${offered ? "offered but its condition does not hold" : "not offered"} here; on offer: ${onOffer}`);
+          }
+        }
+        // The engine offers a choice only when something in it can be taken, so there is always a pick.
+        const picked = wanted ?? r.options.find((o) => o.eligible)!.id;
+        events.push({ type: "choice", options: r.options, picked });
+        flow.choose(picked);
+      } else {
+        events.push(r);
+      }
     }
+  } catch (err) {
+    return failed(err instanceof Error ? err.message : String(err));
   }
   return { events, outcome: "max-steps" };
 }
@@ -85,6 +115,7 @@ export function renderPlay(result: PlayResult): string[] {
       case "text": out.push(`  ${e.text}`); break;
       case "gameEvent": out.push(`    (game event ${JSON.stringify(e.gameData ?? {})})`); break;
       case "error": {
+        if ("fatal" in e) { out.push(`    ! stopped: ${e.message}`); break; }
         const { kind, node, source, message } = e.error;
         out.push(`    ! ${kind} on '${node}'${source ? ` (${source})` : ""} failed, played through: ${message}`);
         break;
@@ -97,8 +128,8 @@ export function renderPlay(result: PlayResult): string[] {
   }
   switch (result.outcome) {
     case "end": out.push("--- END ---"); break;
-    case "stalled": out.push("    (no eligible choice - stopping)"); break;
     case "max-steps": out.push("--- stopped: max steps reached ---"); break;
+    case "error": out.push("--- stopped: the run could not go on ---"); break;
   }
   return out;
 }

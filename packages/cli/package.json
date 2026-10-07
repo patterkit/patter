@@ -1,7 +1,7 @@
 {
   "name": "@patterkit/cli",
   "version": "0.8.1",
-  "description": "The `patter` CLI: validate, format, export, and play a Patter project.",
+  "description": "The `patter` CLI: validate, format, export, play, test coverage, localise, and merge Patter projects.",
   "type": "module",
   "license": "MIT",
   "author": "Ian Thomas",

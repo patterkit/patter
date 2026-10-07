@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync, statSync, mkdirSync, writeFileSync, cpSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs,
@@ -29,7 +29,7 @@ import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, S
 import type { CoverageDriver } from "@patterkit/model";
 import { editorScopes } from "../shared/host-scopes.js";
 import type { ScopeRegistry } from "@wildwinter/scoperegistry";
-import { startAudioIndex, audioManifest, AUDIO_MANIFEST_FILE, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
+import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
 
 interface SceneShards {
   flowPath: string;
@@ -576,7 +576,8 @@ export function commitPackMerge(plan: PackMergePlan): Promise<SaveResult & { pro
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
     const root = loaded.root;
-    const all = [...plan.writes, ...plan.sidecars];
+    // Sidecars first: a merged shard whose sidecar never landed is a conflict resolved to ours without a word.
+    const all = [...plan.sidecars, ...plan.writes];
     if (all.length === 0) return { ok: true, project: summarise(loaded) }; // nothing came back that we do not already have
     const res = await commitWrites(all);
     if (!res.ok) return res;
@@ -712,6 +713,13 @@ export function applyReplace(opts: ReplaceOptions): Promise<SaveResult & { count
       const i = loaded.locales.findIndex((l) => l.scene === ns.scene && l.locale === ns.locale);
       if (i >= 0) loaded.locales[i] = ns;
       sourceMirror.delete(ns.scene); // the mirror holds the pre-replace bytes: the reload must read the new ones
+    }
+    // And the authoring shards Replace stamped (each replaced line's modifiedAt, so its translations go
+    // stale): without the swap, a second Replace would start from the old shard and drop these stamps.
+    for (const a of plan.authoring) {
+      const i = loaded.authoringFiles.indexOf(a.path);
+      if (i >= 0) loaded.authoring[i] = a.file;
+      else { loaded.authoringFiles.push(a.path); loaded.authoring.push(a.file); }
     }
     return { ok: true, count: plan.hits.length, scenes: plan.scenes };
   });
@@ -1388,9 +1396,9 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
     if (live) applyLiveSource(fresh, live);
     const r = runValidate(fresh);
     const structural = r.structural.map((i): Problem => {
-      // Most structural breaks block a clean build; a choice that can run dry is only a warning (it
-      // still compiles + plays - a dry choice gathers/falls through at runtime; spec §5).
-      const severity = i.code === "choice-can-empty" ? "warning" : "error";
+      // Most structural breaks block a clean build; core marks the ones that are only warnings (a choice
+      // that can run dry still compiles + plays - it gathers/falls through at runtime; spec §5).
+      const severity = i.severity ?? "error";
       const base: Problem = { category: "structure", severity, message: i.message, nodeId: i.id, detail: i.code };
       // Quick-fixes (spec §4): add an unknown speaker to the cast; retarget a broken jump.
       if (i.code === "unknown-character" && i.id) {
@@ -1438,6 +1446,9 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
       // The game's shared scopes folder: a scopes file that won't parse or a token two files claim is an
       // error; Patter's file out of date, or the project's copy of a game scope differing from it, a warning.
       ...r.gameScopes.map((i): Problem => ({ category: "game-scopes", severity: i.severity, message: i.message, file: i.file })),
+      // Loc shards that disagree stop the build; a shard nothing reads (an unknown scene or language, a
+      // second file for one) is a warning, as a shard outside the layout is.
+      ...r.localisation.map((i): Problem => ({ category: i.severity === "error" ? "structure" : "not-in-project", severity: i.severity, message: i.message, file: i.file })),
     ];
     // Which scene each node-bearing problem is in, so the renderer can switch to it before revealing.
     const sceneOf = sceneIndex(fresh);
@@ -1486,7 +1497,8 @@ export function report(): ReportData | null {
  *  project is open; recomputed on demand (a full compile, only at a debug handshake, not per frame). */
 export function currentBuildHash(): string | null {
   if (!loaded) return null;
-  try { ensureHydrated(); return runExport(loaded).content.hash ?? null; } catch { return null; }
+  // The compile alone: a build identity, which a project mid-edit still has (export refuses broken content).
+  try { ensureHydrated(); return compileLoaded(loaded).content.hash ?? null; } catch { return null; }
 }
 
 /** Live bundle refresh over the debug link: compile the game-facing bundle (same shape `Build Bundle`
@@ -1590,7 +1602,10 @@ export async function locImport(filePath: string, fallbackLocale?: string): Prom
   if (!locale) return { ok: false, error: "Couldn't tell which language this file is for. Pick a target language first." };
   if (locale === loaded.project.locales.default) return { ok: false, error: `'${locale}' is the source language, so there's nothing to import.` };
 
-  const { writes, stats } = applyLoc(loaded, { ...catalog, locale });
+  let planned;
+  try { planned = applyLoc(loaded, { ...catalog, locale }); }
+  catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; } // a scene or language the project lacks
+  const { writes, stats } = planned;
   if (writes.length === 0) return { ok: true, locale, updated: 0, files: 0 };
   const res = await enqueueWrite(() => commitWrites(writes));
   if (!res.ok) return { ok: false, error: res.error };
@@ -1661,20 +1676,13 @@ export function publishWebTo(dir: string): SaveResult & { kept?: string[] } {
 }
 
 /** The DEFAULT compiled-bundle output path (relative to the project root), shown in Project Settings ▸
- *  Build when the project pins no explicit `export.bundle`: a SIBLING `patter-dist/` folder, NOT inside
- *  the project - on macOS the root is a `.patter` PACKAGE, so writing inside would bury the build in the
- *  document. (The CLI keeps its own `dist/` convention; this is Patterpad's default.) */
-function defaultBundleRel(p: LoadedProject): string {
-  return `../patter-dist/${basename(p.projectFile).replace(/\.patterproj$/, "")}.patterc`;
-}
+ *  Build when the project pins no explicit `export.bundle`: ops' one default, a SIBLING `patter-dist/`
+ *  folder (the CLI writes there too). */
+const defaultBundleRel = defaultBundlePath;
 
 /** The ABSOLUTE path Build Bundle writes to: the pinned `export.bundle` (relative-to-root or absolute),
- *  else the sibling-`patter-dist/` default. Patterpad-local (not ops `bundleOutputPath`, which defaults
- *  inside the root) so the default lands beside the package, never within it. */
-function resolveBundleOut(p: LoadedProject): string {
-  const rel = p.project.export?.bundle ?? defaultBundleRel(p);
-  return isAbsolute(rel) ? rel : resolve(p.root, rel);
-}
+ *  else the sibling-`patter-dist/` default. The same path `patter export` writes. */
+const resolveBundleOut = bundleOutputPath;
 
 /** Fold an edited build-output path back into the project's `export` block: pin `bundle` only when it's
  *  set AND differs from the dist/ default (so a clean file stays clean), preserving other export fields;
@@ -1718,24 +1726,16 @@ export function buildBundle(opts?: { pin?: boolean }): Promise<{ ok: boolean; pa
       }
     }
     const path = resolveBundleOut(loaded);
-    const writes: { path: string; content: string }[] = [];
+    let writes: { path: string; content: string }[];
     let builtHash: string | undefined;
     try {
-      // runExport applies the project's localisation mode (embedded: strings inline; ids: none, the game
-      // localises from beat IDs; +sourceDebug: source language embedded for debug). One self-contained file.
-      const bundle = runExport(loaded);
-      builtHash = bundle.content.hash;
-      writes.push({ path, content: canonicalStringify(bundle, { trailingComma: false }) });
-      writes.push(...patterScopesWrites(loaded.project)); // a build brings the game's scopes folder up to date too
+      // ops' build plan, the one `patter export` commits: the bundle in the project's localisation mode,
+      // the game's scopes file when it changed, and (Audio Folders) the `patteraudio.json` sidecar from the
+      // live index. Refuses content validate calls broken, with the reason.
+      const plan = planBuild(loaded, { audio: audioSnapshot });
+      builtHash = plan.bundle.content.hash;
+      writes = plan.writes;
     } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e), ...(pinned ? { pinned } : {}) }; }
-    // Audio Folders (#206): also emit the sidecar `patteraudio.json` next to the audio, so a game can resolve
-    // each beat's winning clip without a folder search. Only when folder mode + a root are set and some audio
-    // has been found (the indexer keeps a live snapshot). It's a sidecar - never inside the .patterc.
-    const p = loaded!.project;
-    if (audioActive() && p.audioRoot && Object.keys(audioSnapshot).length) {
-      const dir = resolve(loaded!.root, p.audioRoot);
-      writes.push({ path: join(dir, AUDIO_MANIFEST_FILE), content: audioManifest(audioSnapshot, loaded!.root, p.audioRoot) });
-    }
     const res = await commitWrites(writes);
     if (res.ok) { lastBuiltHash = builtHash; notePatterScopesWritten(writes); } // prime the Auto-Rebuild dedup: no redundant auto-build after a manual one
     // `pinned` rides the failure too: the pins landed even if the bundle did not, and the editor must re-read.
@@ -1787,18 +1787,13 @@ async function runAutoRebuild(): Promise<void> {
   await enqueueWrite(async () => {
     if (!loaded?.project.autoRebuild) return;
     ensureHydrated();
-    let bundle: ReturnType<typeof runExport>;
-    try { bundle = runExport(loaded); }
-    catch { return; } // temporarily invalid (half-written condition, dangling jump) - keep the last good build
-    if (bundle.content.hash === lastBuiltHash) return; // deduped: nothing changed
-    const writes: { path: string; content: string }[] = [{ path: resolveBundleOut(loaded), content: canonicalStringify(bundle, { trailingComma: false }) }];
-    const p = loaded.project;
-    if (audioActive() && p.audioRoot && Object.keys(audioSnapshot).length) {
-      const dir = resolve(loaded.root, p.audioRoot);
-      writes.push({ path: join(dir, AUDIO_MANIFEST_FILE), content: audioManifest(audioSnapshot, loaded.root, p.audioRoot) });
-    }
-    const res = await commitWrites(writes);
-    if (res.ok) lastBuiltHash = bundle.content.hash;
+    let plan: ReturnType<typeof planBuild>;
+    // Temporarily invalid (half-written condition, dangling jump): export refuses it, and the last good build stays.
+    try { plan = planBuild(loaded, { audio: audioSnapshot }); }
+    catch { return; }
+    if (plan.bundle.content.hash === lastBuiltHash) return; // deduped: nothing changed
+    const res = await commitWrites(plan.writes);
+    if (res.ok) { lastBuiltHash = plan.bundle.content.hash; notePatterScopesWritten(plan.writes); }
   });
 }
 
@@ -1808,13 +1803,11 @@ async function runAutoRebuild(): Promise<void> {
 export function writeAudioManifest(): Promise<{ ok: boolean; path?: string; error?: string }> {
   return enqueueWrite(async () => {
     if (!loaded) return { ok: false, error: "no project open" };
-    const p = loaded.project;
-    if (!audioActive() || !p.audioRoot) return { ok: false, error: "Audio Folders is not set up (need an audio root)" };
-    if (!Object.keys(audioSnapshot).length) return { ok: false, error: "no audio files found under the audio root yet" };
-    const dir = resolve(loaded.root, p.audioRoot);
-    const path = join(dir, AUDIO_MANIFEST_FILE);
-    const res = await commitWrites([{ path, content: audioManifest(audioSnapshot, loaded.root, p.audioRoot) }]);
-    return res.ok ? { ok: true, path } : { ok: false, error: res.error };
+    if (!audioActive() || !loaded.project.audioRoot) return { ok: false, error: "Audio Folders is not set up (need an audio root)" };
+    const write = audioManifestWrite(loaded, audioSnapshot);
+    if (!write) return { ok: false, error: "no audio files found under the audio root yet" };
+    const res = await commitWrites([write]);
+    return res.ok ? { ok: true, path: write.path } : { ok: false, error: res.error };
   });
 }
 
@@ -1961,7 +1954,8 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     };
     const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
     // Switching VCS re-emits its config files (vcs-setup.md, .gitattributes, ignore) for the new system.
-    if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, "commit"));
+    // The bundle posture carries over, read from the files the old system was set up with.
+    if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, currentBundlePosture(loaded.root, prevVcs === "none" ? undefined : prevVcs)));
     const res = await commitWrites(writes);
     if (!res.ok) return res;
     // Remove the PREVIOUS system's now-orphaned config files (e.g. git's .gitattributes / .gitignore when

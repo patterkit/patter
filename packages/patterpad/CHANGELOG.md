@@ -10,8 +10,29 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - **Live Link refuses web pages.** While Live Link was on, a web page open in any browser could connect to it
   and receive your story each time you saved. It now lets in only games and pages running on your own machine.
+- **Opening a patterpack writes only the project.** A pack could carry other files, `.git/config` among them,
+  and version control would then run what that file names. Patterpad now writes only scenes, strings,
+  authoring, the project file, the game's scopes, and handoff records, and refuses a pack with a hidden file
+  or folder in it.
+- **Importing a translation can't write outside the project.** A file naming a scene the project doesn't
+  have, or a language it doesn't declare, is refused and nothing is written.
 
 ### Fixed
+
+- **Build Bundle and Auto Rebuild refuse a project with errors in it,** listing them, rather than building a
+  bundle the game then fails on. Auto Rebuild keeps the last good build until the errors are fixed, which is
+  what it always meant to do, and Live Link no longer pushes a broken build to a running game.
+- **Merging a returned patterpack keeps comment replies and resolves from both sides,** and never brings back a
+  scene you deleted after sending it.
+- **Replace makes the translations of the lines it changed out of date,** as typing the change does.
+- **A choice that can run dry is a warning everywhere,** and no longer hides the "can never run" warnings.
+- **Two strings files that disagree about a line are reported,** naming both, rather than stopping the checks.
+- **Switching version control keeps a project's choice to leave the bundle out of it.**
+- **The production report counts a writing status that isn't on the ladder as the lowest rung** in its
+  totals, as it already did for each scene's status.
+- **The voice script includes spoken choice prompts,** so they get recorded.
+- **Coverage Test no longer blames a write that ran,** follows gated jumps for its "may need an input" hint,
+  and leaves out empty lines that never ship.
 
 - **Quitting or closing the window straight after typing no longer loses the last edit.** Patterpad saves a
   moment after you stop typing, and a quit inside that moment used to close without saving. It now finishes
@@ -32,6 +53,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   A pack with nothing to merge now says so in a message rather than a system dialog.
 
 ### Changed
+
+- **Build Bundle writes the same files as `patter export`,** which now uses the same `patter-dist/` folder beside
+  the project. Auto Rebuild also brings the game's shared scopes file up to date.
 
 - **The Live Link control says "Live Link"** beside its plug icon in the bottom corner, as Storyletter's does.
 - **The welcome screen offers a kit to start from,** above the finished projects, as Storyletter's does.

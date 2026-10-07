@@ -72,8 +72,8 @@ npm run typecheck      # tsc across the workspace
 
 # the CLI (from a build, or the standalone binary):
 node packages/cli/dist/cli.js init my-game --name "My Game"
-node packages/cli/dist/cli.js play my-game
-node packages/cli/dist/cli.js export my-game        # -> dist/my-game.patterc
+node packages/cli/dist/cli.js play my-game.patter
+node packages/cli/dist/cli.js export my-game.patter # -> patter-dist/my_game.patterc beside it
 ```
 
 `@wildwinter/expr` and `scoperegistry` are resolved from a sibling `../expr`

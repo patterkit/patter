@@ -139,7 +139,7 @@ const STYLE = String.raw`
 
 /** The story narrowed to the source language, plus the page title and the safely-embeddable JSON. */
 function sourceStory(loaded: LoadedProject): { title: string; lang: string; bundleJson: string } {
-  const full = runExportFull(loaded);
+  const full = runExportFull(loaded, { refuseInvalid: true });
   // Narrow to the source language only - a playable handed to a stakeholder reads in one language.
   const def = full.locales?.default ?? Object.keys(full.strings)[0] ?? "en";
   const bundle = { ...full, locales: { default: def, included: [def] }, strings: { [def]: full.strings[def] ?? {} } };

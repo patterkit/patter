@@ -12,7 +12,7 @@ export { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, appl
 export type { LoadedProject } from "./load.js";
 export { applyWrites } from "./write.js";
 export type { PlannedWrite } from "./write.js";
-export { runValidate } from "./validate.js";
+export { runValidate, exportBlockers } from "./validate.js";
 export { reachabilityIssues } from "./reachability.js";
 export type { ValidateResult, HygieneIssue, GameScopesIssue } from "./validate.js";
 export {
@@ -23,9 +23,12 @@ export {
   GAME_SCOPES_DIR, GAME_SCOPES_FILE,
 } from "./game-scopes.js";
 export type { GameScopes } from "./game-scopes.js";
-export { runExport, runExportFull, bundleOutputPath } from "./export.js";
+export { runExport, runExportFull, planBuild } from "./export.js";
+export type { ExportOptions, BuildPlan } from "./export.js";
+export { compileLoaded, bundleOutputPath, defaultBundlePath, besideBundlePath } from "./compile.js";
 export { runExportHtml, runExportWeb } from "./export-html.js";
-export { scanAudioStatus } from "./audio-scan.js";
+export { scanAudio, scanAudioStatus, pickAudio, audioFolderRungs, audioFoldersActive, audioManifest, audioManifestWrite, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "./audio-index.js";
+export type { AudioRung, AudioEntry, AudioSnapshot } from "./audio-index.js";
 export type { WebExport } from "./export-html.js";
 export { runPlay, renderPlay } from "./play.js";
 export type { PlayOptions, PlayResult, PlayEvent, PlayOutcome } from "./play.js";
@@ -51,7 +54,7 @@ export { runScriptDoc } from "./script-doc.js";
 export type { ScriptDoc, ScriptElement } from "./script-doc.js";
 export { scriptToDocx } from "./script-docx.js";
 export { scriptToPdf } from "./script-pdf.js";
-export { runInit, vcsConfigWrites } from "./init.js";
+export { runInit, vcsConfigWrites, currentBundlePosture } from "./init.js";
 export type { InitOptions, InitResult, InitVcs, BundlePosture } from "./init.js";
 export { runResolve, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags } from "./resolve.js";
 export type { ResolveEntry, SearchFocus } from "./resolve.js";
@@ -62,7 +65,7 @@ export { planPins } from "./pin.js";
 export type { PinnedName, PinPlan } from "./pin.js";
 export { runPack, SHARD_EXTENSIONS } from "./pack.js";
 export type { DocumentManifest } from "./pack.js";
-export { runUnpack, runUnpackMerge, UnsafeEntryError, isUnsafeEntry } from "./unpack.js";
+export { runUnpack, runUnpackMerge, UnsafeEntryError, NotAPackError, isUnsafeEntry } from "./unpack.js";
 export type { UnpackResult, UnpackMergeResult, MergedShard, ProvenanceCheck } from "./unpack.js";
 export { resolveDocumentation, classesForChannel } from "./documentation.js";
 export { runMerge, detectMergeType, UnsupportedMergeError, sidecarIssues, CONFLICT_SIDECAR, AUTHORING_HANDLED } from "./merge.js";

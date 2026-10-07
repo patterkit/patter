@@ -145,13 +145,13 @@ describe("main exit codes", () => {
     expect(existsSync(join(base, "MyGame"))).toBe(false); // not the bare folder
   });
 
-  it("export writes the conventional dist/<name>.patterc by default; -o overrides; -o - is stdout", async () => {
+  it("export writes the sibling patter-dist/<name>.patterc by default; -o overrides; -o - is stdout", async () => {
     const dir = join(mkdtempSync(join(tmpdir(), "patter-cli-export-")), "game.patter");
     expect(await main(["init", dir, "--name", "Export Game"])).toBe(0);
 
     // No -o: the conventional path. Strict JSON (no trailing comma), parseable.
     expect(await main(["export", dir])).toBe(0);
-    const def = join(dir, "dist", "export_game.patterc");
+    const def = join(dir, "..", "patter-dist", "export_game.patterc");
     const bundle = JSON.parse(readFileSync(def, "utf8"));
     expect(bundle.schema).toBe("patter/bundle@0");
 

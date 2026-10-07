@@ -52,6 +52,17 @@ type SelectableNode = CompiledGroup | CompiledSnippet;
 // per evaluation was the engine's hottest path (every condition / effect / slot).
 const astCache = new WeakMap<Expression, ExprNode>();
 
+// The tag index depends only on the bundle's structure, so it is built once per bundle object rather than
+// once per engine. A tool that builds a fresh engine for every run over one bundle (coverage does, to keep
+// the runs independent) spent over a third of its time rebuilding it. A changed bundle is a new object
+// (hotSwap takes one; replaceStrings touches only strings), so the cache never answers for stale content.
+const tagIndexCache = new WeakMap<Bundle, Map<string, string[]>>();
+function tagIndexFor(bundle: Bundle): Map<string, string[]> {
+  let index = tagIndexCache.get(bundle);
+  if (!index) { index = buildTagIndex(bundle); tagIndexCache.set(bundle, index); }
+  return index;
+}
+
 // The save shape is the FAMILY's contract and lives in @patterkit/model (`SaveGame` and friends, with
 // the reasoning). Re-exported here so `import type { SaveGame } from "@patterkit/runtime"` keeps
 // working; this engine's saveGame() output IS that document, and every port writes the same.
@@ -602,7 +613,7 @@ export class Engine {
       emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
       bundle, emitIds, strings, defaultStrings, castDisplay, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
-      tagIndex: buildTagIndex(bundle), registry, ownsRegistry, patterBag, hostScopes,
+      tagIndex: tagIndexFor(bundle), registry, ownsRegistry, patterBag, hostScopes,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
       sharedVisits: new Map(), qualityLadders: new Map(),
       sharedSelectors: new Map(),

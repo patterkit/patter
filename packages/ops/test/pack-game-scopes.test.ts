@@ -166,15 +166,17 @@ describe("unpacking a pack that carries the game's scopes", () => {
     expect(loadProject(target).project.project.name).toBe("Story");
   });
 
-  it("keeps anything else under game-scopes/ a shard, as it always was", async () => {
+  it("keeps a shard under game-scopes/ a shard, and writes no scopes file but one directly in it", async () => {
     const zip = new JSZip();
+    zip.file("game.patterproj", "{}");
     zip.file("game-scopes/notes.patterx", "{}");
     zip.file("game-scopes/deeper/x.scopes.json", "{}");
     zip.file("game-scopes/game.scopes.json", "{}");
     const target = mkdtempSync(join(tmpdir(), "patter-packrecv-"));
-    const { shards, scopes } = await runUnpack(await zip.generateAsync({ type: "nodebuffer" }), target);
-    expect(shards.map((w) => w.path)).toEqual([join(target, "game-scopes/deeper/x.scopes.json"), join(target, "game-scopes/notes.patterx")]);
+    const { shards, scopes, other } = await runUnpack(await zip.generateAsync({ type: "nodebuffer" }), target);
+    expect(shards.map((w) => w.path)).toEqual([join(target, "game-scopes/notes.patterx"), join(target, "game.patterproj")]);
     expect(scopes.map((w) => w.path)).toEqual([join(target, "game-scopes/game.scopes.json")]);
+    expect(other).toEqual(["game-scopes/deeper/x.scopes.json"]);
   });
 });
 

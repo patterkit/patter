@@ -58,10 +58,12 @@ describe("patter --help", () => {
     });
   }
 
-  it("still treats an unknown command as a usage error", async () => {
+  it("still treats an unknown command as a usage error, naming it on stderr", async () => {
     // The exit code that MUST stay 2, or the change would hide real mistakes.
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const { code, out } = await captured(["frobnicate"]);
-    expect(out).toContain("Usage:");
+    expect(out).toBe("");
+    expect(err.mock.calls.map((c) => c.join(" ")).join("\n")).toContain('usage: unknown command "frobnicate"');
     expect(code).toBe(2);
   });
 });

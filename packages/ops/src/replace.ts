@@ -13,13 +13,20 @@
 // preview / confirm) PLUS the planned shard writes + the rewritten shard objects
 // (so the caller can both commit to disk and refresh its in-memory model). The
 // caller commits the writes through the VC layer.
+//
+// A replaced string is a source edit like any other, so each one gets a fresh
+// `edits[id].modifiedAt` in its scene's authoring shard, as accepting a suggestion
+// and Patterpad's save both stamp it. That stamp is what makes a translation of the
+// line go stale; without it a replace changed the source and every translation
+// still read as current.
 // ---------------------------------------------------------------------------
 
 import { canonicalStringify } from "@patterkit/core";
 import { walkNodes, PROJECT_LOCALE_SCENE } from "@patterkit/model";
-import type { Group, Snippet, LocaleFile } from "@patterkit/model";
+import type { Group, Snippet, LocaleFile, AuthoringFile } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
+import { authoringPath } from "./localisation.js";
 import { findMatcher } from "@wildwinter/toolkit";   // the escaped, global find regex
 
 export interface ReplaceOptions {
@@ -33,6 +40,8 @@ export interface ReplaceOptions {
   wholeWord?: boolean;
   /** Restrict the replacement to a single beat id (the per-row "Replace this one"). */
   onlyId?: string;
+  /** The time stamped as each replaced string's `modifiedAt` (ISO 8601; default now). For tests. */
+  now?: string;
 }
 
 /** One replaced string, for the preview / confirm list. */
@@ -47,11 +56,16 @@ export interface ReplaceHit {
 
 export interface ReplacePlan {
   hits: ReplaceHit[];
-  /** Shard writes the caller commits through the VC layer (one per touched scene). */
+  /** Shard writes the caller commits through the VC layer: the string shards (one per touched scene) first,
+   *  then the authoring shards that carry their `modifiedAt` stamps (one per touched scene). */
   writes: PlannedWrite[];
-  /** The rewritten shard objects (index-aligned with `writes`), so the caller can swap them into its
-   *  in-memory `LoadedProject.locales` after committing: keeping reads + the open scene current. */
+  /** The rewritten string shard objects (index-aligned with the first `shards.length` of `writes`), so the
+   *  caller can swap them into its in-memory `LoadedProject.locales` after committing: keeping reads + the
+   *  open scene current. */
   shards: LocaleFile[];
+  /** The stamped authoring shards (the rest of `writes`, in order), for the caller to swap into its
+   *  in-memory `LoadedProject.authoring` after committing, so a later edit builds on the stamps. */
+  authoring: Array<{ path: string; file: AuthoringFile }>;
   /** Distinct scenes touched. */
   scenes: number;
 }
@@ -63,10 +77,12 @@ export interface ReplacePlan {
  * matches, and returns the hits + the shard writes. With `onlyId`, only that one beat's string is touched.
  */
 export function runReplace(loaded: LoadedProject, opts: ReplaceOptions): ReplacePlan {
-  const plan: ReplacePlan = { hits: [], writes: [], shards: [], scenes: 0 };
+  const plan: ReplacePlan = { hits: [], writes: [], shards: [], authoring: [], scenes: 0 };
   const re = findMatcher(opts);
   if (!re) return plan;
   const def = loaded.project.locales.default;
+  const now = opts.now ?? new Date().toISOString();
+  const stamped = new Map<string, AuthoringFile>(); // authoring path -> the stamped copy
 
   // id -> [scene name, block name] for the preview breadcrumb; scene id -> scene name for the fallback.
   const locOf = new Map<string, string[]>();
@@ -89,7 +105,7 @@ export function runReplace(loaded: LoadedProject, opts: ReplaceOptions): Replace
     const path = loaded.localeFiles[i];
     if (!path) continue;
 
-    let changed = false;
+    const changedIds: string[] = [];
     const merged: Record<string, string> = { ...shard.strings };
     for (const [id, before] of Object.entries(shard.strings)) {
       if (opts.onlyId && id !== opts.onlyId) continue;
@@ -99,14 +115,31 @@ export function runReplace(loaded: LoadedProject, opts: ReplaceOptions): Replace
       if (after === before) continue;
       plan.hits.push({ id, sceneId: shard.scene, location: locOf.get(id) ?? [sceneName.get(shard.scene) ?? shard.scene], before, after });
       merged[id] = after;
-      changed = true;
+      changedIds.push(id);
     }
-    if (changed) {
+    if (changedIds.length) {
       const next: LocaleFile = { ...shard, strings: merged };
       plan.writes.push({ path, content: canonicalStringify(next) });
       plan.shards.push(next);
       plan.scenes++;
+      // The per-string stamp, merged over the scene's authoring shard (a copy: `loaded` stays untouched).
+      // Keyed by path, so two string shards for one scene still make one authoring write holding both.
+      const aPath = authoringPath(loaded, shard.scene);
+      let af = stamped.get(aPath);
+      if (!af) {
+        const ai = loaded.authoringFiles.indexOf(aPath);
+        af = ai >= 0 ? structuredClone(loaded.authoring[ai]!) : { schema: "patter/authoring@0" };
+        stamped.set(aPath, af);
+      }
+      const edits = { ...af.edits };
+      for (const id of changedIds) edits[id] = { ...edits[id], modifiedAt: now };
+      af.edits = edits;
     }
+  }
+  // String shards first, then the stamps, so `shards` stays index-aligned with the head of `writes`.
+  for (const [path, file] of stamped) {
+    plan.authoring.push({ path, file });
+    plan.writes.push({ path, content: canonicalStringify(file) });
   }
   return plan;
 }

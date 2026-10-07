@@ -27,6 +27,10 @@ describe("detectMergeType + dispatch", () => {
     expect(detectMergeType({ schema: "patter/authoring@0" })).toBe("authoring");
     expect(detectMergeType({ schema: "patter/flow@0" })).toBe("flow");
   });
+  it("matches the schema's name exactly, not by prefix", () => {
+    expect(() => detectMergeType({ schema: "patter/projectmap@0" })).toThrow(UnsupportedMergeError);
+    expect(detectMergeType({ schema: "patter/project@1" })).toBe("project");
+  });
   it("throws UnsupportedMergeError for an unrecognised schema", () => {
     expect(() => runMerge({}, { schema: "nonsense@0" }, {})).toThrow(UnsupportedMergeError);
   });
@@ -88,6 +92,46 @@ describe("authoring (.patterx) merge", () => {
     );
     expect(r.conflicts).toEqual([]);
     expect((r.merged.comments as Array<{ id: string }>).map((c) => c.id)).toEqual(["c0", "c1", "c2"]); // sorted by ts
+  });
+
+  // CLI review 2026-10, item 3: the first copy seen was kept, which was always base's.
+  const msg = (author: string, ts: string, body: string, extra: Obj = {}): Obj => ({ author, ts, body, ...extra });
+  const thread = (messages: Obj[], extra: Obj = {}): Obj => ({ id: "c0", anchor: "L1", messages, ...extra });
+  const threadOf = (r: { merged: Obj }): any => (r.merged.comments as any[] | undefined)?.find((c) => c.id === "c0");
+
+  it("comment threads keep a reply from one side and a resolve from the other", () => {
+    const first = msg("Ann", "2026-01-01T00:00:00Z", "Is this right?");
+    const r = runMerge(
+      authoring({ comments: [thread([first])] }),
+      authoring({ comments: [thread([first, msg("Bo", "2026-01-02T00:00:00Z", "Yes.")])] }),
+      authoring({ comments: [thread([first], { resolved: true })] }),
+    );
+    expect(r.conflicts).toEqual([]);
+    expect(threadOf(r).messages.map((m: Obj) => m.body)).toEqual(["Is this right?", "Yes."]);
+    expect(threadOf(r).resolved).toBe(true);
+  });
+
+  it("comment threads keep both sides' replies, and a reopen on either side", () => {
+    const first = msg("Ann", "2026-01-01T00:00:00Z", "Hmm");
+    const r = runMerge(
+      authoring({ comments: [thread([first], { resolved: true })] }),
+      authoring({ comments: [thread([first, msg("Bo", "2026-01-03T00:00:00Z", "ours")])] }),
+      authoring({ comments: [thread([first, msg("Cy", "2026-01-02T00:00:00Z", "theirs")], { resolved: true })] }),
+    );
+    expect(threadOf(r).messages.map((m: Obj) => m.body)).toEqual(["Hmm", "theirs", "ours"]);
+    expect(threadOf(r).resolved).toBeUndefined();
+  });
+
+  it("a message deleted on one side stays deleted, and a thread deleted whole goes unless the other side replied", () => {
+    const a = msg("Ann", "2026-01-01T00:00:00Z", "one"), b = msg("Bo", "2026-01-02T00:00:00Z", "two");
+    const tomb = { ...a, body: "", deleted: true };
+    const kept = runMerge(authoring({ comments: [thread([a, b])] }), authoring({ comments: [thread([tomb, b])] }), authoring({ comments: [thread([a, b])] }));
+    expect(threadOf(kept).messages).toEqual([tomb, b]);
+    const gone = runMerge(authoring({ comments: [thread([a])] }), authoring({ comments: [] }), authoring({ comments: [thread([a])] }));
+    expect(threadOf(gone)).toBeUndefined();
+    const reply = msg("Cy", "2026-01-03T00:00:00Z", "wait");
+    const answered = runMerge(authoring({ comments: [thread([a])] }), authoring({ comments: [] }), authoring({ comments: [thread([a, reply])] }));
+    expect(threadOf(answered).messages).toEqual([tomb, reply]);
   });
 
   it("writing status: last-writer-wins by each side's edit timestamp", () => {

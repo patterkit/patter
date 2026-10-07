@@ -5,7 +5,7 @@
 //
 // M1 covers the two simplest, highest-value shard types (patter-merge.md §7):
 //   - LOCALE (`.patterloc`): a flat beatId -> text map, per-key 3-way (§3.3).
-//   - AUTHORING (`.patterx`): comments union, status last-writer-wins by edit
+//   - AUTHORING (`.patterx`): comment threads merged message by message, status last-writer-wins by edit
 //     timestamp, documentation 3-way, edits newer-record + localisedAt max,
 //     cut per-key (§3.4).
 // FLOW and PROJECT mergers are M2; runMerge throws `UnsupportedMergeError` for
@@ -87,12 +87,16 @@ export function sidecarIssues(sidecarPaths: readonly string[]): Array<{ file: st
   }));
 }
 
+/** Each source schema's name, to the merge strategy for it. */
+const MERGE_TYPES: Record<string, MergeFileType> = { flow: "flow", strings: "loc", authoring: "authoring", project: "project" };
+
 export function detectMergeType(file: { schema?: unknown }): MergeFileType {
   const s = typeof file.schema === "string" ? file.schema : "";
-  if (s.startsWith("patter/flow")) return "flow";
-  if (s.startsWith("patter/strings")) return "loc";
-  if (s.startsWith("patter/authoring")) return "authoring";
-  if (s.startsWith("patter/project")) return "project";
+  // The schema's NAME, exactly (`patter/<name>@<version>`): matching by prefix would give a future
+  // `patter/projectmap` the project strategy, the slip Storylets' merge made (their review, HIGH 7).
+  const name = /^patter\/([a-z]+)(?:@|$)/.exec(s)?.[1];
+  const type = name ? MERGE_TYPES[name] : undefined;
+  if (type) return type;
   throw new UnsupportedMergeError(`cannot detect a Patter merge type from schema '${s}'`);
 }
 
@@ -232,12 +236,60 @@ function mergeById(base: unknown[], ours: unknown[], theirs: unknown[], path: st
   return Object.values(merged).sort((a, b) => String(asMap(a).ts ?? "").localeCompare(String(asMap(b).ts ?? "")));
 }
 
+/**
+ * Merge comment threads by id. A thread is not immutable: replies are appended, a message is deleted as a
+ * tombstone (body emptied, `deleted` set), the thread is resolved and reopened, and it goes from the file
+ * once every message is deleted. Taking the first copy seen, as this once did, kept BASE's copy of every
+ * thread, so a reply on one branch and a resolve on the other both vanished without a conflict.
+ *
+ * Per thread: the messages are the union of every side's, keyed by author and timestamp, a message either
+ * side deleted stays deleted, and a thread one side removed counts as that side deleting the messages it
+ * had; `resolved` takes whichever side changed it from base; the thread goes when nothing readable is
+ * left, by the same rule the editor applies.
+ */
 function mergeComments(base: unknown[], ours: unknown[], theirs: unknown[]): unknown[] {
-  const byId = new Map<string, Obj>();
-  for (const c of [...base, ...ours, ...theirs]) {
-    if (isObj(c) && typeof c.id === "string" && !byId.has(c.id)) byId.set(c.id, c);
+  const index = (arr: unknown[]): Map<string, Obj> => {
+    const m = new Map<string, Obj>();
+    for (const c of arr) if (isObj(c) && typeof c.id === "string") m.set(c.id, c);
+    return m;
+  };
+  const b = index(base), o = index(ours), t = index(theirs);
+  const msgKey = (m: Obj): string => `${String(m.author ?? "")}|${String(m.ts ?? "")}`;
+  const out: Obj[] = [];
+  for (const id of new Set([...b.keys(), ...o.keys(), ...t.keys()])) {
+    const bc = b.get(id), oc = o.get(id), tc = t.get(id);
+    const sides = [oc, tc].filter((c): c is Obj => c !== undefined);
+    if (sides.length === 0) continue; // both removed it
+    // A comment with no thread (the shape before threads) has nothing to merge inside it.
+    if (![bc, oc, tc].some((c) => Array.isArray(c?.messages))) { out.push((oc ?? tc)!); continue; }
+    // A side that had the thread in base and no longer has it deleted every message base held.
+    const deletedBy = new Set<string>();
+    for (const c of [oc, tc]) {
+      if (c === undefined && bc) for (const m of asArr(bc.messages)) if (isObj(m)) deletedBy.add(msgKey(m));
+    }
+    const messages = new Map<string, Obj>();
+    for (const c of [bc, ...sides]) {
+      for (const m of asArr(c?.messages)) {
+        if (!isObj(m)) continue;
+        const key = msgKey(m);
+        const seen = messages.get(key);
+        // A tombstone wins over the live copy, wherever it came from.
+        if (!seen || (m.deleted === true && seen.deleted !== true)) messages.set(key, m);
+      }
+    }
+    for (const key of deletedBy) {
+      const m = messages.get(key);
+      if (m && m.deleted !== true) messages.set(key, { ...m, body: "", deleted: true });
+    }
+    const merged = [...messages.values()].sort((x, y) => String(x.ts ?? "").localeCompare(String(y.ts ?? "")));
+    if (merged.length === 0 || merged.every((m) => m.deleted === true)) continue;
+    const was = bc?.resolved === true;
+    const oursSays = oc ? oc.resolved === true : was, theirsSays = tc ? tc.resolved === true : was;
+    const resolved = oursSays !== was ? oursSays : theirsSays;
+    const { resolved: _r, messages: _m, ...rest } = (oc ?? tc)!;
+    out.push({ ...rest, ...(resolved ? { resolved: true } : {}), messages: merged });
   }
-  return [...byId.values()].sort((a, b) => String(a.ts ?? "").localeCompare(String(b.ts ?? "")));
+  return out.sort((x, y) => String(asArr(x.messages).map(asMap)[0]?.ts ?? x.ts ?? "").localeCompare(String(asArr(y.messages).map(asMap)[0]?.ts ?? y.ts ?? "")));
 }
 
 function lastWriterWins(oursEdits: Obj, theirsEdits: Obj): Resolver {

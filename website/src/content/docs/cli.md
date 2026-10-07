@@ -20,6 +20,11 @@ overwritten. **Exit codes** are consistent. Exit **0** means success, **1** mean
 problems or failed, and **2** means a usage error. `fmt` is an alias for `format`, and `stats`
 for `report`.
 
+`patter <command> --help` (or `-h`, or `patter help <command>`) prints that command's usage. Flags
+take their value as the next word or inline (`--seed=-5`); anything starting with `-` is a flag, so a
+mistyped one is refused rather than read as a path. Every usage error is printed under `usage:`,
+followed by the command's whole form.
+
 ### Which build am I running?
 
 ```sh
@@ -38,37 +43,46 @@ Scaffold a new project: `<dir>.patter` with a starter scene and VCS config.
 in place stays a plain folder.)
 
 ### `patter validate [path]`
-Check structure, expressions, interpolation, encoding, a stale bundle, and unresolved
-merges. Exit **1** if anything is wrong: the command to gate a PR on. Where the game
+Check structure, expressions, interpolation, encoding, the localisation files, a stale bundle, and
+unresolved merges. Exit **1** if anything is wrong: the command to gate a PR on. A choice that can run
+dry is a warning, as in Patterpad, and never fails the run. A bundle counts as stale when it no longer
+matches the source or is not strict JSON, wherever the project writes it. Where the game
 [shares its scopes](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools),
 it also checks the other tools' names and types against their files, and reports the folder
 itself (`[game-scopes]`): a file that won't parse or a scope two files claim is an error, while
 another tool's name, `patter.scopes.json` being out of date, or the project's copy of a game
 scope differing from `game.scopes.json` is a warning, printed as one, which never fails the run.
 
-### `patter format [files…]` (alias `fmt`)
-Rewrite source to canonical form. `--check` reports what *would* change and writes
-nothing, exiting **1** if anything differs: a CI formatting gate.
+### `patter format [paths…]` (alias `fmt`)
+Rewrite Patter source (`.patterflow`, `.patterloc`, `.patterx`, `.patterproj`) to canonical form. A
+folder means every shard in that project; any other file is left alone, so the bundle and the
+scopes files stay the strict JSON a game reads, and `patter format $(git ls-files)` is safe. `--check`
+reports what *would* change and writes nothing, exiting **1** if anything differs: a CI formatting gate.
 
 ## Build & play
 
 ### `patter export [path] [-o file]`
 Compile to a `.patterc` bundle (a single JSON file). Defaults to the project's configured
-output, else `dist/<name>.patterc`; `-o -` writes to stdout. `--ids` builds an
-IDs-only bundle (ships no strings); `--source-debug` is IDs-only but embeds the source
-language for debug playback. Where the game shares its scopes, it also writes
-`game-scopes/patter.scopes.json`, and only when its content would change (not with `-o -`).
+output, else `patter-dist/<name>.patterc` beside the project folder, where Patterpad's **Build Bundle**
+writes too; `-o -` writes to stdout. `--ids` builds an IDs-only bundle (ships no strings);
+`--source-debug` is IDs-only but embeds the source language for debug playback. A project
+`validate` finds errors in (a jump to nowhere, a condition that doesn't parse) is refused, with the
+problems listed; `--allow-invalid` builds it anyway, for looking at, never for shipping. Where the game
+shares its scopes, it also writes `game-scopes/patter.scopes.json`, and only when its content would
+change, and in an **Audio Folders** project the `patteraudio.json` manifest beside the audio (neither
+with `-o -`).
 
 ### `patter export-script [path] [-o file.pdf|.docx]`
 Export a **readable screenplay** of the script + flow: dialogue, narration, choices (with their
 conditions / flags), and jumps, in reading order. Format follows the extension; default
-`dist/<name>.pdf`. PDF uses built-in fonts (Latin / Western-European); use `.docx` for full
+beside the bundle, as `<name>.pdf`. PDF uses built-in fonts (Latin / Western-European); use `.docx` for full
 Unicode. The document's layout is described on [Building & shipping](/setup/building-and-shipping/).
 
 ### `patter export-html [path] [-o file]`
 Export a single self-contained, **playable** `.html`: the runtime, the whole story, and
 a reader UI inlined, so it plays offline in any browser with no server. Hand one file to a
-stakeholder. Defaults to `dist/<name>.html`; `-o -` writes to stdout. Reads in the project's
+stakeholder. Defaults to beside the bundle, as `<name>.html`; `-o -` writes to stdout. Refused, like `export`,
+for a project `validate` finds errors in. Reads in the project's
 source language, as [Building & shipping](/setup/building-and-shipping/) describes.
 
 ### `patter play [path]`
@@ -114,13 +128,14 @@ shows.
 
 ### `patter loc-export [path] -o file`
 Export strings for translation. `--format json|xlsx|po` (required) · `--locale xx`
-(omit for a blank template / POT). Each string carries its translator context, including
+(omit for a blank template / POT). `-o -` writes JSON or PO to stdout. Each string carries its translator context, including
 the speaker's [grammatical
 gender](/production/localisation/#who-is-speaking-grammatical-gender).
 
 ### `patter loc-import <file> [path]`
 Import a translated file back; the format is read from the extension, and `--locale xx`
-overrides the file's locale.
+overrides the file's locale. A file naming a scene the project doesn't have, or a language it doesn't
+declare, is refused and nothing is written.
 
 ### `patter voice-export [path] -o file.xlsx`
 A voice-recording script. Requires a **Voiced** project (`voiced: true`), or it exits with an
@@ -162,10 +177,20 @@ folder, `pack` carries a snapshot of it and `unpack` writes that into `game-scop
 project; `unpack --merge` never writes the snapshot back, but when the returned pack changed World
 properties it writes that change to your `game.scopes.json` and prints a `game scopes:` line.
 
+A pack may come from outside the team, so `unpack` writes only what a pack of Patter's carries: the
+source shards, the game's scopes files, and open handoff records. Any other file in it is named in a
+warning and left unwritten, and a pack holding a dot-file or dot-folder (`.git/config`, say) is refused
+outright. `unpack` also refuses a folder that already holds a different project. `unpack --merge`
+writes only the shards the merge changed, and never brings back a scene you deleted after sending the
+pack.
+
 ### `patter merge BASE OURS THEIRS`
 A 3-way structural merge of Patter source **by node id**. `-o out` (otherwise stdout)
 · `--type flow|loc|authoring|project` (otherwise auto-detected) · `--json`. Conflicts
-write a provisional result plus a `.patterconflict` sidecar and exit **1**.
+write a provisional result plus a `.patterconflict` sidecar and exit **1**. As git's merge driver
+it runs as `patter merge %O %A %B -o %A --path %P`: `-o` is git's temporary file, and `--path`
+names the real one, so the sidecar lands beside the shard where validate finds it. Input that is not
+Patter source exits **2**, so the version control can fall back to its own merge.
 
 ### `patter mergetool BASE THEIRS OURS OUT`
 A version-control merge-driver wrapper: Patter source goes through the structured

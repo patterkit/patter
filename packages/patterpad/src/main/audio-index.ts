@@ -9,34 +9,14 @@
 
 import { readdir, readFile } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
-import { resolve, relative, sep } from "node:path";
+import { audioFolderRungs, pickAudio } from "@patterkit/ops";
+import type { AudioRung, AudioSnapshot } from "@patterkit/ops";
 import { readDinkHash } from "../shared/wav-hash.js";
 
-/** A recording ladder rung as the indexer needs it: a name and its (optional) project-relative folder. */
-export interface AudioRung { name: string; folder?: string }
-/** One resolved beat: the rung it landed in, the absolute path to its audio file, and (for scratch takes)
- *  the text-hash stamped in the WAV so the editor can flag a take that's gone stale against its line. */
-export interface AudioEntry { status: string; path: string; textHash?: string }
-/** beatId -> resolved audio. Absent ids are implicitly "missing". */
-export type AudioSnapshot = Record<string, AudioEntry>;
-
-/** The sidecar audio manifest (`patteraudio.json`): each beat's winning clip, keyed by beatId, with its
- *  path relative to the audio root (forward-slashed) + the rung it resolved to. Consumed by the runtimes'
- *  audio resolvers. Kept OUT of the .patterc so audio stays decoupled from story rebuilds. */
-export const AUDIO_MANIFEST_SCHEMA = "patter/audio@0";
-export const AUDIO_MANIFEST_FILE = "patteraudio.json";
-
-/** Serialise a snapshot into the sidecar manifest JSON, with each absolute path made root-relative
- *  (forward-slashed) against `<projectRoot>/<audioRoot>`. Pure: build-time + Production action share it. */
-export function audioManifest(snapshot: AudioSnapshot, projectRoot: string, audioRoot: string): string {
-  const base = resolve(projectRoot, audioRoot);
-  const clips: Record<string, { file: string; status: string }> = {};
-  for (const beatId of Object.keys(snapshot).sort()) {
-    const entry = snapshot[beatId]!;
-    clips[beatId] = { file: relative(base, entry.path).split(sep).join("/"), status: entry.status };
-  }
-  return JSON.stringify({ schema: AUDIO_MANIFEST_SCHEMA, clips }, null, 2) + "\n";
-}
+// The rules (which take wins, the manifest's shape) are ops', shared with `patter export`; this module is
+// only the live half: watching the folders and re-scanning when they change.
+export type { AudioRung, AudioEntry, AudioSnapshot } from "@patterkit/ops";
+export { audioManifest, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "@patterkit/ops";
 
 export interface AudioIndexHandle {
   /** The ladder (folders) or scratch rung changed: re-watch + re-scan. */
@@ -47,7 +27,6 @@ export interface AudioIndexHandle {
   dispose(): void;
 }
 
-const AUDIO_EXT = [".wav", ".mp3"]; // .wav preferred when both exist for an id
 
 /**
  * Start watching the project's audio folders. `rungs` is the recording ladder lowest -> highest (as stored);
@@ -61,35 +40,22 @@ export function startAudioIndex(projectRoot: string, rungs: AudioRung[], onSnaps
   let disposed = false;
 
   // Rungs with a folder, HIGHEST priority first (the most-finished take wins over a rougher one).
-  const folderRungs = (): Array<{ name: string; dir: string }> =>
-    current.filter((r) => r.folder?.trim()).reverse().map((r) => ({ name: r.name, dir: resolve(projectRoot, r.folder!.trim()) }));
+  const folderRungs = (): Array<{ name: string; dir: string }> => audioFolderRungs(projectRoot, current);
 
   const scan = async (): Promise<void> => {
     ensureWatchers(); // folders can appear AFTER start (the first scratch take creates its folder) - retry here
-    const rs = folderRungs();
-    const snap: AudioSnapshot = {};
-    for (const { name, dir } of rs) {
-      let files: string[];
+    const listings: Array<{ name: string; dir: string; files: string[] | undefined }> = [];
+    for (const { name, dir } of folderRungs()) {
+      let files: string[] | undefined;
       try { files = await readdir(dir); } catch {
         // Missing / unreadable folder -> treated as empty. Drop any watcher it had (a deleted-and-recreated
         // folder needs a FRESH watch; the dead one would block re-attachment above).
         const w = watchers.get(dir);
         if (w) { try { w.close(); } catch { /* already gone */ } watchers.delete(dir); }
-        continue;
       }
-      // Within a folder, map id -> best file (wav beats mp3); a HIGHER rung already claimed wins overall.
-      const byId = new Map<string, string>();
-      for (const f of files) {
-        const dot = f.lastIndexOf(".");
-        if (dot <= 0) continue;
-        const ext = f.slice(dot).toLowerCase();
-        if (!AUDIO_EXT.includes(ext)) continue;
-        const id = f.slice(0, dot);
-        const existing = byId.get(id);
-        if (!existing || (ext === ".wav" && !existing.toLowerCase().endsWith(".wav"))) byId.set(id, f);
-      }
-      for (const [id, file] of byId) if (!(id in snap)) snap[id] = { status: name, path: resolve(dir, file) };
+      listings.push({ name, dir, files });
     }
+    const snap: AudioSnapshot = pickAudio(listings);
     // For lines that resolved to the scratch rung, read the take's stamped text-hash so the editor can flag
     // a scratch recording that's gone stale against its (edited) line. Scoped to scratch to bound the I/O.
     if (scratch) {

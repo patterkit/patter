@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { loadProject, runValidate, runExport, runExportFull, bundleOutputPath, runFormat, runPlay, renderPlay, applyWrites } from "../src/index.js";
@@ -60,9 +60,9 @@ describe("runExport", () => {
 });
 
 describe("bundleOutputPath", () => {
-  it("defaults to dist/<project-file-stem>.patterc", () => {
+  it("defaults to a sibling patter-dist/<project-file-stem>.patterc, beside the project, as Patterpad writes", () => {
     const loaded = loadProject(fixtureDir);
-    expect(bundleOutputPath(loaded)).toBe(join(loaded.root, "dist", "the-tavern.patterc"));
+    expect(bundleOutputPath(loaded)).toBe(join(dirname(loaded.root), "patter-dist", "the-tavern.patterc"));
   });
   it("honours a project export.bundle override (relative resolved against the root)", () => {
     const loaded = loadProject(fixtureDir);

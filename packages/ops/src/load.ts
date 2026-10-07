@@ -71,6 +71,24 @@ export function walkFiles(dir: string, ext: string): string[] {
   return out.sort();
 }
 
+/** `walkFiles` for several extensions in ONE walk of the tree: each extension's files, sorted. Validate
+ *  wants six kinds, and walking a project holding thousands of audio takes once per kind was most of its
+ *  time (the tour with 21,000 takes beside it: 118 ms, about 20 ms with one walk). */
+export function walkFilesByExt(dir: string, exts: readonly string[]): Map<string, string[]> {
+  const out = new Map<string, string[]>(exts.map((ext) => [ext, []]));
+  const walk = (d: string): void => {
+    for (const e of readDirSafe(d)) {
+      if (e.name.startsWith(".")) continue; // as walkFiles: dot-entries are not the project
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) for (const ext of exts) if (e.name.endsWith(ext)) out.get(ext)!.push(p);
+    }
+  };
+  walk(dir);
+  for (const files of out.values()) files.sort();
+  return out;
+}
+
 /**
  * Find the nearest `*.patterproj` at or above `startPath` - one readdir per
  * level (never a recursive scan of ancestors). Throws if none is found, or if

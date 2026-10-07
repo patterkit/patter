@@ -25,18 +25,27 @@
 // validated twice: a screen on the entry NAME (no absolute paths, no `..`), and
 // containment of the resolved WRITE PATH inside the target, which is the one
 // that holds. See `isUnsafeEntry` / `containedWrite` at the foot of this file.
+//
+// Containment is not enough on its own: `.git/config` is inside the target, and
+// git runs what it names when the VC layer adds the next file (CLI review
+// 2026-10, item 1). So an entry with any segment starting with a dot is refused
+// outright (no pack of ours carries one), and only three kinds are ever
+// written: a shard (by its extension), a scopes file directly in `game-scopes/`
+// and a handoff record directly in `handoffs/`. Anything else comes back in
+// `other`, unwritten.
 // ---------------------------------------------------------------------------
 
 import JSZip from "jszip";
-import { join, normalize, isAbsolute, resolve, sep } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { parseSource, canonicalStringify } from "@patterkit/core";
 import { findProjectFile } from "./load.js";
 import { runMerge } from "./merge.js";
 import type { MergeResult } from "./merge.js";
 import type { DocumentManifest } from "./pack.js";
 import type { PlannedWrite } from "./write.js";
-import { escapesTarget, isUnsafeEntry } from "@wildwinter/toolkit/archive";
+import { isUnsafeEntry } from "@wildwinter/toolkit/archive";
+import { SHARD_EXTENSIONS } from "./pack.js";
 import type { ProjectFile } from "@patterkit/model";
 import { discoverGameScopes, planReturnedWorld, GAME_SCOPES_DIR, GAME_SCOPES_FILE } from "./game-scopes.js";
 import { SCOPES_FILE_SUFFIX } from "@wildwinter/scoperegistry/scopes";
@@ -58,8 +67,24 @@ const isHandoffEntry = (name: string): boolean => {
   return rest !== undefined && !rest.includes("/") && rest.endsWith(".json");
 };
 
-/** A document entry whose path escapes the target dir (rejected). */
+/** A document entry whose path escapes the target dir, or that names a dot-file or dot-folder (rejected). */
 export class UnsafeEntryError extends Error {}
+
+/** Bytes that are not a `.patterpack` at all: not a zip, or a zip holding no project file. */
+export class NotAPackError extends Error {}
+
+/** A shard by its extension, wherever it sits: what the pack walked to gather it. */
+const isShardEntry = (name: string): boolean => SHARD_EXTENSIONS.some((ext) => name.endsWith(ext));
+
+/** Refuse an entry bound outside the target, or naming a dot-file or dot-folder anywhere in its path
+ *  (`.git/config`, `.gitattributes`, `scenes/.hidden/x.patterflow`). Case does not matter: a
+ *  case-insensitive file system writes `.GIT/config` into `.git`. */
+function refuseUnsafe(name: string): void {
+  if (isUnsafeEntry(name)) throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
+  if (name.split("/").some((segment) => segment.startsWith("."))) {
+    throw new UnsafeEntryError(`document entry names a dot-file or dot-folder: ${name}`);
+  }
+}
 
 /** A document's contents: its shards as relpath -> text (paths validated), its game scopes snapshot as
  *  entry name -> text (paths validated the same way), and its manifest when it has a readable one. One
@@ -68,14 +93,19 @@ interface DocContents {
   shards: Map<string, string>;
   scopes: Map<string, string>;
   handoffs: Map<string, string>;
+  /** Entries that are none of those, by name: never written. */
+  other: string[];
   manifest?: DocumentManifest;
 }
 
-async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
-  const zip = await JSZip.loadAsync(bytes);
+async function readDoc(bytes: Buffer | Uint8Array, which: "pack" | "base" = "pack"): Promise<DocContents> {
+  let zip: JSZip;
+  try { zip = await JSZip.loadAsync(bytes); }
+  catch { throw new NotAPackError(`the ${which === "base" ? "base file" : "file"} is not a .patterpack (it is not a zip archive)`); }
   const shards = new Map<string, string>();
   const scopes = new Map<string, string>();
   const handoffs = new Map<string, string>();
+  const other: string[] = [];
   let manifest: DocumentManifest | undefined;
   for (const [name, entry] of Object.entries(zip.files)) {
     if (entry.dir) continue;
@@ -85,10 +115,13 @@ async function readDoc(bytes: Buffer | Uint8Array): Promise<DocContents> {
       try { manifest = JSON.parse(await entry.async("string")) as DocumentManifest; } catch { /* unvouched */ }
       continue;
     }
-    if (isUnsafeEntry(name)) throw new UnsafeEntryError(`document entry escapes the target directory: ${name}`);
-    (isScopesEntry(name) ? scopes : isHandoffEntry(name) ? handoffs : shards).set(name, await entry.async("string"));
+    refuseUnsafe(name);
+    if (isScopesEntry(name)) scopes.set(name, await entry.async("string"));
+    else if (isHandoffEntry(name)) handoffs.set(name, await entry.async("string"));
+    else if (isShardEntry(name)) shards.set(name, await entry.async("string"));
+    else other.push(name);
   }
-  return { shards, scopes, handoffs, ...(manifest ? { manifest } : {}) };
+  return { shards, scopes, handoffs, other: other.sort(), ...(manifest ? { manifest } : {}) };
 }
 
 /** What unpacking a document plans: its shards, and its game scopes snapshot (empty for a pack with none,
@@ -98,15 +131,51 @@ export interface UnpackResult {
   shards: PlannedWrite[];
   /** The game's scopes files, in `<targetDir>/game-scopes/`, where the new project finds them first. */
   scopes: PlannedWrite[];
+  /** Entries that are none of a shard, a scopes file or a handoff record, by name: never written. */
+  other: string[];
 }
 
-/** Unpack a `.patterpack` document (zip bytes) into planned writes under `targetDir`. */
+/**
+ * Unpack a `.patterpack` document (zip bytes) into planned writes under `targetDir`. Throws
+ * `NotAPackError` for bytes that are not a pack, `UnsafeEntryError` for an entry bound outside the target
+ * or naming a dot-file, and refuses a target that already holds a DIFFERENT project (its project id is
+ * not the pack's): that leaves two project files, and every later load fails. Unpacking over the same
+ * project, or into a folder with no project, is allowed.
+ */
 export async function runUnpack(bytes: Buffer | Uint8Array, targetDir: string): Promise<UnpackResult> {
   const doc = await readDoc(bytes);
+  // A merge takes a partial pack (the shards someone sent back); a new project needs its project file.
+  if (projectEntry(doc.shards) === undefined) throw new NotAPackError("the file is not a .patterpack (it holds no project file)");
+  const here = projectIdIn(targetDir);
+  const packed = projectIdOf(doc.shards);
+  if (here !== undefined && packed !== undefined && here !== packed) {
+    throw new Error(`${targetDir} already holds a different project (${here}); unpack into an empty folder, or use --merge to fold a returned pack into this one`);
+  }
   const plan = (entries: Map<string, string>): PlannedWrite[] => [...entries.entries()]
     .map(([name, content]) => ({ path: containedWrite(targetDir, name), content }))
     .sort((a, b) => a.path.localeCompare(b.path));
-  return { shards: plan(new Map([...doc.shards, ...doc.handoffs])), scopes: plan(doc.scopes) };
+  return { shards: plan(new Map([...doc.shards, ...doc.handoffs])), scopes: plan(doc.scopes), other: doc.other };
+}
+
+/** The project id of a project file directly in `dir` (not above it: unpacking into a folder inside
+ *  another project's tree is fine), or undefined when there is none to read. */
+function projectIdIn(dir: string): string | undefined {
+  let names: string[];
+  try { names = readdirSync(dir).filter((n) => n.endsWith(".patterproj")); } catch { return undefined; }
+  for (const n of names) {
+    try {
+      const id = (parseSource(readFileSync(join(dir, n), "utf8")) as { project?: { id?: string } }).project?.id;
+      if (id) return id;
+    } catch { /* unreadable: the load reports it */ }
+  }
+  return undefined;
+}
+
+/** The project id a document's project file declares, or undefined when it can't be read. */
+function projectIdOf(shards: Map<string, string>): string | undefined {
+  const rel = projectEntry(shards);
+  if (rel === undefined) return undefined;
+  try { return (parseSource(shards.get(rel)!) as { project?: { id?: string } }).project?.id; } catch { return undefined; }
 }
 
 /** One shard's outcome in a merge-unpack. */
@@ -116,6 +185,8 @@ export interface MergedShard {
   /** Merge result, or undefined when the shard was ADDED (new file from the author). */
   result?: MergeResult;
   added: boolean;
+  /** Whether there is a write for it: false when the merge leaves the shard saying what it already says. */
+  changed: boolean;
 }
 
 /**
@@ -170,10 +241,13 @@ function targetProjectId(projectDir: string): string | undefined {
 export interface UnpackMergeResult {
   shards: MergedShard[];
   /** Merged (and added) shard contents to write into the project, and `game.scopes.json` when the
-   *  recipient changed the game's scopes (`gameScopes`). */
+   *  recipient changed the game's scopes (`gameScopes`). Only shards the merge changes. Commit `sidecars`
+   *  FIRST: a merged shard whose sidecar never landed is a conflict resolved to ours without a word. */
   writes: PlannedWrite[];
   /** `.patterconflict` sidecars for shards with conflicts. */
   sidecars: PlannedWrite[];
+  /** The returned pack's entries that are none of a shard, a scopes file or a handoff record: never written. */
+  other: string[];
   conflicts: number;
   warnings: number;
   /** Do the returned document, the base document and the target project agree on their project id? */
@@ -201,7 +275,7 @@ export async function runUnpackMerge(
   projectDir: string,
 ): Promise<UnpackMergeResult> {
   const returnedDoc = await readDoc(returnedBytes);
-  const baseDoc = await readDoc(baseBytes);
+  const baseDoc = await readDoc(baseBytes, "base");
   const theirs = returnedDoc.shards;
   const base = baseDoc.shards;
   const provenance = checkProvenance(returnedDoc.manifest?.project?.id, baseDoc.manifest?.project?.id, targetProjectId(projectDir));
@@ -215,10 +289,27 @@ export async function runUnpackMerge(
 
   for (const [rel, theirText] of [...theirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const outPath = containedWrite(projectDir, rel);
+    const baseText = base.get(rel);
     if (!existsSync(outPath)) {
-      // The author added a file we do not have - take it verbatim.
+      // A shard they returned exactly as it was sent, and we no longer have: we deleted it after sending,
+      // and their untouched copy is not a reason to bring it back.
+      if (baseText === theirText) continue;
+      // The author added a file we do not have (or changed one we deleted) - take it verbatim.
       writes.push({ path: outPath, content: theirText });
-      shards.push({ path: rel, added: true });
+      shards.push({ path: rel, added: true, changed: true });
+      continue;
+    }
+    // The texts alone settle most shards, with nothing parsed: one they returned as it was sent keeps ours,
+    // and one where both sides say the same thing is already merged. A returned pack is mostly shards
+    // nobody touched, and parsing all three sides of each was most of the merge's time.
+    const oursText = readFileSync(outPath, "utf8");
+    if (theirText === baseText || theirText === oursText) {
+      if (rel === projectRel && baseText !== undefined) {
+        const read = (t: string): ProjectFile => parseSource(t) as unknown as ProjectFile;
+        const ours = read(oursText);
+        projectSides = { ours, base: read(baseText), theirs: read(theirText), merged: ours };
+      }
+      shards.push({ path: rel, added: false, changed: false });
       continue;
     }
     // A three-way merge cannot proceed over a shard it cannot read, and half-merging a return leg is
@@ -230,13 +321,14 @@ export async function runUnpackMerge(
       try { return parseSource(text) as Record<string, unknown>; }
       catch (e) { throw new Error(`${rel}: the ${side} copy is not readable Patter source - ${e instanceof Error ? e.message : String(e)}`); }
     };
-    const oursObj = readSide("ours", readFileSync(outPath, "utf8"));
+    const oursObj = readSide("ours", oursText);
     const theirsObj = readSide("theirs", theirText);
-    const baseText = base.get(rel);
     const baseObj = baseText !== undefined ? readSide("base", baseText) : {};
 
     const result = runMerge(baseObj, oursObj, theirsObj);
-    writes.push({ path: outPath, content: canonicalStringify(result.merged) });
+    const mergedText = canonicalStringify(result.merged);
+    const changed = mergedText !== oursText;
+    if (changed) writes.push({ path: outPath, content: mergedText });
     if (rel === projectRel && baseText !== undefined) {
       projectSides = { ours: oursObj as unknown as ProjectFile, base: baseObj as unknown as ProjectFile, theirs: theirsObj as unknown as ProjectFile, merged: result.merged as unknown as ProjectFile };
     }
@@ -245,7 +337,7 @@ export async function runUnpackMerge(
       conflicts += result.conflicts.length;
     }
     warnings += result.warnings.length;
-    shards.push({ path: rel, result, added: false });
+    shards.push({ path: rel, result, added: false, changed });
   }
 
   // The returned pack's game scopes snapshot is never written: the sender's folder stays the truth. But
@@ -272,7 +364,7 @@ export async function runUnpackMerge(
     if (merged) { writes.push({ path: outPath, content: serialiseHandoff(merged) }); handoffs.push(rel); }
   }
 
-  return { shards, writes, sidecars, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}), ...(handoffs.length ? { handoffs } : {}) };
+  return { shards, writes, sidecars, other: returnedDoc.other, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}), ...(handoffs.length ? { handoffs } : {}) };
 }
 
 /** Our handoff record with any reimports their side logged that ours lacks, and closed if either side

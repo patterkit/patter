@@ -14,6 +14,25 @@
 
 import type { LocCatalog, LocEntry } from "./localisation.js";
 
+// --- Reading checks ---------------------------------------------------------
+
+/**
+ * A catalogue's scene or locale, checked as it is read. Both name files on disk (a scene's string shard sits
+ * under its locale's folder), and a catalogue is a file from outside: a translator's, a vendor's, or one
+ * edited by hand. So each must be a non-empty string with no path separator and no `..`, and is refused
+ * here, naming the field, before anything downstream can build a path from it. (Import also refuses a
+ * scene or locale the project lacks; this is the format's own check, and it holds for every reader.)
+ */
+export function checkCatalogField(format: string, field: "scene" | "locale", value: unknown): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${format}: '${field}' must be a non-empty string (got ${JSON.stringify(value) ?? String(value)})`);
+  }
+  if (/[\\/]/.test(value) || value.includes("..")) {
+    throw new Error(`${format}: '${field}' ${JSON.stringify(value)} is not a plain name (it holds a path separator or '..')`);
+  }
+  return value;
+}
+
 // --- JSON (lossless, one file, whole project) ------------------------------
 
 /** The catalog IS the JSON shape: a stable, lossless, human-diffable envelope. */
@@ -29,9 +48,9 @@ export function jsonToCatalog(text: string): LocCatalog {
   return {
     project: typeof o.project === "string" ? o.project : "",
     defaultLocale: o.defaultLocale,
-    locale: typeof o.locale === "string" ? o.locale : undefined,
+    locale: o.locale === undefined || o.locale === null ? undefined : checkCatalogField("localisation JSON", "locale", o.locale),
     entries: o.entries.map((e): LocEntry => ({
-      id: String(e.id), scene: String(e.scene),
+      id: String(e.id), scene: checkCatalogField("localisation JSON", "scene", e.scene),
       source: String(e.source ?? ""), translation: String(e.translation ?? ""),
       comments: Array.isArray(e.comments) ? e.comments.map(String) : [],
       context: e.context, stale: !!e.stale,
@@ -41,8 +60,15 @@ export function jsonToCatalog(text: string): LocCatalog {
 
 // --- gettext PO / POT ------------------------------------------------------
 
-const poEscape = (s: string): string => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\t/g, "\\t");
-const poUnescape = (s: string): string => s.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+// Escaping is one pass each way, through a lookup. Sequential replaces cannot be made right in both
+// directions: unescaping `C:\\new` (an escaped backslash, then an n) first meets the `\n` inside it and
+// makes a newline, so `C:\new` came back as `C:\`, a newline, and `ew`. Reading left to right, one escape
+// at a time, each backslash pairs with exactly the character after it.
+const PO_ESCAPES: Record<string, string> = { "\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r" };
+const PO_UNESCAPES: Record<string, string> = { "\\": "\\", '"': '"', n: "\n", t: "\t", r: "\r" };
+const poEscape = (s: string): string => s.replace(/[\\"\n\t\r]/g, (c) => PO_ESCAPES[c]!);
+/** An escape this reader does not know (gettext has a few more, such as `\a`) is kept as written. */
+const poUnescape = (s: string): string => s.replace(/\\(.)/gs, (all, c: string) => PO_UNESCAPES[c] ?? all);
 const poField = (key: string, value: string): string => `${key} "${poEscape(value)}"`;
 
 /** Render the catalog as a PO file (or a POT template when `catalog.locale` is undefined). */
@@ -101,11 +127,11 @@ export function poToCatalog(text: string): LocCatalog {
 
   const flush = (msgstr: string): void => {
     if (ctxt !== undefined) {
-      entries.push({ id: ctxt, scene, source: msgid, translation: msgstr, comments, stale });
+      entries.push({ id: ctxt, scene: checkCatalogField("PO", "scene", scene), source: msgid, translation: msgstr, comments, stale });
     } else if (msgid === "") {
       // Header block: read Language / Project-Id-Version out of the msgstr metadata.
       const lang = /Language:\s*([^\\\n]*)/.exec(msgstr);
-      if (lang?.[1]?.trim()) locale = lang[1].trim();
+      if (lang?.[1]?.trim()) locale = checkCatalogField("PO", "locale", lang[1].trim());
       const pid = /Project-Id-Version:\s*([^\\\n]*)/.exec(msgstr);
       if (pid?.[1]?.trim()) project = pid[1].trim();
     }

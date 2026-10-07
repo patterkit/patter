@@ -15,8 +15,9 @@ describe("runReplace", () => {
     expect(plan.hits).toHaveLength(1);
     expect(plan.hits[0]).toMatchObject({ id: "L_1", sceneId: "scn_tavern", before: "Welcome.", after: "Hello." });
     expect(plan.scenes).toBe(1);
-    expect(plan.writes).toHaveLength(1);
+    expect(plan.writes).toHaveLength(2); // the string shard, then the authoring shard stamping modifiedAt
     expect(plan.writes[0]!.path).toMatch(/tavern\.patterloc$/);
+    expect(plan.writes[1]!.path).toMatch(/tavern\.patterx$/);
     expect(plan.writes[0]!.content).toContain('"Hello."'); // canonical shard carries the new text
     expect(plan.writes[0]!.content).not.toContain("Welcome");
     // location breadcrumb for the preview (scene › block).

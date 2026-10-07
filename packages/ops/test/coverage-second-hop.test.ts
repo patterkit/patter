@@ -156,17 +156,23 @@ describe("what it refuses to claim", () => {
     expect(beat(r, "L_gated").blockedBy).toBeUndefined();      // but NOT because @world.alarm is unwritten
   });
 
-  it("stays quiet when a writer's running cannot be witnessed", () => {
-    // n_silent writes the gate and has no beats of its own, so no measurement says whether it ran. It may
-    // well have. Claiming the gate is unwritten-in-practice would be a guess, so the hop drops it.
-    const r = run(project("unwitnessed", decls, [
+  it("witnesses a writer with no beats by its own visit count", () => {
+    // n_silent writes the gate and has no beats of its own. This hop used to drop it, since no beat could
+    // say whether it ran; each site is now witnessed by its own visit count, so a writer that was never
+    // entered is named (by its node id, having no beat to show), and one that was is not.
+    const nodes = (cond: string): Node[] => [
       { id: "n0", type: "snippet", beats: [{ id: "L_intro", kind: "line", character: "A" }] },
-      { id: "n_silent", type: "snippet", condition: "@world.key",
+      { id: "n_silent", type: "snippet", condition: cond,
         onEnter: [{ kind: "set", target: "@world.alarm", value: "true" }] },
-      { id: "n_gated", type: "snippet", condition: "@world.alarm",
+      { id: "n_gated", type: "snippet", condition: "@world.alarm && @world.key",
         beats: [{ id: "L_gated", kind: "line", character: "A" }] },
-    ]), 40);
-    expect(beat(r, "L_gated").reachedRuns).toBe(0);
-    expect(beat(r, "L_gated").blockedBy).toBeUndefined();
+    ];
+    const never = run(project("unwitnessed", decls, nodes("@world.key")), 40);
+    expect(beat(never, "L_gated").reachedRuns).toBe(0);
+    expect(beat(never, "L_gated").blockedBy).toEqual([{ ref: "@world.alarm", writers: ["n_silent"] }]);
+    // The same writer, entered every run: it wrote, so the gate is not the question.
+    const ran = run(project("witnessed", decls, nodes("!@world.key")), 40);
+    expect(beat(ran, "L_gated").reachedRuns).toBe(0);
+    expect(beat(ran, "L_gated").blockedBy).toBeUndefined();
   });
 });

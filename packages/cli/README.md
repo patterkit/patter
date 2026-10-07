@@ -1,290 +1,89 @@
 # `patter` - the Patter CLI
 
-Command-line tooling for **Patter** projects: scaffold, validate, format, play,
-compile, report, and package authored dialogue. The CLI is a thin front-end over
-`@patterkit/ops` (the shared operations layer), so it behaves identically to the
-Patterpad editor and to CI.
+Command-line tooling for **Patter** projects: scaffold, validate, format, compile, play, test
+coverage, localise, report, and share authored dialogue. The CLI is a thin front end over
+`@patterkit/ops` (the shared operations layer), so it does what the Patterpad editor does, in CI or a
+terminal.
+
+The full reference, with every flag, is at **[patterkit.dev/cli](https://patterkit.dev/cli/)**, and
+`patter <command> --help` prints any command's usage.
 
 ## Install / run
 
-- **Standalone binary** (no Node required): the `patter` executable shipped for
-  your platform - put it on your `PATH`.
-- **npm** (once published): `npm i -g @patterkit/cli`, which installs the
-  `patter` command.
-- **From a checkout of this repo:** `node packages/cli/dist/cli.js <command>`
-  (run `npm run build` in `packages/cli` first).
-
-Running `patter` with no command prints usage.
+- **npm:** `npm i -g @patterkit/cli`, which installs the `patter` command.
+- **Standalone binary** (no Node needed): the `patter` executable for your platform, from
+  [the downloads page](https://patterkit.dev/download/). Put it on your `PATH`.
+- **From a checkout of this repo:** `node packages/cli/dist/cli.js <command>` (run `npm run build` in
+  `packages/cli` first).
 
 ## Quick start
 
 ```sh
-patter init my-game --name "My Game" --vcs git   # scaffold a project
-patter play my-game                              # play it through the runtime
-patter export my-game                            # compile -> dist/my-game.patterc
+patter init my-game --name "My Game" --vcs git   # scaffold my-game.patter
+patter play my-game.patter                       # play it through the runtime
+patter export my-game.patter                     # compile -> patter-dist/my_game.patterc beside it
 ```
 
 ## Commands
 
-Most commands accept a project `path` - a directory, or any file inside the
-project, from which the CLI walks up to the nearest `*.patterproj` - defaulting
-to the current directory (`.`). The exceptions: `format` takes explicit files,
-`unpack` takes a `.patter` file, and `resolve` takes a lookup query.
+Most commands take a project `path`: a folder, or any file inside the project, from which the CLI
+walks up to the nearest `*.patterproj`. It defaults to the current folder.
 
-### `patter init [dir]`
+| Command | What it does |
+|---------|--------------|
+| `init [dir]` | Scaffold a new project with a starter scene and version-control config. |
+| `validate [path]` | Check structure, expressions, interpolation, encoding, localisation files, a stale bundle, and unresolved merges. The command to gate a pull request on. |
+| `format [paths...]` (`fmt`) | Rewrite Patter source to canonical form; `--check` for CI. Anything that is not a shard is left alone. |
+| `export [path]` | Compile the `.patterc` bundle (plus the game's scopes file and the audio manifest, where the project has them). Refuses content `validate` finds errors in. |
+| `export-html [path]` | One self-contained, playable `.html` page. |
+| `export-script [path]` | A readable screenplay, as `.pdf` or `.docx`. |
+| `play [path]` | Play the story non-interactively and print a transcript. |
+| `coverage [path]` | Play the story many times with random choices and find content nobody reaches. |
+| `resolve <query> [path]` | Find a line or node by id, Game ID, or name. |
+| `usage <query> [path]` | Find everywhere a property is used. |
+| `report [path]` (`stats`) | The production report; `--xlsx` for a spreadsheet, `--json` for pipelines. |
+| `loc-export [path]` | Export strings for translation (JSON, Excel, or PO). |
+| `loc-import <file> [path]` | Import a translated file back. |
+| `voice-export [path]` | The voice-recording script, as a spreadsheet. |
+| `export-editable [path]` | An editable `.docx` script for an editor outside Patter. |
+| `import-editable <file> [path]` | Bring that file back as suggestions and comments. |
+| `suggestions [path]` | List open suggestions; `--accept-clean` accepts the clean ones. |
+| `share-scopes [path]` | Share the project's scopes with the game's other editing tools. |
+| `pack [path] -o file` | Pack a project into one portable `.patterpack`. |
+| `unpack <file> -o dir` | Explode a pack into a project, or with `--merge --base sent.patterpack`, fold a returned one back in. |
+| `merge BASE OURS THEIRS` | 3-way structured merge of Patter source by node id (git's merge driver). |
+| `mergetool BASE THEIRS OURS OUT` | The single merge tool for Perforce, Plastic, and SVN: Patter source to the structured merge, anything else to your usual tool. |
+| `--version` | Print the version (also `-v`, `version`). |
 
-Scaffold a new project: the project file, a minimal playable starter scene + its
-strings, an `.editorconfig`, a `vcs-setup.md`, and the VCS config for your VCS.
-Refuses to scaffold over an existing project.
+## Conventions
 
-| Option | Values | Default | Meaning |
-|--------|--------|---------|---------|
-| `--name <x>` | string | directory basename | Project display name. |
-| `--vcs <x>` | `git` \| `perforce` \| `plastic` \| `svn` | none | Emit tailored VCS config (`.gitattributes` + an ignore file for git/perforce/plastic; SVN guidance in `vcs-setup.md`). |
-| `--bundle <x>` | `commit` \| `ignore` | `commit` | Whether the compiled `.patterc` bundle is committed (kept honest by the validate staleness gate) or git-ignored and built in CI. |
-
-```sh
-patter init                       # scaffold in the current directory
-patter init game --name "Heist"   # named, in ./game
-patter init game --vcs git --bundle ignore
-```
-
-### `patter validate [path]`
-
-Validate a project: structure + invariants (unique ids, no dangling jumps,
-non-empty names, cast membership, scope rules), condition / interpolation
-expressions, encoding + line-endings (UTF-8 no-BOM, LF), and **bundle staleness**
-(any committed `.patterc` whose embedded hash no longer matches source). Exits
-non-zero if there are any issues. Ideal as a pre-commit hook and in CI.
-
-Where the game keeps a shared `game-scopes/` folder (found by walking up from the
-project, or named by the project's `gameScopes`), it also checks the names and
-types the project uses from other tools' scopes against their files, and reports
-the folder (`[game-scopes]`): a file that won't parse or a scope two files claim is
-an issue; another tool's undeclared name, a type mismatch, a write to a read-only
-property, `patter.scopes.json` out of date, or the project's copy of a game scope
-differing from `game.scopes.json` is a **warning**, printed as one, which never
-fails the run.
-
-```sh
-patter validate
-patter validate my-game
-```
-
-### `patter format [files...]` (alias `fmt`)
-
-Rewrite source files to canonical form (sorted keys, 2-space indent, LF, final
-newline, trailing commas). Pass explicit files.
-
-| Option | Meaning |
-|--------|---------|
-| `--check` | Report what *would* change and write nothing; exits non-zero if any file is non-canonical (for CI). |
-
-```sh
-patter format scenes/*.patterflow
-patter format --check scenes/opening.patterflow   # CI: fail if not canonical
-```
-
-### `patter export [path]`
-
-Compile a project (flow + selected locales) to a `.patterc` runtime bundle -
-strict JSON the game runtime loads.
-
-| Option | Meaning |
-|--------|---------|
-| `-o <file>` | Write to `<file>`. |
-| `-o -` | Stream the bundle to stdout (for pipelines). |
-| *(no `-o`)* | Write the conventional path: the project's `export.bundle`, else `dist/<project-name>.patterc`. |
-
-```sh
-patter export                       # -> dist/<name>.patterc
-patter export -o build/game.patterc
-patter export -o - | gzip > game.patterc.gz
-```
-
-Where the game keeps a shared `game-scopes/` folder, `export` also writes
-`game-scopes/patter.scopes.json` (the project's shared `@patter` properties), and
-only when its content would change. Not with `-o -`.
-
-### `patter play [path]`
-
-Play a project through the reference runtime and print a transcript - lines,
-text, game events, and choices. Exits non-zero if the playthrough cannot finish
-(a stall / max-steps), which makes it usable as a smoke test. A line naming another
-engine's scope (`@story.act`) plays where the game's `game-scopes/` folder declares
-it, standing that engine in from its declared defaults; without the folder it is
-refused, since Patter is playing alone. `patter coverage` does the same.
-
-| Option | Values | Meaning |
-|--------|--------|---------|
-| `--scene <id>` | scene id | Start at this scene. |
-| `--block <id>` | block id | Start at this block. |
-| `--choices <a,b,c>` | comma list | Auto-pick these option ids, in order, at successive choices. |
-| `--seed <n>` | integer | Seed the runtime PRNG for reproducible selection. |
-
-```sh
-patter play
-patter play --scene scn_tavern --choices opt_work,opt_secret
-patter play --seed 42
-```
-
-### `patter coverage [path]`
-
-Play the story many times with random choices and count how often each beat comes
-up, to find content no player can reach. The summary counts beats reached, never
-reached, and rarely reached (in fewer than 5% of runs), and says how the runs
-ended: reached the end, stalled at a choice with nothing to pick, or hit the step
-limit. The table gives each beat's **reached** (the share of runs that played it)
-and **played** (times it played in all runs), least reached first. Marks: `‼`
-never reached, `?` never reached but may just need an input driver, `~` rarely
-reached. Choices that ran dry (nothing to take and no fallback) are listed too.
-
-| Option | Values | Meaning |
-|--------|--------|---------|
-| `--runs <n>` | integer | How many playthroughs (default 5000). |
-| `--max-steps <n>` | integer | Steps before a run is stopped (default 200). |
-| `--seed <n>` | integer | The same seed gives the same result. |
-| `--scene <id>` / `--block <id>` | id | Start here instead of the project's start. |
-| `--order <o>` | `least` / `script` | Least reached first (default), or the script's order, scene by scene. |
-| `--fail-on-gap` | | Exit 1 if any beat is never reached (a CI gate). |
-| `--propose` | | Print suggested `@world` input drivers instead of running. |
-| `--json` | | The full report as JSON. |
-
-```sh
-patter coverage
-patter coverage --runs 10000 --seed 7 --order script
-patter coverage --fail-on-gap
-```
-
-### `patter resolve <query> [path]`
-
-Look up an **id**, **handle**, or **name** and report what it is and where it
-lives (file + location path). The CLI counterpart to the editor's dual search -
-handy when a locale table or VO asset references something by id.
-
-```sh
-patter resolve scn_tavern
-patter resolve "Tavern > Intro"
-```
-
-### `patter report [path]` (alias `stats`)
-
-Production report: writing/recording status against the project ladders, the
-voiced-vs-written line split, the burndown (done / to-write / projected), plan
-coverage, cut content, character rollups, and localisation staleness. Prints a
-compact summary by default.
-
-| Option | Meaning |
-|--------|---------|
-| `--xlsx <file>` | Also write a polished spreadsheet (Scenes / Characters / Localisation / Plan). |
-| `--json` | Emit the full structured report as JSON on stdout (for pipelines). With `--xlsx`, the "wrote" note goes to stderr so stdout stays pure JSON. |
-
-```sh
-patter report
-patter stats --xlsx report.xlsx
-patter report --json | jq '.totals'
-```
-
-### `patter share-scopes [path] [--at <dir>]`
-
-Share the project's scopes with the game's other editing tools, as Patterpad's **File > Share Scopes
-with Other Tools** does: makes the game's `game-scopes/` folder (in `--at`, else at the
-version-control root above the project, else beside it) with `patter.scopes.json` and a
-`game.scopes.json` holding the project's own game scopes (its World properties), which the project
-keeps as its synced copy. A folder another tool already made is joined, not replaced: its
-`game.scopes.json` keeps every scope it holds and gains only the ones it lacks. When looking up from
-the project wouldn't find the folder, the project names it in `gameScopes`. A project that already
-shares its scopes is refused.
-
-### `patter pack [path] -o <file.patterpack>`
-
-Pack a project (the `.patter` folder) into a single portable **`.patterpack`** - a
-binary zip envelope, the send-and-return artifact for collaborators without VCS
-(you cannot email a folder; this is the zip of it). `-o` is required. When the
-project has a game scopes folder (`game-scopes/`, found as every command finds it),
-the pack also carries a read-only snapshot of every `*.scopes.json` in it, as
-`game-scopes/<name>` entries listed in the manifest's `gameScopes`. A project with
-no folder packs to exactly the same bytes as before.
-
-```sh
-patter pack my-game.patter -o my-game.patterpack
-```
-
-### `patter unpack <file.patterpack> -o <dir>`
-
-Explode a `.patterpack` back into source shards under `<dir>`. Both the input
-file and `-o <dir>` are required. Entry paths that would escape the target
-directory are rejected. A pack's game scopes snapshot is written to
-`<dir>/game-scopes/`, where the unpacked project finds it first, so `validate`,
-`play`, and `coverage` there know the other tools' scopes.
-
-| Option | Meaning |
-|--------|---------|
-| `--merge --base <sent.patterpack>` | Instead of extracting, **fold a returned document's edits back into the existing project** at `<dir>` via the 3-way merge engine. `--base` is the `.patterpack` you originally packed and sent (the common ancestor). Per shard: a clean merge updates the file, a conflict writes a `.patterconflict` sidecar; a file only in the returned document is added. Exits non-zero if any shard conflicts. The returned pack's game scopes snapshot is never written. When the project has a game scopes folder and the returned project file's copy of the game's scopes (World properties) differs from the base pack's, the scopes they changed are written to `game.scopes.json` (the rest of the file is kept) and a `game scopes:` line says so. |
-
-```sh
-patter unpack returned.patterpack -o ./my-game.patter --merge --base sent.patterpack
-```
-
-### `patter merge BASE OURS THEIRS`
-
-Domain-aware **3-way merge** of Patter source by node id (not by line), for all
-four shard types (flow / loc / authoring / project). The merged output is always
-valid canonical source; conflicts resolve provisionally to OURS and are listed
-in a `.patterconflict` sidecar. Mostly invoked by your VCS via `mergetool`, but
-usable directly.
-
-| Option | Meaning |
-|--------|---------|
-| `-o <file>` | Write the merged result to `<file>` (+ `<file>.patterconflict` on conflicts). Without it, the merge streams to stdout. |
-| `--type <t>` | Force the type (`flow`/`loc`/`authoring`/`project`); default auto-detects from the `schema` tag. |
-| `--json` | Emit the structured `{ type, merged, conflicts, warnings }` as JSON. |
-
-Exit: `0` clean, `1` conflicts (sidecar written), `2` error. `%O %A %B` from a
-git driver map to BASE OURS THEIRS.
-
-```sh
-patter merge base.patterflow ours.patterflow theirs.patterflow -o ours.patterflow
-patter merge base.patterloc ours.patterloc theirs.patterloc --json
-```
-
-### `patter mergetool BASE THEIRS OURS OUT`
-
-The **VCS merge-tool wrapper** - register it once as your single global merge
-tool. It sniffs the path: Patter source goes to the structured merge above;
-anything else is handed to your normal tool. Arguments are in the BASE THEIRS
-OURS OUT order that Perforce / Plastic / SVN all use; `patter init --vcs <x>`
-writes the exact registration into `vcs-setup.md`. (git instead uses its
-per-path driver and calls `patter merge` directly.)
-
-| Option | Meaning |
-|--------|---------|
-| `--fallback <cmd>` | The tool to run for non-Patter files (e.g. `p4merge`, `"code --wait --merge"`). It receives the same four file arguments. |
-
-```sh
-patter mergetool $BASE $THEIRS $OURS $OUT --fallback p4merge
-```
+- Every write goes through your version control (checking a file out first, adding new files), so a
+  locked or read-only file fails the write rather than being overwritten.
+- `patter <command> --help` (or `-h`, or `patter help <command>`) prints that command's usage.
+- A flag takes its value as the next word or inline (`--seed=-5`). Anything starting with `-` is a
+  flag, so a mistyped one is refused rather than read as a path. `-o -` streams text output to stdout
+  where that makes sense.
+- Usage errors are printed under `usage:`, followed by the command's whole form.
 
 ## File types
 
-| Extension | Role | In VCS? |
-|-----------|------|---------|
-| `.patter` | The **project** folder (a macOS package; a plain folder elsewhere) | yes - it *is* the source tree |
-| `.patterproj` | Project settings manifest (inside the `.patter`) | yes (source) |
-| `.patterflow` | One flow / scene (the structural tree) | yes (source) |
-| `.patterloc` | Localised strings, per scene per locale | yes (source) |
-| `.patterx` | Authoring / production metadata (status, comments, estimates) | yes (source) |
-| `.patterc` | Compiled runtime bundle (`export` output, strict JSON) | committed by default (see `--bundle`) |
-| `.patterpack` | Packed portable send document (`pack` output, binary zip) | no - ignored, ephemeral |
+| Extension | Role | In version control? |
+|-----------|------|---------------------|
+| `.patter` | The **project** folder (a macOS package; a plain folder elsewhere) | yes, it *is* the source tree |
+| `.patterproj` | Project settings (inside the `.patter`) | yes (source) |
+| `.patterflow` | One scene's structure | yes (source) |
+| `.patterloc` | Localised strings, per scene per language | yes (source) |
+| `.patterx` | Authoring metadata (status, comments, suggestions) | yes (source) |
+| `.patterc` | Compiled runtime bundle (`export` output, strict JSON) | committed by default (see `init --bundle`) |
+| `.patterpack` | Packed portable document (`pack` output, a zip) | no, ignored |
 
-Source files are UTF-8 + LF JSON5 (trailing commas allowed); `patter format`
-keeps them canonical, and the VCS config from `patter init` pins encoding and
-wires structured merge.
+Source files are UTF-8 + LF JSON5 (trailing commas allowed); `patter format` keeps them canonical,
+and the version-control config from `patter init` pins the encoding and wires up the structured merge.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | Success. |
-| `1` | The operation ran but found problems or failed (validation issues, a stalled playthrough, a write failure). |
-| `2` | Usage error (unknown command, unknown flag, missing required value). |
+| `1` | The operation ran but found problems or failed (validation issues, a failed playthrough, a write failure). |
+| `2` | Usage error (unknown command or flag, a missing value). `merge` and `mergetool` also exit 2 for input that is not Patter source, so a version control can fall back to its own merge. |
