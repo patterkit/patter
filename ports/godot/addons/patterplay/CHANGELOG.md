@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-07
+
 ### Changed
 
 - **The conformance corpus covers more, and every runtime is held to it**: the outline and beat sequence, the

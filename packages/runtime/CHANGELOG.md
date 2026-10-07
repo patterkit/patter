@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-07
+
 ### Changed
 
 - **A new `Engine` on a bundle another engine already uses no longer rebuilds the tag index.** It is built once

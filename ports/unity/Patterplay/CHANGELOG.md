@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-07
+
 ### Changed
 
 - **The core runtime assembly (`Patterplay.Runtime`) declares that it uses no engine code**, so nothing

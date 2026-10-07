@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-07
+
 ### Added
 
 - **Game Data values typed in Blueprint.** Each `FPatterGameDataEntry` carries `TypedValue` (an `FPatterValue`)
