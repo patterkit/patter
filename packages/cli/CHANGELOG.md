@@ -1,5 +1,20 @@
 # @patterkit/cli
 
+## 0.10.0
+
+### Minor Changes
+
+- a4db109: Speaker qualifiers in the exports. The screenplay (PDF and DOCX), the playable HTML, and `patter play` print a qualified cue as `TAM (O.S.)`; the voice script gains a Qualifier column, with lines still under the one character; localisation exports carry a line's qualifier as read-only context and the qualifier names as project-level strings; and the editable script handoff sends the qualifier in the cue and reads a changed one back as a suggestion. `patter suggestions` lists a qualifier change. `@patterkit/ops` exports `cueLabel` and `qualifierNamer`.
+
+### Patch Changes
+
+- 62abf4f: In a Plastic SCM workspace, a file already checked out is now recognised as checked out, so writing it again no longer fails as locked by your own checkout (`@wildwinter/simple-vc-lib` 0.5.2, which reads `cm status` in the format `cm` actually prints).
+- Updated dependencies [73cbed5]
+- Updated dependencies [a4db109]
+- Updated dependencies [a4db109]
+  - @patterkit/ops@0.15.0
+  - @patterkit/core@0.5.0
+
 ## 0.9.3
 
 ### Patch Changes
