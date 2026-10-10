@@ -1,6 +1,6 @@
 {
   "name": "@patterkit/cli",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "The `patter` CLI: validate, format, export, play, test coverage, localise, and merge Patter projects.",
   "type": "module",
   "license": "MIT",
