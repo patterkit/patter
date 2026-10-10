@@ -33,6 +33,15 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker qualifiers**: a line can say how it is delivered, a screenplay's `TAM (O.S.)`, without becoming a
+  second character. A `line` step, and a line-kind choice prompt, carries `qualifier`, the qualifier's `gameId`
+  (`vo`, `os`, `radio`, or the project's own), and `qualifierName`, its shown name, resolved as `characterName`
+  is: the active locale's `qualifier:<gameId>` string, then the default locale's, then the authored name.
+  `qualifierName` is absent in an IDs-only build, and both are dropped on a line silenced by closed captions.
+  Saves and the outline and beat sequence carry them too. What a qualifier means is the game's to decide.
+
 ## [0.21.0] - 2026-10-07
 
 ### Changed
