@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-10
+
 ### Added
 
 - **Line padding.** Set the pause after a line in its inspector, under Pad after, in seconds. Below zero,
