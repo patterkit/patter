@@ -6,7 +6,8 @@ the `patter` CLI writes) and plays it directly in C++, with the whole API also e
 Blueprint. Every Patterplay runtime plays the same bundle with the same behaviour, so a story
 authored once runs identically here, on the web, in Unity, and in Godot.
 
-Full documentation: **[the Unreal guide](https://patterkit.dev/play/unreal/)**.
+Works with Unreal Engine 5.7 and 5.8 (verified on 5.7.4 and 5.8.3). Full documentation:
+**[the Unreal guide](https://patterkit.dev/play/unreal/)**.
 
 ## Install
 

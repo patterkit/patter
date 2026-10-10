@@ -15,8 +15,9 @@ copy into another project first.
      PatterplayDemo.uproject       # <- open this
    ```
 
-2. Open `PatterplayDemo.uproject` (any Unreal Engine 5.7 release, verified on 5.7.4, and a C++ toolchain - everything
-   ships source-only; confirm the build prompt on first open). The very first open takes a
+2. Open `PatterplayDemo.uproject` (any Unreal Engine 5.7 or 5.8 release, verified on 5.7.4 and 5.8.3, and a C++
+   toolchain - everything ships source-only; confirm the build prompt on first open). The project is saved for
+   5.7, so 5.8 offers to convert it first; a converted copy is fine. The very first open takes a
    few minutes while Unreal compiles the code and warms its shader caches - that's a
    one-time cost, not a hang.
 3. Press **Play**. That's it: the project's game mode spawns the tour, which loads

@@ -10,8 +10,11 @@ C++-friendly plugin. It loads a `.patterc` [bundle](/format/overview/) and plays
 directly: same bundle, same behaviour, held to the same
 [shared test suite](/compatibility/) as every other engine.
 
-> Verified on Unreal Engine 5.7.4, and builds from source against any 5.7 release (it is not
-> locked to one point version). Usable from C++ or Blueprint; some engineering is expected.
+> Verified on Unreal Engine 5.7.4 and 5.8.3, and builds from source against any 5.7 or 5.8 release
+> (it is not locked to one point version). Usable from C++ or Blueprint; some engineering is expected.
+>
+> On a Mac, Unreal 5.7 accepts Xcode only up to 26.9. With Xcode 27, use Unreal 5.8, or keep an
+> Xcode 26.x beside it and point 5.7's build at that one.
 
 ## Install
 
