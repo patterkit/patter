@@ -1,5 +1,14 @@
 # @patterkit/play-helpers
 
+## 0.8.4
+
+### Patch Changes
+
+- 6d88383: Uses `@patterkit/runtime` 0.23.0, the Patterplay 0.23.0 release.
+- Updated dependencies [09f4abc]
+- Updated dependencies [9630c0e]
+  - @patterkit/model@0.12.0
+
 ## 0.8.3
 
 ### Patch Changes

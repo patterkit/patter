@@ -1,5 +1,13 @@
 # @patterkit/conformance
 
+## 0.1.8
+
+### Patch Changes
+
+- Updated dependencies [09f4abc]
+- Updated dependencies [9630c0e]
+  - @patterkit/model@0.12.0
+
 ## 0.1.7
 
 ### Patch Changes
