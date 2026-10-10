@@ -21,6 +21,9 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **Plastic SCM: saving after the first checkout, again.** 0.26.1 still refused the second save of a file as
+  "locked": it misread what Plastic reports about a checked-out file, so it tried to check the file out on
+  every save. It now reads Plastic's report correctly, checks a file out once, and saves it freely after that.
 - **Right-clicking a speaker's name** opens the context menu and nothing else. The character picker used
   to open behind it.
 - **Clicking the colon after a speaker's name** selects the speaker, as clicking the name does. It used to
