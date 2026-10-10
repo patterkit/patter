@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-10
+
 ### Added
 
 - **Speaker qualifiers.** A line can say how it's delivered as well as who says it: `TAM (O.S.)`,
