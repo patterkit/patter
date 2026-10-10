@@ -25,7 +25,8 @@ Both hang off the engine (build one from your bundle, then call these, no flow n
 
 Each beat carries the same data a played step would: `id`, `kind` (line / text / gameEvent),
 `character` + resolved `characterName`, `direction`, the speaker `qualifier` + resolved
-`qualifierName`, the **source `text`** (un-interpolated), the
+`qualifierName`, the resolved `padAfter` (and `ownPadAfter` when the beat sets its own), the **source
+`text`** (un-interpolated), the
 author `gameData` overrides, and accumulated `tags`. Text and names are read at the source locale.
 Each outline scene and block carries its `id`, `gameId` address, `name`, its own author `gameData`
 overrides (left out when empty), and its `tags`.

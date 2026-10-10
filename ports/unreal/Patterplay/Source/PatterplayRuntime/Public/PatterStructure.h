@@ -47,6 +47,18 @@ struct FPatterBeatInfo
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString QualifierName;
 
+	/** The pause after this beat, in seconds, resolved from its own value and the defaults above it (line and
+	 *  text only; 0 for a gameEvent): what a delivered step carries. See line padding. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double PadAfter = 0;
+
+	/** The beat's own padAfter, when it sets one (bHasOwnPadAfter); otherwise it inherits a default. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double OwnPadAfter = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasOwnPadAfter = false;
+
 	/** Source text, un-interpolated (line / text). Empty for gameEvent and IDs-only bundles. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Text;

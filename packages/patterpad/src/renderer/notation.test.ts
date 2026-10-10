@@ -99,7 +99,7 @@ describe("the problems bar's copy", () => {
   const problem = (over: Partial<Problem>): Problem => ({ category: "structure", severity: "error", message: "x", ...over });
   const CODES = ["missing-prompt", "invalid-prompt", "unknown-character", "empty-snippet", "empty-container", "empty-scene",
     "missing-name", "choice-can-empty", "jump-cycle", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
-    "duplicate-gameid", "stale-build", "merge-conflict", "unknown-qualifier", "invalid-qualifier"];
+    "duplicate-gameid", "stale-build", "merge-conflict", "unknown-qualifier", "invalid-qualifier", "invalid-pad", "pad-overlaps-seam"];
 
   it("has an entry for every code Patterpad raises, each a sentence", () => {
     for (const code of CODES) {
@@ -148,6 +148,13 @@ describe("the problems bar's copy", () => {
     expect(problemLineFor(problem({ detail: "unknown-qualifier", message: "odd" }))).toBe("This line's qualifier isn't one of the project's qualifiers. Pick another, or add it in Project Settings.");
     expect(problemLineFor(problem({ detail: "invalid-qualifier", message: "qualifier address 'vo' is used more than once" })))
       .toBe("A speaker qualifier in Project Settings isn't set up properly. Each one needs a name and its own Game ID.");
+  });
+
+  it("explains a pause out of range and a cut-in across a snippet's seam, with what to do", () => {
+    expect(problemLineFor(problem({ detail: "invalid-pad", message: "beat 'L1' pause '99' must be a number of seconds from -10 to 60" })))
+      .toBe("This pause is outside the range Patter allows. Use a number of seconds from -10 to 60.");
+    expect(problemLineFor(problem({ severity: "warning", detail: "pad-overlaps-seam", message: "beat 'L1' is its snippet's last line" })))
+      .toBe("This line ends its snippet, so nothing can cut in on it. It plays with no pause after it. Set the pause to 0 or more.");
   });
 
   it("falls back to the softened message, titled by the file for a hygiene note, and never writes [", () => {

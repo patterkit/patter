@@ -1148,11 +1148,13 @@ namespace Patterkit.Patterplay.TestHost
                     if (s.Direction != null) o["direction"] = s.Direction;
                     if (s.Qualifier != null) o["qualifier"] = s.Qualifier;             // speaker qualifier gameId
                     if (s.QualifierName != null) o["qualifierName"] = s.QualifierName; // and its locale-resolved name
+                    NormalizePad(s, o);                                                 // line padding, when not the default
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
                 case StepType.Text:
                     o["type"] = "text"; o["id"] = s.Id; o["text"] = s.Text;
+                    NormalizePad(s, o);
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
@@ -1180,6 +1182,14 @@ namespace Patterkit.Patterplay.TestHost
                     break;
             }
             return o;
+        }
+
+        // A transcript records a line or text step's padAfter only when it differs from the built-in default
+        // (runner.ts normaliseStep). A missing one is recorded as such, so a step that leaves it off still fails.
+        private static void NormalizePad(StepResult s, Dictionary<string, object> o)
+        {
+            if (s.PadAfter == null) o["padAfter"] = "<missing>";
+            else if (s.PadAfter.Value != Bundle.DefaultPadAfter) o["padAfter"] = s.PadAfter.Value;
         }
 
         private static Dictionary<string, object> NormalizePrompt(ChoicePrompt p)
@@ -1380,6 +1390,9 @@ namespace Patterkit.Patterplay.TestHost
                         Name = q.TryGetProperty("name", out var qn) ? qn.GetString() : null,
                     });
 
+            // The project's line-padding default (absent = the built-in one).
+            bundle.PadAfterDefault = Num(b, "padAfterDefault");
+
             if (b.TryGetProperty("properties", out var props))
                 foreach (var p in props.EnumerateArray()) bundle.Properties.Add(ParsePropDecl(p));
 
@@ -1460,6 +1473,7 @@ namespace Patterkit.Patterplay.TestHost
             if (s.TryGetProperty("sceneProps", out var sp)) scene.SceneProps = sp.EnumerateArray().Select(ParsePropDecl).ToList();
             if (s.TryGetProperty("onEntry", out var oe)) scene.OnEntry = ParseEffects(oe);
             if (s.TryGetProperty("gameData", out var sgd)) scene.GameData = ParseGameData(sgd);
+            scene.PadAfterDefault = Num(s, "padAfterDefault");
             foreach (var blk in s.GetProperty("blocks").EnumerateArray()) scene.Blocks.Add(ParseBlock(blk));
             return scene;
         }
@@ -1474,6 +1488,7 @@ namespace Patterkit.Patterplay.TestHost
             };
             if (b.TryGetProperty("tags", out var bt)) block.Tags = TagList(bt);
             if (b.TryGetProperty("gameData", out var bgd)) block.GameData = ParseGameData(bgd);
+            block.PadAfterDefault = Num(b, "padAfterDefault");
             if (b.TryGetProperty("children", out var ch)) foreach (var n in ch.EnumerateArray()) block.Children.Add(ParseNode(n));
             return block;
         }
@@ -1486,6 +1501,7 @@ namespace Patterkit.Patterplay.TestHost
             if (n.TryGetProperty("onExit", out var oex)) node.OnExit = ParseEffects(oex);
             if (n.TryGetProperty("gameData", out var gd)) node.GameData = ParseGameData(gd);
             if (n.TryGetProperty("tags", out var nt)) node.Tags = TagList(nt);
+            node.PadAfterDefault = Num(n, "padAfterDefault");
             // Option-position flags, on a bare snippet option as on an Option group.
             if (n.TryGetProperty("sticky", out var st)) node.Sticky = st.GetBoolean();
             if (n.TryGetProperty("fallback", out var fb)) node.Fallback = fb.GetBoolean();
@@ -1524,11 +1540,16 @@ namespace Patterkit.Patterplay.TestHost
                 Character = b.TryGetProperty("character", out var c) ? c.GetString() : null,
                 Direction = b.TryGetProperty("direction", out var d) ? d.GetString() : null,
                 Qualifier = b.TryGetProperty("qualifier", out var q) ? q.GetString() : null,
+                PadAfter = Num(b, "padAfter"),
             };
             if (b.TryGetProperty("gameData", out var gd)) beat.GameData = ParseGameData(gd);
             if (b.TryGetProperty("tags", out var bt)) beat.Tags = TagList(bt);
             return beat;
         }
+
+        /// <summary>A number field, or null when it is absent (or not a number).</summary>
+        private static double? Num(JsonElement o, string key)
+            => o.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : (double?)null;
 
         private static List<string> TagList(JsonElement a) => a.EnumerateArray().Select(x => x.GetString()).ToList();
     }

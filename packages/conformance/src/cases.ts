@@ -1811,6 +1811,92 @@ const scriptedQualifierSaveLoad = {
   ],
 } satisfies ScriptedFixture;
 
+// --- line padding -----------------------------------------------------------------------------------
+// A line or text step carries `padAfter`, the pause after it in seconds: its own, else the nearest
+// `padAfterDefault` above it (snippet, each group innermost first, block, scene), else the project's, else the
+// built-in 0.6. A pause can be negative only when the very next beat in its snippet is a line or text beat: a
+// snippet's last line or text beat (what follows the seam isn't certain) and one followed by a game event (a
+// cut-in can't cross the event) are clamped to zero or more. A game event carries no pause of its own.
+// (Transcripts record `padAfter` only when it isn't the built-in 0.6.)
+const linePadding = {
+  name: "a step carries its pause: its own, else the nearest default, else the project's; a snippet's last line is never negative",
+  project: project({ cast: [{ name: "TAM" }], padAfterDefault: 1 }),
+  scenes: [{ id: "s", type: "scene", name: "S", padAfterDefault: 2, blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "g", type: "group", padAfterDefault: 0.3, children: [
+      { id: "sn1", type: "snippet", padAfterDefault: -0.2, beats: [
+        { id: "L_own", kind: "line", character: "TAM", padAfter: -0.5 },  // own: a cut-in, mid-snippet
+        { id: "L_snip", kind: "line", character: "TAM" },                 // the snippet's default
+        { id: "T_last", kind: "text", padAfter: -1 },                     // the last line or text beat: clamped
+        { id: "E_after", kind: "gameEvent", gameData: { cue: "door" } },  // no pause, and not the last line
+      ] },
+      { id: "sn_ev", type: "snippet", beats: [
+        { id: "L_cross", kind: "line", character: "TAM", padAfter: -0.4 }, // a game event next: clamped
+        { id: "E_mid", kind: "gameEvent", gameData: { cue: "bell" } },
+        { id: "L_after", kind: "line", character: "TAM" },                // the group's default
+      ] },
+      { id: "sn2", type: "snippet", beats: [
+        { id: "L_group", kind: "line", character: "TAM" },                // the group's default
+        { id: "L_zero", kind: "line", character: "TAM", padAfter: 0.6 },  // own, equal to the built-in
+      ] },
+    ] },
+    { id: "sn3", type: "snippet", beats: [{ id: "L_scene", kind: "line", character: "TAM" }], jump: { to: "s2" } }, // the scene's
+  ] }] }, { id: "s2", type: "scene", name: "S2", blocks: [{ id: "b2", type: "block", name: "B2", children: [
+    { id: "sn4", type: "snippet", beats: [{ id: "T_project", kind: "text" }], jump: { to: "END" } },          // the project's
+  ] }] }],
+  locales: [loc("s", { L_own: "One", L_snip: "Two", T_last: "Three", L_cross: "Wait", L_after: "Ding", L_group: "Four", L_zero: "Five", L_scene: "Six" }), loc("s2", { T_project: "Seven" })],
+  expectedTranscript: [
+    { type: "line", id: "L_own", text: "One", character: "TAM", padAfter: -0.5 },
+    { type: "line", id: "L_snip", text: "Two", character: "TAM", padAfter: -0.2 },
+    { type: "text", id: "T_last", text: "Three", padAfter: 0 },
+    { type: "gameEvent", id: "E_after", gameData: { cue: "door" } },
+    { type: "line", id: "L_cross", text: "Wait", character: "TAM", padAfter: 0 },
+    { type: "gameEvent", id: "E_mid", gameData: { cue: "bell" } },
+    { type: "line", id: "L_after", text: "Ding", character: "TAM", padAfter: 0.3 },
+    { type: "line", id: "L_group", text: "Four", character: "TAM", padAfter: 0.3 },
+    { type: "line", id: "L_zero", text: "Five", character: "TAM" },
+    { type: "line", id: "L_scene", text: "Six", character: "TAM", padAfter: 2 },
+    { type: "text", id: "T_project", text: "Seven", padAfter: 1 },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// An option's spoken prompt is the head of its option's run, so its pause times the reply and may be negative
+// (the reply cuts in on the question); it resolves through the option. A line silenced by closed captions still
+// fires, so it still carries its pause.
+const linePaddingPrompt = {
+  name: "a spoken prompt's pause resolves through its option and is never clamped; a silenced line keeps its pause",
+  project: project({ cast: [{ name: "TAM" }, { name: "SFX" }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn0", type: "snippet", beats: [{ id: "L_sfx", kind: "line", character: "SFX", padAfter: 1.5 }], jump: { to: "b_ask" } },
+  ] }, { id: "b_ask", type: "block", name: "Ask", children: [
+    { id: "g_ask", type: "group", selector: "choice", children: [
+      { id: "o_cut", type: "group", prompt: { id: "P_cut", kind: "line", character: "TAM", padAfter: -0.4 }, children: [
+        { id: "cut_c", type: "snippet", beats: [{ id: "T_reply", kind: "text" }], jump: { to: "b_ask" } },
+      ] },
+      { id: "o_wait", type: "group", padAfterDefault: 3, prompt: { id: "P_wait", kind: "text" }, children: [
+        { id: "wait_c", type: "snippet", jump: { to: "END" } },
+      ] },
+    ] },
+  ] }] }],
+  locales: [loc("s", { L_sfx: "(a door slams)", P_cut: "Who's there?", T_reply: "Me!", P_wait: "Wait" })],
+  engineOptions: { replayPromptOnChoose: true, closedCaptions: false },
+  choices: ["o_cut", "o_wait"],
+  expectedTranscript: [
+    { type: "line", id: "L_sfx", text: "", padAfter: 1.5 },
+    { type: "choice", groupId: "g_ask", options: [
+      { id: "o_cut", prompt: { kind: "line", text: "Who's there?", character: "TAM" }, eligible: true },
+      { id: "o_wait", prompt: { kind: "text", text: "Wait" }, eligible: true },
+    ] },
+    { type: "line", id: "P_cut", text: "Who's there?", character: "TAM", padAfter: -0.4 },
+    { type: "text", id: "T_reply", text: "Me!" },                               // the built-in default
+    { type: "choice", groupId: "g_ask", options: [
+      { id: "o_wait", prompt: { kind: "text", text: "Wait" }, eligible: true },
+    ] },
+    { type: "text", id: "P_wait", text: "Wait", padAfter: 3 },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
 // ---------------------------------------------------------------------------
 // gameData merge-at-read - a node's sparse override resolved against its TYPE's
 // declared field defaults (runtime effectiveGameData). Not a transcript; a host
@@ -2809,7 +2895,7 @@ const outlineEverything = {
     id: "s_hall", type: "scene", name: "Great Hall", tags: ["indoor"], gameData: { music: "harp" },
     blocks: [{ id: "b_door", type: "block", name: "Door", tags: ["door"], children: [
       { id: "sn_open", type: "snippet", tags: ["opening"], beats: [
-        { id: "L_hi", kind: "line", character: "ANNA", direction: "warmly", qualifier: "os", gameData: { mood: "glad" }, tags: ["greeting"] },
+        { id: "L_hi", kind: "line", character: "ANNA", direction: "warmly", qualifier: "os", padAfter: -0.3, gameData: { mood: "glad" }, tags: ["greeting"] },
         { id: "E_bell", kind: "gameEvent", gameData: { mood: "loud" } },
         { id: "T_wind", kind: "text" },
       ] },
@@ -2820,7 +2906,7 @@ const outlineEverything = {
           children: [{ id: "sn_l", type: "snippet", jump: { to: "END" } }] },
       ] },
     ] }, {
-      id: "b_cellar", type: "block", name: "Cellar", children: [
+      id: "b_cellar", type: "block", name: "Cellar", padAfterDefault: 1.2, children: [
         { id: "g_seq", type: "group", selector: "sequence", options: { order: "sequential", exhaust: "stick" }, children: [
           { id: "sn_c1", type: "snippet", beats: [{ id: "T_c1", kind: "text" }] },
           { id: "sn_c2", type: "snippet", beats: [{ id: "T_c2", kind: "text" }] },
@@ -2910,6 +2996,7 @@ export const cases: Fixtures = {
     characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent,
+    linePadding, linePaddingPrompt,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
   scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,

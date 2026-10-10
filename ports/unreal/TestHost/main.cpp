@@ -126,11 +126,13 @@ static JsonValue normalize(const StepResult& s)
             if (s.hasDirection) o.set("direction", JsonValue::Str(s.direction));
             if (s.hasQualifier) o.set("qualifier", JsonValue::Str(s.qualifier));               // speaker qualifier gameId
             if (s.hasQualifierName) o.set("qualifierName", JsonValue::Str(s.qualifierName));   // and its locale-resolved name
+            if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter)); // line padding, when not the default
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
             break;
         case StepType::Text:
             o.set("type", JsonValue::Str("text")); o.set("id", JsonValue::Str(s.id)); o.set("text", JsonValue::Str(s.text));
+            if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter));
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
             break;
@@ -594,6 +596,9 @@ static JsonValue beatInfoToJson(const BeatInfo& b)
     if (!b.direction.empty()) o.set("direction", JsonValue::Str(b.direction));
     if (!b.qualifier.empty()) o.set("qualifier", JsonValue::Str(b.qualifier));
     if (!b.qualifierName.empty()) o.set("qualifierName", JsonValue::Str(b.qualifierName));
+    // Line padding: a line or text beat always has its resolved pause, defaults included; its own only when set.
+    if (b.kind == "line" || b.kind == "text") o.set("padAfter", JsonValue::Num(b.padAfter));
+    if (b.hasOwnPadAfter) o.set("ownPadAfter", JsonValue::Num(b.ownPadAfter));
     if (!b.text.empty()) o.set("text", JsonValue::Str(b.text));
     if (!b.gameData.empty()) o.set("gameData", rawGameDataToJson(b.gameData));
     if (!b.tags.empty()) o.set("tags", strsToJson(b.tags));

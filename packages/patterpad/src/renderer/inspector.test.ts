@@ -25,6 +25,7 @@ const handlers: InspectorHandlers = {
   scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,
   needsRerecord: () => false, setNeedsRerecord: noop,
   qualifiers: () => [], setQualifier: noop,
+  projectPadAfter: () => 0.6, setPadAfter: noop, setPadAfterDefault: noop,
 };
 const ctx = (level: unknown): InspectorContext => ({ levels: [level] }) as InspectorContext;
 
@@ -265,5 +266,72 @@ describe("inspector: the speaker qualifier row", () => {
     const bare = document.createElement("div");
     renderInspector(bare, line(), handlers); // no qualifiers in the project, none on the line
     expect(select(bare)).toBeNull();
+  });
+});
+
+describe("inspector: line padding fields", () => {
+  const field = (host: HTMLElement): HTMLInputElement | null => host.querySelector<HTMLInputElement>("input.insp-pad-input");
+  const commit = (input: HTMLInputElement, value: string): void => { input.value = value; input.dispatchEvent(new Event("change")); };
+
+  it("shows a line's inherited pause as a placeholder, naming where it comes from", () => {
+    const host = document.createElement("div");
+    renderInspector(host, ctx({ kind: "leaf", beat: "line", id: "L1", character: "TAM", padInherited: { value: 0.25, from: "block" } }), handlers);
+    const input = field(host)!;
+    expect(input.value).toBe("");
+    expect(input.placeholder).toBe("0.25 from the block");
+    expect(input.min).toBe("-10");
+    const bare = document.createElement("div");
+    renderInspector(bare, ctx({ kind: "leaf", beat: "prose", id: "T1" }), { ...handlers, projectPadAfter: () => 0.6 });
+    expect(field(bare)!.placeholder).toBe("0.6 from the project");
+  });
+
+  it("writes a typed pause, clears it when emptied, and puts back text that isn't a number", () => {
+    const host = document.createElement("div");
+    const setPadAfter = vi.fn();
+    renderInspector(host, ctx({ kind: "leaf", beat: "line", id: "L1", character: "TAM", padAfter: -0.5 }), { ...handlers, setPadAfter });
+    const input = field(host)!;
+    expect(input.value).toBe("-0.5");
+    commit(input, "1.2");
+    commit(input, "");
+    commit(input, "abc");
+    expect(input.value).toBe("");
+    commit(input, "99"); // above the range: clamped to the maximum
+    expect(setPadAfter.mock.calls).toEqual([["L1", 1.2], ["L1", null], ["L1", 60]]);
+  });
+
+  it("never offers a negative pause on a snippet's last line, and says so for an inherited one", () => {
+    const host = document.createElement("div");
+    const setPadAfter = vi.fn();
+    renderInspector(host, ctx({ kind: "leaf", beat: "line", id: "L9", character: "TAM", endsSnippet: true, padInherited: { value: -0.4, from: "snippet" } }), { ...handlers, setPadAfter });
+    const input = field(host)!;
+    expect(input.min).toBe("0");
+    expect(input.placeholder).toBe("0 at the end of a snippet");
+    commit(input, "-1");
+    expect(setPadAfter).toHaveBeenCalledWith("L9", 0);
+    // A prompt times the reply, which is certain: its field goes below zero.
+    const prompt = document.createElement("div");
+    renderInspector(prompt, ctx({ kind: "leaf", beat: "line", id: "P1", character: "TAM", prompt: true }), handlers);
+    expect(field(prompt)!.min).toBe("-10");
+  });
+
+  it("puts a Default pad field on snippets, groups, blocks, and scenes, and none on a game event", () => {
+    const setPadAfterDefault = vi.fn();
+    const levels = [
+      { kind: "snippet", id: "sn", beatCount: 1, padAfterDefault: 0.3 },
+      { kind: "group", id: "g", role: "sequence", labelParts: ["Sequence"], label: "Sequence", padInherited: { value: 1, from: "scene" } },
+      { kind: "block", id: "b", name: "B", address: "b" },
+      { kind: "scene", id: "s", name: "S", address: "s" },
+    ];
+    const host = document.createElement("div");
+    renderInspector(host, { levels } as InspectorContext, { ...handlers, setPadAfterDefault });
+    const inputs = [...host.querySelectorAll<HTMLInputElement>("input.insp-pad-input")];
+    expect(inputs.map((i) => i.getAttribute("aria-label"))).toEqual(["Default pad", "Default pad", "Default pad", "Default pad"]);
+    expect(inputs[0]!.value).toBe("0.3");
+    expect(inputs[1]!.placeholder).toBe("1 from the scene");
+    commit(inputs[2]!, "0.9");
+    expect(setPadAfterDefault).toHaveBeenCalledWith("b", 0.9);
+    const event = document.createElement("div");
+    renderInspector(event, ctx({ kind: "leaf", beat: "gameEvent", id: "A1" }), handlers);
+    expect(field(event)).toBeNull();
   });
 });

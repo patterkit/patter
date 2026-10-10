@@ -55,6 +55,9 @@ var scene_game_id_to_id: Dictionary = {}
 var block_game_id_to_id: Dictionary = {}
 ## Author tags (#215): node id -> accumulated tags (own + every ancestor's, deduped). Built once.
 var tag_index: Dictionary = {}
+## Line padding: every line and text beat's resolved pause, beat id -> {"resolved", "own" when set}.
+## Built once (PatterBundle.build_pad_index).
+var pad_index: Dictionary = {}
 ## The game's one registry: `@patter` (the SHARED globals), host scopes, every instance bag. Held
 ## untyped: a combined game may hand over a registry another addon's shim built.
 var registry = null

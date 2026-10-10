@@ -93,6 +93,21 @@ writer's call, covered in
 
 Pasting a block of dialogue lays each line out as its own beat automatically.
 
+## Pauses between lines
+
+How long to wait after a line, and when to let the next line cut in on it, is set in the inspector.
+**Pad after** on a line or a piece of narration is the pause after it, in seconds: positive waits,
+zero follows at once, and negative starts the next line that long before this one ends, a cut-in.
+Leave it empty and the line takes the **Default pad** from the nearest snippet, group, block, or
+scene above it that sets one, then the project's (**Project Settings ▸ General**), then 0.6 seconds.
+The empty field shows the value it will take, and where from.
+
+A snippet's last line can't cut in, because what follows it isn't settled until the story chooses,
+and nor can a line followed by a game event, which a cut-in can't cross, so their fields won't go below
+zero. A negative pause that lands there by moving lines around is flagged, and plays as no pause. Pauses are often settled after recording, so there's no need to set
+them while writing. [Play](/patterpad/playtesting/) times the scene with them, and your game reads
+them from the bundle.
+
 ## Moving around
 
 Beyond the usual arrows and clicks, two things are worth knowing:

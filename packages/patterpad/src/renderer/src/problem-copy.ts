@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { defaultProblemCopy, describeProblem, problemName, type ProblemCopyTable, type ProblemLike } from "@wildwinter/app-shell";
+import { PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import type { Problem } from "../../shared/api.js";
 
 /** The sentence for each code, in Patter nouns (snippet, scene, choice, fallback, cast, prompt),
@@ -32,6 +33,15 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
   "invalid-qualifier": () => ({
     text: "A speaker qualifier in Project Settings isn't set up properly.",
     next: "Each one needs a name and its own Game ID.",
+  }),
+  "invalid-pad": () => ({
+    text: "This pause is outside the range Patter allows.",
+    next: `Use a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}.`,
+  }),
+  "pad-overlaps-seam": (p) => ({
+    text: /game event/.test(p.message) ? "A game event comes after this line, so nothing can cut in on it."
+      : "This line ends its snippet, so nothing can cut in on it.",
+    next: "It plays with no pause after it. Set the pause to 0 or more.",
   }),
   "empty-snippet": () => ({ text: "This snippet is empty.", next: "Add a line, or send it somewhere." }),
   "empty-container": () => ({ text: "This is empty.", next: "Add something inside it." }),

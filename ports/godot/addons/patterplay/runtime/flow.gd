@@ -1065,7 +1065,7 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 			ra["tags"] = tags
 		return ra
 	if kind == "text":
-		var rt := {"type": "text", "id": beat["id"], "text": _interp(_resolve_string(beat["id"]))}
+		var rt := {"type": "text", "id": beat["id"], "text": _interp(_resolve_string(beat["id"])), "padAfter": _pad_of(beat["id"])}
 		if beat.has("gameData"):
 			rt["gameData"] = _norm_gamedata(beat["gameData"])
 		if not tags.is_empty():
@@ -1095,11 +1095,19 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		var qn = _resolve_qualifier_name(beat)
 		if qn != null:
 			r["qualifierName"] = qn
+	r["padAfter"] = _pad_of(beat["id"])  # a silent line still fires, so it still carries its pause
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
 	if not tags.is_empty():
 		r["tags"] = tags
 	return r
+
+
+# A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default above
+# it, else the project's, else the built-in one; clamped to zero on a snippet's last line.
+func _pad_of(beat_id: String) -> float:
+	var pad = _host.pad_index.get(beat_id)
+	return float(pad["resolved"]) if pad != null else PatterBundle.DEFAULT_PAD_AFTER
 
 
 func _norm_gamedata(gd: Dictionary) -> Dictionary:
@@ -1173,6 +1181,7 @@ func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
 		for k in ["character", "characterName", "direction", "qualifier", "qualifierName"]:
 			if shown.has(k):
 				r[k] = str(shown[k])
+	r["padAfter"] = _pad_of(beat["id"])
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
 	if not tags.is_empty():

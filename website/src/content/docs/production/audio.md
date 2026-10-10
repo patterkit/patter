@@ -87,9 +87,10 @@ runtime side is on [Audio (runtime)](/play/audio/).
 ## Playing with audio
 
 When a project is in Audio Folders mode, the **Play** window gains an **Audio** toggle. With
-it on, **Continue** becomes a *table-read*: each line plays its clip and the next beat waits
-for it to finish, so the scene plays back at performance pace. A line with no clip is timed at
-a natural reading speed so the read stays in rhythm. **Step** still moves one beat at a time,
+it on, **Continue** becomes a *table-read*: each line plays its clip, and the next line follows
+when the clip and the line's [pause](/patterpad/writing-surface/#pauses-between-lines) allow, so the
+scene plays back at performance pace, cut-ins included. A line with no clip is timed by how long it
+would take to read, so the read stays in rhythm. **Step** still moves one beat at a time,
 playing each line's clip as you go. See [Playtesting](/patterpad/playtesting/).
 
 ## Recording scratch takes

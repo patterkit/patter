@@ -15,7 +15,7 @@
 // wired in with the compiler.)
 // ---------------------------------------------------------------------------
 
-import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers } from "@patterkit/model";
+import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, ScalarValue, AuthoringFile } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
@@ -36,6 +36,8 @@ export interface ValidationIssue {
     | "unknown-character"
     | "unknown-qualifier"
     | "invalid-qualifier"
+    | "invalid-pad"
+    | "pad-overlaps-seam"
     | "invalid-temporary"
     | "invalid-declaration"
     | "invalid-status-ladder"
@@ -161,6 +163,29 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
   const jumps: Array<{ to: string; from: string }> = [];
   const castNames = new Set((project.cast ?? []).map((c) => c.name));
   const qualifierIds = new Set(projectQualifiers(project).map((q) => q.gameId));
+  // Line padding: a padAfter or padAfterDefault is a number of seconds within the range, so a typo can't stall a
+  // scene for minutes (design/proposals/line-padding.md).
+  const checkPad = (value: unknown, what: string, id?: string): void => {
+    if (value === undefined) return;
+    if (typeof value !== "number" || !Number.isFinite(value) || value < PAD_AFTER_MIN || value > PAD_AFTER_MAX) {
+      issues.push({ code: "invalid-pad", message: `${what} pause '${String(value)}' must be a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}`, id });
+    }
+  };
+  // A cut-in needs a line to cut in with: a beat's pause can be negative only when the very next beat in its
+  // snippet is a line or text beat. A snippet's last one can't cut in on what follows the seam (that isn't
+  // certain until the switch), and one followed by a game event can't cut in across the event. The runtime
+  // clamps both to zero; this says so where the writer can see it.
+  const checkSeamPad = (beats: Snippet["beats"]): void => {
+    const list = beats ?? [];
+    list.forEach((beat, i) => {
+      if ((beat.kind !== "line" && beat.kind !== "text") || typeof beat.padAfter !== "number" || beat.padAfter >= 0) return;
+      const next = list[i + 1];
+      if (next && (next.kind === "line" || next.kind === "text")) return;
+      const why = next ? "is followed by a game event" : "is its snippet's last line";
+      issues.push({ code: "pad-overlaps-seam", severity: "warning", id: beat.id,
+        message: `beat '${beat.id}' ${why}, so its negative pause can't cut in on what follows; it plays as no pause` });
+    });
+  };
   // A line's speaker qualifier must be one of the project's (one removed from the list is caught here).
   const checkQualifier = (beat: { id: string; kind: string; qualifier?: string }, what: string): void => {
     if (beat.kind === "line" && beat.qualifier !== undefined && !qualifierIds.has(beat.qualifier)) {
@@ -204,6 +229,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
 
   for (const scene of scenes) {
     seeId(scene.id, "scene", "project");
+    checkPad(scene.padAfterDefault, `scene '${scene.id}' default`, scene.id);
     const where = `scene '${scene.id}'`;
     if (typeof scene.id === "string") addressable.add(scene.id);
     if (!scene.name?.trim()) {
@@ -239,6 +265,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
 
     for (const block of scene.blocks) {
       seeId(block.id, "block", where);
+      checkPad(block.padAfterDefault, `block '${block.id}' default`, block.id);
       checkTags(block.tags, `block '${block.id}'`, block.id);
       if (typeof block.id === "string") addressable.add(block.id);
       if (!block.name?.trim()) {
@@ -283,6 +310,12 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
       walkNodes<Group | Snippet>(block.children, (node) => {
         const inBlock = `block '${block.id}'`;
         checkTags(node.tags, `${node.type} '${node.id}'`, node.id);
+        checkPad(node.padAfterDefault, `${node.type} '${node.id}' default`, node.id);
+        if (node.type === "group" && node.prompt) checkPad(node.prompt.padAfter, `prompt '${node.prompt.id}'`, node.prompt.id);
+        if (node.type === "snippet") {
+          for (const beat of node.beats ?? []) if (beat.kind !== "gameEvent") checkPad(beat.padAfter, `beat '${beat.id}'`, beat.id);
+          checkSeamPad(node.beats);
+        }
         if (node.type === "group") {
           seeId(node.id, "group", inBlock);
           if (!Array.isArray(node.children)) {
@@ -442,6 +475,11 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
   }
   if (project.recordingStatuses) {
     checkLadderNames(project.recordingStatuses.map((s) => s.name), "recordingStatuses", issues);
+  }
+
+  const pad: unknown = project.padAfterDefault;
+  if (pad !== undefined && (typeof pad !== "number" || !Number.isFinite(pad) || pad < PAD_AFTER_MIN || pad > PAD_AFTER_MAX)) {
+    issues.push({ code: "invalid-pad", message: `the project default pause '${String(pad)}' must be a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}` });
   }
 
   // Speaker qualifiers: each has a name and a valid gameId, unique in the project (a line stores the gameId).

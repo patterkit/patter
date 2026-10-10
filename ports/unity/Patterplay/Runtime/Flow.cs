@@ -900,7 +900,7 @@ namespace Patterkit.Patterplay
                 case "gameEvent":
                     return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = beat.GameData, Tags = tags };
                 case "text":
-                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), GameData = beat.GameData, Tags = tags };
+                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), GameData = beat.GameData, Tags = tags };
                 case "line":
                 {
                     string raw = ResolveString(beat.Id);
@@ -922,6 +922,7 @@ namespace Patterkit.Patterplay
                         Direction = silent ? null : beat.Direction,
                         Qualifier = silent ? null : beat.Qualifier,
                         QualifierName = silent ? null : ResolveQualifierName(beat.Qualifier),
+                        PadAfter = PadOf(beat.Id), // a silent line still fires, so it still carries its pause
                         GameData = beat.GameData,
                         Tags = tags,
                     };
@@ -968,15 +969,20 @@ namespace Patterkit.Patterplay
         {
             var tags = _host.TagIndex.TryGetValue(beat.Id, out var t) && t.Count > 0 ? t : null;
             if (shown.Kind == "text")
-                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, GameData = beat.GameData, Tags = tags };
+                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = beat.GameData, Tags = tags };
             return new StepResult
             {
                 Type = StepType.Line, Id = beat.Id, Text = shown.Text,
                 Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
-                Qualifier = shown.Qualifier, QualifierName = shown.QualifierName,
+                Qualifier = shown.Qualifier, QualifierName = shown.QualifierName, PadAfter = PadOf(beat.Id),
                 GameData = beat.GameData, Tags = tags,
             };
         }
+
+        /// <summary>A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest
+        /// default above it, else the project's, else the built-in one; clamped to zero on a snippet's last line.</summary>
+        private double PadOf(string beatId)
+            => _host.PadIndex.TryGetValue(beatId, out var pad) ? pad.Resolved : Bundle.DefaultPadAfter;
 
         private Beat PromptBeatOf(Node node)
         {

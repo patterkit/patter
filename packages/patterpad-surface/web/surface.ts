@@ -34,7 +34,7 @@ import { setSnippetJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
 import { setPlayBlockHandler } from "./actionmenu.js";
 import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
-import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr } from "../src/zoneutil.js";
+import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr, isZoneBeat } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
 import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu, destroyActionMenu } from "./views.js";
 import { problemsPlugin, setProblemMarks, type ProblemMark } from "./problems.js";
@@ -51,7 +51,7 @@ export type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, LeafKind,
 } from "../src/inspect.js";
 export type { GroupPropsPatch, SnippetEffect } from "../src/groups.js";
-export type { OptionSummary } from "../src/inspect.js";
+export type { OptionSummary, PadSource } from "../src/inspect.js";
 export type { DocNote, DocNoteMap } from "./docnotes.js";
 export type { CommentMark, CommentOpenRequest } from "./comments.js";
 export type { SuggestionMark, SuggestionOpenRequest } from "./suggestions.js";
@@ -186,6 +186,12 @@ export interface SurfaceHandle {
   /** The keyboard route: cycle the caret's line through the project's qualifiers, then none. False when
    *  the caret isn't on a dialogue line, or the project has no qualifiers. */
   cycleQualifier(): boolean;
+  /** Set (or clear, with null) the pause after the line or text beat with this id, in seconds (line
+   *  padding, `padAfter`). Returns false if the id isn't a line or text beat here. */
+  setPadAfter(id: string, seconds: number | null): boolean;
+  /** Set (or clear, with null) the default pause for the lines inside the snippet, group, block, or scene
+   *  with this id (`padAfterDefault`). Returns false if the id isn't one of those here. */
+  setPadAfterDefault(id: string, seconds: number | null): boolean;
   /** Replace the project's qualifier list (after a Project Settings save): the cues repaint with it. */
   setQualifiers(list: QualifierChoice[]): void;
   /** This scene's local `@scene` property declarations (read from the scene doc, for the editor). */
@@ -1072,6 +1078,14 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     },
     cycleQualifier() {
       return cycleQualifierKey(view.state, view.dispatch);
+    },
+    setPadAfter(id, seconds) {
+      return editRaw(id, (raw) => { if (seconds === null) delete raw.padAfter; else raw.padAfter = seconds; }, isZoneBeat);
+    },
+    setPadAfterDefault(id, seconds) {
+      // The scene's doc is matched by id inside editRaw; the rest are the containers that carry a default.
+      return editRaw(id, (raw) => { if (seconds === null) delete raw.padAfterDefault; else raw.padAfterDefault = seconds; },
+        (n) => n.type.name === "snippet" || n.type.name === "group" || n.type.name === "block");
     },
     setQualifiers(list) {
       view.dispatch(setQualifierList(view.state, list));

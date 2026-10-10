@@ -183,6 +183,10 @@ namespace patter
     {
         std::string id, kind, character, characterName, direction, text;
         std::string qualifier, qualifierName;   // speaker qualifier gameId (`vo`) and shown name (source locale)
+        // Line padding (line and text only): the resolved pause after the beat, in seconds, what a delivered
+        // step carries (0 for a game event); and the beat's own value, when it sets one.
+        double padAfter = 0;
+        bool hasOwnPadAfter = false; double ownPadAfter = 0;
         std::vector<std::pair<std::string, PatterValue>> gameData;   // author overrides (raw)
         std::vector<std::string> tags;                               // accumulated
     };
@@ -495,6 +499,13 @@ namespace patter
     /// The engine-level live tap (Engine::onTrace): every flow's decisions, each with the flow it happened in.
     using TraceHandler = std::function<void(const std::string& flow, const LogEntry& entry)>;
 
+    // A line or text beat's pause (line padding): its own `padAfter` when it sets one, and the resolved one.
+    struct BeatPad
+    {
+        bool hasOwn = false; double own = 0;
+        double resolved = DEFAULT_PAD_AFTER;
+    };
+
     struct FlowHost
     {
         /// True when the run asked for a log.
@@ -535,6 +546,8 @@ namespace patter
         std::map<std::string, std::string> sceneGameIdToId;
         std::map<std::string, std::map<std::string, std::string>> blockGameIdToId;
         std::map<std::string, std::vector<std::string>> tagIndex;   // author tags (#215): node id -> accumulated
+        // Line padding: every line and text beat's resolved pause, worked out once per bundle (indexPads).
+        std::map<std::string, BeatPad> padIndex;
         /** The game's one registry: @patter (the SHARED globals), host scopes, every instance bag. */
         std::shared_ptr<ScopeRegistry> registry;
         /** True when the engine made the registry (a standalone game): saveGame() then carries its values. */
@@ -1903,10 +1916,11 @@ namespace patter
                 if (it != host_->tagIndex.end() && !it->second.empty()) { s.hasTags = true; s.tags = it->second; }
             };
             if (beat.kind == "gameEvent") { r.type = StepType::GameEvent; r.id = beat.id; r.gameData = beat.gameData; applyTags(r); return r; }
-            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.gameData = beat.gameData; applyTags(r); return r; }
+            if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.gameData = beat.gameData; applyTags(r); return r; }
             // line
             std::string raw = resolveString(beat.id);
             r.type = StepType::Line; r.id = beat.id;
+            r.padAfter = padOf(beat.id);   // a silent line still fires, so it still carries its pause
             // Closed captions (#214): a line goes SILENT (off only) when the caption CHARACTER speaks it
             // (whole line is a caption, delimiters or not) OR stripping cues leaves it empty. A silent line
             // still FIRES (audio plays) but carries no text + no speaker.
@@ -1927,6 +1941,13 @@ namespace patter
             r.gameData = beat.gameData;
             applyTags(r);
             return r;
+        }
+        // A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default
+        // above it, else the project's, else the built-in one; clamped to zero on a snippet's last line.
+        double padOf(const std::string& beatId) const
+        {
+            auto it = host_->padIndex.find(beatId);
+            return it != host_->padIndex.end() ? it->second.resolved : DEFAULT_PAD_AFTER;
         }
         std::string interp(const std::string& raw)
         {
@@ -1970,7 +1991,7 @@ namespace patter
         StepResult promptResult(const Beat& beat, const ChoicePrompt& shown)
         {
             StepResult r;
-            r.id = beat.id; r.text = shown.text; r.gameData = beat.gameData;
+            r.id = beat.id; r.text = shown.text; r.gameData = beat.gameData; r.padAfter = padOf(beat.id);
             auto it = host_->tagIndex.find(beat.id);
             if (it != host_->tagIndex.end() && !it->second.empty()) { r.hasTags = true; r.tags = it->second; }
             if (shown.kind == "text") { r.type = StepType::Text; return r; }
@@ -2132,6 +2153,10 @@ namespace patter
                     host_.tagIndex[block.id] = blockTags;
                     walkNodes(block.children, [&](const Node* n) { host_.nodeIndex[n->id] = n; });
                     indexTags(block.children, blockTags);
+                    // Line padding: the nearest default above each beat, block over scene over project.
+                    const double projectPad = bundle.hasPadAfterDefault ? bundle.padAfterDefault : DEFAULT_PAD_AFTER;
+                    const double scenePad = scene.hasPadAfterDefault ? scene.padAfterDefault : projectPad;
+                    indexPads(block.children, block.hasPadAfterDefault ? block.padAfterDefault : scenePad);
                 }
                 host_.blockGameIdToId[sceneId] = blockAddrs;
             }
@@ -2728,6 +2753,9 @@ namespace patter
             }
             if (beat.kind == "line" || beat.kind == "text")
             {
+                auto pad = host_.padIndex.find(beat.id);
+                info.padAfter = pad != host_.padIndex.end() ? pad->second.resolved : DEFAULT_PAD_AFTER;
+                if (pad != host_.padIndex.end() && pad->second.hasOwn) { info.hasOwnPadAfter = true; info.ownPadAfter = pad->second.own; }
                 auto t = host_.defaultStrings->find(beat.id);
                 if (t != host_.defaultStrings->end()) info.text = t->second;   // source, un-interpolated
             }
@@ -3010,6 +3038,41 @@ namespace patter
                 if (n->isGroup() && n->prompt) host_.tagIndex[n->prompt->id] = dedupeTags(n->prompt->tags, acc);
                 if (n->isGroup()) indexTags(n->children, acc);
                 else for (const auto& beat : n->beats) host_.tagIndex[beat.id] = dedupeTags(beat.tags, acc);
+            }
+        }
+        // Line padding (design/proposals/line-padding.md): record each line and text beat's pause, its own
+        // `padAfter` else the nearest `padAfterDefault` above it (snippet, then each group innermost first; the
+        // caller passes the block's, scene's, or project's). A snippet's last line or text beat, and one followed
+        // by a game event, is clamped to zero or more: it can't cut in across the seam or the event. An option's
+        // prompt is the head of its option's run: it resolves through the option and is never clamped.
+        void setPad(const Beat& beat, double inherited, bool clamp)
+        {
+            BeatPad pad;
+            if (beat.hasPadAfter) { pad.hasOwn = true; pad.own = beat.padAfter; }
+            pad.resolved = beat.hasPadAfter ? beat.padAfter : inherited;
+            if (clamp && pad.resolved < 0) pad.resolved = 0;
+            host_.padIndex[beat.id] = pad;
+        }
+        void indexPads(const std::vector<NodePtr>& nodes, double inherited)
+        {
+            auto spoken = [](const Beat& b) { return b.kind == "line" || b.kind == "text"; };
+            for (const auto& n : nodes)
+            {
+                const double def = n->hasPadAfterDefault ? n->padAfterDefault : inherited;
+                if (n->isGroup())
+                {
+                    if (n->prompt) setPad(*n->prompt, def, false);
+                    indexPads(n->children, def);
+                    continue;
+                }
+                // A pause can be negative only when the very next beat is a line or text beat: a snippet's last
+                // one (the seam) and one followed by a game event (a cut-in can't cross it) are clamped.
+                for (std::size_t i = 0; i < n->beats.size(); ++i)
+                {
+                    if (!spoken(n->beats[i])) continue;
+                    const bool nextSpoken = i + 1 < n->beats.size() && spoken(n->beats[i + 1]);
+                    setPad(n->beats[i], def, !nextSpoken);
+                }
             }
         }
     };

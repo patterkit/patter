@@ -104,8 +104,8 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 
 | `step.type` | Fields |
 | --- | --- |
-| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `gameData?`, `tags?` |
-| `"text"` | `id`, `text`, `gameData?`, `tags?` |
+| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `padAfter`, `gameData?`, `tags?` |
+| `"text"` | `id`, `text`, `padAfter`, `gameData?`, `tags?` |
 | `"gameEvent"` | `id`, `gameData?`, `tags?`: no text; the host-event beat |
 | `"choice"` | `groupId`, `options: ChoiceOption[]` |
 | `"end"` |: |
@@ -117,7 +117,15 @@ has none, it's absent and you fall back to the `character` token. **`qualifier`*
 `"radio"`, or one of the project's own), and **`qualifierName`** is its shown name (`V.O.`),
 localised as `characterName` is. Both are absent when the line has none. What a qualifier
 means is your game's: play a `vo` line from a non-positional voice, say, or put a filter on a
-`radio` one. A **`ChoiceOption`**
+`radio` one.
+
+**`padAfter`** is the writer's pause after a line or text beat, in seconds, already resolved from the
+beat's own value and the defaults above it (0.6 when nothing sets one). Negative means the next line cuts in
+that long before this one ends; a snippet's last line, or a line followed by a game event, is never negative. When your game times lines itself,
+these are the rules the writer expects: start the next line `padAfter` after this one ends (from the
+start of a cut-in line, never before this line's own start); ignore the pause on the last line of a
+conversation and on the line before a choice, where the player decides; count a pause after a game event
+from when the event is done; and apply no pauses when the player clicks through. A **`ChoiceOption`**
 is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present (greyed)
 unless they're secret; pass `id` to `choose()`. A choice is only offered when at least one option
 can be taken: if every remaining option is greyed out, the choice runs dry, as one with no options

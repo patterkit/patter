@@ -6,6 +6,19 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Line padding**: the writer's pause after a line, so a game can time a conversation the way it was written.
+  A line or text step gains `PadAfter`, in seconds: the beat's own `padAfter`, else the nearest
+  `padAfterDefault` above it (its snippet, each group it sits in, innermost first, its block, its scene), else
+  the project's, else the built-in `Bundle.DefaultPadAfter` (0.6). A negative value is a cut-in on the line
+  before; on a snippet's last line, or a line followed by a game event, it is clamped to zero, since nothing
+  past the seam is certain and a cut-in can't cross the event. A spoken
+  prompt (`ReplayPromptOnChoose`) resolves through its option and is never clamped, and a line closed captions
+  silence keeps its pause. Game event steps carry none. `GetOutline` and `GetBeatSequence` report `PadAfter`
+  on a line or text beat's `BeatInfo`, and `OwnPadAfter` when the beat sets its own. Older bundles load
+  unchanged and pause 0.6 after every line.
+
 ## [0.22.0] - 2026-10-10
 
 ### Added

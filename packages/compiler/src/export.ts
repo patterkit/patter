@@ -58,6 +58,7 @@ function compileNode(node: Group | Snippet, foreign?: ScopeRegistrySpec): Compil
       shared: node.shared,
       options: node.options,
       children: node.children.map((c) => compileNode(c, foreign)),
+      padAfterDefault: node.padAfterDefault,   // line padding: the default for the beats inside
       gameData: node.gameData,
       tags: node.tags,                         // author tags (#215), accumulated at runtime
       prompt: node.prompt,                     // option-position only (spec §5)
@@ -73,6 +74,7 @@ function compileNode(node: Group | Snippet, foreign?: ScopeRegistrySpec): Compil
     beats: node.beats,
     onEnter: node.onEnter?.map((e) => compileEffect(e, foreign)),
     onExit: node.onExit?.map((e) => compileEffect(e, foreign)),
+    padAfterDefault: node.padAfterDefault,   // line padding: the default for the beats inside
     gameData: node.gameData,
     tags: node.tags,                         // author tags (#215)
     jump: node.jump,
@@ -89,6 +91,7 @@ function compileBlock(block: Block, foreign?: ScopeRegistrySpec): CompiledBlock 
     name: block.name,
     ...(block.gameId ? { gameId: block.gameId } : {}), // host-facing address; runtime falls back to the name slug
     children: block.children.map((c) => compileNode(c, foreign)),
+    padAfterDefault: block.padAfterDefault,  // line padding: the default for the beats inside
     gameData: block.gameData,
     tags: block.tags,                        // author tags (#215)
   };
@@ -100,6 +103,7 @@ function compileScene(scene: Scene, foreign?: ScopeRegistrySpec): CompiledScene 
     type: "scene",
     name: scene.name,
     ...(scene.gameId ? { gameId: scene.gameId } : {}), // host-facing address; runtime falls back to the name slug
+    padAfterDefault: scene.padAfterDefault,  // line padding: the default for the beats inside
     gameData: scene.gameData,
     tags: scene.tags,                        // author tags (#215)
     onEntry: scene.onEntry?.map((e) => compileEffect(e, foreign)),
@@ -186,6 +190,7 @@ export function exportBundle(input: ExportInput): Bundle {
         scenes: scenesOut, strings, properties: project.properties ?? [],
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
+        ...(project.padAfterDefault !== undefined ? { padAfterDefault: project.padAfterDefault } : {}),
       }, { trailingComma: false })),
       // Structure-only fingerprint (live bundle refresh): the same hash with the string tables left
       // out. Same structureHash + a different hash = a text-only edit, safe to swap in place with
@@ -195,6 +200,7 @@ export function exportBundle(input: ExportInput): Bundle {
         scenes: scenesOut, properties: project.properties ?? [],
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
+        ...(project.padAfterDefault !== undefined ? { padAfterDefault: project.padAfterDefault } : {}),
       }, { trailingComma: false })),
     },
     voiced: project.voiced ?? false,
@@ -211,6 +217,8 @@ export function exportBundle(input: ExportInput): Bundle {
       return m;
     }),
     ...(qualifiers.length > 0 ? { qualifiers } : {}),
+    // The project's own line-padding default, only when it sets one: absent, every runtime uses the built-in one.
+    ...(project.padAfterDefault !== undefined ? { padAfterDefault: project.padAfterDefault } : {}),
 
     properties: project.properties,
     scopeRegistry: hostScopes,

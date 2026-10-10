@@ -41,6 +41,9 @@ namespace patter
         bool hasDirection = false; std::string direction;
         bool hasQualifier = false; std::string qualifier;           // speaker qualifier gameId (`vo`)
         bool hasQualifierName = false; std::string qualifierName;   // and its resolved shown name
+        // The pause after a line or text step, in seconds (line padding): always set on those two, resolved
+        // from the beat's own value and the defaults above it; 0 on any other step, which carries none.
+        double padAfter = 0;
         std::shared_ptr<GameData> gameData;
         bool hasTags = false; std::vector<std::string> tags;   // author tags (#215)
         std::vector<ChoiceOption> options;       // choice only

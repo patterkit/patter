@@ -5,10 +5,10 @@
 
 import { iconNode, iconHtml, iconSvg, metaLine } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
 import type {
-  InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch,
+  InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch, PadSource,
 } from "@patterkit/patterpad-surface/surface";
 import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, WritingStatusDecl, RecordingStatusDecl, SpeakerQualifier } from "@patterkit/model";
-import { RERECORD_STATUS_DECL } from "@patterkit/model";
+import { RERECORD_STATUS_DECL, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
 
@@ -151,9 +151,83 @@ function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
     rows.push(qualifierRow(lv.id, lv.qualifier, h));
     rows.push(row("Direction", lv.direction));
   }
+  if (lv.beat !== "gameEvent") rows.push(leafPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection(leafNodeKind(lv.beat), lv.id, lv.gameData, h));
   return rows.filter((r): r is HTMLElement => r != null);
+}
+
+// --- line padding (design/proposals/line-padding.md) ---------------------------------------------------
+// A line or text beat's Pad after field, and the Default pad field on a snippet, group, block, or scene.
+// Empty means "inherit": the placeholder says what the line takes then, and from where. Seconds, commit on
+// change (blur / Enter) as the Game Data fields do, since the inspector re-renders on every edit.
+
+/** Seconds as a field shows them: up to three decimals, no trailing zeros. */
+export const formatSeconds = (n: number): string => String(Math.round(n * 1000) / 1000);
+
+/** What a pause field's text means: null for blank (inherit), a number clamped to [min, max], or
+ *  undefined for text that isn't a number (the field puts its old value back). */
+export function parsePad(text: string, min: number, max = PAD_AFTER_MAX): number | null | undefined {
+  const t = text.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(max, Math.max(min, Math.round(n * 1000) / 1000));
+}
+
+/** The words a pause field shows when it's empty: what applies instead, and where it comes from. */
+export function inheritedPadText(inherited: PadSource | undefined, projectDefault: number, noCutIn: false | "seam" | "event" = false): string {
+  const value = inherited?.value ?? projectDefault;
+  if (noCutIn && value < 0) return noCutIn === "seam" ? "0 at the end of a snippet" : "0 before a game event"; // the runtime clamps it
+  return `${formatSeconds(value)} from the ${inherited?.from ?? "project"}`;
+}
+
+/** One seconds field: `own` is the node's value (empty when it sets none), `min` the lowest it offers. */
+function padRow(label: string, id: string | null, own: number | undefined, placeholder: string, min: number, tip: string, set: (id: string, seconds: number | null) => void): HTMLElement {
+  const r = el("div", "insp-row");
+  r.append(el("span", "insp-key", label));
+  const wrap = el("div", "insp-pad");
+  const input = el("input", "insp-gd-input insp-pad-input") as HTMLInputElement;
+  input.type = "number"; input.step = "0.1";
+  input.min = String(min); input.max = String(PAD_AFTER_MAX);
+  input.value = own === undefined ? "" : formatSeconds(own);
+  input.placeholder = placeholder;
+  input.setAttribute("aria-label", label);
+  input.dataset.tip = tip;
+  if (!id) input.disabled = true;
+  escRestores(input);
+  let committed = input.value;
+  input.addEventListener("change", () => {
+    const v = parsePad(input.value, min);
+    if (v === undefined) { input.value = committed; return; }
+    input.value = v === null ? "" : formatSeconds(v);
+    if (input.value === committed) return;
+    committed = input.value;
+    if (id) set(id, v);
+  });
+  wrap.append(input, el("span", "insp-unit", "seconds"));
+  r.append(wrap);
+  return r;
+}
+
+/** The Pad after field on a line or text beat (or an option's prompt). A snippet's last line can't cut in
+ *  across the seam, so its field starts at 0 there; a prompt times the reply, which is certain. */
+function leafPadRow(lv: LeafLevel, h: InspectorHandlers): HTMLElement {
+  const noCutIn = lv.endsSnippet === true ? "seam" as const : lv.beforeEvent === true ? "event" as const : false;
+  const tip = lv.prompt ? "The pause after this prompt before the reply. Below zero, the reply cuts in early."
+    : noCutIn === "seam" ? "The pause after this line. It ends its snippet, so nothing can cut in on it."
+    : noCutIn === "event" ? "The pause after this line. A game event comes next, so nothing can cut in on it."
+    : "The pause after this line before the next. Below zero, the next line cuts in early.";
+  return padRow("Pad after", lv.id, lv.padAfter, inheritedPadText(lv.padInherited, h.projectPadAfter(), noCutIn),
+    noCutIn ? 0 : PAD_AFTER_MIN, tip, h.setPadAfter);
+}
+
+/** The Default pad field on a snippet, group, block, or scene: the pause after each line inside that
+ *  sets none of its own. */
+function defaultPadRow(lv: SnippetLevel | GroupLevel | BlockLevel | SceneLevel, h: InspectorHandlers): HTMLElement {
+  const inherited = lv.kind === "scene" ? undefined : lv.padInherited;
+  return padRow("Default pad", lv.id, lv.padAfterDefault, inheritedPadText(inherited, h.projectPadAfter()), PAD_AFTER_MIN,
+    "The pause after each line inside that doesn't set its own.", h.setPadAfterDefault);
 }
 
 /** The speaker qualifier dropdown on a dialogue line or line prompt: "None" and the project's qualifiers,
@@ -485,6 +559,7 @@ function snippetBody(lv: SnippetLevel, h: InspectorHandlers): HTMLElement[] {
   rows.push(phaseRow(lv.id, "On begin", "onEnter", onEnter, onExit, h));
   rows.push(phaseRow(lv.id, "On end", "onExit", onEnter, onExit, h));
   if (lv.beatCount === 0) rows.push(row("Beats", "none (a jump-only snippet)"));
+  rows.push(defaultPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection("snippet", lv.id, lv.gameData, h));
   return rows.filter((r): r is HTMLElement => r != null);
@@ -561,6 +636,7 @@ function groupBody(lv: GroupLevel, h: InspectorHandlers): HTMLElement[] {
       }
     }
   }
+  rows.push(defaultPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(...gameDataRows(lv.gameData));
   return rows.filter((r): r is HTMLElement => r != null);
@@ -602,6 +678,7 @@ function scenePropsRow(h: InspectorHandlers): HTMLElement {
 function addressBody(lv: SceneLevel | BlockLevel, h: InspectorHandlers): HTMLElement[] {
   const rows: Array<HTMLElement | null> = [addressRow(lv.id, lv.gameId, lv.address, h.editGameId)];
   if (lv.kind === "scene") rows.push(scenePropsRow(h));
+  rows.push(defaultPadRow(lv, h));
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection(lv.kind, lv.id, lv.gameData, h));
   return rows.filter((r): r is HTMLElement => r != null);
@@ -726,6 +803,13 @@ export interface InspectorHandlers {
   qualifiers: () => SpeakerQualifier[];
   /** Set (or clear, with "") a dialogue line's speaker qualifier gameId. */
   setQualifier: (id: string, gameId: string) => void;
+  /** The project's default pause after a line, in seconds (line padding): what an empty field shows
+   *  when nothing nearer sets one. */
+  projectPadAfter: () => number;
+  /** Set (or clear, with null) the pause after a line or text beat, in seconds. */
+  setPadAfter: (id: string, seconds: number | null) => void;
+  /** Set (or clear, with null) a snippet, group, block, or scene's default pause, in seconds. */
+  setPadAfterDefault: (id: string, seconds: number | null) => void;
 }
 
 /** Render the whole stack into `host`. Empty selection -> a muted placeholder. */

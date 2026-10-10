@@ -74,6 +74,9 @@ namespace Patterkit.Patterplay
                 foreach (var q in quals)
                     if (q is JObject qo) bundle.Qualifiers.Add(new Qualifier { GameId = (string)qo["gameId"], Name = (string)qo["name"] });
 
+            // The project's line-padding default (absent = the built-in one).
+            bundle.PadAfterDefault = Num(b["padAfterDefault"]);
+
             if (b["properties"] is JArray props)
                 foreach (var p in props) bundle.Properties.Add(PropDecl((JObject)p));
 
@@ -160,6 +163,10 @@ namespace Patterkit.Patterplay
             Purpose = f["purpose"]?.Type == JTokenType.String && (string)f["purpose"] != "" ? (string)f["purpose"] : null,
         };
 
+        /// <summary>A number field, or null when it is absent (or not a number).</summary>
+        private static double? Num(JToken t)
+            => t != null && (t.Type == JTokenType.Integer || t.Type == JTokenType.Float) ? (double)t : (double?)null;
+
         private static List<string> ToStringList(JArray a)
         {
             var list = new List<string>();
@@ -216,6 +223,7 @@ namespace Patterkit.Patterplay
             if (s["sceneProps"] is JArray sp) foreach (var p in sp) scene.SceneProps.Add(PropDecl((JObject)p));
             if (s["onEntry"] is JArray oe) scene.OnEntry = Effects(oe);
             if (s["gameData"] is JObject sgd) scene.GameData = ParseGameData(sgd);
+            scene.PadAfterDefault = Num(s["padAfterDefault"]);
             foreach (var blk in (JArray)s["blocks"]) scene.Blocks.Add(ParseBlock((JObject)blk));
             return scene;
         }
@@ -225,6 +233,7 @@ namespace Patterkit.Patterplay
             var block = new Block { Id = (string)b["id"], Name = (string)b["name"] ?? "", GameId = (string)b["gameId"] };
             if (b["tags"] is JArray bt) block.Tags = ToStringList(bt);
             if (b["gameData"] is JObject bgd) block.GameData = ParseGameData(bgd);
+            block.PadAfterDefault = Num(b["padAfterDefault"]);
             if (b["children"] is JArray ch) foreach (var n in ch) block.Children.Add(ParseNode((JObject)n));
             return block;
         }
@@ -237,6 +246,7 @@ namespace Patterkit.Patterplay
             if (n["onExit"] is JArray oex) node.OnExit = Effects(oex);
             if (n["gameData"] is JObject gd) node.GameData = ParseGameData(gd);
             if (n["tags"] is JArray nt) node.Tags = ToStringList(nt);
+            node.PadAfterDefault = Num(n["padAfterDefault"]);
             // Option-position flags, on a bare snippet option as on an Option group. Read on groups only
             // until 2026-10, so a snippet fallback was offered as an ordinary option.
             node.Sticky = (bool?)n["sticky"] ?? false;
@@ -271,6 +281,7 @@ namespace Patterkit.Patterplay
                 Character = (string)b["character"],
                 Direction = (string)b["direction"],
                 Qualifier = (string)b["qualifier"],
+                PadAfter = Num(b["padAfter"]),
             };
             if (b["gameData"] is JObject gd) beat.GameData = ParseGameData(gd);
             if (b["tags"] is JArray bt) beat.Tags = ToStringList(bt);

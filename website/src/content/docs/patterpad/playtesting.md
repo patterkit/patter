@@ -35,9 +35,14 @@ Auto-continue (the **▸▸ Continue** toggle in the header, on by default) turn
 at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. Turn it off
 to step one beat at a time.
 
-Speed (Slow / Normal / Fast / Instant) sets how long each line is held before the next
-appears, and **Instant** drops the wait entirely. It paces the reveal only. A voiced line
-always plays its full clip.
+**Continue** times the scene the way the game will. Each line lasts as long as its recording, when
+it has one, or as long as it would take to read, and then waits for its [pause](/patterpad/writing-surface/#pauses-between-lines)
+before the next line starts. A line with a negative pause is cut in on: the next line arrives
+before it finishes, and both play at once. There's no pause before a choice or after the last
+line, and **Step** ignores pauses, since you decide when each beat plays.
+
+Speed (Half / Normal / Double / Instant) speeds the whole timing up or slows it down, so you can
+skim a scene without losing its shape. **Instant** drops the waits entirely and plays no audio.
 
 Options you can take are buttons; ones whose condition isn't met are shown faded and
 can't be clicked. Pick one and the story moves on.

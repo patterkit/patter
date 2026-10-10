@@ -36,6 +36,7 @@
     "@patterkit/runtime": "0.22.0",
     "@wildwinter/app-shell": "^0.47.0",
     "@wildwinter/expr-editor": "^0.16.1",
+    "@wildwinter/game-subtitles": "^0.3.2",
     "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0",
     "@wildwinter/simple-vc-lib": "^0.5.2",
     "electron-updater": "^6.3.9",

@@ -154,3 +154,15 @@ describe("runExport: content-less beats are stripped from the bundle", () => {
     expect(snip.jump).toEqual({ to: "END" });  // ...the jump it carried is preserved
   });
 });
+
+// Line padding: a play's line and text events carry the step's resolved pause (for Patterpad's playthrough
+// runner and any tool), and the CLI's transcript shows nothing new.
+describe("runPlay: line padding", () => {
+  it("carries each line and text step's padAfter, and renderPlay doesn't show it", () => {
+    const result = runPlay(loadProject(tavernDir), { scene: "scn_tavern", choices: ["opt_leave"] });
+    const spoken = result.events.filter((e) => e.type === "line" || e.type === "text");
+    expect(spoken.length).toBeGreaterThan(0);
+    for (const e of spoken) expect(typeof (e as { padAfter?: number }).padAfter).toBe("number");
+    expect(renderPlay(result).join("\n")).not.toMatch(/pad/i);
+  });
+});

@@ -254,6 +254,14 @@ namespace Patterkit.Patterplay
         internal Checkpoint(Journal journal) { Journal = journal; }
     }
 
+    /// <summary>A line or text beat's pause (line padding): its own `padAfter` when it sets one, and the
+    /// resolved one (always).</summary>
+    internal struct BeatPad
+    {
+        public double? Own;
+        public double Resolved;
+    }
+
     internal sealed class FlowHost
     {
         /// <summary>True when the run asked for a log.</summary>
@@ -290,6 +298,7 @@ namespace Patterkit.Patterplay
         public Dictionary<string, string> SceneGameIdToId;
         public Dictionary<string, Dictionary<string, string>> BlockGameIdToId;
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
+        public Dictionary<string, BeatPad> PadIndex;      // line padding: line / text beat id -> its pause
         /// <summary>The game's one registry: @patter (the SHARED globals), host scopes, every instance bag.</summary>
         public ScopeRegistry Registry;
         /// <summary>True when the engine made the registry (a standalone game): SaveGame then carries its values.</summary>
@@ -512,6 +521,7 @@ namespace Patterkit.Patterplay
                 OnError = options.OnError,
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
+                PadIndex = BuildPadIndex(bundle),
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
                 Registry = registry, OwnsRegistry = ownsRegistry, SelfBackedTokens = selfBacked, BoundTokens = bound,
                 SharedPatter = sharedPatter, PatterSharedDecls = sharedDecls, PatterLocalDecls = localDecls,
@@ -953,7 +963,12 @@ namespace Patterkit.Patterplay
                 }
             }
             if (beat.Kind == "line" || beat.Kind == "text")
+            {
+                // Line padding: the resolved pause always, the beat's own only when it sets one.
+                if (_host.PadIndex.TryGetValue(beat.Id, out var pad)) { info.PadAfter = pad.Resolved; info.OwnPadAfter = pad.Own; }
+                else info.PadAfter = Bundle.DefaultPadAfter;
                 if (_host.DefaultStrings.TryGetValue(beat.Id, out var src)) info.Text = src; // source, un-interpolated
+            }
             if (beat.GameData != null && beat.GameData.Count > 0) info.GameData = beat.GameData;
             info.Tags = TagsOrNull(beat.Id);
             return info;
@@ -1302,6 +1317,55 @@ namespace Patterkit.Patterplay
                 if (n.IsGroup) IndexTags(n.Children, acc, index);
                 else foreach (var beat in n.Beats ?? new List<Beat>()) index[beat.Id] = DedupeTags(beat.Tags, acc);
             }
+        }
+
+        // Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes
+        // the nearest `PadAfterDefault` above it (snippet, then each group, innermost first, then block, then
+        // scene), else the project's, else Bundle.DefaultPadAfter. A snippet's last line or text beat can't cut
+        // in on what follows the seam, nor one followed by a game event across the event, so a negative value
+        // there is clamped to zero. Like the tag index, it
+        // depends only on where a beat sits, so it is worked out once per bundle. An option's prompt is the head
+        // of its option's run: it resolves through the option, and is never clamped (its reply is certain).
+        internal static Dictionary<string, BeatPad> BuildPadIndex(Bundle bundle)
+        {
+            var index = new Dictionary<string, BeatPad>();
+            double projectDefault = bundle.PadAfterDefault ?? Bundle.DefaultPadAfter;
+            foreach (var scene in bundle.Scenes.Values)
+            {
+                double sceneDefault = scene.PadAfterDefault ?? projectDefault;
+                foreach (var block in scene.Blocks)
+                    IndexPads(block.Children, block.PadAfterDefault ?? sceneDefault, index);
+            }
+            return index;
+        }
+
+        private static void IndexPads(List<Node> nodes, double inherited, Dictionary<string, BeatPad> index)
+        {
+            foreach (var n in nodes ?? new List<Node>())
+            {
+                double def = n.PadAfterDefault ?? inherited;
+                if (n.IsGroup)
+                {
+                    if (n.Prompt != null) SetPad(n.Prompt, def, false, index);
+                    IndexPads(n.Children, def, index);
+                    continue;
+                }
+                // A pause can be negative only when the very next beat is a line or text beat: a snippet's last
+                // one (the seam) and one followed by a game event (a cut-in can't cross it) are clamped.
+                var beats = n.Beats ?? new List<Beat>();
+                for (int i = 0; i < beats.Count; i++)
+                    if (IsSpoken(beats[i])) SetPad(beats[i], def, !(i + 1 < beats.Count && IsSpoken(beats[i + 1])), index);
+            }
+        }
+
+        private static bool IsSpoken(Beat b) => b.Kind == "line" || b.Kind == "text";
+
+        private static void SetPad(Beat beat, double inherited, bool clamp, Dictionary<string, BeatPad> index)
+        {
+            double? own = beat.Kind == "gameEvent" ? null : beat.PadAfter;
+            double resolved = own ?? inherited;
+            if (clamp && resolved < 0) resolved = 0;
+            index[beat.Id] = new BeatPad { Own = own, Resolved = resolved };
         }
 
         // Combine inherited + own tags, deduped, preserving first-seen order.

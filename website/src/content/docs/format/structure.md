@@ -83,6 +83,13 @@ A game event is an instruction to the engine with **no visible words**. It carri
 Data the host reads when the beat plays, so it can play a sound or move a camera. Game event
 beats never appear in the locale tables.
 
+A line or text beat can also carry **`padAfter`**: the pause after it, before the next line, in seconds.
+Positive waits, zero follows at once, and negative starts the next line that long before this one ends, a
+cut-in. A beat that sets none takes the nearest **`padAfterDefault`** above it (its snippet, any groups around
+it, its block, its scene), then the project's, then 0.6 seconds. A cut-in needs a line straight after to cut in
+with: a snippet's last line can't, because what follows isn't certain until the switch, and nor can a line
+followed by a game event, which a cut-in can't cross. A negative pause there plays as none.
+
 Every beat gets a stable **id** the moment it's created, never based on its content or
 position. Translations, jumps, cursors, and visit counts all key off that id, so
 content can move around freely without breaking anything.

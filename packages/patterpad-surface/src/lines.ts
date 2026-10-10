@@ -21,6 +21,7 @@ import type { Node as PMNode } from "prosemirror-model";
 import { context, type ZoneState } from "./context.js";
 import { cueText, zoneContentStart, zoneContentEnd, findBeatById, emptyBeatNode, beatNode, prevBeatKind, freshSnippetRaw } from "./zoneutil.js";
 import { deleteSelectionGuarded } from "./delete.js";
+import { movePad, padDefaultOf, rawWithPadDefault } from "./pad.js";
 
 /** A fresh, empty beat mirroring the current one: same kind, and for dialogue the same speaker. */
 const mirroredBeat = (c: ZoneState): PMNode =>
@@ -177,6 +178,7 @@ function splitSayAtCaret(state: EditorState, c: ZoneState): import("prosemirror-
   const tr = state.tr.delete(state.selection.from, sayEnd); // drop the tail from this line
   const insertAt = tr.mapping.map(beat.pos + beat.node.nodeSize);
   tr.insert(insertAt, newBeat);
+  movePad(tr, beat.pos, insertAt); // the pause followed the words that moved, so it goes with them (line padding)
   return tr.setSelection(TextSelection.create(tr.doc, zoneContentStart(newBeat, insertAt, "say"))); // caret at the new content start
 }
 
@@ -249,8 +251,9 @@ function splitSnippetPair(tr: import("prosemirror-state").Transaction, snippetPo
   // split() copies the WHOLE snippet onto B, so B would inherit A's authored logic - its condition and
   // its effects. B is a NEW snippet that merely receives the tail beats: only the BEATS move down, never
   // the gating or the state changes (a copied condition silently re-gates the new bubble; copied effects
-  // would fire twice). Give B a fresh snippet raw and nothing else. The terminal `jump` is a separate
-  // attr and DOES belong to B - endBubble clears it on A.
-  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: freshSnippetRaw() });
+  // would fire twice). Give B a fresh snippet raw, keeping only A's default pause (line padding) so the
+  // lines that moved keep their timing. The terminal `jump` is a separate attr and DOES belong to B -
+  // endBubble clears it on A.
+  tr.setNodeMarkup(bPos, undefined, { ...b.attrs, raw: rawWithPadDefault(freshSnippetRaw(), padDefaultOf(a)) });
   return { aPos, bPos };
 }

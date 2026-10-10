@@ -17,7 +17,7 @@ import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterki
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
-import { projectQualifiers, DEFAULT_QUALIFIERS } from "@patterkit/model";
+import { projectQualifiers, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
 import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
@@ -226,6 +226,7 @@ function summarise(p: LoadedProject): OpenedProject {
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
     qualifiers: projectQualifiers(p.project),
+    padAfterDefault: p.project.padAfterDefault ?? DEFAULT_PAD_AFTER,
     gameDataFields: p.project.gameDataFields ?? {},
     scenes: p.scenes.map((s) => ({ id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ id: b.id, name: b.name })) })),
     sceneIds: p.scenes.map((s) => s.id),
@@ -1215,8 +1216,8 @@ function resetPlaySession(): void { flow = null; engine = null; playBundle = nul
 // where the playhead is. The editor uses it to follow a cross-scene jump.
 const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
   const s = scene ?? undefined;
-  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName };
-  if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text };
+  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, padAfter: r.padAfter };
+  if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter };
   if (r.type === "gameEvent") return { kind: "gameEvent", id: r.id, scene: s };
   return null; // choice / end carry no played beat
 };
@@ -1945,6 +1946,8 @@ export function readSettings(): ProjectSettingsDto | null {
     // Track audio status (#206): default OFF (opt-in even for a voiced project); stored only when ticked on.
     trackAudioStatus: p.trackAudioStatus ?? false,
     formatting: p.formatting ?? true,
+    // Line padding: the project's default pause, else the built-in one, so the field is never blank.
+    padAfterDefault: p.padAfterDefault ?? DEFAULT_PAD_AFTER,
     localeDefault: p.locales.default,
     locales: p.locales.all,
     gameDataFields: p.gameDataFields ?? {},
@@ -2041,6 +2044,9 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       // Track audio status (#206): default OFF, so store only when ticked ON (keeps a clean file).
       trackAudioStatus: s.trackAudioStatus ? true : undefined,
       formatting: s.formatting,
+      // Line padding: stored only when it differs from the built-in default, as the ladders are. A caller
+      // that sends none (an older settings shape) leaves the project's as it is.
+      padAfterDefault: s.padAfterDefault === undefined ? loaded.project.padAfterDefault : s.padAfterDefault === DEFAULT_PAD_AFTER ? undefined : s.padAfterDefault,
       // Autosave and Auto Rebuild are no longer project settings (rulings A and B of the October 2026
       // review): the family always saves, and Auto Rebuild is per person. A file that still names either
       // has it dropped on the next save.

@@ -27,6 +27,7 @@ import { NodeSelection, TextSelection, type EditorState, type Transaction } from
 import { Fragment, type Node as PMNode, type Slice } from "prosemirror-model";
 import { patterSchema as S } from "./schema.js";
 import { beatNode, sayText } from "./zoneutil.js";
+import { movePad } from "./pad.js";
 
 /** The plain text a copied slice puts on the clipboard: one line per beat, spoken words only. */
 export function clipboardText(slice: Slice): string {
@@ -132,6 +133,8 @@ export function pasteParagraphs(state: EditorState, paragraphs: Fragment[], form
   const insertAt = tr.mapping.slice(mark).map(beatEnd);
   tr.insert(insertAt, beats);
   const lastPos = insertAt + beats.slice(0, -1).reduce((n, b) => n + b.nodeSize, 0);
+  // The words after the caret now end the last new beat, and the pause after them goes with them.
+  if (tail.size > 0) movePad(tr, $at.before(beatDepth), lastPos);
   caretInSay(tr, lastPos, tail.size);
   return tr.scrollIntoView();
 }

@@ -6,6 +6,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Line padding.** Set the pause after a line in its inspector, under Pad after, in seconds. Below zero,
+  the next line cuts in before this one ends. An empty field shows the pause the line takes instead and
+  where it comes from. A snippet, group, block, or scene can set a Default pad for the lines inside it, and
+  the project sets one under General in Project Settings (0.6 seconds unless you change it). An option's
+  prompt has one too, which times the reply.
+- **A line that ends its snippet can't be cut in on,** because what follows isn't certain until the story
+  gets there. Its field starts at zero, and if a line ends up there with a negative pause after a move or
+  a merge, the problems bar says so straight away.
+- **Play times a scene the way the game will.** Continue holds each line for the length of its recording,
+  or for an estimate of its reading time when there's no recording, then waits its pause. A cut-in line
+  arrives while the one before is still playing, and with audio on you hear the two overlap. Speed is now
+  Half, Normal, Double, or Instant, and speeds up or slows down the whole timing. Step still moves on only
+  when you ask.
+
 ## [0.27.0] - 2026-10-10
 
 ### Added

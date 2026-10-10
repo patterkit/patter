@@ -21,7 +21,7 @@ import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
 import { cueText, prevBeatKind, emptyBeatNode, isChunk, isChoiceGroup, modelIdOf, freshSnippet, rawAttr } from "./zoneutil.js";
-import { ALLOW_STRUCTURE, refusal, snippetLogic, snippetLossMessage } from "./guard.js";
+import { ALLOW_STRUCTURE, refusal, snippetLogic, snippetLossMessage, padDefaultLossMessage } from "./guard.js";
 import { landOnBeat } from "./lines.js";
 import { canInsertSpecial } from "./special.js";
 import { SET_MULTI } from "./multiselect.js";
@@ -235,7 +235,8 @@ export function joinSnippet(state: EditorState, pos: number, dir: "up" | "down")
   const aPos = aIsThis ? pos : pos - other.nodeSize;
   if (aNode.attrs.jump) return refusal(state, `${aIsThis ? "This" : "The previous"} bubble ends in a jump. Move or clear it first.`);
   // B's jump is carried onto the merged bubble; its condition and effects would not be.
-  const lose = snippetLossMessage(aIsThis ? "The next bubble" : "This bubble", bNode.type.create({ ...bNode.attrs, jump: "" }));
+  const bSubject = aIsThis ? "The next bubble" : "This bubble";
+  const lose = snippetLossMessage(bSubject, bNode.type.create({ ...bNode.attrs, jump: "" })) ?? padDefaultLossMessage(bSubject, bNode, aNode);
   if (lose) return refusal(state, lose);
   const beats: PMNode[] = [];
   aNode.forEach((bt) => beats.push(bt)); bNode.forEach((bt) => beats.push(bt));

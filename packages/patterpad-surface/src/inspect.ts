@@ -22,8 +22,17 @@ import { cueText, zoneText, sayText, isChoiceGroup, rawAttr } from "./zoneutil.j
 import { groupLabelParts, optionLabelParts, labelText, groupRole, type GroupRole } from "./grouplabel.js";
 import { multiSelectPositions } from "./multiselect.js";
 import { qualifierOf } from "./qualifier.js";
+import { padOf, padDefaultOf, endsSnippet, beforeGameEvent } from "./pad.js";
 
 export type LeafKind = "line" | "prose" | "gameEvent";
+
+/** Where an inherited pause comes from (line padding): the nearest container above that sets a
+ *  `padAfterDefault`, named as the inspector heads it ("snippet", a group's role, "block", "scene"), with
+ *  its value. Absent on a level = nothing above sets one, so the project's default applies. */
+export interface PadSource {
+  value: number;
+  from: "snippet" | GroupRole | "block" | "scene";
+}
 
 /** The beat under the caret (or the selected game-event atom). */
 export interface LeafLevel {
@@ -39,6 +48,18 @@ export interface LeafLevel {
   gameData?: GameData;
   /** Author tags (#215) on this beat. */
   tags?: string[];
+  /** line / text only - the beat's own pause after it, in seconds (line padding), absent for none. */
+  padAfter?: number;
+  /** line / text only - the default it takes when it sets none, from the nearest container above. */
+  padInherited?: PadSource;
+  /** line / text only - the beat is its snippet's last line or text beat, so a negative pause can't
+   *  cut in across the seam (the runtime plays it as none). Never true for an option's prompt. */
+  endsSnippet?: boolean;
+  /** line / text only - a game event follows it straight away, and a cut-in can't cross the event (the runtime
+   *  plays a negative pause as none). */
+  beforeEvent?: boolean;
+  /** The beat is a choice option's prompt (its pause times the reply, and is never clamped). */
+  prompt?: boolean;
 }
 
 /** The snippet (bubble) holding the leaf: its routing + eligibility + effects. */
@@ -55,6 +76,10 @@ export interface SnippetLevel {
   tags?: string[];
   /** Beats in the snippet; 0 = a pure-jump / un-entered bubble. */
   beatCount: number;
+  /** The default pause for the lines inside that set none (line padding), absent for none. */
+  padAfterDefault?: number;
+  /** What those lines take when this sets none, from the nearest container above. */
+  padInherited?: PadSource;
 }
 
 /** One option of a choice (for the consolidated choice editor): its prompt text + eligibility. */
@@ -99,6 +124,10 @@ export interface GroupLevel {
   gameData?: GameData;
   /** Author tags (#215) on this group. */
   tags?: string[];
+  /** The default pause for the lines inside that set none (line padding), absent for none. */
+  padAfterDefault?: number;
+  /** What those lines take when this sets none, from the nearest container above. */
+  padInherited?: PadSource;
 }
 
 /** The block the caret is in. */
@@ -113,6 +142,10 @@ export interface BlockLevel {
   gameData?: GameData;
   /** Author tags (#215) on this block. */
   tags?: string[];
+  /** The default pause for the lines inside that set none (line padding), absent for none. */
+  padAfterDefault?: number;
+  /** What those lines take when this sets none: the scene's default, when it sets one. */
+  padInherited?: PadSource;
 }
 
 /** The scene the caret is in (the outermost level shown). */
@@ -125,6 +158,9 @@ export interface SceneLevel {
   gameData?: GameData;
   /** Author tags (#215) on this scene. */
   tags?: string[];
+  /** The default pause for the lines inside that set none (line padding), absent for none. Above it
+   *  there is only the project's. */
+  padAfterDefault?: number;
 }
 
 /** Several whole chunks are selected at once (a shift-click run, groups §6) - the inspector shows a
@@ -168,6 +204,8 @@ function leafLevel(beat: PMNode): LeafLevel {
     const qualifier = qualifierOf(beat);
     if (qualifier) base.qualifier = qualifier;
   }
+  const pad = padOf(beat);
+  if (pad !== undefined) base.padAfter = pad;
   return base;
 }
 
@@ -180,6 +218,7 @@ function snippetLevel(node: PMNode): SnippetLevel {
   if (raw.secretUntilEligible === true) level.secretUntilEligible = true;
   const gameData = gd(raw); if (gameData) level.gameData = gameData;
   const tags = tagsOf(raw); if (tags) level.tags = tags;
+  const pad = padDefaultOf(node); if (pad !== undefined) level.padAfterDefault = pad;
   // The jump is a snippet ATTR (a JSON Jump, or "" for none), not part of `raw`.
   const jumpAttr = node.attrs.jump as string;
   if (jumpAttr) { try { level.jump = JSON.parse(jumpAttr) as Jump; } catch { /* ignore */ } }
@@ -203,6 +242,7 @@ function groupLevel(node: PMNode, parent: PMNode | null): GroupLevel {
   if (raw.fallback === true) level.fallback = true;
   const gameData = gd(raw); if (gameData) level.gameData = gameData;
   const tags = tagsOf(raw); if (tags) level.tags = tags;
+  const pad = padDefaultOf(node); if (pad !== undefined) level.padAfterDefault = pad;
   if (level.role === "choice") {
     const options: OptionSummary[] = [];
     node.forEach((child) => { if (child.type.name === "group") options.push(optionSummary(child)); });
@@ -250,14 +290,33 @@ function blockLevel(node: PMNode): BlockLevel {
   const raw = rawAttr(node);
   const name = typeof raw.name === "string" ? raw.name : "";
   const gameId = gameIdOf(raw);
-  return { kind: "block", id: rawId(raw) ?? idAttr(node), name, gameId, address: effectiveGameId({ gameId, name }), gameData: gd(raw), tags: tagsOf(raw) };
+  const level: BlockLevel = { kind: "block", id: rawId(raw) ?? idAttr(node), name, gameId, address: effectiveGameId({ gameId, name }), gameData: gd(raw), tags: tagsOf(raw) };
+  const pad = padDefaultOf(node); if (pad !== undefined) level.padAfterDefault = pad;
+  return level;
 }
 
 function sceneLevel(doc: PMNode): SceneLevel {
   const raw = rawAttr(doc);
   const name = typeof raw.name === "string" ? raw.name : "";
   const gameId = gameIdOf(raw);
-  return { kind: "scene", id: rawId(raw), name, gameId, address: effectiveGameId({ gameId, name }), gameData: gd(raw), tags: tagsOf(raw) };
+  const level: SceneLevel = { kind: "scene", id: rawId(raw), name, gameId, address: effectiveGameId({ gameId, name }), gameData: gd(raw), tags: tagsOf(raw) };
+  const pad = padDefaultOf(doc); if (pad !== undefined) level.padAfterDefault = pad;
+  return level;
+}
+
+/** The pause each level inherits (line padding): for every level, the nearest level ABOVE it (later in
+ *  the innermost-first chain) that sets a default. The same chain the runtime resolves through: snippet,
+ *  then each group innermost first, then block, then scene; the project's is the host's to add. */
+function addPadInheritance(levels: InspectLevel[]): void {
+  let above: PadSource | undefined;
+  for (let i = levels.length - 1; i >= 0; i--) {
+    const lv = levels[i]!;
+    if (lv.kind === "multi") continue;
+    if (lv.kind !== "scene" && above) lv.padInherited = above;
+    if (lv.kind !== "leaf" && lv.padAfterDefault !== undefined) {
+      above = { value: lv.padAfterDefault, from: lv.kind === "group" ? lv.role : lv.kind };
+    }
+  }
 }
 
 /**
@@ -283,7 +342,12 @@ export function inspect(state: EditorState): InspectorContext {
   for (let d = $head.depth; d >= 0; d--) {
     const node = $head.node(d);
     switch (node.type.name) {
-      case "line": case "prose": case "gameEvent": levels.push(leafLevel(node)); sawLeaf = true; break;
+      case "line": case "prose": case "gameEvent": {
+        const leaf = leafLevel(node);
+        const parent = d > 0 ? $head.node(d - 1) : null;
+        if (node.type.name !== "gameEvent") leafPlace(leaf, node, parent);
+        levels.push(leaf); sawLeaf = true; break;
+      }
       case "snippet": levels.push(snippetLevel(node)); break;
       case "group": levels.push(groupLevel(node, d > 0 ? $head.node(d - 1) : null)); break;
       case "block": levels.push(blockLevel(node)); break;
@@ -299,7 +363,9 @@ export function inspect(state: EditorState): InspectorContext {
   if (selNode) {
     const n = selNode.type.name;
     if (!sawLeaf && (n === "gameEvent" || n === "line" || n === "prose")) {
-      levels.unshift(leafLevel(selNode));
+      const leaf = leafLevel(selNode);
+      if (n !== "gameEvent") leafPlace(leaf, selNode, $head.parent);
+      levels.unshift(leaf);
     } else if (n === "snippet" && !levels.some((l) => l.kind === "snippet")) {
       levels.unshift(snippetLevel(selNode));
     } else if (n === "group") {
@@ -309,7 +375,15 @@ export function inspect(state: EditorState): InspectorContext {
     }
   }
 
+  addPadInheritance(levels);
   return levels.length ? { levels } : EMPTY;
+}
+
+/** Where a line or text beat sits, for its pause: an option's prompt, or its snippet's last line. */
+function leafPlace(leaf: LeafLevel, beat: PMNode, parent: PMNode | null): void {
+  if (parent?.type.name === "optionprompt") leaf.prompt = true;
+  else if (parent?.type.name === "snippet" && endsSnippet(parent, beat)) leaf.endsSnippet = true;
+  else if (parent?.type.name === "snippet" && beforeGameEvent(parent, beat)) leaf.beforeEvent = true;
 }
 
 /** The scene-only inspector context: the scene title sits OUTSIDE the editable flow, so clicking it

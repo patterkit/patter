@@ -104,7 +104,7 @@ describe("state logger", () => {
     expect(changed).toEqual([{ path: "@patter.hp", from: 0, to: 9 }]);
     expect(lines).toContain("[t] @patter.hp: 0 -> 9");
 
-    log.logStep({ type: "text", id: "T", text: "Hello", gameData: { mood: "calm" } });
+    log.logStep({ type: "text", id: "T", text: "Hello", padAfter: 0.6, gameData: { mood: "calm" } });
     expect(lines.some((l) => l.includes('text: "Hello"') && l.includes('gameData={"mood":"calm"}'))).toBe(true);
 
     // A second capture with no mutation yields nothing.

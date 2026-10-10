@@ -37,8 +37,9 @@ import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
-import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, DEFAULT_PAD_AFTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
+import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
 import type {
   EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoicePrompt, FlowSnapshot, SaveGame, SaveGameV2,
@@ -62,6 +63,14 @@ function tagIndexFor(bundle: Bundle): Map<string, string[]> {
   if (!index) { index = buildTagIndex(bundle); tagIndexCache.set(bundle, index); }
   return index;
 }
+// The line-padding index (pads.ts) is structural too, cached per bundle the same way.
+const padIndexCache = new WeakMap<Bundle, Map<string, BeatPad>>();
+function padIndexFor(bundle: Bundle): Map<string, BeatPad> {
+  let index = padIndexCache.get(bundle);
+  if (!index) { index = buildPadIndex(bundle); padIndexCache.set(bundle, index); }
+  return index;
+}
+
 /** A node's tags as a COPY: the index is shared by every engine on the bundle, so a host that edits an
  *  array it was given (a step's tags, `tagsForBeat`) must not change the answer for all of them. */
 function tagsOf(host: { tagIndex: Map<string, string[]> }, id: string): string[] | undefined {
@@ -102,8 +111,8 @@ const keys = {
 
 /** What `Flow.advance()` surfaces to the host at each stop. */
 export type StepResult =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; gameData?: GameData; tags?: string[] }
-  | { type: "text"; id: string; text: string; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter: number; gameData?: GameData; tags?: string[] }
+  | { type: "text"; id: string; text: string; padAfter: number; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
   | { type: "choice"; groupId: string; options: ChoiceOption[] }
   | { type: "end" };
@@ -128,6 +137,11 @@ export interface BeatInfo {
   qualifier?: string;
   /** The qualifier's shown name (source locale), e.g. `V.O.`. */
   qualifierName?: string;
+  /** The pause after this beat, in seconds, resolved from its own value and the defaults above it (line and
+   *  text only; see line padding). What a delivered step carries. */
+  padAfter?: number;
+  /** The beat's own `padAfter`, when it sets one (line and text only). */
+  ownPadAfter?: number;
   /** Source text, un-interpolated (line / text). Omitted for gameEvent and IDs-only bundles. */
   text?: string;
   /** Author gameData overrides on this beat (raw, as the step carries them). Omitted when empty. */
@@ -449,6 +463,8 @@ interface FlowHost {
   blockGameIdToId: Map<string, Map<string, string>>;
   /** Author tags (#215): node id -> accumulated tags (own + every ancestor's, deduped). Built once. */
   tagIndex: Map<string, string[]>;
+  /** Every line and text beat's resolved pause (line padding), precomputed per bundle (pads.ts). */
+  padIndex: Map<string, BeatPad>;
   /** The game's one registry: `@patter` (the SHARED globals), host scopes, every instance bag. */
   registry: ScopeRegistry;
   /** True when the engine made the registry (a standalone game): `saveGame()` then carries its values. */
@@ -630,7 +646,7 @@ export class Engine {
       emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
       bundle, emitIds, strings, defaultStrings, castDisplay, qualifierDisplay, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
-      tagIndex: tagIndexFor(bundle), registry, ownsRegistry, patterBag, hostScopes,
+      tagIndex: tagIndexFor(bundle), padIndex: padIndexFor(bundle), registry, ownsRegistry, patterBag, hostScopes,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
       sharedVisits: new Map(), qualityLadders: new Map(),
       sharedSelectors: new Map(),
@@ -1043,6 +1059,9 @@ export class Engine {
       }
     }
     if (beat.kind === "line" || beat.kind === "text") {
+      const pad = this.host.padIndex.get(beat.id);
+      info.padAfter = pad?.resolved ?? DEFAULT_PAD_AFTER;
+      if (pad?.own !== undefined) info.ownPadAfter = pad.own;
       const source = this.host.defaultStrings[beat.id]; // source-locale text, un-interpolated
       if (source !== undefined) info.text = source;
     }
@@ -2354,7 +2373,7 @@ export class Flow {
       case "gameEvent":
         return { type: "gameEvent", id: beat.id, gameData: beat.gameData, ...withTags };
       case "text":
-        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), gameData: beat.gameData, ...withTags };
+        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), gameData: beat.gameData, ...withTags };
       case "line": {
         const raw = this.resolveString(beat.id);
         // Closed captions (#214) apply to DIALOGUE lines only: strip cues when captions are off. Two ways a
@@ -2374,6 +2393,7 @@ export class Flow {
           direction: silent ? undefined : beat.direction,
           qualifier: silent ? undefined : beat.qualifier,
           qualifierName: silent ? undefined : this.resolveQualifierName(beat.qualifier),
+          padAfter: this.padOf(beat.id), // a silent line still fires, so it still carries its pause
           gameData: beat.gameData,
           ...withTags,
         };
@@ -2435,11 +2455,11 @@ export class Flow {
   private promptResult(beat: LineBeat | TextBeat, shown: ChoicePrompt): StepResult {
     const tags = tagsOf(this.host, beat.id);
     const withTags = tags && tags.length ? { tags } : {};
-    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, gameData: beat.gameData, ...withTags };
+    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, padAfter: this.padOf(beat.id), gameData: beat.gameData, ...withTags };
     return {
       type: "line", id: beat.id, text: shown.text,
       character: shown.character, characterName: shown.characterName, direction: shown.direction,
-      qualifier: shown.qualifier, qualifierName: shown.qualifierName,
+      qualifier: shown.qualifier, qualifierName: shown.qualifierName, padAfter: this.padOf(beat.id),
       gameData: beat.gameData, ...withTags,
     };
   }
@@ -2481,6 +2501,12 @@ export class Flow {
     if (this.host.emitIds) return undefined; // IDs-only: omit the display name; the game maps the `character` token
     const key = castStringKey(character);
     return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.castDisplay.get(character);
+  }
+
+  /** A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default above
+   *  it, else the project's, else the built-in one; clamped to zero on a snippet's last line. */
+  private padOf(beatId: string): number {
+    return this.host.padIndex.get(beatId)?.resolved ?? DEFAULT_PAD_AFTER;
   }
 
   /** A speaker qualifier's shown name, resolved as a character's is: the `qualifier:<gameId>` string in the

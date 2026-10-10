@@ -42,6 +42,14 @@ name), and carries `direction` when set. A line with a speaker qualifier (`TAM (
 `qualifier`, the qualifier's `gameId` (`"os"`) for your game to switch on, and `qualifierName`, its
 shown name (`"O.S."`) in the active language. A line prompt on a choice option carries the same fields.
 
+Every `"line"` and `"text"` step also carries `padAfter`, the pause after it in seconds, before the next
+line: positive waits, zero follows at once, and negative starts the next line that long before this one
+ends (a cut-in). It is already resolved: the beat's own value, else the nearest default above it
+(snippet, group, block, scene, then the project's), else 0.6, and never negative on a snippet's last line.
+A replayed prompt carries its option's pause, and a line silenced by closed captions keeps its pause.
+Timing is your player's call: under click-through, ignore it. `get_outline()` and `get_beat_sequence()`
+give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own.
+
 ## Demos
 
 In `demo/` (delete the folder freely):

@@ -127,6 +127,8 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 			_index_nodes(block.get("children", []))
 			_index_tags(block.get("children", []), block_tags)
 		_block_game_id_to_id[sid] = block_addrs
+	# Line padding: every line and text beat's pause, resolved once from where it sits.
+	_host.pad_index = PatterBundle.build_pad_index(bundle)
 
 	for p in bundle.get("properties", []):
 		var shared: bool = p.get("shared", true)
@@ -1104,6 +1106,11 @@ func _beat_info(beat: Dictionary) -> Dictionary:
 			if qn != null:
 				info["qualifierName"] = qn
 	if kind == "line" or kind == "text":
+		# Line padding: the resolved pause (what a delivered step carries), and the beat's own when it sets one.
+		var pad: Dictionary = _host.pad_index.get(beat["id"], {})
+		info["padAfter"] = float(pad.get("resolved", PatterBundle.DEFAULT_PAD_AFTER))
+		if pad.has("own"):
+			info["ownPadAfter"] = pad["own"]
 		var src = _host.default_strings.get(beat["id"])  # source text, un-interpolated
 		if src != null:
 			info["text"] = src

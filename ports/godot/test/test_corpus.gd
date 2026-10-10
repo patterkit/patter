@@ -424,7 +424,7 @@ func _run_runtime(arr: Array) -> int:
 		var transcript: Array = []
 		for i in 1000:
 			var step := flow.advance()
-			transcript.append(step)
+			transcript.append(_transcript_step(step))
 			if step["type"] == "end":
 				break
 			if step["type"] == "choice":
@@ -444,6 +444,22 @@ func _run_runtime(arr: Array) -> int:
 		else:
 			_fail("runtime", name, "transcript mismatch\n    expected %s\n    got      %s" % [JSON.stringify(c["expectedTranscript"]), JSON.stringify(transcript)])
 	return pass_count
+
+
+# A step as the corpus transcripts record it (the reference runner's normaliseStep): every line and text
+# step carries `padAfter`, a float, but a transcript records it only when it isn't the built-in 0.6. A
+# step missing the field, or carrying a non-float, is marked so the comparison fails.
+func _transcript_step(step: Dictionary) -> Dictionary:
+	var kind = step.get("type", "")
+	if kind != "line" and kind != "text":
+		return step
+	var out := step.duplicate()
+	var pad = out.get("padAfter")
+	if typeof(pad) != TYPE_FLOAT:
+		out["padAfter"] = "<missing or not a float: %s>" % str(pad)
+	elif pad == PatterBundle.DEFAULT_PAD_AFTER:
+		out.erase("padAfter")
+	return out
 
 
 # -- logs ----------------------------------------------------------------------
@@ -606,7 +622,7 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 			"useFlow":
 				current = op["flow"]
 			"advance":
-				chunk.append(holder["engine"].get_flow(current).advance())
+				chunk.append(_transcript_step(holder["engine"].get_flow(current).advance()))
 			"choose":
 				holder["engine"].get_flow(current).choose(op["id"])
 			"resetFlow":

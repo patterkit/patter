@@ -10,6 +10,10 @@ namespace Patterkit.Patterplay
 {
     public sealed class Bundle
     {
+        /// <summary>The built-in `padAfter`, in seconds, for a project that sets no default of its own (line
+        /// padding): the same on every runtime and in Patterpad's Play window.</summary>
+        public const double DefaultPadAfter = 0.6;
+
         /// <summary>The bundle schema tag ("patter/bundle@0"). Null if absent (an older compiler).</summary>
         public string Schema;
         public bool Voiced;
@@ -27,6 +31,8 @@ namespace Patterkit.Patterplay
         /// <summary>The speaker qualifiers the content uses (`gameId` + authored name), in the project's order.
         /// Empty when no line has one (an older bundle carries none).</summary>
         public List<Qualifier> Qualifiers = new List<Qualifier>();
+        /// <summary>The project's own `padAfterDefault` (line padding); null = <see cref="DefaultPadAfter"/>.</summary>
+        public double? PadAfterDefault;
         public List<PropertyDecl> Properties = new List<PropertyDecl>();
         public Dictionary<string, Scene> Scenes = new Dictionary<string, Scene>();
         /// <summary>locale -> (string id -> text). Empty for an IDs-only build (the engine emits beat IDs).</summary>
@@ -133,6 +139,7 @@ namespace Patterkit.Patterplay
         public List<Block> Blocks = new List<Block>();
         public List<PropertyDecl> SceneProps = new List<PropertyDecl>();
         public List<Effect> OnEntry = new List<Effect>();
+        public double? PadAfterDefault; // line padding: the default for the beats inside; null when none
         public GameData GameData;    // author overrides (raw, sparse); null when none
         public List<string> Tags;    // author tags (#215)
     }
@@ -143,6 +150,7 @@ namespace Patterkit.Patterplay
         public string Name;
         public string GameId;
         public List<Node> Children = new List<Node>();
+        public double? PadAfterDefault; // line padding: the default for the beats inside; null when none
         public GameData GameData;    // author overrides (raw, sparse); null when none
         public List<string> Tags;    // author tags (#215)
     }
@@ -157,6 +165,7 @@ namespace Patterkit.Patterplay
         public Expression Condition;
         public List<Effect> OnEnter;
         public List<Effect> OnExit;
+        public double? PadAfterDefault; // line padding: the default for the beats inside; null when none
         public GameData GameData;
         public List<string> Tags;    // author tags (#215)
 
@@ -187,6 +196,10 @@ namespace Patterkit.Patterplay
         public string Character;
         public string Direction;
         public string Qualifier;     // speaker qualifier gameId (`vo`), line only; null when none
+        /// <summary>The pause after this beat, before the next, in seconds (line and text only; negative = the
+        /// next line cuts in). Null = the nearest `PadAfterDefault` above it, else the project's, else
+        /// <see cref="Bundle.DefaultPadAfter"/>.</summary>
+        public double? PadAfter;
         public GameData GameData;
         public List<string> Tags;    // author tags (#215)
     }

@@ -22,7 +22,8 @@ import { Fragment, type Node as PMNode } from "prosemirror-model";
 import { newId } from "@patterkit/core";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
-import { cueText, prevBeatKind, emptyBeatNode, findBeatById, findByModelId, zoneContentEnd, isBlankBeat, freshSnippet } from "./zoneutil.js";
+import { cueText, prevBeatKind, emptyBeatNode, findBeatById, findByModelId, zoneContentEnd, isBlankBeat, freshSnippetRaw } from "./zoneutil.js";
+import { padDefaultOf, rawWithPadDefault } from "./pad.js";
 import { landOnBeat } from "./lines.js";
 
 /**
@@ -77,7 +78,8 @@ export function insertJump(state: EditorState, target: string): Transaction | nu
   if (after.length > 0) {
     // Mid-bubble SPLIT: the trailing beats become snippet B, inheriting the OLD jump; land on its
     // first content beat so the author can keep editing the continuation.
-    const newB = freshSnippet(after, oldJump);
+    // B is a fresh bubble, keeping only A's default pause so the lines that moved keep their timing.
+    const newB = S.node("snippet", { raw: rawWithPadDefault(freshSnippetRaw(), padDefaultOf(A)), jump: oldJump }, after);
     const tr = state.tr.replaceWith(c.snippet.pos, c.snippet.pos + A.nodeSize, Fragment.fromArray([newA, newB]));
     const landId = (after.find((b) => b.type.name === "line" || b.type.name === "prose")?.attrs.id as string) ?? "";
     if (landId) landOnBeat(tr, landId);

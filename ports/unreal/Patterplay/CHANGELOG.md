@@ -7,6 +7,18 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Line padding**: a line or text step carries `PadAfter`, the pause after it in seconds before the next
+  line. It is the beat's own `padAfter`, else the nearest `padAfterDefault` above it (its snippet, each
+  group innermost first, its block, its scene), else the project's, else the built-in 0.6. A negative value
+  is a cut-in: the next line starts that long before this one ends. A snippet's last line or text beat, and
+  one followed by a game event, is clamped to zero, so nothing overlaps across a seam or an event; an option's prompt resolves through its option and
+  is never clamped. A line silenced by closed captions, and a prompt spoken back on choosing, carry theirs
+  too; a game event carries none. The outline's `FPatterBeatInfo` gains `PadAfter` (resolved) and
+  `OwnPadAfter` with `bHasOwnPadAfter`, and the C++ core's `patter::Bundle` reads `padAfter` and every
+  level's `padAfterDefault`. Bundles without them play as before, each line taking 0.6.
+
 ## [0.22.0] - 2026-10-10
 
 ### Added

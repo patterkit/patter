@@ -63,6 +63,9 @@ namespace
 		Out.Direction = Ue(B.direction);
 		Out.Qualifier = Ue(B.qualifier);
 		Out.QualifierName = Ue(B.qualifierName);
+		Out.PadAfter = B.padAfter;
+		Out.bHasOwnPadAfter = B.hasOwnPadAfter;
+		if (B.hasOwnPadAfter) Out.OwnPadAfter = B.ownPadAfter;
 		Out.Text = Ue(B.text);
 		Out.GameData = ConvertGameData(B.gameData);
 		for (const std::string& T : B.tags) Out.Tags.Add(Ue(T));
@@ -146,6 +149,7 @@ namespace
 		if (S.hasQualifier) Out.Qualifier = Ue(S.qualifier);
 		Out.bHasQualifierName = S.hasQualifierName;
 		if (S.hasQualifierName) Out.QualifierName = Ue(S.qualifierName);
+		Out.PadAfter = S.padAfter;   // line padding: set on a line or text step, 0 on the rest
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);

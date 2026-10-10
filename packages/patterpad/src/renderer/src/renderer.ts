@@ -37,7 +37,7 @@ import { adoptSceneName, relabelNavScene } from "./scene-name.js";
 import { selectAllOutsideEditor } from "./edit-commands.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
-import { renderInspector } from "./inspector.js";
+import { renderInspector, formatSeconds } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
 import { openConditionEditor, renderConditionPills } from "./cond-editor.js";
@@ -93,7 +93,7 @@ import "@wildwinter/app-shell/notes-editor.css"; // the family's Notes editor (r
 import "@wildwinter/app-shell/comments.css"; // a shared module carries its own CSS
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
-import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
+import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { openValuePicker } from "./value-picker.js";
 import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
@@ -1830,6 +1830,10 @@ onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e
     setTags: (id, tags) => { surface?.setTags(id, tags); }, // author tags (#215)
     qualifiers: () => project?.qualifiers ?? [],
     setQualifier: (id, gameId) => { surface?.setQualifier(id, gameId); }, // a surface edit: saves as any edit does
+    // Line padding: the pause fields are surface edits too, so they save, validate, and reach Play as any edit does.
+    projectPadAfter: () => project?.padAfterDefault ?? DEFAULT_PAD_AFTER,
+    setPadAfter: (id, seconds) => { surface?.setPadAfter(id, seconds); },
+    setPadAfterDefault: (id, seconds) => { surface?.setPadAfterDefault(id, seconds); },
     writingStatuses: () => project?.writingStatuses ?? [], // the ladder (name + colour) for the status dropdown (#196)
     lineStatus: (id) => writingMap[id] ?? null,            // the beat's current status, or null (unset)
     setLineStatus: (id, status) => setLineStatus([id], status),
@@ -2747,7 +2751,7 @@ let settingsRead: SettingsRead | null = null;
 /** The controls and editors of the OPEN dialog, filled by each section's mount() and read by Save. */
 interface LiveSettings {
   name: HTMLInputElement; start: HTMLSelectElement;
-  voiced: HTMLInputElement; formatting: HTMLInputElement;
+  voiced: HTMLInputElement; formatting: HTMLInputElement; padAfter: HTMLInputElement;
   build: HTMLInputElement; buildLocales: HTMLSelectElement; buildSourceDebug: HTMLInputElement;
   vcs: HTMLSelectElement;
   ccOpen: HTMLInputElement; ccClose: HTMLInputElement; ccCharacter: HTMLInputElement;
@@ -2799,12 +2803,22 @@ const settingsDlg = mountSettingsDialog({
       // below), and flipping it here updates the tab without reopening.
       voiced.input.addEventListener("change", () => settingsDlg.refreshTabs());
       const formatting = sToggle("Inline formatting", "Bold and italic in dialogue and narration.", s.formatting);
+      // Line padding: the project's default pause after a line. Blank goes back to the built-in one.
+      const padAfter = el("input", "settings-seconds"); padAfter.type = "number"; padAfter.step = "0.1";
+      padAfter.min = String(PAD_AFTER_MIN); padAfter.max = String(PAD_AFTER_MAX);
+      padAfter.value = formatSeconds(s.padAfterDefault ?? DEFAULT_PAD_AFTER); padAfter.placeholder = formatSeconds(DEFAULT_PAD_AFTER);
       host.append(sField("Project name", name), sField("Start", start, sNote("settings-fieldnote", "The scene Play from Start opens.")),
+        sField("Pad after", padAfter, sNote("settings-fieldnote", "Seconds of pause after each line, unless the line or something around it sets its own.")),
         voiced.row, formatting.row);
-      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input });
+      Object.assign(live, { name, start, voiced: voiced.input, formatting: formatting.input, padAfter });
       // A blank name used to close the dialog and drop every other edit with it (parity row 7); now it
       // is the fault the gate names.
-      return { firstInvalid: () => name.value.trim() ? null : { el: name, message: "Give the project a name." } };
+      return { firstInvalid: () => {
+        if (!name.value.trim()) return { el: name, message: "Give the project a name." };
+        const pad = padAfter.value.trim() === "" ? DEFAULT_PAD_AFTER : Number(padAfter.value);
+        if (!Number.isFinite(pad) || pad < PAD_AFTER_MIN || pad > PAD_AFTER_MAX) return { el: padAfter, message: `Use a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}.` };
+        return null;
+      } };
     } },
     { id: "build", label: "Publish", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
@@ -2943,6 +2957,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
   return saveProjectSettings({
     name: l.name.value.trim(), vcs: l.vcs.value as VcsKind, ...(l.start.value ? { start: { scene: l.start.value } } : {}),
     voiced: l.voiced.checked, formatting: l.formatting.checked,
+    padAfterDefault: l.padAfter.value.trim() === "" ? DEFAULT_PAD_AFTER : Number(l.padAfter.value), // the gate checked its range
     closedCaptions: { open: l.ccOpen.value, close: l.ccClose.value, character: l.ccCharacter.value.trim() },
     buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
     ...l.langs.value(), gameDataFields: l.gd.value(),

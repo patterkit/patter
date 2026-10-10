@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@types/pdfkit": "^0.17.6",
+    "@wildwinter/game-subtitles": "^0.3.2",
     "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0",
     "esbuild": "^0.28.2"
   }

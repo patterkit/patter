@@ -90,6 +90,9 @@ export interface OpenedProject {
   /** The speaker qualifiers a line can pick from, in display order (ProjectFile.qualifiers, else the
    *  defaults): the inspector's Qualifier dropdown, the cue's `(O.S.)`, and the keyboard route's cycle. */
   qualifiers: SpeakerQualifier[];
+  /** The project's default pause after a line, in seconds (ProjectFile.padAfterDefault, else the built-in
+   *  `DEFAULT_PAD_AFTER`): what the inspector's Pad after field shows when nothing nearer sets one. */
+  padAfterDefault: number;
   /** Author-defined gameData field definitions per node type (the inspector renders editable rows). */
   gameDataFields: GameDataFields;
   /** Every scene in the project, in file order. */
@@ -134,6 +137,10 @@ export interface ProjectSettingsDto {
   trackAudioStatus: boolean;
   /** Inline text formatting (ProjectFile.formatting, default on). */
   formatting: boolean;
+  /** The default pause after a line, in seconds (ProjectFile.padAfterDefault, line padding). Always
+   *  populated (the built-in default when the project sets none); saveSettings drops it again when it
+   *  still matches. Optional on save, so a caller with an older settings shape leaves it alone. */
+  padAfterDefault?: number;
   /** Build output: where Build Bundle writes the compiled `.patterc` (ProjectFile.export.bundle, relative
    *  to the project root or absolute). Always populated for display - the sibling default when unpinned. */
   buildBundle: string;
@@ -546,6 +553,9 @@ export interface PlayStep {
   /** The speaker qualifier's gameId (`os`) and its resolved shown name (`O.S.`), shown after the name. */
   qualifier?: string;
   qualifierName?: string;
+  /** line / text only: the pause after it before the next line, in seconds, resolved by the runtime
+   *  (line padding). Negative = the next line cuts in. */
+  padAfter?: number;
 }
 
 export interface PlayChoiceOption {

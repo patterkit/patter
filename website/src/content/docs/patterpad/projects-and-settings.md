@@ -17,8 +17,10 @@ sidebar:
 The **General** tab holds the project name, the **Start** scene (where the story begins,
 used by **Play ▸ Play from Start** and the coverage test), your version-control system,
 the **voiced** flag, the **formatting** (bold/italic) toggle, the
-**Bundle path**, and how strings are handled (the **localisation mode**, Embedded
-or IDs-only, with a source-debug option).
+**Bundle path**, how strings are handled (the **localisation mode**, Embedded
+or IDs-only, with a source-debug option), and **Pad after**, the project's default
+[pause between lines](/patterpad/writing-surface/#pauses-between-lines), 0.6 seconds unless
+you change it.
 
 The **Language** tab lists the languages your project supports and which one is the
 source.

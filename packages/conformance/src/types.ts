@@ -29,10 +29,15 @@ export type ScopeBag = Record<string, ScalarValue>;
  * speaker, their resolved name, and the direction). Until 2026-10 the transcript flattened an option to
  * its prompt's text and dropped the group id, so a runtime could omit both and still pass; one did.
  * There is no flat `text` on an option: it would only repeat `prompt.text`.
+ *
+ * A line or text step's `padAfter` (line padding) is recorded only when it differs from the built-in
+ * `DEFAULT_PAD_AFTER`: every step carries one, and writing 0.6 into every hand-authored transcript would bury
+ * the cases that are about something else. The outline cases pin every beat's resolved pause, defaults
+ * included, so a runtime that leaves the field off still fails.
  */
 export type TranscriptStep =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; gameData?: GameData; tags?: string[] }
-  | { type: "text"; id: string; text: string; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter?: number; gameData?: GameData; tags?: string[] }
+  | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
   | { type: "end" };

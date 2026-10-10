@@ -7,7 +7,8 @@
 //
 // It leans on what an accessor could get wrong: object fields in document order (the scene ids sort the
 // other way from the authored order), a null read as absent, a value's type told apart (a boolean, a
-// number, a string, a flag list), and a required field reported by name.
+// number, a string, a flag list), a number that is negative or whole (a pause), and a required field reported
+// by name.
 #pragma once
 
 #include <string>
@@ -40,22 +41,23 @@ namespace patter { namespace bundlereadercase
     { "token": "opaque" }
   ] },
   "externalScopes": ["story"],
+  "padAfterDefault": 1,
   "gameDataFields": { "line": [{ "name": "camera", "type": "string", "default": "wide", "values": ["wide", "close"] }] },
   "strings": { "en": { "L1": "Hello.", "T1": "Go" }, "fr": { "L1": "Bonjour." } },
   "scenes": {
-    "scn_zz": { "id": "scn_zz", "name": "Tavern", "gameId": "tavern", "tags": ["night"],
+    "scn_zz": { "id": "scn_zz", "name": "Tavern", "gameId": "tavern", "tags": ["night"], "padAfterDefault": 2,
       "gameData": { "music": "jig", "volume": 0.5, "loud": true, "moods": ["warm"] },
       "sceneProps": [{ "name": "visits", "type": "number", "default": 0 }],
       "onEntry": [{ "kind": "set", "target": "@scene.visits", "value": { "src": "@scene.visits + 1", "ast": ["bin", "+", ["sv", "scene", "visits"], ["n", 1]] } }],
-      "blocks": [{ "id": "b_t", "name": "Bar", "gameId": "bar", "children": [
-        { "id": "g_c", "type": "group", "selector": "choice", "shared": true,
+      "blocks": [{ "id": "b_t", "name": "Bar", "gameId": "bar", "padAfterDefault": 0, "children": [
+        { "id": "g_c", "type": "group", "selector": "choice", "shared": true, "padAfterDefault": 0.3,
           "options": { "order": "authored", "exhaust": "once" },
           "prompt": { "id": "P1", "kind": "line", "character": "ANNA", "qualifier": "radio" },
           "children": [
-            { "id": "o_s", "type": "snippet", "sticky": true, "beats": [{ "id": "T1", "kind": "text" }], "jump": { "to": "scn_aa", "mode": "call" } },
+            { "id": "o_s", "type": "snippet", "sticky": true, "padAfterDefault": 1.5, "beats": [{ "id": "T1", "kind": "text" }], "jump": { "to": "scn_aa", "mode": "call" } },
             { "id": "o_h", "type": "snippet", "secretUntilEligible": true,
               "condition": { "src": "@gold > 3", "ast": ["bin", ">", ["sv", "patter", "gold"], ["n", 3]] },
-              "beats": [{ "id": "L1", "kind": "line", "character": "", "direction": "quietly", "qualifier": "os", "tags": ["hush"], "gameData": { "camera": "close" } }] },
+              "beats": [{ "id": "L1", "kind": "line", "character": "", "direction": "quietly", "qualifier": "os", "padAfter": -0.25, "tags": ["hush"], "gameData": { "camera": "close" } }] },
             { "id": "o_f", "type": "snippet", "fallback": true, "onExit": [{ "kind": "set", "target": "@gold", "value": { "src": "0", "ast": ["n", 0] } }] }
           ] }
       ] }] },
@@ -112,6 +114,7 @@ namespace patter { namespace bundlereadercase
             expect(!b.scopeRegistry.scopes[1].hasDeclarations && !b.scopeRegistry.scopes[1].hasWritable, "an opaque host scope");
         }
         expect(b.externalScopes == std::vector<std::string>{"story"}, "externalScopes");
+        expect(b.hasPadAfterDefault && b.padAfterDefault == 1, "the project's padAfterDefault");
         auto gdf = b.gameDataFields.find("line");
         expect(gdf != b.gameDataFields.end() && gdf->second.size() == 1 && gdf->second[0].hasDefault && gdf->second[0].def.s == "wide" && gdf->second[0].values.size() == 2, "gameDataFields");
         expect(b.strings.size() == 2 && b.strings.at("en").at("T1") == "Go" && b.strings.at("fr").size() == 1, "strings");
@@ -125,23 +128,27 @@ namespace patter { namespace bundlereadercase
         expect(s.name == "Tavern" && s.gameId == "tavern" && s.tags == std::vector<std::string>{"night"}, "scene fields");
         expect(s.gameData && s.gameData->size() == 4 && s.gameData->at("music").kind == PatterKind::Str && s.gameData->at("volume").n == 0.5
             && s.gameData->at("loud").kind == PatterKind::Bool && s.gameData->at("loud").b && s.gameData->at("moods").kind == PatterKind::Flags, "scene gameData, one value of each kind");
+        expect(s.hasPadAfterDefault && s.padAfterDefault == 2, "scene padAfterDefault");
         expect(s.sceneProps.size() == 1 && s.sceneProps[0].name == "visits", "sceneProps");
         expect(s.onEntry.size() == 1 && s.onEntry[0].target == "@scene.visits" && s.onEntry[0].value.src == "@scene.visits + 1" && s.onEntry[0].value.ast, "onEntry effect, with its src");
         expect(s.blocks.size() == 1 && s.blocks[0].gameId == "bar" && s.blocks[0].children.size() == 1, "block");
-        expect(b.scenes.count("scn_aa") && b.scenes.at("scn_aa").blocks.empty(), "a scene with no blocks");
+        expect(s.blocks.size() == 1 && s.blocks[0].hasPadAfterDefault && s.blocks[0].padAfterDefault == 0, "block padAfterDefault, zero set");
+        expect(b.scenes.count("scn_aa") && b.scenes.at("scn_aa").blocks.empty() && !b.scenes.at("scn_aa").hasPadAfterDefault, "a scene with no blocks, no padAfterDefault");
         expect(b.scenes.count("scn_mm") && b.scenes.at("scn_mm").name.empty() && b.scenes.at("scn_mm").blocks.size() == 1, "a scene with no name");
         if (s.blocks.size() != 1 || s.blocks[0].children.size() != 1) return bad;
 
         const Node& g = *s.blocks[0].children[0];
         expect(g.isGroup() && g.selector == "choice" && g.shared && g.options && g.options->order == "authored" && g.options->exhaust == "once", "group, options");
-        expect(g.prompt && g.prompt->id == "P1" && g.prompt->character == "ANNA" && g.prompt->hasQualifier && g.prompt->qualifier == "radio", "prompt");
+        expect(g.hasPadAfterDefault && g.padAfterDefault == 0.3, "group padAfterDefault");
+        expect(g.prompt && g.prompt->id == "P1" && g.prompt->character == "ANNA" && g.prompt->hasQualifier && g.prompt->qualifier == "radio" && !g.prompt->hasPadAfter, "prompt");
         expect(g.children.size() == 3, "options");
         if (g.children.size() != 3) return bad;
         const Node& sticky = *g.children[0];
         expect(sticky.sticky && !sticky.fallback && !sticky.secretUntilEligible, "a sticky option");
         expect(sticky.jump && sticky.jump->to == "scn_aa" && sticky.jump->mode == "call", "a call jump");
+        expect(sticky.hasPadAfterDefault && sticky.padAfterDefault == 1.5 && sticky.beats.size() == 1 && !sticky.beats[0].hasPadAfter, "snippet padAfterDefault, a beat without its own");
         const Node& secret = *g.children[1];
-        expect(secret.secretUntilEligible && !secret.sticky, "a secret-until-eligible option");
+        expect(secret.secretUntilEligible && !secret.sticky && !secret.hasPadAfterDefault, "a secret-until-eligible option");
         expect(secret.condition && secret.condition->src == "@gold > 3" && secret.condition->ast, "a condition, with its src");
         expect(secret.beats.size() == 1, "beats");
         if (secret.beats.size() == 1)
@@ -150,6 +157,7 @@ namespace patter { namespace bundlereadercase
             expect(l.hasCharacter && l.character.empty(), "a \"\" character is set, not absent");
             expect(l.hasDirection && l.direction == "quietly" && l.tags == std::vector<std::string>{"hush"}, "beat direction, tags");
             expect(l.hasQualifier && l.qualifier == "os", "beat qualifier");
+            expect(l.hasPadAfter && l.padAfter == -0.25, "beat padAfter, negative");
             expect(l.gameData && l.gameData->at("camera").s == "close", "beat gameData");
         }
         expect(!secret.jump, "no jump");

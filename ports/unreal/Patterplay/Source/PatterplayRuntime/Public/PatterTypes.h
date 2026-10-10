@@ -481,6 +481,12 @@ struct FPatterStep
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasQualifierName = false;
 
+	/** The pause after this line or text step, in seconds (line padding): the beat's own, else the nearest
+	 *  default above it, else the project's, else the built-in 0.6. Negative = the next line starts that long
+	 *  before this one ends (a cut-in). Always set on a Line or Text step; 0 on any other. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double PadAfter = 0;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterOption> Options;
 

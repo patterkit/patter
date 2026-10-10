@@ -21,7 +21,9 @@ import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips, pinButton, followButton, toolWindowHead, iconNode, type IconName } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it
 import { colourFor } from "@patterkit/patterpad-surface/colour";
+import { estimateDuration } from "@wildwinter/game-subtitles"; // the same estimate Patterstage times a line by
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
+import { Timeline, SPEED_RATE, readSpeed, toMs, type PlaySpeed } from "./timing.js";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
 // nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
@@ -38,10 +40,11 @@ continueEl.prepend(iconNode("arrowRight", 12));
 const audioEl = document.getElementById("play-audio") as HTMLButtonElement;
 audioEl.prepend(iconNode("speaker", 12)); // the family's drawn speaker (app-shell 0.47.0), in place of one drawn in the markup
 
-// "Play with audio" (#206 P3): in Audio Folders mode, Continue becomes a time-paced table-read - each line
-// plays its clip and the next beat waits for it to finish; a line with no file (or a text beat) is faked at
-// ~150 wpm proportional to its length. Step stays manual: it just fires the clip without pacing. The toggle
-// is remembered across runs, and only shown when the project is in folder mode.
+// "Play with audio" (#206 P3): in Audio Folders mode, Continue becomes a table-read - each line plays its
+// clip, overlapping where a negative pause cuts one line in on another. Continue times every line the same
+// way with audio on or off (timing.ts): by its recording's length when one exists, else by the duration
+// estimate. Step stays manual: it just fires the clip. The toggle is remembered across runs, and only shown
+// when the project is in folder mode.
 let audioAvailable = false;
 // Default ON when audio is available: a voiced project plays its table-read by default. `!== "0"` keeps it on
 // for a fresh project (no stored value) while still honouring an explicit off the author chose before.
@@ -53,12 +56,11 @@ let audioOn = localStorage.getItem("patter.playAudio") !== "0";
 // ON for a fresh install (no stored value) while still honouring an explicit off.
 let continueMode = localStorage.getItem("patter.playContinue") !== "0";
 let runGen = 0; // bumped on start / restart / stale so a paced read bails the moment it's superseded
-// Stop / pause a paced run: `stopRequested` halts the reveal at the CURRENT line (the un-played rest waits
-// behind a resume control - it never rushes ahead); `skipFire` cuts short the current beat's delay; `stopClip`
-// stops + unblocks its sounding clip. `resumeState` remembers where a paused reveal left off.
+// Stop / pause a paced run: `stopRequested` halts the reveal before the NEXT beat (the un-played rest waits
+// behind a resume control - it never rushes ahead); `skipFire` cuts short the wait in flight; `stopSounding`
+// stops every line still sounding. `resumeState` remembers where a paused reveal left off.
 let stopRequested = false;
 let skipFire: (() => void) | null = null;
-let stopClip: (() => void) | null = null;
 let resumeState: { batch: PlayBatch; gen: number; nextIdx: number } | null = null;
 
 function setAudio(on: boolean): void {
@@ -77,7 +79,7 @@ function setContinue(on: boolean): void {
   // Turning Continue OFF while a paced run is in flight (the Stop control is up) pauses it at the current
   // line - otherwise the reveal keeps auto-advancing, ignoring the toggle. If we're paused mid-reveal, or on
   // an idle Step row, re-label the control to the new mode instead.
-  if (!on && controlsEl.querySelector(".play-stop")) { stopRequested = true; skipFire?.(); stopClip?.(); }
+  if (!on && controlsEl.querySelector(".play-stop")) { stopRequested = true; skipFire?.(); stopSounding(); }
   else if (controlsEl.querySelector(".presume") && resumeState) showResume(resumeState.batch, resumeState.gen, resumeState.nextIdx);
   else if (controlsEl.querySelector(".padv-row")) showAdvance();
 }
@@ -99,66 +101,89 @@ function reflectCaptions(on: boolean): void {
 ccEl.addEventListener("click", () => { reflectCaptions(!captionsOn); void play.setClosedCaptions(captionsOn); });
 
 
-// Reading speed: how long a beat is held in a paced reveal before the next appears. Sets the words/min
-// pace of the faked (non-audio) delay; "instant" drops it. A voiced line still plays to the end of its
-// clip regardless. Persisted; the dropdown lives in the top bar (#196-style control).
-const SPEED_WPM: Record<string, number> = { slow: 300, normal: 500, fast: 800, instant: 0 };
-let speedKey = localStorage.getItem("patter.playSpeed") ?? "normal";
-if (SPEED_WPM[speedKey] === undefined) speedKey = "normal";
+// Speed: a speed-up of the whole timing (half, normal, double, instant), so a writer can skim without losing
+// the shape of the scene. Instant reveals a played-through run at once, with no audio. Stored under the key
+// and values the playable HTML export reads too. The old reading paces (slow, fast) map across when read,
+// but nothing is written back until the writer picks a speed, so an older Patterpad still reads its own.
+let speed: PlaySpeed = readSpeed(localStorage.getItem("patter.playSpeed"));
 const speedEl = document.getElementById("play-speed") as HTMLSelectElement | null;
-function setSpeed(key: string): void {
-  speedKey = SPEED_WPM[key] === undefined ? "normal" : key;
-  localStorage.setItem("patter.playSpeed", speedKey);
-  if (speedEl) speedEl.value = speedKey;
+if (speedEl) {
+  speedEl.value = speed; // the options are in the markup (index.html and the preview copy), in PLAY_SPEEDS order
+  speedEl.addEventListener("change", () => {
+    speed = readSpeed(speedEl.value);
+    localStorage.setItem("patter.playSpeed", speed);
+  });
 }
-if (speedEl) { setSpeed(speedKey); speedEl.addEventListener("change", () => setSpeed(speedEl.value)); }
 
-function fakeDuration(text: string | undefined): number {
-  const wpm = SPEED_WPM[speedKey] ?? 300;
-  if (wpm === 0) return 0; // "instant" - no reading delay (a voiced line, when audio is on, still plays out)
-  const words = (text ?? "").trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(450, Math.round((words / wpm) * 60000)); // a beat needs to land
-}
-/** Play a beat's audio clip and resolve when it ends; false (immediately) if there's no file for it. While
- *  it plays, `lineEl` (the transcript line) pulses via `.pline-playing` so it's clear which line is sounding. */
-async function playClip(beatId: string, lineEl?: HTMLElement): Promise<boolean> {
+/** The rate a clip plays at: the speed's, except under Instant, where only Step sounds a clip (at its own pace). */
+const clipRate = (): number => (speed === "instant" ? 1 : SPEED_RATE[speed]);
+
+/** A line's recording, loaded far enough to know its length. */
+interface Clip { audio: HTMLAudioElement; url: string; duration: number }
+
+/** Load a line's recording (Audio Folders mode), or null when there's no file for it or it won't load. */
+async function loadClip(beatId: string): Promise<Clip | null> {
+  if (!audioAvailable) return null;
   const data = await play.audioBytes(beatId);
-  if (!data) return false;
+  if (!data) return null;
   const url = URL.createObjectURL(new Blob([data.bytes as BlobPart], { type: data.mime }));
   const audio = new Audio(url);
-  lineEl?.classList.add("pline-playing");
-  await audio.play().catch(() => undefined);
-  // Resolve when the clip ends or errors. Stop interrupts via an EXPLICIT resolver (`stopClip`), not the
-  // 'pause' event - a stray pause on this or a later clip must never cut a playing line short.
-  let resolveWait: () => void = () => {};
-  const wait = new Promise<void>((res) => { resolveWait = res; });
-  audio.onended = () => resolveWait();
-  audio.onerror = () => resolveWait();
-  const myStop = (): void => { audio.pause(); resolveWait(); };
-  stopClip = myStop;
-  await wait;
-  if (stopClip === myStop) stopClip = null;
-  URL.revokeObjectURL(url);
-  lineEl?.classList.remove("pline-playing");
-  return true;
+  audio.preload = "auto";
+  const duration = await new Promise<number>((res) => {
+    audio.onloadedmetadata = () => res(audio.duration);
+    audio.onerror = () => res(Number.NaN);
+  });
+  if (!Number.isFinite(duration)) { URL.revokeObjectURL(url); return null; }
+  return { audio, url, duration };
 }
-/** A delay that resolves after `ms` OR when Stop cuts it short (via `skipFire`), so a long paced reveal can
- *  be interrupted mid-beat. Only one is ever in flight at a time. */
-function raceDelay(ms: number): Promise<void> {
+
+/** Everything sounding now (a clip, or a line held for its length): Stop and a restart end them all. */
+const sounding = new Set<() => void>();
+function stopSounding(): void { for (const stop of [...sounding]) stop(); }
+
+/** Play a loaded clip without waiting for it. While it sounds, `lineEl` (the transcript line) pulses via
+ *  `.pline-playing`, so overlapping lines both show. */
+function playLoaded(clip: Clip, lineEl: HTMLElement): void {
+  let over = false;
+  const done = (): void => {
+    if (over) return;
+    over = true; sounding.delete(stop);
+    lineEl.classList.remove("pline-playing");
+    URL.revokeObjectURL(clip.url);
+  };
+  const stop = (): void => { clip.audio.pause(); done(); };
+  sounding.add(stop);
+  lineEl.classList.add("pline-playing");
+  clip.audio.playbackRate = clipRate(); // the pitch is kept (the element's default)
+  clip.audio.onended = done;
+  clip.audio.onerror = done;
+  void clip.audio.play().catch(done);
+}
+
+/** Mark a line as playing for `ms` with no audio, so a cut-in still shows against the line it cuts into. */
+function holdLine(lineEl: HTMLElement, ms: number): void {
+  if (ms <= 0) return;
+  lineEl.classList.add("pline-playing");
+  const stop = (): void => { clearTimeout(t); sounding.delete(stop); lineEl.classList.remove("pline-playing"); };
+  const t = setTimeout(stop, ms);
+  sounding.add(stop);
+}
+
+/** Step: fire a line's clip if audio is on, without waiting (Step has no timing). */
+function soundOnStep(step: PlayStep, lineEl: HTMLElement): void {
+  if (!audioOn || step.kind !== "line") return;
+  void loadClip(step.id).then((clip) => { if (clip) playLoaded(clip, lineEl); });
+}
+
+/** Wait until `at` (a performance.now() time), or until Stop cuts it short (via `skipFire`). Only one wait
+ *  is ever in flight at a time. */
+function waitUntil(at: number): Promise<void> {
+  const ms = at - performance.now();
+  if (ms <= 0) return Promise.resolve();
   return new Promise<void>((resolve) => {
     const t = setTimeout(resolve, ms);
     skipFire = () => { clearTimeout(t); resolve(); };
   });
-}
-/** A breathing gap after a voiced line's clip so the next line doesn't tread on its tail. */
-const AUDIO_GAP_MS = 600;
-/** Pace one beat in a paced reveal: a voiced line (audio on + a clip exists) holds for its own duration
- *  plus a short gap; everything else - text, a missing clip, or audio off entirely - waits out a
- *  reading-length delay so the beat still lands before the next one appears. */
-async function paceBeat(step: PlayStep, lineEl?: HTMLElement): Promise<void> {
-  if (audioOn && step.kind === "line" && await playClip(step.id, lineEl)) { if (!stopRequested) await raceDelay(AUDIO_GAP_MS); return; }
-  if (SPEED_WPM[speedKey] === 0) return; // "instant": no faked delay
-  await raceDelay(step.kind === "gameEvent" ? 350 : fakeDuration(step.text));
 }
 
 /** A control button. `icon` is a LEADING drawn icon from the family's vocabulary (a text button never
@@ -241,7 +266,7 @@ function scrollToEnd(): void {
  *  clip / delay). The un-played beats stay queued behind a resume control (showResume) - it does NOT rush
  *  ahead through the rest. */
 function showStop(): void {
-  controlsEl.replaceChildren(button("Stop", "play-stop", () => { stopRequested = true; skipFire?.(); stopClip?.(); }));
+  controlsEl.replaceChildren(button("Stop", "play-stop", () => { stopRequested = true; skipFire?.(); stopSounding(); }));
 }
 
 function showAdvance(): void {
@@ -305,29 +330,49 @@ async function advance(pending: Promise<PlayBatch>, paced = false): Promise<void
   appendWarnings(batch);
   if (paced) { await revealFrom(batch, gen, 0); return; } // Continue: a paced, pausable reveal
   // Single Step: reveal the beat at once (it still fades in); fire its clip if audio is on, don't block.
+  // No pauses apply under Step: the reader decides when the next line starts.
   for (const s of batch.steps) {
     const el = appendStep(s); play.mark(s.id, s.scene);
-    if (audioOn && s.kind === "line") void playClip(s.id, el);
+    soundOnStep(s, el);
   }
   showTerminal(batch);
 }
 
-/** Reveal a paced (Continue) batch from `startIdx`: one beat at a time, each held for the length of its
- *  audio (a voiced line, audio on) or a reading-length delay (text, a missing clip, or audio off); each
- *  line fades in (CSS). Stop pauses at the current line - the un-played rest waits behind a resume control
- *  (showResume) rather than rushing through. */
+/** Reveal a paced (Continue) batch from `startIdx`, on the timeline of timing.ts: each line lasts as long as
+ *  its recording (whether or not audio is on) or the duration estimate, and the next starts its `padAfter`
+ *  later, so a negative pause brings it in before the last one ends (their clips overlap). The batch's
+ *  controls appear when the last line still playing ends. Stop pauses before the next beat - the un-played
+ *  rest waits behind a resume control (showResume) rather than rushing through. */
 async function revealFrom(batch: PlayBatch, gen: number, startIdx: number): Promise<void> {
   stopRequested = false;
   showStop();
+  const timeline = new Timeline(); // the first beat starts at once: nothing before it carries a pause
+  const t0 = performance.now();
+  const at = (seconds: number): number => t0 + toMs(seconds, speed);
   for (let i = startIdx; i < batch.steps.length; i++) {
     if (gen !== runGen) return;
     const s = batch.steps[i]!;
+    // Load the recording while waiting for the beat's turn: its length is what times the next one.
+    const pending = s.kind === "line" && speed !== "instant" ? loadClip(s.id) : Promise.resolve(null);
+    await waitUntil(at(timeline.startOf(s)));
+    const clip = await pending;
+    if (gen !== runGen || stopRequested) {
+      if (clip) URL.revokeObjectURL(clip.url);
+      if (gen === runGen) { stopRequested = false; showResume(batch, gen, i); } // paused: queue the rest
+      return;
+    }
+    const length = s.kind === "gameEvent" ? 0 : clip?.duration ?? estimateDuration(s.text);
+    timeline.place(s, length);
     const el = appendStep(s); play.mark(s.id, s.scene); scrollToEnd();
-    await paceBeat(s, el);
-    if (gen !== runGen) return;
-    if (stopRequested) { stopRequested = false; showResume(batch, gen, i + 1); return; } // paused: queue the rest
+    if (clip && audioOn) playLoaded(clip, el);
+    else {
+      if (clip) URL.revokeObjectURL(clip.url);
+      holdLine(el, toMs(length, speed));
+    }
   }
+  await waitUntil(at(timeline.end)); // the last line's own pause is ignored: nothing follows it here
   if (gen !== runGen) return;
+  stopRequested = false;
   skipFire = null;
   showTerminal(batch);
 }
@@ -338,7 +383,7 @@ function revealOne(batch: PlayBatch, gen: number, idx: number): void {
   if (gen !== runGen) return;
   const s = batch.steps[idx]!;
   const el = appendStep(s); play.mark(s.id, s.scene);
-  if (audioOn && s.kind === "line") void playClip(s.id, el); // fire its clip, don't block (single-step)
+  soundOnStep(s, el); // fire its clip, don't block (single-step)
   showResume(batch, gen, idx + 1);
 }
 
@@ -380,7 +425,7 @@ async function chooseThen(optionId: string): Promise<void> {
 
 async function startRun(): Promise<void> {
   const gen = ++runGen; // cancel any in-flight table-read from the previous run
-  stopRequested = false; skipFire?.(); stopClip?.(); resumeState = null; // stop any sounding clip / pending delay / paused reveal
+  stopRequested = false; skipFire?.(); stopSounding(); resumeState = null; // stop any sounding clip / pending wait / paused reveal
   transcriptEl.replaceChildren();
   play.resetMarks();
   await play.start();

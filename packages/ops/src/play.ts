@@ -28,8 +28,9 @@ export interface PlayOptions {
 
 /** One thing that happened during a playthrough, in order. */
 export type PlayEvent =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; gameData?: GameData }
-  | { type: "text"; id: string; text: string; gameData?: GameData }
+  /** `padAfter` is the step's resolved pause after it, in seconds (line padding), as the runtime delivers it. */
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter?: number; gameData?: GameData }
+  | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData }
   | { type: "gameEvent"; id: string; gameData?: GameData }
   | { type: "choice"; options: ChoiceOption[]; picked?: string }
   /** A condition or effect that failed; the engine played through it (see the runtime's PlayError). */

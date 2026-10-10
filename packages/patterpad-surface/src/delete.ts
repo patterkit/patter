@@ -37,6 +37,7 @@ import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
 import { removeDirection } from "./direction.js";
 import { qualifierOf, rawWithQualifier } from "./qualifier.js";
+import { padOf, rawWithPad, withPadOf } from "./pad.js";
 import { arrowLeft } from "./navigation.js";
 import { sayNode, cueText, zoneText, zoneContentStart, zoneContentEnd, sayStartOf, beatNode, rawAttr } from "./zoneutil.js";
 import { refusal, snippetLossMessage } from "./guard.js";
@@ -193,6 +194,9 @@ function mergeIntoPrevBeat(state: EditorStateLike, dispatch: Dispatch, c: Ctx): 
     // Insert the content itself, not its text: insertText would take the marks at the seam, smearing
     // the previous line's bold over these words and dropping their own (review 2026-10, MEDIUM 32).
     if (content.size) tr.insert(prevSayEnd, content);
+    // The merged line ends where this one did, so the pause after it is this one's (line padding).
+    const pad = padOf(c.beat.node);
+    if (pad !== padOf(prev)) tr.setNodeMarkup(prevPos, undefined, { ...prev.attrs, raw: rawWithPad(prev.attrs.raw, pad) });
     dispatch(tr.setSelection(TextSelection.create(tr.doc, prevSayEnd)).scrollIntoView());
   }
   return true;
@@ -219,7 +223,8 @@ function mergeIntoPrevBubble(state: EditorStateLike, dispatch: Dispatch, c: Ctx)
   const refuse = prevSnip.attrs.jump ? "The previous bubble ends in a jump. Move or clear it first." : snippetLossMessage("This bubble", cur);
   if (refuse) { if (dispatch) dispatch(refusal(state, refuse)); return true; }
 
-  const mergedLast = appendSay(prevBeats[prevBeats.length - 1]!, sayContent(curBeats[0]!));
+  // The merged line ends where this bubble's first did, so it takes that line's pause (line padding).
+  const mergedLast = withPadOf(appendSay(prevBeats[prevBeats.length - 1]!, sayContent(curBeats[0]!)), curBeats[0]!);
   const newPrev = prevSnip.copy(Fragment.fromArray([...prevBeats.slice(0, -1), mergedLast, ...curBeats.slice(1)]));
 
   if (dispatch) {
@@ -258,8 +263,13 @@ function prevLineOf(state: EditorStateLike, c: Ctx): { node: PMNode; pos: number
  *   - P is text (prose): keep it text, inline L's direction into the text;
  *   - P is dialogue WITH content: keep P's direction, DROP L's, concatenate the say;
  *   - P is dialogue with NO content: take everything from L (its say, its direction, and its qualifier).
- *  P keeps its id and raw. The say moves as content, so bold / italic survive the fold. */
+ *  P keeps its id and raw, except for the pause after it: the merged line ends where L did, so it takes
+ *  L's (line padding). The say moves as content, so bold / italic survive the fold. */
 function foldInto(P: PMNode, L: PMNode): PMNode {
+  return withPadOf(fold(P, L), L);
+}
+
+function fold(P: PMNode, L: PMNode): PMNode {
   const lSay = sayContent(L);
   const lDir = zoneText(L, "paren");
   const keep = { id: P.attrs.id as string, raw: P.attrs.raw as string };

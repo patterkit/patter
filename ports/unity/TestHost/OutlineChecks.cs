@@ -92,6 +92,8 @@ namespace Patterkit.Patterplay.TestHost
             if (b.Direction != null) o["direction"] = b.Direction;
             if (b.Qualifier != null) o["qualifier"] = b.Qualifier;
             if (b.QualifierName != null) o["qualifierName"] = b.QualifierName;
+            if (b.PadAfter != null) o["padAfter"] = b.PadAfter.Value;         // line padding: resolved, always (line / text)
+            if (b.OwnPadAfter != null) o["ownPadAfter"] = b.OwnPadAfter.Value; // and the beat's own, when it sets one
             if (b.Text != null) o["text"] = b.Text;
             if (b.GameData != null && b.GameData.Count > 0) o["gameData"] = GameDataToObject(b.GameData);
             if (b.Tags != null && b.Tags.Count > 0) o["tags"] = b.Tags.Cast<object>().ToList();

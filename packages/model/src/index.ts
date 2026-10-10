@@ -58,6 +58,11 @@ export interface LineBeat {
    *  how the line is delivered (`TAM (O.S.)`), not who says it. Absent = none. The speaker is still
    *  `character` for every authoring and reporting purpose. See `SpeakerQualifier`. */
   qualifier?: string;
+  /** The pause after this beat, before the next, in seconds (`padAfter`, design/proposals/line-padding.md):
+   *  positive waits, zero follows at once, negative starts the next line that long before this one ends (a
+   *  cut-in). Absent = the nearest `padAfterDefault` above it, else the project's, else `DEFAULT_PAD_AFTER`.
+   *  Never negative on a snippet's last line or text beat: the runtime clamps it to zero there. */
+  padAfter?: number;
   gameData?: GameData;
   /** Author-defined freeform tags (#215): a cross-cutting label layer that travels to the runtime.
    *  At runtime a beat's tags are the UNION of its own and every ancestor's (scene → block → group(s) →
@@ -74,6 +79,11 @@ export interface LineBeat {
 export interface TextBeat {
   id: string;
   kind: "text";
+  /** The pause after this beat, before the next, in seconds (`padAfter`, design/proposals/line-padding.md):
+   *  positive waits, zero follows at once, negative starts the next line that long before this one ends (a
+   *  cut-in). Absent = the nearest `padAfterDefault` above it, else the project's, else `DEFAULT_PAD_AFTER`.
+   *  Never negative on a snippet's last line or text beat: the runtime clamps it to zero there. */
+  padAfter?: number;
   gameData?: GameData;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
@@ -132,6 +142,9 @@ export interface Snippet {
   beats?: Beat[];
   onEnter?: Effect[];
   onExit?: Effect[];
+  /** The default `padAfter` for the line and text beats inside it that set none (the nearest default wins:
+   *  snippet, then each group, innermost first, then block, then scene, then the project). */
+  padAfterDefault?: number;
   gameData?: GameData;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
@@ -170,6 +183,9 @@ export interface Group {
   /** `sequence` config (order × exhaust, spec §4). */
   options?: SequenceOptions;
   children: Array<Group | Snippet>;
+  /** The default `padAfter` for the line and text beats inside it that set none (the nearest default wins:
+   *  snippet, then each group, innermost first, then block, then scene, then the project). */
+  padAfterDefault?: number;
   gameData?: GameData;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
@@ -208,6 +224,9 @@ export interface Block {
    */
   gameId?: string;
   children: Array<Group | Snippet>;
+  /** The default `padAfter` for the line and text beats inside it that set none (the nearest default wins:
+   *  snippet, then each group, innermost first, then block, then scene, then the project). */
+  padAfterDefault?: number;
   gameData?: GameData;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
@@ -225,6 +244,10 @@ export interface Scene {
   gameId?: string;
   /** Host metadata - e.g. `location` lives here, not as a core field. */
   gameData?: GameData;
+  /** The default `padAfter` for the line and text beats inside it that set none (the nearest default wins:
+   *  snippet, then each group, innermost first, then block, then scene, then the project). */
+  padAfterDefault?: number;
+
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
   /** Entry behaviour / setup (spec §15). */
@@ -512,6 +535,13 @@ export function usedQualifiers(project: Pick<ProjectFile, "qualifiers">, scenes:
   return projectQualifiers(project).filter((q) => used.has(q.gameId));
 }
 
+/** The built-in `padAfter`, in seconds, for a project that sets no default of its own: the same on every runtime
+ *  and in Patterpad's Play window (design/proposals/line-padding.md section 4). */
+export const DEFAULT_PAD_AFTER = 0.6;
+/** The range validation keeps a `padAfter` or `padAfterDefault` within, in seconds. */
+export const PAD_AFTER_MIN = -10;
+export const PAD_AFTER_MAX = 60;
+
 /** A qualifier as it reaches a compiled bundle: its `gameId` and authored name (the unlocalised fallback). */
 export interface BundleQualifier {
   gameId: string;
@@ -780,6 +810,9 @@ export interface ProjectFile {
   /** The speaker qualifiers a line can pick from, in display order; default `DEFAULT_QUALIFIERS`. An empty
    *  list means the project uses none. */
   qualifiers?: SpeakerQualifier[];
+  /** The project's default `padAfter` for every line and text beat that sets none and has no default above it.
+   *  Absent = `DEFAULT_PAD_AFTER`. */
+  padAfterDefault?: number;
   gameDataFields?: GameDataFields;
   /** Ordered writing-status ladder (not-done -> done); default `DEFAULT_WRITING_STATUSES`. */
   writingStatuses?: WritingStatusDecl[];
@@ -1094,6 +1127,7 @@ export interface CompiledSnippet {
   beats?: Beat[];                  // beats carry no expressions
   onEnter?: CompiledEffect[];
   onExit?: CompiledEffect[];
+  padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
   tags?: string[];                 // author tags (#215), accumulated down the tree at runtime
   jump?: Jump;
@@ -1114,6 +1148,7 @@ export interface CompiledGroup {
   shared?: boolean;
   options?: SequenceOptions;
   children: Array<CompiledGroup | CompiledSnippet>;
+  padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
   tags?: string[];                 // author tags (#215)
   /** Option-position fields (spec §5) - only when a direct child of a `choice`. */
@@ -1132,6 +1167,7 @@ export interface CompiledBlock {
   /** Host-facing address (spec §6); the runtime resolves it to `id`. Absent = derived from `name`. */
   gameId?: string;
   children: Array<CompiledGroup | CompiledSnippet>;
+  padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
   tags?: string[];                 // author tags (#215)
 }
@@ -1142,6 +1178,7 @@ export interface CompiledScene {
   name: string;
   /** Host-facing address (spec §6); the runtime resolves it to `id`. Absent = derived from `name`. */
   gameId?: string;
+  padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
   tags?: string[];                 // author tags (#215)
   onEntry?: CompiledEffect[];
@@ -1162,6 +1199,8 @@ export interface Bundle {
   /** The speaker qualifiers the content uses, in the project's order. Absent when no line has one, so a
    *  bundle without qualifiers is exactly as before. */
   qualifiers?: BundleQualifier[];
+  /** The project's own `padAfterDefault`, when it sets one; absent = `DEFAULT_PAD_AFTER`. */
+  padAfterDefault?: number;
   properties?: PropertyDecl[];
   /** Host / world scope declarations, baked from the project so the runtime can self-back a declared
    *  scope (`@world`, ...) when no host resolver claims its token. Absent = no host scopes. */

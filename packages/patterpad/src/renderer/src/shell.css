@@ -357,6 +357,13 @@
 /* editable gameData field value (text / number input) */
 .insp-gd-input { font: 12.5px var(--font-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5.5px; min-width: 0; width: 100%; max-width: 176px; }
 .insp-gd-input:focus-visible { border-color: var(--accent); outline-offset: 0; }
+/* A seconds field (line padding): a short number box and its unit. The placeholder says what an empty
+   field inherits, so it gets the width it needs to read. */
+.insp-pad { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.insp-pad .insp-pad-input { flex: 1 1 auto; max-width: 150px; }
+.insp-unit { flex: none; color: var(--muted); font: 11.5px var(--font-ui); }
+/* The project's default pause in Project Settings: a few digits, not a full-width text field. */
+.settings-dialog input.settings-seconds { width: 96px; max-width: 96px; flex: none; }
 
 /* Author tags chip editor (#215): hash-coloured chips (the `--char-N` cue palette) + an inline input. */
 .insp-row-tags { align-items: start; }

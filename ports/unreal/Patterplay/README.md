@@ -49,6 +49,12 @@ A line step names its speaker (`Character`, and `CharacterName`, the locale-reso
 your code to switch on, and `QualifierName` its shown name (`O.S.`), so a dialogue widget can show
 `TAM (O.S.)`. An option's `Prompt` carries the same fields, and each has a `bHas` flag for whether it is set.
 
+A line or text step also carries `PadAfter`, the pause after it in seconds, before the next line: the
+line's own, else the nearest default above it (its snippet, groups, block, scene, then the project's),
+else the built-in 0.6. A negative value starts the next line that long before this one ends (a cut-in);
+a snippet's last line is never negative. The step only reports the pause: timing the lines is your
+player's job.
+
 The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint** (with `FPatterStep`
 and `FPatterOption` as Blueprint structs), so a designer can drive the flow and bind steps to
 a dialogue widget without touching C++.
@@ -90,7 +96,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   cursor to the editor; `ApplyLiveBundle` hot-reloads an edited bundle into the running
   engine. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Structure**: `GetOutline` / `GetBeatSequence` expose the authored tree (per-beat text,
-  character, speaker qualifier, gameData, tags, plus each scene's and block's own gameData) for tooling like
+  character, speaker qualifier, resolved `PadAfter` and any `OwnPadAfter`, gameData, tags, plus each scene's and block's own gameData) for tooling like
   Sequencer binding. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
   a block's own gameData by address, raw (not merged with the declared defaults).
 

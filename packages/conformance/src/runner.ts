@@ -19,7 +19,7 @@ import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, StepResult } from "@patterkit/runtime";
-import { SAVE_SCHEMA } from "@patterkit/model";
+import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
@@ -277,12 +277,14 @@ export function normaliseStep(r: StepResult): TranscriptStep {
       if (r.direction !== undefined) s.direction = r.direction;
       if (r.qualifier !== undefined) s.qualifier = r.qualifier;             // speaker qualifier gameId
       if (r.qualifierName !== undefined) s.qualifierName = r.qualifierName; // and its locale-resolved name
+      if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = r.padAfter;          // line padding, when not the default
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
       return s;
     }
     case "text": {
       const s: TranscriptStep = { type: "text", id: r.id, text: r.text };
+      if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = r.padAfter;
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.tags !== undefined) s.tags = r.tags;
       return s;

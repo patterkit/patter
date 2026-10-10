@@ -126,3 +126,66 @@ static func effective_game_data(fields: Array, node) -> Dictionary:
 			if not out.has(k):
 				out[k] = PatterValues.to_value(node[k])
 	return out
+
+
+# -- line padding ----------------------------------------------------------------
+
+## The built-in `padAfter`, in seconds, for a project that sets no default of its own: the same on every
+## runtime and in Patterpad's Play window.
+const DEFAULT_PAD_AFTER := 0.6
+
+
+# Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes
+# the nearest `padAfterDefault` above it (snippet, then each group, innermost first, then block, then
+# scene), else the project's (the bundle root's), else DEFAULT_PAD_AFTER. A snippet's last line or text
+# beat can't cut in on what follows the seam, nor one followed by a game event across the event, so a
+# negative value there is clamped to zero. An option's
+# prompt resolves through the option, and is never clamped (its reply is certain).
+#
+# The answer depends only on where a beat sits, so it is worked out once into a flat index:
+# beat id -> {"resolved": float, "own": float only when the beat sets one}. Mirrors the JS buildPadIndex.
+static func build_pad_index(bundle: Dictionary) -> Dictionary:
+	var index := {}
+	var project_default := float(bundle.get("padAfterDefault", DEFAULT_PAD_AFTER))
+	var scenes: Dictionary = bundle.get("scenes", {})
+	for sid in scenes:
+		var scene: Dictionary = scenes[sid]
+		var scene_default := float(scene.get("padAfterDefault", project_default))
+		for block in scene.get("blocks", []):
+			var block_default := float(block.get("padAfterDefault", scene_default))
+			for child in block.get("children", []):
+				_index_pads(index, child, block_default)
+	return index
+
+
+static func _index_pads(index: Dictionary, node: Dictionary, inherited: float) -> void:
+	var def := float(node.get("padAfterDefault", inherited))
+	if node.get("type", "") == "group":
+		if node.get("prompt") is Dictionary:
+			_set_pad(index, node["prompt"], def, false)
+		for child in node.get("children", []):
+			_index_pads(index, child, def)
+		return
+	# A pause can be negative only when the very next beat is a line or text beat: a snippet's last one
+	# (the seam) and one followed by a game event (a cut-in can't cross it) are clamped.
+	var beats: Array = node.get("beats", [])
+	for i in beats.size():
+		if _spoken(beats[i]):
+			var next_spoken := i + 1 < beats.size() and _spoken(beats[i + 1])
+			_set_pad(index, beats[i], def, not next_spoken)
+
+
+static func _spoken(beat: Dictionary) -> bool:
+	var kind = beat.get("kind", "")
+	return kind == "line" or kind == "text"
+
+
+static func _set_pad(index: Dictionary, beat: Dictionary, inherited: float, clamp_last: bool) -> void:
+	var own = beat.get("padAfter") if beat.get("kind", "") != "gameEvent" else null
+	var resolved := float(own) if own != null else inherited
+	if clamp_last and resolved < 0.0:
+		resolved = 0.0
+	var pad := {"resolved": resolved}
+	if own != null:
+		pad["own"] = float(own)
+	index[beat["id"]] = pad

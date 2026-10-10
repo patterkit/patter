@@ -16,6 +16,10 @@ namespace patter
 {
     using GameData = std::map<std::string, PatterValue>;
 
+    // The built-in pause after a line or text beat, in seconds, for a project that sets no default of its own
+    // (line padding, design/proposals/line-padding.md): the same on every runtime and in Patterpad's Play window.
+    inline constexpr double DEFAULT_PAD_AFTER = 0.6;
+
     struct Locales { std::string defaultLocale = "en"; std::vector<std::string> included; };
     struct Cast { std::string name, displayName; };
     // A speaker qualifier as the bundle ships it (`V.O.`): the `gameId` a line stores, and its authored
@@ -75,6 +79,7 @@ namespace patter
         std::string id, kind, character, direction;
         bool hasCharacter = false, hasDirection = false; // set, even to "" (absent = unset): a "" is a value
         bool hasQualifier = false; std::string qualifier; // speaker qualifier gameId (`vo`), line only
+        bool hasPadAfter = false; double padAfter = 0;    // the pause after it, in seconds (line / text only)
         std::shared_ptr<GameData> gameData;             // null = none
         std::vector<std::string> tags;                  // author tags (#215)
     };
@@ -89,6 +94,7 @@ namespace patter
         std::vector<Effect> onEnter, onExit;
         std::shared_ptr<GameData> gameData;
         std::vector<std::string> tags;                  // author tags (#215)
+        bool hasPadAfterDefault = false; double padAfterDefault = 0;   // line padding: the default for the beats inside
 
         // group
         std::string selector;
@@ -112,6 +118,7 @@ namespace patter
         std::vector<NodePtr> children;
         std::vector<std::string> tags;
         std::shared_ptr<GameData> gameData;             // author overrides (raw); null = none
+        bool hasPadAfterDefault = false; double padAfterDefault = 0;   // line padding: the default for the beats inside
     };
     struct Scene
     {
@@ -121,6 +128,7 @@ namespace patter
         std::vector<Effect> onEntry;
         std::vector<std::string> tags;                  // author tags (#215)
         std::shared_ptr<GameData> gameData;             // author overrides (raw); null = none
+        bool hasPadAfterDefault = false; double padAfterDefault = 0;   // line padding: the default for the beats inside
     };
 
     struct GameDataField
@@ -151,6 +159,8 @@ namespace patter
         Locales locales;
         std::vector<Cast> cast;
         std::vector<Qualifier> qualifiers;   // the speaker qualifiers the content uses; empty = none
+        // The project's own line-padding default, when it sets one; absent = DEFAULT_PAD_AFTER.
+        bool hasPadAfterDefault = false; double padAfterDefault = 0;
         std::vector<PropertyDecl> properties;
         std::map<std::string, Scene> scenes;
         // Scene ids in AUTHORED order (the bundle's key order, which is the project's nav order). `scenes`

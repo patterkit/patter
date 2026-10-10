@@ -45,6 +45,10 @@ namespace Patterkit.Patterplay
         public string Direction;
         public string Qualifier;             // line only: the speaker qualifier's gameId (`vo`); null when none
         public string QualifierName;         // line only: its resolved shown name (`V.O.`); null in IDs-only mode
+        /// <summary>Line and text only (always set there; null on the others): the pause after this step, in
+        /// seconds, resolved from the beat's own value and the defaults above it (line padding). Negative = the
+        /// next line cuts in that long before this one ends; never negative on a snippet's last line.</summary>
+        public double? PadAfter;
         public GameData GameData;
         public List<string> Tags;            // author tags (#215); null when none
         public List<ChoiceOption> Options;   // choice only

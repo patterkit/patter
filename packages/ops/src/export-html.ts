@@ -11,7 +11,7 @@
 
 import { canonicalStringify } from "@patterkit/core";
 import { runExportFull } from "./export.js";
-import { PLAYABLE_RUNTIME_JS } from "./playable-runtime.js";
+import { PLAYABLE_RUNTIME_JS, PLAYABLE_TIMING_JS } from "./playable-runtime.js";
 import type { LoadedProject } from "./load.js";
 
 const esc = (s: string): string => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
@@ -35,23 +35,37 @@ const PLAYER_JS = String.raw`
   function add(cls, html) { var d = document.createElement("div"); d.className = cls; d.innerHTML = html; stage.appendChild(d); return d; }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
 
-  // Pacing: a source-only reader carries no audio, so each line is held on screen for a reading-length delay
-  // (proportional to its word count) before the next appears, and every line fades in (see CSS). The Speed
-  // control sets the reading pace (words/min); "Instant" drops the delay entirely. The choice is persisted.
-  // A run token cancels an in-flight paced read the moment the player restarts, loads, or picks a choice.
-  var SPEED_WPM = { slow: 300, normal: 500, fast: 800, instant: 0 }, runToken = 0;
+  // Pacing (line padding): a source-only reader carries no audio, so each line is timed by the estimate
+  // Patterstage uses for a line with no recording (game-subtitles' estimateDuration), and the step's padAfter
+  // says when the next one starts: after a pause, at once, or cutting in before this one ends. The player
+  // rules: the first line starts at once, as does the reply to a choice; the line before a choice keeps no
+  // pause (its options appear while it plays), nor does the last line (the end comes as it ends); a cut-in
+  // never starts before the line it cuts into; and a game event is never held here, so it's done at once.
+  // Every line fades in (see CSS). The Speed control scales the whole timing (half, normal, or double speed)
+  // or drops it (instant). It is stored under the key Patterpad's Play window uses, so the two keep one
+  // choice; the old reading paces carry over (slow is half speed, fast is double).
+  // A run token cancels an in-flight wait the moment the player restarts, loads, or picks a choice.
+  var SPEED_SCALE = { half: 2, normal: 1, double: 0.5, instant: 0 }, OLD_SPEED = { slow: "half", fast: "double" }, runToken = 0;
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
   var speedKey = (function () { try { return localStorage.getItem("patter.playSpeed") || "normal"; } catch (e) { return "normal"; } })();
-  if (SPEED_WPM[speedKey] === undefined) speedKey = "normal";
-  function fakeDuration(text) {
-    var wpm = SPEED_WPM[speedKey];
-    if (!wpm) return 0; // "Instant" - reveal the next line immediately
-    var words = String(text == null ? "" : text).trim().split(/\s+/).filter(Boolean).length;
-    return Math.max(450, Math.round((words / wpm) * 60000)); // a beat needs to land
+  if (own(OLD_SPEED, speedKey)) speedKey = OLD_SPEED[speedKey];
+  if (!own(SPEED_SCALE, speedKey)) speedKey = "normal";
+  var estimate = window.GameSubtitles.estimateDuration;
+  // How long after a line or text step starts the step after it starts, in ms, given what that step is.
+  function gapAfter(s, next) {
+    var scale = SPEED_SCALE[speedKey];
+    if (!scale) return 0; // "Instant": no waits
+    var length = estimate(s.text);
+    var pad = typeof s.padAfter === "number" ? s.padAfter : 0.6; // the built-in, for a bundle from before padding
+    var secs = next.type === "choice" ? 0 // the options appear while the line plays
+      : next.type === "line" || next.type === "text" ? Math.max(0, length + pad) // never before this line starts
+      : length; // the end: the line plays out, its pause unused
+    return Math.round(secs * scale * 1000);
   }
   function scrollDown() { window.scrollTo(0, document.body.scrollHeight); }
   var speedSel = document.getElementById("speed");
   if (speedSel) {
-    speedSel.value = speedKey; // a fresh fakeDuration() reads speedKey each line, so a change applies next line
+    speedSel.value = speedKey; // gapAfter() reads speedKey each line, so a change applies from the next line
     speedSel.onchange = function () { speedKey = speedSel.value; try { localStorage.setItem("patter.playSpeed", speedKey); } catch (e) {} };
   }
 
@@ -59,13 +73,25 @@ const PLAYER_JS = String.raw`
 
   function newGame() { stage.innerHTML = ""; controls.innerHTML = ""; build(); run(); }
 
+  // The player reads one step ahead of what it shows, as a game's would, to know whether a choice, the end,
+  // or another line follows the line on screen. While a step is read but not yet shown, the engine is past
+  // what the reader sees, so Save keeps the game as it was before the read (resumeSave).
+  var resumeSave = null;
+  function readNext() {
+    try { resumeSave = JSON.stringify(engine.saveGame()); } catch (e) { resumeSave = null; }
+    var s = flow.advance();
+    while (s && s.type === "gameEvent") s = flow.advance(); // a host cue with nothing to show, done at once
+    return s;
+  }
+
   function run() {
     controls.innerHTML = "";
     var token = ++runToken;
-    (function step() {
+    (function show(s) {
       if (token !== runToken) return; // superseded by a restart / load / choice pick
-      var s = flow.advance();
-      if (!s) { add("end", "The End"); return; } // defensive: a step should always be returned; never hard-crash
+      resumeSave = null; // what's shown is where the engine is
+      if (!s || s.type === "end") { add("end", "The End"); return; } // no step is defensive: never hard-crash
+      if (s.type === "choice") { renderChoice(s); return; }
       if (s.type === "line") {
         var who = s.characterName || s.character || "";
         // A speaker qualifier follows the name, as the script's cue has it: TAM (O.S.).
@@ -73,13 +99,13 @@ const PLAYER_JS = String.raw`
         if (qual && who) who += " (" + qual + ")";
         var dir = s.direction ? '<em class="dir">(' + esc(s.direction) + ')</em> ' : "";
         add("line", '<span class="who" style="color:hsl(' + hueOf(s.character || who) + ',55%,38%)">' + esc(who) + '</span>' + dir + esc(s.text));
-        scrollDown(); setTimeout(step, fakeDuration(s.text));
-      } else if (s.type === "text") {
-        add("text", esc(s.text)); scrollDown(); setTimeout(step, fakeDuration(s.text));
-      } else if (s.type === "choice") { renderChoice(s); }
-      else if (s.type === "end") { add("end", "The End"); }
-      else { step(); } // game-event beat: a host cue with no player-facing text - skip it, advance at once
-    })();
+      } else {
+        add("text", esc(s.text));
+      }
+      scrollDown();
+      var next = readNext();
+      setTimeout(function () { show(next); }, gapAfter(s, next || { type: "end" }));
+    })(readNext()); // the first line (or the reply to a choice) starts at once
   }
 
   function renderChoice(step) {
@@ -97,7 +123,7 @@ const PLAYER_JS = String.raw`
   }
 
   document.getElementById("restart").onclick = newGame;
-  document.getElementById("save").onclick = function () { try { localStorage.setItem(SAVE_KEY, JSON.stringify(engine.saveGame())); flash("Saved"); } catch (e) {} };
+  document.getElementById("save").onclick = function () { try { localStorage.setItem(SAVE_KEY, resumeSave || JSON.stringify(engine.saveGame())); flash("Saved"); } catch (e) {} };
   document.getElementById("load").onclick = function () {
     var blob; try { blob = localStorage.getItem(SAVE_KEY); } catch (e) {}
     if (!blob) { flash("No save yet"); return; }
@@ -177,10 +203,10 @@ ${head}
   <button id="save">Save</button>
   <button id="load">Load</button>
   <label class="speedlabel">Speed
-    <select id="speed" title="Reading speed: how long each line is held before the next appears">
-      <option value="slow">Slow</option>
+    <select id="speed" title="How fast the scene plays: its timing at half speed, as written, at double speed, or with no waits">
+      <option value="half">Half</option>
       <option value="normal">Normal</option>
-      <option value="fast">Fast</option>
+      <option value="double">Double</option>
       <option value="instant">Instant</option>
     </select>
   </label>
@@ -198,6 +224,7 @@ export function runExportHtml(loaded: LoadedProject): string {
   const { title, lang, bundleJson } = sourceStory(loaded);
   return page(title, lang, `<style>${STYLE}</style>`,
     `<script>${PLAYABLE_RUNTIME_JS}</script>
+<script>${PLAYABLE_TIMING_JS}</script>
 <script>window.PATTER_BUNDLE=${bundleJson};</script>
 <script>${PLAYER_JS}</script>`);
 }
@@ -211,7 +238,7 @@ export interface WebExport {
   indexHtml: string;
   /** The look of the page, separated so it's approachable to edit. Published once. */
   styleCss: string;
-  /** The Patterplay runtime + this page's player glue. Refreshed on every publish. */
+  /** The Patterplay runtime, the line-timing estimate, and this page's player glue. Refreshed on every publish. */
   patterplayJs: string;
   /** The compiled story as `window.PATTER_BUNDLE = …`. Refreshed on every publish. */
   storyJs: string;
@@ -225,7 +252,7 @@ export function runExportWeb(loaded: LoadedProject): WebExport {
       `<script src="story.js"></script>
 <script src="patterplay.js"></script>`),
     styleCss: `${STYLE.trim()}\n`,
-    patterplayJs: `${PLAYABLE_RUNTIME_JS}\n${PLAYER_JS}`,
+    patterplayJs: `${PLAYABLE_RUNTIME_JS}\n${PLAYABLE_TIMING_JS}\n${PLAYER_JS}`,
     storyJs: `window.PATTER_BUNDLE=${bundleJson};\n`,
   };
 }

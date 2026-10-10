@@ -98,6 +98,8 @@ namespace patter
                     out.qualifiers.push_back(qualifier);
                 });
 
+            if (const J* p = field(root, "padAfterDefault")) readPad(*p, out.hasPadAfterDefault, out.padAfterDefault);
+
             if (const J* p = field(root, "properties"))
                 eachElement(*p, [&](const J& d) { out.properties.push_back(propDecl(d)); });
 
@@ -165,6 +167,7 @@ namespace patter
                 if (const J* p = field(s, "gameId")) scene.gameId = text(*p);
                 if (const J* p = field(s, "tags")) scene.tags = strList(*p);   // author tags (#215)
                 if (const J* p = field(s, "gameData")) scene.gameData = gameData(*p);
+                if (const J* p = field(s, "padAfterDefault")) readPad(*p, scene.hasPadAfterDefault, scene.padAfterDefault);
                 if (const J* p = field(s, "sceneProps")) eachElement(*p, [&](const J& d) { scene.sceneProps.push_back(propDecl(d)); });
                 if (const J* p = field(s, "onEntry")) scene.onEntry = effects(*p);
                 eachElement(reqArray(s, "blocks"), [&](const J& b)
@@ -176,6 +179,7 @@ namespace patter
                     if (const J* p = field(b, "gameId")) block.gameId = text(*p);
                     if (const J* p = field(b, "tags")) block.tags = strList(*p);   // author tags (#215)
                     if (const J* p = field(b, "gameData")) block.gameData = gameData(*p);
+                    if (const J* p = field(b, "padAfterDefault")) readPad(*p, block.hasPadAfterDefault, block.padAfterDefault);
                     if (const J* p = field(b, "children")) eachElement(*p, [&](const J& c) { block.children.push_back(node(c)); });
                     scene.blocks.push_back(std::move(block));
                 });
@@ -225,6 +229,13 @@ namespace patter
         // convert, which in Unreal logs an error per field.
         static std::string text(const J& v) { return A::isString(v) ? A::str(v) : std::string(); }
         static bool flag(const J& v) { return T::isBool(v) && A::boolean(v); }
+
+        // A pause in seconds (line padding): set only when it is a number; anything else reads as unset, so
+        // the beat falls back to the defaults above it.
+        static void readPad(const J& v, bool& has, double& out)
+        {
+            if (T::isNumber(v)) { has = true; out = A::num(v); }
+        }
 
         template <typename Fn>
         static void eachElement(const J& arr, Fn&& fn)
@@ -323,6 +334,7 @@ namespace patter
             if (const J* p = field(o, "character")) { b.hasCharacter = true; b.character = text(*p); }
             if (const J* p = field(o, "direction")) { b.hasDirection = true; b.direction = text(*p); }
             if (const J* p = field(o, "qualifier")) { b.hasQualifier = true; b.qualifier = text(*p); }
+            if (const J* p = field(o, "padAfter")) readPad(*p, b.hasPadAfter, b.padAfter);   // line padding
             if (const J* p = field(o, "gameData")) b.gameData = gameData(*p);
             if (const J* p = field(o, "tags")) b.tags = strList(*p);   // author tags (#215)
             return b;
@@ -338,6 +350,7 @@ namespace patter
             if (const J* p = field(o, "onExit")) n->onExit = effects(*p);
             if (const J* p = field(o, "gameData")) n->gameData = gameData(*p);
             if (const J* p = field(o, "tags")) n->tags = strList(*p);   // author tags (#215)
+            if (const J* p = field(o, "padAfterDefault")) readPad(*p, n->hasPadAfterDefault, n->padAfterDefault);
             // Option-position flags, on a bare snippet option as on an Option group.
             if (const J* p = field(o, "sticky")) n->sticky = flag(*p);
             if (const J* p = field(o, "fallback")) n->fallback = flag(*p);
