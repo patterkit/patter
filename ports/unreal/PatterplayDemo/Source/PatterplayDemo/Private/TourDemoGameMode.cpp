@@ -5,7 +5,7 @@
 void ATourDemoGameMode::BeginPlay()
 {
 	Super::BeginPlay();
-	for (TActorIterator<ATourDemoActor> It(GetWorld()); It; ++It)
+	if (TActorIterator<ATourDemoActor>(GetWorld()))
 		return; // the level already carries one (placed by hand) - use that
 	GetWorld()->SpawnActor<ATourDemoActor>();
 }

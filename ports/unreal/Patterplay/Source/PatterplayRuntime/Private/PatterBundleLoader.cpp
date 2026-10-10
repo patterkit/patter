@@ -54,15 +54,23 @@ namespace patter
 		static bool isNull(const J& v) { return !v.IsValid() || v->Type == EJson::Null; }
 		static bool isNumber(const J& v) { return v.IsValid() && v->Type == EJson::Number; }
 		static bool isBool(const J& v) { return v.IsValid() && v->Type == EJson::Boolean; }
+		// A field's key as an FString. Unreal 5.7 keys FJsonObject's fields by FString; 5.8 by a shared string
+		// type, read through its view. The FString overload wins on 5.7, so the template is only used on 5.8.
+		static FString keyString(const FString& Key) { return Key; }
+		template <typename K>
+		static FString keyString(const K& Key) { return FString(Key.ToView()); }
 		static const J* find(const J& o, const char* key)
 		{
-			return isObject(o) ? o->AsObject()->Values.Find(FString(UTF8_TO_TCHAR(key))) : nullptr;
+			if (!isObject(o)) return nullptr;
+			const FString Wanted(UTF8_TO_TCHAR(key));
+			for (const auto& KV : o->AsObject()->Values) if (keyString(KV.Key) == Wanted) return &KV.Value;
+			return nullptr;
 		}
 		// FJsonObject keeps its fields in document order, which is the authored scene order.
 		template <typename Fn>
 		static void forEachField(const J& o, Fn&& fn)
 		{
-			for (const auto& KV : o->AsObject()->Values) fn(Std(KV.Key), KV.Value);
+			for (const auto& KV : o->AsObject()->Values) fn(Std(keyString(KV.Key)), KV.Value);
 		}
 	};
 }

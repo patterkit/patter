@@ -25,6 +25,11 @@ runtime behaviour.
 
 ### Fixed
 
+- **Builds on Unreal Engine 5.8.** The bundle reader read `FJsonObject`'s fields by `FString` keys, which
+  5.8 replaced with a shared string type, so the plugin no longer compiled there; it now reads the keys in a
+  way both versions accept. The demo's check for a hand-placed tour actor also tripped 5.8's stricter
+  warnings. Verified on both 5.7 and 5.8.3: the plugin and demo build, and the plugin's automation tests
+  pass.
 - **A speaker qualifier without a name** in the bundle no longer gives a line an empty `QualifierName`: the
   field is left unset, as on the other three runtimes, unless a locale string names the qualifier.
 
