@@ -1,5 +1,19 @@
 # @patterkit/ops
 
+## 0.15.0
+
+### Minor Changes
+
+- a4db109: Speaker qualifiers in the exports. The screenplay (PDF and DOCX), the playable HTML, and `patter play` print a qualified cue as `TAM (O.S.)`; the voice script gains a Qualifier column, with lines still under the one character; localisation exports carry a line's qualifier as read-only context and the qualifier names as project-level strings; and the editable script handoff sends the qualifier in the cue and reads a changed one back as a suggestion. `patter suggestions` lists a qualifier change. `@patterkit/ops` exports `cueLabel` and `qualifierNamer`.
+
+### Patch Changes
+
+- 73cbed5: Uses `@patterkit/runtime` 0.22.0, the Patterplay 0.22.0 release.
+- Updated dependencies [a4db109]
+  - @patterkit/model@0.11.0
+  - @patterkit/core@0.5.0
+  - @patterkit/compiler@0.5.0
+
 ## 0.14.2
 
 ### Patch Changes

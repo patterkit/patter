@@ -1,5 +1,22 @@
 # @patterkit/compiler
 
+## 0.5.0
+
+### Minor Changes
+
+- a4db109: Speaker qualifiers: a line can say how it is delivered, a screenplay's `TAM (O.S.)`, without becoming a second character.
+
+  - `@patterkit/model`: `LineBeat.qualifier` (the qualifier's `gameId`), `ProjectFile.qualifiers` with `DEFAULT_QUALIFIERS` (`V.O.`, `O.S.`, `RADIO`), `projectQualifiers`, `usedQualifiers`, `qualifierStringKey`, `Bundle.qualifiers`, the qualifier on a saved choice prompt, and qualifier slots on handoff lines and suggestions.
+  - `@patterkit/core`: `validateProject` reports a line whose qualifier isn't in the project's list (`unknown-qualifier`) and a malformed list (`invalid-qualifier`).
+  - `@patterkit/compiler`: the bundle carries the qualifiers the lines use, and folds them into its hashes; a project that uses none compiles exactly as before.
+
+### Patch Changes
+
+- Updated dependencies [a4db109]
+  - @patterkit/model@0.11.0
+  - @patterkit/core@0.5.0
+  - @patterkit/dialect@0.2.7
+
 ## 0.4.7
 
 ### Patch Changes
