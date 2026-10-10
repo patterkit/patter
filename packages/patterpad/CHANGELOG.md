@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Plastic SCM: saving after the first checkout.** In a workspace that keeps files read-only, the first save
+  checked a file out and every save after it was refused as "locked" by your own checkout. Patterpad now sees
+  the file is already checked out and saves it, and an unchanged file is properly checked out on its first save.
+
 ## [0.26.0] - 2026-10-07
 
 ### Security
