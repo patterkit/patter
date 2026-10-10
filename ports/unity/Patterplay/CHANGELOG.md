@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-10
+
 ### Added
 
 - **Line padding**: the writer's pause after a line, so a game can time a conversation the way it was written.

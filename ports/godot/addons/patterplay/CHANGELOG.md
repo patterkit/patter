@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-10
+
 ### Added
 
 - **Line padding: a line or text step carries `padAfter`, the pause after it in seconds.** Positive waits,

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-10
+
 ### Added
 
 - **Line padding**: the writer's pause after a line, in seconds. A `line` or `text` step carries `padAfter`,

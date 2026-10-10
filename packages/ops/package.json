@@ -30,7 +30,7 @@
     "@patterkit/compiler": "0.5.0",
     "@patterkit/core": "0.5.0",
     "@patterkit/model": "0.11.0",
-    "@patterkit/runtime": "0.22.0",
+    "@patterkit/runtime": "0.23.0",
     "@wildwinter/toolkit": "^0.1.0",
     "@xmldom/xmldom": "^0.8.15",
     "docx": "^9.7.1",
