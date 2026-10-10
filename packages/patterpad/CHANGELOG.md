@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-10
+
 ### Fixed
 
 - **Plastic SCM: saving after the first checkout.** In a workspace that keeps files read-only, the first save
