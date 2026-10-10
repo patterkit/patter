@@ -1,5 +1,26 @@
 # @patterkit/ops
 
+## 0.16.0
+
+### Minor Changes
+
+- 9e20199: Line padding in the playable HTML: each line is timed by a reading estimate (the same one Patterstage uses), then by the writer's pause after it, with cut-ins overlapping the line before. Speed becomes Half, Normal, Double, and Instant, and a saved Slow or Fast choice carries over. Play events carry `padAfter`. The recording script and the screenplay are unchanged.
+
+### Patch Changes
+
+- 6d88383: Uses `@patterkit/runtime` 0.23.0, the Patterplay 0.23.0 release.
+- 9630c0e: Speaker qualifiers and line padding, tidied after review.
+
+  - `@patterkit/model`: `HandoffLine.qualifierName`, the qualifier's name as the editable script's cue printed it. Optional, so older handoff records still load.
+  - `@patterkit/core`: `validateProject` warns on a qualifier on a line with no speaker (`qualifier-without-speaker`), and on a negative pause on an option's prompt when the option plays no beat (`prompt-pad-without-beat`); it reports a qualifier list that isn't a list, or holds an entry that isn't a qualifier, as `invalid-qualifier` instead of throwing.
+  - `@patterkit/ops`: reimporting an editable script reads each cue against the qualifier name it was printed with, so renaming a qualifier in settings after export no longer reads an untouched cue as a change. The project merge merges `qualifiers` per `gameId`, so two branches each adding one both land.
+
+- Updated dependencies [09f4abc]
+- Updated dependencies [9630c0e]
+  - @patterkit/model@0.12.0
+  - @patterkit/core@0.6.0
+  - @patterkit/compiler@0.6.0
+
 ## 0.15.0
 
 ### Minor Changes

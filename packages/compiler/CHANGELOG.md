@@ -1,5 +1,23 @@
 # @patterkit/compiler
 
+## 0.6.0
+
+### Minor Changes
+
+- 09f4abc: Line padding: the pause after a line, a writing decision every tool now times the same way.
+
+  - `@patterkit/model`: `padAfter` on line and text beats, in seconds (negative cuts the next line in on this one); `padAfterDefault` on snippets, groups, blocks, scenes, the project, and the bundle; `DEFAULT_PAD_AFTER` (0.6), `PAD_AFTER_MIN` and `PAD_AFTER_MAX`.
+  - `@patterkit/core`: `validateProject` reports a pause outside the range (`invalid-pad`), and warns on a negative pause on a snippet's last line, which can't cut in across the seam (`pad-overlaps-seam`).
+  - `@patterkit/compiler`: the bundle carries the defaults, and the project's when it sets one, folded into its hashes; a project that sets none compiles exactly as before.
+
+### Patch Changes
+
+- Updated dependencies [09f4abc]
+- Updated dependencies [9630c0e]
+  - @patterkit/model@0.12.0
+  - @patterkit/core@0.6.0
+  - @patterkit/dialect@0.2.8
+
 ## 0.5.0
 
 ### Minor Changes
