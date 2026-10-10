@@ -124,6 +124,8 @@ static JsonValue normalize(const StepResult& s)
             if (s.hasCharacter) o.set("character", JsonValue::Str(s.character));
             if (s.hasCharacterName) o.set("characterName", JsonValue::Str(s.characterName));
             if (s.hasDirection) o.set("direction", JsonValue::Str(s.direction));
+            if (s.hasQualifier) o.set("qualifier", JsonValue::Str(s.qualifier));               // speaker qualifier gameId
+            if (s.hasQualifierName) o.set("qualifierName", JsonValue::Str(s.qualifierName));   // and its locale-resolved name
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
             break;
@@ -156,6 +158,8 @@ static JsonValue normalize(const StepResult& s)
                     if (opt.prompt->hasCharacter) p.set("character", JsonValue::Str(opt.prompt->character));
                     if (opt.prompt->hasCharacterName) p.set("characterName", JsonValue::Str(opt.prompt->characterName));
                     if (opt.prompt->hasDirection) p.set("direction", JsonValue::Str(opt.prompt->direction));
+                    if (opt.prompt->hasQualifier) p.set("qualifier", JsonValue::Str(opt.prompt->qualifier));
+                    if (opt.prompt->hasQualifierName) p.set("qualifierName", JsonValue::Str(opt.prompt->qualifierName));
                     od.set("prompt", std::move(p));
                 }
                 od.set("eligible", JsonValue::Boolean(opt.eligible));
@@ -588,6 +592,8 @@ static JsonValue beatInfoToJson(const BeatInfo& b)
     if (!b.character.empty()) o.set("character", JsonValue::Str(b.character));
     if (!b.characterName.empty()) o.set("characterName", JsonValue::Str(b.characterName));
     if (!b.direction.empty()) o.set("direction", JsonValue::Str(b.direction));
+    if (!b.qualifier.empty()) o.set("qualifier", JsonValue::Str(b.qualifier));
+    if (!b.qualifierName.empty()) o.set("qualifierName", JsonValue::Str(b.qualifierName));
     if (!b.text.empty()) o.set("text", JsonValue::Str(b.text));
     if (!b.gameData.empty()) o.set("gameData", rawGameDataToJson(b.gameData));
     if (!b.tags.empty()) o.set("tags", strsToJson(b.tags));

@@ -104,7 +104,7 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 
 | `step.type` | Fields |
 | --- | --- |
-| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `gameData?`, `tags?` |
+| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `gameData?`, `tags?` |
 | `"text"` | `id`, `text`, `gameData?`, `tags?` |
 | `"gameEvent"` | `id`, `gameData?`, `tags?`: no text; the host-event beat |
 | `"choice"` | `groupId`, `options: ChoiceOption[]` |
@@ -112,7 +112,12 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 
 `text` is interpolated for you (against current property values), except on voiced
 lines, which are static. `characterName` is the localised display name; if a character
-has none, it's absent and you fall back to the `character` token. A **`ChoiceOption`**
+has none, it's absent and you fall back to the `character` token. **`qualifier`** is the line's
+[speaker qualifier](/setup/cast/#speaker-qualifiers), by its `gameId` (`"vo"`, `"os"`,
+`"radio"`, or one of the project's own), and **`qualifierName`** is its shown name (`V.O.`),
+localised as `characterName` is. Both are absent when the line has none. What a qualifier
+means is your game's: play a `vo` line from a non-positional voice, say, or put a filter on a
+`radio` one. A **`ChoiceOption`**
 is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present (greyed)
 unless they're secret; pass `id` to `choose()`. A choice is only offered when at least one option
 can be taken: if every remaining option is greyed out, the choice runs dry, as one with no options

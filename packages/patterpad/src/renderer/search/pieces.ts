@@ -25,6 +25,7 @@ export function modeHint(mode: SearchMode): HTMLElement[] {
     case "status": return [lead("Pick a writing status, then type to filter"), hintBar([MOVE, JUMP])];
     case "recording": return [lead("Pick a recording status, then type to filter"), hintBar([MOVE, JUMP])];
     case "tag": return [lead("Pick a tag, then type to filter"), hintBar([MOVE, JUMP])];
+    case "qualifier": return [lead("Pick a qualifier, then type to filter"), hintBar([MOVE, JUMP])];
     case "property": return [lead("Find where a property is used"), hintBar([MOVE, JUMP])];
     case "replace": return [lead("Replaces dialogue, narration and choice text across every scene. Review, then Replace all.")];
     case "suggestions": return [lead("Pick a handoff, or All. Click a line to see it; out-of-date suggestions stay open.")];

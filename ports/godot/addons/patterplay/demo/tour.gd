@@ -62,6 +62,9 @@ func _step() -> void:
 	match step["type"]:
 		"line":
 			var who: String = step.get("characterName", step.get("character", ""))
+			var qualifier: String = step.get("qualifierName", step.get("qualifier", ""))
+			if qualifier != "":
+				who += " (%s)" % qualifier
 			_append("[b]%s[/b]  %s" % [who.to_upper(), _fmt(step["text"])])
 			_play_clip(step["id"])
 			_show_next()

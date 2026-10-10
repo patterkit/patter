@@ -920,6 +920,8 @@ namespace Patterkit.Patterplay
                         Character = silent ? null : beat.Character,
                         CharacterName = silent ? null : ResolveCharacterName(beat.Character),
                         Direction = silent ? null : beat.Direction,
+                        Qualifier = silent ? null : beat.Qualifier,
+                        QualifierName = silent ? null : ResolveQualifierName(beat.Qualifier),
                         GameData = beat.GameData,
                         Tags = tags,
                     };
@@ -949,7 +951,11 @@ namespace Patterkit.Patterplay
             string text = Interpolate(ResolveString(beat.Id));
             // A line-kind prompt is dialogue, so captions apply; a text-kind prompt is left as-is.
             return beat.Kind == "line"
-                ? new ChoicePrompt { Kind = "line", Text = CaptionLine(text), Character = beat.Character, CharacterName = ResolveCharacterName(beat.Character), Direction = beat.Direction }
+                ? new ChoicePrompt
+                {
+                    Kind = "line", Text = CaptionLine(text), Character = beat.Character, CharacterName = ResolveCharacterName(beat.Character), Direction = beat.Direction,
+                    Qualifier = beat.Qualifier, QualifierName = ResolveQualifierName(beat.Qualifier),
+                }
                 : new ChoicePrompt { Kind = "text", Text = text };
         }
 
@@ -967,6 +973,7 @@ namespace Patterkit.Patterplay
             {
                 Type = StepType.Line, Id = beat.Id, Text = shown.Text,
                 Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
+                Qualifier = shown.Qualifier, QualifierName = shown.QualifierName,
                 GameData = beat.GameData, Tags = tags,
             };
         }
@@ -1005,6 +1012,19 @@ namespace Patterkit.Patterplay
             if (_host.Strings.TryGetValue(key, out var a)) return a;
             if (_host.DefaultStrings.TryGetValue(key, out var d)) return d;
             return _host.CastDisplay.TryGetValue(character, out var disp) ? disp : null;
+        }
+
+        /// <summary>A speaker qualifier's shown name, resolved as a character's is: the `qualifier:&lt;gameId&gt;`
+        /// string in the active locale, else the default locale, else the authored name. Null in IDs-only mode
+        /// (the game maps the `qualifier` gameId itself).</summary>
+        private string ResolveQualifierName(string qualifier)
+        {
+            if (qualifier == null) return null;
+            if (_host.EmitIds) return null;
+            string key = "qualifier:" + qualifier;
+            if (_host.Strings.TryGetValue(key, out var a)) return a;
+            if (_host.DefaultStrings.TryGetValue(key, out var d)) return d;
+            return _host.QualifierDisplay.TryGetValue(qualifier, out var disp) ? disp : null;
         }
 
         // -- scene seeding ------------------------------------------------------
@@ -1235,6 +1255,7 @@ namespace Patterkit.Patterplay
         private static ChoicePrompt ClonePrompt(ChoicePrompt p) => p == null ? null : new ChoicePrompt
         {
             Kind = p.Kind, Text = p.Text, Character = p.Character, CharacterName = p.CharacterName, Direction = p.Direction,
+            Qualifier = p.Qualifier, QualifierName = p.QualifierName,
         };
 
         private static ChoiceOption CloneOption(ChoiceOption o)

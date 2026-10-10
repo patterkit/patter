@@ -16,7 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun } from "docx";
-import { TOKENS, characterColour, textRuns, type ScriptDoc, type ScriptElement, type TextRun as Run } from "./script-doc.js";
+import { TOKENS, characterColour, cueLabel, textRuns, type ScriptDoc, type ScriptElement, type TextRun as Run } from "./script-doc.js";
 
 export const SERIF = "Georgia";     // reading: dialogue, narration, headings
 export const SANS = "Arial";        // chrome: character cues, group labels, option tags
@@ -65,7 +65,7 @@ export function paragraph(el: ScriptElement, prev: ScriptElement | undefined): P
       // The spoken line insets by DIALOGUE_INDENT; the cue then out-dents by HANG (hanging indent) so the
       // coloured speaker name sticks out left of the wrapped dialogue. Colour + case carry it (no colon).
       const kids: TextRun[] = [];
-      if (el.character) kids.push(new TextRun({ text: el.character.toUpperCase(), font: SANS, bold: true, allCaps: true, color: characterColour(el.character), size: S.cue }), new TextRun({ text: "  ", font: SANS, size: S.cue }));
+      if (el.character) kids.push(new TextRun({ text: cueLabel(el.character, el.qualifierName), font: SANS, bold: true, allCaps: true, color: characterColour(el.character), size: S.cue }), new TextRun({ text: "  ", font: SANS, size: S.cue }));
       if (el.direction) kids.push(new TextRun({ text: `(${el.direction})  `, font: SERIF, italics: true, color: TOKENS.muted, size: S.body }));
       kids.push(...bodyRuns(el.runs, TOKENS.inkRead));
       return new Paragraph({ keepLines: true, spacing: { before, after: 20 }, indent: { left: leftOf(el) + DIALOGUE_INDENT + HANG, hanging: HANG }, children: kids });

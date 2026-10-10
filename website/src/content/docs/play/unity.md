@@ -78,7 +78,9 @@ public sealed class StoryRunner : MonoBehaviour
 
 Drop that on a GameObject, assign the imported bundle to the **Bundle** field, and press Play.
 Render each `step` into your own dialogue UI; on a `Choice`, show `step.Options` (each has a
-`Prompt` and an `Eligible` flag) and call `flow.Choose(id)` with the player's pick.
+`Prompt` and an `Eligible` flag) and call `flow.Choose(id)` with the player's pick. A line's
+`Qualifier` is its [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId` (`vo`, `os`,
+`radio`), and `QualifierName` its localised shown name; a line prompt carries both too.
 
 Two ready-made samples ship with the package. Import them from **Package Manager ▸ Patterplay ▸
 Samples**. Each carries a **ready-made scene**, so there is nothing to set up: import, open the

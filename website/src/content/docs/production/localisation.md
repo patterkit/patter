@@ -79,8 +79,8 @@ as the standard `#, fuzzy` flag.)
 All three carry the same IDs and the same staleness signal; pick by who's receiving the file:
 
 - **Excel (.xlsx)** is for human translators working by hand, with one sheet per scene and columns
-  ID / Source / Translation / Comments / Status / Gender, which makes it the friendliest to
-  non-technical folk.
+  ID / Source / Translation / Comments / Status / Gender / Qualifier, which makes it the friendliest
+  to non-technical folk.
 - **PO / POT** is for agencies and gettext-based tooling (Poedit, Weblate, Crowdin, …), where
   exporting with no language gives a blank POT template and staleness is `#, fuzzy`.
 - **JSON** is for pipelines and engines, plain ID → string tables, easy to transform or feed into
@@ -88,6 +88,12 @@ All three carry the same IDs and the same staleness signal; pick by who's receiv
 
 Translator-facing **comments** come from your documentation notes routed to the `loc`
 channel, as [Reviewing & feedback](/patterpad/reviewing/) describes.
+
+A line's [speaker qualifier](/setup/cast/#speaker-qualifiers) travels as context, never as text
+to translate: the Excel **Qualifier** column, the PO comment (`#. [line TAM (O.S.)]`), and
+`context.qualifier` in JSON, so a translator knows a line is a thought or heard over a radio. The
+qualifier **names** themselves (`V.O.`, `RADIO`) are translated with the cast's display names, as
+`qualifier:vo`-style strings beside the `cast:` ones.
 
 ### Who is speaking: grammatical gender
 

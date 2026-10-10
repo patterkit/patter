@@ -81,9 +81,10 @@ describe("Excel round-trip", () => {
     const ws = wb.getWorksheet("s1")!;
 
     // Appended AFTER Status, so the reader's positional columns 1-5 (and any sheet an older Patterpad
-    // exported) keep working. The hidden Scene column after it carries the scene id for import.
+    // exported) keep working. The hidden Scene column after it carries the scene id for import, and the
+    // Qualifier column (a line's speaker qualifier, translator context) comes after that.
     const header = (ws.getRow(1).values as unknown[]).slice(1).map((v) => String(v ?? ""));
-    expect(header).toEqual(["ID", "Source", "Translation", "Comments", "Status", "Gender", "Scene"]);
+    expect(header).toEqual(["ID", "Source", "Translation", "Comments", "Status", "Gender", "Scene", "Qualifier"]);
     expect(ws.getColumn(7).hidden).toBe(true);
 
     const rowFor = (id: string) => { let r; ws.eachRow((row, n) => { if (n > 1 && String(row.getCell(1).value) === id) r = row; }); return r!; };

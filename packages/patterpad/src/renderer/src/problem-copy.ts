@@ -25,6 +25,14 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
   "missing-prompt": () => ({ text: "This option needs a label.", next: "What does the player choose here?" }),
   "invalid-prompt": () => ({ text: "An option's label should be a single line." }),
   "unknown-character": (p) => ({ text: `${p.title ? problemName(p) : "This line's speaker"} isn't in your cast yet.` }),
+  "unknown-qualifier": (p) => ({
+    text: `${p.title ? `The qualifier ${problemName(p)}` : "This line's qualifier"} isn't one of the project's qualifiers.`,
+    next: "Pick another, or add it in Project Settings.",
+  }),
+  "invalid-qualifier": () => ({
+    text: "A speaker qualifier in Project Settings isn't set up properly.",
+    next: "Each one needs a name and its own Game ID.",
+  }),
   "empty-snippet": () => ({ text: "This snippet is empty.", next: "Add a line, or send it somewhere." }),
   "empty-container": () => ({ text: "This is empty.", next: "Add something inside it." }),
   "empty-scene": (p) => ({ text: `${p.title ? problemName(p) : "This scene"} has nothing in it yet.` }),
@@ -81,12 +89,15 @@ export function softenProblemMessage(message: string): string {
 
 /** A Patterpad problem as the shell translator reads it. `path` is the offending file as the project
  *  sees it (relative to its folder). The title is what the renderer can resolve from the message: the
- *  speaker of an unknown-character problem; the file, for a hygiene note, so the fallback names it. */
+ *  speaker of an unknown-character problem, the gameId of an unknown-qualifier one; the file, for a
+ *  hygiene note, so the fallback names it. */
 export function toProblemLike(p: Problem, path?: string): ProblemLike {
   const code = problemCode(p);
   const softened = code !== undefined || p.category === "structure" || p.category === "condition" || p.category === "interpolation";
   const speaker = code === "unknown-character" ? /'([^']+)' is not in the project cast/.exec(p.message)?.[1] : undefined;
-  const title = speaker ?? (p.category === "hygiene" ? path : undefined);
+  // An unknown qualifier is named by the gameId the line carries (the only name it still has).
+  const qualifier = code === "unknown-qualifier" ? /qualifier '([^']+)' is not in the project's qualifiers/.exec(p.message)?.[1] : undefined;
+  const title = speaker ?? qualifier ?? (p.category === "hygiene" ? path : undefined);
   return {
     ...(code !== undefined ? { code } : {}),
     message: softened ? softenProblemMessage(p.message) : p.message,

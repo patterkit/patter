@@ -49,7 +49,10 @@ writing status by beat and by scene, branching, recording coverage (when
 Choose **Export Production Info…** to write that same report as an `.xlsx` spreadsheet.
 
 Use **Export Voice Script…** for a recording script for voice actors, either every voiced line or
-only those marked ready to record. Once takes come back, drop them into folders by status and
+only those marked ready to record. A **Qualifier** column gives each line's
+[speaker qualifier](/setup/cast/#speaker-qualifiers), so the actor knows a line is a thought or
+off-screen, and the studio knows a `RADIO` line is recorded clean and filtered later; the lines
+still sit under the one character. Once takes come back, drop them into folders by status and
 Patterpad reads each line's recording status from the files, as
 [Audio & recording](/production/audio/#recording-status) describes.
 

@@ -19,6 +19,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⌘,` | Project Settings |
 | `⌘Z` / `⇧⌘Z` | Undo / Redo |
 | `⌘D` | Duplicate the selected snippet, group, option, or block (contents and all) |
+| `⇧⌘E` | Cycle the current line's [speaker qualifier](/patterpad/writing-surface/#speaker-qualifiers-vo-os-radio) (V.O., O.S., …, none) |
 | `⌘P` | Play |
 | `⌘F` | Search (go to anything) |
 | `⌘⌥F` / `Ctrl-H` | Replace text across the project |

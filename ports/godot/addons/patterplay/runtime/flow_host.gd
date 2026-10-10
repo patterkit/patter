@@ -43,6 +43,8 @@ var strings: Dictionary = {}
 var default_strings: Dictionary = {}
 ## Cast canonical name -> authoring displayName (the unlocalised fallback when no loc string exists).
 var cast_display: Dictionary = {}
+## Speaker qualifier gameId -> authored name (the unlocalised fallback when no loc string exists).
+var qualifier_display: Dictionary = {}
 var node_index: Dictionary = {}
 ## Block id -> the id of the scene it is in. JS maps to `{ sceneId }`; here the value is the id.
 var block_index: Dictionary = {}

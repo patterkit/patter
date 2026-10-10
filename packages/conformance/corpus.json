@@ -6281,6 +6281,591 @@
       ]
     },
     {
+      "name": "a line carries its speaker qualifier's gameId and shown name; a line prompt does too",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1l708j8",
+          "structureHash": "1q8t1qa"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          },
+          {
+            "name": "BASE"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          },
+          {
+            "gameId": "radio",
+            "name": "RADIO"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_door",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os",
+                        "direction": "muffled"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "TAM"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_radio",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_call",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "call_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "L_reply",
+                                "kind": "line",
+                                "character": "BASE",
+                                "qualifier": "radio"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_call",
+                          "kind": "line",
+                          "character": "TAM",
+                          "qualifier": "radio"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Too quiet.",
+            "L_door": "Who's there?",
+            "L_plain": "Hello.",
+            "P_call": "Base, come in.",
+            "L_reply": "Reading you."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_call"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_think",
+          "text": "Too quiet.",
+          "character": "TAM",
+          "characterName": "Tam",
+          "qualifier": "vo",
+          "qualifierName": "V.O."
+        },
+        {
+          "type": "line",
+          "id": "L_door",
+          "text": "Who's there?",
+          "character": "TAM",
+          "characterName": "Tam",
+          "direction": "muffled",
+          "qualifier": "os",
+          "qualifierName": "O.S."
+        },
+        {
+          "type": "line",
+          "id": "L_plain",
+          "text": "Hello.",
+          "character": "TAM",
+          "characterName": "Tam"
+        },
+        {
+          "type": "choice",
+          "groupId": "g_radio",
+          "options": [
+            {
+              "id": "o_call",
+              "prompt": {
+                "kind": "line",
+                "text": "Base, come in.",
+                "character": "TAM",
+                "characterName": "Tam",
+                "qualifier": "radio",
+                "qualifierName": "RADIO"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "L_reply",
+          "text": "Reading you.",
+          "character": "BASE",
+          "qualifier": "radio",
+          "qualifierName": "RADIO"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "a qualifier's shown name follows the active locale, then the default locale, then its authored name",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "03e4mao",
+          "structureHash": "1ans7n6"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "TAM"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "VO"
+          },
+          {
+            "gameId": "phone",
+            "name": "PHONE"
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_vo",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_phone",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "phone"
+                      },
+                      {
+                        "id": "L_os",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_vo": "Hm.",
+            "L_phone": "Hello?",
+            "L_os": "Coming!",
+            "qualifier:phone": "TELEPHONE"
+          },
+          "fr": {
+            "L_vo": "Hm.",
+            "L_phone": "Allo ?",
+            "L_os": "J'arrive !",
+            "qualifier:vo": "VOIX OFF"
+          }
+        }
+      },
+      "locale": "fr",
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_vo",
+          "text": "Hm.",
+          "character": "TAM",
+          "qualifier": "vo",
+          "qualifierName": "VOIX OFF"
+        },
+        {
+          "type": "line",
+          "id": "L_phone",
+          "text": "Allo ?",
+          "character": "TAM",
+          "qualifier": "phone",
+          "qualifierName": "TELEPHONE"
+        },
+        {
+          "type": "line",
+          "id": "L_os",
+          "text": "J'arrive !",
+          "character": "TAM",
+          "qualifier": "os",
+          "qualifierName": "O.S."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "IDs-only build emits the qualifier gameId and omits its shown name",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1l708j8",
+          "structureHash": "1q8t1qa"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          },
+          {
+            "gameId": "radio",
+            "name": "RADIO"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_door",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os",
+                        "direction": "muffled"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "TAM"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_radio",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_call",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "call_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "L_reply",
+                                "kind": "line",
+                                "character": "BASE",
+                                "qualifier": "radio"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_call",
+                          "kind": "line",
+                          "character": "TAM",
+                          "qualifier": "radio"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {},
+        "localisation": {
+          "mode": "ids"
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "choices": [
+        "o_call"
+      ],
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_think",
+          "text": "L_think",
+          "character": "TAM",
+          "qualifier": "vo"
+        },
+        {
+          "type": "line",
+          "id": "L_door",
+          "text": "L_door",
+          "character": "TAM",
+          "direction": "muffled",
+          "qualifier": "os"
+        },
+        {
+          "type": "line",
+          "id": "L_plain",
+          "text": "L_plain",
+          "character": "TAM"
+        },
+        {
+          "type": "choice",
+          "groupId": "g_radio",
+          "options": [
+            {
+              "id": "o_call",
+              "prompt": {
+                "kind": "line",
+                "text": "P_call",
+                "character": "TAM",
+                "qualifier": "radio"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "line",
+          "id": "L_reply",
+          "text": "L_reply",
+          "character": "BASE",
+          "qualifier": "radio"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "a line silenced by closed captions drops its qualifier with its speaker",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0boo5zx",
+          "structureHash": "08vgg4b"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "SFX"
+          },
+          {
+            "name": "TAM"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_sfx",
+                        "kind": "line",
+                        "character": "SFX",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_sfx": "(a door slams)",
+            "L_tam": "Sorry!"
+          }
+        }
+      },
+      "engineOptions": {
+        "closedCaptions": false
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_sfx",
+          "text": ""
+        },
+        {
+          "type": "line",
+          "id": "L_tam",
+          "text": "Sorry!",
+          "character": "TAM",
+          "qualifier": "os",
+          "qualifierName": "O.S."
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
       "name": "specificity prefers the more specific line (AND sums)",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -16637,6 +17222,272 @@
           ]
         }
       ]
+    },
+    {
+      "name": "a qualified line prompt keeps its qualifier through a save, pending and spoken back",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1l708j8",
+          "structureHash": "1q8t1qa"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          },
+          {
+            "name": "BASE"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          },
+          {
+            "gameId": "radio",
+            "name": "RADIO"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_door",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os",
+                        "direction": "muffled"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "TAM"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_radio",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_call",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "call_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "L_reply",
+                                "kind": "line",
+                                "character": "BASE",
+                                "qualifier": "radio"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_call",
+                          "kind": "line",
+                          "character": "TAM",
+                          "qualifier": "radio"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Too quiet.",
+            "L_door": "Who's there?",
+            "L_plain": "Hello.",
+            "P_call": "Base, come in.",
+            "L_reply": "Reading you."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Too quiet.",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "vo",
+              "qualifierName": "V.O."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_door",
+              "text": "Who's there?",
+              "character": "TAM",
+              "characterName": "Tam",
+              "direction": "muffled",
+              "qualifier": "os",
+              "qualifierName": "O.S."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_plain",
+              "text": "Hello.",
+              "character": "TAM",
+              "characterName": "Tam"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_radio",
+              "options": [
+                {
+                  "id": "o_call",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Base, come in.",
+                    "character": "TAM",
+                    "characterName": "Tam",
+                    "qualifier": "radio",
+                    "qualifierName": "RADIO"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_radio",
+              "options": [
+                {
+                  "id": "o_call",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Base, come in.",
+                    "character": "TAM",
+                    "characterName": "Tam",
+                    "qualifier": "radio",
+                    "qualifierName": "RADIO"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_call"
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_call",
+              "text": "Base, come in.",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "radio",
+              "qualifierName": "RADIO"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_reply",
+              "text": "Reading you.",
+              "character": "BASE",
+              "qualifier": "radio",
+              "qualifierName": "RADIO"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [
@@ -18189,6 +19040,315 @@
           ]
         }
       ]
+    },
+    {
+      "name": "a save written by the JS reference keeps a qualified prompt's qualifier, pending and spoken back",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1l708j8",
+          "structureHash": "1q8t1qa"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          },
+          {
+            "name": "BASE"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          },
+          {
+            "gameId": "radio",
+            "name": "RADIO"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_door",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os",
+                        "direction": "muffled"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "TAM"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_radio",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_call",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "call_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "L_reply",
+                                "kind": "line",
+                                "character": "BASE",
+                                "qualifier": "radio"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_call",
+                          "kind": "line",
+                          "character": "TAM",
+                          "qualifier": "radio"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Too quiet.",
+            "L_door": "Who's there?",
+            "L_plain": "Hello.",
+            "P_call": "Base, come in.",
+            "L_reply": "Reading you."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {},
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "sn": 1,
+            "g_radio": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "sn": 1,
+                "g_radio": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 2
+                  }
+                ],
+                "activeSnippetId": null,
+                "beatIndex": 0,
+                "pendingChoice": {
+                  "groupId": "g_radio",
+                  "options": [
+                    {
+                      "id": "o_call",
+                      "prompt": {
+                        "kind": "line",
+                        "text": "Base, come in.",
+                        "character": "TAM",
+                        "characterName": "Tam",
+                        "qualifier": "radio",
+                        "qualifierName": "RADIO"
+                      },
+                      "eligible": true
+                    }
+                  ]
+                },
+                "pendingPromptOwnerId": null,
+                "selectors": {}
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingChoice/groupId",
+        "save/flows/main/cursor/pendingChoice/options",
+        "save/flows/main/cursor/pendingChoice/options[0]",
+        "save/flows/main/cursor/pendingChoice/options[0]/eligible",
+        "save/flows/main/cursor/pendingChoice/options[0]/id",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/character",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/characterName",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifier",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifierName",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/g_radio",
+        "save/flows/main/visits/s",
+        "save/flows/main/visits/sn",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/g_radio",
+        "save/sharedVisits/s",
+        "save/sharedVisits/sn",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_radio",
+              "options": [
+                {
+                  "id": "o_call",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Base, come in.",
+                    "character": "TAM",
+                    "characterName": "Tam",
+                    "qualifier": "radio",
+                    "qualifierName": "RADIO"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_call"
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_call",
+              "text": "Base, come in.",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "radio",
+              "qualifierName": "RADIO"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_reply",
+              "text": "Reading you.",
+              "character": "BASE",
+              "qualifier": "radio",
+              "qualifierName": "RADIO"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
     }
   ],
   "logs": [
@@ -18899,8 +20059,8 @@
         "schema": "patter/bundle@0",
         "content": {
           "project": "conf",
-          "hash": "0o9e3ds",
-          "structureHash": "0f6jgtd"
+          "hash": "1na0ait",
+          "structureHash": "1gkfb52"
         },
         "voiced": false,
         "locales": {
@@ -18915,6 +20075,12 @@
           },
           {
             "name": "BRAM"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "os",
+            "name": "O.S."
           }
         ],
         "gameDataFields": {
@@ -18957,6 +20123,7 @@
                         "kind": "line",
                         "character": "ANNA",
                         "direction": "warmly",
+                        "qualifier": "os",
                         "gameData": {
                           "mood": "glad"
                         },
@@ -19151,6 +20318,8 @@
                       "kind": "line",
                       "character": "ANNA",
                       "direction": "warmly",
+                      "qualifier": "os",
+                      "qualifierName": "O.S.",
                       "text": "Hello.",
                       "gameData": {
                         "mood": "glad"
@@ -19362,6 +20531,8 @@
             "kind": "line",
             "character": "ANNA",
             "direction": "warmly",
+            "qualifier": "os",
+            "qualifierName": "O.S.",
             "text": "Hello.",
             "gameData": {
               "mood": "glad"

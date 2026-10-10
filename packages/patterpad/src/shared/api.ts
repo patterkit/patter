@@ -2,7 +2,7 @@
 // onto the Node main process (files, VCS, the @patterkit/ops core). Kept tiny on purpose - every
 // entry is an explicit, auditable operation, never raw fs / shell access.
 
-import type { GameDataFields, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver } from "@patterkit/model";
+import type { GameDataFields, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
 
@@ -87,6 +87,9 @@ export interface OpenedProject {
   trackAudioStatus: boolean;
   /** Master cast names (ProjectFile.cast). */
   cast: string[];
+  /** The speaker qualifiers a line can pick from, in display order (ProjectFile.qualifiers, else the
+   *  defaults): the inspector's Qualifier dropdown, the cue's `(O.S.)`, and the keyboard route's cycle. */
+  qualifiers: SpeakerQualifier[];
   /** Author-defined gameData field definitions per node type (the inspector renders editable rows). */
   gameDataFields: GameDataFields;
   /** Every scene in the project, in file order. */
@@ -160,6 +163,12 @@ export interface ProjectSettingsDto {
   coverageDrivers?: CoverageDriver[];
   /** The master cast (the Cast settings tab). */
   cast: CastMember[];
+  /** The speaker qualifiers (the Qualifiers settings tab), in display order. Always populated (the defaults
+   *  when the project has none); saveSettings drops the list when it still matches the defaults. */
+  qualifiers: SpeakerQualifier[];
+  /** Qualifier gameIds the author changed in the Qualifiers tab, old -> new. Saving rewrites every line
+   *  that uses an old one (through the VC layer), as a cast rename would. Write-only: never read back. */
+  qualifierRenames?: Record<string, string>;
   /** The ordered writing-status ladder, not-done -> done (the Status settings tab). */
   writingStatuses: WritingStatusDecl[];
   /** Estimating config (the Estimating settings tab): replace a still-guesswork scene's line count with an
@@ -398,6 +407,9 @@ export interface OpenSuggestionDto {
   baselineCharacter?: string;
   proposedDirection?: string;
   baselineDirection?: string;
+  /** A proposed speaker qualifier, and the one when suggested: shown NAMES ("" for none). */
+  proposedQualifier?: string;
+  baselineQualifier?: string;
   proposedCut?: boolean;
   handoff?: string;
   /** Parts changed since it was made; empty means it still applies cleanly. */
@@ -531,6 +543,9 @@ export interface PlayStep {
   /** The speaker's resolved player-facing name (locale-aware), when the character has one. */
   characterName?: string;
   direction?: string;
+  /** The speaker qualifier's gameId (`os`) and its resolved shown name (`O.S.`), shown after the name. */
+  qualifier?: string;
+  qualifierName?: string;
 }
 
 export interface PlayChoiceOption {
@@ -609,7 +624,7 @@ export interface PatterPlayApi {
 
 /** The faces of the search tool window (#205): find by text / id, replace, browse by writing / recording
  *  status, find property usage, or browse by author tag (#215). */
-export type SearchMode = "content" | "replace" | "status" | "recording" | "property" | "tag" | "suggestions";
+export type SearchMode = "content" | "replace" | "status" | "recording" | "property" | "tag" | "qualifier" | "suggestions";
 
 /** Audio Folders index entry (#206): a dialogue beat's folder-derived recording status + the absolute path
  *  to the audio file that resolved it, plus (for scratch takes, #224) the text-hash stamped in the WAV so
@@ -645,6 +660,10 @@ export interface PatterSearchApi {
   /** The distinct author tags in the project with node counts, for the Tag tab's chips (the tag counterpart
    *  to the status ladder). */
   tags(): Promise<Array<{ name: string; count: number }>>;
+  /** Qualifier browse: every dialogue line (and line prompt) carrying the speaker qualifier `gameId`. */
+  linesByQualifier(gameId: string): Promise<SearchEntry[]>;
+  /** The project's speaker qualifiers with how many lines use each, for the Qualifier tab's chips. */
+  qualifiers(): Promise<Array<{ gameId: string; name: string; count: number }>>;
   /** Replace PREVIEW (no writes): the source-prose hits a project-wide replacement would make + scene count. */
   replacePreview(opts: ReplaceQuery): Promise<{ hits: ReplaceHitDto[]; scenes: number }>;
   /** Replace APPLY: flush the open scene, commit the rewrite through VC, reload the editor. Returns the count. */
@@ -745,7 +764,10 @@ export type QuickFix =
   | { kind: "add-prompt"; optionId: string }
   /** A condition compares an enum property to an invalid value: pick a valid one + rewrite the
    *  condition. `bad` is the offending literal, `options` the valid values, `src` the condition. */
-  | { kind: "pick-enum-value"; bad: string; options: string[]; src: string };
+  | { kind: "pick-enum-value"; bad: string; options: string[]; src: string }
+  /** A line's speaker qualifier is not in the project's list (one removed): pick one that is, or none,
+   *  for the line `lineId`. `bad` is the gameId it carries. */
+  | { kind: "pick-qualifier"; lineId: string; bad: string };
 
 export interface Problem {
   category: ProblemCategory;

@@ -39,6 +39,14 @@ struct FPatterBeatInfo
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Direction;
 
+	/** Speaker qualifier gameId (line only), e.g. `vo`. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Qualifier;
+
+	/** The qualifier's shown name (source locale), e.g. `V.O.`. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString QualifierName;
+
 	/** Source text, un-interpolated (line / text). Empty for gameEvent and IDs-only bundles. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString Text;

@@ -371,6 +371,18 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   letter-spacing: 0.06em; text-transform: uppercase;
 }
 .zone.cue .cue-colon { color: var(--muted); user-select: none; }
+/* A speaker qualifier, TAM (O.S.): set in the cue's own face, as a script prints it, but in the muted ink
+   and outside the name token (views.ts), so it reads as how the line is delivered, not who says it. One
+   the project no longer lists keeps the problem squiggle. */
+.zone.cue .cue-qual {
+  font: 600 0.72rem/1 var(--font-ui);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); margin-left: 0.35em; user-select: none;
+}
+.zone.cue .cue-qual[hidden] { display: none; }
+.zone.cue .cue-qual.unknown {
+  text-decoration-line: underline; text-decoration-style: wavy; text-decoration-color: var(--danger);
+}
 /* The gap after the cue/direction lives as a margin-LEFT on the following zone,
    so it is present whether that zone is empty or filled - the caret then sits
    where the text will, instead of flush against the ":" / ")" then jumping. */

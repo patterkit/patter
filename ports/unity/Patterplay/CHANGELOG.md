@@ -6,6 +6,16 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker qualifiers**: a line can say how it is delivered, a screenplay's `TAM (O.S.)`, without becoming a
+  second character. A line step gains `Qualifier` (the qualifier's `gameId`, such as `vo`) and `QualifierName`
+  (its shown name, such as `V.O.`, resolved as `CharacterName` is: the active locale, then the default locale,
+  then the authored name, and absent in an IDs-only build). A line-kind choice prompt carries them too, a save
+  keeps them on a pending prompt, and `GetOutline` and `GetBeatSequence` report them on a line's `BeatInfo`.
+  Both are absent on a line with no qualifier, and on a line closed captions silence. Older bundles and saves
+  load unchanged. The samples show the qualifier after the speaker's name.
+
 ## [0.21.0] - 2026-10-07
 
 ### Changed

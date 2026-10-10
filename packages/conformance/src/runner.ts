@@ -275,6 +275,8 @@ export function normaliseStep(r: StepResult): TranscriptStep {
       if (r.character !== undefined) s.character = r.character;
       if (r.characterName !== undefined) s.characterName = r.characterName; // locale-resolved display name
       if (r.direction !== undefined) s.direction = r.direction;
+      if (r.qualifier !== undefined) s.qualifier = r.qualifier;             // speaker qualifier gameId
+      if (r.qualifierName !== undefined) s.qualifierName = r.qualifierName; // and its locale-resolved name
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
       return s;
@@ -300,6 +302,8 @@ export function normaliseStep(r: StepResult): TranscriptStep {
           if (o.prompt.character !== undefined) p.character = o.prompt.character;
           if (o.prompt.characterName !== undefined) p.characterName = o.prompt.characterName;
           if (o.prompt.direction !== undefined) p.direction = o.prompt.direction;
+          if (o.prompt.qualifier !== undefined) p.qualifier = o.prompt.qualifier;
+          if (o.prompt.qualifierName !== undefined) p.qualifierName = o.prompt.qualifierName;
           opt.prompt = p;
         }
         if (o.gameData !== undefined) opt.gameData = o.gameData;

@@ -150,6 +150,10 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         // Duplicate the selected block / group / snippet (or the one holding the caret) with everything
         // inside it - the copy takes fresh ids throughout, so it never aliases the original.
         { ...EDIT_MENU.duplicate, enabled: hasProject, click: () => send("duplicate") },
+        // The speaker qualifier's keyboard route: the caret's dialogue line steps through the project's
+        // qualifiers, then none (TAM, TAM (V.O.), TAM (O.S.), ...). E for a screenplay's character Extension;
+        // nothing else in the family takes Shift+Cmd/Ctrl+E.
+        { label: "Cycle Speaker Qualifier", accelerator: "Shift+CmdOrCtrl+E", enabled: hasProject, click: () => send("cycle-qualifier") },
         // Storyletter's Edit Scene in Patterpad, the other way: the storylet card this scene plays. Only
         // while a Storyletter project nearby names this one as its Patter project.
         ...(storyletter ? [{ label: "Show Card in Storyletter", click: () => send("show-in-storyletter") }] : []),
@@ -201,6 +205,8 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
         { ...REVIEW_MENU.findPropertyUsage, enabled: hasProject, click: () => send("find-property") },
         // Browse every node carrying an author tag (#215) - the search palette in tag mode.
         { label: "Find by Tag…", enabled: hasProject, click: () => send("find-by-tag") },
+        // Browse every dialogue line carrying a speaker qualifier (V.O., O.S., ...) - the search palette in qualifier mode.
+        { label: "Find Lines by Qualifier…", enabled: hasProject, click: () => send("find-by-qualifier") },
         {
           // Which writing-status rungs show their per-beat gutter pill. Per-rung check/uncheck, plus
           // Show All / Show None; remembered in panes.lineStatusShown (default none). Empty when no

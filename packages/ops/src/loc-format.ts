@@ -85,7 +85,10 @@ export function catalogToPo(catalog: LocCatalog): string {
   for (const e of catalog.entries) {
     for (const c of e.comments) out.push(`#. ${c}`);
     if (e.context?.character || e.context?.kind) {
-      out.push(`#. [${[e.context.kind, e.context.character].filter(Boolean).join(" ")}]`);
+      // The speaker as the script's cue shows them, qualifier included (`[line TAM (O.S.)]`): how the line is
+      // delivered is context for the translator, never text to translate.
+      const speaker = e.context.character && e.context.qualifier ? `${e.context.character} (${e.context.qualifier})` : e.context.character;
+      out.push(`#. [${[e.context.kind, speaker].filter(Boolean).join(" ")}]`);
     }
     // The speaker's grammatical gender, on its own extracted-comment line so a translator (or a CAT tool
     // reading `#.`) can spot it without parsing the bracketed context.

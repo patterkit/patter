@@ -2,7 +2,7 @@
 // window.patter bridge with canned data, so the shell layout / CSS / states can be eyeballed. NOT
 // part of the Electron build (electron-vite's renderer entry is the real index.html). Drive states
 // with ?view=welcome / ?view=firstrun in the URL; default is the project workspace.
-import flowSource from "../../../../patterpad-surface/test/fixtures/tavern.patterflow?raw";
+import tavernFlow from "../../../../patterpad-surface/test/fixtures/tavern.patterflow?raw";
 import locSource from "../../../../patterpad-surface/test/fixtures/tavern.patterloc?raw";
 // The REAL vendored dictionaries (#177) so the preview's live spell-check engine actually works.
 import enGbAff from "../../../resources/dictionaries/en-GB/index.aff?raw";
@@ -14,6 +14,17 @@ const DICT_BYTES: Record<string, { aff: string; dic: string }> = {
   "en-US": { aff: enUsAff, dic: enUsDic },
 };
 
+// The fixture with one speaker qualifier on a line, so the preview shows the cue's BARKEEP (O.S.), the
+// inspector's Qualifier dropdown, and the run rule (a new BARKEEP line after it takes O.S. too).
+const flowSource = tavernFlow.replace('direction: "wiping a glass" }', 'direction: "wiping a glass", qualifier: "os" }');
+
+// The project's speaker qualifiers (the defaults, as a project that never edited them reads).
+const QUALIFIERS = [
+  { gameId: "vo", name: "V.O.", description: "Voice-over: the character isn't in the scene (a thought, narration, a voice in the ear)." },
+  { gameId: "os", name: "O.S.", description: "Off-screen: the character is there, but not seen (the next room, behind a door)." },
+  { gameId: "radio", name: "RADIO", description: "Heard through a radio, a phone, or a loudspeaker." },
+];
+
 const project = {
   name: "The Tavern",
   root: "/Users/ian/Projects/the-tavern.patter",
@@ -21,6 +32,7 @@ const project = {
   voiced: true, // a voiced demo - audio status / folders / scratch only surface when this is on (#206)
   trackAudioStatus: true, // audio-status tracking on (voiced + not opted out) -> the inspector Audio row shows
   cast: ["BARKEEP", "ANNA", "BO"],
+  qualifiers: QUALIFIERS,
   gameDataFields: {
     scene: [{ name: "music", type: "text", default: "tavern-loop", purpose: "Background music cue id for this scene." }],
     line: [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"], purpose: "Facial-animation mood for this line." }],
@@ -269,6 +281,7 @@ const stub = {
       { name: "BARKEEP", displayName: "The Barkeep", notes: "Gruff, warm underneath." },
       { name: "ANNA" },
     ],
+    qualifiers: QUALIFIERS,
     writingStatuses: [
       { name: "stub", colour: 0 }, { name: "draft 1", colour: 1 }, { name: "draft 2", colour: 2 },
       { name: "edited", readyToRecord: true, colour: 4 }, { name: "final", readyToShip: true, colour: 9 },

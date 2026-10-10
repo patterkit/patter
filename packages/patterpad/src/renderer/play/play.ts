@@ -210,6 +210,10 @@ function appendStep(step: PlayStep): HTMLElement {
     // cast scans by colour here too. Key off the canonical token, never the localised name, so the slot is
     // stable across locales. Empty/narrator keeps the CSS --accent default.
     if (step.character) cue.style.color = colourFor(step.character);
+    // The speaker qualifier after the name, as the script shows it: TAM (O.S.). The localised name the
+    // runtime resolved, else the gameId (an IDs-only build carries no names).
+    const qualifier = step.qualifierName ?? step.qualifier;
+    if (qualifier) { const q = document.createElement("span"); q.className = "pqual"; q.textContent = `(${qualifier})`; cue.append(q); }
     const body = document.createElement("span");
     if (step.direction) { const d = document.createElement("em"); d.className = "pdir"; d.textContent = `(${step.direction}) `; body.appendChild(d); }
     renderMarkup(body, step.text ?? "");

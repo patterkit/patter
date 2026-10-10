@@ -49,8 +49,10 @@ The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint**, with `
 dialogue widget without touching C++. It is the API the other runtimes have, under the same names:
 a flow's `GetChoices`, `GetProperty` and `SetProperty` (its `@scene` values included), `Log`,
 `Interpolate` and `StripCaptions`; and the engine's `Flows`, addresses, tags, Game Data, and
-`OpenFlow` with a block and a seed. A step's `bHasCharacter`, `bHasCharacterName` and
-`bHasDirection` tell a field that isn't set from one that is empty.
+`OpenFlow` with a block and a seed. A step's `bHasCharacter`, `bHasCharacterName`,
+`bHasDirection`, `bHasQualifier`, and `bHasQualifierName` tell a field that isn't set from one that is
+empty. `Qualifier` is the line's [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId`
+(`vo`, `os`, `radio`), and `QualifierName` its localised shown name; a line prompt carries both too.
 
 To choose how the engine plays, create it with **`UPatterEngine::CreateWithOptions`** and an
 `FPatterEngineOptions`: a seed for a repeatable run, the locale to play in, a decision log (read it

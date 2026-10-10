@@ -45,6 +45,8 @@ import { spellcheckPlugin, setSpellChecker, setSpellAddHandler, setSpellIgnoreHa
 import { writingStatusPlugin, setWritingStatusMap, setWritingStatusShown, setWritingStatusLadder, setWritingStatusHandler, type WritingStatusMap, type WritingStatusRung } from "./writingstatus.js";
 import { replaceSayText } from "../src/lines.js";
 import { multiSelectDecorations } from "./multiselect.js";
+import { qualifiersPlugin, setQualifierList, qualifierList, type QualifierChoice } from "./qualifiers.js";
+import { cycleQualifier as cycleQualifierCmd } from "../src/qualifier.js";
 export type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, LeafKind,
 } from "../src/inspect.js";
@@ -54,6 +56,7 @@ export type { DocNote, DocNoteMap } from "./docnotes.js";
 export type { CommentMark, CommentOpenRequest } from "./comments.js";
 export type { SuggestionMark, SuggestionOpenRequest } from "./suggestions.js";
 export type { SpellChecker } from "./spellcheck.js";
+export type { QualifierChoice } from "./qualifiers.js";
 // The themed tooltip is the shell's now (app-shell 0.7.0 lifted THIS one), so it
 // is re-exported rather than re-implemented and the surface's callers are
 // unchanged. `tipAt` / `hideTip` come with it: a tip anchored to a rectangle
@@ -75,6 +78,10 @@ export interface MountOptions {
   formatting?: boolean;
   /** Recency-ordered cast seed; the opened scene's speakers are auto-adopted on top. */
   castSeed?: string[];
+  /** The project's speaker qualifiers in display order (gameId + the name the cue shows): drawn after a
+   *  qualified line's speaker, `TAM (O.S.)`, and cycled by the keyboard route. Push changes with
+   *  `setQualifiers`. */
+  qualifiers?: QualifierChoice[];
   /** Cross-scene jump targets offered by the jump picker, APPENDED to END + THIS scene (whose
    *  live blocks the surface reads from the doc). Each is a scene `{ id, label }` with its `blocks`
    *  (so you can jump to any scene OR any block); ids are the stable join keys stored on the jump,
@@ -173,6 +180,14 @@ export interface SurfaceHandle {
   /** Replace the author tags (#215) on any node by id (scene / block / group / snippet / beat). An empty
    *  list drops the `tags` key. Returns false if the id isn't found. */
   setTags(id: string, tags: string[]): boolean;
+  /** Set (or clear, with "") the speaker qualifier (a gameId from the project's list) on the dialogue
+   *  line or line prompt with this id. Returns false if the id isn't a line here. */
+  setQualifier(id: string, gameId: string): boolean;
+  /** The keyboard route: cycle the caret's line through the project's qualifiers, then none. False when
+   *  the caret isn't on a dialogue line, or the project has no qualifiers. */
+  cycleQualifier(): boolean;
+  /** Replace the project's qualifier list (after a Project Settings save): the cues repaint with it. */
+  setQualifiers(list: QualifierChoice[]): void;
   /** This scene's local `@scene` property declarations (read from the scene doc, for the editor). */
   sceneProps(): PropertyDecl[];
   /** Replace this scene's local `@scene` property declarations (an empty list clears them). */
@@ -536,6 +551,9 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // transaction flushes asynchronously.
   let lastInputWasPointer = false;
   let lastPointerOnCue = false;
+  // A secondary press (right-click, or Ctrl-click on the Mac) opens a context menu. It may still move the
+  // caret into a cue, but it must never raise the cast popup, which would open behind the menu.
+  let lastPointerSecondary = false;
   let lastKeyWasVertical = false; // the last keydown was Up/Down - such a move passes THROUGH cues (#20)
   // The beat the caret last sat in; when it changes (click / arrow / entering a prompt) we recentre.
   let lastBeatPos: number | null = null;
@@ -608,6 +626,12 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
   // join zones and beats in ways no command here designed. Only the keys baseKeymap itself binds on
   // this platform are taken, so nothing the browser or the OS owns is captured. Mid-zone the spine
   // returns false and the key keeps its native meaning (a word or a line deleted).
+  /** Cycle the caret line's qualifier through the list the plugin holds (none when the project has none). */
+  const cycleQualifierKey: Command = (state, dispatch) => {
+    if (!isEditable) return false;
+    return cycleQualifierCmd(qualifierList(state).map((q) => q.gameId))(state, dispatch);
+  };
+
   const spineKeys: Record<string, Command> = {};
   for (const k of Object.keys(baseKeymap)) {
     if (/(^|-)Backspace$/.test(k) || k === "Ctrl-h") spineKeys[k] = backspace;
@@ -642,6 +666,9 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
           ...spineKeys,
           "Mod-t": toggleLineType, "Alt-t": toggleLineType, // Cmd-T is browser new-tab; Alt-T in the harness
         }),
+        // The qualifier's keyboard route (E for a screenplay's character Extension). Patterpad's Edit menu
+        // carries the same accelerator, so it is discoverable there; this binding serves any other host.
+        keymap({ "Mod-Shift-e": cycleQualifierKey, "Mod-Shift-E": cycleQualifierKey }),
         keymap({ "Mod-b": fmtKey(patterSchema.marks.strong), "Mod-i": fmtKey(patterSchema.marks.em) }),
         // Ahead of baseKeymap, whose Mod-a selects the whole document (see src/selectall.ts).
         keymap({ "Mod-a": selectAllInBeat }),
@@ -655,6 +682,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         suggestionsPlugin(), // "suggest a rewrite" pencils on beats with open proposals (handle.setSuggestions)
         spellcheckPlugin(), // inline spell-check squiggles + right-click fix menu (#177; handle.setSpellChecker)
         writingStatusPlugin(), // per-beat writing-status colour badges in the LEFT icon gutter (#196)
+        qualifiersPlugin(opts.qualifiers ?? []), // the cue's (O.S.) and run inheritance of a line's qualifier
       ],
     }),
     nodeViews,
@@ -672,10 +700,26 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         if (tr) v.dispatch(tr.setMeta("uiEvent", "paste"));
         return true;
       },
-      mousedown: (_v, event) => {
+      mousedown: (v, event) => {
         const t = event.target as Element | null;
         lastInputWasPointer = true;
         lastPointerOnCue = !!(t && t.closest && t.closest(".zone.cue"));
+        lastPointerSecondary = event.button !== 0 || event.ctrlKey;
+        if (lastPointerSecondary) { popup.close(); return false; }
+        // The cue's drawn chrome, its speaker qualifier `(O.S.)` and its colon, takes no caret: the browser
+        // left the selection where it was, so the next keystroke landed somewhere else entirely. A press
+        // there is a press on the name: put the caret in the cue, which selects the speaker and opens the
+        // cast popup, as a click on the name does.
+        const chrome = t?.closest?.(".cue-qual, .cue-colon");
+        const cueText = chrome?.closest(".zone.cue")?.querySelector(".cue-text");
+        if (cueText) {
+          event.preventDefault();
+          let pos: number;
+          try { pos = v.posAtDOM(cueText, 0); } catch { return true; }
+          v.focus();
+          v.dispatch(v.state.tr.setSelection(TextSelection.create(v.state.doc, pos)));
+          return true;
+        }
         return false;
       },
       blur: (v) => {
@@ -757,14 +801,15 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       if (tr.selectionSet || tr.docChanged) { slash.close(); scheduleSelect(); }
       // A vertical (Up/Down) move only passes THROUGH a cue, so it must not raise the cast popup; a
       // sideways move or a click into the cue may (#20). A click off the cue is already a stray-click close.
-      const mayOpenCue = lastInputWasPointer ? lastPointerOnCue : !lastKeyWasVertical;
+      const mayOpenCue = lastInputWasPointer ? lastPointerOnCue && !lastPointerSecondary : !lastKeyWasVertical;
       // The cast popup and the slash menu are MUTUALLY EXCLUSIVE (slashmenu.ts says so, and only one of
       // them can own the keyboard). Opening the menu closes the popup, but `popup.update` here would
       // raise it again on the very next transaction whenever the caret sits in an empty cue - which is
       // exactly the "/" with no character set case, where the popup came back on top of the menu and
       // swallowed the typing, so the menu looked like it had done nothing (#63).
       if (slash.isOpen()) popup.close();
-      else if (tr.getMeta(STRUCTURAL_MOVE) || fromStrayClick) popup.close(); else popup.update(view, ctx, mayOpenCue);
+      else if (tr.getMeta(STRUCTURAL_MOVE) || fromStrayClick || (lastInputWasPointer && lastPointerSecondary)) popup.close();
+      else popup.update(view, ctx, mayOpenCue);
       // Hints depend only on the selection context, which changes only when the selection or doc does
       // (multi-select dispatches also set the selection) - so skip the rebuild on metadata-only
       // transactions (problem-mark updates), matching the scheduleSelect gate above.
@@ -1020,6 +1065,16 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     setTags(id, tags) {
       // Author tags (#215); drop the key when empty.
       return editRaw(id, (raw) => { if (tags.length) raw.tags = tags; else delete raw.tags; });
+    },
+    setQualifier(id, gameId) {
+      const q = gameId.trim();
+      return editRaw(id, (raw) => { if (q) raw.qualifier = q; else delete raw.qualifier; }, (n) => n.type.name === "line");
+    },
+    cycleQualifier() {
+      return cycleQualifierKey(view.state, view.dispatch);
+    },
+    setQualifiers(list) {
+      view.dispatch(setQualifierList(view.state, list));
     },
     sceneProps() {
       const raw = JSON.parse(view.state.doc.attrs.raw as string) as Record<string, unknown>;

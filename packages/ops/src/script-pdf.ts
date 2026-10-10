@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import PDFDocument from "pdfkit";
-import { TOKENS, characterColour, textRuns, type ScriptDoc, type ScriptElement, type TextRun } from "./script-doc.js";
+import { TOKENS, characterColour, cueLabel, textRuns, type ScriptDoc, type ScriptElement, type TextRun } from "./script-doc.js";
 
 const MARGIN = 64;
 const INDENT_STEP = 20;      // points per structural nesting level
@@ -147,14 +147,15 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
           // left, baseline-aligned to the body's first line (colour + case carry it, no colon).
           const cueX = cx + DIALOGUE_INDENT;
           let bodyX = cueX;
-          if (el.character) { pdf.font("Sans-Bold").fontSize(CUE); bodyX = cueX + pdf.widthOfString(el.character.toUpperCase()) + CUE_GAP; }
+          const cue = el.character ? cueLabel(el.character, el.qualifierName) : "";
+          if (cue) { pdf.font("Sans-Bold").fontSize(CUE); bodyX = cueX + pdf.widthOfString(cue) + CUE_GAP; }
           const yTop = pdf.y;
           // Cue FIRST, then the body. The cue is placed against the body's first line, whose position is
           // known up front - and a long body may run onto the next page, after which yTop names a spot on
           // a page PDFKit has left. Drawn afterwards, the cue landed at that spot on the NEW page: a
           // stranded speaker name at the bottom of one page for a body at the top of the next.
-          if (el.character) {
-            pdf.font("Sans-Bold").fontSize(CUE).fillColor(hex(characterColour(el.character))).text(el.character.toUpperCase(), cueX, yTop + ascentPt("Serif", BODY) - ascentPt("Sans-Bold", CUE), { lineBreak: false });
+          if (cue) {
+            pdf.font("Sans-Bold").fontSize(CUE).fillColor(hex(characterColour(el.character))).text(cue, cueX, yTop + ascentPt("Serif", BODY) - ascentPt("Sans-Bold", CUE), { lineBreak: false });
             pdf.y = yTop;
           }
           pdf.fontSize(BODY);

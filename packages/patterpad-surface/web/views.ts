@@ -8,7 +8,8 @@
 // if reached anyway (review 2026-10, MEDIUM 33). The surface also refuses doc
 // changes while read-only, so this is belt and braces.
 
-import type { NodeViewConstructor, EditorView } from "prosemirror-view";
+import type { NodeViewConstructor, EditorView, Decoration } from "prosemirror-view";
+import type { CueQualifierSpec } from "./qualifiers.js";
 import { NodeSelection } from "prosemirror-state";
 import { selectChunkAt } from "./chunkselect.js";
 import type { Node as PMNode } from "prosemirror-model";
@@ -172,29 +173,58 @@ export function remeasureCues(): void {
 }
 if (typeof document !== "undefined" && document.fonts) void document.fonts.ready.then(remeasureCues);
 
-const cueView: NodeViewConstructor = (node) => {
+/** The qualifier a cue's decorations carry (web/qualifiers.ts): its shown name, and whether it is one the
+ *  project no longer lists. An empty name means none. */
+function cueQualifier(decos: readonly Decoration[]): CueQualifierSpec {
+  for (const d of decos) {
+    const spec = d.spec as Partial<CueQualifierSpec>;
+    if (spec.qualifier) return { qualifier: spec.qualifier, unknown: spec.unknown === true };
+  }
+  return { qualifier: "", unknown: false };
+}
+
+const cueView: NodeViewConstructor = (node, _view, _getPos, decorations) => {
   const dom = document.createElement("span"); dom.className = "zone cue";
   const content = document.createElement("span"); content.className = "cue-text";
+  // The speaker qualifier, `TAM (O.S.)`: part of the cue as a script prints it, but chrome OUTSIDE the
+  // name token (the contentDOM), so picking and typing a name work exactly as they did.
+  const qual = document.createElement("span"); qual.className = "cue-qual"; qual.contentEditable = "false";
   const colon = document.createElement("span"); colon.className = "cue-colon"; colon.contentEditable = "false"; colon.textContent = ":";
-  dom.append(content, colon);
+  dom.append(content, qual, colon);
   const paint = (n: typeof node): void => {
     const name = n.textContent;
     content.style.color = name ? colourFor(name) : "var(--muted)";
     colon.style.display = name ? "" : "none";
     dom.classList.toggle("empty", name.length === 0);
   };
+  let lastQual = "";
+  /** Draw the qualifier; true when what it shows changed (the cue's width moved). */
+  const paintQual = (decos: readonly Decoration[]): boolean => {
+    const { qualifier, unknown } = cueQualifier(decos);
+    qual.textContent = qualifier ? `(${qualifier})` : "";
+    qual.hidden = !qualifier;
+    qual.classList.toggle("unknown", unknown);
+    if (unknown) qual.dataset.tip = "Not one of the project's qualifiers."; else delete qual.dataset.tip;
+    const changed = qualifier !== lastQual;
+    lastQual = qualifier;
+    return changed;
+  };
   paint(node);
+  paintQual(decorations);
   scheduleCueMeasure(dom);
   let lastMeasured = node.textContent; // the name the --cue-w width was last measured for
-  return { dom, contentDOM: content, update: (n) => {
+  return { dom, contentDOM: content, update: (n, decos) => {
     if (n.type.name !== "cue") return false;
     paint(n);
-    // Only remeasure when the NAME changed - the width tracks the text, so a sibling edit / selection
-    // update repainting the cue must not schedule a layout read every keystroke. (Font / reading-size
-    // changes go through remeasureCues(), and fonts.ready handles the late webfont swap.)
-    if (n.textContent !== lastMeasured) { lastMeasured = n.textContent; scheduleCueMeasure(dom); }
+    const qualChanged = paintQual(decos);
+    // Only remeasure when the NAME (or its qualifier) changed - the width tracks the text, so a sibling
+    // edit / selection update repainting the cue must not schedule a layout read every keystroke. (Font /
+    // reading-size changes go through remeasureCues(), and fonts.ready handles the late webfont swap.)
+    if (n.textContent !== lastMeasured || qualChanged) { lastMeasured = n.textContent; scheduleCueMeasure(dom); }
     return true;
-  } };
+  },
+  // The qualifier is drawn chrome: a change to it is never an edit for ProseMirror to read back.
+  ignoreMutation: (m) => m.type !== "selection" && qual.contains(m.target) };
 };
 
 const parenView: NodeViewConstructor = () => {

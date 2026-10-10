@@ -24,6 +24,7 @@ const handlers: InspectorHandlers = {
   audioFoldersOn: () => false, recordingFolderStatus: () => null, playRecording: noop,
   scratchStatus: () => null, recordScratch: noop, scratchStale: () => false,
   needsRerecord: () => false, setNeedsRerecord: noop,
+  qualifiers: () => [], setQualifier: noop,
 };
 const ctx = (level: unknown): InspectorContext => ({ levels: [level] }) as InspectorContext;
 
@@ -230,5 +231,39 @@ describe("inspector: surfaced line ID + copy", () => {
     renderInspector(host, ctx({ kind: "snippet", id: "sn_1", beatCount: 1 }), handlers);
     expect(host.querySelector(".insp-head-actions .insp-copy")).toBeNull();
     expect(host.querySelector(".insp-head-actions .insp-note")).toBeTruthy();
+  });
+});
+
+describe("inspector: the speaker qualifier row", () => {
+  const LIST = [{ gameId: "vo", name: "V.O." }, { gameId: "os", name: "O.S." }];
+  const line = (over: Record<string, unknown> = {}): InspectorContext => ctx({ kind: "leaf", beat: "line", id: "L1", character: "TAM", ...over });
+  const select = (host: HTMLElement): HTMLSelectElement | null => host.querySelector<HTMLSelectElement>("select.insp-qualifier");
+
+  it("offers None and the project's qualifiers by name, the line's selected", () => {
+    const host = document.createElement("div");
+    renderInspector(host, line({ qualifier: "os" }), { ...handlers, qualifiers: () => LIST });
+    const sel = select(host)!;
+    expect([...sel.options].map((o) => o.textContent)).toEqual(["None", "V.O.", "O.S."]);
+    expect(sel.value).toBe("os");
+  });
+
+  it("writes the picked gameId (and \"\" for None) through the handler", () => {
+    const host = document.createElement("div");
+    const setQualifier = vi.fn();
+    renderInspector(host, line(), { ...handlers, qualifiers: () => LIST, setQualifier });
+    const sel = select(host)!;
+    expect(sel.value).toBe("");
+    sel.value = "vo"; sel.dispatchEvent(new Event("change"));
+    sel.value = ""; sel.dispatchEvent(new Event("change"));
+    expect(setQualifier.mock.calls).toEqual([["L1", "vo"], ["L1", ""]]);
+  });
+
+  it("keeps a qualifier the project no longer lists, marked, and shows no row when there is nothing to pick", () => {
+    const host = document.createElement("div");
+    renderInspector(host, line({ qualifier: "phone" }), { ...handlers, qualifiers: () => LIST });
+    expect(select(host)!.selectedOptions[0]?.textContent).toBe("phone (not in the list)");
+    const bare = document.createElement("div");
+    renderInspector(bare, line(), handlers); // no qualifiers in the project, none on the line
+    expect(select(bare)).toBeNull();
   });
 });

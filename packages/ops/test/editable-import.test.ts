@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import { canonicalStringify, parseSource } from "@patterkit/core";
-import type { AuthoringFile, LocaleFile } from "@patterkit/model";
+import type { AuthoringFile, FlowFile, LineBeat, LocaleFile, ProjectFile } from "@patterkit/model";
 import {
   loadProject, applyWrites, exportEditableScript, readEditableDocx, planEditableImport, readHandoff, handoffWrite,
 } from "../src/index.js";
@@ -26,11 +26,13 @@ function seeded(seed: number): () => number {
   return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 2 ** 32; };
 }
 
-/** A fresh tavern (optionally with some strings changed first), exported, with its handoff committed. */
-async function sent(strings: Record<string, string> = {}) {
+/** A fresh tavern (optionally with some strings changed, or other edits made, first), exported, with its
+ *  handoff committed. */
+async function sent(strings: Record<string, string> = {}, prepare?: (dir: string) => void) {
   const dir = join(mkdtempSync(join(tmpdir(), "patter-import-")), "tavern.patter");
   cpSync(fixture, dir, { recursive: true });
   if (Object.keys(strings).length) setStrings(dir, strings);
+  prepare?.(dir);
   const out = await exportEditableScript(loadProject(dir), { by: "Ian", recipient: "Sam", now: "2026-10-03T12:00:00Z", random: seeded(3) });
   applyWrites(out.writes);
   const code = (beat: string): string => Object.entries(out.handoff.lines).find(([, l]) => l.id === beat)![0];
@@ -41,6 +43,38 @@ function setStrings(dir: string, strings: Record<string, string>): void {
   const path = join(dir, "loc/en/tavern.patterloc");
   const loc = parseSource(readFileSync(path, "utf8")) as LocaleFile;
   writeFileSync(path, canonicalStringify({ ...loc, strings: { ...loc.strings, ...strings } }));
+}
+
+/** Set fields on a tavern line beat (`undefined` removes one). */
+function setLine(dir: string, id: string, patch: Partial<LineBeat>): void {
+  const path = join(dir, "scenes/tavern.patterflow");
+  const flow = parseSource(readFileSync(path, "utf8")) as FlowFile;
+  const visit = (nodes: Array<{ beats?: LineBeat[]; children?: unknown[] }>): void => {
+    for (const n of nodes) {
+      for (const b of n.beats ?? []) if (b.id === id) { Object.assign(b, patch); for (const k of Object.keys(patch)) if (patch[k as keyof LineBeat] === undefined) delete b[k as keyof LineBeat]; }
+      visit((n.children ?? []) as typeof nodes);
+    }
+  };
+  for (const block of flow.scene.blocks) visit(block.children as Parameters<typeof visit>[0]);
+  writeFileSync(path, canonicalStringify(flow));
+}
+
+/** The tavern's line beat, as it is on disk. */
+function lineOf(dir: string, id: string): LineBeat {
+  const flow = parseSource(readFileSync(join(dir, "scenes/tavern.patterflow"), "utf8")) as FlowFile;
+  let found: LineBeat | undefined;
+  const visit = (nodes: Array<{ beats?: LineBeat[]; children?: unknown[] }>): void => {
+    for (const n of nodes) { found ??= (n.beats ?? []).find((b) => b.id === id); visit((n.children ?? []) as typeof nodes); }
+  };
+  for (const block of flow.scene.blocks) visit(block.children as Parameters<typeof visit>[0]);
+  return found!;
+}
+
+/** Add cast members to the tavern. */
+function addCast(dir: string, ...names: string[]): void {
+  const path = join(dir, "tavern.patterproj");
+  const project = parseSource(readFileSync(path, "utf8")) as ProjectFile;
+  writeFileSync(path, canonicalStringify({ ...project, cast: [...(project.cast ?? []), ...names.map((name) => ({ name }))] }));
 }
 
 /** Return the export with `document.xml` edited (and extra parts), read, and planned. */
@@ -342,5 +376,70 @@ describe("planEditableImport: applying", () => {
     expect(loc.strings["L_work"]).toBe("Changed at home.");
     const outcomes = Object.fromEntries(authoringOf(s.dir).suggestions!.map((x) => [x.anchor, x.outcome ?? "open"]));
     expect(outcomes).toEqual({ L_greet: "accepted", L_work: "open" });
+  });
+});
+
+describe("planEditableImport: speaker qualifiers", () => {
+  const lead = (x: string, code: string, cue: string): string => setCell(x, code, 0, p(r(cue)));
+
+  it("the export prints the cue as BARKEEP (O.S.) and records the qualifier's gameId as sent", async () => {
+    const s = await sent({}, (dir) => setLine(dir, "L_greet", { qualifier: "os" }));
+    const line = s.out.handoff.lines[s.code("L_greet")]!;
+    expect(line).toMatchObject({ character: "BARKEEP", qualifier: "os" });
+    const xml = await (await JSZip.loadAsync(s.out.docx)).file("word/document.xml")!.async("string");
+    expect(xml).toContain(">BARKEEP (O.S.)<");
+    // Untouched, it comes back with nothing to suggest.
+    const plan = await bringBack(s);
+    expect(plan.suggestions).toEqual([]);
+    expect(plan.report.problems).toEqual([]);
+  });
+
+  it("a qualifier added in the cue is a suggestion, read case-insensitively; the speaker is unchanged", async () => {
+    const s = await sent();
+    const plan = await bringBack(s, (x) => lead(x, s.code("L_greet"), "Barkeep (v.o.)"));
+    expect(plan.suggestions).toHaveLength(1);
+    expect(plan.suggestions[0]).toMatchObject({ proposedQualifier: "vo", baselineQualifier: "", proposed: GREET });
+    expect(plan.suggestions[0]!.proposedCharacter).toBeUndefined();
+  });
+
+  it("the bracket removed proposes none; a speaker and qualifier changed together are one suggestion", async () => {
+    const s = await sent({}, (dir) => setLine(dir, "L_greet", { qualifier: "os" }));
+    const removed = await bringBack(s, (x) => lead(x, s.code("L_greet"), "BARKEEP"));
+    expect(removed.suggestions[0]).toMatchObject({ proposedQualifier: "", baselineQualifier: "os" });
+    const both = await bringBack(s, (x) => lead(x, s.code("L_greet"), "PLAYER (RADIO)"));
+    expect(both.suggestions[0]).toMatchObject({ proposedCharacter: "PLAYER", baselineCharacter: "BARKEEP", proposedQualifier: "radio", baselineQualifier: "os" });
+  });
+
+  it("a bracket that isn't one of the project's qualifiers is flagged and kept in a comment", async () => {
+    const s = await sent();
+    const plan = await bringBack(s, (x) => lead(x, s.code("L_greet"), "BARKEEP (WHISPERED)"));
+    expect(plan.suggestions).toEqual([]);
+    expect(problemsOf(plan, "unknown-qualifier")).toHaveLength(1);
+    expect(problemsOf(plan, "unknown-speaker")).toEqual([]);
+    expect(plan.comments[0]!.messages[0]!.body).toContain("WHISPERED");
+    // A speaker who isn't in the cast is still the speaker problem, bracket or not.
+    const stranger = await bringBack(s, (x) => lead(x, s.code("L_greet"), "STRANGER (V.O.)"));
+    expect(problemsOf(stranger, "unknown-speaker")).toHaveLength(1);
+  });
+
+  it("an exact cast name wins over reading a bracket as a qualifier", async () => {
+    const s = await sent({}, (dir) => addCast(dir, "GUARD", "GUARD (RADIO)"));
+    const plan = await bringBack(s, (x) => lead(x, s.code("L_greet"), "guard (radio)"));
+    expect(plan.suggestions[0]).toMatchObject({ proposedCharacter: "GUARD (RADIO)" });
+    expect(plan.suggestions[0]!.proposedQualifier).toBeUndefined();
+  });
+
+  it("a cast name that looks like a qualified cue round-trips untouched", async () => {
+    const s = await sent({}, (dir) => { addCast(dir, "BARKEEP (RADIO)"); setLine(dir, "L_greet", { character: "BARKEEP (RADIO)" }); });
+    const plan = await bringBack(s);
+    expect(plan.suggestions).toEqual([]);
+    expect(plan.report.problems).toEqual([]);
+  });
+
+  it("direct: a clean qualifier change is written onto the line", async () => {
+    const s = await sent();
+    applyWrites((await bringBack(s, (x) => lead(x, s.code("L_greet"), "BARKEEP (O.S.)"), { direct: true })).writes);
+    expect(lineOf(s.dir, "L_greet")).toMatchObject({ character: "BARKEEP", qualifier: "os" });
+    expect(authoringOf(s.dir).suggestions![0]).toMatchObject({ proposedQualifier: "os", outcome: "accepted" });
   });
 });

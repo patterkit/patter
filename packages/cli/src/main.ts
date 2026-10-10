@@ -24,7 +24,7 @@ import {
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus,
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
-  exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions,
+  exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog, ImportPlan, LoadedProject } from "@patterkit/ops";
 import { createHash } from "node:crypto";
@@ -631,7 +631,8 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
         return 0;
       }
       if (!open.length) { console.log("no open suggestions"); return 0; }
-      for (const o of open) console.log(describeSuggestion(o));
+      const nameOf = qualifierNamer(loaded.project);
+      for (const o of open) console.log(describeSuggestion(o, nameOf));
       const stale = open.filter((o) => o.stale.length).length;
       console.log(`${open.length} open suggestion(s)${stale ? `, ${stale} out of date` : ""}`);
       return 0;
@@ -846,12 +847,13 @@ export function renderImportReport(plan: ImportPlan): string {
 }
 
 /** One open suggestion on one line. */
-function describeSuggestion(o: ReturnType<typeof listOpenSuggestions>[number]): string {
+function describeSuggestion(o: ReturnType<typeof listOpenSuggestions>[number], qualifierName: (gameId: string | undefined) => string | undefined): string {
   const s = o.suggestion;
   const parts: string[] = [];
   if (s.proposedCut) parts.push("cut this line");
   if (s.proposed !== s.baseline) parts.push(`"${s.baseline}" -> "${s.proposed}"`);
   if (s.proposedCharacter !== undefined) parts.push(`speaker ${s.baselineCharacter || "(none)"} -> ${s.proposedCharacter}`);
+  if (s.proposedQualifier !== undefined) parts.push(`qualifier ${qualifierName(s.baselineQualifier) ?? "(none)"} -> ${qualifierName(s.proposedQualifier) ?? "(none)"}`);
   if (s.proposedDirection !== undefined) parts.push(`direction "${s.baselineDirection ?? ""}" -> "${s.proposedDirection}"`);
   const from = s.handoff ? ` [${s.handoff.id}]` : "";
   const stale = o.stale.length ? ` OUT OF DATE (${o.stale.join(", ")})` : "";

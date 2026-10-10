@@ -6,6 +6,26 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker qualifiers.** A line can say how it's delivered as well as who says it: `TAM (O.S.)`,
+  `PLAYER (V.O.)`, `GUARD (RADIO)`. Pick one from the Qualifier list in the line's inspector, or press
+  Shift+Cmd+E (Shift+Ctrl+E on Windows and Linux) to step through them; the cue shows it after the name,
+  and Play does too. A new line takes the qualifier of the same character's last line, so a run of
+  thoughts or a radio exchange needs one pick. TAM and TAM (O.S.) are still one character in the cast,
+  the counts, and the report.
+- **A Qualifiers tab in Project Settings.** Add, rename, reorder, and describe them, or start from a
+  screenplay set or a game set. Changing a qualifier's Game ID updates every line that uses it.
+- **Find Lines by Qualifier** in the Review menu, and a Qualifier tab in the search window. A line whose
+  qualifier has been removed from the list shows in the problems bar, with a fix that picks another.
+
+### Fixed
+
+- **Right-clicking a speaker's name** opens the context menu and nothing else. The character picker used
+  to open behind it.
+- **Clicking the colon after a speaker's name** selects the speaker, as clicking the name does. It used to
+  leave the cursor where it was, so the next thing you typed could land somewhere else in the scene.
+
 ## [0.26.1] - 2026-10-10
 
 ### Fixed

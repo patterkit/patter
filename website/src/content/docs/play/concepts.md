@@ -68,7 +68,7 @@ kinds:
 
 | Step | Meaning | What it carries |
 |---|---|---|
-| **line** | A character speaks | the speaker, the (localised) display name, the text, direction, Game Data, tags |
+| **line** | A character speaks | the speaker, the (localised) display name, the text, direction, the speaker qualifier, Game Data, tags |
 | **text** | Narration the player reads | the text, Game Data, tags |
 | **gameEvent** | A host-facing cue, no spoken text | an id + Game Data (play a sound, move the camera) |
 | **choice** | The player must pick | a list of options (each with prompt text + an `eligible` flag) |

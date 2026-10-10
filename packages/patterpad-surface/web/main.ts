@@ -5,6 +5,7 @@
 
 // Self-hosted web fonts (@fontsource), so the harness works offline. The app bundles its own; the
 // active set is chosen by data-font (theme.css).
+import { DEFAULT_QUALIFIERS } from "@patterkit/model";
 import "@fontsource/newsreader/400.css";
 import "@fontsource/newsreader/400-italic.css";
 import "@fontsource/newsreader/600.css";
@@ -49,6 +50,7 @@ const surface = mountSurface({
   locSource,
   formatting: true,
   castSeed: ["BARKEEP", "ANNA", "BO"],
+  qualifiers: DEFAULT_QUALIFIERS, // the cue's (O.S.) and Shift-Mod-E's cycle
   showTitle: true,
   onChange: (api) => {
     const { flow, loc } = api.getSource();

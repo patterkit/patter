@@ -14,6 +14,7 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
     { header: "Scope", key: "scope", width: 28 },
     { header: "Line ID", key: "id", width: 18 },
     { header: "Character", key: "character", width: 16 },
+    { header: "Qualifier", key: "qualifier", width: 11 },
     { header: "Actor", key: "actor", width: 16 },
     { header: "Text", key: "text", width: 60 },
     { header: "Comments", key: "comments", width: 36 },
@@ -27,7 +28,7 @@ export async function voiceScriptToXlsx(data: VoiceScript): Promise<Buffer> {
 
   for (const l of data.lines) {
     const row = ws.addRow({
-      scope: l.scope, id: l.id, character: l.character, actor: l.actor ?? "",
+      scope: l.scope, id: l.id, character: l.character, qualifier: l.qualifier ?? "", actor: l.actor ?? "",
       text: l.text, comments: l.comments.join("\n"), status: l.recordingStatus,
     });
     row.getCell("text").alignment = { wrapText: true, vertical: "top" };

@@ -21,6 +21,7 @@ import { effectiveGameId } from "@patterkit/model";
 import { cueText, zoneText, sayText, isChoiceGroup, rawAttr } from "./zoneutil.js";
 import { groupLabelParts, optionLabelParts, labelText, groupRole, type GroupRole } from "./grouplabel.js";
 import { multiSelectPositions } from "./multiselect.js";
+import { qualifierOf } from "./qualifier.js";
 
 export type LeafKind = "line" | "prose" | "gameEvent";
 
@@ -33,6 +34,8 @@ export interface LeafLevel {
   character?: string;
   /** line only - the performance direction (live zone text). */
   direction?: string;
+  /** line only - the speaker qualifier's gameId (`os`), absent for none. */
+  qualifier?: string;
   gameData?: GameData;
   /** Author tags (#215) on this beat. */
   tags?: string[];
@@ -162,6 +165,8 @@ function leafLevel(beat: PMNode): LeafLevel {
     const direction = zoneText(beat, "paren");
     if (character) base.character = character;
     if (direction) base.direction = direction;
+    const qualifier = qualifierOf(beat);
+    if (qualifier) base.qualifier = qualifier;
   }
   return base;
 }

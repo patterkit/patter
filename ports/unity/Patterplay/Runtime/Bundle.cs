@@ -24,6 +24,9 @@ namespace Patterkit.Patterplay
         public string ContentVersion;
         public Locales Locales = new Locales();
         public List<Cast> Cast = new List<Cast>();
+        /// <summary>The speaker qualifiers the content uses (`gameId` + authored name), in the project's order.
+        /// Empty when no line has one (an older bundle carries none).</summary>
+        public List<Qualifier> Qualifiers = new List<Qualifier>();
         public List<PropertyDecl> Properties = new List<PropertyDecl>();
         public Dictionary<string, Scene> Scenes = new Dictionary<string, Scene>();
         /// <summary>locale -> (string id -> text). Empty for an IDs-only build (the engine emits beat IDs).</summary>
@@ -69,6 +72,14 @@ namespace Patterkit.Patterplay
     {
         public string Name;
         public string DisplayName;
+    }
+
+    /// <summary>A speaker qualifier as the bundle ships it (`V.O.`, `O.S.`, `RADIO`): the `gameId` a line
+    /// carries, and the authored name (the fallback when no `qualifier:&lt;gameId&gt;` string exists).</summary>
+    public sealed class Qualifier
+    {
+        public string GameId;
+        public string Name;
     }
 
     public sealed class PropertyDecl
@@ -175,6 +186,7 @@ namespace Patterkit.Patterplay
         public string Kind;          // line | text | gameEvent
         public string Character;
         public string Direction;
+        public string Qualifier;     // speaker qualifier gameId (`vo`), line only; null when none
         public GameData GameData;
         public List<string> Tags;    // author tags (#215)
     }

@@ -67,6 +67,8 @@ body.play {
 @keyframes pline-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .pline-playing::before { animation: none; opacity: 0.9; } }
 .pcue { color: var(--accent); font: 600 0.74rem var(--font-ui); letter-spacing: 0.05em; text-transform: uppercase; margin-right: 0.45rem; }
+/* The speaker qualifier, set in the cue's face but the muted ink: how the line is delivered, not who says it. */
+.pcue .pqual { color: var(--muted); margin-left: 0.35em; }
 .pdir { color: var(--muted); font-size: 0.86rem; }
 
 .play-choices { border-top: 1px solid var(--line); padding: 0.8rem clamp(1rem, 6vw, 2.4rem); display: flex; flex-direction: column; gap: 0.45rem; background: var(--surface); }

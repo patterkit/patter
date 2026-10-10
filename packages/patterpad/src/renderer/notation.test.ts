@@ -41,7 +41,7 @@ describe("the search window's hint line", () => {
     expect(typed(h)).not.toMatch(TYPED);
   });
   it("every mode is free of typed notation, and replace mode is a sentence with no keys", () => {
-    for (const mode of ["content", "replace", "status", "recording", "property", "tag", "suggestions"] as const) {
+    for (const mode of ["content", "replace", "status", "recording", "property", "tag", "qualifier", "suggestions"] as const) {
       const h = host(...modeHint(mode));
       expect(typed(h), mode).not.toMatch(TYPED);
       expect(h.textContent, mode).not.toContain(" / ");
@@ -99,7 +99,7 @@ describe("the problems bar's copy", () => {
   const problem = (over: Partial<Problem>): Problem => ({ category: "structure", severity: "error", message: "x", ...over });
   const CODES = ["missing-prompt", "invalid-prompt", "unknown-character", "empty-snippet", "empty-container", "empty-scene",
     "missing-name", "choice-can-empty", "jump-cycle", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
-    "duplicate-gameid", "stale-build", "merge-conflict"];
+    "duplicate-gameid", "stale-build", "merge-conflict", "unknown-qualifier", "invalid-qualifier"];
 
   it("has an entry for every code Patterpad raises, each a sentence", () => {
     for (const code of CODES) {
@@ -139,6 +139,15 @@ describe("the problems bar's copy", () => {
     expect(toProblemLike(p).title).toBe("ANNA");
     expect(problemLineFor(p)).toBe("“ANNA” isn't in your cast yet.");
     expect(problemLineFor(problem({ detail: "unknown-character", message: "speaker missing" }))).toBe("This line's speaker isn't in your cast yet.");
+  });
+
+  it("names the qualifier of an unknown-qualifier problem by its gameId, and says what to do", () => {
+    const p = problem({ detail: "unknown-qualifier", message: "beat 'L1' qualifier 'phone' is not in the project's qualifiers" });
+    expect(toProblemLike(p).title).toBe("phone");
+    expect(problemLineFor(p)).toBe("The qualifier “phone” isn't one of the project's qualifiers. Pick another, or add it in Project Settings.");
+    expect(problemLineFor(problem({ detail: "unknown-qualifier", message: "odd" }))).toBe("This line's qualifier isn't one of the project's qualifiers. Pick another, or add it in Project Settings.");
+    expect(problemLineFor(problem({ detail: "invalid-qualifier", message: "qualifier address 'vo' is used more than once" })))
+      .toBe("A speaker qualifier in Project Settings isn't set up properly. Each one needs a name and its own Game ID.");
   });
 
   it("falls back to the softened message, titled by the file for a hygiene note, and never writes [", () => {

@@ -37,6 +37,11 @@ Render each step into your own dialogue UI; on a `"choice"`, present `step["opti
 has a `prompt` whose `"text"` is the label, and an `eligible` flag) and call `flow.choose(id)`
 with the player's pick.
 
+A `"line"` step names its speaker with `character` (the cast token) and `characterName` (the shown
+name), and carries `direction` when set. A line with a speaker qualifier (`TAM (O.S.)`) also carries
+`qualifier`, the qualifier's `gameId` (`"os"`) for your game to switch on, and `qualifierName`, its
+shown name (`"O.S."`) in the active language. A line prompt on a choice option carries the same fields.
+
 ## Demos
 
 In `demo/` (delete the folder freely):

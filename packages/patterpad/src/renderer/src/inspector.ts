@@ -7,7 +7,7 @@ import { iconNode, iconHtml, iconSvg, metaLine } from "@wildwinter/app-shell"; /
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch,
 } from "@patterkit/patterpad-surface/surface";
-import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, WritingStatusDecl, RecordingStatusDecl } from "@patterkit/model";
+import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, WritingStatusDecl, RecordingStatusDecl, SpeakerQualifier } from "@patterkit/model";
 import { RERECORD_STATUS_DECL } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
@@ -148,11 +148,38 @@ function leafBody(lv: LeafLevel, h: InspectorHandlers): HTMLElement[] {
   if (lv.beat === "line") rows.push(rerecordRow(lv.id, h));         // "needs re-record" override, dialogue lines only (#227)
   if (lv.beat === "line") {
     rows.push(lv.character ? row("Character", lv.character) : emptyRow("Character"));
+    rows.push(qualifierRow(lv.id, lv.qualifier, h));
     rows.push(row("Direction", lv.direction));
   }
   rows.push(tagsRow(lv.id, lv.tags, h));
   rows.push(gameDataSection(leafNodeKind(lv.beat), lv.id, lv.gameData, h));
   return rows.filter((r): r is HTMLElement => r != null);
+}
+
+/** The speaker qualifier dropdown on a dialogue line or line prompt: "None" and the project's qualifiers,
+ *  by the name the cue shows (`TAM (O.S.)`). Picking writes the line's gameId through the surface, as any
+ *  edit does. A qualifier the project no longer lists stays selected, marked, until another is picked.
+ *  Null when the project has none and the line carries none. */
+function qualifierRow(id: string | null, current: string | undefined, h: InspectorHandlers): HTMLElement | null {
+  const list = h.qualifiers();
+  if (!list.length && !current) return null;
+  const r = el("div", "insp-row");
+  r.append(el("span", "insp-key", "Qualifier"));
+  const sel = el("select", "insp-select insp-qualifier") as HTMLSelectElement;
+  const add = (value: string, label: string): void => {
+    const o = el("option", undefined, label) as HTMLOptionElement;
+    o.value = value;
+    sel.append(o);
+  };
+  add("", "None");
+  for (const q of list) add(q.gameId, q.name);
+  if (current && !list.some((q) => q.gameId === current)) add(current, `${current} (not in the list)`);
+  sel.value = current ?? "";
+  sel.dataset.tip = "How the line is delivered. The speaker stays the same character.";
+  if (!id) sel.disabled = true;
+  sel.addEventListener("change", () => { if (id) h.setQualifier(id, sel.value); });
+  r.append(sel);
+  return r;
 }
 
 /** A soft, READABLE fill for a status chip: the rung's palette colour mixed heavily toward the theme
@@ -695,6 +722,10 @@ export interface InspectorHandlers {
   scratchStale: (id: string) => boolean;
   /** Replace the author tags (#215) on a node by id (an empty list clears them). */
   setTags: (id: string, tags: string[]) => void;
+  /** The project's speaker qualifiers, in display order (the Qualifier dropdown on a dialogue line). */
+  qualifiers: () => SpeakerQualifier[];
+  /** Set (or clear, with "") a dialogue line's speaker qualifier gameId. */
+  setQualifier: (id: string, gameId: string) => void;
 }
 
 /** Render the whole stack into `host`. Empty selection -> a muted placeholder. */

@@ -188,8 +188,11 @@ void ATourDemoActor::Step()
 	{
 		case EPatterStepType::Line:
 		{
-			const FString& Speaker = S.CharacterName.IsEmpty() ? S.Character : S.CharacterName;
-			AddLine(Speaker.ToUpper(), S.Text, LineColour);
+			FString Speaker = (S.CharacterName.IsEmpty() ? S.Character : S.CharacterName).ToUpper();
+			// A speaker qualifier shows after the name, as a script's cue does: TAM (O.S.).
+			const FString& Qualifier = S.QualifierName.IsEmpty() ? S.Qualifier : S.QualifierName;
+			if (!Qualifier.IsEmpty()) Speaker += FString::Printf(TEXT(" (%s)"), *Qualifier);
+			AddLine(Speaker, S.Text, LineColour);
 			const float Clip = PlayClip(S.Id);
 			if (Clip > 0.f) Hold = Clip + 0.25f; // a voiced line holds for its take
 			break;

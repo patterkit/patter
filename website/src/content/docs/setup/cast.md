@@ -35,3 +35,29 @@ Only the **script name** and the **display name** are compiled into the publishe
 bundle. Grammatical gender, notes, and the actor's name are project-side context for translators
 and the production team; they are deliberately left out, so a game you ship never contains a real
 person's name or a writer's private notes about a character.
+
+## Speaker qualifiers
+
+A **speaker qualifier** is what a screenplay calls a character extension: how a line is delivered,
+not who says it. `TAM (O.S.)` is Tam heard but not seen, `PLAYER (V.O.)` is a thought or narration,
+and `GUARD (RADIO)` is a voice through a radio. A qualified line is still the same character, so
+`TAM` and `TAM (O.S.)` count as one in the cast, the report, coverage, and every script export. You
+never need a second cast member such as `TAM_OS` to get one.
+
+A project starts with three:
+
+| Qualifier | Address | Meaning |
+| --- | --- | --- |
+| `V.O.` | `vo` | Voice-over: the character isn't in the scene (a thought, narration, a voice in the ear) |
+| `O.S.` | `os` | Off-screen: the character is there, but not seen (the next room, behind a door) |
+| `RADIO` | `radio` | Heard through a radio, a phone, or a loudspeaker |
+
+Change the list in **Project Settings ▸ Qualifiers**: add your own (`PHONE`, `PA`, `O.C.`), rename,
+reorder, describe, or remove them. Each has a **name**, which the script shows, and an **address**,
+which your game's code relies on, so renaming `V.O.` to `VO` changes nothing in the game. A new
+qualifier's address is made from its name, and you can edit it; changing an address updates every
+line that uses it.
+
+A qualifier's name is translated like a display name, as part of
+[Languages & translation](/setup/languages/). Only the qualifiers your lines use are compiled into
+the `.patterc`, with their address and name; the description is for writers.

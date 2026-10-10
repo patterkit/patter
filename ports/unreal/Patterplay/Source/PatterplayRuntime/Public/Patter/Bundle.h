@@ -18,6 +18,9 @@ namespace patter
 
     struct Locales { std::string defaultLocale = "en"; std::vector<std::string> included; };
     struct Cast { std::string name, displayName; };
+    // A speaker qualifier as the bundle ships it (`V.O.`): the `gameId` a line stores, and its authored
+    // name (the unlocalised fallback for its shown name).
+    struct Qualifier { std::string gameId, name; };
 
     struct PropertyDecl
     {
@@ -71,6 +74,7 @@ namespace patter
     {
         std::string id, kind, character, direction;
         bool hasCharacter = false, hasDirection = false; // set, even to "" (absent = unset): a "" is a value
+        bool hasQualifier = false; std::string qualifier; // speaker qualifier gameId (`vo`), line only
         std::shared_ptr<GameData> gameData;             // null = none
         std::vector<std::string> tags;                  // author tags (#215)
     };
@@ -146,6 +150,7 @@ namespace patter
         std::string contentVersion;   // content.version - the authored bundle version, if stamped
         Locales locales;
         std::vector<Cast> cast;
+        std::vector<Qualifier> qualifiers;   // the speaker qualifiers the content uses; empty = none
         std::vector<PropertyDecl> properties;
         std::map<std::string, Scene> scenes;
         // Scene ids in AUTHORED order (the bundle's key order, which is the project's nav order). `scenes`

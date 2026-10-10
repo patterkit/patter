@@ -10,13 +10,14 @@
 // ---------------------------------------------------------------------------
 
 import type {
-  Bundle, BundleCastMember, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
+  Bundle, BundleCastMember, BundleQualifier, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
   ProjectFile, Scene, Block, Group, Snippet, Effect, LocaleFile,
 } from "@patterkit/model";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
 import { canonicalStringify, hash32 } from "@patterkit/core";
 import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
+import { usedQualifiers } from "@patterkit/model";
 import { compileExpression } from "./expressions.js";
 import { externalGameScopes, projectScopes } from "./game-scopes.js";
 
@@ -154,6 +155,10 @@ export function exportBundle(input: ExportInput): Bundle {
   for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, compileScopes);
   const externalScopes = externalScopesIn(scenesOut, new Set([...EXTERNAL_SCOPES, ...gameExternal.map((s) => s.token)]));
 
+  // The qualifiers the content uses, as the bundle ships them: `gameId` and authored name (the description
+  // is for writers). One no line uses stays out, so a project that uses none compiles exactly as before.
+  const qualifiers: BundleQualifier[] = usedQualifiers(project, scenes).map((q) => ({ gameId: q.gameId, name: q.name }));
+
   const strings: Record<string, Record<string, string>> = {};
   for (const loc of locales) {
     if (includeLocales && !includeLocales.includes(loc.locale)) continue;
@@ -175,18 +180,21 @@ export function exportBundle(input: ExportInput): Bundle {
       // Binds saves to the content they were taken against, and gates bundle
       // staleness (schema §10.5). A stable strict-JSON fingerprint - independent
       // of the source-form trailing-comma policy.
-      // `scopeRegistry` is folded in only when present, so projects without host scopes keep their exact
-      // prior hash (no ripple to existing bundles / the conformance corpus).
+      // `scopeRegistry` and `qualifiers` are folded in only when present, so projects without them keep
+      // their exact prior hash (no ripple to existing bundles / the conformance corpus).
       hash: hash32(canonicalStringify({
         scenes: scenesOut, strings, properties: project.properties ?? [],
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
+        ...(qualifiers.length > 0 ? { qualifiers } : {}),
       }, { trailingComma: false })),
       // Structure-only fingerprint (live bundle refresh): the same hash with the string tables left
       // out. Same structureHash + a different hash = a text-only edit, safe to swap in place with
       // `engine.replaceStrings()`; a changed structureHash needs the full save/load hot swap.
+      // A qualifier's name rides in `qualifiers`, not the string tables, so renaming one is a structure change.
       structureHash: hash32(canonicalStringify({
         scenes: scenesOut, properties: project.properties ?? [],
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
+        ...(qualifiers.length > 0 ? { qualifiers } : {}),
       }, { trailingComma: false })),
     },
     voiced: project.voiced ?? false,
@@ -202,6 +210,7 @@ export function exportBundle(input: ExportInput): Bundle {
       if (c.gameData !== undefined) m.gameData = c.gameData;
       return m;
     }),
+    ...(qualifiers.length > 0 ? { qualifiers } : {}),
 
     properties: project.properties,
     scopeRegistry: hostScopes,

@@ -11,7 +11,8 @@
 // ---------------------------------------------------------------------------
 
 import type { Block, DocLine, GameEventBeat, Group, Scene, Snippet } from "@patterkit/model";
-import { DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
+import { DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers } from "@patterkit/model";
+import type { ProjectFile } from "@patterkit/model";
 import { humanizeNodeRefs } from "@patterkit/core";
 import { sourceStrings, mergeAuthoring } from "./loaded-helpers.js";
 import { classesForChannel } from "./documentation.js";
@@ -49,6 +50,21 @@ export function colourIndex(name: string): number {
 /** The cue colour for a speaker name, as a bare hex (no '#'). */
 export function characterColour(name: string): string {
   return CHAR_PALETTE[colourIndex(name)]!;
+}
+
+
+/** A speaker cue as the script shows it: the character, then the speaker qualifier's name in brackets, the
+ *  screenplay convention (`TAM (O.S.)`). Upper case, as every cue is set. The qualifier is how the line is
+ *  delivered, never part of who says it, so a cue's colour and any counting stay on the character alone. */
+export function cueLabel(character: string, qualifierName?: string): string {
+  return qualifierName ? `${character.toUpperCase()} (${qualifierName.toUpperCase()})` : character.toUpperCase();
+}
+
+/** A speaker qualifier's shown name by its `gameId`, from the project's list. A `gameId` the list lacks (one
+ *  removed, which validation flags) shows as itself, so the script still says something was there. */
+export function qualifierNamer(project: Pick<ProjectFile, "qualifiers">): (gameId: string | undefined) => string | undefined {
+  const names = new Map(projectQualifiers(project).map((q) => [q.gameId, q.name]));
+  return (gameId) => (gameId ? names.get(gameId) ?? gameId : undefined);
 }
 
 
@@ -96,8 +112,10 @@ export function textRuns(text: string): TextRun[] {
 export type ScriptElement =
   | { kind: "scene"; id: string; text: string }
   | { kind: "block"; id: string; text: string }
-  /** A spoken line: SPEAKER cue (coloured, uppercase), an optional (direction), and the body runs. */
-  | { kind: "line"; id: string; indent: number; snippet?: number; character: string; direction?: string; runs: TextRun[] }
+  /** A spoken line: SPEAKER cue (coloured, uppercase), an optional (direction), and the body runs. A speaker
+   *  qualifier rides as its `gameId` (`qualifier`) and its shown name (`qualifierName`), for the cue to print
+   *  after the character (`cueLabel`). */
+  | { kind: "line"; id: string; indent: number; snippet?: number; character: string; qualifier?: string; qualifierName?: string; direction?: string; runs: TextRun[] }
   /** Prose narration / on-screen text (speaker-less), upright in a soft ink, flush left. `id` is the beat. */
   | { kind: "narration"; id: string; indent: number; snippet?: number; runs: TextRun[] }
   /** A gating condition, set in accent mono above the beat it controls: `‹ if @brave ›`. `id` is the node
@@ -203,6 +221,13 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
   const humanize = (cond: string): string => humanizeNodeRefs(cond, (id) => blockName.get(id) ?? sceneOf.get(id) ?? id);
 
   const els: ScriptElement[] = [];
+  const nameOf = qualifierNamer(project);
+  // A line beat's speaker fields, for a `line` element: the qualifier only when the line has one.
+  const speaker = (beat: { character?: string; qualifier?: string; direction?: string }) => ({
+    character: beat.character ?? "",
+    ...(beat.qualifier ? { qualifier: beat.qualifier, qualifierName: nameOf(beat.qualifier) } : {}),
+    direction: beat.direction,
+  });
   const textOf = (id: string): string => source[id] ?? "";
   const notes = (id: string, indent: number, sid: number | undefined): void => {
     for (const l of ownNotes(id)) els.push({ kind: "note", id, indent, snippet: sid, text: l.text, class: l.type });
@@ -221,7 +246,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
   const emitBeats = (node: Snippet, indent: number, sid: number | undefined): void => {
     for (const beat of node.beats ?? []) {
       if (cut.has(beat.id)) continue;
-      if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent, snippet: sid, character: beat.character ?? "", direction: beat.direction, runs: textRuns(textOf(beat.id)) });
+      if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent, snippet: sid, ...speaker(beat), runs: textRuns(textOf(beat.id)) });
       else if (beat.kind === "text") els.push({ kind: "narration", id: beat.id, indent, snippet: sid, runs: textRuns(textOf(beat.id)) });
       else if (beat.kind === "gameEvent") els.push({ kind: "gameEvent", id: beat.id, indent, snippet: sid, text: gameEventLabel(beat) });
       else continue;
@@ -274,7 +299,7 @@ export function runScriptDoc(loaded: LoadedProject, opts: ScriptDocOptions = {})
           for (const beat of beats) {
             if (!seenPrompt && beat === first) { seenPrompt = true; continue; }
             if (cut.has(beat.id)) continue;
-            if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent: indent + 1, snippet: cid, character: beat.character ?? "", direction: beat.direction, runs: textRuns(textOf(beat.id)) });
+            if (beat.kind === "line") els.push({ kind: "line", id: beat.id, indent: indent + 1, snippet: cid, ...speaker(beat), runs: textRuns(textOf(beat.id)) });
             else if (beat.kind === "text") els.push({ kind: "narration", id: beat.id, indent: indent + 1, snippet: cid, runs: textRuns(textOf(beat.id)) });
             else if (beat.kind === "gameEvent") els.push({ kind: "gameEvent", id: beat.id, indent: indent + 1, snippet: cid, text: gameEventLabel(beat) });
             else continue;

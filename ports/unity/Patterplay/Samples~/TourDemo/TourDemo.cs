@@ -86,7 +86,8 @@ namespace Patterkit.Patterplay.Samples
             switch (step.Type)
             {
                 case StepType.Line:
-                    _transcript.Add($"<b>{(step.CharacterName ?? step.Character ?? "").ToUpperInvariant()}</b>  {Fmt(step.Text)}");
+                    var qualifier = step.QualifierName ?? step.Qualifier; // shown after the name: TAM (O.S.)
+                    _transcript.Add($"<b>{(step.CharacterName ?? step.Character ?? "").ToUpperInvariant()}{(qualifier != null ? $" ({qualifier})" : "")}</b>  {Fmt(step.Text)}");
                     PlayClip(step.Id);
                     _pending = null;
                     break;

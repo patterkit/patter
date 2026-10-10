@@ -58,6 +58,11 @@ while (true)
 Render each step into your own dialogue UI; on a `Choice`, present `step.Options` (each has a
 `Prompt` and an `Eligible` flag) and call `flow.Choose(id)` with the player's pick.
 
+A line step carries its speaker as `Character` (the cast token) and `CharacterName` (the shown name), its
+`Direction`, and, when the writer gave it one, a speaker qualifier: `Qualifier` is the qualifier's `gameId`
+(`vo`, `os`, `radio`), for your code to switch on, and `QualifierName` its shown name (`V.O.`), localised as
+`CharacterName` is. A script shows it after the name, `TAM (O.S.)`; what it means for your game is yours.
+
 ## Samples
 
 Import from **Package Manager ▸ Patterplay ▸ Samples**. Each sample ships a **ready-made

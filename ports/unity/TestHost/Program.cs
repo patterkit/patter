@@ -1146,6 +1146,8 @@ namespace Patterkit.Patterplay.TestHost
                     if (s.Character != null) o["character"] = s.Character;
                     if (s.CharacterName != null) o["characterName"] = s.CharacterName;
                     if (s.Direction != null) o["direction"] = s.Direction;
+                    if (s.Qualifier != null) o["qualifier"] = s.Qualifier;             // speaker qualifier gameId
+                    if (s.QualifierName != null) o["qualifierName"] = s.QualifierName; // and its locale-resolved name
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
@@ -1186,6 +1188,8 @@ namespace Patterkit.Patterplay.TestHost
             if (p.Character != null) o["character"] = p.Character;
             if (p.CharacterName != null) o["characterName"] = p.CharacterName;
             if (p.Direction != null) o["direction"] = p.Direction;
+            if (p.Qualifier != null) o["qualifier"] = p.Qualifier;
+            if (p.QualifierName != null) o["qualifierName"] = p.QualifierName;
             return o;
         }
 
@@ -1368,6 +1372,14 @@ namespace Patterkit.Patterplay.TestHost
                 foreach (var c in cast.EnumerateArray())
                     bundle.Cast.Add(new Cast { Name = c.GetProperty("name").GetString(), DisplayName = c.TryGetProperty("displayName", out var dn) ? dn.GetString() : null });
 
+            // The speaker qualifiers the content uses (absent in an older bundle, or one that uses none).
+            if (b.TryGetProperty("qualifiers", out var quals))
+                foreach (var q in quals.EnumerateArray())
+                    bundle.Qualifiers.Add(new Qualifier {
+                        GameId = q.TryGetProperty("gameId", out var qg) ? qg.GetString() : null,
+                        Name = q.TryGetProperty("name", out var qn) ? qn.GetString() : null,
+                    });
+
             if (b.TryGetProperty("properties", out var props))
                 foreach (var p in props.EnumerateArray()) bundle.Properties.Add(ParsePropDecl(p));
 
@@ -1511,6 +1523,7 @@ namespace Patterkit.Patterplay.TestHost
                 Kind = b.GetProperty("kind").GetString(),
                 Character = b.TryGetProperty("character", out var c) ? c.GetString() : null,
                 Direction = b.TryGetProperty("direction", out var d) ? d.GetString() : null,
+                Qualifier = b.TryGetProperty("qualifier", out var q) ? q.GetString() : null,
             };
             if (b.TryGetProperty("gameData", out var gd)) beat.GameData = ParseGameData(gd);
             if (b.TryGetProperty("tags", out var bt)) beat.Tags = TagList(bt);

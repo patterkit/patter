@@ -123,4 +123,14 @@ describe("import-editable and suggestions", () => {
   it("needs a file", async () => {
     expect(await main(["import-editable"])).toBe(2);
   });
+
+  it("lists a speaker qualifier change by the qualifiers' shown names", async () => {
+    const dir = tavern();
+    const authoring = join(dir, "authoring/tavern.patterx");
+    const af = parseSource(readFileSync(authoring, "utf8")) as AuthoringFile;
+    const suggestion = { id: "sg_q", anchor: "L_greet", baseline: "What'll it be, stranger?", proposed: "What'll it be, stranger?", author: "Sam", ts: "2026-10-01T00:00:00Z", proposedQualifier: "os", baselineQualifier: "" };
+    writeFileSync(authoring, JSON.stringify({ ...af, suggestions: [suggestion] }));
+    expect(await main(["suggestions", dir])).toBe(0);
+    expect(logged()).toContain("qualifier (none) -> O.S.");
+  });
 });

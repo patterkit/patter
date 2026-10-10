@@ -79,6 +79,7 @@ import { PANEL_KEEP_CLEAR } from "./panel.js";
 import { mountGameDataFields } from "./gamedata-fields.js";
 import { mountProperties } from "./settings-properties.js";
 import { mountCast } from "./settings-cast.js";
+import { mountQualifiers } from "./settings-qualifiers.js";
 import { mountWorld } from "./settings-world.js";
 import { mountWritingStatus, mountAudio } from "./settings-status.js";
 import { mountEstimating } from "./settings-estimating.js";
@@ -945,6 +946,7 @@ function fixLabel(fix: NonNullable<Problem["fix"]>): string {
   if (fix.kind === "retarget-jump") return "Choose where it goes…";
   if (fix.kind === "add-prompt") return "Add a label";
   if (fix.kind === "pick-enum-value") return `Pick a valid value…`;
+  if (fix.kind === "pick-qualifier") return "Pick a qualifier…";
   return "Fix";
 }
 
@@ -1091,6 +1093,22 @@ async function applyCurrentFix(): Promise<void> {
     });
     return;
   }
+  if (fix.kind === "pick-qualifier") {
+    // Surface edit: pick one of the project's qualifiers (or none) for the line, save, re-validate. The
+    // line may be in another scene: open it first, as Go to issue would.
+    const p = problems[problemAt];
+    const list = project?.qualifiers ?? [];
+    const NONE = "None";
+    openValuePicker({
+      anchor, title: `Instead of “${fix.bad}”`, values: [...list.map((q) => q.name), NONE],
+      onPick: async (name) => {
+        if (p?.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
+        const gameId = name === NONE ? "" : (list.find((q) => q.name === name)?.gameId ?? "");
+        if (surface?.setQualifier(fix.lineId, gameId)) { await save(); await refreshProblems(); }
+      },
+    });
+    return;
+  }
   const res = await window.patter.applyFix(fix); // add-to-cast / declare-property (project-file writes)
   if (!landed(res, "Couldn't apply the fix")) return;
   if (fix.kind === "declare-property") {
@@ -1100,6 +1118,22 @@ async function applyCurrentFix(): Promise<void> {
     if (st) sceneProps = [...st.properties.map((d) => declToConditionProperty("patter", d)), ...sceneProps.filter((p) => p.scope === "scene")];
   }
   await refreshProblems(); // re-validate: the fixed problem (and its squiggle) drops out
+}
+
+/** A speaker qualifier's shown name for its gameId ("" stays "", one the project no longer lists shows
+ *  its gameId). */
+function qualifierShownName(gameId: string): string {
+  if (!gameId) return "";
+  return project?.qualifiers?.find((q) => q.gameId === gameId)?.name ?? gameId;
+}
+
+/** Edit ▸ Cycle Speaker Qualifier: the caret's dialogue line steps to the next qualifier, then none. Says
+ *  why when it can't, since a menu command that quietly does nothing reads as broken. */
+function cycleQualifierCommand(): void {
+  if (!surface || !project) return;
+  if (surface.cycleQualifier()) return;
+  if (!(project.qualifiers ?? []).length) toast("This project has no speaker qualifiers. Add them in Project Settings.", "info");
+  else if (surface.isEditable()) toast("Put the caret in a dialogue line to change its qualifier.", "info");
 }
 
 /** Register a brand-new character (from the cue popup's "+ Add") in the project master cast, so it persists
@@ -1613,6 +1647,7 @@ function openSuggestions(req: SuggestionOpenRequest): void {
       textChanged: s.proposed !== s.baseline,
       ...(s.proposedCharacter !== undefined ? { speaker: { from: s.baselineCharacter ?? "", to: s.proposedCharacter } } : {}),
       ...(s.proposedDirection !== undefined ? { direction: { from: s.baselineDirection ?? "", to: s.proposedDirection } } : {}),
+      ...(s.proposedQualifier !== undefined ? { qualifier: { from: qualifierShownName(s.baselineQualifier ?? ""), to: qualifierShownName(s.proposedQualifier) } } : {}),
       ...(s.proposedCut ? { cut: true } : {}),
       ...(s.handoff ? { handoff: s.handoff.id } : {}),
     }));
@@ -1621,8 +1656,8 @@ function openSuggestions(req: SuggestionOpenRequest): void {
     anchor: req.anchor, rows,
     onAccept: (id) => {
       const s = suggestions.find((x) => x.id === id); if (!s) return;
-      if (s.proposedCharacter !== undefined || s.proposedDirection !== undefined || s.proposedCut) {
-        // A speaker, direction, or cut lives outside the say text the surface edits: decide it on the files
+      if (s.proposedCharacter !== undefined || s.proposedDirection !== undefined || s.proposedQualifier !== undefined || s.proposedCut) {
+        // A speaker, direction, qualifier, or cut lives outside the say text the surface edits: decide it on the files
         // (main saves this scene first, applies every part, and reloads it).
         void acceptOnFiles(s.id);
         return;
@@ -1793,6 +1828,8 @@ onChange: (ph, effects) => { surface?.setEffects(id, ph, effects.filter((e) => e
     gameDataFields: (kind) => project?.gameDataFields[kind] ?? [],
     setGameData: (id, key, value) => { surface?.setGameData(id, key, value); },
     setTags: (id, tags) => { surface?.setTags(id, tags); }, // author tags (#215)
+    qualifiers: () => project?.qualifiers ?? [],
+    setQualifier: (id, gameId) => { surface?.setQualifier(id, gameId); }, // a surface edit: saves as any edit does
     writingStatuses: () => project?.writingStatuses ?? [], // the ladder (name + colour) for the status dropdown (#196)
     lineStatus: (id) => writingMap[id] ?? null,            // the beat's current status, or null (unset)
     setLineStatus: (id, status) => setLineStatus([id], status),
@@ -1921,6 +1958,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
     locSource,
     formatting: project.formatting,
     castSeed: project.cast,
+    qualifiers: project.qualifiers ?? [], // the cue's (O.S.), the keyboard cycle
     // Cross-scene jump targets: every scene + its blocks (the surface adds THIS scene with live blocks).
     jumpTargets: project.scenes.map((s) => ({ id: s.id, label: s.name, blocks: s.blocks.map((b) => ({ id: b.id, label: b.name })) })),
     showTitle: true,
@@ -2044,6 +2082,13 @@ function openTagBrowse(): void {
   if (!project) return;
   const focus = currentSceneId ? { sceneId: currentSceneId, fromBeatId: caretNodeId ?? undefined } : undefined;
   void window.patter.openSearchWindow("tag", focus);
+}
+
+/** Review ▸ Find Lines by Qualifier: the search window's Qualifier tab, the caret's scene first. */
+function openQualifierBrowse(): void {
+  if (!project) return;
+  const focus = currentSceneId ? { sceneId: currentSceneId, fromBeatId: caretNodeId ?? undefined } : undefined;
+  void window.patter.openSearchWindow("qualifier", focus);
 }
 
 async function showProject(open: OpenResult): Promise<void> {
@@ -2708,6 +2753,7 @@ interface LiveSettings {
   ccOpen: HTMLInputElement; ccClose: HTMLInputElement; ccCharacter: HTMLInputElement;
   langs: ReturnType<typeof mountLanguages>; gd: ReturnType<typeof mountGameDataFields>;
   world: ReturnType<typeof mountWorld>; worldHost: HTMLElement; cast: ReturnType<typeof mountCast>;
+  qualifiers: ReturnType<typeof mountQualifiers>;
   writingStatus: ReturnType<typeof mountWritingStatus>; estimating: ReturnType<typeof mountEstimating>;
   audio: ReturnType<typeof mountAudio>; dictionary: ReturnType<typeof mountDictionary>;
 }
@@ -2809,6 +2855,13 @@ const settingsDlg = mountSettingsDialog({
       live.cast = cast;
       return { firstInvalid: () => { const dup = cast.firstDuplicate(); return dup ? { el: dup, message: DUP_MESSAGE } : null; } };
     } },
+    { id: "qualifiers", label: "Qualifiers", mount: (host): SettingsSectionHandle => {
+      host.append(sNote("settings-note", "How a line is delivered, shown after the speaker's name: TAM (O.S.). The speaker stays one character."));
+      const qHost = el("div"); host.append(qHost);
+      const qualifiers = mountQualifiers(qHost, settingsRead!.s.qualifiers ?? []);
+      live.qualifiers = qualifiers;
+      return { firstInvalid: () => qualifiers.firstInvalid() };
+    } },
     { id: "writing-status", label: "Writing status", group: "Writing & audio", mount: (host): SettingsSectionHandle => {
       const wsHost = el("div"); host.append(wsHost);
       live.writingStatus = mountWritingStatus(wsHost, settingsRead!.s.writingStatuses);
@@ -2895,6 +2948,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     ...l.langs.value(), gameDataFields: l.gd.value(),
     properties: read.s.properties, // @patter lives in the Properties document now; pass the current set through untouched
     ...l.world.value(), cast: l.cast.value(),
+    qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(),
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),
   });
@@ -2922,6 +2976,7 @@ async function saveProjectSettings(s: ProjectSettingsDto, opts: { propertiesOnly
     if (!opts.propertiesOnly) {
       await buildSpellcheck(); // the Dictionary settings (language / words / on-off) may have changed (#177)
       pushWritingStatus(); // the writing-status ladder (names / colours) may have changed - re-push to the surface (#196)
+      surface?.setQualifiers(project.qualifiers ?? []); // the qualifier names (and list) may have changed: the cues repaint
     }
     void refreshProblems();  // revalidate against the new declarations (and, after a full save, the new spelling setup)
     lastInspectorSig = null; if (lastInspectorCtx) showInspector(lastInspectorCtx); // refresh the status dropdown + condition pills
@@ -3222,6 +3277,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "play-from-start") void playFromStart();
   else if (cmd === "select-all") selectAllCommand();
   else if (cmd === "duplicate") surface?.duplicate();
+  else if (cmd === "cycle-qualifier") cycleQualifierCommand();
   else if (cmd === "show-in-storyletter") void showInStoryletter();
   else if (cmd === "undo") surface?.undo();
   else if (cmd === "redo") surface?.redo();
@@ -3251,6 +3307,7 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "find-by-recording") openRecordingBrowse();
   else if (cmd === "find-property") openPropertyUsage();
   else if (cmd === "find-by-tag") openTagBrowse();
+  else if (cmd === "find-by-qualifier") openQualifierBrowse();
   else if (cmd === "spelling:toggle") void setDictionaryFromMenu({ enabled: !(project?.dictionary.enabled ?? true) });
   else if (cmd.startsWith("spelling:dict:")) void setDictionaryFromMenu({ language: cmd.slice("spelling:dict:".length) });
   else if (cmd === "coverage-test") void openCoverage();

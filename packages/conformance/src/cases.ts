@@ -10,7 +10,7 @@
 
 import type { DescribeFixture, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
-import { castStringKey } from "@patterkit/model";
+import { castStringKey, qualifierStringKey } from "@patterkit/model";
 
 // A minimal project scaffold shared by the runtime fixtures.
 const project = (extra: Partial<ProjectFile> = {}): ProjectFile => ({
@@ -1675,6 +1675,142 @@ const idsMode = {
   ],
 } satisfies RuntimeFixture;
 
+// --- speaker qualifiers ---------------------------------------------------------------------------------
+// A line's speaker qualifier (`TAM (O.S.)`) rides on its step as the qualifier's `gameId` and its resolved
+// shown name, beside `character` and `characterName`; a line prompt carries them too. The project here
+// declares no list, so it has the defaults (V.O. / O.S. / RADIO), and a line with none carries neither field.
+const qualifierScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "sn", type: "snippet", beats: [
+    { id: "L_think", kind: "line", character: "TAM", qualifier: "vo" },
+    { id: "L_door", kind: "line", character: "TAM", qualifier: "os", direction: "muffled" },
+    { id: "L_plain", kind: "line", character: "TAM" },
+  ] },
+  { id: "g_radio", type: "group", selector: "choice", children: [
+    { id: "o_call", type: "group", prompt: { id: "P_call", kind: "line", character: "TAM", qualifier: "radio" }, children: [
+      { id: "call_c", type: "snippet", beats: [{ id: "L_reply", kind: "line", character: "BASE", qualifier: "radio" }], jump: { to: "END" } },
+    ] },
+  ] },
+] }] }];
+const qualifierLocales = [loc("s", { L_think: "Too quiet.", L_door: "Who's there?", L_plain: "Hello.", P_call: "Base, come in.", L_reply: "Reading you." })];
+const speakerQualifiers = {
+  name: "a line carries its speaker qualifier's gameId and shown name; a line prompt does too",
+  project: project({ cast: [{ name: "TAM", displayName: "Tam" }, { name: "BASE" }] }),
+  scenes: qualifierScenes,
+  locales: qualifierLocales,
+  choices: ["o_call"],
+  expectedTranscript: [
+    { type: "line", id: "L_think", text: "Too quiet.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O." },
+    { type: "line", id: "L_door", text: "Who's there?", character: "TAM", characterName: "Tam", direction: "muffled", qualifier: "os", qualifierName: "O.S." },
+    { type: "line", id: "L_plain", text: "Hello.", character: "TAM", characterName: "Tam" }, // none: neither field
+    { type: "choice", groupId: "g_radio", options: [
+      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }, eligible: true },
+    ] },
+    { type: "line", id: "L_reply", text: "Reading you.", character: "BASE", qualifier: "radio", qualifierName: "RADIO" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// The project's own list: a renamed qualifier shows its authored name, and the active locale's
+// `qualifier:<gameId>` string (the `@project` shard) wins over it; one the locale lacks falls back to the
+// default locale's string, then the authored name.
+const speakerQualifiersLocale = {
+  name: "a qualifier's shown name follows the active locale, then the default locale, then its authored name",
+  project: project({
+    cast: [{ name: "TAM" }],
+    locales: { default: "en", all: ["en", "fr"] },
+    qualifiers: [{ gameId: "vo", name: "VO" }, { gameId: "phone", name: "PHONE" }, { gameId: "os", name: "O.S." }],
+  }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [
+      { id: "L_vo", kind: "line", character: "TAM", qualifier: "vo" },
+      { id: "L_phone", kind: "line", character: "TAM", qualifier: "phone" },
+      { id: "L_os", kind: "line", character: "TAM", qualifier: "os" },
+    ], jump: { to: "END" } },
+  ] }] }],
+  locales: [
+    loc("s", { L_vo: "Hm.", L_phone: "Hello?", L_os: "Coming!" }),
+    loc("s", { L_vo: "Hm.", L_phone: "Allo ?", L_os: "J'arrive !" }, "fr"),
+    loc("@project", { [qualifierStringKey("phone")]: "TELEPHONE" }),         // en (default)
+    loc("@project", { [qualifierStringKey("vo")]: "VOIX OFF" }, "fr"),        // fr
+  ],
+  locale: "fr",
+  expectedTranscript: [
+    { type: "line", id: "L_vo", text: "Hm.", character: "TAM", qualifier: "vo", qualifierName: "VOIX OFF" },        // fr string
+    { type: "line", id: "L_phone", text: "Allo ?", character: "TAM", qualifier: "phone", qualifierName: "TELEPHONE" }, // default-locale string
+    { type: "line", id: "L_os", text: "J'arrive !", character: "TAM", qualifier: "os", qualifierName: "O.S." },       // authored name
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// IDs-only: the `qualifier` gameId is still emitted (the game switches on it); its shown name is omitted,
+// as the character name is, for the game to localise.
+const speakerQualifiersIds = {
+  name: "IDs-only build emits the qualifier gameId and omits its shown name",
+  project: project({ cast: [{ name: "TAM", displayName: "Tam" }] }),
+  scenes: qualifierScenes,
+  locales: qualifierLocales,
+  idsOnly: true,
+  choices: ["o_call"],
+  expectedTranscript: [
+    { type: "line", id: "L_think", text: "L_think", character: "TAM", qualifier: "vo" },
+    { type: "line", id: "L_door", text: "L_door", character: "TAM", direction: "muffled", qualifier: "os" },
+    { type: "line", id: "L_plain", text: "L_plain", character: "TAM" },
+    { type: "choice", groupId: "g_radio", options: [
+      { id: "o_call", prompt: { kind: "line", text: "P_call", character: "TAM", qualifier: "radio" }, eligible: true },
+    ] },
+    { type: "line", id: "L_reply", text: "L_reply", character: "BASE", qualifier: "radio" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// A line that goes silent with captions off (the caption character's) drops its speaker fields, the
+// qualifier with them: no caption shows, so there is nothing to qualify.
+const speakerQualifiersSilent = {
+  name: "a line silenced by closed captions drops its qualifier with its speaker",
+  project: project({ cast: [{ name: "SFX" }, { name: "TAM" }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [
+      { id: "L_sfx", kind: "line", character: "SFX", qualifier: "os" },
+      { id: "L_tam", kind: "line", character: "TAM", qualifier: "os" },
+    ], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { L_sfx: "(a door slams)", L_tam: "Sorry!" })],
+  engineOptions: { closedCaptions: false },
+  expectedTranscript: [
+    { type: "line", id: "L_sfx", text: "" },
+    { type: "line", id: "L_tam", text: "Sorry!", character: "TAM", qualifier: "os", qualifierName: "O.S." },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// replayPromptOnChoose with a save between choose and advance: the pending choice's options and the
+// prompt to speak back both keep the qualifier through the save.
+const scriptedQualifierSaveLoad = {
+  name: "a qualified line prompt keeps its qualifier through a save, pending and spoken back",
+  project: project({ cast: [{ name: "TAM", displayName: "Tam" }, { name: "BASE" }] }),
+  scenes: qualifierScenes,
+  locales: qualifierLocales,
+  engineOptions: { replayPromptOnChoose: true },
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "line", id: "L_think", text: "Too quiet.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O." }] },
+    { op: "advance", expect: [{ type: "line", id: "L_door", text: "Who's there?", character: "TAM", characterName: "Tam", direction: "muffled", qualifier: "os", qualifierName: "O.S." }] },
+    { op: "advance", expect: [{ type: "line", id: "L_plain", text: "Hello.", character: "TAM", characterName: "Tam" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g_radio", options: [
+      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }, eligible: true },
+    ] }] },
+    { op: "saveLoad" }, // at the pending choice
+    { op: "advance", expect: [{ type: "choice", groupId: "g_radio", options: [
+      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }, eligible: true },
+    ] }] },
+    { op: "choose", id: "o_call" },
+    { op: "saveLoad" }, // the prompt is still to be spoken back
+    { op: "advance", expect: [{ type: "line", id: "P_call", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_reply", text: "Reading you.", character: "BASE", qualifier: "radio", qualifierName: "RADIO" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // ---------------------------------------------------------------------------
 // gameData merge-at-read - a node's sparse override resolved against its TYPE's
 // declared field defaults (runtime effectiveGameData). Not a transcript; a host
@@ -2673,7 +2809,7 @@ const outlineEverything = {
     id: "s_hall", type: "scene", name: "Great Hall", tags: ["indoor"], gameData: { music: "harp" },
     blocks: [{ id: "b_door", type: "block", name: "Door", tags: ["door"], children: [
       { id: "sn_open", type: "snippet", tags: ["opening"], beats: [
-        { id: "L_hi", kind: "line", character: "ANNA", direction: "warmly", gameData: { mood: "glad" }, tags: ["greeting"] },
+        { id: "L_hi", kind: "line", character: "ANNA", direction: "warmly", qualifier: "os", gameData: { mood: "glad" }, tags: ["greeting"] },
         { id: "E_bell", kind: "gameEvent", gameData: { mood: "loud" } },
         { id: "T_wind", kind: "text" },
       ] },
@@ -2773,6 +2909,7 @@ export const cases: Fixtures = {
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
     characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
+    speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
   scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
@@ -2781,7 +2918,8 @@ export const cases: Fixtures = {
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
-    scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties],
+    scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties,
+    scriptedQualifierSaveLoad],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
@@ -2802,6 +2940,7 @@ export const cases: Fixtures = {
       ],
     },
     asSaveFixture(scriptedEmptySpeakerSaveLoad, "a save written by the JS reference keeps a pending choice's empty speaker fields"),
+    asSaveFixture(scriptedQualifierSaveLoad, "a save written by the JS reference keeps a qualified prompt's qualifier, pending and spoken back"),
   ],
   logs: [decisionLog],
   describes: [describeEverything],

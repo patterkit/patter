@@ -87,6 +87,16 @@ namespace patter
                     if (const J* q = field(c, "displayName")) cast.displayName = text(*q);
                     out.cast.push_back(cast);
                 });
+            if (const J* p = field(root, "qualifiers"))
+                eachElement(*p, [&](const J& q)
+                {
+                    // One without a gameId names nothing a line could store: skipped, as the reference does.
+                    Qualifier qualifier;
+                    if (const J* g = field(q, "gameId")) qualifier.gameId = text(*g);
+                    if (qualifier.gameId.empty()) return;
+                    if (const J* n = field(q, "name")) qualifier.name = text(*n);
+                    out.qualifiers.push_back(qualifier);
+                });
 
             if (const J* p = field(root, "properties"))
                 eachElement(*p, [&](const J& d) { out.properties.push_back(propDecl(d)); });
@@ -312,6 +322,7 @@ namespace patter
             // Set (even to "") or absent: a step keeps a "" speaker field, as every runtime does.
             if (const J* p = field(o, "character")) { b.hasCharacter = true; b.character = text(*p); }
             if (const J* p = field(o, "direction")) { b.hasDirection = true; b.direction = text(*p); }
+            if (const J* p = field(o, "qualifier")) { b.hasQualifier = true; b.qualifier = text(*p); }
             if (const J* p = field(o, "gameData")) b.gameData = gameData(*p);
             if (const J* p = field(o, "tags")) b.tags = strList(*p);   // author tags (#215)
             return b;

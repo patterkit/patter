@@ -25,7 +25,7 @@ stays clean.
 | **`.patterflow`** | one **scene**'s structure: blocks, groups, snippets, beats, conditions, selectors, jumps | No prose, no audio. Tiny and stable, so it merges cleanly. |
 | **`.patterloc`** | the **strings** for one scene in one locale, keyed by beat id (`loc/<locale>/<scene>.patterloc`) | Text only. Even the source language lives here, not in the flow. |
 | **`.patterx`** | all volatile **authoring metadata**: comments, documentation notes, writing/recording status, the edit trail, cut markers, estimates, suggestions | Stripped at export. Merges by union of ids. |
-| **`.patterproj`** | project **settings**: cast, properties, Game Data schema, status ladders, locales, VCS kind | The thing the editor "opens." Found by walking up the directory tree. |
+| **`.patterproj`** | project **settings**: cast, speaker qualifiers, properties, Game Data schema, status ladders, locales, VCS kind | The thing the editor "opens." Found by walking up the directory tree. |
 
 Two things follow from this that are worth knowing.
 
@@ -58,7 +58,8 @@ covers what it's for.
 single **`.patterc`** file: plain UTF-8 JSON, never a zip. It carries exactly what a
 runtime needs and nothing more: the scene structure, compiled conditions and effects,
 the assembled locale strings (or none, in IDs-only mode), the cast (player-facing names
-only), the Game Data schema, resolved addresses, and a content hash.
+only), the speaker qualifiers the lines use, the Game Data schema, resolved addresses, and a
+content hash.
 
 Authoring context is deliberately left behind. A [cast member's](/setup/cast/) notes,
 grammatical gender, and the **voice actor's name** belong to your team, your translators, and

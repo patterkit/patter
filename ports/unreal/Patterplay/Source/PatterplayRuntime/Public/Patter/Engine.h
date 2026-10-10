@@ -182,6 +182,7 @@ namespace patter
     struct BeatInfo
     {
         std::string id, kind, character, characterName, direction, text;
+        std::string qualifier, qualifierName;   // speaker qualifier gameId (`vo`) and shown name (source locale)
         std::vector<std::pair<std::string, PatterValue>> gameData;   // author overrides (raw)
         std::vector<std::string> tags;                               // accumulated
     };
@@ -524,6 +525,8 @@ namespace patter
         const std::map<std::string, std::string>* defaultStrings = &noStrings();
         static const std::map<std::string, std::string>& noStrings() { static const std::map<std::string, std::string> none; return none; }
         std::map<std::string, std::string> castDisplay;
+        // Speaker qualifier gameId -> authored name: the fallback for its shown name, as castDisplay is for a speaker's.
+        std::map<std::string, std::string> qualifierDisplay;
         std::map<std::string, const Node*> nodeIndex;
         std::map<std::string, std::string> blockToScene;
         std::map<std::string, const Block*> blockById;
@@ -1918,6 +1921,8 @@ namespace patter
                 if (beat.hasCharacter) { r.hasCharacter = true; r.character = beat.character; }
                 std::string cn; if (resolveCharacterName(beat, cn)) { r.hasCharacterName = true; r.characterName = cn; }
                 if (beat.hasDirection) { r.hasDirection = true; r.direction = beat.direction; }
+                if (beat.hasQualifier) { r.hasQualifier = true; r.qualifier = beat.qualifier; }
+                std::string qn; if (resolveQualifierName(beat, qn)) { r.hasQualifierName = true; r.qualifierName = qn; }
             }
             r.gameData = beat.gameData;
             applyTags(r);
@@ -1949,6 +1954,8 @@ namespace patter
                 if (beat->hasCharacter) { p->hasCharacter = true; p->character = beat->character; }
                 std::string cn; if (resolveCharacterName(*beat, cn)) { p->hasCharacterName = true; p->characterName = cn; }
                 if (beat->hasDirection) { p->hasDirection = true; p->direction = beat->direction; }
+                if (beat->hasQualifier) { p->hasQualifier = true; p->qualifier = beat->qualifier; }
+                std::string qn; if (resolveQualifierName(*beat, qn)) { p->hasQualifierName = true; p->qualifierName = qn; }
             }
             else { p->kind = "text"; p->text = text; }
             return p;
@@ -1971,6 +1978,8 @@ namespace patter
             if (shown.hasCharacter) { r.hasCharacter = true; r.character = shown.character; }
             if (shown.hasCharacterName) { r.hasCharacterName = true; r.characterName = shown.characterName; }
             if (shown.hasDirection) { r.hasDirection = true; r.direction = shown.direction; }
+            if (shown.hasQualifier) { r.hasQualifier = true; r.qualifier = shown.qualifier; }
+            if (shown.hasQualifierName) { r.hasQualifierName = true; r.qualifierName = shown.qualifierName; }
             return r;
         }
         const Beat* promptBeatOf(const Node* node)
@@ -2010,6 +2019,19 @@ namespace patter
             auto a = host_->strings->find(key); if (a != host_->strings->end()) { out = a->second; return true; }
             auto d = host_->defaultStrings->find(key); if (d != host_->defaultStrings->end()) { out = d->second; return true; }
             auto c = host_->castDisplay.find(character); if (c != host_->castDisplay.end()) { out = c->second; return true; }
+            return false;
+        }
+        // A speaker qualifier's shown name, resolved as a speaker's is: the active `qualifier:<gameId>` string,
+        // the default one, then the authored name. False when the beat has no qualifier, and in IDs-only mode
+        // (the game maps the `qualifier` gameId itself).
+        bool resolveQualifierName(const Beat& beat, std::string& out)
+        {
+            if (!beat.hasQualifier) return false;
+            if (host_->emitIds) return false;
+            std::string key = "qualifier:" + beat.qualifier;
+            auto a = host_->strings->find(key); if (a != host_->strings->end()) { out = a->second; return true; }
+            auto d = host_->defaultStrings->find(key); if (d != host_->defaultStrings->end()) { out = d->second; return true; }
+            auto q = host_->qualifierDisplay.find(beat.qualifier); if (q != host_->qualifierDisplay.end()) { out = q->second; return true; }
             return false;
         }
 
@@ -2090,6 +2112,7 @@ namespace patter
             auto ds = allStrings.find(bundle.locales.defaultLocale); if (ds != allStrings.end()) host_.defaultStrings = &ds->second;
 
             for (const auto& c : bundle.cast) if (!c.displayName.empty()) host_.castDisplay[c.name] = c.displayName;
+            for (const auto& q : bundle.qualifiers) if (!q.gameId.empty()) host_.qualifierDisplay[q.gameId] = q.name;
             defaultSeed_ = options.hasSeed ? Mulberry32::ToUint32(options.seed) : 0x9e3779b9u;
 
             for (const auto& kv : bundle.scenes)
@@ -2695,6 +2718,13 @@ namespace patter
                     else { auto d = host_.castDisplay.find(beat.character); if (d != host_.castDisplay.end()) info.characterName = d->second; }
                 }
                 info.direction = beat.direction;
+                if (beat.hasQualifier)
+                {
+                    info.qualifier = beat.qualifier;
+                    auto q = host_.defaultStrings->find("qualifier:" + beat.qualifier);
+                    if (q != host_.defaultStrings->end()) info.qualifierName = q->second;
+                    else { auto d = host_.qualifierDisplay.find(beat.qualifier); if (d != host_.qualifierDisplay.end()) info.qualifierName = d->second; }
+                }
             }
             if (beat.kind == "line" || beat.kind == "text")
             {

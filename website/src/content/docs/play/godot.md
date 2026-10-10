@@ -44,8 +44,10 @@ Render each `step` into your own dialogue UI. A `"choice"` step carries the choi
 its `options`, each `{ "id", "prompt", "eligible", "gameData" }` (`prompt` and `gameData` only when
 set): present each option's `prompt["text"]`, greyed when `eligible` is false, and call
 `flow.choose(id)` with the player's pick. The `prompt` is `{ "kind": "line" | "text", "text" }`, and a
-`"line"` prompt also carries the speaker's `character`, `characterName`, and `direction` when set,
-the same shape every Patterplay runtime gives.
+`"line"` prompt also carries the speaker's `character`, `characterName`, `direction`, `qualifier`,
+and `qualifierName` when set, the same shape every Patterplay runtime gives. A `"line"` step carries
+`qualifier` and `qualifierName` the same way: the line's
+[speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId`, and its localised shown name.
 
 `open_flow` returns null, with `push_error`, when the address does not resolve: an unknown scene, or
 a block that is not in the scene you named. Nothing opens, and a flow already open under that name

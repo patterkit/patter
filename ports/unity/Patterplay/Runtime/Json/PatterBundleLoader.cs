@@ -69,6 +69,11 @@ namespace Patterkit.Patterplay
                 foreach (var c in cast)
                     bundle.Cast.Add(new Cast { Name = (string)c["name"], DisplayName = (string)c["displayName"] });
 
+            // The speaker qualifiers the content uses (absent in an older bundle, or one that uses none).
+            if (b["qualifiers"] is JArray quals)
+                foreach (var q in quals)
+                    if (q is JObject qo) bundle.Qualifiers.Add(new Qualifier { GameId = (string)qo["gameId"], Name = (string)qo["name"] });
+
             if (b["properties"] is JArray props)
                 foreach (var p in props) bundle.Properties.Add(PropDecl((JObject)p));
 
@@ -265,6 +270,7 @@ namespace Patterkit.Patterplay
                 Kind = (string)b["kind"],
                 Character = (string)b["character"],
                 Direction = (string)b["direction"],
+                Qualifier = (string)b["qualifier"],
             };
             if (b["gameData"] is JObject gd) beat.GameData = ParseGameData(gd);
             if (b["tags"] is JArray bt) beat.Tags = ToStringList(bt);

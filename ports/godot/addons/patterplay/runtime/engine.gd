@@ -103,6 +103,10 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	for c in bundle.get("cast", []):
 		if str(c.get("displayName", "")) != "":
 			_host.cast_display[c["name"]] = c["displayName"]
+	# Qualifier gameId -> authored name: the fallback for its shown name, as cast_display is for a speaker's.
+	for q in bundle.get("qualifiers", []):
+		if q is Dictionary and str(q.get("gameId", "")) != "" and q.get("name") != null:
+			_host.qualifier_display[str(q["gameId"])] = str(q.get("name", ""))
 
 	if options.has("seed"):
 		_default_seed = PatterMulberry32.to_uint32(float(options["seed"]))
@@ -1092,6 +1096,13 @@ func _beat_info(beat: Dictionary) -> Dictionary:
 				info["characterName"] = nm
 		if beat.has("direction"):
 			info["direction"] = beat["direction"]
+		if beat.has("qualifier"):
+			info["qualifier"] = beat["qualifier"]
+			var qn = _host.default_strings.get("qualifier:" + str(beat["qualifier"]))
+			if qn == null:
+				qn = _host.qualifier_display.get(beat["qualifier"])
+			if qn != null:
+				info["qualifierName"] = qn
 	if kind == "line" or kind == "text":
 		var src = _host.default_strings.get(beat["id"])  # source text, un-interpolated
 		if src != null:

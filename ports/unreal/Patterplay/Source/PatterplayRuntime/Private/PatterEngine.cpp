@@ -61,6 +61,8 @@ namespace
 		Out.Character = Ue(B.character);
 		Out.CharacterName = Ue(B.characterName);
 		Out.Direction = Ue(B.direction);
+		Out.Qualifier = Ue(B.qualifier);
+		Out.QualifierName = Ue(B.qualifierName);
 		Out.Text = Ue(B.text);
 		Out.GameData = ConvertGameData(B.gameData);
 		for (const std::string& T : B.tags) Out.Tags.Add(Ue(T));
@@ -107,6 +109,10 @@ namespace
 			if (O.prompt->hasCharacterName) P.CharacterName = Ue(O.prompt->characterName);
 			P.bHasDirection = O.prompt->hasDirection;
 			if (O.prompt->hasDirection) P.Direction = Ue(O.prompt->direction);
+			P.bHasQualifier = O.prompt->hasQualifier;
+			if (O.prompt->hasQualifier) P.Qualifier = Ue(O.prompt->qualifier);
+			P.bHasQualifierName = O.prompt->hasQualifierName;
+			if (O.prompt->hasQualifierName) P.QualifierName = Ue(O.prompt->qualifierName);
 			// The deprecated flat fields, filled as they were, for Blueprints that still read them.
 			Opt.PromptKind = P.Kind;
 			Opt.Text = P.Text;
@@ -136,6 +142,10 @@ namespace
 		if (S.hasCharacterName) Out.CharacterName = Ue(S.characterName);
 		Out.bHasDirection = S.hasDirection;
 		if (S.hasDirection) Out.Direction = Ue(S.direction);
+		Out.bHasQualifier = S.hasQualifier;
+		if (S.hasQualifier) Out.Qualifier = Ue(S.qualifier);
+		Out.bHasQualifierName = S.hasQualifierName;
+		if (S.hasQualifierName) Out.QualifierName = Ue(S.qualifierName);
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);

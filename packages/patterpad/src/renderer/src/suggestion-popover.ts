@@ -52,11 +52,13 @@ export interface SuggestionRow {
   stale: boolean;
   resolved?: boolean;
   outcome?: "accepted" | "rejected";
-  /** Whether the text itself is part of the proposal (a speaker, direction, or cut suggestion may not be). */
+  /** Whether the text itself is part of the proposal (a speaker, direction, qualifier, or cut suggestion may not be). */
   textChanged?: boolean;
   /** A proposed new speaker or direction (the editable-script handoff), shown from -> to. */
   speaker?: { from: string; to: string };
   direction?: { from: string; to: string };
+  /** A proposed speaker qualifier, as the names the cue shows ("" for none). */
+  qualifier?: { from: string; to: string };
   /** A proposal to cut the line (an editor emptied it). */
   cut?: boolean;
   /** The handoff it arrived in ("H-7Q2K"). */
@@ -99,6 +101,7 @@ export function openSuggestionReview(opts: {
     const paren = (d: string): string => (d ? `(${d})` : "(none)");
     if (r.speaker) card.append(el("div", "sg-diff-label", "Speaker"), change(r.speaker.from || "(none)", r.speaker.to));
     if (r.direction) card.append(el("div", "sg-diff-label", "Direction"), change(paren(r.direction.from), paren(r.direction.to)));
+    if (r.qualifier) card.append(el("div", "sg-diff-label", "Qualifier"), change(paren(r.qualifier.from), paren(r.qualifier.to)));
 
     if (!r.resolved) {
       const actions = el("div", "cmt-actions");

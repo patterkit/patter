@@ -24,7 +24,10 @@ void APatterplayDemoActor::BeginPlay()
 		{
 			case EPatterStepType::Line:
 			{
-				const FString& Speaker = Step.CharacterName.IsEmpty() ? Step.Character : Step.CharacterName;
+				FString Speaker = Step.CharacterName.IsEmpty() ? Step.Character : Step.CharacterName;
+				// A speaker qualifier shows after the name, as a script's cue does: TAM (O.S.).
+				const FString& Qualifier = Step.QualifierName.IsEmpty() ? Step.Qualifier : Step.QualifierName;
+				if (!Qualifier.IsEmpty()) Speaker += FString::Printf(TEXT(" (%s)"), *Qualifier);
 				UE_LOG(LogTemp, Display, TEXT("%s: %s"), *Speaker, *Step.Text);
 				break;
 			}

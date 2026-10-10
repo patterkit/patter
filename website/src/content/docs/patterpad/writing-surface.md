@@ -42,6 +42,23 @@ Click or arrow into a name and a small picker opens:
 
 Anyone you name is added to the cast for you, so there's no cast list to set up first.
 
+### Speaker qualifiers: V.O., O.S., RADIO
+
+A [speaker qualifier](/setup/cast/#speaker-qualifiers) says how a line is delivered: `TAM (O.S.)`
+for Tam heard but not seen, `PLAYER (V.O.)` for a thought, `GUARD (RADIO)` for a voice through a
+radio. It is picked, not typed. Choose it from the **Qualifier** menu in the line's inspector, or
+press **`⇧⌘E`** (`Shift-Ctrl-E` off the Mac, also **Edit ▸ Cycle Speaker Qualifier**) to step the
+line through the project's list and back to none. The cue shows it after the name.
+
+Runs look after themselves. A new line by a character takes the qualifier of that character's
+last line above it in the scene, so a run of thoughts or a radio exchange needs one pick, not one
+per line; pick none to end the run. A line by someone else starts clean. The qualifier is saved on
+each line, so nothing changes later if the lines around it do.
+
+A qualified line is still the same character: the cast, the report, and every count treat `TAM` and
+`TAM (O.S.)` as one. To find every line with a given qualifier, use **Review ▸ Find Lines by
+Qualifier…**.
+
 ## Typing: lines, narration, and directions
 
 Most of writing is just typing. These keys cover the rest:

@@ -12,9 +12,11 @@
 //     on the FIRST line of a run - the enclosing group / option's `vo` notes
 //     prepended (so the actor sees which option / beat this is).
 //   - Status = the line's RECORDING status (missing / scratch / recorded / final).
+//   - QUALIFIER = the line's speaker qualifier by its shown name (V.O., RADIO): how the line is delivered
+//     and processed. The CHARACTER stays the one character, so `TAM` and `TAM (O.S.)` are one actor's lines.
 // ---------------------------------------------------------------------------
 
-import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
+import { DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers } from "@patterkit/model";
 import type { Beat, Block, Group, Snippet } from "@patterkit/model";
 import { sourceStrings, mergeAuthoring, effectiveRecording } from "./loaded-helpers.js";
 import { classesForChannel } from "./documentation.js";
@@ -27,6 +29,8 @@ export interface VoiceLine {
   id: string;
   /** The canonical speaker token. */
   character: string;
+  /** The speaker qualifier's shown name (`V.O.`), when the line has one. Never part of `character`. */
+  qualifier?: string;
   /** The cast member's voice actor, if known. */
   actor?: string;
   /** The line's source-locale text. */
@@ -87,6 +91,8 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
   const source = sourceStrings(loaded);
   const actorOf = new Map<string, string>();
   for (const c of project.cast ?? []) if (c.actor) actorOf.set(c.name, c.actor);
+  // Speaker qualifiers by shown name; a gameId the list lacks shows as itself.
+  const qualifierName = new Map(projectQualifiers(project).map((q) => [q.gameId, q.name]));
 
   // `vo`-channel classes - the documentation that flows to the voice script (own notes only here; the
   // run-leading prepend gives ancestor context, matching the editor's under-heading surfacing).
@@ -107,6 +113,7 @@ export function runVoiceScript(loaded: LoadedProject, opts: { everything?: boole
       scope: scope.join(" › "),
       id: beat.id,
       character: beat.character ?? "",
+      ...(beat.qualifier ? { qualifier: qualifierName.get(beat.qualifier) ?? beat.qualifier } : {}),
       actor: beat.character ? actorOf.get(beat.character) : undefined,
       text: plainVoice(source[beat.id] ?? ""),
       comments: leadingVo ? [...leadingVo, ...own] : own, // first line of the run gets the enclosing context

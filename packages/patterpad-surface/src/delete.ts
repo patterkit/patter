@@ -36,6 +36,7 @@ import { Fragment, type Node as PMNode } from "prosemirror-model";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
 import { removeDirection } from "./direction.js";
+import { qualifierOf, rawWithQualifier } from "./qualifier.js";
 import { arrowLeft } from "./navigation.js";
 import { sayNode, cueText, zoneText, zoneContentStart, zoneContentEnd, sayStartOf, beatNode, rawAttr } from "./zoneutil.js";
 import { refusal, snippetLossMessage } from "./guard.js";
@@ -256,7 +257,7 @@ function prevLineOf(state: EditorStateLike, c: Ctx): { node: PMNode; pos: number
 /** L's content folded into the line P before it, per the merge rules:
  *   - P is text (prose): keep it text, inline L's direction into the text;
  *   - P is dialogue WITH content: keep P's direction, DROP L's, concatenate the say;
- *   - P is dialogue with NO content: take everything from L (its say AND its direction).
+ *   - P is dialogue with NO content: take everything from L (its say, its direction, and its qualifier).
  *  P keeps its id and raw. The say moves as content, so bold / italic survive the fold. */
 function foldInto(P: PMNode, L: PMNode): PMNode {
   const lSay = sayContent(L);
@@ -268,7 +269,8 @@ function foldInto(P: PMNode, L: PMNode): PMNode {
   }
   const pSay = sayContent(P);
   if (pSay.size > 0) return beatNode("line", { ...keep, speaker: cueText(P), direction: zoneText(P, "paren"), say: pSay.append(lSay) });
-  return beatNode("line", { ...keep, speaker: cueText(P), direction: lDir || zoneText(P, "paren"), say: lSay });
+  // An empty P takes L's delivery whole: its words, its direction, and its speaker qualifier.
+  return beatNode("line", { id: keep.id, raw: L.type.name === "line" ? rawWithQualifier(keep.raw, qualifierOf(L)) : keep.raw, speaker: cueText(P), direction: lDir || zoneText(P, "paren"), say: lSay });
 }
 
 /** Dissolve this dialogue line into the previous line: delete the (highlighted) name,

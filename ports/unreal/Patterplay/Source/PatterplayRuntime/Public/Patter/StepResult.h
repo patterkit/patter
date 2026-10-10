@@ -19,6 +19,8 @@ namespace patter
         bool hasCharacter = false; std::string character;
         bool hasCharacterName = false; std::string characterName;
         bool hasDirection = false; std::string direction;
+        bool hasQualifier = false; std::string qualifier;           // speaker qualifier gameId (`vo`)
+        bool hasQualifierName = false; std::string qualifierName;   // and its resolved shown name
     };
 
     struct ChoiceOption
@@ -37,6 +39,8 @@ namespace patter
         bool hasCharacter = false; std::string character;
         bool hasCharacterName = false; std::string characterName;
         bool hasDirection = false; std::string direction;
+        bool hasQualifier = false; std::string qualifier;           // speaker qualifier gameId (`vo`)
+        bool hasQualifierName = false; std::string qualifierName;   // and its resolved shown name
         std::shared_ptr<GameData> gameData;
         bool hasTags = false; std::vector<std::string> tags;   // author tags (#215)
         std::vector<ChoiceOption> options;       // choice only

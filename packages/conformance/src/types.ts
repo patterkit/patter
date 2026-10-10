@@ -31,7 +31,7 @@ export type ScopeBag = Record<string, ScalarValue>;
  * There is no flat `text` on an option: it would only repeat `prompt.text`.
  */
 export type TranscriptStep =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; gameData?: GameData; tags?: string[] }
   | { type: "text"; id: string; text: string; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
@@ -55,6 +55,9 @@ export interface TranscriptPrompt {
   character?: string;
   characterName?: string;
   direction?: string;
+  /** The speaker qualifier's `gameId` and resolved shown name (a `line` prompt only, and only when set). */
+  qualifier?: string;
+  qualifierName?: string;
 }
 
 /**

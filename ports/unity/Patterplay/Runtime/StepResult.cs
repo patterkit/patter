@@ -15,6 +15,8 @@ namespace Patterkit.Patterplay
         public string Character;       // line only
         public string CharacterName;   // line only
         public string Direction;       // line only
+        public string Qualifier;       // line only: the speaker qualifier's gameId (`vo`)
+        public string QualifierName;   // line only: its resolved shown name (`V.O.`)
     }
 
     public sealed class ChoiceOption
@@ -41,6 +43,8 @@ namespace Patterkit.Patterplay
         public string Character;
         public string CharacterName;
         public string Direction;
+        public string Qualifier;             // line only: the speaker qualifier's gameId (`vo`); null when none
+        public string QualifierName;         // line only: its resolved shown name (`V.O.`); null in IDs-only mode
         public GameData GameData;
         public List<string> Tags;            // author tags (#215); null when none
         public List<ChoiceOption> Options;   // choice only

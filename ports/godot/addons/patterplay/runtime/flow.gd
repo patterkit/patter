@@ -1090,6 +1090,11 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 			r["characterName"] = cn
 		if beat.has("direction"):
 			r["direction"] = beat["direction"]
+		if beat.has("qualifier"):
+			r["qualifier"] = beat["qualifier"]
+		var qn = _resolve_qualifier_name(beat)
+		if qn != null:
+			r["qualifierName"] = qn
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
 	if not tags.is_empty():
@@ -1126,8 +1131,8 @@ func interpolate(text: String) -> String:
 
 
 # An option's prompt (spec 5): its prompt beat, resolved and interpolated, as
-# {"kind": "line" | "text", "text": ..., and for a line "character" / "characterName" / "direction"
-# when set}. The same shape every runtime's choice option carries. null when there is no prompt beat.
+# {"kind": "line" | "text", "text": ..., and for a line "character" / "characterName" / "direction" /
+# "qualifier" / "qualifierName" when set}. The same shape every runtime's choice option carries. null when there is no prompt beat.
 func _prompt_for(node: Dictionary):
 	var beat = _prompt_beat_of(node)
 	if beat == null:
@@ -1144,6 +1149,11 @@ func _prompt_for(node: Dictionary):
 		p["characterName"] = cn
 	if beat.has("direction"):
 		p["direction"] = beat["direction"]
+	if beat.has("qualifier"):
+		p["qualifier"] = beat["qualifier"]
+	var qn = _resolve_qualifier_name(beat)
+	if qn != null:
+		p["qualifierName"] = qn
 	return p
 
 
@@ -1160,7 +1170,7 @@ func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
 	var tags: Array = _host.tag_index.get(beat["id"], [])
 	var r := {"type": "text" if shown.get("kind", "") == "text" else "line", "id": beat["id"], "text": str(shown.get("text", ""))}
 	if r["type"] == "line":
-		for k in ["character", "characterName", "direction"]:
+		for k in ["character", "characterName", "direction", "qualifier", "qualifierName"]:
 			if shown.has(k):
 				r[k] = str(shown[k])
 	if beat.has("gameData"):
@@ -1221,6 +1231,25 @@ func _resolve_character_name(beat: Dictionary):
 		return _host.default_strings[key]
 	if _host.cast_display.has(character):
 		return _host.cast_display[character]
+	return null
+
+
+# A line beat's speaker qualifier's shown name, resolved as a character's is: the `qualifier:<gameId>`
+# string in the active locale, else the default locale, else the authored name. null when the beat has no
+# qualifier, and in IDs-only mode (the game maps the `qualifier` gameId itself).
+func _resolve_qualifier_name(beat: Dictionary):
+	if not beat.has("qualifier"):
+		return null
+	if _host.emit_ids:
+		return null
+	var qualifier := str(beat["qualifier"])
+	var key := "qualifier:" + qualifier
+	if _host.strings.has(key):
+		return _host.strings[key]
+	if _host.default_strings.has(key):
+		return _host.default_strings[key]
+	if _host.qualifier_display.has(qualifier):
+		return _host.qualifier_display[qualifier]
 	return null
 
 

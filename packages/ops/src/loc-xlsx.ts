@@ -1,15 +1,17 @@
 // ---------------------------------------------------------------------------
 // The Excel localisation format (spec §14): one sheet per scene (+ an `@project`
 // sheet for display names), columns ID / Source / Translation / Comments / Status
-// / Gender. A view of the LocCatalog, like loc-format.ts's JSON/PO. exceljs is
+// / Gender / Qualifier. A view of the LocCatalog, like loc-format.ts's JSON/PO. exceljs is
 // lazy-loaded (heavy; only this path needs it), mirroring report-xlsx.ts.
 //
 // Round-trips: a hidden Scene column carries the scene id on every row; Status
 // "stale" carries the staleness flag. Source / Comments are read back for
 // completeness but applyLoc only consumes id + scene + translation + stale. Gender
 // is export-only translator context (regenerated from the cast each export), so the
-// reader ignores it. Gender and Scene are APPENDED: the reader indexes columns 1-5
-// positionally, so a sheet exported by an older Patterpad still imports unchanged.
+// reader ignores it, as it does Qualifier (a line's speaker qualifier, how it is
+// delivered: context, never text to translate). Gender, Scene, and Qualifier are
+// APPENDED: the reader indexes columns 1-5 positionally, and finds Scene at 7, so a
+// sheet exported by an older Patterpad still imports unchanged.
 //
 // The scene cannot ride on the sheet name alone, because Excel's sheet names are
 // not a faithful carrier: at most 31 characters, unique regardless of case, and
@@ -22,7 +24,7 @@
 import type { LocCatalog, LocEntry } from "./localisation.js";
 import { checkCatalogField } from "./loc-format.js";
 
-const HEADERS = ["ID", "Source", "Translation", "Comments", "Status", "Gender", "Scene"] as const;
+const HEADERS = ["ID", "Source", "Translation", "Comments", "Status", "Gender", "Scene", "Qualifier"] as const;
 /** The 1-based column of the hidden scene id. */
 const SCENE_COLUMN = HEADERS.indexOf("Scene") + 1;
 /** Excel's (and exceljs's) cap on a sheet name's length. */
@@ -88,6 +90,8 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
       { header: "Gender", key: "gender", width: 12 },
       // Hidden: the translator has no use for it, and it is the import's only faithful record of the scene.
       { header: "Scene", key: "scene", width: 22, hidden: true },
+      // After the hidden Scene column, so the columns an older reader finds by position stay where they were.
+      { header: "Qualifier", key: "qualifier", width: 11 },
     ];
     ws.getRow(1).font = { bold: true };
     // Frozen, not just bold: a long sheet is read by scrolling, and the header row is the only
@@ -97,7 +101,7 @@ export async function catalogToXlsx(catalog: LocCatalog): Promise<Buffer> {
     for (const e of entries) {
       ws.addRow({ id: e.id, source: e.source, translation: e.translation,
         comments: e.comments.join("\n"), status: e.stale ? "stale" : (e.translation ? "translated" : ""),
-        gender: e.context?.gender ?? "", scene });
+        gender: e.context?.gender ?? "", scene, qualifier: e.context?.qualifier ?? "" });
     }
   }
   return Buffer.from(await wb.xlsx.writeBuffer());

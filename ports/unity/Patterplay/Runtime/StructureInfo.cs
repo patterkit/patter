@@ -15,6 +15,8 @@ namespace Patterkit.Patterplay
         public string Character;       // line only
         public string CharacterName;   // resolved display name (source locale), if the cast declares one
         public string Direction;       // line only
+        public string Qualifier;       // speaker qualifier gameId (line only), e.g. `vo`
+        public string QualifierName;   // the qualifier's shown name (source locale), e.g. `V.O.`
         public string Text;            // source text, un-interpolated (line/text); null for gameEvent / IDs-only
         public GameData GameData;      // author overrides (raw); null when empty
         public List<string> Tags;      // accumulated author tags; null when empty

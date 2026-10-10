@@ -182,6 +182,20 @@ struct FPatterChoicePrompt
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasDirection = false;
+
+	/** The speaker qualifier's gameId (`vo`, `os`, `radio`): how the line is delivered, `TAM (O.S.)`. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Qualifier;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasQualifier = false;
+
+	/** The qualifier's shown name (`O.S.`), locale-resolved as CharacterName is; unset in an IDs-only build. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString QualifierName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasQualifierName = false;
 };
 
 USTRUCT(BlueprintType)
@@ -452,6 +466,20 @@ struct FPatterStep
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasDirection = false;
+
+	/** The speaker qualifier's gameId (`vo`, `os`, `radio`): how the line is delivered, `TAM (O.S.)`. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Qualifier;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasQualifier = false;
+
+	/** The qualifier's shown name (`O.S.`), locale-resolved as CharacterName is; unset in an IDs-only build. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString QualifierName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasQualifierName = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterOption> Options;

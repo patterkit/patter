@@ -45,6 +45,13 @@ language can inflect that character's lines (see
 free-text **Notes** on casting, voice, or intent. Each character's colour is shown but
 chosen for you.
 
+The **Qualifiers** tab holds the project's [speaker qualifiers](/setup/cast/#speaker-qualifiers),
+`V.O.`, `O.S.`, and `RADIO` to start with. Each row has a name, which the script shows, and a
+Game ID, which your game relies on and which follows the name until you edit it; expand a row for a
+description. Add, remove, or reorder them, or start from the **Screenplay** or **Game** set.
+Changing a Game ID updates every line that uses it. Removing a qualifier leaves its lines flagged,
+with a fix that picks a replacement.
+
 The **Writing Status** and **Audio Status** tabs hold the status ladders, each stage with
 its own colour. Audio Status is opt-in (a **Track Audio Status?** switch) and needs the
 project to be **Voiced**; see [Recording status &

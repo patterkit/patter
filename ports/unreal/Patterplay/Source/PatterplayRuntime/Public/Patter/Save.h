@@ -107,6 +107,8 @@ namespace patter
             if (p.hasCharacter) out += ",\"character\":" + jsonQuote(p.character);
             if (p.hasCharacterName) out += ",\"characterName\":" + jsonQuote(p.characterName);
             if (p.hasDirection) out += ",\"direction\":" + jsonQuote(p.direction);
+            if (p.hasQualifier) out += ",\"qualifier\":" + jsonQuote(p.qualifier);
+            if (p.hasQualifierName) out += ",\"qualifierName\":" + jsonQuote(p.qualifierName);
             return out + "}";
         }
 
@@ -384,6 +386,8 @@ namespace patter
             if (const JV* v = p.get("character")) { prompt->hasCharacter = true; prompt->character = v->t == JV::T::Str ? v->s : ""; }
             if (const JV* v = p.get("characterName")) { prompt->hasCharacterName = true; prompt->characterName = v->t == JV::T::Str ? v->s : ""; }
             if (const JV* v = p.get("direction")) { prompt->hasDirection = true; prompt->direction = v->t == JV::T::Str ? v->s : ""; }
+            if (const JV* v = p.get("qualifier")) { prompt->hasQualifier = true; prompt->qualifier = v->t == JV::T::Str ? v->s : ""; }
+            if (const JV* v = p.get("qualifierName")) { prompt->hasQualifierName = true; prompt->qualifierName = v->t == JV::T::Str ? v->s : ""; }
             return prompt;
         }
 

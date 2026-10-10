@@ -6,6 +6,18 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker qualifiers: a line step carries `qualifier` and `qualifierName`.** A line can say how it is
+  delivered (`TAM (O.S.)`, `PLAYER (V.O.)`, `GUARD (RADIO)`) without changing who says it. `qualifier` is
+  the qualifier's `gameId` (`"os"`), what a game switches on; `qualifierName` is its shown name, resolved
+  as `characterName` is (the `qualifier:<gameId>` string in the active locale, then the default locale,
+  then the name the bundle carries) and left out in an IDs-only build. Both are absent when the line has
+  no qualifier, and dropped with the speaker when closed captions silence a line. A line prompt on a
+  choice option, a replayed prompt, a saved choice, and `get_outline` / `get_beat_sequence` carry them
+  too. Older bundles and saves load unchanged. The demos show the qualifier after the speaker's name.
+  Held across all four runtimes by the conformance corpus.
+
 ## [0.21.0] - 2026-10-07
 
 ### Changed

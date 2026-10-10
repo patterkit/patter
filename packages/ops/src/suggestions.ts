@@ -5,7 +5,8 @@
 // many at once from the Search window, or from the CLI, has no surface: this does the same work on the
 // project's shards and returns the writes for the caller to commit through VC.
 //
-// A suggestion proposes any of: new text, a new speaker, a new direction, cutting the beat. Each part it
+// A suggestion proposes any of: new text, a new speaker, a new speaker qualifier, a new direction, cutting
+// the beat. Each part it
 // carries is checked against its own baseline first; if the project has moved on since (the text or the
 // speaker isn't what the suggestion was made against), the suggestion is STALE and is refused, never
 // applied over the newer work. Rejecting needs no check.
@@ -27,8 +28,9 @@ export function staleParts(s: Suggestion, liveText: string, line: LineBeat | und
   const stale: string[] = [];
   if (liveText !== s.baseline) stale.push("the text");
   if (s.proposedCharacter !== undefined && (line?.character ?? "") !== (s.baselineCharacter ?? "")) stale.push("the speaker");
+  if (s.proposedQualifier !== undefined && (line?.qualifier ?? "") !== (s.baselineQualifier ?? "")) stale.push("the speaker qualifier");
   if (s.proposedDirection !== undefined && (line?.direction ?? "") !== (s.baselineDirection ?? "")) stale.push("the direction");
-  if ((s.proposedCharacter !== undefined || s.proposedDirection !== undefined) && !line) stale.push("the line (no longer a spoken line)");
+  if ((s.proposedCharacter !== undefined || s.proposedQualifier !== undefined || s.proposedDirection !== undefined) && !line) stale.push("the line (no longer a spoken line)");
   return stale;
 }
 
@@ -222,6 +224,10 @@ export function applySuggestionDecisions(
     }
     if (line && flow && s.proposedCharacter !== undefined && s.proposedCharacter !== (line.character ?? "")) {
       line.character = s.proposedCharacter; work.touch(flow.path); edited = true;
+    }
+    if (line && flow && s.proposedQualifier !== undefined && s.proposedQualifier !== (line.qualifier ?? "")) {
+      if (s.proposedQualifier === "") delete line.qualifier; else line.qualifier = s.proposedQualifier;
+      work.touch(flow.path); edited = true;
     }
     if (line && flow && s.proposedDirection !== undefined && s.proposedDirection !== (line.direction ?? "")) {
       if (s.proposedDirection === "") delete line.direction; else line.direction = s.proposedDirection;

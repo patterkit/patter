@@ -68,6 +68,9 @@ const PLAYER_JS = String.raw`
       if (!s) { add("end", "The End"); return; } // defensive: a step should always be returned; never hard-crash
       if (s.type === "line") {
         var who = s.characterName || s.character || "";
+        // A speaker qualifier follows the name, as the script's cue has it: TAM (O.S.).
+        var qual = s.qualifierName || s.qualifier;
+        if (qual && who) who += " (" + qual + ")";
         var dir = s.direction ? '<em class="dir">(' + esc(s.direction) + ')</em> ' : "";
         add("line", '<span class="who" style="color:hsl(' + hueOf(s.character || who) + ',55%,38%)">' + esc(who) + '</span>' + dir + esc(s.text));
         scrollDown(); setTimeout(step, fakeDuration(s.text));

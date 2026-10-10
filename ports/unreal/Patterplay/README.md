@@ -44,6 +44,11 @@ FPatterStep Step = Flow->Advance();   // Step.Type, Step.Text, Step.Character, S
 Flow->Choose(Step.Options[0].Id);
 ```
 
+A line step names its speaker (`Character`, and `CharacterName`, the locale-resolved name), its
+`Direction`, and any speaker qualifier: `Qualifier` is the qualifier's gameId (`vo`, `os`, `radio`) for
+your code to switch on, and `QualifierName` its shown name (`O.S.`), so a dialogue widget can show
+`TAM (O.S.)`. An option's `Prompt` carries the same fields, and each has a `bHas` flag for whether it is set.
+
 The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint** (with `FPatterStep`
 and `FPatterOption` as Blueprint structs), so a designer can drive the flow and bind steps to
 a dialogue widget without touching C++.
@@ -85,7 +90,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   cursor to the editor; `ApplyLiveBundle` hot-reloads an edited bundle into the running
   engine. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Structure**: `GetOutline` / `GetBeatSequence` expose the authored tree (per-beat text,
-  character, gameData, tags, plus each scene's and block's own gameData) for tooling like
+  character, speaker qualifier, gameData, tags, plus each scene's and block's own gameData) for tooling like
   Sequencer binding. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
   a block's own gameData by address, raw (not merged with the declared defaults).
 

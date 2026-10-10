@@ -77,7 +77,10 @@ needs first. If someone else holds one, **nothing is written**, and the dialog s
   one line are all credited).
 - **A box emptied**, or deleted with Track Changes on, becomes a suggestion to **cut** the line.
 - **A speaker changed** to one of your cast becomes a suggestion to reassign the line; a **direction**
-  added or changed becomes a suggestion too.
+  added or changed becomes a suggestion too, and so does a
+  [speaker qualifier](/setup/cast/#speaker-qualifiers) added, changed, or removed in the cue
+  (`TAM (O.S.)`). The cue is matched against your cast first, so a character whose name has brackets
+  in it is still read as that character; a bracket that isn't one of your qualifiers is flagged.
 - **Comments** from Word or Google Docs become comment threads on the line or node they were on, with
   their replies. Inline `[[notes]]` become comments as well.
 - **A line that changed in the project since you sent it** still gets its suggestion, shown as out of

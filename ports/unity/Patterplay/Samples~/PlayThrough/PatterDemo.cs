@@ -29,7 +29,11 @@ namespace Patterkit.Patterplay.Samples
                 var step = flow.Advance();
                 switch (step.Type)
                 {
-                    case StepType.Line: Debug.Log($"{step.CharacterName ?? step.Character}: {step.Text}"); break;
+                    case StepType.Line:
+                        // The speaker qualifier, when the line has one, shows after the name: TAM (O.S.).
+                        var qualifier = step.QualifierName ?? step.Qualifier;
+                        Debug.Log($"{step.CharacterName ?? step.Character}{(qualifier != null ? $" ({qualifier})" : "")}: {step.Text}");
+                        break;
                     case StepType.Text: Debug.Log(step.Text); break;
                     case StepType.Choice:
                     {

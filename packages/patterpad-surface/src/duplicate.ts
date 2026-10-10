@@ -19,6 +19,7 @@ import type { Node as PMNode } from "prosemirror-model";
 import type { EditorState, Transaction } from "prosemirror-state";
 import { newId } from "@patterkit/core";
 import { isChoiceGroup } from "./zoneutil.js";
+import { NO_INHERIT } from "./qualifier.js";
 
 /** old id -> new id for every node in a duplicated subtree. */
 export type IdMap = Record<string, string>;
@@ -151,6 +152,7 @@ export function duplicateChunk(state: EditorState, pos: number): { tr: Transacti
     const raw = parseObj(copy.attrs.raw as string);
     if (raw && "fallback" in raw) { delete raw.fallback; copy = copy.type.create({ ...copy.attrs, raw: JSON.stringify(raw) }, copy.content, copy.marks); }
   }
-  const tr = state.tr.insert(pos + node.nodeSize, copy);
+  // A copy keeps each line's qualifier as it was copied: the run rule is for lines being written.
+  const tr = state.tr.insert(pos + node.nodeSize, copy).setMeta(NO_INHERIT, true);
   return { tr, idMap };
 }

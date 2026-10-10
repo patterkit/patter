@@ -8,6 +8,7 @@
 //   - "recording":   the same over the recording ladder, in a project that tracks audio status.
 //   - "property":    every place a property is used (conditions, effects, interpolated text).
 //   - "tag":         every node carrying a tag.
+//   - "qualifier":   every dialogue line carrying a speaker qualifier (TAM (O.S.)).
 //   - "suggestions": the open suggestions, to accept or reject.
 import "@patterkit/patterpad-surface/theme.css"; // app design tokens (same look as the editor + play window)
 import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() below draws
@@ -41,6 +42,7 @@ const modeStatusBtn = document.getElementById("mode-status") as HTMLButtonElemen
 const modeRecordingBtn = document.getElementById("mode-recording") as HTMLButtonElement;
 const modePropertyBtn = document.getElementById("mode-property") as HTMLButtonElement;
 const modeTagBtn = document.getElementById("mode-tag") as HTMLButtonElement;
+const modeQualifierBtn = document.getElementById("mode-qualifier") as HTMLButtonElement;
 const modeSuggestionsBtn = document.getElementById("mode-suggestions") as HTMLButtonElement;
 const suggRow = document.getElementById("swin-sugg-row")!;
 const suggSummary = document.getElementById("swin-sugg-summary")!;
@@ -54,7 +56,7 @@ const replaceAllBtn = document.getElementById("swin-replace-all") as HTMLButtonE
 const statusLike = (m: SearchMode): boolean => m === "status" || m === "recording";
 /** Modes that browse via CHIPS + a filter box (writing / recording status, or author tags) rather than a
  *  free-text query. They share the chip rail, the "filter these" input, and the pick-a-chip flow. */
-const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag" || m === "suggestions";
+const chipMode = (m: SearchMode): boolean => statusLike(m) || m === "tag" || m === "qualifier" || m === "suggestions";
 /** The Suggestions tab's "every handoff" chip (also catches suggestions made by hand in the editor). */
 const ALL = "All";
 // The head is the shell's `toolWindowHead`: the drag bar, the pin, one "Close (Esc)" and Escape
@@ -78,8 +80,10 @@ let mode: SearchMode = "content";
 let voiced = false; // recording status (and its tab) is voiced-only (#206)
 let hasProject = false; // nothing to re-run against until one is open
 // The chip rail's items: writing / recording rungs (with a palette colour) OR author tags (with a node
-// count). `activeChip` is the picked one; `chipHits` its full result list (the input box then filters it).
-let chips: Array<{ name: string; colour?: number; count?: number }> = [];
+// count), or speaker qualifiers (a name shown, a gameId queried: `id`). `activeChip` is the picked one's key
+// (`id`, else its name); `chipHits` its full result list (the input box then filters it).
+let chips: Array<{ name: string; id?: string; colour?: number; count?: number }> = [];
+const chipKey = (c: { name: string; id?: string }): string => c.id ?? c.name;
 let activeChip = "";
 let chipHits: SearchEntry[] = [];
 let results: SearchEntry[] = [];
@@ -129,7 +133,9 @@ const renderResults = (): void => {
     const empty = document.createElement("div");
     empty.className = "swin-empty";
     empty.textContent = chipMode(mode)
-      ? (activeChip ? (mode === "tag" ? `Nothing tagged “${activeChip}”.` : `No ${activeChip} lines.`) : "")
+      ? (activeChip ? (mode === "tag" ? `Nothing tagged “${activeChip}”.`
+        : mode === "qualifier" ? `No lines with ${chips.find((c) => chipKey(c) === activeChip)?.name ?? activeChip}.`
+        : `No ${activeChip} lines.`) : "")
       : (input.value.trim() ? "No matches." : "");
     resultsEl.append(empty);
     return;
@@ -143,12 +149,12 @@ const renderChips = (): void => {
   for (const s of chips) {
     const c = document.createElement("button");
     c.type = "button";
-    c.className = `swin-chip${s.name === activeChip ? " active" : ""}`;
+    c.className = `swin-chip${chipKey(s) === activeChip ? " active" : ""}`;
     if (s.colour != null) { const dot = document.createElement("span"); dot.className = "swin-chip-dot"; dot.style.background = `var(--char-${s.colour})`; c.append(dot); }
     c.append(document.createTextNode(s.name));
     // Tags carry a node count instead of a ladder colour: show it so you can see how used each tag is.
     if (s.count != null) { const n = document.createElement("span"); n.className = "swin-chip-count"; n.textContent = String(s.count); c.append(n); }
-    c.addEventListener("mousedown", (ev) => { ev.preventDefault(); void loadChip(s.name); });
+    c.addEventListener("mousedown", (ev) => { ev.preventDefault(); void loadChip(chipKey(s)); });
     chipsEl.append(c);
   }
 };
@@ -183,7 +189,9 @@ const loadChip = async (name: string): Promise<void> => {
     if (mine !== token) return;
     suggHits = hits; applyChipFilter(); return;
   }
-  const hits = mode === "tag" ? await search.tagUsage(name) : await search.linesByStatus(name, mode === "recording");
+  const hits = mode === "tag" ? await search.tagUsage(name)
+    : mode === "qualifier" ? await search.linesByQualifier(name)
+    : await search.linesByStatus(name, mode === "recording");
   if (mine !== token) return;
   chipHits = hits; applyChipFilter();
 };
@@ -275,6 +283,7 @@ const suggestionRow = (s: OpenSuggestionDto): HTMLElement => {
   else if (s.proposed !== s.baseline) what.append(part("swin-before", s.baseline), arrow(), part("swin-after", s.proposed));
   if (s.proposedCharacter !== undefined) what.append(part("swin-slabel", "Speaker"), part("swin-before", s.baselineCharacter || "(none)"), arrow(), part("swin-after", s.proposedCharacter));
   if (s.proposedDirection !== undefined) what.append(part("swin-slabel", "Direction"), part("swin-before", s.baselineDirection || "(none)"), arrow(), part("swin-after", s.proposedDirection || "(none)"));
+  if (s.proposedQualifier !== undefined) what.append(part("swin-slabel", "Qualifier"), part("swin-before", s.baselineQualifier || "(none)"), arrow(), part("swin-after", s.proposedQualifier || "(none)"));
   const meta = document.createElement("span"); meta.className = "swin-loc";
   meta.append(locationCrumbs(s.sceneName ? [s.sceneName] : []), part("swin-sauthor", s.author));
   if (s.stale.length) { const st = part("swin-stale", "Out of date"); st.dataset.tip = `${s.stale.join(" and ")} changed since this was suggested.`; meta.append(st); }
@@ -338,7 +347,7 @@ acceptCleanBtn.addEventListener("click", () => void acceptAllClean());
 // --- mode switching ----------------------------------------------------------
 async function setMode(next: SearchMode): Promise<void> {
   mode = next;
-  for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeTagBtn, "tag"], [modeSuggestionsBtn, "suggestions"]] as const) {
+  for (const [btn, m] of [[modeContentBtn, "content"], [modeReplaceBtn, "replace"], [modeStatusBtn, "status"], [modeRecordingBtn, "recording"], [modePropertyBtn, "property"], [modeTagBtn, "tag"], [modeQualifierBtn, "qualifier"], [modeSuggestionsBtn, "suggestions"]] as const) {
     btn.classList.toggle("on", mode === m);
     btn.setAttribute("aria-selected", String(mode === m));
   }
@@ -347,7 +356,7 @@ async function setMode(next: SearchMode): Promise<void> {
   suggRow.hidden = mode !== "suggestions"; // the summary + Accept all clean
   input.placeholder = mode === "suggestions" ? "Filter suggestions…"
     : mode === "tag" ? "Filter tagged nodes…"
-    : statusLike(mode) ? "Filter these lines…"
+    : statusLike(mode) || mode === "qualifier" ? "Filter these lines…"
     : mode === "property" ? "Property usage… (@gold, world.threat, faction rebels)"
     : mode === "replace" ? "Find text to replace…"
     : "Search… (text, title, Game ID, or paste an id)";
@@ -355,16 +364,18 @@ async function setMode(next: SearchMode): Promise<void> {
   results = []; replaceHits = []; sel = 0; renderResults();
   if (chipMode(mode)) {
     input.value = ""; // a chip mode's box is a post-filter; start empty so the full list for the picked chip shows
-    chips = mode === "suggestions" ? await suggestionChips() : mode === "tag" ? await search.tags() : await search.statuses(mode === "recording");
+    chips = mode === "suggestions" ? await suggestionChips() : mode === "tag" ? await search.tags()
+      : mode === "qualifier" ? (await search.qualifiers()).map((q) => ({ name: q.name, id: q.gameId, count: q.count }))
+      : await search.statuses(mode === "recording");
     if (!chips.length) {
       activeChip = ""; renderChips();
       resultsEl.replaceChildren();
       const empty = document.createElement("div"); empty.className = "swin-empty";
-      empty.textContent = mode === "tag" ? "No tags in this project yet." : "";
+      empty.textContent = mode === "tag" ? "No tags in this project yet." : mode === "qualifier" ? "No speaker qualifiers in this project. Add them in Project Settings." : "";
       resultsEl.append(empty);
       input.focus(); input.select(); return;
     }
-    if (!chips.some((s) => s.name === activeChip)) activeChip = chips[0]!.name;
+    if (!chips.some((s) => chipKey(s) === activeChip)) activeChip = chipKey(chips[0]!);
     renderChips();
     await loadChip(activeChip);
   } else if (mode === "property") {
@@ -412,6 +423,7 @@ modeStatusBtn.addEventListener("click", () => void setMode("status"));
 modeRecordingBtn.addEventListener("click", () => void setMode("recording"));
 modePropertyBtn.addEventListener("click", () => void setMode("property"));
 modeTagBtn.addEventListener("click", () => void setMode("tag"));
+modeQualifierBtn.addEventListener("click", () => void setMode("qualifier"));
 modeSuggestionsBtn.addEventListener("click", () => void setMode("suggestions"));
 
 

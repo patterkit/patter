@@ -4,7 +4,8 @@
 // them in Word, Google Docs, or OnlyOffice and send the file back.
 //
 // Each editable line (dialogue, narration, a choice option's prompt) is a one-row table:
-//   lead cell    the cue and direction, or ◇ for an option (context, styled as the readable script),
+//   lead cell    the cue (with any speaker qualifier, `TAM (O.S.)`) and direction, or ◇ for an option
+//                (context, styled as the readable script),
 //                set right so each sits against its box;
 //                narration has none, so its words start flush left, apart from the dialogue
 //   text cell    the words, shaded with a hairline edge: the only thing meant to be edited
@@ -29,7 +30,7 @@ import { HANDOFF_SCHEMA } from "@patterkit/model";
 import type { HandoffFile, HandoffLine, HandoffRow } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import type { PlannedWrite } from "./write.js";
-import { runScriptDoc, characterColour, TOKENS } from "./script-doc.js";
+import { runScriptDoc, characterColour, cueLabel, TOKENS } from "./script-doc.js";
 import type { ScriptElement } from "./script-doc.js";
 import { SERIF, SANS, MONO, S, bodyRuns, leftOf, paragraph } from "./script-docx.js";
 import { mergeAuthoring, sourceStrings } from "./loaded-helpers.js";
@@ -103,7 +104,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
       // returned box is compared against.
       const baseline = source[el.id] ?? "";
       lines[code] = el.kind === "line"
-        ? { id: el.id, kind: "line", character: el.character, ...(el.direction ? { direction: el.direction } : {}), baseline }
+        ? { id: el.id, kind: "line", character: el.character, ...(el.qualifier ? { qualifier: el.qualifier } : {}), ...(el.direction ? { direction: el.direction } : {}), baseline }
         : { id: el.id, kind: el.kind === "option" ? "option" : "narration", baseline };
       skeleton.push({ kind: "box", marker: code });
     } else {
@@ -174,7 +175,7 @@ function box(el: Editable, code: string, status: string | undefined): Table {
     new TableCell({ width: { size: width, type: WidthType.DXA }, borders: { top: NONE, bottom: NONE, left: NONE, right: NONE }, margins: { top: 60, bottom: 60, left: 100, right: 100 }, children, ...extra });
 
   const lead: TextRun[] = [];
-  if (el.kind === "line" && el.character) lead.push(new TextRun({ text: el.character.toUpperCase(), font: SANS, bold: true, allCaps: true, size: S.cue, color: characterColour(el.character) }));
+  if (el.kind === "line" && el.character) lead.push(new TextRun({ text: cueLabel(el.character, el.qualifierName), font: SANS, bold: true, allCaps: true, size: S.cue, color: characterColour(el.character) }));
   if (el.kind === "line" && el.direction) lead.push(new TextRun({ text: `(${el.direction})`, font: SERIF, italics: true, size: S.cue, color: TOKENS.muted, break: el.character ? 1 : 0 }));
   if (el.kind === "option") lead.push(new TextRun({ text: "◇", color: TOKENS.accent, size: S.body }));
 

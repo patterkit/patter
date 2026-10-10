@@ -58,6 +58,26 @@ describe("applySuggestionDecisions", () => {
     expect(read<AuthoringFile>(dir, "authoring/tavern.patterx").edits?.["L_greet"]).toBeUndefined();
   });
 
+  it("accepting a speaker qualifier sets it on the beat, and accepting none takes it off", () => {
+    const dir = tavernWith([sugg("on", { proposedQualifier: "os", baselineQualifier: "" }), sugg("off", { proposedQualifier: "", baselineQualifier: "os" })]);
+    const first = applySuggestionDecisions(loadProject(dir), [{ id: "on", accept: true }], { now: NOW });
+    expect(first.results).toEqual([{ id: "on", outcome: "accepted" }]);
+    applyWrites(first.writes);
+    expect(greet(dir)).toMatchObject({ character: "BARKEEP", qualifier: "os" });
+    applyWrites(applySuggestionDecisions(loadProject(dir), [{ id: "off", accept: true }], { now: NOW }).writes);
+    expect(greet(dir).qualifier).toBeUndefined();
+  });
+
+  it("a speaker qualifier is stale-checked on its own: changed since, the suggestion is refused", () => {
+    const dir = tavernWith([sugg("q", { proposedQualifier: "vo", baselineQualifier: "radio" })]);
+    const plan = applySuggestionDecisions(loadProject(dir), [{ id: "q", accept: true }], { now: NOW });
+    expect(plan.results[0]).toMatchObject({ outcome: "stale" });
+    expect(plan.results[0]!.reason).toContain("the speaker qualifier");
+    expect(plan.results[0]!.reason).not.toContain("the text");
+    expect(plan.writes).toEqual([]);
+    expect(listOpenSuggestions(loadProject(dir))[0]!.stale).toEqual(["the speaker qualifier"]);
+  });
+
   it("accepting a cut marks the beat cut, so exports leave it out", () => {
     const dir = tavernWith([sugg("s1", { proposedCut: true })]);
     applyWrites(applySuggestionDecisions(loadProject(dir), [{ id: "s1", accept: true }], { now: NOW }).writes);

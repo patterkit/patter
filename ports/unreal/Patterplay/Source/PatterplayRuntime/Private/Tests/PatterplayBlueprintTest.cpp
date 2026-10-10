@@ -20,7 +20,7 @@ namespace
 {
 	// Compiled from a Patter project: one scene with a scene property, tags and Game Data; a line that
 	// sets the property on its way out; and a choice of a spoken prompt and a text one.
-	const TCHAR* BlueprintBundleJson = TEXT(R"JSON({"schema":"patter/bundle@0","content":{"project":"bp","hash":"0htxidz","structureHash":"0wam8yk"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"ANNA"}],"properties":[{"name":"gold","type":"number","shared":true,"default":3}],"gameDataFields":{"scene":[{"name":"music","type":"string","default":"calm"}],"block":[{"name":"light","type":"number","default":1}]},"scenes":{"s_hall":{"id":"s_hall","type":"scene","name":"Great Hall","gameData":{"music":"tense"},"tags":["indoor"],"sceneProps":[{"name":"knocks","type":"number","default":0}],"blocks":[{"id":"b_door","type":"block","name":"The Door","children":[{"id":"sn_greet","type":"snippet","beats":[{"id":"L_greet","kind":"line","character":"ANNA"}],"onExit":[{"kind":"set","target":"@scene.knocks","value":{"src":"@scene.knocks + 1","ast":["bin","+",["sv","scene","knocks"],["n",1]]}}]},{"id":"g_ask","type":"group","selector":"choice","children":[{"id":"o_knock","type":"group","children":[{"id":"sn_k","type":"snippet","jump":{"to":"END"}}],"prompt":{"id":"P_knock","kind":"line","character":"ANNA","direction":"softly"}},{"id":"o_leave","type":"group","children":[{"id":"sn_l","type":"snippet","jump":{"to":"END"}}],"prompt":{"id":"P_leave","kind":"text"}}]}],"gameData":{"light":2},"tags":["door"]}]}},"strings":{"en":{"L_greet":"Gold {@gold}.","P_knock":"Knock","P_leave":"Leave"}}})JSON");
+	const TCHAR* BlueprintBundleJson = TEXT(R"JSON({"schema":"patter/bundle@0","content":{"project":"bp","hash":"0htxidz","structureHash":"0wam8yk"},"voiced":false,"locales":{"default":"en","included":["en"]},"cast":[{"name":"ANNA"}],"qualifiers":[{"gameId":"radio","name":"RADIO"}],"properties":[{"name":"gold","type":"number","shared":true,"default":3}],"gameDataFields":{"scene":[{"name":"music","type":"string","default":"calm"}],"block":[{"name":"light","type":"number","default":1}]},"scenes":{"s_hall":{"id":"s_hall","type":"scene","name":"Great Hall","gameData":{"music":"tense"},"tags":["indoor"],"sceneProps":[{"name":"knocks","type":"number","default":0}],"blocks":[{"id":"b_door","type":"block","name":"The Door","children":[{"id":"sn_greet","type":"snippet","beats":[{"id":"L_greet","kind":"line","character":"ANNA"}],"onExit":[{"kind":"set","target":"@scene.knocks","value":{"src":"@scene.knocks + 1","ast":["bin","+",["sv","scene","knocks"],["n",1]]}}]},{"id":"g_ask","type":"group","selector":"choice","children":[{"id":"o_knock","type":"group","children":[{"id":"sn_k","type":"snippet","jump":{"to":"END"}}],"prompt":{"id":"P_knock","kind":"line","character":"ANNA","direction":"softly","qualifier":"radio"}},{"id":"o_leave","type":"group","children":[{"id":"sn_l","type":"snippet","jump":{"to":"END"}}],"prompt":{"id":"P_leave","kind":"text"}}]}],"gameData":{"light":2},"tags":["door"]}]}},"strings":{"en":{"L_greet":"Gold {@gold}.","P_knock":"Knock","P_leave":"Leave"}}})JSON");
 
 	FPatterValue Number(double N)
 	{
@@ -110,6 +110,7 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("bHasCharacter"), Line.bHasCharacter);
 	TestEqual(TEXT("Character"), Line.Character, FString(TEXT("ANNA")));
 	TestFalse(TEXT("bHasDirection: the line has none"), Line.bHasDirection);
+	TestFalse(TEXT("bHasQualifier: nor a speaker qualifier"), Line.bHasQualifier || Line.bHasQualifierName);
 
 	// --- the choice, with each option's prompt as one value -----------------------------------
 	const FPatterStep Choice = Flow->Advance();
@@ -123,6 +124,8 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("its text"), Knock.Prompt.Text, FString(TEXT("Knock")));
 		TestTrue(TEXT("its speaker is set"), Knock.Prompt.bHasCharacter);
 		TestEqual(TEXT("its direction"), Knock.Prompt.Direction, FString(TEXT("softly")));
+		TestTrue(TEXT("its speaker qualifier"), Knock.Prompt.bHasQualifier && Knock.Prompt.Qualifier == TEXT("radio"));
+		TestTrue(TEXT("and the qualifier's shown name"), Knock.Prompt.bHasQualifierName && Knock.Prompt.QualifierName == TEXT("RADIO"));
 		TestEqual(TEXT("the deprecated flat Text still reads"), Knock.Text, FString(TEXT("Knock")));
 		TestTrue(TEXT("a text prompt"), Choices[1].Prompt.Kind == EPatterPromptKind::Text);
 		TestFalse(TEXT("with no speaker"), Choices[1].Prompt.bHasCharacter);

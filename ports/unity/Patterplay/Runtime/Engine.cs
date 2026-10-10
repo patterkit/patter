@@ -280,6 +280,8 @@ namespace Patterkit.Patterplay
         public Dictionary<string, string> Strings;
         public Dictionary<string, string> DefaultStrings;
         public Dictionary<string, string> CastDisplay;
+        /// <summary>Speaker qualifier gameId -> authored name (the fallback when no loc string exists).</summary>
+        public Dictionary<string, string> QualifierDisplay;
         public Dictionary<string, Node> NodeIndex;
         public Dictionary<string, string> BlockToScene;   // block id -> scene id
         public Dictionary<string, Block> BlockById;
@@ -405,6 +407,10 @@ namespace Patterkit.Patterplay
             var castDisplay = new Dictionary<string, string>();
             foreach (var c in bundle.Cast ?? new List<Cast>())
                 if (!string.IsNullOrEmpty(c.DisplayName)) castDisplay[c.Name] = c.DisplayName;
+            // Qualifier gameId -> authored name: the fallback for its shown name, as castDisplay is for a speaker's.
+            var qualifierDisplay = new Dictionary<string, string>();
+            foreach (var q in bundle.Qualifiers ?? new List<Qualifier>())
+                if (q != null && !string.IsNullOrEmpty(q.GameId) && q.Name != null) qualifierDisplay[q.GameId] = q.Name;
 
             _defaultSeed = Mulberry32.ToUint32(options.Seed ?? 0x9e3779b9);
 
@@ -504,7 +510,7 @@ namespace Patterkit.Patterplay
                 EngineLog = _engineLog,
                 OnDryChoice = options.OnDryChoice,
                 OnError = options.OnError,
-                Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay,
+                Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
                 Registry = registry, OwnsRegistry = ownsRegistry, SelfBackedTokens = selfBacked, BoundTokens = bound,
@@ -939,6 +945,12 @@ namespace Patterkit.Patterplay
                     else if (_host.CastDisplay.TryGetValue(beat.Character, out var disp)) info.CharacterName = disp;
                 }
                 info.Direction = beat.Direction;
+                if (beat.Qualifier != null)
+                {
+                    info.Qualifier = beat.Qualifier;
+                    if (_host.DefaultStrings.TryGetValue("qualifier:" + beat.Qualifier, out var qn)) info.QualifierName = qn;
+                    else if (_host.QualifierDisplay.TryGetValue(beat.Qualifier, out var qdisp)) info.QualifierName = qdisp;
+                }
             }
             if (beat.Kind == "line" || beat.Kind == "text")
                 if (_host.DefaultStrings.TryGetValue(beat.Id, out var src)) info.Text = src; // source, un-interpolated

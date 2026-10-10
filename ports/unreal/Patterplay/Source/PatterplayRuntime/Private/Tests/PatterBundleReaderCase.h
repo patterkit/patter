@@ -26,6 +26,7 @@ namespace patter { namespace bundlereadercase
   "closedCaptions": { "open": "<", "close": ">", "character": "FX" },
   "locales": { "default": "en", "included": ["en", "fr"] },
   "cast": [{ "name": "ANNA", "displayName": "Anna" }, { "name": "FX" }],
+  "qualifiers": [{ "gameId": "os", "name": "O.S." }, { "gameId": "radio", "name": "RADIO" }],
   "properties": [
     { "name": "gold", "type": "number", "shared": true, "default": 5 },
     { "name": "mood", "type": "enum", "values": ["calm", "cross"], "default": "calm", "temporary": true },
@@ -49,12 +50,12 @@ namespace patter { namespace bundlereadercase
       "blocks": [{ "id": "b_t", "name": "Bar", "gameId": "bar", "children": [
         { "id": "g_c", "type": "group", "selector": "choice", "shared": true,
           "options": { "order": "authored", "exhaust": "once" },
-          "prompt": { "id": "P1", "kind": "line", "character": "ANNA" },
+          "prompt": { "id": "P1", "kind": "line", "character": "ANNA", "qualifier": "radio" },
           "children": [
             { "id": "o_s", "type": "snippet", "sticky": true, "beats": [{ "id": "T1", "kind": "text" }], "jump": { "to": "scn_aa", "mode": "call" } },
             { "id": "o_h", "type": "snippet", "secretUntilEligible": true,
               "condition": { "src": "@gold > 3", "ast": ["bin", ">", ["sv", "patter", "gold"], ["n", 3]] },
-              "beats": [{ "id": "L1", "kind": "line", "character": "", "direction": "quietly", "tags": ["hush"], "gameData": { "camera": "close" } }] },
+              "beats": [{ "id": "L1", "kind": "line", "character": "", "direction": "quietly", "qualifier": "os", "tags": ["hush"], "gameData": { "camera": "close" } }] },
             { "id": "o_f", "type": "snippet", "fallback": true, "onExit": [{ "kind": "set", "target": "@gold", "value": { "src": "0", "ast": ["n", 0] } }] }
           ] }
       ] }] },
@@ -84,6 +85,7 @@ namespace patter { namespace bundlereadercase
         expect(b.closedCaptions.present && b.closedCaptions.open == "<" && b.closedCaptions.close == ">" && b.closedCaptions.character == "FX", "closedCaptions");
         expect(b.locales.defaultLocale == "en" && b.locales.included == std::vector<std::string>{"en", "fr"}, "locales");
         expect(b.cast.size() == 2 && b.cast[0].displayName == "Anna" && b.cast[1].name == "FX" && b.cast[1].displayName.empty(), "cast");
+        expect(b.qualifiers.size() == 2 && b.qualifiers[0].gameId == "os" && b.qualifiers[0].name == "O.S." && b.qualifiers[1].gameId == "radio", "qualifiers");
 
         expect(b.properties.size() == 4, "properties");
         if (b.properties.size() == 4)
@@ -132,7 +134,7 @@ namespace patter { namespace bundlereadercase
 
         const Node& g = *s.blocks[0].children[0];
         expect(g.isGroup() && g.selector == "choice" && g.shared && g.options && g.options->order == "authored" && g.options->exhaust == "once", "group, options");
-        expect(g.prompt && g.prompt->id == "P1" && g.prompt->character == "ANNA", "prompt");
+        expect(g.prompt && g.prompt->id == "P1" && g.prompt->character == "ANNA" && g.prompt->hasQualifier && g.prompt->qualifier == "radio", "prompt");
         expect(g.children.size() == 3, "options");
         if (g.children.size() != 3) return bad;
         const Node& sticky = *g.children[0];
@@ -147,6 +149,7 @@ namespace patter { namespace bundlereadercase
             const Beat& l = secret.beats[0];
             expect(l.hasCharacter && l.character.empty(), "a \"\" character is set, not absent");
             expect(l.hasDirection && l.direction == "quietly" && l.tags == std::vector<std::string>{"hush"}, "beat direction, tags");
+            expect(l.hasQualifier && l.qualifier == "os", "beat qualifier");
             expect(l.gameData && l.gameData->at("camera").s == "close", "beat gameData");
         }
         expect(!secret.jump, "no jump");

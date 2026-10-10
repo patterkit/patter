@@ -26,6 +26,7 @@ let suggestions = [
   { id: "sg_2", anchor: "L_work", sceneId: "scn_tavern", sceneName: "The Tavern", author: "Sam", ts: "2026-10-04T09:05:00Z", baseline: "Aye - rats in the cellar.", proposed: "Rats. Big ones. In the cellar.", handoff: "H-7Q2K", stale: ["the text"] },
   { id: "sg_3", anchor: "L_intim", sceneId: "scn_tavern", sceneName: "The Tavern", author: "Jo", ts: "2026-10-04T10:00:00Z", baseline: "...fine, fine.", proposed: "...fine, fine.", proposedCharacter: "PLAYER", baselineCharacter: "BARKEEP", proposedDirection: "sighing", baselineDirection: "", handoff: "H-7Q2K", stale: [] as string[] },
   { id: "sg_4", anchor: "T_lean", sceneId: "scn_tavern", sceneName: "The Tavern", author: "Sam", ts: "2026-10-04T10:30:00Z", baseline: "You lean across the bar and murmur about the cellar.", proposed: "You lean across the bar and murmur about the cellar.", proposedCut: true, handoff: "H-7Q2K", stale: [] as string[] },
+  { id: "sg_6", anchor: "L_greet", sceneId: "scn_tavern", sceneName: "The Tavern", author: "Sam", ts: "2026-10-04T11:00:00Z", baseline: "What'll it be, stranger?", proposed: "What'll it be, stranger?", proposedQualifier: "O.S.", baselineQualifier: "", handoff: "H-7Q2K", stale: [] as string[] },
   { id: "sg_5", anchor: "L_secret", sceneId: "scn_tavern", sceneName: "The Tavern", author: "Ian", ts: "2026-10-02T10:30:00Z", baseline: "...so you DO know.", proposed: "...so you do know.", stale: [] as string[] },
 ];
 
@@ -53,6 +54,8 @@ const stub = {
     ? [{ name: "missing", colour: 0 }, { name: "recorded", colour: 4 }]
     : [{ name: "stub", colour: 0 }, { name: "final", colour: 9 }]),
   tagUsage: async (_tag: string) => tagHits,
+  linesByQualifier: async (_gameId: string) => statusHits,
+  qualifiers: async () => [{ gameId: "vo", name: "V.O.", count: 3 }, { gameId: "os", name: "O.S.", count: 1 }, { gameId: "radio", name: "RADIO", count: 0 }],
   tags: async () => [{ name: "barked", count: 4 }, { name: "tutorial", count: 2 }, { name: "whisper", count: 1 }],
   jump: (e: SearchEntry) => console.log("jump", e.id),
   setPin: (on: boolean) => console.log("setPin", on),

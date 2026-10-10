@@ -66,8 +66,15 @@ one, optionally followed by a jump. Nothing is re-evaluated *inside* a snippet. 
 A snippet holds **beats**, and there are three kinds.
 
 A `line` beat is spoken dialogue. It has a `character` (checked against the cast), an
-optional `direction` for the performer (language-neutral, never localised), and localised
-text. A voiced line is a fixed string, with no interpolation.
+optional `direction` for the performer (language-neutral, never localised), an optional
+**speaker qualifier**, and localised text. A voiced line is a fixed string, with no
+interpolation.
+
+A speaker qualifier is what a screenplay calls a character extension: `TAM (O.S.)` for a
+character heard but not seen, `PLAYER (V.O.)` for a thought, `GUARD (RADIO)` for a voice over a
+radio. It says how the line is delivered, not who says it, so `TAM` and `TAM (O.S.)` are the same
+character everywhere. The line stores the qualifier's `gameId` (`os`), picked from the project's
+list of [qualifiers](/setup/cast/#speaker-qualifiers).
 
 A `text` beat is narration or the author's voice. It has no speaker, is never voiced, and is
 free to interpolate property values.

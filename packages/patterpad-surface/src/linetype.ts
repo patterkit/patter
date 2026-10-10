@@ -20,12 +20,15 @@ import { Fragment, type Node as PMNode } from "prosemirror-model";
 import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
 import { zoneText, sayNode, beatNode } from "./zoneutil.js";
+import { rawWithoutQualifier } from "./qualifier.js";
 
 // The say moves as a Fragment, never as text, so bold / italic survive a toggle (review 2026-10,
 // MEDIUM 32: rebuilding through textContent stripped them).
 const makeLine = (id: string, raw: string, character: string, direction: string, content: Fragment): PMNode =>
   beatNode("line", { id, raw, speaker: character, direction, say: content });
-const makeProse = (id: string, raw: string, content: Fragment): PMNode => beatNode("prose", { id, raw, say: content });
+// A text beat has no speaker qualifier, so a line becoming text leaves its qualifier behind; turned back
+// into dialogue and named, it takes one again by the run rule (src/qualifier.ts).
+const makeProse = (id: string, raw: string, content: Fragment): PMNode => beatNode("prose", { id, raw: rawWithoutQualifier(raw), say: content });
 const sayOf = (beat: PMNode): Fragment => sayNode(beat)?.content ?? Fragment.empty;
 
 /** Parse a leading "word:" name and "(direction)" out of free-text content (free text -> dialogue). */

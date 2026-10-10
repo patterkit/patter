@@ -15,7 +15,7 @@
 // wired in with the compiler.)
 // ---------------------------------------------------------------------------
 
-import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES } from "@patterkit/model";
+import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers } from "@patterkit/model";
 import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, ScalarValue, AuthoringFile } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
@@ -34,6 +34,8 @@ export interface ValidationIssue {
     | "invalid-gameid"
     | "duplicate-gameid"
     | "unknown-character"
+    | "unknown-qualifier"
+    | "invalid-qualifier"
     | "invalid-temporary"
     | "invalid-declaration"
     | "invalid-status-ladder"
@@ -158,6 +160,13 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
   const sceneGameIds = new Map<string, string>(); // effective gameId -> scene id (project-wide uniqueness)
   const jumps: Array<{ to: string; from: string }> = [];
   const castNames = new Set((project.cast ?? []).map((c) => c.name));
+  const qualifierIds = new Set(projectQualifiers(project).map((q) => q.gameId));
+  // A line's speaker qualifier must be one of the project's (one removed from the list is caught here).
+  const checkQualifier = (beat: { id: string; kind: string; qualifier?: string }, what: string): void => {
+    if (beat.kind === "line" && beat.qualifier !== undefined && !qualifierIds.has(beat.qualifier)) {
+      issues.push({ code: "unknown-qualifier", message: `${what} '${beat.id}' qualifier '${beat.qualifier}' is not in the project's qualifiers`, id: beat.id });
+    }
+  };
 
   // Author tags (#215): non-empty, no whitespace, no comma (the entry delimiter). Reported per offending tag.
   const checkTags = (tags: string[] | undefined, where: string, id?: string): void => {
@@ -304,6 +313,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
                 if (p.kind === "line" && p.character && !castNames.has(p.character)) {
                   issues.push({ code: "unknown-character", message: `prompt '${p.id}' speaker '${p.character}' is not in the project cast`, id: p.id });
                 }
+                checkQualifier(p, "prompt");
               }
             }
             // At most one fallback (spec §5) - more than one is ambiguous about which is the last resort.
@@ -345,6 +355,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
               id: beat.id,
             });
           }
+          checkQualifier(beat, "beat");
         }
         if (node.jump) jumps.push({ to: node.jump.to, from: node.id });
       });
@@ -431,6 +442,20 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
   }
   if (project.recordingStatuses) {
     checkLadderNames(project.recordingStatuses.map((s) => s.name), "recordingStatuses", issues);
+  }
+
+  // Speaker qualifiers: each has a name and a valid gameId, unique in the project (a line stores the gameId).
+  const seenQualifiers = new Set<string>();
+  for (const q of project.qualifiers ?? []) {
+    if (typeof q.name !== "string" || !q.name.trim()) {
+      issues.push({ code: "invalid-qualifier", message: `qualifier '${String(q.gameId)}' has no name` });
+    }
+    if (typeof q.gameId !== "string" || !isValidGameId(q.gameId)) {
+      issues.push({ code: "invalid-qualifier", message: `qualifier '${String(q.name)}' address '${String(q.gameId)}' is invalid (lowercase letters, digits, hyphens; no leading/trailing hyphen)` });
+    } else if (seenQualifiers.has(q.gameId)) {
+      issues.push({ code: "invalid-qualifier", message: `qualifier address '${q.gameId}' is used more than once` });
+    }
+    if (typeof q.gameId === "string") seenQualifiers.add(q.gameId);
   }
 
   // gameData field definitions (the author-defined custom fields per node type): within each node

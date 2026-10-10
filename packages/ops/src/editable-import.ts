@@ -21,7 +21,8 @@ import type { Random } from "./handoff.js";
 import { sourceStrings } from "./loaded-helpers.js";
 import { authoringPath } from "./localisation.js";
 import { applySuggestionDecisions, indexPlaces } from "./suggestions.js";
-import { AUTHORING_SCHEMA } from "@patterkit/model";
+import { AUTHORING_SCHEMA, projectQualifiers } from "@patterkit/model";
+import type { CastMember, SpeakerQualifier } from "@patterkit/model";
 
 export interface ImportOptions {
   /** Who is importing (the import log). */
@@ -44,7 +45,7 @@ export interface ImportProblem {
   severity: "warning" | "info";
   kind:
     | "damaged-marker" | "repaired-marker" | "duplicate-marker" | "missing-box" | "moved" | "placeholders"
-    | "line-gone" | "unknown-speaker" | "added-text" | "context-edited" | "untracked-edits" | "joined-paragraphs"
+    | "line-gone" | "unknown-speaker" | "unknown-qualifier" | "added-text" | "context-edited" | "untracked-edits" | "joined-paragraphs"
     | "dropped-formatting" | "stale";
   message: string;
   /** The project line or node it concerns, for "Go to". */
@@ -180,6 +181,7 @@ export function planEditableImport(loaded: LoadedProject, returned: ReturnedDoc,
   const places = indexPlaces(loaded);
   const live = sourceStrings(loaded);
   const cast = loaded.project.cast ?? [];
+  const qualifiers = projectQualifiers(loaded.project);
 
   const suggestions: Suggestion[] = [];
   const comments: Comment[] = [];
@@ -250,26 +252,29 @@ export function planEditableImport(loaded: LoadedProject, returned: ReturnedDoc,
       problems.push({ severity: "info", kind: "untracked-edits", marker: code, anchor: sent.id, message: "This line has tracked changes and some untracked ones too, so the credit may be incomplete." });
     }
 
-    // The cue and direction (spoken lines).
+    // The cue (speaker and speaker qualifier) and direction (spoken lines).
     const cue = sent.kind === "line" ? readLead(b.lead.proposed) : undefined;
-    let proposedCharacter: string | undefined, proposedDirection: string | undefined;
+    let proposedCharacter: string | undefined, proposedQualifier: string | undefined, proposedDirection: string | undefined;
     if (sent.kind === "line" && cue) {
-      const sentCue = (sent.character ?? "").toUpperCase();
-      if (cue.character && cue.character.toUpperCase() !== sentCue) {
-        const match = cast.find((c) => c.name.toUpperCase() === cue.character!.toUpperCase());
-        if (match) proposedCharacter = match.name;
-        else {
-          problems.push({ severity: "warning", kind: "unknown-speaker", marker: code, anchor: sent.id, message: `The speaker was changed to ${cue.character}, who isn't in the cast; it's in a comment.` });
-          comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sent.character ?? "(none)"} to ${cue.character}, who isn't in the cast.`, ts);
-        }
+      const read = readCue(cue.character, sent.character ?? "", sent.qualifier ?? "", cast, qualifiers);
+      if (read.unknownSpeaker !== undefined) {
+        problems.push({ severity: "warning", kind: "unknown-speaker", marker: code, anchor: sent.id, message: `The speaker was changed to ${read.unknownSpeaker}, who isn't in the cast; it's in a comment.` });
+        comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sentCue(sent.character, sent.qualifier, qualifiers) || "(none)"} to ${read.unknownSpeaker}, who isn't in the cast.`, ts);
       }
+      if (read.unknownQualifier !== undefined) {
+        problems.push({ severity: "warning", kind: "unknown-qualifier", marker: code, anchor: sent.id, message: `The speaker qualifier was changed to (${read.unknownQualifier}), which isn't one of the project's qualifiers; it's in a comment.` });
+        comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sentCue(sent.character, sent.qualifier, qualifiers) || "(none)"} to ${tidy(cue.character)}, but (${read.unknownQualifier}) isn't one of the project's qualifiers.`, ts);
+      }
+      if (read.character !== undefined && read.character !== (sent.character ?? "")) proposedCharacter = read.character;
+      if (read.qualifier !== undefined && read.qualifier !== (sent.qualifier ?? "")) proposedQualifier = read.qualifier;
       if (tidy(cue.direction) !== tidy(sent.direction ?? "")) proposedDirection = tidy(cue.direction);
     }
+    const cueChanged = !!proposedCharacter || proposedQualifier !== undefined || proposedDirection !== undefined;
 
     for (const note of notes) comment(here ?? nearestLine(boxes.indexOf(b)), author, note, ts);
 
     if (!here) {
-      if (textChanged || proposedCharacter || proposedDirection !== undefined) {
+      if (textChanged || cueChanged) {
         problems.push({ severity: "warning", kind: "line-gone", marker: code, message: `The line ${quote(sent.baseline)} is no longer in the project; the editor's version is in a comment nearby.` });
         comment(nearestLine(boxes.indexOf(b)), author, `For a line no longer in the project (${quote(sent.baseline)}), the editor wrote: ${quote(proposed)}`, ts);
       } else unchanged++;
@@ -286,14 +291,15 @@ export function planEditableImport(loaded: LoadedProject, returned: ReturnedDoc,
     if (textChanged && !sameList(placeholders(proposed), placeholders(sent.baseline))) {
       problems.push({ severity: "warning", kind: "placeholders", marker: code, anchor: sent.id, message: `The {@…} placeholders changed, so this line wasn't suggested; the editor's version is in a comment.` });
       comment(here, author, `The editor's version changes the {@…} placeholders (${placeholders(sent.baseline).join(", ") || "none"} became ${placeholders(proposed).join(", ") || "none"}), so it wasn't made a suggestion: ${quote(proposed)}`, ts);
-      if (!proposedCharacter && proposedDirection === undefined) continue;
+      if (!cueChanged) continue;
     }
     const keepText = textChanged && sameList(placeholders(proposed), placeholders(sent.baseline));
 
-    if (!keepText && !proposedCharacter && proposedDirection === undefined) { unchanged++; continue; }
+    if (!keepText && !cueChanged) { unchanged++; continue; }
     suggestions.push(suggestion({
       proposed: keepText ? proposed : sent.baseline,
       ...(proposedCharacter ? { proposedCharacter, baselineCharacter: sent.character ?? "" } : {}),
+      ...(proposedQualifier !== undefined ? { proposedQualifier, baselineQualifier: sent.qualifier ?? "" } : {}),
       ...(proposedDirection !== undefined ? { proposedDirection, baselineDirection: sent.direction ?? "" } : {}),
     }));
 
@@ -386,6 +392,45 @@ function readLead(text: string): { character: string; direction: string } {
   const direction = lines.find((l) => /^\(.*\)$/s.test(l));
   const character = lines.find((l) => l !== direction) ?? "";
   return { character, direction: direction ? direction.slice(1, -1) : "" };
+}
+
+/** What a returned cue says, read against the cast and the project's qualifiers. `character` and `qualifier`
+ *  (a `gameId`, "" for none) are set only for what could be read; `unknownSpeaker` and `unknownQualifier`
+ *  carry what couldn't, as written. */
+interface ReadCue { character?: string; qualifier?: string; unknownSpeaker?: string; unknownQualifier?: string }
+
+/** The cue as the exporter printed it for a speaker and qualifier (`TAM (O.S.)`), for comparing and quoting. */
+function sentCue(character: string | undefined, qualifier: string | undefined, qualifiers: SpeakerQualifier[]): string {
+  if (!character) return "";
+  if (!qualifier) return character;
+  return `${character} (${qualifiers.find((q) => q.gameId === qualifier)?.name ?? qualifier})`;
+}
+
+/**
+ * Read a returned cue. A cue that still reads as sent (case aside) changes nothing, so a cast member whose
+ * name looks like a qualified cue round-trips untouched. Otherwise the WHOLE cue is matched against the cast
+ * first: an exact cast name wins, since a cast name may itself hold brackets, and means no qualifier. Only
+ * when nothing matches is a trailing `(…)` split off: the rest must be a cast member (or the speaker as
+ * sent), and the bracket one of the project's qualifier names, both case-insensitively as the speaker
+ * always was. A bracket that names no qualifier is reported, and the speaker before it is still read.
+ */
+function readCue(text: string, sentCharacter: string, sentQualifier: string, cast: CastMember[], qualifiers: SpeakerQualifier[]): ReadCue {
+  const cue = tidy(text);
+  if (!cue) return {}; // the cue cell emptied: nothing to read (the speaker isn't removed this way)
+  const upper = (s: string): string => s.toUpperCase();
+  if (upper(cue) === upper(sentCue(sentCharacter, sentQualifier, qualifiers))) return {};
+  const speaker = (name: string): string | undefined =>
+    cast.find((c) => upper(c.name) === upper(name))?.name ?? (sentCharacter && upper(name) === upper(sentCharacter) ? sentCharacter : undefined);
+
+  const whole = speaker(cue);
+  if (whole !== undefined) return { character: whole, qualifier: "" };
+
+  const m = /^(.*?)\s*\(([^()]*)\)$/s.exec(cue);
+  const rest = m ? speaker(m[1]!.trim()) : undefined;
+  if (!m || rest === undefined) return { unknownSpeaker: cue };
+  const bracket = m[2]!.trim();
+  const q = qualifiers.find((x) => upper(x.name) === upper(bracket));
+  return q ? { character: rest, qualifier: q.gameId } : { character: rest, unknownQualifier: bracket };
 }
 
 /** Change authors, the most prolific first (ties by first appearance). */

@@ -660,6 +660,11 @@ input::placeholder, textarea::placeholder {
 .world-driver-values { flex: 1 1 128px; min-width: 0; }
 /* Cast: name + display name + actor share the line (notes go in the expander). */
 .set-rowline .cast-field { flex: 1 1 0; min-width: 64px; }
+/* Qualifiers tab: the Game ID is a code value, so it reads in the mono face beside the name. */
+.set-rowline .qual-gameid { flex: 0 0 132px; width: 132px; font-family: var(--font-mono); }
+.set-rowline .qual-gameid.bad-id { border-color: var(--danger); }
+.qual-sets { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.qual-sets-label { color: var(--muted); font-size: 12px; }
 /* Dictionary tab (#177): the language picker row (select + Import / Remove) and the import error line. */
 .dict-lang-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 1.5px; }
 .dict-lang-row .gd-add { margin-top: 0; }

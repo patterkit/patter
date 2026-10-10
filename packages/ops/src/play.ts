@@ -28,7 +28,7 @@ export interface PlayOptions {
 
 /** One thing that happened during a playthrough, in order. */
 export type PlayEvent =
-  | { type: "line"; id: string; text: string; character?: string; direction?: string; gameData?: GameData }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; gameData?: GameData }
   | { type: "text"; id: string; text: string; gameData?: GameData }
   | { type: "gameEvent"; id: string; gameData?: GameData }
   | { type: "choice"; options: ChoiceOption[]; picked?: string }
@@ -111,7 +111,12 @@ export function renderPlay(result: PlayResult): string[] {
   const out: string[] = [];
   for (const e of result.events) {
     switch (e.type) {
-      case "line": out.push(`${e.character ?? "?"}: ${e.text}`); break;
+      case "line": {
+        // The speaker qualifier follows the name, as the script's cue has it: `TAM (O.S.): ...`.
+        const q = e.qualifierName ?? e.qualifier;
+        out.push(`${e.character ?? "?"}${q ? ` (${q})` : ""}: ${e.text}`);
+        break;
+      }
       case "text": out.push(`  ${e.text}`); break;
       case "gameEvent": out.push(`    (game event ${JSON.stringify(e.gameData ?? {})})`); break;
       case "error": {

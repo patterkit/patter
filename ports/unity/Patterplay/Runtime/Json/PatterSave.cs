@@ -170,6 +170,8 @@ namespace Patterkit.Patterplay
             if (prompt.Character != null) p["character"] = prompt.Character;
             if (prompt.CharacterName != null) p["characterName"] = prompt.CharacterName;
             if (prompt.Direction != null) p["direction"] = prompt.Direction;
+            if (prompt.Qualifier != null) p["qualifier"] = prompt.Qualifier;
+            if (prompt.QualifierName != null) p["qualifierName"] = prompt.QualifierName;
             return p;
         }
 
@@ -177,6 +179,7 @@ namespace Patterkit.Patterplay
         {
             Kind = StrOrNull(p, "kind"), Text = StrOrNull(p, "text"), Character = StrOrNull(p, "character"),
             CharacterName = StrOrNull(p, "characterName"), Direction = StrOrNull(p, "direction"),
+            Qualifier = StrOrNull(p, "qualifier"), QualifierName = StrOrNull(p, "qualifierName"),
         };
 
         private static JObject OptionToken(ChoiceOption o)

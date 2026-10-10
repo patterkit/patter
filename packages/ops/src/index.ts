@@ -50,7 +50,7 @@ export { catalogToXlsx, xlsxToCatalog } from "./loc-xlsx.js";
 export { runVoiceScript } from "./voice-script.js";
 export type { VoiceScript, VoiceLine } from "./voice-script.js";
 export { voiceScriptToXlsx } from "./voice-script-xlsx.js";
-export { runScriptDoc } from "./script-doc.js";
+export { runScriptDoc, cueLabel, qualifierNamer } from "./script-doc.js";
 export type { ScriptDoc, ScriptElement } from "./script-doc.js";
 export { scriptToDocx } from "./script-docx.js";
 export { scriptToPdf } from "./script-pdf.js";

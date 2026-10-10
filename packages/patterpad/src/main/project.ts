@@ -17,6 +17,8 @@ import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterki
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
+import { projectQualifiers, DEFAULT_QUALIFIERS } from "@patterkit/model";
+import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
 import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
@@ -223,6 +225,7 @@ function summarise(p: LoadedProject): OpenedProject {
     voiced: p.project.voiced ?? false,
     trackAudioStatus: (p.project.voiced ?? false) && (p.project.trackAudioStatus ?? false),
     cast: (p.project.cast ?? []).map((c) => c.name),
+    qualifiers: projectQualifiers(p.project),
     gameDataFields: p.project.gameDataFields ?? {},
     scenes: p.scenes.map((s) => ({ id: s.id, name: s.name, blocks: s.blocks.map((b) => ({ id: b.id, name: b.name })) })),
     sceneIds: p.scenes.map((s) => s.id),
@@ -1005,10 +1008,10 @@ export function readSceneSuggestions(sceneId: string): Suggestion[] {
 }
 
 /** Persist a scene's suggestions, MERGING over the rest of the shard. Proposals with no proposed text are
- *  pruned, so a cancelled "Suggest rewrite" leaves the file clean; one that proposes a cut, a speaker, or a
- *  direction (an editable-script import) is kept whatever its text. */
+ *  pruned, so a cancelled "Suggest rewrite" leaves the file clean; one that proposes a cut, a speaker, a
+ *  direction, or a qualifier (an editable-script import) is kept whatever its text. */
 export function saveSceneSuggestions(sceneId: string, suggestions: Suggestion[]): Promise<SaveResult> {
-  const kept = suggestions.filter((sg) => sg.proposed.trim() || sg.proposedCut || sg.proposedCharacter !== undefined || sg.proposedDirection !== undefined);
+  const kept = suggestions.filter((sg) => sg.proposed.trim() || sg.proposedCut || sg.proposedCharacter !== undefined || sg.proposedDirection !== undefined || sg.proposedQualifier !== undefined);
   return saveAuthoringField(sceneId, (af) => { af.suggestions = kept.length ? kept : undefined; });
 }
 
@@ -1148,6 +1151,8 @@ export function listSuggestions(filter: { handoff?: string }): OpenSuggestionDto
     ...(sceneId ? { sceneId, sceneName: names.get(sceneId) ?? sceneId } : {}),
     ...(s.proposedCharacter !== undefined ? { proposedCharacter: s.proposedCharacter, baselineCharacter: s.baselineCharacter ?? "" } : {}),
     ...(s.proposedDirection !== undefined ? { proposedDirection: s.proposedDirection, baselineDirection: s.baselineDirection ?? "" } : {}),
+    // A qualifier part travels as gameIds; the list shows the names the script shows ("" for none).
+    ...(s.proposedQualifier !== undefined ? { proposedQualifier: qualifierName(loaded!.project, s.proposedQualifier), baselineQualifier: qualifierName(loaded!.project, s.baselineQualifier ?? "") } : {}),
     ...(s.proposedCut ? { proposedCut: true } : {}),
     ...(s.handoff ? { handoff: s.handoff.id } : {}),
   }));
@@ -1210,7 +1215,7 @@ function resetPlaySession(): void { flow = null; engine = null; playBundle = nul
 // where the playhead is. The editor uses it to follow a cross-scene jump.
 const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
   const s = scene ?? undefined;
-  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction };
+  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName };
   if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text };
   if (r.type === "gameEvent") return { kind: "gameEvent", id: r.id, scene: s };
   return null; // choice / end carry no played beat
@@ -1477,6 +1482,10 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
         base.fix = { kind: "retarget-jump", snippetId: i.id };
       } else if (i.code === "missing-prompt" && i.id) {
         base.fix = { kind: "add-prompt", optionId: i.id };
+      } else if (i.code === "unknown-qualifier" && i.id) {
+        // Pick a qualifier that is in the list (or none) for the line: a surface edit, done in the renderer.
+        const bad = /qualifier '([^']*)'/.exec(i.message)?.[1] ?? "";
+        base.fix = { kind: "pick-qualifier", lineId: i.id, bad };
       }
       return base;
     });
@@ -1886,6 +1895,43 @@ export function writeAudioManifest(): Promise<{ ok: boolean; path?: string; erro
   });
 }
 
+/** The scene and project-string writes a qualifier gameId rename makes: each scene with a line using an
+ *  old gameId, and each project-level loc shard holding an old `qualifier:<gameId>` name. Works on copies,
+ *  so a refused batch leaves the loaded model as it was. */
+function qualifierRenameWrites(renames: Map<string, string>): { path: string; content: string }[] {
+  if (!loaded) return [];
+  ensureHydrated(); // lines anywhere in the project
+  const writes: { path: string; content: string }[] = [];
+  for (const scene of loaded.scenes) {
+    const copy = structuredClone(scene);
+    const path = loaded.sceneFiles[scene.id];
+    if (path && renameQualifiersInScene(copy, renames) > 0) writes.push({ path, content: canonicalStringify({ schema: FLOW_SCHEMA, scene: copy } satisfies FlowFile) });
+  }
+  loaded.locales.forEach((loc, i) => {
+    const copy = structuredClone(loc);
+    const path = loaded!.localeFiles[i];
+    if (path && renameQualifierStrings(copy, renames)) writes.push({ path, content: canonicalStringify(copy) });
+  });
+  return writes;
+}
+
+/** The project's qualifiers with how many lines use each (the search window's Qualifier chips). */
+export function qualifierList(): Array<{ gameId: string; name: string; count: number }> {
+  if (!loaded) return [];
+  ensureHydrated(); // counts span every scene
+  return qualifierCounts(loaded.project, loaded.scenes);
+}
+
+/** Qualifier browse: every line (and line prompt) carrying the qualifier `gameId`, the caret's scene first. */
+export function linesByQualifier(gameId: string, focus?: SearchFocus): SearchEntry[] {
+  if (!gameId) return [];
+  ensureHydrated(); // spans every scene
+  if (!loaded) return [];
+  const strings: Record<string, string> = {};
+  for (const l of loaded.locales) if (l.locale === loaded.project.locales.default) Object.assign(strings, l.strings);
+  return linesWithQualifier(loaded.scenes, gameId, strings, loaded.sceneFiles, focus?.sceneId).slice(0, 500);
+}
+
 /** The project-level settings for the Project Settings modal (General section). */
 export function readSettings(): ProjectSettingsDto | null {
   if (!loaded) return null;
@@ -1909,6 +1955,9 @@ export function readSettings(): ProjectSettingsDto | null {
     ...(loaded.gameScopes ? { worldFile: join(loaded.gameScopes.dir, GAME_SCOPES_FILE) } : {}),
     coverageDrivers: p.coverageDrivers,
     cast: p.cast ?? [],
+    // Seeded with the defaults when the project lists none, so the tab is never empty; saveSettings drops
+    // the list again when it still matches them.
+    qualifiers: projectQualifiers(p),
     // Build output (Build tab): the pinned `export.bundle`, else the sibling default - so the field always
     // shows where Publish Bundle will write, and saveSettings drops it back to undefined when left default.
     buildBundle: p.export?.bundle ?? defaultBundleRel(loaded),
@@ -2007,6 +2056,10 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       scopeRegistry,
       coverageDrivers: s.coverageDrivers && s.coverageDrivers.length ? s.coverageDrivers : undefined,
       cast: s.cast.length ? s.cast : undefined,
+      // Speaker qualifiers: stored only when they DIFFER from the defaults, as the ladders are. An empty list
+      // is stored as one (the project uses none), which is not the same as absent (the defaults).
+      // A caller that sends none (an older settings shape) leaves the project's list as it is.
+      qualifiers: s.qualifiers === undefined ? loaded.project.qualifiers : sameJson(s.qualifiers, DEFAULT_QUALIFIERS) ? undefined : s.qualifiers,
       // Status ladders: store only when they DIFFER from the built-in defaults, so a project that takes
       // the standard ladders keeps a clean file (and silently follows any future change to the defaults).
       writingStatuses: sameJson(s.writingStatuses, DEFAULT_WRITING_STATUSES) ? undefined : s.writingStatuses,
@@ -2028,6 +2081,11 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       export: buildExport(loaded, s.buildBundle, s.buildLocalisation, s.buildSourceDebug, loaded.project.export),
     };
     const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
+    // A qualifier whose gameId changed is a rename: every line using the old gameId is rewritten to the new
+    // one, and its translated names move with it, in the same batch as the project file (the caller flushed
+    // the open scene first, and reloads it after).
+    const renames = cleanRenames(s.qualifierRenames);
+    if (renames) writes.push(...qualifierRenameWrites(renames));
     // Switching VCS re-emits its config files (vcs-setup.md, .gitattributes, ignore) for the new system.
     // The bundle posture carries over, read from the files the old system was set up with.
     if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, currentBundlePosture(loaded.root, prevVcs === "none" ? undefined : prevVcs)));
@@ -2044,6 +2102,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       }
     }
     loaded.project = next; // reflect in the cached project
+    if (renames) reloadFromDisk(); // the rewritten scenes and strings, read back whole
     if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)
     syncAudioIndex();      // audio config may have changed (mode toggle / rung folders) (#206)

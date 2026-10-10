@@ -18,14 +18,15 @@
 
 import { basename, dirname, join, sep } from "node:path";
 import { canonicalStringify } from "@patterkit/core";
-import { walkNodes, castStringKey, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
+import { walkNodes, castStringKey, qualifierStringKey, usedQualifiers, projectQualifiers, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
 import type { PlannedWrite } from "./write.js";
 import { resolveDocumentation } from "./documentation.js";
 
-/** One localisable string. `id` is the beat id (or `cast:<NAME>` for a display name). */
+/** One localisable string. `id` is the beat id (or `cast:<NAME>` for a display name, `qualifier:<gameId>` for a
+ *  speaker qualifier's name). */
 export interface LocEntry {
   id: string;
   /** Owning scene id, or `@project` for project-level strings (display names). */
@@ -39,7 +40,7 @@ export interface LocEntry {
   /** Best-effort context for the translator. `gender` is the speaker's grammatical gender, looked up
    *  from the cast - what a gendered language needs to inflect the line. Export-only: `applyLoc` never
    *  reads it back, it is regenerated from the cast on every export. */
-  context?: { character?: string; kind?: string; gender?: GrammaticalGender };
+  context?: { character?: string; kind?: string; gender?: GrammaticalGender; qualifier?: string };
   /** Translated, but the source changed since (source modifiedAt > localisedAt[locale]). */
   stale: boolean;
 }
@@ -92,6 +93,13 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
     return g ? { ...context, gender: g } : context;
   };
 
+  // A line's speaker qualifier, by its shown name: read-only context (how the line is delivered), never text.
+  const qualifierName = new Map(projectQualifiers(loaded.project).map((q) => [q.gameId, q.name]));
+  const lineContext = (b: { kind: string; character?: string; qualifier?: string }): LocEntry["context"] => {
+    const q = b.kind === "line" && b.qualifier ? qualifierName.get(b.qualifier) ?? b.qualifier : undefined;
+    return { character: b.kind === "line" ? b.character : undefined, kind: b.kind, ...(q ? { qualifier: q } : {}) };
+  };
+
   const entries: LocEntry[] = [];
   const push = (id: string, scene: string, context?: LocEntry["context"]): void => {
     const src = source[id];
@@ -106,11 +114,11 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
       walkNodes<Group | Snippet>(block.children, (node) => {
         if (node.type === "group") {
           const p = node.prompt; // an option's prompt is localised content (spec §5)
-          if (p) push(p.id, scene.id, { character: p.kind === "line" ? p.character : undefined, kind: p.kind });
+          if (p) push(p.id, scene.id, lineContext(p));
           return;
         }
         for (const beat of node.beats ?? []) {
-          if (beat.kind !== "gameEvent") push(beat.id, scene.id, { character: beat.kind === "line" ? beat.character : undefined, kind: beat.kind });
+          if (beat.kind !== "gameEvent") push(beat.id, scene.id, lineContext(beat));
         }
       });
     }
@@ -123,6 +131,15 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
     const src = source[id] ?? c.displayName; // default shard if present, else the authoring displayName
     const translation = isTemplate ? "" : (target[id] ?? "");
     entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: commentsOf(id), context: withGender({ character: c.name }), stale: staleFor(id, translation) });
+  }
+
+  // Project-level speaker qualifier names (`qualifier:<gameId>`), for the qualifiers the lines use, seeded
+  // from the authored name as a cast display name is from its displayName.
+  for (const q of usedQualifiers(loaded.project, loaded.scenes)) {
+    const id = qualifierStringKey(q.gameId);
+    const src = source[id] ?? q.name;
+    const translation = isTemplate ? "" : (target[id] ?? "");
+    entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: commentsOf(id), context: { kind: "qualifier" }, stale: staleFor(id, translation) });
   }
 
   return { project: loaded.project.project.id, defaultLocale, locale: targetLocale, entries };

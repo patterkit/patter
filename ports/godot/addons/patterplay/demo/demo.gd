@@ -18,6 +18,9 @@ func _initialize() -> void:
 		match step["type"]:
 			"line":
 				var speaker = step.get("characterName", step.get("character", ""))
+				var qualifier = step.get("qualifierName", step.get("qualifier", ""))
+				if qualifier != "":
+					speaker += " (%s)" % qualifier
 				print("%s: %s" % [speaker, step["text"]])
 			"text":
 				print(step["text"])

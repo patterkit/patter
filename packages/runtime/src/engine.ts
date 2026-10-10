@@ -37,7 +37,7 @@ import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
-import { walkNodes, effectiveGameId, castStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
 import { SAVE_VERSION } from "@patterkit/model";
 import type {
@@ -102,7 +102,7 @@ const keys = {
 
 /** What `Flow.advance()` surfaces to the host at each stop. */
 export type StepResult =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; gameData?: GameData; tags?: string[] }
   | { type: "text"; id: string; text: string; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
   | { type: "choice"; groupId: string; options: ChoiceOption[] }
@@ -124,6 +124,10 @@ export interface BeatInfo {
   characterName?: string;
   /** Performance direction (line only). */
   direction?: string;
+  /** Speaker qualifier `gameId` (line only), e.g. `vo`. */
+  qualifier?: string;
+  /** The qualifier's shown name (source locale), e.g. `V.O.`. */
+  qualifierName?: string;
   /** Source text, un-interpolated (line / text). Omitted for gameEvent and IDs-only bundles. */
   text?: string;
   /** Author gameData overrides on this beat (raw, as the step carries them). Omitted when empty. */
@@ -195,6 +199,9 @@ export interface ChoicePrompt {
   /** The speaker's resolved player-facing name (locale-aware; absent when the character has none). */
   characterName?: string;
   direction?: string;
+  /** The speaker qualifier's `gameId` (`vo`), and its resolved shown name (locale-aware). */
+  qualifier?: string;
+  qualifierName?: string;
 }
 
 /** A single option of a pending `choice` group. */
@@ -431,6 +438,8 @@ interface FlowHost {
   defaultStrings: Record<string, string>;
   /** Cast canonical name -> authoring `displayName` (the unlocalised fallback when no loc string exists). */
   castDisplay: Map<string, string>;
+  /** Speaker qualifier gameId -> authored name (the unlocalised fallback when no loc string exists). */
+  qualifierDisplay: Map<string, string>;
   nodeIndex: Map<string, SelectableNode>;
   blockIndex: Map<string, { sceneId: string }>;
   blockById: Map<string, CompiledBlock>;
@@ -541,6 +550,9 @@ export class Engine {
     // active nor the default locale carries a `cast:<name>` string.
     const castDisplay = new Map<string, string>();
     for (const c of bundle.cast ?? []) if (c.displayName) castDisplay.set(c.name, c.displayName);
+    // Qualifier gameId -> authored name: the fallback for its shown name, as castDisplay is for a speaker's.
+    const qualifierDisplay = new Map<string, string>();
+    for (const q of bundle.qualifiers ?? []) if (q?.gameId) qualifierDisplay.set(q.gameId, q.name);
     this.defaultSeed = (options.seed ?? 0x9e3779b9) >>> 0;
 
     const nodeIndex = new Map<string, SelectableNode>();
@@ -616,7 +628,7 @@ export class Engine {
       logEnabled: options.log ?? false,
       tracing: options.log ?? false,
       emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
-      bundle, emitIds, strings, defaultStrings, castDisplay, nodeIndex, blockIndex, blockById,
+      bundle, emitIds, strings, defaultStrings, castDisplay, qualifierDisplay, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
       tagIndex: tagIndexFor(bundle), registry, ownsRegistry, patterBag, hostScopes,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
@@ -1024,6 +1036,11 @@ export class Engine {
         if (name !== undefined) info.characterName = name;
       }
       if (beat.direction !== undefined) info.direction = beat.direction;
+      if (beat.qualifier !== undefined) {
+        info.qualifier = beat.qualifier;
+        const name = this.host.defaultStrings[qualifierStringKey(beat.qualifier)] ?? this.host.qualifierDisplay.get(beat.qualifier);
+        if (name !== undefined) info.qualifierName = name;
+      }
     }
     if (beat.kind === "line" || beat.kind === "text") {
       const source = this.host.defaultStrings[beat.id]; // source-locale text, un-interpolated
@@ -2355,6 +2372,8 @@ export class Flow {
           character: silent ? undefined : beat.character,
           characterName: silent ? undefined : this.resolveCharacterName(beat.character),
           direction: silent ? undefined : beat.direction,
+          qualifier: silent ? undefined : beat.qualifier,
+          qualifierName: silent ? undefined : this.resolveQualifierName(beat.qualifier),
           gameData: beat.gameData,
           ...withTags,
         };
@@ -2399,7 +2418,10 @@ export class Flow {
     const text = this.interpolate(this.resolveString(beat.id));
     // A line-kind prompt is dialogue, so captions apply to it; a text-kind prompt is left as-is.
     return beat.kind === "line"
-      ? { kind: "line", text: this.captionLine(text), character: beat.character, characterName: this.resolveCharacterName(beat.character), direction: beat.direction }
+      ? {
+          kind: "line", text: this.captionLine(text), character: beat.character, characterName: this.resolveCharacterName(beat.character), direction: beat.direction,
+          qualifier: beat.qualifier, qualifierName: this.resolveQualifierName(beat.qualifier),
+        }
       : { kind: "text", text };
   }
 
@@ -2417,6 +2439,7 @@ export class Flow {
     return {
       type: "line", id: beat.id, text: shown.text,
       character: shown.character, characterName: shown.characterName, direction: shown.direction,
+      qualifier: shown.qualifier, qualifierName: shown.qualifierName,
       gameData: beat.gameData, ...withTags,
     };
   }
@@ -2458,6 +2481,16 @@ export class Flow {
     if (this.host.emitIds) return undefined; // IDs-only: omit the display name; the game maps the `character` token
     const key = castStringKey(character);
     return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.castDisplay.get(character);
+  }
+
+  /** A speaker qualifier's shown name, resolved as a character's is: the `qualifier:<gameId>` string in the
+   *  active locale, else the default locale, else the authored name. Undefined in IDs-only mode (the game
+   *  maps the `qualifier` gameId itself). */
+  private resolveQualifierName(qualifier: string | undefined): string | undefined {
+    if (qualifier === undefined) return undefined;
+    if (this.host.emitIds) return undefined;
+    const key = qualifierStringKey(qualifier);
+    return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.qualifierDisplay.get(qualifier);
   }
 
   /** Split a ref into scope + name. Tokens: `@scene`, registered tokens, else `@patter` (incl. bare `@name`). */
@@ -2582,6 +2615,8 @@ function savedPrompt(p: ChoicePrompt): SavedChoicePrompt {
   if (p.character !== undefined) out.character = p.character;
   if (p.characterName !== undefined) out.characterName = p.characterName;
   if (p.direction !== undefined) out.direction = p.direction;
+  if (p.qualifier !== undefined) out.qualifier = p.qualifier;
+  if (p.qualifierName !== undefined) out.qualifierName = p.qualifierName;
   return out;
 }
 

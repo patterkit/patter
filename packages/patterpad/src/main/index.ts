@@ -1041,7 +1041,12 @@ function registerIpc(): void {
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
   ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
+    // A qualifier gameId rename rewrites lines across the project, the open scene's among them: its unsaved
+    // edits go to disk first, and it reloads from the rewritten file after.
+    const renames = Object.entries(s.qualifierRenames ?? {}).some(([from, to]) => from !== to);
+    if (renames) await flushEditorScene();
     const r = await project.saveSettings(s);
+    if (r.ok && renames) win?.webContents.send("replace:applied");
     refreshMenu(); // dictionary tab may change spell-check on/off + language
     if (r.ok) {
       scheduleDebugPush(); // settings shape the bundle, so refresh a connected external game too
@@ -1222,6 +1227,8 @@ function registerIpc(): void {
   ipcMain.handle("searchWin:byProperty", (_e, query: string) => project.propertyUsage(query, searchFocus));
   ipcMain.handle("searchWin:byTag", (_e, tag: string) => project.tagUsage(tag, searchFocus));
   ipcMain.handle("searchWin:tags", () => project.tagList());
+  ipcMain.handle("searchWin:byQualifier", (_e, gameId: string) => project.linesByQualifier(gameId, searchFocus));
+  ipcMain.handle("searchWin:qualifiers", () => project.qualifierList());
   ipcMain.handle("searchWin:query", (_e, query: string) => project.searchProject(query, searchFocus));
   // The dimension comes from the WINDOW's current tab (not main's reopen-mode, which goes stale when the
   // user switches tabs in the window): `recording` true = recording-status, else writing-status.

@@ -90,6 +90,8 @@ namespace Patterkit.Patterplay.TestHost
             if (b.Character != null) o["character"] = b.Character;
             if (b.CharacterName != null) o["characterName"] = b.CharacterName;
             if (b.Direction != null) o["direction"] = b.Direction;
+            if (b.Qualifier != null) o["qualifier"] = b.Qualifier;
+            if (b.QualifierName != null) o["qualifierName"] = b.QualifierName;
             if (b.Text != null) o["text"] = b.Text;
             if (b.GameData != null && b.GameData.Count > 0) o["gameData"] = GameDataToObject(b.GameData);
             if (b.Tags != null && b.Tags.Count > 0) o["tags"] = b.Tags.Cast<object>().ToList();

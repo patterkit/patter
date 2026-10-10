@@ -24,7 +24,8 @@ Both hang off the engine (build one from your bundle, then call these, no flow n
   `{ scene, block, snippet }` it belongs to. Use it to lay one thing per beat.
 
 Each beat carries the same data a played step would: `id`, `kind` (line / text / gameEvent),
-`character` + resolved `characterName`, `direction`, the **source `text`** (un-interpolated), the
+`character` + resolved `characterName`, `direction`, the speaker `qualifier` + resolved
+`qualifierName`, the **source `text`** (un-interpolated), the
 author `gameData` overrides, and accumulated `tags`. Text and names are read at the source locale.
 Each outline scene and block carries its `id`, `gameId` address, `name`, its own author `gameData`
 overrides (left out when empty), and its `tags`.
@@ -129,7 +130,7 @@ These reads are read-only and static, so they reflect the compiled bundle, not a
 you want the full set. To read one scene's or block's without walking the outline, use
 [`gameDataForScene` / `gameDataForBlock`](/play/integration/#scene-and-block-game-data).
 
-Text comes from the source locale. `text` and `characterName` come from the source language, and an
+Text comes from the source locale. `text`, `characterName`, and `qualifierName` come from the source language, and an
 IDs-only bundle has no embedded text, so `text` is empty.
 
 Order is authored order. Within a scene, blocks / nodes / beats are in the order they were written.

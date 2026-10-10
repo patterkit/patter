@@ -7,6 +7,18 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker qualifiers** (a script's `TAM (O.S.)`): a line step carries `Qualifier`, the qualifier's gameId
+  (`vo`, `os`, `radio`, or the project's own), and `QualifierName`, its shown name, beside `Character` and
+  `CharacterName`, each with a `bHas` flag. `QualifierName` resolves as `CharacterName` does: the active
+  locale's `qualifier:<gameId>` string, then the default locale's, then the name the project gave it; an
+  IDs-only build leaves it unset for your game to localise. A line prompt (`FPatterOption::Prompt`) carries
+  both too, a prompt spoken back on choosing keeps them, and a save keeps them on a pending choice. A line
+  that goes silent with closed captions off drops them with its speaker. The outline's `FPatterBeatInfo`
+  gains `Qualifier` and `QualifierName`, and the C++ core's `patter::Bundle` reads the bundle's `qualifiers`
+  list. Bundles and saves without qualifiers load and play as before.
+
 ## [0.21.0] - 2026-10-07
 
 ### Added

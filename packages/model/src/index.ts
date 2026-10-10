@@ -54,6 +54,10 @@ export interface LineBeat {
   character?: string;
   /** Performance direction, language-neutral (never localised). */
   direction?: string;
+  /** Speaker qualifier: the `gameId` of one of the project's qualifiers (`vo`, `os`, `radio`), which says
+   *  how the line is delivered (`TAM (O.S.)`), not who says it. Absent = none. The speaker is still
+   *  `character` for every authoring and reporting purpose. See `SpeakerQualifier`. */
+  qualifier?: string;
   gameData?: GameData;
   /** Author-defined freeform tags (#215): a cross-cutting label layer that travels to the runtime.
    *  At runtime a beat's tags are the UNION of its own and every ancestor's (scene → block → group(s) →
@@ -466,6 +470,54 @@ export interface CastMember {
   gameData?: GameData;
 }
 
+/** A speaker qualifier (a screenplay's character extension): `V.O.`, `O.S.`, `RADIO`, or the project's own.
+ *  A line stores the `gameId`; the `name` is what the cue, Play, and the scripts show, and is localised as a
+ *  cast display name is (`qualifierStringKey`). */
+export interface SpeakerQualifier {
+  /** What code switches on, and what a line stores. Unique in the project; hyphen-slug form (`gameIdify`). */
+  gameId: string;
+  /** What the script shows (`V.O.`). Free to change: lines hold the `gameId`. */
+  name: string;
+  /** What the qualifier means, for writers. Authoring only. */
+  description?: string;
+}
+
+/** The qualifiers a project starts with. Their `gameId`s are pinned (`gameIdify` would make `V.O.` into
+ *  `v-o`); a qualifier a writer adds takes its `gameId` from `gameIdify(name)`. */
+export const DEFAULT_QUALIFIERS: SpeakerQualifier[] = [
+  { gameId: "vo", name: "V.O.", description: "Voice-over: the character isn't in the scene (a thought, narration, a voice in the ear)." },
+  { gameId: "os", name: "O.S.", description: "Off-screen: the character is there, but not seen (the next room, behind a door)." },
+  { gameId: "radio", name: "RADIO", description: "Heard through a radio, a phone, or a loudspeaker." },
+];
+
+/** The project's qualifiers: its own list, else the defaults. */
+export function projectQualifiers(project: Pick<ProjectFile, "qualifiers">): SpeakerQualifier[] {
+  return project.qualifiers ?? DEFAULT_QUALIFIERS;
+}
+
+/** The project's qualifiers that some line (or line prompt) in these scenes uses, in the project's order. */
+export function usedQualifiers(project: Pick<ProjectFile, "qualifiers">, scenes: Scene[]): SpeakerQualifier[] {
+  const used = new Set<string>();
+  for (const scene of scenes) {
+    for (const block of scene.blocks) {
+      walkNodes<Group | Snippet>(block.children, (node) => {
+        if (node.type === "group") {
+          if (node.prompt?.kind === "line" && node.prompt.qualifier) used.add(node.prompt.qualifier);
+          return;
+        }
+        for (const beat of node.beats ?? []) if (beat.kind === "line" && beat.qualifier) used.add(beat.qualifier);
+      });
+    }
+  }
+  return projectQualifiers(project).filter((q) => used.has(q.gameId));
+}
+
+/** A qualifier as it reaches a compiled bundle: its `gameId` and authored name (the unlocalised fallback). */
+export interface BundleQualifier {
+  gameId: string;
+  name: string;
+}
+
 /** The cast as it reaches a compiled bundle: the player-facing fields only. `notes`, `actor` and
  *  `gender` are authoring / production / translation context, and the compiler drops them, so a shipped
  *  game never carries a real person's name or a writer's private notes. The compiler copies the shipping
@@ -725,6 +777,9 @@ export interface ProjectFile {
    *  externally-gated branches get exercised. Authoring-only (never reaches the runtime bundle). */
   coverageDrivers?: CoverageDriver[];
   cast?: CastMember[];
+  /** The speaker qualifiers a line can pick from, in display order; default `DEFAULT_QUALIFIERS`. An empty
+   *  list means the project uses none. */
+  qualifiers?: SpeakerQualifier[];
   gameDataFields?: GameDataFields;
   /** Ordered writing-status ladder (not-done -> done); default `DEFAULT_WRITING_STATUSES`. */
   writingStatuses?: WritingStatusDecl[];
@@ -771,7 +826,8 @@ export interface LocaleFile {
 }
 
 /** The `scene` marker for a project-level loc shard (`loc/<locale>/_project.patterloc`): strings that
- *  aren't tied to a scene beat - currently cast display names, later project title / UI strings. */
+ *  aren't tied to a scene beat - currently cast display names and speaker qualifier names, later project
+ *  title / UI strings. */
 export const PROJECT_LOCALE_SCENE = "@project";
 
 /** The project-level loc-string key for a cast member's player-facing name, e.g. `cast:BARKEEP`.
@@ -779,6 +835,12 @@ export const PROJECT_LOCALE_SCENE = "@project";
  *  CastMember's `displayName`; the runtime resolves a character's shown name through this key. */
 export function castStringKey(name: string): string {
   return `cast:${name}`;
+}
+
+/** The project-level loc-string key for a speaker qualifier's shown name, e.g. `qualifier:vo`. Resolved as a
+ *  cast display name is: the active locale, then the default locale, then the authored `name`. */
+export function qualifierStringKey(gameId: string): string {
+  return `qualifier:${gameId}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -868,6 +930,10 @@ export interface Suggestion {
   /** A proposed new direction (the parenthetical), and the direction when suggested ("" for none). */
   proposedDirection?: string;
   baselineDirection?: string;
+  /** A proposed new speaker qualifier (a `gameId` from the project's list, "" for none), and the qualifier
+   *  when suggested ("" for none). */
+  proposedQualifier?: string;
+  baselineQualifier?: string;
   /** A proposal to cut the beat (an editor emptied its line). Accept marks it cut. */
   proposedCut?: boolean;
   /** Where the suggestion came from, when it arrived in an editable-script handoff: the handoff and the
@@ -984,8 +1050,9 @@ export interface HandoffLine {
   /** The beat id (a line, a narration beat, or an option prompt). */
   id: string;
   kind: "line" | "narration" | "option";
-  /** The speaker and direction as sent (spoken lines only). */
+  /** The speaker, speaker qualifier (`gameId`), and direction as sent (spoken lines only). */
   character?: string;
+  qualifier?: string;
   direction?: string;
   /** The text as sent: the baseline for every comparison on reimport. */
   baseline: string;
@@ -1092,6 +1159,9 @@ export interface Bundle {
   locales: { default: string; included: string[] };
   /** Player-facing cast only: the compiler strips notes / actor / gender (see `BundleCastMember`). */
   cast?: BundleCastMember[];
+  /** The speaker qualifiers the content uses, in the project's order. Absent when no line has one, so a
+   *  bundle without qualifiers is exactly as before. */
+  qualifiers?: BundleQualifier[];
   properties?: PropertyDecl[];
   /** Host / world scope declarations, baked from the project so the runtime can self-back a declared
    *  scope (`@world`, ...) when no host resolver claims its token. Absent = no host scopes. */
@@ -1205,6 +1275,8 @@ export interface SavedChoicePrompt {
   character?: string;
   characterName?: string;
   direction?: string;
+  qualifier?: string;
+  qualifierName?: string;
 }
 
 /** One option of a pending choice, saved VERBATIM: re-deriving on load would re-evaluate conditions. */
