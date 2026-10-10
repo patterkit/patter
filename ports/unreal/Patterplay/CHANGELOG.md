@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-10
+
 ### Added
 
 - **Speaker qualifiers** (a script's `TAM (O.S.)`): a line step carries `Qualifier`, the qualifier's gameId

@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-10
+
 ### Added
 
 - **Speaker qualifiers: a line step carries `qualifier` and `qualifierName`.** A line can say how it is

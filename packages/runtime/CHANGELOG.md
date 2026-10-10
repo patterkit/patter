@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-10
+
 ### Added
 
 - **Speaker qualifiers**: a line can say how it is delivered, a screenplay's `TAM (O.S.)`, without becoming a
