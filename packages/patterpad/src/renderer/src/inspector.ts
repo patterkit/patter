@@ -176,9 +176,9 @@ export function parsePad(text: string, min: number, max = PAD_AFTER_MAX): number
 }
 
 /** The words a pause field shows when it's empty: what applies instead, and where it comes from. */
-export function inheritedPadText(inherited: PadSource | undefined, projectDefault: number, noCutIn: false | "seam" | "event" = false): string {
+export function inheritedPadText(inherited: PadSource | undefined, projectDefault: number, endsSnippet = false): string {
   const value = inherited?.value ?? projectDefault;
-  if (noCutIn && value < 0) return noCutIn === "seam" ? "0 at the end of a snippet" : "0 before a game event"; // the runtime clamps it
+  if (endsSnippet && value < 0) return "0 at the end of a snippet"; // the runtime clamps it at the seam
   return `${formatSeconds(value)} from the ${inherited?.from ?? "project"}`;
 }
 
@@ -213,13 +213,12 @@ function padRow(label: string, id: string | null, own: number | undefined, place
 /** The Pad after field on a line or text beat (or an option's prompt). A snippet's last line can't cut in
  *  across the seam, so its field starts at 0 there; a prompt times the reply, which is certain. */
 function leafPadRow(lv: LeafLevel, h: InspectorHandlers): HTMLElement {
-  const noCutIn = lv.endsSnippet === true ? "seam" as const : lv.beforeEvent === true ? "event" as const : false;
+  const seam = lv.endsSnippet === true;
   const tip = lv.prompt ? "The pause after this prompt before the reply. Below zero, the reply cuts in early."
-    : noCutIn === "seam" ? "The pause after this line. It ends its snippet, so nothing can cut in on it."
-    : noCutIn === "event" ? "The pause after this line. A game event comes next, so nothing can cut in on it."
-    : "The pause after this line before the next. Below zero, the next line cuts in early.";
-  return padRow("Pad after", lv.id, lv.padAfter, inheritedPadText(lv.padInherited, h.projectPadAfter(), noCutIn),
-    noCutIn ? 0 : PAD_AFTER_MIN, tip, h.setPadAfter);
+    : seam ? "The pause after this line. It ends its snippet, so nothing can cut in on it."
+    : "The pause after this line before what comes next. Below zero, it starts before this line ends.";
+  return padRow("Pad after", lv.id, lv.padAfter, inheritedPadText(lv.padInherited, h.projectPadAfter(), seam),
+    seam ? 0 : PAD_AFTER_MIN, tip, h.setPadAfter);
 }
 
 /** The Default pad field on a snippet, group, block, or scene: the pause after each line inside that

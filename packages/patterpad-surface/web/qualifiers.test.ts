@@ -9,6 +9,8 @@
 import { describe, it, expect } from "vitest";
 import { TextSelection } from "prosemirror-state";
 import { mountSurface, type SurfaceHandle } from "./surface.js";
+import { prependLine } from "../src/lines.js";
+import { findBeatById, sayStartOf } from "../src/zoneutil.js";
 import flowSource from "../test/fixtures/tavern.patterflow?raw";
 import locSource from "../test/fixtures/tavern.patterloc?raw";
 
@@ -119,6 +121,27 @@ describe("pressing on the cue", () => {
     press(cue.querySelector(".cue-text")!);
     intoCue();
     expect(popupShown()).toBe(true);
+    h.destroy();
+  });
+
+  // Review 2026-10: the secondary press was remembered until the next mousedown, so a command picked from
+  // the context menu it opened (which brings no keydown or mousedown to the editor) closed the popup on the
+  // line it had just added, instead of opening it there.
+  it("after a right-click, a command from the menu that adds a dialogue line still raises the popup", () => {
+    const { h, cueOf } = mount();
+    h.view.focus();
+    const addLineAbove = (id: string): void => {
+      const $line = h.view.state.doc.resolve(findBeatById(h.view.state.doc, id)!.pos);
+      h.view.dispatch(prependLine(h.view.state, $line.before($line.depth))!);
+    };
+    for (const target of [cueOf("L_greet2").querySelector(".cue-text")!, cueOf("L_greet2").parentElement!.querySelector(".zone.say")!]) {
+      press(target, { button: 2 });
+      expect(popupShown()).toBe(false);
+      addLineAbove("L_greet2");
+      expect(h.view.state.selection.$from.parent.type.name).toBe("cue");
+      expect(popupShown()).toBe(true);
+      h.view.dispatch(h.view.state.tr.setSelection(TextSelection.create(h.view.state.doc, sayStartOf(h.view.state.doc, "L_greet2"))));
+    }
     h.destroy();
   });
 });

@@ -190,7 +190,7 @@ export function exportBundle(input: ExportInput): Bundle {
         scenes: scenesOut, strings, properties: project.properties ?? [],
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
-        ...(project.padAfterDefault !== undefined ? { padAfterDefault: project.padAfterDefault } : {}),
+        ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
       }, { trailingComma: false })),
       // Structure-only fingerprint (live bundle refresh): the same hash with the string tables left
       // out. Same structureHash + a different hash = a text-only edit, safe to swap in place with
@@ -200,7 +200,7 @@ export function exportBundle(input: ExportInput): Bundle {
         scenes: scenesOut, properties: project.properties ?? [],
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
-        ...(project.padAfterDefault !== undefined ? { padAfterDefault: project.padAfterDefault } : {}),
+        ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
       }, { trailingComma: false })),
     },
     voiced: project.voiced ?? false,
@@ -218,7 +218,7 @@ export function exportBundle(input: ExportInput): Bundle {
     }),
     ...(qualifiers.length > 0 ? { qualifiers } : {}),
     // The project's own line-padding default, only when it sets one: absent, every runtime uses the built-in one.
-    ...(project.padAfterDefault !== undefined ? { padAfterDefault: project.padAfterDefault } : {}),
+    ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
 
     properties: project.properties,
     scopeRegistry: hostScopes,

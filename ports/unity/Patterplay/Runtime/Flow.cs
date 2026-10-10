@@ -950,14 +950,15 @@ namespace Patterkit.Patterplay
             var beat = PromptBeatOf(node);
             if (beat == null) return null;
             string text = Interpolate(ResolveString(beat.Id));
+            double padAfter = PadOf(beat.Id);
             // A line-kind prompt is dialogue, so captions apply; a text-kind prompt is left as-is.
             return beat.Kind == "line"
                 ? new ChoicePrompt
                 {
                     Kind = "line", Text = CaptionLine(text), Character = beat.Character, CharacterName = ResolveCharacterName(beat.Character), Direction = beat.Direction,
-                    Qualifier = beat.Qualifier, QualifierName = ResolveQualifierName(beat.Qualifier),
+                    Qualifier = beat.Qualifier, QualifierName = ResolveQualifierName(beat.Qualifier), PadAfter = padAfter,
                 }
-                : new ChoicePrompt { Kind = "text", Text = text };
+                : new ChoicePrompt { Kind = "text", Text = text, PadAfter = padAfter };
         }
 
         /// <summary>An option's AUTHORED prompt beat: an Option group's own prompt. The only prompt a replay speaks.</summary>
@@ -983,6 +984,14 @@ namespace Patterkit.Patterplay
         /// default above it, else the project's, else the built-in one; clamped to zero on a snippet's last line.</summary>
         private double PadOf(string beatId)
             => _host.PadIndex.TryGetValue(beatId, out var pad) ? pad.Resolved : Bundle.DefaultPadAfter;
+
+        /// <summary>The resolved pause of the beat an option shows as its prompt (its authored prompt, else its
+        /// first content line), for a saved option that predates prompts carrying one.</summary>
+        private double PromptPadOf(Node node)
+        {
+            var beat = PromptBeatOf(node);
+            return beat != null ? PadOf(beat.Id) : Bundle.DefaultPadAfter;
+        }
 
         private Beat PromptBeatOf(Node node)
         {
@@ -1239,7 +1248,14 @@ namespace Patterkit.Patterplay
                 {
                     if (!_host.NodeIndex.TryGetValue(o.Id, out var n)) continue;
                     byId[o.Id] = n;
-                    options.Add(CloneOption(o));
+                    // A save from before prompts carried their pause has none: work it out again from the prompt's beat.
+                    var opt = CloneOption(o);
+                    if (opt.Prompt != null)
+                    {
+                        opt.Prompt = ClonePrompt(opt.Prompt);
+                        if (opt.Prompt.PadAfter == null) opt.Prompt.PadAfter = PromptPadOf(n);
+                    }
+                    options.Add(opt);
                 }
                 if (options.Count > 0) _pendingChoice = new ChoiceStateInternal { GroupId = snap.PendingGroupId, Options = options, ById = byId };
             }
@@ -1255,13 +1271,17 @@ namespace Patterkit.Patterplay
             if (_pendingPromptOwnerId != null && _host.NodeIndex.TryGetValue(_pendingPromptOwnerId, out var owner))
                 _pendingPromptBeat = AuthoredPromptOf(owner);
             if (_pendingPromptBeat == null) _pendingPromptOwnerId = null;
-            else _pendingPromptShown = ClonePrompt(snap.PendingPrompt);
+            else
+            {
+                _pendingPromptShown = ClonePrompt(snap.PendingPrompt);
+                if (_pendingPromptShown != null && _pendingPromptShown.PadAfter == null) _pendingPromptShown.PadAfter = PadOf(_pendingPromptBeat.Id);
+            }
         }
 
         private static ChoicePrompt ClonePrompt(ChoicePrompt p) => p == null ? null : new ChoicePrompt
         {
             Kind = p.Kind, Text = p.Text, Character = p.Character, CharacterName = p.CharacterName, Direction = p.Direction,
-            Qualifier = p.Qualifier, QualifierName = p.QualifierName,
+            Qualifier = p.Qualifier, QualifierName = p.QualifierName, PadAfter = p.PadAfter,
         };
 
         private static ChoiceOption CloneOption(ChoiceOption o)

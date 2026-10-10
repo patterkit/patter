@@ -1321,20 +1321,20 @@ namespace Patterkit.Patterplay
 
         // Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes
         // the nearest `PadAfterDefault` above it (snippet, then each group, innermost first, then block, then
-        // scene), else the project's, else Bundle.DefaultPadAfter. A snippet's last line or text beat can't cut
-        // in on what follows the seam, nor one followed by a game event across the event, so a negative value
-        // there is clamped to zero. Like the tag index, it
-        // depends only on where a beat sits, so it is worked out once per bundle. An option's prompt is the head
-        // of its option's run: it resolves through the option, and is never clamped (its reply is certain).
+        // scene), else the project's, else Bundle.DefaultPadAfter. A snippet's last line or text beat can't be cut
+        // in on (what follows the seam isn't certain), so a negative value there is clamped to zero. A negative
+        // pause before a game event stands: the event starts as the line ends. Like the tag index, it depends
+        // only on where a beat sits, so it is worked out once per bundle. An option's prompt is the head of its
+        // option's run: it resolves through the option, and is never clamped (its reply is certain).
         internal static Dictionary<string, BeatPad> BuildPadIndex(Bundle bundle)
         {
             var index = new Dictionary<string, BeatPad>();
-            double projectDefault = bundle.PadAfterDefault ?? Bundle.DefaultPadAfter;
+            double projectDefault = Finite(bundle.PadAfterDefault) ?? Bundle.DefaultPadAfter;
             foreach (var scene in bundle.Scenes.Values)
             {
-                double sceneDefault = scene.PadAfterDefault ?? projectDefault;
+                double sceneDefault = Finite(scene.PadAfterDefault) ?? projectDefault;
                 foreach (var block in scene.Blocks)
-                    IndexPads(block.Children, block.PadAfterDefault ?? sceneDefault, index);
+                    IndexPads(block.Children, Finite(block.PadAfterDefault) ?? sceneDefault, index);
             }
             return index;
         }
@@ -1343,26 +1343,30 @@ namespace Patterkit.Patterplay
         {
             foreach (var n in nodes ?? new List<Node>())
             {
-                double def = n.PadAfterDefault ?? inherited;
+                double def = Finite(n.PadAfterDefault) ?? inherited;
                 if (n.IsGroup)
                 {
                     if (n.Prompt != null) SetPad(n.Prompt, def, false, index);
                     IndexPads(n.Children, def, index);
                     continue;
                 }
-                // A pause can be negative only when the very next beat is a line or text beat: a snippet's last
-                // one (the seam) and one followed by a game event (a cut-in can't cross it) are clamped.
+                // Only the snippet's last line or text beat is clamped; a game event doesn't count as one.
                 var beats = n.Beats ?? new List<Beat>();
+                int last = -1;
+                for (int i = 0; i < beats.Count; i++) if (IsSpoken(beats[i])) last = i;
                 for (int i = 0; i < beats.Count; i++)
-                    if (IsSpoken(beats[i])) SetPad(beats[i], def, !(i + 1 < beats.Count && IsSpoken(beats[i + 1])), index);
+                    if (IsSpoken(beats[i])) SetPad(beats[i], def, i == last, index);
             }
         }
 
         private static bool IsSpoken(Beat b) => b.Kind == "line" || b.Kind == "text";
 
+        /// <summary>A pause value is used only when it is a finite number; anything else is absent and inherits.</summary>
+        private static double? Finite(double? v) => v.HasValue && !double.IsNaN(v.Value) && !double.IsInfinity(v.Value) ? v : null;
+
         private static void SetPad(Beat beat, double inherited, bool clamp, Dictionary<string, BeatPad> index)
         {
-            double? own = beat.Kind == "gameEvent" ? null : beat.PadAfter;
+            double? own = beat.Kind == "gameEvent" ? null : Finite(beat.PadAfter);
             double resolved = own ?? inherited;
             if (clamp && resolved < 0) resolved = 0;
             index[beat.Id] = new BeatPad { Own = own, Resolved = resolved };

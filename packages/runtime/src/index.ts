@@ -12,6 +12,8 @@ export { Engine, Flow, Checkpoint } from "./engine.js";
 // The compiled-bundle type the Engine constructor consumes (from the shared model), so hosts can
 // type a parsed .patterc without depending on @patterkit/model directly.
 export type { Bundle } from "@patterkit/model";
+/** The built-in pause after a line, in seconds, when nothing in the project sets one (line padding). */
+export { DEFAULT_PAD_AFTER } from "@patterkit/model";
 // The examiner row listProperties() returns, for the same reason: it is the shared kernel's
 // (@wildwinter/scoperegistry, the property implementation both product families use), and a
 // host typing a row should not have to depend on the kernel to name it.

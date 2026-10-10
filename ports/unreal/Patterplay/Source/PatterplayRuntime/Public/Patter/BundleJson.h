@@ -13,6 +13,7 @@
 // catches either and reports it through its Error string; the TestHost lets it throw.
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <stdexcept>
 #include <string>
@@ -94,7 +95,7 @@ namespace patter
                     Qualifier qualifier;
                     if (const J* g = field(q, "gameId")) qualifier.gameId = text(*g);
                     if (qualifier.gameId.empty()) return;
-                    if (const J* n = field(q, "name")) qualifier.name = text(*n);
+                    if (const J* n = field(q, "name")) if (A::isString(*n)) { qualifier.hasName = true; qualifier.name = A::str(*n); }
                     out.qualifiers.push_back(qualifier);
                 });
 
@@ -230,11 +231,13 @@ namespace patter
         static std::string text(const J& v) { return A::isString(v) ? A::str(v) : std::string(); }
         static bool flag(const J& v) { return T::isBool(v) && A::boolean(v); }
 
-        // A pause in seconds (line padding): set only when it is a number; anything else reads as unset, so
-        // the beat falls back to the defaults above it.
+        // A pause in seconds (line padding): set only when it is a finite number; anything else reads as
+        // unset, so the beat falls back to the defaults above it.
         static void readPad(const J& v, bool& has, double& out)
         {
-            if (T::isNumber(v)) { has = true; out = A::num(v); }
+            if (!T::isNumber(v)) return;
+            const double d = A::num(v);
+            if (std::isfinite(d)) { has = true; out = d; }
         }
 
         template <typename Fn>

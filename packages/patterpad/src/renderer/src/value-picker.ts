@@ -13,8 +13,9 @@ export function closeValuePicker(): void {
   active?.close();
 }
 
-/** Offer `values` under `title`; picking one calls `onPick` and closes. */
-export function openValuePicker(opts: { anchor: HTMLElement; title: string; values: string[]; current?: string; onPick: (value: string) => void }): void {
+/** Offer `values` under `title`; picking one calls `onPick` with its label and its row, and closes. Read
+ *  the row when two rows can share a label (a list with a "None" row, say). */
+export function openValuePicker(opts: { anchor: HTMLElement; title: string; values: string[]; current?: string; onPick: (value: string, index: number) => void }): void {
   const panel = openPanel({
     anchor: opts.anchor, className: "value-picker", title: opts.title, width: 220,
     onClose: () => { if (active === panel) active = null; }, // runs after the exit fade
@@ -22,10 +23,19 @@ export function openValuePicker(opts: { anchor: HTMLElement; title: string; valu
   if (!panel) return; // re-clicked the same control: toggled closed
   active = panel;
   panel.body.classList.add("value-list");
-  for (const v of opts.values) {
+  opts.values.forEach((v, i) => {
     const b = el("button", `exed-opt${v === opts.current ? " sel" : ""}`, v);
     b.type = "button";
-    b.addEventListener("click", () => { opts.onPick(v); closeValuePicker(); });
+    b.addEventListener("click", () => { opts.onPick(v, i); closeValuePicker(); });
     panel.body.append(b);
-  }
+  });
+}
+
+/** The pick-qualifier quick fix's rows: the project's qualifiers by name, then a row for none, and the Game
+ *  ID each row stands for. Read by row, so a qualifier that is itself named "None" is still that qualifier. */
+export function qualifierRows(list: ReadonlyArray<{ name: string; gameId: string }>): { values: string[]; gameIdAt: (index: number) => string } {
+  return {
+    values: [...list.map((q) => q.name), "None"],
+    gameIdAt: (index) => list[index]?.gameId ?? "",
+  };
 }

@@ -80,7 +80,10 @@ Drop that on a GameObject, assign the imported bundle to the **Bundle** field, a
 Render each `step` into your own dialogue UI; on a `Choice`, show `step.Options` (each has a
 `Prompt` and an `Eligible` flag) and call `flow.Choose(id)` with the player's pick. A line's
 `Qualifier` is its [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId` (`vo`, `os`,
-`radio`), and `QualifierName` its localised shown name; a line prompt carries both too.
+`radio`), and `QualifierName` its localised shown name; a line prompt carries both too. A `Line` or
+`Text` step's `PadAfter` (a `double?`, null on the other steps) is the writer's pause after it in
+seconds, already resolved; `Bundle.DefaultPadAfter` (0.6) is the one a project gets when it sets
+none. The [timing rules](/play/engine/#step-shapes) say how to play it.
 
 Two ready-made samples ship with the package. Import them from **Package Manager ▸ Patterplay ▸
 Samples**. Each carries a **ready-made scene**, so there is nothing to set up: import, open the

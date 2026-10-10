@@ -53,6 +53,9 @@ a flow's `GetChoices`, `GetProperty` and `SetProperty` (its `@scene` values incl
 `bHasDirection`, `bHasQualifier`, and `bHasQualifierName` tell a field that isn't set from one that is
 empty. `Qualifier` is the line's [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId`
 (`vo`, `os`, `radio`), and `QualifierName` its localised shown name; a line prompt carries both too.
+`PadAfter` is the writer's pause after a line or text step, in seconds, already resolved. It's always
+set on a `Line` or `Text` step and 0 on any other, so it has no `bHas` flag. The
+[timing rules](/play/engine/#step-shapes) say how to play it.
 
 To choose how the engine plays, create it with **`UPatterEngine::CreateWithOptions`** and an
 `FPatterEngineOptions`: a seed for a repeatable run, the locale to play in, a decision log (read it

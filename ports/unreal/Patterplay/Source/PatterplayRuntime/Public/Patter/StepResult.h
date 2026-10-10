@@ -21,6 +21,10 @@ namespace patter
         bool hasDirection = false; std::string direction;
         bool hasQualifier = false; std::string qualifier;           // speaker qualifier gameId (`vo`)
         bool hasQualifierName = false; std::string qualifierName;   // and its resolved shown name
+        // The prompt's resolved pause, in seconds (line padding): when it is spoken (by replayPromptOnChoose,
+        // or by a game that voices it), the wait before the reply, negative to cut in on the question. Always
+        // set by the engine; hasPadAfter is false only on a prompt read from a save written before it existed.
+        bool hasPadAfter = false; double padAfter = DEFAULT_PAD_AFTER;
     };
 
     struct ChoiceOption

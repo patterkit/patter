@@ -1086,6 +1086,10 @@ export interface HandoffLine {
   /** The speaker, speaker qualifier (`gameId`), and direction as sent (spoken lines only). */
   character?: string;
   qualifier?: string;
+  /** The qualifier's name as the cue printed it (`O.S.` in `TAM (O.S.)`), so a returned cue is read against
+   *  what the editor saw even after the name changes in settings. Absent in handoffs written before it was
+   *  recorded, which compare against the qualifier's current name. */
+  qualifierName?: string;
   direction?: string;
   /** The text as sent: the baseline for every comparison on reimport. */
   baseline: string;
@@ -1316,6 +1320,8 @@ export interface SavedChoicePrompt {
   direction?: string;
   qualifier?: string;
   qualifierName?: string;
+  /** The prompt's resolved pause (line padding). Absent in a save written before it existed. */
+  padAfter?: number;
 }
 
 /** One option of a pending choice, saved VERBATIM: re-deriving on load would re-evaluate conditions. */

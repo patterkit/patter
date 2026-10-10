@@ -4,15 +4,15 @@
 // lines by qualifier; and a line whose qualifier was removed from the list gets the pick-a-qualifier fix.
 
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync, cpSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, cpSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseSource, canonicalStringify } from "@patterkit/core";
-import { DEFAULT_QUALIFIERS, walkNodes } from "@patterkit/model";
-import type { FlowFile, Group, Snippet, Scene } from "@patterkit/model";
+import { DEFAULT_QUALIFIERS, HANDOFF_SCHEMA, walkNodes } from "@patterkit/model";
+import type { AuthoringFile, FlowFile, Group, HandoffFile, Snippet, Scene } from "@patterkit/model";
 import * as project from "../src/main/project.js";
-import { renameQualifiersInScene, renameQualifierStrings, cleanRenames } from "../src/main/qualifiers.js";
+import { renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, cleanRenames } from "../src/main/qualifiers.js";
 
 const TAVERN = resolve(dirname(fileURLToPath(import.meta.url)), "../../../test-fixtures/tavern-example.patter");
 
@@ -76,6 +76,39 @@ describe("speaker qualifiers in the project session", () => {
     expect(project.validate().problems.filter((p) => p.detail === "unknown-qualifier")).toEqual([]);
   });
 
+  it("a Game ID change also moves suggestions, edit records, and handoff records to the new gameId", async () => {
+    const { dir } = tavernWithQualifier();
+    // An open suggestion from an editable-script reimport, the translation-staleness record of the
+    // qualifier's name, and the handoff record the script was sent with: all hold the old gameId.
+    const authoringPath = join(dir, "authoring", "tavern.patterx");
+    const af = parseSource(readFileSync(authoringPath, "utf8")) as AuthoringFile;
+    af.suggestions = [{ id: "sg1", anchor: "L_greet", baseline: "x", proposed: "x", author: "Sam", ts: "2026-10-01T00:00:00Z", proposedQualifier: "vo", baselineQualifier: "os" }];
+    af.edits = { ...af.edits, "qualifier:os": { modifiedAt: "2026-10-01T00:00:00Z" } };
+    writeFileSync(authoringPath, canonicalStringify(af));
+    mkdirSync(join(dir, "handoffs"));
+    const handoff: HandoffFile = {
+      schema: HANDOFF_SCHEMA, id: "H-TEST", createdAt: "2026-10-01T00:00:00Z", createdBy: "Ian", format: "docx",
+      range: { scenes: ["tavern"] }, options: { notes: "all", status: false, cast: false },
+      lines: { K7Q2M: { id: "L_greet", kind: "line", character: "BARKEEP", qualifier: "os", qualifierName: "O.S.", baseline: "x" } },
+      skeleton: [{ kind: "box", marker: "K7Q2M" }],
+    };
+    const handoffPath = join(dir, "handoffs", "H-TEST.json");
+    writeFileSync(handoffPath, JSON.stringify(handoff, null, 2) + "\n");
+
+    project.openProject(dir);
+    const s = project.readSettings()!;
+    // A swap of two gameIds, to show it lands as a swap everywhere.
+    const swapped = s.qualifiers.map((q) => (q.gameId === "os" ? { ...q, gameId: "vo" } : q.gameId === "vo" ? { ...q, gameId: "os" } : q));
+    expect((await project.saveSettings({ ...s, qualifiers: swapped, qualifierRenames: { os: "vo", vo: "os" } })).ok).toBe(true);
+
+    const after = parseSource(readFileSync(authoringPath, "utf8")) as AuthoringFile;
+    expect(after.suggestions![0]).toMatchObject({ proposedQualifier: "os", baselineQualifier: "vo" });
+    expect(after.edits!["qualifier:vo"]).toEqual({ modifiedAt: "2026-10-01T00:00:00Z" });
+    expect(after.edits!["qualifier:os"]).toBeUndefined();
+    const sentAfter = JSON.parse(readFileSync(handoffPath, "utf8")) as HandoffFile;
+    expect(sentAfter.lines.K7Q2M).toMatchObject({ qualifier: "vo", qualifierName: "O.S." });
+  });
+
   it("a qualifier removed from the list is flagged on the line, with the pick-a-qualifier fix", async () => {
     const { dir } = tavernWithQualifier();
     project.openProject(dir);
@@ -114,6 +147,25 @@ describe("the rename helpers", () => {
     expect(renameQualifiersInScene(sc, cleanRenames({ vo: "os", os: "vo" })!)).toBe(3);
     expect(quals(sc)).toEqual(["os", "vo", undefined, "os"]);
     expect(cleanRenames({ vo: "vo", os: "" })).toBeNull();
+  });
+
+  it("renames suggestions, edit records, and handoff lines, a swap as a swap, and says when nothing moved", () => {
+    const renames = cleanRenames({ vo: "os", os: "vo" })!;
+    const af: AuthoringFile = {
+      schema: "patter/authoring@0",
+      suggestions: [
+        { id: "a", anchor: "L1", baseline: "", proposed: "", author: "x", ts: "", proposedQualifier: "vo", baselineQualifier: "" },
+        { id: "b", anchor: "L2", baseline: "", proposed: "", author: "x", ts: "", proposedQualifier: "", baselineQualifier: "os" },
+      ],
+      edits: { "qualifier:vo": { modifiedAt: "1" }, "qualifier:os": { modifiedAt: "2" }, L1: { modifiedAt: "3" } },
+    };
+    expect(renameQualifiersInAuthoring(af, renames)).toBe(true);
+    expect(af.suggestions!.map((x) => [x.proposedQualifier, x.baselineQualifier])).toEqual([["os", ""], ["", "vo"]]);
+    expect(af.edits).toEqual({ "qualifier:os": { modifiedAt: "1" }, "qualifier:vo": { modifiedAt: "2" }, L1: { modifiedAt: "3" } });
+    expect(renameQualifiersInAuthoring({ schema: "patter/authoring@0", edits: { L1: {} } }, renames)).toBe(false);
+    const h = { lines: { A: { id: "L1", kind: "line", qualifier: "vo", baseline: "" }, B: { id: "L2", kind: "line", qualifier: "os", baseline: "" }, C: { id: "L3", kind: "narration", baseline: "" } } } as unknown as HandoffFile;
+    expect(renameQualifiersInHandoff(h, renames)).toBe(true);
+    expect(Object.values(h.lines).map((l) => l.qualifier)).toEqual(["os", "vo", undefined]);
   });
 
   it("moves a translated qualifier name to its new key, in project-level strings only", () => {

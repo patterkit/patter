@@ -35,7 +35,8 @@ teammate can bring it back.
 ## What the editor sees
 
 The document reads like the [readable script](/patterpad/publishing/): scene and block headings, speaker
-names, conditions, choices, jumps, and game events, so the editor can follow the story. The **words of
+names (with any speaker qualifier, `TAM (O.S.)`), conditions, choices, jumps, and game events, so the editor
+can follow the story. The **words of
 every line sit in a shaded box**, with a small grey marker like `[#K7Q2M]` beside it. A front page
 explains the rules in plain terms:
 

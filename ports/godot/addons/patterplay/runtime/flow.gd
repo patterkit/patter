@@ -1140,16 +1140,18 @@ func interpolate(text: String) -> String:
 
 # An option's prompt (spec 5): its prompt beat, resolved and interpolated, as
 # {"kind": "line" | "text", "text": ..., and for a line "character" / "characterName" / "direction" /
-# "qualifier" / "qualifierName" when set}. The same shape every runtime's choice option carries. null when there is no prompt beat.
+# "qualifier" / "qualifierName" when set, and always "padAfter", the prompt beat's resolved pause, a float}.
+# The same shape every runtime's choice option carries. null when there is no prompt beat.
 func _prompt_for(node: Dictionary):
 	var beat = _prompt_beat_of(node)
 	if beat == null:
 		return null
 	var text := _interp(_resolve_string(beat["id"]))
+	var pad := _pad_of(beat["id"])
 	if beat["kind"] != "line":
-		return {"kind": "text", "text": text}
+		return {"kind": "text", "text": text, "padAfter": pad}
 	# A line-kind prompt is dialogue, so captions apply; a text-kind prompt is left as-is (#214).
-	var p := {"kind": "line", "text": _caption_line(text)}
+	var p := {"kind": "line", "text": _caption_line(text), "padAfter": pad}
 	if beat.has("character"):
 		p["character"] = beat["character"]
 	var cn = _resolve_character_name(beat)
@@ -1163,6 +1165,20 @@ func _prompt_for(node: Dictionary):
 	if qn != null:
 		p["qualifierName"] = qn
 	return p
+
+
+# The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first content
+# line), for a saved option that predates prompts carrying one.
+func _prompt_pad_of(node: Dictionary) -> float:
+	var beat = _prompt_beat_of(node)
+	return _pad_of(beat["id"]) if beat != null else PatterBundle.DEFAULT_PAD_AFTER
+
+
+# A saved prompt's pause: the one it carries (an int or a float after a JSON round-trip), as a float, else
+# `fallback`, worked out again from the prompt's beat (a save from before prompts carried one).
+static func _saved_pad(prompt: Dictionary, fallback: Callable) -> float:
+	var v = prompt.get("padAfter")
+	return float(v) if PatterBundle._is_pad(v) else float(fallback.call())
 
 
 # An option's AUTHORED prompt beat: an Option group's own prompt. The only prompt a replay speaks.
@@ -1688,8 +1704,11 @@ func _restore_cursor(snap: Dictionary) -> void:
 			if opt.has("text") and not opt.has("prompt"):
 				var prompt = _prompt_for(node)
 				if prompt == null:
-					prompt = {"kind": "text", "text": str(opt["text"])}
+					prompt = {"kind": "text", "text": str(opt["text"]), "padAfter": PatterBundle.DEFAULT_PAD_AFTER}
 				opt["prompt"] = prompt
+			elif opt.get("prompt") is Dictionary:
+				var saved: Dictionary = opt["prompt"]
+				saved["padAfter"] = _saved_pad(saved, func(): return _prompt_pad_of(node))
 			opt.erase("text")
 			options.append(opt)
 		if not options.is_empty():
@@ -1710,3 +1729,5 @@ func _restore_cursor(snap: Dictionary) -> void:
 		_pending_prompt_owner = ""
 	elif c.get("pendingPrompt", null) is Dictionary:
 		_pending_prompt_shown = (c["pendingPrompt"] as Dictionary).duplicate()
+		var beat_id: String = _pending_prompt_beat["id"]
+		_pending_prompt_shown["padAfter"] = _saved_pad(_pending_prompt_shown, func(): return _pad_of(beat_id))

@@ -11,7 +11,9 @@
 // scene, in document order, and "none" on that line means none. The same rule
 // runs when the character of a blank line is set or changed. The result is
 // written onto the line: nothing is inherited at runtime, and a line by another
-// character, or with no character yet, takes nothing.
+// character, or with no character yet, takes nothing. Inheritance only fills a
+// qualifier the writer hasn't picked: one picked on a line before it had a
+// character stays when the character is named.
 // ---------------------------------------------------------------------------
 
 import type { Command, EditorState, Transaction } from "prosemirror-state";
@@ -82,13 +84,13 @@ function touchesCue(tr: Transaction): boolean {
   });
 }
 
-/** Every beat in `doc` by id: a line's cue text, or null for a beat that is not a line. */
-function beatCues(doc: PMNode): Map<string, string | null> {
-  const out = new Map<string, string | null>();
+/** Every beat in `doc` by id: a line's cue text and qualifier, or null for a beat that is not a line. */
+function beatCues(doc: PMNode): Map<string, { cue: string; qualifier: string | undefined } | null> {
+  const out = new Map<string, { cue: string; qualifier: string | undefined } | null>();
   doc.descendants((node) => {
     if (!BEAT_TYPES.has(node.type.name)) return true;
     const id = node.attrs.id;
-    if (typeof id === "string") out.set(id, node.type.name === "line" ? cueText(node) : null);
+    if (typeof id === "string") out.set(id, node.type.name === "line" ? { cue: cueText(node), qualifier: qualifierOf(node) } : null);
     return false;
   });
   return out;
@@ -98,7 +100,8 @@ function beatCues(doc: PMNode): Map<string, string | null> {
  * The inheritance rule, as an appended transaction (web/qualifiers.ts): after `trs` took `oldState` to
  * `newState`, every line that is NEW (its id was nowhere in the old doc), or is BLANK (no words yet) and
  * had its speaker set or changed, takes the qualifier of the nearest earlier line by the same speaker,
- * or none when that line has none or there is no such line. Null when nothing needs to change.
+ * or none when that line has none or there is no such line. A blank line that had no speaker but had a
+ * qualifier (picked first) keeps it when named. Null when nothing needs to change.
  *
  * Undo / redo, and a Duplicate (NO_INHERIT), are left alone: they restore or copy lines whose qualifier
  * is already what it should be. Typing in a say or a direction adds no line and touches no speaker, so
@@ -120,7 +123,9 @@ export function inheritQualifiers(trs: readonly Transaction[], oldState: EditorS
     const cue = cueText(node);
     if (!cue) return false; // no speaker yet: nothing to inherit from
     const isNew = !before.has(id);
-    const respoken = !isNew && before.get(id) !== cue && sayText(node) === "";
+    const was = before.get(id);
+    const picked = !!was && was.cue === "" && was.qualifier !== undefined; // chosen before it had a speaker
+    const respoken = !isNew && was?.cue !== cue && sayText(node) === "" && !picked;
     if (isNew || respoken) { targets.add(id); speakers.add(cue); }
     return false;
   });

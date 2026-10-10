@@ -22,7 +22,7 @@ import { cueText, zoneText, sayText, isChoiceGroup, rawAttr } from "./zoneutil.j
 import { groupLabelParts, optionLabelParts, labelText, groupRole, type GroupRole } from "./grouplabel.js";
 import { multiSelectPositions } from "./multiselect.js";
 import { qualifierOf } from "./qualifier.js";
-import { padOf, padDefaultOf, endsSnippet, beforeGameEvent } from "./pad.js";
+import { padOf, padDefaultOf, endsSnippet } from "./pad.js";
 
 export type LeafKind = "line" | "prose" | "gameEvent";
 
@@ -55,9 +55,6 @@ export interface LeafLevel {
   /** line / text only - the beat is its snippet's last line or text beat, so a negative pause can't
    *  cut in across the seam (the runtime plays it as none). Never true for an option's prompt. */
   endsSnippet?: boolean;
-  /** line / text only - a game event follows it straight away, and a cut-in can't cross the event (the runtime
-   *  plays a negative pause as none). */
-  beforeEvent?: boolean;
   /** The beat is a choice option's prompt (its pause times the reply, and is never clamped). */
   prompt?: boolean;
 }
@@ -383,7 +380,6 @@ export function inspect(state: EditorState): InspectorContext {
 function leafPlace(leaf: LeafLevel, beat: PMNode, parent: PMNode | null): void {
   if (parent?.type.name === "optionprompt") leaf.prompt = true;
   else if (parent?.type.name === "snippet" && endsSnippet(parent, beat)) leaf.endsSnippet = true;
-  else if (parent?.type.name === "snippet" && beforeGameEvent(parent, beat)) leaf.beforeEvent = true;
 }
 
 /** The scene-only inspector context: the scene title sits OUTSIDE the editable flow, so clicking it

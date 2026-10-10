@@ -13,19 +13,19 @@ performed table-read.
 ## Recording status
 
 Recording status works just like writing status (an ordered, colour-tinted ladder edited in
-**Project Settings ▸ Audio Status**), with two differences. It applies to **dialogue lines
+**Project Settings ▸ Recording status**), with two differences. It applies to **dialogue lines
 only** (narration and game event beats never carry one), and the default ladder runs
 **missing → scratch → recorded → final**. A line with no status set reads as the lowest
 stage, **missing**.
 
 Recording status is **off by default** and opt-in, even for a voiced project (you might want
-voice scripts without tracking every take). Turn it on with the **Track Audio Status?** switch
-at the top of the **Audio Status** tab. The project also has to be
+voice scripts without tracking every take). Turn it on with the **Track audio status** switch
+at the top of the **Recording status** tab. The project also has to be
 [**Voiced**](/patterpad/projects-and-settings/) (General tab); until both are on, no
 Audio row shows in the inspector, and recording figures stay out of the production report and
 its spreadsheet.
 
-There are two ways to track it, chosen per project on the **Audio Status** tab.
+There are two ways to track it, chosen per project on the **Recording status** tab.
 
 Tracking it **manually** is the default. Select a line and pick its stage from the **Audio** dropdown
 in the inspector, exactly like the Writing dropdown.
@@ -90,7 +90,8 @@ When a project is in Audio Folders mode, the **Play** window gains an **Audio** 
 it on, **Continue** becomes a *table-read*: each line plays its clip, and the next line follows
 when the clip and the line's [pause](/patterpad/writing-surface/#pauses-between-lines) allow, so the
 scene plays back at performance pace, cut-ins included. A line with no clip is timed by how long it
-would take to read, so the read stays in rhythm. **Step** still moves one beat at a time,
+would take to read, so the read stays in rhythm. **Speed** plays the clips slower or faster, with
+their pitch kept, so a fast read still sounds like the actor. **Step** still moves one beat at a time,
 playing each line's clip as you go. See [Playtesting](/patterpad/playtesting/).
 
 ## Recording scratch takes
@@ -98,7 +99,7 @@ playing each line's clip as you go. See [Playtesting](/patterpad/playtesting/).
 In Audio Folders mode you can also record quick **scratch takes** right inside Patterpad, a
 fast way to hear a scene before you book a session. It's the one bit of the audio pipeline a
 **writer** reaches for as much as a producer. Rough a line in your own voice, at your desk,
-and hear the scene read back. Turn on **Enable scratch recording** on the **Audio Status** tab
+and hear the scene read back. Turn on **Enable scratch recording** on the **Recording status** tab
 and choose which stage's folder the takes land in (the **scratch** stage by default).
 
 Then, for any line **at or below** the scratch stage (one that hasn't already got a more

@@ -47,9 +47,9 @@ describe("choice text is the option's prompt (spec §5)", () => {
     const r = flow.advance();
     if (r.type !== "choice") throw new Error("expected a choice");
     const byId = new Map(r.options.map((o) => [o.id, o.prompt]));
-    expect(byId.get("label")).toEqual({ kind: "text", text: "Explicit" });
-    expect(byId.get("voiced")).toEqual({ kind: "line", text: "I'll go.", character: "PLAYER", direction: undefined });
-    expect(byId.get("bareline")).toEqual({ kind: "text", text: "Own line" });
+    expect(byId.get("label")).toEqual({ kind: "text", text: "Explicit", padAfter: 0.6 }); // every prompt carries its pause
+    expect(byId.get("voiced")).toMatchObject({ kind: "line", text: "I'll go.", character: "PLAYER", padAfter: 0.6 });
+    expect(byId.get("bareline")).toEqual({ kind: "text", text: "Own line", padAfter: 0.6 });
     expect(byId.get("bare")).toBeUndefined(); // nothing derivable; never the raw id
   });
 

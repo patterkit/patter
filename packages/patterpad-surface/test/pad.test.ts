@@ -12,11 +12,11 @@ import type { Scene, Beat } from "@patterkit/model";
 import { sceneToDoc, docToScene } from "../src/bridge.js";
 import { inspect, type LeafLevel, type SnippetLevel, type GroupLevel, type BlockLevel, type SceneLevel } from "../src/inspect.js";
 import { enter, endBubble } from "../src/lines.js";
-import { backspace, forwardDelete } from "../src/delete.js";
-import { joinSnippet } from "../src/groups.js";
+import { backspace, forwardDelete, deleteSelectionGuarded } from "../src/delete.js";
+import { joinSnippet, unwrapGroup } from "../src/groups.js";
 import { structureGuard } from "../src/guard.js";
 import { pasteParagraphs, textParagraphs } from "../src/paste.js";
-import { setPadAt } from "../src/pad.js";
+import { setPadAt, projectPad, keepTimingOnJoin } from "../src/pad.js";
 import { findByModelId } from "../src/zoneutil.js";
 
 const scene = (): Scene => ({
@@ -38,11 +38,13 @@ const scene = (): Scene => ({
     ],
   }],
 });
-const STRINGS = { T1: "One two", T2: "Three", L1: "Four", T3: "Five", P1: "Six", T4: "Seven", T5: "Eight" };
+const STRINGS = { T1: "One two", T2: "Three", L1: "Four", T3: "Five", P1: "Six", T4: "Seven", T5: "Eight", L8: "More", T6: "Nine" };
 
-function state(sc: Scene = scene(), guard = false): { s: EditorState; said: string[] } {
+/** A state for `sc`; with `guard`, the plugins the surface runs on every edit: the structure guard (its
+ *  refusals collected in `said`), history, the project's default pause, and keepTimingOnJoin. */
+function state(sc: Scene = scene(), guard = false, project?: number): { s: EditorState; said: string[] } {
   const said: string[] = [];
-  const plugins = guard ? [structureGuard((m) => said.push(m)), history()] : [];
+  const plugins = guard ? [structureGuard((m) => said.push(m)), history(), projectPad(() => project), keepTimingOnJoin()] : [projectPad(() => project)];
   return { s: EditorState.create({ doc: sceneToDoc(sc, STRINGS), plugins }), said };
 }
 const sayPos = (s: EditorState, id: string, offset = 0): number => {
@@ -95,23 +97,6 @@ describe("the inspector context: own and inherited pauses", () => {
     const [leaf, , group] = levels("T3") as [LeafLevel, SnippetLevel, GroupLevel];
     expect(leaf.padInherited).toEqual({ value: 0.9, from: "sequence" });
     expect(group.padAfterDefault).toBe(0.9);
-  });
-
-  it("marks a line followed by a game event: a cut-in can't cross the event", () => {
-    const sc: Scene = { id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
-      { id: "a", type: "snippet", beats: [
-        { id: "L1", kind: "line", character: "ANNA", padAfter: -0.4 },
-        { id: "E1", kind: "gameEvent", gameData: { cue: "bell" } },
-        { id: "L2", kind: "line", character: "ANNA" },
-      ] },
-    ] }] };
-    const { s } = state(sc);
-    const before = inspect(caret(s, sayPos(s, "L1"))).levels[0] as LeafLevel;
-    expect(before).toMatchObject({ padAfter: -0.4, beforeEvent: true });
-    expect(before.endsSnippet).toBeUndefined();
-    const last = inspect(caret(s, sayPos(s, "L2"))).levels[0] as LeafLevel;
-    expect(last).toMatchObject({ endsSnippet: true });
-    expect(last.beforeEvent).toBeUndefined();
   });
 
   it("an option's prompt resolves through its option and is never a snippet's last line", () => {
@@ -180,34 +165,170 @@ describe("edits keep a pause with the words it follows", () => {
   });
 });
 
-describe("a bubble's own default pause is not merged away", () => {
-  const two = (bDefault: number | undefined): Scene => {
+describe("merging an empty line up keeps the pause of the line it joins", () => {
+  // Review 2026-10: a merge gave the line above the merged line's pause even when that line had no words,
+  // so Enter at a line's end and then Backspace wiped the line's own pause.
+  const newBeat = (s: EditorState, after: string): string => { const list = pads(s); return list[list.findIndex(([id]) => id === after) + 1]![0]; };
+
+  it("Backspace at a blank text line's start", () => {
+    const { s } = state();
+    const split = run(caret(s, sayEnd(s, "T1")), enter);
+    const out = run(caret(split, sayPos(split, newBeat(split, "T1"))), backspace);
+    expect(pads(out).slice(0, 2)).toEqual([["T1", -0.4], ["T2", undefined]]);
+  });
+
+  it("Delete at a line's end with a blank line after it", () => {
+    const { s } = state();
+    const split = run(caret(s, sayEnd(s, "T1")), enter);
+    const out = run(caret(split, sayEnd(split, "T1")), forwardDelete);
+    expect(pads(out).slice(0, 2)).toEqual([["T1", -0.4], ["T2", undefined]]);
+  });
+
+  it("Backspace on a new dialogue line's name (Enter lands with it selected)", () => {
+    const { s } = state();
+    const split = run(caret(s, sayEnd(s, "L1")), enter);
+    expect(pads(split).slice(0, 4).map(([id]) => id)).toEqual(["T1", "T2", "L1", newBeat(split, "L1")]);
+    const out = run(split, backspace);
+    expect(pads(out).slice(0, 4)).toEqual([["T1", -0.4], ["T2", undefined], ["L1", -0.5], ["T5", undefined]]);
+  });
+
+  const bubbles = (second: Beat): Scene => {
     const sc = scene();
     sc.blocks[0]!.children = [
-      { id: "a", type: "snippet", padAfterDefault: 0.3, beats: [{ id: "T1", kind: "text" }] },
-      { id: "x", type: "snippet", ...(bDefault !== undefined ? { padAfterDefault: bDefault } : {}), beats: [{ id: "T2", kind: "text" }] },
+      { id: "a", type: "snippet", beats: [{ id: "L1", kind: "line", character: "ANNA", padAfter: 2 }] },
+      { id: "x", type: "snippet", beats: [second] },
     ];
     return sc;
   };
-  const posOf = (s: EditorState, id: string): number => findByModelId(s.doc, id)!.pos;
 
-  it("Join refuses when the bubble that goes sets a different default, and joins when they match", () => {
-    let { s } = state(two(0.8));
-    const refused = joinSnippet(s, posOf(s, "x"), "up")!;
-    expect(refused.docChanged).toBe(false);
-    ({ s } = state(two(0.3)));
-    const joined = s.apply(joinSnippet(s, posOf(s, "x"), "up")!);
-    expect(snippets(joined)).toHaveLength(1);
-    ({ s } = state(two(undefined)));
-    expect(snippets(s.apply(joinSnippet(s, posOf(s, "x"), "up")!))).toHaveLength(1); // nothing of its own to lose
+  it("Backspace at a blank first line folds into the previous bubble", () => {
+    const { s } = state(bubbles({ id: "T9", kind: "text" }), true);
+    const out = run(caret(s, sayPos(s, "T9")), backspace);
+    expect(snippets(out)).toHaveLength(1);
+    expect(pads(out)).toEqual([["L1", 2]]);
   });
 
-  it("Backspace at the bubble's start is refused by the guard, with a reason", () => {
-    const { s, said } = state(two(0.8), true);
-    const out = run(caret(s, sayPos(s, "T2")), backspace);
-    expect(snippets(out)).toHaveLength(2);
-    expect(said).toEqual(["This bubble has its own default pause. Clear it, or give both bubbles the same one, first."]);
-    const same = state(two(0.3), true);
-    expect(snippets(run(caret(same.s, sayPos(same.s, "T2")), backspace))).toHaveLength(1);
+  it("a blank line alone in its bubble, its name removed, folds into the previous bubble", () => {
+    const { s } = state(bubbles({ id: "L9", kind: "line", character: "ANNA" }), true);
+    const out = run(run(caret(s, sayPos(s, "L9")), backspace), backspace);
+    expect(snippets(out)).toHaveLength(1);
+    expect(pads(out)).toEqual([["L1", 2]]);
+  });
+
+  it("a merged line with words still brings its pause", () => {
+    const { s } = state(bubbles({ id: "L8", kind: "line", character: "ANNA", padAfter: 0.5 }), true);
+    const out = run(run(caret(s, sayPos(s, "L8")), backspace), backspace);
+    expect(pads(out)).toEqual([["L1", 0.5]]);
+  });
+});
+
+describe("lines that come under a different default keep their timing when any of them is timed", () => {
+  // The rule (pad.ts): if none of the moved lines sets its own pause, they take the new default; if any
+  // does, the own pauses stay and each line that set none is pinned to the pause it had.
+  type B = Beat & { padAfter?: number };
+  const text = (id: string, padAfter?: number): B => ({ id, kind: "text", ...(padAfter !== undefined ? { padAfter } : {}) });
+  /** Bubble `a` (default 0.3) holding T1, then bubble `x` with `xDefault` holding `beats`; nothing above sets
+   *  a default unless `withBlock`. */
+  const two = (xDefault: number | undefined, beats: Beat[], withBlock = true): Scene => ({
+    id: "s", type: "scene", name: "S", blocks: [{
+      id: "b", type: "block", name: "B", ...(withBlock ? { padAfterDefault: 1.5 } : {}), children: [
+        { id: "a", type: "snippet", padAfterDefault: 0.3, beats: [text("T1")] },
+        { id: "x", type: "snippet", ...(xDefault !== undefined ? { padAfterDefault: xDefault } : {}), beats },
+      ],
+    }],
+  });
+  const posOf = (s: EditorState, id: string): number => findByModelId(s.doc, id)!.pos;
+  const join = (s: EditorState): EditorState => s.apply(joinSnippet(s, posOf(s, "x"), "up")!);
+
+  it("Join: when every moved line inherits, they take the new default and nothing is refused", () => {
+    const { s } = state(two(0.8, [text("T2"), text("T3")]));
+    const out = join(s);
+    expect(snippets(out)).toHaveLength(1);
+    expect(pads(out)).toEqual([["T1", undefined], ["T2", undefined], ["T3", undefined]]);
+  });
+
+  it("Join: one timed line pins every other moved line to the pause it had", () => {
+    const { s } = state(two(0.8, [text("T2"), text("T3", -0.2), text("T4")]));
+    const out = join(s);
+    expect(snippets(out)).toHaveLength(1);
+    // T4 ended bubble x, so it played 0.8 there too (a positive pause is never clamped).
+    expect(pads(out)).toEqual([["T1", undefined], ["T2", 0.8], ["T3", -0.2], ["T4", 0.8]]);
+  });
+
+  it("pins a moved line to what it played: clamped at its bubble's end, but not before a game event", () => {
+    const beats: Beat[] = [text("T2"), { id: "E1", kind: "gameEvent", gameData: { cue: "bell" } }, text("T3", 1), text("T4")];
+    const out = join(state(two(-0.2, beats)).s);
+    // T2 is followed by a game event and played -0.2; T4 ended bubble x, so its -0.2 played as none.
+    expect(pads(out)).toEqual([["T1", undefined], ["T2", -0.2], ["E1", undefined], ["T3", 1], ["T4", 0]]);
+  });
+
+  it("a line pinned through the project's default takes the project's value", () => {
+    const out = join(state(two(undefined, [text("T2"), text("T3", 1)], false), false, 0.25).s);
+    expect(pads(out)).toEqual([["T1", undefined], ["T2", 0.25], ["T3", 1]]);
+  });
+
+  it("Backspace at a bubble's start merges it, with no refusal, and the rule holds", () => {
+    let { s, said } = state(two(0.8, [text("T2"), text("T3")]), true);
+    let out = run(caret(s, sayPos(s, "T2")), backspace);
+    expect(said).toEqual([]);
+    expect(pads(out)).toEqual([["T1", undefined], ["T3", undefined]]);
+
+    ({ s, said } = state(two(0.8, [text("T2"), text("T3", -0.2), text("T4")]), true));
+    out = run(caret(s, sayPos(s, "T2")), backspace);
+    expect(said).toEqual([]);
+    // T1 now ends with T2's words, so it stands in for T2 and keeps the pause T2 played.
+    expect(pads(out)).toEqual([["T1", 0.8], ["T3", -0.2], ["T4", 0.8]]);
+  });
+
+  it("a range delete from one bubble into the next: the rest of the second keeps its timing", () => {
+    const { s, said } = state(two(0.8, [text("T2"), text("T3"), text("T4", 0.4)]), true);
+    const sel = s.apply(s.tr.setSelection(TextSelection.create(s.doc, sayPos(s, "T1", 3), sayPos(s, "T2", 2))));
+    const out = run(sel, deleteSelectionGuarded);
+    expect(said).toEqual([]);
+    expect(snippets(out)).toHaveLength(1);
+    expect(pads(out)).toEqual([["T1", undefined], ["T3", 0.8], ["T4", 0.4]]);
+  });
+
+  it("a range delete that removes a bubble outright, default and all, is not refused", () => {
+    // Review 2026-10: the guard read a bubble the selection deleted whole as one whose lines moved into
+    // another, and refused the delete over its default pause.
+    const sc = two(1, [text("T2"), { id: "L1", kind: "line", character: "ANNA" }]);
+    sc.blocks[0]!.children.push({ id: "e", type: "snippet", beats: [text("T5")] });
+    const { s, said } = state(sc, true);
+    const sel = s.apply(s.tr.setSelection(TextSelection.create(s.doc, sayPos(s, "T1", 3), sayPos(s, "T5", 2))));
+    const out = run(sel, deleteSelectionGuarded);
+    expect(said).toEqual([]);
+    expect(snippets(out).map((c) => c.id)).toEqual(["a"]);
+    expect(docToScene(out.doc).strings.T1).toBe("Oneght");
+  });
+
+  /** A block holding a sequence group (default 0.9) of bubble `c` with `beats`, and bubble `d` (default 0.1)
+   *  with T6, which its own default shields from the group's. */
+  const grouped = (beats: Beat[]): Scene => ({
+    id: "s", type: "scene", name: "S", blocks: [{
+      id: "b", type: "block", name: "B", padAfterDefault: 1.5, children: [
+        { id: "g", type: "group", selector: "sequence", padAfterDefault: 0.9, children: [
+          { id: "c", type: "snippet", beats },
+          { id: "d", type: "snippet", padAfterDefault: 0.1, beats: [text("T6")] },
+        ] },
+      ],
+    }],
+  });
+  const ungroup = (s: EditorState): EditorState => s.apply(unwrapGroup(s, posOf(s, "g"))!);
+  const allPads = (s: EditorState): Array<[string, number | undefined]> => {
+    const out: Array<[string, number | undefined]> = [];
+    for (const c of model(s).blocks[0]!.children) if (c.type === "snippet") for (const b of c.beats ?? []) out.push([b.id, (b as B).padAfter]);
+    return out;
+  };
+
+  it("Ungroup: with every line inheriting, they take the default above the group", () => {
+    const out = ungroup(state(grouped([text("T2"), text("T3")])).s);
+    expect(allPads(out)).toEqual([["T2", undefined], ["T3", undefined], ["T6", undefined]]);
+  });
+
+  it("Ungroup: one timed line pins the lines whose pause came from the group's default", () => {
+    const out = ungroup(state(grouped([text("T2"), text("T3", 0.2), text("T4")])).s);
+    // T6 took its bubble's 0.1 before and after, so it is left alone.
+    expect(allPads(out)).toEqual([["T2", 0.9], ["T3", 0.2], ["T4", 0.9], ["T6", undefined]]);
   });
 });

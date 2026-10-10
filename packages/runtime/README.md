@@ -44,6 +44,13 @@ for (;;) {
 }
 ```
 
+A `line` step carries `id`, `text`, `character`, `characterName`, `direction`, and, when the line has a
+speaker qualifier, `qualifier` (its `gameId`, `os`) and `qualifierName` (its shown name, `O.S.`). Line and
+text steps both carry `padAfter`, the writer's pause after the beat in seconds, already resolved; a negative
+one means the next line cuts in. Line, text, and game event steps can carry `gameData` and `tags`. The
+[step shapes](https://patterkit.dev/play/engine/#step-shapes) give the full list and the timing rules a game
+should follow.
+
 `new Engine(bundle, options)` takes `{ rng?, seed?, locale?, hostScopes?, registry?, replayPromptOnChoose?, closedCaptions? }`:
 - `hostScopes` binds the scopes your game owns, by token, each `{ get(name), set?(name, value) }`: for World
   Properties, `hostScopes: { world: { get, set } }`. Leave `world` unbound and the runtime self-backs `@world`
@@ -60,8 +67,8 @@ state, visit counts, and PRNG are untouched - so a game's "language" setting can
 rebuilding the engine or losing the player's place.
 
 The above is the **Embedded** build (strings ship inside the `.patterc`). An **IDs-only** build ships no
-strings: `step.text` is the beat **ID** and `step.characterName` is omitted - your game localises the IDs in
-its own system, then applies `{@ref}` replacement with **`flow.interpolate(yourString)`**. See the
+strings: `step.text` is the beat **ID**, and `step.characterName` and `step.qualifierName` are omitted, so
+your game localises the IDs in its own system, then applies `{@ref}` replacement with **`flow.interpolate(yourString)`**. See the
 [Localisation guide](https://patterkit.dev/play/localisation/) for both modes across all four runtimes.
 
 ## Drop-in (`<script>`)

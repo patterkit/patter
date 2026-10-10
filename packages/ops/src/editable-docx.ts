@@ -104,7 +104,7 @@ export async function exportEditableScript(loaded: LoadedProject, opts: Editable
       // returned box is compared against.
       const baseline = source[el.id] ?? "";
       lines[code] = el.kind === "line"
-        ? { id: el.id, kind: "line", character: el.character, ...(el.qualifier ? { qualifier: el.qualifier } : {}), ...(el.direction ? { direction: el.direction } : {}), baseline }
+        ? { id: el.id, kind: "line", character: el.character, ...(el.qualifier ? { qualifier: el.qualifier, ...(el.qualifierName ? { qualifierName: el.qualifierName } : {}) } : {}), ...(el.direction ? { direction: el.direction } : {}), baseline }
         : { id: el.id, kind: el.kind === "option" ? "option" : "narration", baseline };
       skeleton.push({ kind: "box", marker: code });
     } else {

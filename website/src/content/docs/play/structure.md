@@ -39,7 +39,8 @@ overrides (left out when empty), and its `tags`.
 const engine = new Engine(BUNDLE);
 const outline = engine.getOutline();          // OutlineScene[]
 for (const flat of engine.getBeatSequence()) {
-  // flat.sceneId / flat.blockId / flat.snippetId, flat.beat.{id,kind,character,text,gameData,tags}
+  // flat.sceneId / flat.blockId / flat.snippetId,
+  // flat.beat.{id,kind,character,qualifier,text,padAfter,gameData,tags}
 }
 ```
 
@@ -50,9 +51,12 @@ var engine = new Engine(bundle);
 List<OutlineScene> outline = engine.GetOutline();
 foreach (var flat in engine.GetBeatSequence())
 {
-    // flat.SceneId, flat.Beat.Id, flat.Beat.Kind, flat.Beat.GameData ...
+    // flat.SceneId, flat.Beat.Id, flat.Beat.Kind, flat.Beat.Qualifier, flat.Beat.PadAfter, flat.Beat.GameData ...
 }
 ```
+
+A beat's `PadAfter` and `OwnPadAfter` are `double?`. `PadAfter` is set on every line or text beat,
+and `OwnPadAfter` is null when the beat sets no pause of its own.
 
 **Unreal** (C++ / Blueprint):
 
@@ -61,14 +65,17 @@ UPatterEngine* Engine = UPatterEngine::Create(Bundle);
 TArray<FPatterOutlineScene> Outline = Engine->GetOutline();
 for (const FPatterFlatBeat& Flat : Engine->GetBeatSequence())
 {
-    // Flat.SnippetId, Flat.Beat.Id, Flat.Beat.Kind, Flat.Beat.GameData (name/type/value) ...
+    // Flat.SnippetId, Flat.Beat.Id, Flat.Beat.Kind, Flat.Beat.Qualifier, Flat.Beat.PadAfter,
+    // Flat.Beat.GameData (name/type/value) ...
 }
 ```
 
 Both `GetOutline` and `GetBeatSequence` are `BlueprintCallable`, so a designer can build the Sequencer
 graph without C++. One Unreal-specific wrinkle: a Blueprint struct can't nest itself, so the tree is
 stored **flat on each block** (`Nodes`) and linked by index (`RootIndices`, and each group node's
-`ChildIndices`) rather than by nested children. `GetBeatSequence` needs none of that.
+`ChildIndices`) rather than by nested children. `GetBeatSequence` needs none of that. A beat carries
+`PadAfter`, plus `OwnPadAfter` with `bHasOwnPadAfter` to say whether the beat sets its own. Its
+`Qualifier` and `QualifierName` have no `bHas` flags; an empty string means the line has none.
 
 **Godot** (GDScript):
 
@@ -76,7 +83,8 @@ stored **flat on each block** (`Nodes`) and linked by index (`RootIndices`, and 
 var engine := PatterEngine.new(bundle)
 var outline := engine.get_outline()
 for flat in engine.get_beat_sequence():
-    # flat["sceneId"], flat["beat"]["id"], flat["beat"]["kind"], flat["beat"]["gameData"] ...
+    # flat["sceneId"], flat["beat"]["id"], flat["beat"]["kind"], flat["beat"]["qualifier"],
+    # flat["beat"]["padAfter"], flat["beat"]["gameData"] ...
     pass
 ```
 

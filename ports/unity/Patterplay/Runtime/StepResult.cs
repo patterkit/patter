@@ -17,6 +17,10 @@ namespace Patterkit.Patterplay
         public string Direction;       // line only
         public string Qualifier;       // line only: the speaker qualifier's gameId (`vo`)
         public string QualifierName;   // line only: its resolved shown name (`V.O.`)
+        /// <summary>The prompt's resolved pause, in seconds (line padding): when it is spoken (by
+        /// `ReplayPromptOnChoose`, or by a game that voices it), the wait before the reply, negative to cut in on
+        /// the question. Always set on a prompt the engine shows.</summary>
+        public double? PadAfter;
     }
 
     public sealed class ChoiceOption

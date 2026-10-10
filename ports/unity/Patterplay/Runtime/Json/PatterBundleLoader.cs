@@ -164,8 +164,14 @@ namespace Patterkit.Patterplay
         };
 
         /// <summary>A number field, or null when it is absent (or not a number).</summary>
+        // A pause value as a bundle holds it: a finite number, or nothing (anything else, which validation
+        // refuses, inherits).
         private static double? Num(JToken t)
-            => t != null && (t.Type == JTokenType.Integer || t.Type == JTokenType.Float) ? (double)t : (double?)null;
+        {
+            if (t == null || (t.Type != JTokenType.Integer && t.Type != JTokenType.Float)) return null;
+            double v = (double)t;
+            return double.IsNaN(v) || double.IsInfinity(v) ? (double?)null : v;
+        }
 
         private static List<string> ToStringList(JArray a)
         {

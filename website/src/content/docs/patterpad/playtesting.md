@@ -35,17 +35,25 @@ Auto-continue (the **▸▸ Continue** toggle in the header, on by default) turn
 at a time. **◼ Stop** pauses the reveal, and Step/Continue picks it back up. Turn it off
 to step one beat at a time.
 
-**Continue** times the scene the way the game will. Each line lasts as long as its recording, when
-it has one, or as long as it would take to read, and then waits for its [pause](/patterpad/writing-surface/#pauses-between-lines)
-before the next line starts. A line with a negative pause is cut in on: the next line arrives
-before it finishes, and both play at once. There's no pause before a choice or after the last
-line, and **Step** ignores pauses, since you decide when each beat plays.
+**Continue** times the scene the way the game will. A line lasts as long as its recording, when
+it has one, or as long as it would take to read, and then waits for its
+[pause](/patterpad/writing-surface/#pauses-between-lines) before the next line starts. Narration is
+timed by the same reading estimate. Recordings exist only in an [Audio Folders](/production/audio/)
+project, and a line that has one is timed by it even with **Audio** off, so muting doesn't change the
+timing. A line with a negative pause is cut in on, so the next line arrives before it finishes and
+both play at once. The options appear as the line before them starts, so you can choose while it's
+still playing. The end comes when every line has finished, and the reply after a choice starts at once. **Step** ignores pauses, since you decide when each beat plays.
 
 Speed (Half / Normal / Double / Instant) speeds the whole timing up or slows it down, so you can
-skim a scene without losing its shape. **Instant** drops the waits entirely and plays no audio.
+skim a scene without losing its shape. Half and Double also play each recording slower or faster,
+with its pitch kept. Under Continue, **Instant** drops the waits entirely and plays no audio. Step
+still plays each line's clip at Instant, at the clip's own pace.
 
 Options you can take are buttons; ones whose condition isn't met are shown faded and
 can't be clicked. Pick one and the story moves on.
+
+A line with a [speaker qualifier](/setup/cast/#speaker-qualifiers) shows it after the name, as the
+script does, `TAM (O.S.)`.
 
 A line that names another engine's scope, such as the Storylet Engine's `@story.act`, plays
 where the game [shares its scopes](/setup/properties-and-data/#sharing-scopes-with-the-games-other-tools):
@@ -60,7 +68,8 @@ file for that engine yet, it names the file that's missing.
 The **CC** control shows or hides the non-spoken
 [caption cues](/play/closed-captions/) (on by default). In an
 [Audio Folders](/production/audio/) project an **Audio** toggle also appears, turning
-Continue into a table-read that plays each line's recording.
+Continue into a table-read that plays each line's recording, overlapping where one line cuts in on
+another.
 
 ## The editor follows along
 

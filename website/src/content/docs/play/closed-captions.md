@@ -71,7 +71,8 @@ For each **dialogue line** (it never touches narration, choice text, or anything
 
 If that leaves the line **empty** (the whole line was a cue), it becomes a **silent line**: the dialogue
 event *still fires* (so its **audio still plays** and visit-tracking still counts) but it carries **no
-text and no speaker**, so nothing is captioned. Lines with no cue are returned untouched.
+text, no speaker, and no qualifier**, so nothing is captioned. It keeps its `padAfter`, so the pause
+after it still holds. Lines with no cue are returned untouched.
 
 Captions are a **presentation** setting, like the language: toggling them never changes save state, the
 story position, or which lines play. Audio is keyed off the line's id, so a silent line's voice take plays

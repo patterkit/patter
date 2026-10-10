@@ -196,6 +196,12 @@ struct FPatterChoicePrompt
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasQualifierName = false;
+
+	/** The prompt's resolved pause, in seconds (line padding), as on a step: when the prompt is spoken (by
+	 *  bReplayPromptOnChoose, or by a game that voices it), the wait before the reply, negative to cut in on
+	 *  the question. Always set. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	double PadAfter = 0.6;
 };
 
 USTRUCT(BlueprintType)

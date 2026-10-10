@@ -216,6 +216,9 @@ export interface ChoicePrompt {
   /** The speaker qualifier's `gameId` (`vo`), and its resolved shown name (locale-aware). */
   qualifier?: string;
   qualifierName?: string;
+  /** The prompt's resolved pause, in seconds: when it is spoken (by `replayPromptOnChoose`, or by a game that
+   *  voices it), the wait before the reply, negative to cut in on the question (line padding). */
+  padAfter: number;
 }
 
 /** A single option of a pending `choice` group. */
@@ -1947,7 +1950,9 @@ export class Flow {
         const node = this.host.nodeIndex.get(o.id);
         if (!node) continue;
         byId.set(o.id, node);
-        options.push({ ...o });
+        // A save from before prompts carried their pause has none: work it out again from the prompt's beat.
+        const { prompt: saved, ...rest } = o;
+        options.push({ ...rest, ...(saved ? { prompt: { ...saved, padAfter: saved.padAfter ?? this.promptPadOf(node) } } : {}) });
       }
       if (options.length > 0) this.pendingChoice = { groupId: c.pendingChoice.groupId, options, byId };
     }
@@ -1962,7 +1967,7 @@ export class Flow {
     if (this.pendingPromptOwnerId) {
       const owner = this.host.nodeIndex.get(this.pendingPromptOwnerId);
       const beat = owner ? this.authoredPromptOf(owner) : undefined;
-      if (beat) this.pendingPrompt = { beat, ...(c.pendingPrompt ? { shown: { ...c.pendingPrompt } } : {}) };
+      if (beat) this.pendingPrompt = { beat, ...(c.pendingPrompt ? { shown: { ...c.pendingPrompt, padAfter: c.pendingPrompt.padAfter ?? this.padOf(beat.id) } } : {}) };
       else this.pendingPromptOwnerId = null;
     }
   }
@@ -2436,13 +2441,14 @@ export class Flow {
     const beat = this.promptBeatOf(node);
     if (!beat) return undefined;
     const text = this.interpolate(this.resolveString(beat.id));
+    const padAfter = this.padOf(beat.id);
     // A line-kind prompt is dialogue, so captions apply to it; a text-kind prompt is left as-is.
     return beat.kind === "line"
       ? {
           kind: "line", text: this.captionLine(text), character: beat.character, characterName: this.resolveCharacterName(beat.character), direction: beat.direction,
-          qualifier: beat.qualifier, qualifierName: this.resolveQualifierName(beat.qualifier),
+          qualifier: beat.qualifier, qualifierName: this.resolveQualifierName(beat.qualifier), padAfter,
         }
-      : { kind: "text", text };
+      : { kind: "text", text, padAfter };
   }
 
   /** An option's AUTHORED prompt beat: an Option group's own `prompt`. The only prompt a replay speaks. */
@@ -2501,6 +2507,13 @@ export class Flow {
     if (this.host.emitIds) return undefined; // IDs-only: omit the display name; the game maps the `character` token
     const key = castStringKey(character);
     return this.host.strings[key] ?? this.host.defaultStrings[key] ?? this.host.castDisplay.get(character);
+  }
+
+  /** The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first content
+   *  line), for a saved option that predates prompts carrying one. */
+  private promptPadOf(node: SelectableNode): number {
+    const beat = this.promptBeatOf(node);
+    return beat ? this.padOf(beat.id) : DEFAULT_PAD_AFTER;
   }
 
   /** A line or text beat's resolved pause (line padding): its own `padAfter`, else the nearest default above
@@ -2643,6 +2656,7 @@ function savedPrompt(p: ChoicePrompt): SavedChoicePrompt {
   if (p.direction !== undefined) out.direction = p.direction;
   if (p.qualifier !== undefined) out.qualifier = p.qualifier;
   if (p.qualifierName !== undefined) out.qualifierName = p.qualifierName;
+  if (typeof p.padAfter === "number") out.padAfter = p.padAfter;
   return out;
 }
 

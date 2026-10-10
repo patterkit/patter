@@ -9,7 +9,7 @@ import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "nod
 import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
-  exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs,
+  exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
   patterScopesWrite, previewRegistry, GAME_SCOPES_DIR, GAME_SCOPES_FILE, PATTER_SCOPES_FILE,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
@@ -18,7 +18,7 @@ import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { projectQualifiers, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER } from "@patterkit/model";
-import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
+import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
 import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
@@ -1896,9 +1896,10 @@ export function writeAudioManifest(): Promise<{ ok: boolean; path?: string; erro
   });
 }
 
-/** The scene and project-string writes a qualifier gameId rename makes: each scene with a line using an
- *  old gameId, and each project-level loc shard holding an old `qualifier:<gameId>` name. Works on copies,
- *  so a refused batch leaves the loaded model as it was. */
+/** The writes a qualifier gameId rename makes: each scene with a line using an old gameId, each project-level
+ *  loc shard holding an old `qualifier:<gameId>` name, each authoring shard with a suggestion or edit record
+ *  on one, and each handoff record with a line sent with one. Works on copies, so a refused batch leaves the
+ *  loaded model as it was. */
 function qualifierRenameWrites(renames: Map<string, string>): { path: string; content: string }[] {
   if (!loaded) return [];
   ensureHydrated(); // lines anywhere in the project
@@ -1913,6 +1914,16 @@ function qualifierRenameWrites(renames: Map<string, string>): { path: string; co
     const path = loaded!.localeFiles[i];
     if (path && renameQualifierStrings(copy, renames)) writes.push({ path, content: canonicalStringify(copy) });
   });
+  // Authoring shards as they are on disk now (the loaded set may predate shards written since it was read).
+  const authoringPaths = new Set([...loaded.authoringFiles, ...[...shards.values()].map((sh) => sh.authoringPath)]);
+  for (const path of authoringPaths) {
+    if (!existsSync(path)) continue;
+    const af = loadAuthoring(path); // a clone
+    if (renameQualifiersInAuthoring(af, renames)) writes.push({ path, content: canonicalStringify(af) });
+  }
+  for (const handoff of readHandoffs(loaded.root).handoffs) {
+    if (renameQualifiersInHandoff(handoff, renames)) writes.push(handoffWrite(loaded.root, handoff));
+  }
   return writes;
 }
 
@@ -2088,8 +2099,8 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     };
     const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
     // A qualifier whose gameId changed is a rename: every line using the old gameId is rewritten to the new
-    // one, and its translated names move with it, in the same batch as the project file (the caller flushed
-    // the open scene first, and reloads it after).
+    // one, and its translated names, suggestions, edit records, and handoff records move with it, in the
+    // same batch as the project file (the caller flushed the open scene first, and reloads it after).
     const renames = cleanRenames(s.qualifierRenames);
     if (renames) writes.push(...qualifierRenameWrites(renames));
     // Switching VCS re-emits its config files (vcs-setup.md, .gitattributes, ignore) for the new system.

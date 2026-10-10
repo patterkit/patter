@@ -23,8 +23,9 @@ namespace patter
     struct Locales { std::string defaultLocale = "en"; std::vector<std::string> included; };
     struct Cast { std::string name, displayName; };
     // A speaker qualifier as the bundle ships it (`V.O.`): the `gameId` a line stores, and its authored
-    // name (the unlocalised fallback for its shown name).
-    struct Qualifier { std::string gameId, name; };
+    // name (the unlocalised fallback for its shown name). hasName is false when the bundle gives no name (or
+    // one that isn't a string): then no shown name comes from it, only from a locale string.
+    struct Qualifier { std::string gameId, name; bool hasName = false; };
 
     struct PropertyDecl
     {

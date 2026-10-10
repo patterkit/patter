@@ -33,7 +33,8 @@ export type ScopeBag = Record<string, ScalarValue>;
  * A line or text step's `padAfter` (line padding) is recorded only when it differs from the built-in
  * `DEFAULT_PAD_AFTER`: every step carries one, and writing 0.6 into every hand-authored transcript would bury
  * the cases that are about something else. The outline cases pin every beat's resolved pause, defaults
- * included, so a runtime that leaves the field off still fails.
+ * included, so a runtime that leaves the field off still fails, and a step or prompt that should carry a pause
+ * and doesn't records a "<missing>" marker instead.
  */
 export type TranscriptStep =
   | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter?: number; gameData?: GameData; tags?: string[] }
@@ -63,6 +64,8 @@ export interface TranscriptPrompt {
   /** The speaker qualifier's `gameId` and resolved shown name (a `line` prompt only, and only when set). */
   qualifier?: string;
   qualifierName?: string;
+  /** The prompt's resolved pause, recorded only when it isn't the built-in 0.6 (as on a step). */
+  padAfter?: number;
 }
 
 /**

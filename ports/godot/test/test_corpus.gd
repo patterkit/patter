@@ -447,16 +447,32 @@ func _run_runtime(arr: Array) -> int:
 
 
 # A step as the corpus transcripts record it (the reference runner's normaliseStep): every line and text
-# step carries `padAfter`, a float, but a transcript records it only when it isn't the built-in 0.6. A
-# step missing the field, or carrying a non-float, is marked so the comparison fails.
+# step, and every choice option's prompt, carries `padAfter`, a float, but a transcript records it only
+# when it isn't the built-in 0.6. One missing the field, or carrying a non-float, is marked so the
+# comparison fails.
 func _transcript_step(step: Dictionary) -> Dictionary:
 	var kind = step.get("type", "")
+	if kind == "choice":
+		var out := step.duplicate()
+		var options: Array = []
+		for o in step.get("options", []):
+			var opt: Dictionary = (o as Dictionary).duplicate()
+			if opt.get("prompt") is Dictionary:
+				opt["prompt"] = _transcript_pad((opt["prompt"] as Dictionary).duplicate())
+			options.append(opt)
+		out["options"] = options
+		return out
 	if kind != "line" and kind != "text":
 		return step
-	var out := step.duplicate()
+	return _transcript_pad(step.duplicate())
+
+
+func _transcript_pad(out: Dictionary) -> Dictionary:
 	var pad = out.get("padAfter")
-	if typeof(pad) != TYPE_FLOAT:
-		out["padAfter"] = "<missing or not a float: %s>" % str(pad)
+	if pad == null:
+		out["padAfter"] = "<missing>"
+	elif typeof(pad) != TYPE_FLOAT:
+		out["padAfter"] = "<not a float: %s>" % str(pad)
 	elif pad == PatterBundle.DEFAULT_PAD_AFTER:
 		out.erase("padAfter")
 	return out

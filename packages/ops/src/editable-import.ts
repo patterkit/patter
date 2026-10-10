@@ -22,7 +22,7 @@ import { sourceStrings } from "./loaded-helpers.js";
 import { authoringPath } from "./localisation.js";
 import { applySuggestionDecisions, indexPlaces } from "./suggestions.js";
 import { AUTHORING_SCHEMA, projectQualifiers } from "@patterkit/model";
-import type { CastMember, SpeakerQualifier } from "@patterkit/model";
+import type { CastMember, HandoffLine, SpeakerQualifier } from "@patterkit/model";
 
 export interface ImportOptions {
   /** Who is importing (the import log). */
@@ -256,14 +256,14 @@ export function planEditableImport(loaded: LoadedProject, returned: ReturnedDoc,
     const cue = sent.kind === "line" ? readLead(b.lead.proposed) : undefined;
     let proposedCharacter: string | undefined, proposedQualifier: string | undefined, proposedDirection: string | undefined;
     if (sent.kind === "line" && cue) {
-      const read = readCue(cue.character, sent.character ?? "", sent.qualifier ?? "", cast, qualifiers);
+      const read = readCue(cue.character, sent, cast, qualifiers);
       if (read.unknownSpeaker !== undefined) {
         problems.push({ severity: "warning", kind: "unknown-speaker", marker: code, anchor: sent.id, message: `The speaker was changed to ${read.unknownSpeaker}, who isn't in the cast; it's in a comment.` });
-        comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sentCue(sent.character, sent.qualifier, qualifiers) || "(none)"} to ${read.unknownSpeaker}, who isn't in the cast.`, ts);
+        comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sentCue(sent, qualifiers) || "(none)"} to ${read.unknownSpeaker}, who isn't in the cast.`, ts);
       }
       if (read.unknownQualifier !== undefined) {
         problems.push({ severity: "warning", kind: "unknown-qualifier", marker: code, anchor: sent.id, message: `The speaker qualifier was changed to (${read.unknownQualifier}), which isn't one of the project's qualifiers; it's in a comment.` });
-        comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sentCue(sent.character, sent.qualifier, qualifiers) || "(none)"} to ${tidy(cue.character)}, but (${read.unknownQualifier}) isn't one of the project's qualifiers.`, ts);
+        comment(here ?? nearestLine(boxes.indexOf(b)), author, `Speaker changed from ${sentCue(sent, qualifiers) || "(none)"} to ${tidy(cue.character)}, but (${read.unknownQualifier}) isn't one of the project's qualifiers.`, ts);
       }
       if (read.character !== undefined && read.character !== (sent.character ?? "")) proposedCharacter = read.character;
       if (read.qualifier !== undefined && read.qualifier !== (sent.qualifier ?? "")) proposedQualifier = read.qualifier;
@@ -399,11 +399,19 @@ function readLead(text: string): { character: string; direction: string } {
  *  carry what couldn't, as written. */
 interface ReadCue { character?: string; qualifier?: string; unknownSpeaker?: string; unknownQualifier?: string }
 
-/** The cue as the exporter printed it for a speaker and qualifier (`TAM (O.S.)`), for comparing and quoting. */
-function sentCue(character: string | undefined, qualifier: string | undefined, qualifiers: SpeakerQualifier[]): string {
-  if (!character) return "";
-  if (!qualifier) return character;
-  return `${character} (${qualifiers.find((q) => q.gameId === qualifier)?.name ?? qualifier})`;
+/** The qualifier's name as the exporter printed it: the name recorded at export, else (a handoff from before
+ *  that was recorded) its current name, else its gameId. "" for none. */
+function sentQualifierName(sent: HandoffLine, qualifiers: SpeakerQualifier[]): string {
+  if (!sent.qualifier) return "";
+  return sent.qualifierName ?? qualifiers.find((q) => q.gameId === sent.qualifier)?.name ?? sent.qualifier;
+}
+
+/** The cue as the exporter printed it for a line's speaker and qualifier (`TAM (O.S.)`), for comparing and
+ *  quoting. */
+function sentCue(sent: HandoffLine, qualifiers: SpeakerQualifier[]): string {
+  if (!sent.character) return "";
+  const name = sentQualifierName(sent, qualifiers);
+  return name ? `${sent.character} (${name})` : sent.character;
 }
 
 /**
@@ -411,14 +419,16 @@ function sentCue(character: string | undefined, qualifier: string | undefined, q
  * name looks like a qualified cue round-trips untouched. Otherwise the WHOLE cue is matched against the cast
  * first: an exact cast name wins, since a cast name may itself hold brackets, and means no qualifier. Only
  * when nothing matches is a trailing `(…)` split off: the rest must be a cast member (or the speaker as
- * sent), and the bracket one of the project's qualifier names, both case-insensitively as the speaker
- * always was. A bracket that names no qualifier is reported, and the speaker before it is still read.
+ * sent), and the bracket one of the project's qualifier names (or the name printed for the qualifier as
+ * sent), both case-insensitively as the speaker always was. A bracket that names no qualifier is reported,
+ * and the speaker before it is still read.
  */
-function readCue(text: string, sentCharacter: string, sentQualifier: string, cast: CastMember[], qualifiers: SpeakerQualifier[]): ReadCue {
+function readCue(text: string, sent: HandoffLine, cast: CastMember[], qualifiers: SpeakerQualifier[]): ReadCue {
   const cue = tidy(text);
   if (!cue) return {}; // the cue cell emptied: nothing to read (the speaker isn't removed this way)
   const upper = (s: string): string => s.toUpperCase();
-  if (upper(cue) === upper(sentCue(sentCharacter, sentQualifier, qualifiers))) return {};
+  if (upper(cue) === upper(sentCue(sent, qualifiers))) return {};
+  const sentCharacter = sent.character ?? "";
   const speaker = (name: string): string | undefined =>
     cast.find((c) => upper(c.name) === upper(name))?.name ?? (sentCharacter && upper(name) === upper(sentCharacter) ? sentCharacter : undefined);
 
@@ -429,6 +439,8 @@ function readCue(text: string, sentCharacter: string, sentQualifier: string, cas
   const rest = m ? speaker(m[1]!.trim()) : undefined;
   if (!m || rest === undefined) return { unknownSpeaker: cue };
   const bracket = m[2]!.trim();
+  // The name as printed still means the qualifier as sent, though settings may have renamed it since.
+  if (sent.qualifier && upper(bracket) === upper(sentQualifierName(sent, qualifiers))) return { character: rest, qualifier: sent.qualifier };
   const q = qualifiers.find((x) => upper(x.name) === upper(bracket));
   return q ? { character: rest, qualifier: q.gameId } : { character: rest, unknownQualifier: bracket };
 }

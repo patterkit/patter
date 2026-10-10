@@ -27,6 +27,7 @@ import { inspect, inspectScene, type InspectorContext } from "../src/inspect.js"
 import { duplicateChunk, notifyDuplicated, setDuplicateHandler, DUPLICABLE_KINDS } from "../src/duplicate.js";
 import { STRUCTURAL_MOVE, setSnippetCondition, setSnippetEffects, type SnippetEffect, setGroupProps as setGroupPropsCmd, type GroupPropsPatch, insertOption, addOptionPrompt, deleteChunk as deleteChunkCmd, deleteBlock, moveChunk as moveChunkCmd, chunkIsEmpty, deleteChunksAt, chunkContaining, seedBeatInSnippet } from "../src/groups.js";
 import { structureGuard, refusal } from "../src/guard.js";
+import { projectPad, keepTimingOnJoin } from "../src/pad.js";
 import { clipboardText, pasteParagraphs } from "../src/paste.js";
 import { clipboardParagraphs } from "./clipboard.js";
 import { multiSelectState, multiSelectPositions } from "../src/multiselect.js";
@@ -82,6 +83,9 @@ export interface MountOptions {
    *  qualified line's speaker, `TAM (O.S.)`, and cycled by the keyboard route. Push changes with
    *  `setQualifiers`. */
   qualifiers?: QualifierChoice[];
+  /** The project's default pause after a line (line padding), read when an edit pins a moved line to the
+   *  pause it had (src/pad.ts). Absent, or answering undefined, means DEFAULT_PAD_AFTER. */
+  projectPadAfterDefault?: () => number | undefined;
   /** Cross-scene jump targets offered by the jump picker, APPENDED to END + THIS scene (whose
    *  live blocks the surface reads from the doc). Each is a scene `{ id, label }` with its `blocks`
    *  (so you can jump to any scene OR any block); ids are the stable join keys stored on the jump,
@@ -689,6 +693,8 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
         spellcheckPlugin(), // inline spell-check squiggles + right-click fix menu (#177; handle.setSpellChecker)
         writingStatusPlugin(), // per-beat writing-status colour badges in the LEFT icon gutter (#196)
         qualifiersPlugin(opts.qualifiers ?? []), // the cue's (O.S.) and run inheritance of a line's qualifier
+        projectPad(() => opts.projectPadAfterDefault?.()), // the project's default pause, for pinning a moved line
+        keepTimingOnJoin(), // lines a range edit joins into another bubble keep their timing (line padding)
       ],
     }),
     nodeViews,
@@ -788,6 +794,11 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
     dispatchTransaction(tr) {
       // A locked scene takes no doc change from any route (see isEditable).
       if (!isEditable && tr.docChanged && !tr.getMeta(READ_ONLY_OK)) return;
+      // A secondary press only ever moves the caret, and the menu it opens lives outside the editor, so a
+      // command picked there brings no keydown or mousedown here. The first doc change after the press is
+      // that command: the press is over, and the command is programmatic entry, which may raise the popup
+      // on a line it adds. The press's own selection change is still held back (review 2026-10).
+      if (lastPointerSecondary && tr.docChanged) { lastPointerSecondary = false; lastInputWasPointer = false; lastKeyWasVertical = false; }
       const fromStrayClick = lastInputWasPointer && !lastPointerOnCue;
       // A refused transaction (the structure guard's filter) leaves nothing to do: no change to
       // announce, no popup to move.

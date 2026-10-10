@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
+import { DEFAULT_QUALIFIERS } from "@patterkit/model";
 import { runMerge, detectMergeType, UnsupportedMergeError } from "../src/index.js";
 
 type Obj = Record<string, unknown>;
@@ -265,6 +266,39 @@ describe("project (.patterproj) merge", () => {
 
     const conflict = runMerge(base, proj({ properties: [{ name: "hp", type: "string" }] }), proj({ properties: [{ name: "hp", type: "boolean" }] }));
     expect(paths(conflict)).toEqual(["properties.hp:both-changed"]);
+  });
+
+  it("qualifiers keyed by gameId: each side's addition kept, ours first; the same one changed both ways -> conflict", () => {
+    const vo = { gameId: "vo", name: "V.O." }, os = { gameId: "os", name: "O.S." };
+    const base = proj({ qualifiers: [vo, os] });
+    const add = runMerge(base, proj({ qualifiers: [vo, os, { gameId: "phone", name: "PHONE" }] }),
+      proj({ qualifiers: [vo, { gameId: "radio", name: "RADIO" }, os] }));
+    expect(add.conflicts).toEqual([]);
+    expect((add.merged as any).qualifiers.map((q: any) => q.gameId)).toEqual(["vo", "os", "phone", "radio"]);
+
+    // One side renames a qualifier's name, the other removes another: both land.
+    const edit = runMerge(base, proj({ qualifiers: [vo, { gameId: "os", name: "OFF" }] }), proj({ qualifiers: [os] }));
+    expect(edit.conflicts).toEqual([]);
+    expect((edit.merged as any).qualifiers).toEqual([{ gameId: "os", name: "OFF" }]);
+
+    const conflict = runMerge(base, proj({ qualifiers: [vo, { gameId: "os", name: "OFF" }] }), proj({ qualifiers: [vo, { gameId: "os", name: "O/S" }] }));
+    expect(paths(conflict)).toEqual(["qualifiers.os:both-changed"]);
+  });
+
+  it("qualifiers: an absent list is the defaults, and an empty one stays empty", () => {
+    const phone = { gameId: "phone", name: "PHONE" };
+    // Neither side touched them: still absent.
+    expect((runMerge(proj(), proj({ voiced: true }), proj()).merged as any).qualifiers).toBeUndefined();
+    // One side added to the defaults: the defaults plus the addition, from a base that had none stored.
+    const added = runMerge(proj(), proj(), proj({ qualifiers: [...DEFAULT_QUALIFIERS, phone] }));
+    expect(added.conflicts).toEqual([]);
+    expect((added.merged as any).qualifiers).toEqual([...DEFAULT_QUALIFIERS, phone]);
+    // One side cleared the list: none, not the defaults.
+    const cleared = runMerge(proj(), proj({ qualifiers: [] }), proj());
+    expect((cleared.merged as any).qualifiers).toEqual([]);
+    // Back to exactly the defaults: stored as absent, as Patterpad keeps a clean file.
+    const back = runMerge(proj({ qualifiers: [...DEFAULT_QUALIFIERS, phone] }), proj({ qualifiers: [...DEFAULT_QUALIFIERS] }), proj({ qualifiers: [...DEFAULT_QUALIFIERS, phone] }));
+    expect((back.merged as any).qualifiers).toBeUndefined();
   });
 
   it("locales: all is a set union; default is a scalar 3-way", () => {

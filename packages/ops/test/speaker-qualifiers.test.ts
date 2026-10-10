@@ -15,7 +15,7 @@ import JSZip from "jszip";
 import {
   loadProject, runScriptDoc, scriptToDocx, scriptToPdf, runVoiceScript, voiceScriptToXlsx, runReport, runPlay, renderPlay,
   runExportHtml, runExportFull, extractLoc, applyLoc, applyWrites, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog,
-  catalogToXlsx, xlsxToCatalog, cueLabel,
+  catalogToXlsx, xlsxToCatalog, cueLabel, runValidate,
 } from "../src/index.js";
 import type { LocCatalog, ScriptElement } from "../src/index.js";
 import { PLAYABLE_RUNTIME_JS } from "../src/playable-runtime.js";
@@ -182,5 +182,15 @@ describe("localisation formats", () => {
     const flow = new Engine(bundle, { locale: "fr" }).openFlow("main", { scene: "s1" });
     flow.advance();
     expect(flow.advance()).toMatchObject({ qualifier: "os", qualifierName: "H.C." });
+  });
+});
+
+describe("validation", () => {
+  it("a qualifier list that isn't a list, or holds a null, is reported, not thrown", () => {
+    for (const qualifiers of [{ vo: "V.O." }, [null]]) {
+      const broken = loadProject(makeProject(false));
+      (broken.project as { qualifiers?: unknown }).qualifiers = qualifiers;
+      expect(runValidate(broken).structural.map((i) => i.code), JSON.stringify(qualifiers)).toContain("invalid-qualifier");
+    }
   });
 });

@@ -12,12 +12,21 @@ runtime behaviour.
 - **Line padding**: a line or text step carries `PadAfter`, the pause after it in seconds before the next
   line. It is the beat's own `padAfter`, else the nearest `padAfterDefault` above it (its snippet, each
   group innermost first, its block, its scene), else the project's, else the built-in 0.6. A negative value
-  is a cut-in: the next line starts that long before this one ends. A snippet's last line or text beat, and
-  one followed by a game event, is clamped to zero, so nothing overlaps across a seam or an event; an option's prompt resolves through its option and
-  is never clamped. A line silenced by closed captions, and a prompt spoken back on choosing, carry theirs
-  too; a game event carries none. The outline's `FPatterBeatInfo` gains `PadAfter` (resolved) and
+  is a cut-in: the next line starts that long before this one ends. Only a snippet's last line or text beat
+  is clamped to zero, so nothing overlaps across a seam; a game event doesn't count as the last line, and a
+  negative pause before one stands (the event starts as the line ends). An option's prompt resolves through
+  its option and is never clamped, and each prompt on a choice carries its pause too, as
+  `FPatterChoicePrompt::PadAfter` (`patter::ChoicePrompt::padAfter` in the C++ core), for a game that voices
+  the prompts itself; a save keeps it, and a prompt in an older save is worked out again on load. A line
+  silenced by closed captions, and a prompt spoken back on choosing, carry theirs too; a game event carries
+  none. A pause that isn't a finite number is ignored, so the beat inherits. The outline's `FPatterBeatInfo` gains `PadAfter` (resolved) and
   `OwnPadAfter` with `bHasOwnPadAfter`, and the C++ core's `patter::Bundle` reads `padAfter` and every
   level's `padAfterDefault`. Bundles without them play as before, each line taking 0.6.
+
+### Fixed
+
+- **A speaker qualifier without a name** in the bundle no longer gives a line an empty `QualifierName`: the
+  field is left unset, as on the other three runtimes, unless a locale string names the qualifier.
 
 ## [0.22.0] - 2026-10-10
 

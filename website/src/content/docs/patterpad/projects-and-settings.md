@@ -10,17 +10,20 @@ sidebar:
 **File ▸ Project Settings…** (`⌘,`) opens a tabbed dialog.
 
 <figure class="doc-shot">
-  <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Audio status tab open, showing a Track Audio Status switch, an audio root folder, a ladder of recording-status folders, and Use Audio Folders and scratch-recording options." />
-  <figcaption>Project settings, with tabs grouped down the left (Project / Story data / Writing &amp; audio / Localisation). The <strong>Audio Status</strong> tab is shown here, mapping each recording stage to a folder on disk.</figcaption>
+  <img src="/doc-images/ProjectSettings.png" alt="The Project settings dialog: a grouped tab list on the left (Project, Story data, Writing and audio, Localisation) with the Recording status tab open, showing a Track audio status switch, an audio root folder, a ladder of recording-status folders, and Use Audio Folders and scratch-recording options." />
+  <figcaption>Project settings, with tabs grouped down the left (Project / Story data / Writing &amp; audio / Localisation). The <strong>Recording status</strong> tab is shown here, mapping each recording stage to a folder on disk.</figcaption>
 </figure>
 
-The **General** tab holds the project name, the **Start** scene (where the story begins,
-used by **Play ▸ Play from Start** and the coverage test), your version-control system,
-the **voiced** flag, the **formatting** (bold/italic) toggle, the
-**Bundle path**, how strings are handled (the **localisation mode**, Embedded
-or IDs-only, with a source-debug option), and **Pad after**, the project's default
-[pause between lines](/patterpad/writing-surface/#pauses-between-lines), 0.6 seconds unless
-you change it.
+The **General** tab holds the **Project name**, the **Start** scene (where the story begins,
+used by **Play ▸ Play from Start** and the coverage test), **Pad after**, the project's default
+[pause between lines](/patterpad/writing-surface/#pauses-between-lines) (0.6 seconds unless you
+change it), the **Voiced** flag, and the **Inline formatting** (bold and italic) toggle.
+
+The **Publish** tab holds the **Bundle path**, where **Publish ▸ Publish Bundle** writes the
+`.patterc`, and the **Localisation** mode, Embedded or IDs only, with a source-debug option for an
+IDs-only build.
+
+The **Version control** tab picks your version-control system.
 
 The **Language** tab lists the languages your project supports and which one is the
 source.
@@ -28,7 +31,7 @@ source.
 The **Game Data** tab sets out the fields each kind of beat can carry (see
 [Conditions, effects & data](/patterpad/conditions-and-data/)).
 
-The **World Properties** tab holds the `@world` values your game owns and your story
+The **World properties** tab holds the `@world` values your game owns and your story
 reads (declaring them is covered in
 [Properties & Game Data](/setup/properties-and-data/#world-values-your-game-owns)), plus
 the **coverage drivers** that stand in for them during a
@@ -49,13 +52,14 @@ chosen for you.
 
 The **Qualifiers** tab holds the project's [speaker qualifiers](/setup/cast/#speaker-qualifiers),
 `V.O.`, `O.S.`, and `RADIO` to start with. Each row has a name, which the script shows, and a
-Game ID, which your game relies on and which follows the name until you edit it; expand a row for a
-description. Add, remove, or reorder them, or start from the **Screenplay** or **Game** set.
-Changing a Game ID updates every line that uses it. Removing a qualifier leaves its lines flagged,
-with a fix that picks a replacement.
+Game ID, which your game relies on; expand a row for a description. A new qualifier's Game ID follows
+its name until you edit it, and an existing one's stays as it is when you rename it. Add, remove, or
+reorder them, or start from a standard set. **Screenplay set** (`V.O.`, `O.S.`, `O.C.`) and **Game
+set** (`V.O.`, `O.S.`, `RADIO`, `PHONE`) each replace the list. Changing a Game ID updates every line
+that uses it. Removing a qualifier leaves its lines flagged, with a fix that picks a replacement.
 
-The **Writing Status** and **Audio Status** tabs hold the status ladders, each stage with
-its own colour. Audio Status is opt-in (a **Track Audio Status?** switch) and needs the
+The **Writing status** and **Recording status** tabs hold the status ladders, each stage with
+its own colour. Recording status is opt-in (a **Track audio status** switch) and needs the
 project to be **Voiced**; see [Recording status &
 audio](/production/audio/#recording-status).
 
@@ -63,7 +67,7 @@ The **Estimating** tab sizes still-unwritten scenes by a guess instead of their
 placeholder lines, so the report shows the work ahead. See
 [Estimating](/production/tracking-and-reports/#estimating).
 
-The **Closed Captions** tab sets the brackets (default `[` / `]`) and the caption
+The **Closed captions** tab sets the brackets (default `[` / `]`) and the caption
 character (default `SFX`) your game uses to strip non-spoken cues from dialogue when a
 player turns captions off. Avoid `(` as the opener, since parentheses open a performer
 direction at the start of a line. See [Closed captions](/play/closed-captions/).
@@ -73,7 +77,7 @@ The **Dictionary** tab is spell-check setup (below).
 The `@patter` properties your story remembers aren't here. They're the story's working
 vocabulary rather than configuration, so they have their own
 [**Properties** page](/setup/properties-and-data/#properties-the-storys-variables) at the top of the
-navigator. What stays in this dialog is the contract with your game (**World Properties**) and the
+navigator. What stays in this dialog is the contract with your game (**World properties**) and the
 settings around it.
 
 The tabs are grouped down the left (Project / Story data / Writing & audio /
@@ -82,7 +86,7 @@ Localisation) so the list stays easy to read as it grows.
 ## Version control
 
 Choose your VCS (git, Perforce, Plastic, SVN, or none) when you create the project or in
-**Project Settings ▸ General**. Patterpad is lock- and merge-aware: a scene locked by someone else
+**Project Settings ▸ Version control**. Patterpad is lock- and merge-aware: a scene locked by someone else
 goes read-only, your own edits check out when you save, and per-scene badges show each file's
 state. The full picture, what needs the VCS tool installed and how Patter merges changes, is on
 its own page: [Version control](/setup/version-control/).

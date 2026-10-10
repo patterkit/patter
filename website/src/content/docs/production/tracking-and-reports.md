@@ -19,7 +19,7 @@ skew those totals. The numbers reflect only the lines actually written and (if y
 voiced.
 
 Where the report gives you the *counts*, **status search** gives you the *lines*. Open
-**Review ▸ Find Lines by Status…** (or switch the
+**Review ▸ Find Lines by Writing Status…** (or switch the
 [search window](/search/#browsing-by-writing-status) to its **Writing** mode) to list
 and jump straight to every line at a given stage. It's the quick way to pull up "everything
 still at **stub**" and work through it.
@@ -51,7 +51,7 @@ Choose **Export Production Info…** to write that same report as an `.xlsx` spr
 Use **Export Voice Script…** for a recording script for voice actors, either every voiced line or
 only those marked ready to record. A **Qualifier** column gives each line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers), so the actor knows a line is a thought or
-off-screen, and the studio knows a `RADIO` line is recorded clean and filtered later; the lines
+off-screen, and the studio knows it can record a `RADIO` line clean and filter it later; the lines
 still sit under the one character. Once takes come back, drop them into folders by status and
 Patterpad reads each line's recording status from the files, as
 [Audio & recording](/production/audio/#recording-status) describes.

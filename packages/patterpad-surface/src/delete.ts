@@ -37,9 +37,9 @@ import { patterSchema as S } from "./schema.js";
 import { context } from "./context.js";
 import { removeDirection } from "./direction.js";
 import { qualifierOf, rawWithQualifier } from "./qualifier.js";
-import { padOf, rawWithPad, withPadOf } from "./pad.js";
+import { padOf, rawWithPad, withPadOf, keepMovedTiming, linesIn, projectPadOf } from "./pad.js";
 import { arrowLeft } from "./navigation.js";
-import { sayNode, cueText, zoneText, zoneContentStart, zoneContentEnd, sayStartOf, beatNode, rawAttr } from "./zoneutil.js";
+import { sayNode, cueText, zoneText, zoneContentStart, zoneContentEnd, sayStartOf, beatNode, rawAttr, modelIdOf } from "./zoneutil.js";
 import { refusal, snippetLossMessage } from "./guard.js";
 
 /** A say zone's inline content (text with its marks), or empty. */
@@ -194,9 +194,10 @@ function mergeIntoPrevBeat(state: EditorStateLike, dispatch: Dispatch, c: Ctx): 
     // Insert the content itself, not its text: insertText would take the marks at the seam, smearing
     // the previous line's bold over these words and dropping their own (review 2026-10, MEDIUM 32).
     if (content.size) tr.insert(prevSayEnd, content);
-    // The merged line ends where this one did, so the pause after it is this one's (line padding).
+    // When this line brings words, the merged line ends where this one did, so the pause after it is this
+    // one's (line padding). A blank line brings nothing, and the line above keeps its own.
     const pad = padOf(c.beat.node);
-    if (pad !== padOf(prev)) tr.setNodeMarkup(prevPos, undefined, { ...prev.attrs, raw: rawWithPad(prev.attrs.raw, pad) });
+    if (content.size && pad !== padOf(prev)) tr.setNodeMarkup(prevPos, undefined, { ...prev.attrs, raw: rawWithPad(prev.attrs.raw, pad) });
     dispatch(tr.setSelection(TextSelection.create(tr.doc, prevSayEnd)).scrollIntoView());
   }
   return true;
@@ -223,15 +224,28 @@ function mergeIntoPrevBubble(state: EditorStateLike, dispatch: Dispatch, c: Ctx)
   const refuse = prevSnip.attrs.jump ? "The previous bubble ends in a jump. Move or clear it first." : snippetLossMessage("This bubble", cur);
   if (refuse) { if (dispatch) dispatch(refusal(state, refuse)); return true; }
 
-  // The merged line ends where this bubble's first did, so it takes that line's pause (line padding).
-  const mergedLast = withPadOf(appendSay(prevBeats[prevBeats.length - 1]!, sayContent(curBeats[0]!)), curBeats[0]!);
+  // The merged line ends where this bubble's first did, so it takes that line's pause (line padding), unless
+  // that line is blank and brings nothing: then the line it joins keeps its own.
+  const firstSay = sayContent(curBeats[0]!);
+  const appended = appendSay(prevBeats[prevBeats.length - 1]!, firstSay);
+  const mergedLast = firstSay.size ? withPadOf(appended, curBeats[0]!) : appended;
   const newPrev = prevSnip.copy(Fragment.fromArray([...prevBeats.slice(0, -1), mergedLast, ...curBeats.slice(1)]));
 
   if (dispatch) {
+    // This bubble's lines come under the previous bubble's default pause (pad.ts). The line the first one's
+    // words joined stands in for it; a blank first line moves nothing.
+    const project = projectPadOf(state);
+    const moved = linesIn(state.doc, cur, c.snippet.pos, project);
+    const first = moved.findIndex((m) => m.id === modelIdOf(curBeats[0]!));
+    if (first >= 0) {
+      if (firstSay.size) moved[first] = { ...moved[first]!, id: prevLast.attrs.id as string };
+      else moved.splice(first, 1);
+    }
     const prevPos = c.snippet.pos - prevSnip.nodeSize;
     // delete the current snippet first (it is after prevSnip, so prevPos is stable), then replace prev.
     const tr = state.tr.delete(c.snippet.pos, c.snippet.pos + cur.nodeSize);
     tr.replaceWith(prevPos, prevPos + prevSnip.nodeSize, newPrev);
+    keepMovedTiming(tr, moved, project);
     // caret at the seam (end of prev's original last beat content)
     const seam = sayStartOf(tr.doc, prevLast.attrs.id as string) + (sayNode(prevLast)?.content.size ?? 0);
     if (seam >= 0) tr.setSelection(TextSelection.create(tr.doc, seam));
@@ -263,10 +277,12 @@ function prevLineOf(state: EditorStateLike, c: Ctx): { node: PMNode; pos: number
  *   - P is text (prose): keep it text, inline L's direction into the text;
  *   - P is dialogue WITH content: keep P's direction, DROP L's, concatenate the say;
  *   - P is dialogue with NO content: take everything from L (its say, its direction, and its qualifier).
- *  P keeps its id and raw, except for the pause after it: the merged line ends where L did, so it takes
- *  L's (line padding). The say moves as content, so bold / italic survive the fold. */
+ *  P keeps its id and raw, except for the pause after it: when L adds words, the merged line ends where L
+ *  did, so it takes L's (line padding); when L adds none, P keeps its own. The say moves as content, so
+ *  bold / italic survive the fold. */
 function foldInto(P: PMNode, L: PMNode): PMNode {
-  return withPadOf(fold(P, L), L);
+  const merged = fold(P, L);
+  return sayContent(merged).size > sayContent(P).size ? withPadOf(merged, L) : merged;
 }
 
 function fold(P: PMNode, L: PMNode): PMNode {

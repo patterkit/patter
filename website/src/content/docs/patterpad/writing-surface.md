@@ -46,18 +46,22 @@ Anyone you name is added to the cast for you, so there's no cast list to set up 
 
 A [speaker qualifier](/setup/cast/#speaker-qualifiers) says how a line is delivered: `TAM (O.S.)`
 for Tam heard but not seen, `PLAYER (V.O.)` for a thought, `GUARD (RADIO)` for a voice through a
-radio. It is picked, not typed. Choose it from the **Qualifier** menu in the line's inspector, or
-press **`⇧⌘E`** (`Shift-Ctrl-E` off the Mac, also **Edit ▸ Cycle Speaker Qualifier**) to step the
-line through the project's list and back to none. The cue shows it after the name.
+radio. It is picked, not typed. Choose it from the **Qualifier** list in the line's inspector, or
+press **`⇧⌘E`** (`Ctrl-Shift-E` off the Mac, also **Edit ▸ Cycle Speaker Qualifier**) to step the
+line through the project's list and back to none. An option's spoken prompt takes a qualifier the
+same way. The cue shows it after the name. When the project has no qualifiers, `⇧⌘E` says so and
+points you to Project Settings.
 
 Runs look after themselves. A new line by a character takes the qualifier of that character's
 last line above it in the scene, so a run of thoughts or a radio exchange needs one pick, not one
 per line; pick none to end the run. A line by someone else starts clean. The qualifier is saved on
-each line, so nothing changes later if the lines around it do.
+each line, so nothing changes later if the lines around it do. **Duplicate** keeps each copied
+line's qualifier as it was, and turning a line into narration (`⌘T`) drops its qualifier, since
+narration has no speaker.
 
-A qualified line is still the same character: the cast, the report, and every count treat `TAM` and
+A qualified line is still the same character. The cast, the report, and every count treat `TAM` and
 `TAM (O.S.)` as one. To find every line with a given qualifier, use **Review ▸ Find Lines by
-Qualifier…**.
+Qualifier…** (see [Search](/search/#browsing-by-speaker-qualifier)).
 
 ## Typing: lines, narration, and directions
 
@@ -96,17 +100,42 @@ Pasting a block of dialogue lays each line out as its own beat automatically.
 ## Pauses between lines
 
 How long to wait after a line, and when to let the next line cut in on it, is set in the inspector.
-**Pad after** on a line or a piece of narration is the pause after it, in seconds: positive waits,
-zero follows at once, and negative starts the next line that long before this one ends, a cut-in.
-Leave it empty and the line takes the **Default pad** from the nearest snippet, group, block, or
-scene above it that sets one, then the project's (**Project Settings ▸ General**), then 0.6 seconds.
-The empty field shows the value it will take, and where from.
+**Pad after** on a line or a piece of narration is the pause after it, in seconds. A positive pause
+waits, zero follows at once, and a negative one starts the next line that long before this one ends,
+cutting in on it. Leave it empty and the line takes the **Default pad** from the nearest snippet,
+group, block, or scene above it that sets one, then the project's (**Project Settings ▸ General**),
+then 0.6 seconds. The empty field shows the value it will take, and where from. A pause runs from
+-10 to 60 seconds, and the field pulls anything outside that back into the range.
 
-A snippet's last line can't cut in, because what follows it isn't settled until the story chooses,
-and nor can a line followed by a game event, which a cut-in can't cross, so their fields won't go below
-zero. A negative pause that lands there by moving lines around is flagged, and plays as no pause. Pauses are often settled after recording, so there's no need to set
-them while writing. [Play](/patterpad/playtesting/) times the scene with them, and your game reads
-them from the bundle.
+Nothing can cut in on a snippet's last line, because what follows it isn't settled until the story
+chooses, so the field won't go below zero there. A negative pause that lands there by moving lines
+around is flagged, and plays as no pause. A negative pause before a game event is fine, and starts
+the event that long before the line ends.
+
+An option's prompt has a **Pad after** too. When the prompt is spoken, its pause times the reply, so
+a negative one has the reply cut in on the question as it's being asked. Each option has its own,
+so one answer can come at once and another after a long silence.
+
+Pauses stay with the words they follow. Merging two lines keeps the pause of the line whose end the
+merged line now has, and splitting a line gives its pause to the tail.
+
+When lines move into another snippet (joining two snippets, merging one into the snippet before, or
+ungrouping), and every moved line inherits its pause, they take the new snippet's default. If any of
+them sets its own, every moved line keeps the pause it had.
+
+Pauses are often settled after recording, so there's no need to set them while writing.
+[Play](/patterpad/playtesting/) times the scene with them, and your game reads them from the bundle.
+
+## When a line is flagged
+
+The problems bar names anything about a qualifier or a pause that needs a look, on the line itself:
+
+- **The qualifier isn't one of the project's qualifiers.** It was removed from the list in Project
+  Settings, or the file was edited by hand. The fix, **Pick a qualifier…**, chooses another or none;
+  you can also add it back under **Project Settings ▸ Qualifiers**.
+- **The pause is outside the range Patter allows.** Use a number of seconds from -10 to 60.
+- **Nothing can cut in on this line.** It ends its snippet, so its negative pause plays as no
+  pause. Set it to 0 or more. This is a warning, and never stops a build.
 
 ## Moving around
 

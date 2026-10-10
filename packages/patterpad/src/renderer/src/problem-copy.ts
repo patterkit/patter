@@ -38,10 +38,17 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
     text: "This pause is outside the range Patter allows.",
     next: `Use a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}.`,
   }),
-  "pad-overlaps-seam": (p) => ({
-    text: /game event/.test(p.message) ? "A game event comes after this line, so nothing can cut in on it."
-      : "This line ends its snippet, so nothing can cut in on it.",
+  "pad-overlaps-seam": () => ({
+    text: "This line ends its snippet, so nothing can cut in on it.",
     next: "It plays with no pause after it. Set the pause to 0 or more.",
+  }),
+  "prompt-pad-without-beat": () => ({
+    text: "This option plays nothing after its prompt, so nothing can cut in on it.",
+    next: "Add a line to the option, or set the prompt's pause to 0 or more.",
+  }),
+  "qualifier-without-speaker": () => ({
+    text: "This line has a speaker qualifier but no speaker.",
+    next: "Choose who says it, or remove the qualifier.",
   }),
   "empty-snippet": () => ({ text: "This snippet is empty.", next: "Add a line, or send it somewhere." }),
   "empty-container": () => ({ text: "This is empty.", next: "Add something inside it." }),

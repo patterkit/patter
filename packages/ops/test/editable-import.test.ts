@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 import { canonicalStringify, parseSource } from "@patterkit/core";
 import type { AuthoringFile, FlowFile, LineBeat, LocaleFile, ProjectFile } from "@patterkit/model";
+import { projectQualifiers } from "@patterkit/model";
 import {
   loadProject, applyWrites, exportEditableScript, readEditableDocx, planEditableImport, readHandoff, handoffWrite,
 } from "../src/index.js";
@@ -75,6 +76,13 @@ function addCast(dir: string, ...names: string[]): void {
   const path = join(dir, "tavern.patterproj");
   const project = parseSource(readFileSync(path, "utf8")) as ProjectFile;
   writeFileSync(path, canonicalStringify({ ...project, cast: [...(project.cast ?? []), ...names.map((name) => ({ name }))] }));
+}
+
+/** Rename one of the tavern's speaker qualifiers (its shown name, the gameId kept), as settings would. */
+function renameQualifier(dir: string, gameId: string, name: string): void {
+  const path = join(dir, "tavern.patterproj");
+  const project = parseSource(readFileSync(path, "utf8")) as ProjectFile;
+  writeFileSync(path, canonicalStringify({ ...project, qualifiers: projectQualifiers(project).map((q) => (q.gameId === gameId ? { ...q, name } : q)) }));
 }
 
 /** Return the export with `document.xml` edited (and extra parts), read, and planned. */
@@ -434,6 +442,32 @@ describe("planEditableImport: speaker qualifiers", () => {
     const plan = await bringBack(s);
     expect(plan.suggestions).toEqual([]);
     expect(plan.report.problems).toEqual([]);
+  });
+
+  it("a qualifier renamed in settings since export: the untouched cue still reads as sent", async () => {
+    const s = await sent({}, (dir) => setLine(dir, "L_greet", { qualifier: "os" }));
+    expect(s.out.handoff.lines[s.code("L_greet")]).toMatchObject({ qualifier: "os", qualifierName: "O.S." });
+    renameQualifier(s.dir, "os", "OFF");
+    const plan = await bringBack(s);
+    expect(plan.suggestions).toEqual([]);
+    expect(plan.comments).toEqual([]);
+    expect(plan.report.problems).toEqual([]);
+    // The name as printed still names the qualifier as sent, beside a changed speaker.
+    const speaker = await bringBack(s, (x) => lead(x, s.code("L_greet"), "PLAYER (O.S.)"));
+    expect(speaker.suggestions[0]).toMatchObject({ proposedCharacter: "PLAYER" });
+    expect(speaker.suggestions[0]!.proposedQualifier).toBeUndefined();
+    expect(problemsOf(speaker, "unknown-qualifier")).toEqual([]);
+    // And the new name is read as the same qualifier too.
+    const renamed = await bringBack(s, (x) => lead(x, s.code("L_greet"), "BARKEEP (OFF)"));
+    expect(renamed.suggestions).toEqual([]);
+  });
+
+  it("a handoff from before the printed name was recorded compares against the current name", async () => {
+    const s = await sent({}, (dir) => setLine(dir, "L_greet", { qualifier: "os" }));
+    const old = readHandoff(s.dir, s.out.handoff.id)!;
+    delete old.lines[s.code("L_greet")]!.qualifierName;
+    applyWrites([handoffWrite(s.dir, old)]);
+    expect((await bringBack(s)).suggestions).toEqual([]);
   });
 
   it("direct: a clean qualifier change is written onto the line", async () => {

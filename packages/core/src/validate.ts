@@ -38,6 +38,8 @@ export interface ValidationIssue {
     | "invalid-qualifier"
     | "invalid-pad"
     | "pad-overlaps-seam"
+    | "prompt-pad-without-beat"
+    | "qualifier-without-speaker"
     | "invalid-temporary"
     | "invalid-declaration"
     | "invalid-status-ladder"
@@ -162,7 +164,11 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
   const sceneGameIds = new Map<string, string>(); // effective gameId -> scene id (project-wide uniqueness)
   const jumps: Array<{ to: string; from: string }> = [];
   const castNames = new Set((project.cast ?? []).map((c) => c.name));
-  const qualifierIds = new Set(projectQualifiers(project).map((q) => q.gameId));
+  // A list that isn't one (or an entry that isn't a qualifier) is reported by validateProjectFile; read only
+  // the well-formed entries here, and skip the per-line check when there is no list to check against.
+  const qualifierIds: Set<string> | null = project.qualifiers === undefined || Array.isArray(project.qualifiers)
+    ? new Set(projectQualifiers(project).flatMap((q) => (isQualifierEntry(q) && typeof q.gameId === "string" ? [q.gameId] : [])))
+    : null;
   // Line padding: a padAfter or padAfterDefault is a number of seconds within the range, so a typo can't stall a
   // scene for minutes (design/proposals/line-padding.md).
   const checkPad = (value: unknown, what: string, id?: string): void => {
@@ -171,25 +177,39 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
       issues.push({ code: "invalid-pad", message: `${what} pause '${String(value)}' must be a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}`, id });
     }
   };
-  // A cut-in needs a line to cut in with: a beat's pause can be negative only when the very next beat in its
-  // snippet is a line or text beat. A snippet's last one can't cut in on what follows the seam (that isn't
-  // certain until the switch), and one followed by a game event can't cut in across the event. The runtime
-  // clamps both to zero; this says so where the writer can see it.
+  // A cut-in needs something certain to follow within the snippet: a beat's pause can be negative unless it
+  // is its snippet's last beat, which can't cut in on what follows the seam (that isn't certain until the
+  // switch). A game event next is fine: it starts as the line ends. The runtime clamps the last one to zero;
+  // this says so where the writer can see it.
   const checkSeamPad = (beats: Snippet["beats"]): void => {
-    const list = beats ?? [];
-    list.forEach((beat, i) => {
-      if ((beat.kind !== "line" && beat.kind !== "text") || typeof beat.padAfter !== "number" || beat.padAfter >= 0) return;
-      const next = list[i + 1];
-      if (next && (next.kind === "line" || next.kind === "text")) return;
-      const why = next ? "is followed by a game event" : "is its snippet's last line";
-      issues.push({ code: "pad-overlaps-seam", severity: "warning", id: beat.id,
-        message: `beat '${beat.id}' ${why}, so its negative pause can't cut in on what follows; it plays as no pause` });
-    });
+    const last = (beats ?? []).at(-1);
+    if (!last || (last.kind !== "line" && last.kind !== "text") || typeof last.padAfter !== "number" || last.padAfter >= 0) return;
+    issues.push({ code: "pad-overlaps-seam", severity: "warning", id: last.id,
+      message: `beat '${last.id}' is its snippet's last line, so its negative pause can't cut in on what follows; it plays as no pause` });
   };
-  // A line's speaker qualifier must be one of the project's (one removed from the list is caught here).
-  const checkQualifier = (beat: { id: string; kind: string; qualifier?: string }, what: string): void => {
-    if (beat.kind === "line" && beat.qualifier !== undefined && !qualifierIds.has(beat.qualifier)) {
+  // A prompt's negative pause cuts what the option plays first in on it, so the option must play a beat
+  // before its seam, as a snippet's last beat must. Only flagged when that is certain: the option runs its
+  // children in order, and its first is an unconditional snippet with no beats (a jump, or nothing), or it
+  // has no content at all. A group first, or a condition, could play anything, so it is left alone. The
+  // runtime does not clamp this one.
+  const checkPromptPad = (option: Group): void => {
+    const p = option.prompt;
+    if (!p || (p.kind !== "line" && p.kind !== "text") || typeof p.padAfter !== "number" || p.padAfter >= 0) return;
+    if ((option.selector ?? "run") !== "run" || !Array.isArray(option.children)) return;
+    const first = option.children[0];
+    if (first && (first.type !== "snippet" || first.condition || (first.beats?.length ?? 0) > 0)) return;
+    issues.push({ code: "prompt-pad-without-beat", severity: "warning", id: p.id,
+      message: `prompt '${p.id}' has a negative pause, but its option plays nothing before it moves on, so nothing cuts in on it` });
+  };
+  // A line's speaker qualifier must be one of the project's (one removed from the list is caught here), and
+  // qualifies a speaker: on a line with none, it would print as a cue of its own.
+  const checkQualifier = (beat: { id: string; kind: string; character?: string; qualifier?: string }, what: string): void => {
+    if (beat.kind !== "line" || beat.qualifier === undefined) return;
+    if (qualifierIds && !qualifierIds.has(beat.qualifier)) {
       issues.push({ code: "unknown-qualifier", message: `${what} '${beat.id}' qualifier '${beat.qualifier}' is not in the project's qualifiers`, id: beat.id });
+    }
+    if (!beat.character) {
+      issues.push({ code: "qualifier-without-speaker", severity: "warning", message: `${what} '${beat.id}' has the qualifier '${beat.qualifier}' but no speaker`, id: beat.id });
     }
   };
 
@@ -347,6 +367,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
                   issues.push({ code: "unknown-character", message: `prompt '${p.id}' speaker '${p.character}' is not in the project cast`, id: p.id });
                 }
                 checkQualifier(p, "prompt");
+                checkPromptPad(opt);
               }
             }
             // At most one fallback (spec §5) - more than one is ambiguous about which is the last resort.
@@ -419,6 +440,11 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
 // Project-file declarations: properties, status ladders, locales (spec §7/§13).
 // ---------------------------------------------------------------------------
 
+/** An entry of a project's qualifier list that is at least an object (its name and gameId checked apart). */
+function isQualifierEntry(q: unknown): q is { name?: unknown; gameId?: unknown } {
+  return typeof q === "object" && q !== null && !Array.isArray(q);
+}
+
 function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): void {
   checkDecls(project.properties, "project properties", issues);
 
@@ -484,7 +510,15 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
 
   // Speaker qualifiers: each has a name and a valid gameId, unique in the project (a line stores the gameId).
   const seenQualifiers = new Set<string>();
-  for (const q of project.qualifiers ?? []) {
+  const qualifiers: unknown = project.qualifiers;
+  if (qualifiers !== undefined && !Array.isArray(qualifiers)) {
+    issues.push({ code: "invalid-qualifier", message: "qualifiers must be a list" });
+  }
+  for (const q of Array.isArray(qualifiers) ? (qualifiers as unknown[]) : []) {
+    if (!isQualifierEntry(q)) {
+      issues.push({ code: "invalid-qualifier", message: `qualifier '${String(q)}' is not a qualifier (a name and an address)` });
+      continue;
+    }
     if (typeof q.name !== "string" || !q.name.trim()) {
       issues.push({ code: "invalid-qualifier", message: `qualifier '${String(q.gameId)}' has no name` });
     }

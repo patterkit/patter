@@ -99,7 +99,8 @@ describe("the problems bar's copy", () => {
   const problem = (over: Partial<Problem>): Problem => ({ category: "structure", severity: "error", message: "x", ...over });
   const CODES = ["missing-prompt", "invalid-prompt", "unknown-character", "empty-snippet", "empty-container", "empty-scene",
     "missing-name", "choice-can-empty", "jump-cycle", "multiple-fallbacks", "dangling-jump", "jump-into-non-addressable", "invalid-gameid",
-    "duplicate-gameid", "stale-build", "merge-conflict", "unknown-qualifier", "invalid-qualifier", "invalid-pad", "pad-overlaps-seam"];
+    "duplicate-gameid", "stale-build", "merge-conflict", "unknown-qualifier", "invalid-qualifier", "invalid-pad", "pad-overlaps-seam",
+    "prompt-pad-without-beat", "qualifier-without-speaker"];
 
   it("has an entry for every code Patterpad raises, each a sentence", () => {
     for (const code of CODES) {
@@ -155,6 +156,13 @@ describe("the problems bar's copy", () => {
       .toBe("This pause is outside the range Patter allows. Use a number of seconds from -10 to 60.");
     expect(problemLineFor(problem({ severity: "warning", detail: "pad-overlaps-seam", message: "beat 'L1' is its snippet's last line" })))
       .toBe("This line ends its snippet, so nothing can cut in on it. It plays with no pause after it. Set the pause to 0 or more.");
+    expect(problemLineFor(problem({ severity: "warning", detail: "prompt-pad-without-beat", message: "prompt 'P' has a negative pause, but its option plays nothing before it moves on, so nothing cuts in on it" })))
+      .toBe("This option plays nothing after its prompt, so nothing can cut in on it. Add a line to the option, or set the prompt's pause to 0 or more.");
+  });
+
+  it("explains a qualifier on a line with no speaker", () => {
+    expect(problemLineFor(problem({ severity: "warning", detail: "qualifier-without-speaker", message: "beat 'L1' has the qualifier 'vo' but no speaker" })))
+      .toBe("This line has a speaker qualifier but no speaker. Choose who says it, or remove the qualifier.");
   });
 
   it("falls back to the softened message, titled by the file for a hygiene note, and never writes [", () => {

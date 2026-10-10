@@ -115,23 +115,35 @@ lines, which are static. `characterName` is the localised display name; if a cha
 has none, it's absent and you fall back to the `character` token. **`qualifier`** is the line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers), by its `gameId` (`"vo"`, `"os"`,
 `"radio"`, or one of the project's own), and **`qualifierName`** is its shown name (`V.O.`),
-localised as `characterName` is. Both are absent when the line has none. What a qualifier
-means is your game's: play a `vo` line from a non-positional voice, say, or put a filter on a
-`radio` one.
+localised as `characterName` is. Both are absent when the line has none, and on a line
+[closed captions](/play/closed-captions/) silence. What a qualifier means is your game's: play a
+`vo` line from a non-positional voice, say, or put a filter on a `radio` one.
 
 **`padAfter`** is the writer's pause after a line or text beat, in seconds, already resolved from the
-beat's own value and the defaults above it (0.6 when nothing sets one). Negative means the next line cuts in
-that long before this one ends; a snippet's last line, or a line followed by a game event, is never negative. When your game times lines itself,
-these are the rules the writer expects: start the next line `padAfter` after this one ends (from the
-start of a cut-in line, never before this line's own start); ignore the pause on the last line of a
-conversation and on the line before a choice, where the player decides; count a pause after a game event
-from when the event is done; and apply no pauses when the player clicks through. A **`ChoiceOption`**
-is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present (greyed)
-unless they're secret; pass `id` to `choose()`. A choice is only offered when at least one option
-can be taken: if every remaining option is greyed out, the choice runs dry, as one with no options
-does, so its fallback plays if it has one and otherwise the flow moves on. **`tags`** is the beat's accumulated
-author tags (its own plus every ancestor's), absent when empty: see
-[Tags at runtime](/play/tags/).
+beat's own value and the defaults above it (0.6 when nothing sets one). Negative means the next beat
+starts that long before this one ends, so a line or text beat straight after it cuts in on it. A
+snippet's last line or text beat is never negative, since what follows it isn't certain. A spoken
+option prompt's `padAfter` times the reply, and is never clamped. When your game times lines itself,
+these are the rules the writer expects:
+
+- Start the next line `padAfter` after this one ends, but never before this line itself started.
+- Ignore the pause on the last line of a conversation, and on the line before a choice, where the
+  player decides.
+- Start the first line, and the reply to a choice with no spoken prompt, at once.
+- Count a pause after a game event from when the event is done, so a held event doesn't eat it.
+- Apply no pauses when the player clicks through.
+
+A **`ChoiceOption`** is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present
+(greyed) unless they're secret; pass `id` to `choose()`. Its `prompt` is `{ kind, text, padAfter }`,
+where `kind` is `"line"` or `"text"` and `padAfter` is the pause before the reply, for a game that voices
+the prompts itself; a line prompt adds `character`, `characterName`, `direction`, `qualifier`, and
+`qualifierName` when they're set. With `replayPromptOnChoose`, the chosen prompt comes back as the
+first step after `choose()`, carrying the same `padAfter`. A choice is only offered
+when at least one option can be taken: if every remaining option is greyed out, the choice runs dry,
+as one with no options does, so its fallback plays if it has one and otherwise the flow moves on.
+
+**`tags`** is the beat's accumulated author tags (its own plus every ancestor's), absent when empty:
+see [Tags at runtime](/play/tags/).
 
 ## Properties
 

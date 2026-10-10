@@ -12,11 +12,15 @@ same runtime behaviour.
   zero follows at once, and negative starts the next line that long before this one ends (a cut-in). The
   value is resolved for you: the beat's own `padAfter`, else the nearest `padAfterDefault` above it (its
   snippet, then each group, innermost first, then its block, then its scene), else the project's, else the
-  built-in 0.6. A snippet's last line or text beat, and one followed by a game event, is never negative
-  (a negative value there is clamped to zero: a cut-in can't cross the seam or the event), and an option's spoken prompt resolves through its option. A replayed prompt and a line silenced
-  by closed captions carry it too; a game event carries none. `get_outline` and `get_beat_sequence` give
-  each line and text beat its resolved `padAfter`, and `ownPadAfter` when the beat sets its own. Older
-  bundles load unchanged, every line at 0.6. Held across all four runtimes by the conformance corpus.
+  built-in 0.6. Only a snippet's last line or text beat is never negative (a negative value there is
+  clamped to zero, since what follows the seam isn't certain); a negative pause before a game event stands,
+  and the event starts as the line ends. An option's spoken prompt resolves through its option and is never
+  clamped. A replayed prompt and a line silenced by closed captions carry it too; a game event carries none.
+  Each choice option's `prompt` carries its pause as `padAfter` too, for a game that voices the prompts
+  itself, and a saved choice keeps it (a save from before it existed works it out again on load).
+  `get_outline` and `get_beat_sequence` give each line and text beat its resolved `padAfter`, and
+  `ownPadAfter` when the beat sets its own. Older bundles load unchanged, every line at 0.6. Held across
+  all four runtimes by the conformance corpus.
 
 ## [0.22.0] - 2026-10-10
 

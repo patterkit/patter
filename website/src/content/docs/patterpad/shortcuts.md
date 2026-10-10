@@ -29,7 +29,7 @@ the editor always shows the keys that matter right where your cursor is.
 | `⇧⌘B` | Publish Bundle |
 | `⌘⇧R` | Review Feedback (toggle) |
 | `F8` / `⇧F8` | Next / Previous Feedback |
-| `⌘⇧L` | Find Lines by Status |
+| `⌘⇧L` | Find Lines by Writing Status |
 
 ## In the editor
 

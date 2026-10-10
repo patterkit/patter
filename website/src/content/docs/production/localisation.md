@@ -89,11 +89,18 @@ All three carry the same IDs and the same staleness signal; pick by who's receiv
 Translator-facing **comments** come from your documentation notes routed to the `loc`
 channel, as [Reviewing & feedback](/patterpad/reviewing/) describes.
 
-A line's [speaker qualifier](/setup/cast/#speaker-qualifiers) travels as context, never as text
-to translate: the Excel **Qualifier** column, the PO comment (`#. [line TAM (O.S.)]`), and
-`context.qualifier` in JSON, so a translator knows a line is a thought or heard over a radio. The
-qualifier **names** themselves (`V.O.`, `RADIO`) are translated with the cast's display names, as
-`qualifier:vo`-style strings beside the `cast:` ones.
+A line's [speaker qualifier](/setup/cast/#speaker-qualifiers) travels as context, by the name the
+script shows, so a translator knows a line is a thought or heard over a radio:
+
+| Format | Where it appears |
+| --- | --- |
+| Excel | a **Qualifier** column |
+| PO / POT | the speaker in the extracted comment, `#. [line TAM (O.S.)]` |
+| JSON | `context.qualifier` on the entry |
+
+It's context only, never text to translate, and it's never read back on import. The qualifier
+**names** themselves (`V.O.`, `RADIO`) are translated with the cast's display names, as
+`qualifier:vo`-style strings beside the `cast:` ones, for the qualifiers your lines use.
 
 ### Who is speaking: grammatical gender
 

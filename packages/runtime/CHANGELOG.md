@@ -38,10 +38,11 @@ version number always means the same runtime behaviour. This package is versione
 - **Line padding**: the writer's pause after a line, in seconds. A `line` or `text` step carries `padAfter`,
   resolved from the beat's own value, else the nearest `padAfterDefault` above it (its snippet, each group
   around it, innermost first, its block, its scene), else the project's, else the built-in 0.6. Negative is a
-  cut-in, the next line starting that long before this one ends; it is clamped to zero where nothing certain
-  follows to cut in with: a snippet's last line or text beat, and one followed by a game event. A spoken
-  prompt resolves through its option and is never clamped. The outline and beat sequence carry `padAfter`
-  and, when the beat sets its own, `ownPadAfter`. What to do with it is the game's: the docs give the timing
+  cut-in, the next line (or game event) starting that long before this one ends; it is clamped to zero only on
+  a snippet's last line or text beat, where nothing certain follows. A choice option's `prompt` carries its
+  `padAfter` too, resolved through its option and never clamped, for a game that voices the prompts itself.
+  The outline and beat sequence carry `padAfter` and, when the beat sets its own, `ownPadAfter`.
+  `DEFAULT_PAD_AFTER` (0.6) is exported. What to do with it is the game's: the docs give the timing
   rules a writer expects.
 
 ## [0.22.0] - 2026-10-10

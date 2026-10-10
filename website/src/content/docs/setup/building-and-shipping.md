@@ -43,8 +43,10 @@ To hand someone the script to *read* (a producer, an editor, a reviewer who want
 **Publish ▸ Publish Readable Script…** writes a screenplay-style document of the whole project in
 reading order. It has scene and block headings, dialogue (speaker, any performance direction, the
 line), prose narration, and the branching laid out plainly, with choices as a labelled list (with
-their conditions and once-only / repeatable flags) and jumps as “go to …”. Pick **PDF** or **Word
-(.docx)** in the Save dialog.
+their conditions and once-only / repeatable flags) and jumps as “go to …”. A line with a
+[speaker qualifier](/setup/cast/#speaker-qualifiers) prints it in the cue, `TAM (O.S.)`, as the
+[editable script](/production/editable-script/) does. Pick **PDF** or **Word (.docx)** in the Save
+dialog.
 
 It reads top to bottom. Branches sit indented under each choice; it doesn't try to trace every
 path, because it's the document of record rather than a playthrough (that's the playable HTML).
@@ -68,6 +70,13 @@ plays in any browser, online or off. Email it, drop it in a shared folder, open 
 It's the real runtime. Choices, conditions, sequences, and jumps behave exactly as they do in your
 game, because it's the same engine the bundle ships with rather than an approximation. There's a
 Restart, and Save/Load (kept in that browser).
+
+Lines arrive on the scene's own timing. With no recordings in the page, each line is held for an
+estimate of its reading time, then waits for the writer's
+[pause](/patterpad/writing-surface/#pauses-between-lines), so a cut-in arrives before the line it
+cuts into has finished. A **Speed** control (Half / Normal / Double / Instant) slows the timing
+down, speeds it up, or drops the waits, and that browser remembers the choice. A line with a
+[speaker qualifier](/setup/cast/#speaker-qualifiers) shows it after the name, `TAM (O.S.)`.
 
 The page reads in the project's source language, which is the version a stakeholder is reviewing.
 (For translated text, send a localised build or the loc files instead.)

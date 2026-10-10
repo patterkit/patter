@@ -15,7 +15,7 @@ import { acceptCueForBeat } from "../src/cuezone.js";
 import { toggleLineType } from "../src/linetype.js";
 import { duplicateChunk } from "../src/duplicate.js";
 import { findByModelId } from "../src/zoneutil.js";
-import { inheritQualifiers, cycleQualifier, nextQualifier, qualifierOf } from "../src/qualifier.js";
+import { inheritQualifiers, cycleQualifier, nextQualifier, qualifierOf, setQualifierAt } from "../src/qualifier.js";
 
 /** The inheritance rule as the surface runs it: an appended transaction after every edit. */
 const inheritance = new Plugin({ appendTransaction: (trs, a, b) => inheritQualifiers(trs, a, b) });
@@ -123,6 +123,16 @@ describe("runs inherit a qualifier when a line is added", () => {
     expect(lines(s)).toEqual([["TAM", "radio"], ["BO", ""], ["TAM", "radio"]]);
     s = s.apply(acceptCueForBeat(s, fresh, "BO")!); // and back to BO: none again
     expect(lines(s)).toEqual([["TAM", "radio"], ["BO", ""], ["BO", ""]]);
+  });
+
+  it("a qualifier picked before the speaker is named is kept (inheritance only fills an unpicked one)", () => {
+    // Review 2026-10: naming the speaker of a blank line counted as a respeak, so V.O. picked first was
+    // replaced by TAM's last qualifier (none).
+    let s = build([block("b", [L("L1", "TAM"), L("L2", "")])], { L1: "Out loud." });
+    s = s.apply(setQualifierAt(s, findByModelId(s.doc, "L2")!.pos, "vo")!);
+    expect(lines(s)).toEqual([["TAM", ""], ["", "vo"]]);
+    s = s.apply(acceptCueForBeat(s, "L2", "TAM")!);
+    expect(lines(s)).toEqual([["TAM", ""], ["TAM", "vo"]]);
   });
 
   it("a speaker change on a line that has words leaves its qualifier alone", () => {

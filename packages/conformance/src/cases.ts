@@ -1814,12 +1814,12 @@ const scriptedQualifierSaveLoad = {
 // --- line padding -----------------------------------------------------------------------------------
 // A line or text step carries `padAfter`, the pause after it in seconds: its own, else the nearest
 // `padAfterDefault` above it (snippet, each group innermost first, block, scene), else the project's, else the
-// built-in 0.6. A pause can be negative only when the very next beat in its snippet is a line or text beat: a
-// snippet's last line or text beat (what follows the seam isn't certain) and one followed by a game event (a
-// cut-in can't cross the event) are clamped to zero or more. A game event carries no pause of its own.
+// built-in 0.6. A snippet's last line or text beat is clamped to zero or more: what follows the seam isn't
+// certain, so nothing can cut in on it. A negative pause before a game event stands (the event starts as the
+// line ends). A game event carries no pause of its own, and doesn't count as a snippet's last line.
 // (Transcripts record `padAfter` only when it isn't the built-in 0.6.)
 const linePadding = {
-  name: "a step carries its pause: its own, else the nearest default, else the project's; a snippet's last line is never negative",
+  name: "a step carries its pause: its own, else the nearest default, else the project's; only a snippet's last line is never negative",
   project: project({ cast: [{ name: "TAM" }], padAfterDefault: 1 }),
   scenes: [{ id: "s", type: "scene", name: "S", padAfterDefault: 2, blocks: [{ id: "b", type: "block", name: "B", children: [
     { id: "g", type: "group", padAfterDefault: 0.3, children: [
@@ -1830,7 +1830,7 @@ const linePadding = {
         { id: "E_after", kind: "gameEvent", gameData: { cue: "door" } },  // no pause, and not the last line
       ] },
       { id: "sn_ev", type: "snippet", beats: [
-        { id: "L_cross", kind: "line", character: "TAM", padAfter: -0.4 }, // a game event next: clamped
+        { id: "L_cross", kind: "line", character: "TAM", padAfter: -0.4 }, // a game event next: it stands
         { id: "E_mid", kind: "gameEvent", gameData: { cue: "bell" } },
         { id: "L_after", kind: "line", character: "TAM" },                // the group's default
       ] },
@@ -1849,7 +1849,7 @@ const linePadding = {
     { type: "line", id: "L_snip", text: "Two", character: "TAM", padAfter: -0.2 },
     { type: "text", id: "T_last", text: "Three", padAfter: 0 },
     { type: "gameEvent", id: "E_after", gameData: { cue: "door" } },
-    { type: "line", id: "L_cross", text: "Wait", character: "TAM", padAfter: 0 },
+    { type: "line", id: "L_cross", text: "Wait", character: "TAM", padAfter: -0.4 },
     { type: "gameEvent", id: "E_mid", gameData: { cue: "bell" } },
     { type: "line", id: "L_after", text: "Ding", character: "TAM", padAfter: 0.3 },
     { type: "line", id: "L_group", text: "Four", character: "TAM", padAfter: 0.3 },
@@ -1861,8 +1861,9 @@ const linePadding = {
 } satisfies RuntimeFixture;
 
 // An option's spoken prompt is the head of its option's run, so its pause times the reply and may be negative
-// (the reply cuts in on the question); it resolves through the option. A line silenced by closed captions still
-// fires, so it still carries its pause.
+// (the reply cuts in on the question); it resolves through the option. The choice carries each prompt's pause
+// too, for a game that voices the prompts itself. A line silenced by closed captions still fires, so it still
+// carries its pause.
 const linePaddingPrompt = {
   name: "a spoken prompt's pause resolves through its option and is never clamped; a silenced line keeps its pause",
   project: project({ cast: [{ name: "TAM" }, { name: "SFX" }] }),
@@ -1884,13 +1885,13 @@ const linePaddingPrompt = {
   expectedTranscript: [
     { type: "line", id: "L_sfx", text: "", padAfter: 1.5 },
     { type: "choice", groupId: "g_ask", options: [
-      { id: "o_cut", prompt: { kind: "line", text: "Who's there?", character: "TAM" }, eligible: true },
-      { id: "o_wait", prompt: { kind: "text", text: "Wait" }, eligible: true },
+      { id: "o_cut", prompt: { kind: "line", text: "Who's there?", character: "TAM", padAfter: -0.4 }, eligible: true },
+      { id: "o_wait", prompt: { kind: "text", text: "Wait", padAfter: 3 }, eligible: true },
     ] },
     { type: "line", id: "P_cut", text: "Who's there?", character: "TAM", padAfter: -0.4 },
     { type: "text", id: "T_reply", text: "Me!" },                               // the built-in default
     { type: "choice", groupId: "g_ask", options: [
-      { id: "o_wait", prompt: { kind: "text", text: "Wait" }, eligible: true },
+      { id: "o_wait", prompt: { kind: "text", text: "Wait", padAfter: 3 }, eligible: true },
     ] },
     { type: "text", id: "P_wait", text: "Wait", padAfter: 3 },
     { type: "end" },

@@ -83,12 +83,16 @@ A game event is an instruction to the engine with **no visible words**. It carri
 Data the host reads when the beat plays, so it can play a sound or move a camera. Game event
 beats never appear in the locale tables.
 
-A line or text beat can also carry **`padAfter`**: the pause after it, before the next line, in seconds.
-Positive waits, zero follows at once, and negative starts the next line that long before this one ends, a
-cut-in. A beat that sets none takes the nearest **`padAfterDefault`** above it (its snippet, any groups around
-it, its block, its scene), then the project's, then 0.6 seconds. A cut-in needs a line straight after to cut in
-with: a snippet's last line can't, because what follows isn't certain until the switch, and nor can a line
-followed by a game event, which a cut-in can't cross. A negative pause there plays as none.
+A line or text beat can also carry **`padAfter`**, the pause after it in seconds, from -10 to 60. A
+positive pause waits, zero follows at once, and a negative one starts the next beat that long before
+this one ends, so the next line cuts in on it. A beat that sets none takes the nearest
+**`padAfterDefault`** above it (its snippet, any groups around it, its block, its scene), then the
+project's, then 0.6 seconds. A snippet's last line can't be cut in on, because what follows it isn't
+certain until the story chooses, so a negative pause there plays as none.
+
+An option's [prompt](/format/choices-and-logic/#choices-and-options) carries `padAfter` too. When the
+prompt is spoken, its pause times the reply. A line prompt can carry a speaker qualifier, as any line
+can.
 
 Every beat gets a stable **id** the moment it's created, never based on its content or
 position. Translations, jumps, cursors, and visit counts all key off that id, so

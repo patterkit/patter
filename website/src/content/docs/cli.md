@@ -74,13 +74,15 @@ with `-o -`).
 
 ### `patter export-script [path] [-o file.pdf|.docx]`
 Export a **readable screenplay** of the script + flow: dialogue, narration, choices (with their
-conditions / flags), and jumps, in reading order. Format follows the extension; default
+conditions / flags), and jumps, in reading order, with a speaker qualifier in the cue (`TAM (O.S.)`).
+Format follows the extension; default
 beside the bundle, as `<name>.pdf`. PDF uses built-in fonts (Latin / Western-European); use `.docx` for full
 Unicode. The document's layout is described on [Building & shipping](/setup/building-and-shipping/).
 
 ### `patter export-html [path] [-o file]`
 Export a single self-contained, **playable** `.html`: the runtime, the whole story, and
-a reader UI inlined, so it plays offline in any browser with no server. Hand one file to a
+a reader UI inlined, so it plays offline in any browser with no server, timed by a reading estimate
+and the writer's pauses, with a Speed control. Hand one file to a
 stakeholder. Defaults to beside the bundle, as `<name>.html`; `-o -` writes to stdout. Refused, like `export`,
 for a project `validate` finds errors in. Reads in the project's
 source language, as [Building & shipping](/setup/building-and-shipping/) describes.
@@ -89,7 +91,8 @@ source language, as [Building & shipping](/setup/building-and-shipping/) describ
 Run the story through Patterplay **non-interactively** and print a transcript, for
 scripted checks and CI, not for exploring (to actually play through a story, use Patterpad's Play
 window). Choices come from `--choices a,b,c` (option ids taken in order; otherwise the first
-eligible is picked). `--scene id` · `--block id` · `--seed N`. Exits **1** if the playthrough
+eligible is picked). `--scene id` · `--block id` · `--seed N`. A line with a speaker qualifier
+prints it after the name, `TAM (O.S.): …`. Exits **1** if the playthrough
 didn't reach the end, or if a condition or effect failed on the way (the engine plays on past it, and
 the transcript marks it with `!`): a completion gate for CI. A line that names another engine's scope
 (`@story.act`) plays where the game shares its scopes, standing that engine in from its file's

@@ -68,8 +68,8 @@ kinds:
 
 | Step | Meaning | What it carries |
 |---|---|---|
-| **line** | A character speaks | the speaker, the (localised) display name, the text, direction, the speaker qualifier, Game Data, tags |
-| **text** | Narration the player reads | the text, Game Data, tags |
+| **line** | A character speaks | the speaker, the (localised) display name, the text, direction, the speaker qualifier, the pause after it, Game Data, tags |
+| **text** | Narration the player reads | the text, the pause after it, Game Data, tags |
 | **gameEvent** | A host-facing cue, no spoken text | an id + Game Data (play a sound, move the camera) |
 | **choice** | The player must pick | a list of options (each with prompt text + an `eligible` flag) |
 | **end** | The flow finished |: |

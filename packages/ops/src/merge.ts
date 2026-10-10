@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 
 import { canonicalStringify } from "@patterkit/core";
+import { DEFAULT_QUALIFIERS } from "@patterkit/model";
 
 export type MergeFileType = "flow" | "loc" | "authoring" | "project";
 
@@ -353,6 +354,9 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
       // A per-node-type record of name-keyed field arrays; merge each node type's array independently.
       const v = mergeGameDataFields(asMap(base[k]), asMap(ours[k]), asMap(theirs[k]), conflicts);
       if (Object.keys(v).length > 0) merged[k] = v;
+    } else if (k === "qualifiers") {
+      const v = mergeQualifiers(base[k], ours[k], theirs[k], conflicts);
+      if (v !== undefined) merged[k] = v;
     } else if (k === "locales") {
       merged.locales = mergeLocales(asMap(base.locales), asMap(ours.locales), asMap(theirs.locales), conflicts);
     } else {
@@ -372,6 +376,30 @@ function mergeGameDataFields(b: Obj, o: Obj, t: Obj, conflicts: Conflict[]): Obj
     if (v.length > 0) out[kind] = v;
   }
   return out;
+}
+
+/** Speaker qualifiers: an ordered list keyed by `gameId`, merged per qualifier like cast and properties, so
+ *  two sides each adding one both land. An absent list means the defaults (and an empty one means none), so
+ *  each side is read as the list it stands for; the result is ours in our order, then theirs' additions in
+ *  theirs, and absent again when it comes out as exactly the defaults. A list that isn't one, or holds an
+ *  entry with no gameId or one gameId twice, merges whole. */
+function mergeQualifiers(base: unknown, ours: unknown, theirs: unknown, conflicts: Conflict[]): unknown {
+  if (base === undefined && ours === undefined && theirs === undefined) return undefined;
+  // Only a list of distinct gameIds can be keyed without losing an entry; anything else merges whole.
+  const keyed = (arr: unknown[]): boolean => new Set(arr.map((q) => (isObj(q) && typeof q.gameId === "string" ? q.gameId : null))).size === arr.length && arr.every((q) => isObj(q) && typeof q.gameId === "string");
+  const list = (v: unknown): unknown[] | null => (v === undefined ? DEFAULT_QUALIFIERS : Array.isArray(v) && keyed(v) ? v : null);
+  const b = list(base), o = list(ours), t = list(theirs);
+  if (!b || !o || !t) return merge3(base, ours, theirs, "", "qualifiers", conflicts);
+  const byId = (arr: unknown[]): Obj => {
+    const m: Obj = {};
+    for (const q of arr) if (isObj(q) && typeof q.gameId === "string") m[q.gameId] = q;
+    return m;
+  };
+  const merged = mergeMap(byId(b), byId(o), byId(t), "qualifiers", conflicts);
+  const order: string[] = [];
+  for (const q of [...o, ...t]) if (isObj(q) && typeof q.gameId === "string" && q.gameId in merged && !order.includes(q.gameId)) order.push(q.gameId);
+  const out = order.map((id) => merged[id]);
+  return eq(out, DEFAULT_QUALIFIERS) ? undefined : out;
 }
 
 /** locales: `default` is a scalar 3-way; `all` is a set union (preserving first-seen order). */

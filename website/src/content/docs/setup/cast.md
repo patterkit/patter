@@ -46,18 +46,18 @@ never need a second cast member such as `TAM_OS` to get one.
 
 A project starts with three:
 
-| Qualifier | Address | Meaning |
+| Qualifier | Game ID | Meaning |
 | --- | --- | --- |
 | `V.O.` | `vo` | Voice-over: the character isn't in the scene (a thought, narration, a voice in the ear) |
 | `O.S.` | `os` | Off-screen: the character is there, but not seen (the next room, behind a door) |
 | `RADIO` | `radio` | Heard through a radio, a phone, or a loudspeaker |
 
 Change the list in **Project Settings ▸ Qualifiers**: add your own (`PHONE`, `PA`, `O.C.`), rename,
-reorder, describe, or remove them. Each has a **name**, which the script shows, and an **address**,
-which your game's code relies on, so renaming `V.O.` to `VO` changes nothing in the game. A new
-qualifier's address is made from its name, and you can edit it; changing an address updates every
-line that uses it.
+reorder, describe, or remove them. Each has a **name**, which the script shows, and a **Game ID**,
+which your game's code relies on. Renaming `V.O.` to `VO` changes the name a game shows, never what
+its code switches on. A new qualifier's Game ID is made from its name until you edit it, and changing
+a Game ID updates every line that uses it.
 
-A qualifier's name is translated like a display name, as part of
-[Languages & translation](/setup/languages/). Only the qualifiers your lines use are compiled into
-the `.patterc`, with their address and name; the description is for writers.
+A qualifier's name is translated like a display name, for the qualifiers your lines use (see
+[Localisation](/production/localisation/)). Only those qualifiers are compiled into the `.patterc`,
+with their Game ID and name; the description is for writers.

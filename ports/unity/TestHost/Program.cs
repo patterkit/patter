@@ -111,6 +111,7 @@ namespace Patterkit.Patterplay.TestHost
             RunAudioJoinCheck();
             RunDebugLinkUtf8Check();
             RunLegacySaveRngCheck(ParseBundle(root.GetProperty("runtime")[0].GetProperty("bundle")));
+            RunLegacyPromptPadCheck(root.GetProperty("runtime"));
             // runtime[1] is "choice with greyed option, pick the eligible": a fixture that actually
             // exercises the thing under test, rather than one that happens to be first.
             RunTraceLogCheck(ParseBundle(root.GetProperty("runtime")[1].GetProperty("bundle")));
@@ -249,6 +250,51 @@ namespace Patterkit.Patterplay.TestHost
                 return;
             }
             Console.WriteLine("  [legacy-save] a pre-fix save with a negative rngState loads");
+        }
+
+        /// <summary>A save written before choice prompts carried their pause has none: on load each saved prompt
+        /// (the pending choice's options, and the pending replay prompt's shown copy) is re-resolved from its
+        /// beat, so the choice and the next save carry it again.</summary>
+        private static void RunLegacyPromptPadCheck(JsonElement runtime)
+        {
+            JsonElement fixture = default;
+            bool found = false;
+            foreach (var c in runtime.EnumerateArray())
+                if (c.GetProperty("name").GetString().StartsWith("a spoken prompt's pause")) { fixture = c; found = true; break; }
+            if (!found) { Fail("legacy-prompt-pad", "fixture", "the spoken-prompt padding case is not in the corpus"); return; }
+            var bundle = ParseBundle(fixture.GetProperty("bundle"));
+            var pad = new System.Text.RegularExpressions.Regex(",\"padAfter\":-?[0-9.eE+-]+");
+            Engine Fresh() { var o = new EngineOptions(); ApplyEngineOptions(fixture, o); return new Engine(bundle, o); }
+
+            // A pending choice: both options' prompts lose their pause in the aged save.
+            var engine = Fresh();
+            var flow = engine.OpenFlow("main", "s");
+            var stop = flow.AdvanceToStop().Stop;
+            if (stop == null || stop.Type != StepType.Choice) { Fail("legacy-prompt-pad", "choice", "the fixture did not stop at its choice"); return; }
+            string json = PatterSave.SerializeState(engine);
+            string aged = pad.Replace(json, "");
+            if (aged == json) { Fail("legacy-prompt-pad", "envelope", "no prompt padAfter in the save to strip; the check would prove nothing"); return; }
+            var loaded = Fresh();
+            PatterSave.DeserializeState(loaded, aged);
+            var got = loaded.GetFlow("main").GetChoices().Select(o => $"{o.Id}={o.Prompt?.PadAfter?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "<missing>"}");
+            string gotStr = string.Join(" ", got);
+            if (gotStr != "o_cut=-0.4 o_wait=3") { Fail("legacy-prompt-pad", "pending choice", $"re-resolved prompts were {gotStr}"); return; }
+            if (PatterSave.SerializeState(loaded) != json) { Fail("legacy-prompt-pad", "re-save", "the re-saved choice does not match the original save"); return; }
+
+            // The choose->advance window: the pending replay prompt's shown copy loses its pause.
+            engine = Fresh();
+            flow = engine.OpenFlow("main", "s");
+            flow.AdvanceToStop();
+            flow.Choose("o_cut");
+            json = PatterSave.SerializeState(engine);
+            aged = pad.Replace(json, "");
+            if (aged == json) { Fail("legacy-prompt-pad", "envelope", "no pending prompt padAfter in the save to strip"); return; }
+            loaded = Fresh();
+            PatterSave.DeserializeState(loaded, aged);
+            if (PatterSave.SerializeState(loaded) != json) { Fail("legacy-prompt-pad", "pending prompt", "the re-saved pending prompt does not carry its pause again"); return; }
+            var step = loaded.GetFlow("main").Advance();
+            if (step.Id != "P_cut" || step.PadAfter != -0.4) { Fail("legacy-prompt-pad", "replay", $"the replayed prompt was {step.Id} with padAfter {step.PadAfter}"); return; }
+            Console.WriteLine("  [legacy-prompt-pad] a save whose prompts carry no pause loads with each prompt's pause re-resolved");
         }
 
         /// <summary>The save envelope's SHAPE, checked rather than round-tripped.
@@ -1200,6 +1246,9 @@ namespace Patterkit.Patterplay.TestHost
             if (p.Direction != null) o["direction"] = p.Direction;
             if (p.Qualifier != null) o["qualifier"] = p.Qualifier;
             if (p.QualifierName != null) o["qualifierName"] = p.QualifierName;
+            // The prompt's pause, as on a step: only when it isn't the built-in default, and marked when absent.
+            if (p.PadAfter == null) o["padAfter"] = "<missing>";
+            else if (p.PadAfter.Value != Bundle.DefaultPadAfter) o["padAfter"] = p.PadAfter.Value;
             return o;
         }
 
@@ -1548,8 +1597,13 @@ namespace Patterkit.Patterplay.TestHost
         }
 
         /// <summary>A number field, or null when it is absent (or not a number).</summary>
+        // A pause value as a bundle holds it: a finite number, or nothing (anything else inherits).
         private static double? Num(JsonElement o, string key)
-            => o.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : (double?)null;
+        {
+            if (!o.TryGetProperty(key, out var v) || v.ValueKind != JsonValueKind.Number) return null;
+            double d = v.GetDouble();
+            return double.IsNaN(d) || double.IsInfinity(d) ? (double?)null : d;
+        }
 
         private static List<string> TagList(JsonElement a) => a.EnumerateArray().Select(x => x.GetString()).ToList();
     }

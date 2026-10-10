@@ -274,3 +274,33 @@ describe("gameData field definitions", () => {
     expect(codes(p)).toContain("invalid-gamedata-field");
   });
 });
+
+describe("speaker qualifiers", () => {
+  const lineScene = (beat: Record<string, unknown>, prompt?: Record<string, unknown>): Scene => ({
+    id: "s", type: "scene", name: "S",
+    blocks: [{ id: "b", type: "block", name: "B", children: [
+      { id: "sn", type: "snippet", beats: [{ id: "L1", kind: "line", ...beat }] },
+      ...(prompt ? [{ id: "c", type: "group", selector: "choice", children: [
+        { id: "o", type: "group", prompt: { id: "P", kind: "line", ...prompt }, children: [{ id: "sn2", type: "snippet", jump: { to: "END" } }] },
+      ] }] : []),
+    ] }],
+  } as unknown as Scene);
+  const withCast = (): ProjectFile => ({ ...base(), cast: [{ name: "TAM" }] });
+
+  it("warns on a qualifier on a line with no speaker, a line or a prompt", () => {
+    const issues = validateProject({ project: withCast(), scenes: [lineScene({ qualifier: "vo" }, { qualifier: "os", character: "" })] })
+      .filter((i) => i.code === "qualifier-without-speaker");
+    expect(issues.map((i) => [i.id, i.severity])).toEqual([["L1", "warning"], ["P", "warning"]]);
+    expect(validateProject({ project: withCast(), scenes: [lineScene({ character: "TAM", qualifier: "vo" })] })
+      .filter((i) => i.code === "qualifier-without-speaker")).toEqual([]);
+  });
+
+  it("reports a qualifier list that isn't a list, or holds a non-object, instead of throwing", () => {
+    for (const qualifiers of [{ vo: "V.O." }, "V.O.", [null], [42, { gameId: "vo", name: "V.O." }], [["vo"]]]) {
+      const p = { ...withCast(), qualifiers } as unknown as ProjectFile;
+      let issues: ReturnType<typeof validateProject> = [];
+      expect(() => { issues = validateProject({ project: p, scenes: [lineScene({ character: "TAM", qualifier: "vo" })] }); }, JSON.stringify(qualifiers)).not.toThrow();
+      expect(issues.map((i) => i.code), JSON.stringify(qualifiers)).toContain("invalid-qualifier");
+    }
+  });
+});

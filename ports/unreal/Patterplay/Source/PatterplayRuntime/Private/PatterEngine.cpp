@@ -116,6 +116,7 @@ namespace
 			if (O.prompt->hasQualifier) P.Qualifier = Ue(O.prompt->qualifier);
 			P.bHasQualifierName = O.prompt->hasQualifierName;
 			if (O.prompt->hasQualifierName) P.QualifierName = Ue(O.prompt->qualifierName);
+			P.PadAfter = O.prompt->padAfter;   // line padding: the prompt's resolved pause
 			// The deprecated flat fields, filled as they were, for Blueprints that still read them.
 			Opt.PromptKind = P.Kind;
 			Opt.Text = P.Text;

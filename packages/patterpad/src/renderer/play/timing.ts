@@ -10,11 +10,17 @@
 //     before it to carry a pause.
 //   - A game event fires when the line before it ends. Play doesn't hold events, so it's done at once,
 //     and the pause after that line counts from then.
-//   - The last line's pause is ignored: the run ends (or its choices appear) when the last line still
-//     playing ends.
+//   - The last line's pause is ignored. The choices appear as the last line before them starts (they show
+//     while it plays); the end comes when every line still playing has ended, including an earlier line
+//     that a later one cut in on and that runs on past it.
 //   - Under Step (manual advance) none of this applies: each beat appears when it's asked for.
 //
-// Times are in seconds of the script's own timing; the Speed setting scales them (`SPEED_RATE`).
+// Times are in seconds of the script's own timing; the Speed setting scales them (`SPEED_RATE`), through a
+// clock that re-anchors when the speed changes mid-run.
+//
+// The playable HTML export runs the same rules (packages/ops/src/play-timeline.ts, inlined into the page).
+// This renderer can't load that Node package, so it restates them, and play-timing.test.ts holds the two to
+// one table of cases.
 // ---------------------------------------------------------------------------
 
 import { DEFAULT_PAD_AFTER } from "@patterkit/model";
@@ -81,8 +87,53 @@ export class Timeline {
     return { start, end };
   }
 
-  /** When the run's last line ends (its own pause ignored): when the choices or the end appear. */
+  /** When the choices appear: as the last line before them starts, so they show while it plays. */
+  get choicesAt(): number { return this.floor; }
+
+  /** When the run ends: as the last line still playing ends (its own pause ignored). */
   get end(): number { return Math.max(this.last, this.anchor); }
+}
+
+/** Script time on the wall clock, at a speed that can change mid-run. It keeps a (wall, script) anchor and
+ *  moves it on each change, so a change applies from the moment it's made: the time already played keeps
+ *  the pace it was played at, and only what's to come is re-timed. The playable HTML's `createClock`, alike. */
+export class PlayClock {
+  private wall: number; // the anchor's wall time, in ms
+  private script = 0; // the anchor's script time, in seconds (under Instant: the furthest time asked for)
+  constructor(now: number, private rate: number) { this.wall = now; }
+
+  /** The wall time (ms) that script time `seconds` falls at. At Instant it's now: the clock jumps there. */
+  at(seconds: number): number {
+    if (this.rate === Infinity) { this.script = Math.max(this.script, seconds); return this.wall; }
+    return this.wall + ((seconds - this.script) * 1000) / this.rate;
+  }
+
+  /** The script time reached at wall time `now`. */
+  position(now: number): number {
+    return this.rate === Infinity ? this.script : this.script + ((now - this.wall) * this.rate) / 1000;
+  }
+
+  /** Play at `rate` (`SPEED_RATE`) from `now` on. */
+  setRate(now: number, rate: number): void {
+    this.script = this.position(now);
+    this.wall = now;
+    this.rate = rate;
+  }
+
+  /** Move everything still to come `ms` later: a beat that started late (its recording loaded after its
+   *  turn) takes the rest of the run with it, so no overlap appears that nobody set. */
+  delay(ms: number): void { if (ms > 0) this.wall += ms; }
+}
+
+/** The longest a recording is believed to run, at the least: a broken header can claim hours, which would
+ *  hold the run that long. Four times the line's estimate when that's longer, so a slow read still fits. */
+export const MAX_RECORDING_SECONDS = 60;
+
+/** How long a line lasts on the timeline: its recording's length when that's readable, else the duration
+ *  estimate (a recording whose length can't be read still plays), capped at a plausible length. */
+export function lineLength(recorded: number | null | undefined, estimate: number): number {
+  if (recorded === null || recorded === undefined || !Number.isFinite(recorded) || recorded <= 0) return estimate;
+  return Math.min(recorded, Math.max(MAX_RECORDING_SECONDS, estimate * 4));
 }
 
 /** The whole timeline for beats whose lengths are known: each beat's slot, and when the run ends. */

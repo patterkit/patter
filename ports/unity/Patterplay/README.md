@@ -65,11 +65,11 @@ A line step carries its speaker as `Character` (the cast token) and `CharacterNa
 
 A line or text step also carries `PadAfter`, the writer's pause after it in seconds, already resolved from
 the beat's own value and the defaults above it (`Bundle.DefaultPadAfter`, 0.6, when nothing sets one). A
-negative value means the next line cuts in that long before this one ends; a snippet's last line is never
-negative. When your game times lines itself, start the next line `PadAfter` after this one ends (never before
-this line's own start), ignore it on the last line of a conversation and on the line before a choice, count a
-pause after a game event from when the event is done, and apply none when the player clicks through. A game
-event step carries none. `GetOutline` and `GetBeatSequence` report the same `PadAfter` on a line or text
+negative value means the next line (or game event) starts that long before this one ends; only a snippet's
+last line or text beat is never negative. A choice option's `Prompt` carries its `PadAfter` too, for a game
+that voices the prompts itself. When your game times lines itself, follow the
+[timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects. A game event step
+carries none. `GetOutline` and `GetBeatSequence` report the same `PadAfter` on a line or text
 beat's `BeatInfo`, with `OwnPadAfter` when the beat sets its own.
 
 ## Samples

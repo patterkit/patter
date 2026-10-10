@@ -1,10 +1,11 @@
 // Speaker qualifiers on the main side (design/proposals/speaker-qualifiers.md): the gameId rename that
 // rewrites every line using a qualifier (as a cast rename would), and the browse that finds lines by
 // qualifier for the search window. Pure over the loaded model, so they test without Electron; the
-// writes they plan go through the VC layer in project.ts.
+// writes they plan go through the VC layer in project.ts. A rename reaches everything that holds a gameId:
+// the lines, the translated names, suggestions, edit records, and editable-script handoff records.
 
 import { walkNodes, projectQualifiers, qualifierStringKey, PROJECT_LOCALE_SCENE } from "@patterkit/model";
-import type { Beat, Group, Snippet, Scene, ProjectFile, LocaleFile } from "@patterkit/model";
+import type { AuthoringFile, Beat, Group, HandoffFile, Snippet, Scene, ProjectFile, LocaleFile } from "@patterkit/model";
 
 /** Old gameId -> new gameId, with no-ops and blanks dropped. Null when nothing is renamed. */
 export function cleanRenames(renames: Record<string, string> | undefined): Map<string, string> | null {
@@ -34,20 +35,52 @@ export function renameQualifiersInScene(scene: Scene, renames: Map<string, strin
   return n;
 }
 
+/** Move the values of `record` keyed `qualifier:<gameId>` to their new gameIds, in place, reading every key
+ *  before any moves so a swap stays a swap. True when anything moved. */
+function moveQualifierKeys<T>(record: Record<string, T>, renames: Map<string, string>): boolean {
+  const moved = new Map<string, T>();
+  for (const [from, to] of renames) {
+    const value = record[qualifierStringKey(from)];
+    if (value !== undefined) moved.set(qualifierStringKey(to), value);
+  }
+  if (!moved.size) return false;
+  for (const from of renames.keys()) delete record[qualifierStringKey(from)];
+  for (const [key, value] of moved) record[key] = value;
+  return true;
+}
+
 /** Move a project-level loc shard's `qualifier:<gameId>` strings to their new gameIds, in place, so a
  *  translated qualifier name follows its rename. True when anything moved. */
 export function renameQualifierStrings(loc: LocaleFile, renames: Map<string, string>): boolean {
   if (loc.scene !== PROJECT_LOCALE_SCENE || !loc.strings) return false;
-  const strings = loc.strings;
-  const moved = new Map<string, string>(); // new key -> text, read before any key moves (a swap stays a swap)
-  for (const [from, to] of renames) {
-    const text = strings[qualifierStringKey(from)];
-    if (text !== undefined) moved.set(qualifierStringKey(to), text);
+  return moveQualifierKeys(loc.strings, renames);
+}
+
+/** Rewrite an authoring shard's qualifier gameIds through `renames`, in place: each suggestion's proposed and
+ *  baseline qualifier (so accepting one writes the new gameId, and its stale check still matches), and the
+ *  edit records of translated qualifier names (`qualifier:<gameId>`, translation staleness). True when
+ *  anything changed. */
+export function renameQualifiersInAuthoring(af: AuthoringFile, renames: Map<string, string>): boolean {
+  let changed = false;
+  for (const s of af.suggestions ?? []) {
+    const proposed = s.proposedQualifier ? renames.get(s.proposedQualifier) : undefined;
+    const baseline = s.baselineQualifier ? renames.get(s.baselineQualifier) : undefined;
+    if (proposed !== undefined) { s.proposedQualifier = proposed; changed = true; }
+    if (baseline !== undefined) { s.baselineQualifier = baseline; changed = true; }
   }
-  if (!moved.size) return false;
-  for (const from of renames.keys()) delete strings[qualifierStringKey(from)];
-  for (const [key, text] of moved) strings[key] = text;
-  return true;
+  if (af.edits && moveQualifierKeys(af.edits, renames)) changed = true;
+  return changed;
+}
+
+/** Rewrite a handoff record's lines' qualifier gameIds through `renames`, in place, so a reimport compares
+ *  against the line as it now is. The name the cue printed is kept as it was. True when anything changed. */
+export function renameQualifiersInHandoff(handoff: HandoffFile, renames: Map<string, string>): boolean {
+  let changed = false;
+  for (const line of Object.values(handoff.lines)) {
+    const to = line.qualifier ? renames.get(line.qualifier) : undefined;
+    if (to !== undefined) { line.qualifier = to; changed = true; }
+  }
+  return changed;
 }
 
 /** The project's qualifiers with how many lines (and line prompts) in `scenes` use each, in display order. */

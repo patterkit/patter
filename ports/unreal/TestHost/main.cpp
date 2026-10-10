@@ -162,6 +162,9 @@ static JsonValue normalize(const StepResult& s)
                     if (opt.prompt->hasDirection) p.set("direction", JsonValue::Str(opt.prompt->direction));
                     if (opt.prompt->hasQualifier) p.set("qualifier", JsonValue::Str(opt.prompt->qualifier));
                     if (opt.prompt->hasQualifierName) p.set("qualifierName", JsonValue::Str(opt.prompt->qualifierName));
+                    // Line padding, when not the default; a prompt without one records a marker, as normaliseStep does.
+                    if (!opt.prompt->hasPadAfter) p.set("padAfter", JsonValue::Str("<missing>"));
+                    else if (opt.prompt->padAfter != DEFAULT_PAD_AFTER) p.set("padAfter", JsonValue::Num(opt.prompt->padAfter));
                     od.set("prompt", std::move(p));
                 }
                 od.set("eligible", JsonValue::Boolean(opt.eligible));
@@ -1173,6 +1176,75 @@ static void runPendingClearedCheck()
     { Engine e(bundle, opts); Flow* f = toChosen(e); f->gotoAddress("s", ""); const auto r = f->advance();
       if (r.id != "OPEN") fail("pending", "goto", "a goto replayed the abandoned run's prompt (got " + r.id + ")"); }
     std::cout << "  [pending] a restart or a goto drops a chosen prompt still waiting to be replayed\n";
+}
+
+// A save written before choice prompts carried their pause (line padding) has prompts without `padAfter`. On
+// load each is worked out again from the prompt's beat: an authored prompt, or a bare snippet's first content
+// line, and the pending replay prompt's shown copy, as the JS reference's promptPadOf does.
+static void runOldSavePromptPadCheck()
+{
+    const char* json = R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},
+      "scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","blocks":[{"id":"b","type":"block","name":"B","gameId":"b","children":[
+        {"id":"g","type":"group","selector":"choice","children":[
+          {"id":"o","type":"group","prompt":{"id":"P","kind":"line","character":"PC","padAfter":-0.4},"children":[
+            {"id":"sn_ans","type":"snippet","beats":[{"id":"ANS","kind":"text"}],"jump":{"to":"END"}}]},
+          {"id":"sn_bare","type":"snippet","beats":[{"id":"BARE","kind":"text","padAfter":2},{"id":"MORE","kind":"text"}],"jump":{"to":"END"}}]}]}]}},
+      "strings":{"en":{"P":"Ask","ANS":"answer","BARE":"Leave","MORE":"bye"}}})JSON";
+    const Bundle bundle = parseBundle(JsonParser(json).parse());
+    EngineOptions opts; opts.replayPromptOnChoose = true;
+    auto strip = [](std::string s) {
+        for (const std::string key : { ",\"padAfter\":-0.4", ",\"padAfter\":2" })
+            for (std::size_t at; (at = s.find(key)) != std::string::npos;) s.erase(at, key.size());
+        return s;
+    };
+    auto padOfOption = [](Flow* f, const std::string& id) {
+        for (const auto& o : f->getChoices()) if (o.id == id && o.prompt) return o.prompt->hasPadAfter ? o.prompt->padAfter : 99.0;
+        return 99.0;
+    };
+    // A pending choice: both options' prompts.
+    {
+        Engine live(bundle, opts); Flow* f = live.openFlow("f", "s"); f->advance();
+        if (padOfOption(f, "o") != -0.4 || padOfOption(f, "sn_bare") != 2) fail("old-save", "live", "a prompt did not carry its pause");
+        const std::string old = strip(serializeState(live));
+        if (old.find("padAfter") != std::string::npos) fail("old-save", "strip", "the test could not make an old save");
+        Engine loaded(bundle, opts); deserializeState(loaded, old); Flow* g = loaded.getFlow("f");
+        if (!g || padOfOption(g, "o") != -0.4) fail("old-save", "authored prompt", "an old save's prompt pause was not re-resolved");
+        if (!g || padOfOption(g, "sn_bare") != 2) fail("old-save", "bare snippet", "an old save's bare prompt pause was not re-resolved");
+    }
+    // A prompt waiting to be replayed: its shown copy saves its pause again.
+    {
+        Engine live(bundle, opts); Flow* f = live.openFlow("f", "s"); f->advance(); f->choose("o");
+        const std::string old = strip(serializeState(live));
+        Engine loaded(bundle, opts); deserializeState(loaded, old);
+        if (serializeState(loaded).find("\"padAfter\":-0.4") == std::string::npos)
+            fail("old-save", "pending prompt", "an old save's pending prompt did not save its pause again");
+        Flow* g = loaded.getFlow("f");
+        const auto r = g ? g->advance() : StepResult{};
+        if (r.id != "P" || r.padAfter != -0.4) fail("old-save", "replay", "the replayed prompt lost its pause");
+    }
+    std::cout << "  [old-save] a saved prompt without a pause is worked out again on load\n";
+}
+
+// A bundle qualifier without a name gives a line no shown qualifier name (JS, Unity, and Godot leave the field
+// off); it reported an empty one here. A locale string can still name it.
+static void runNamelessQualifierCheck()
+{
+    auto run = [](const std::string& strings) {
+        const std::string json = R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"cast":[{"name":"TAM"}],
+          "qualifiers":[{"gameId":"vo"}],
+          "scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","blocks":[{"id":"b","type":"block","name":"B","gameId":"b","children":[
+            {"id":"sn","type":"snippet","beats":[{"id":"L","kind":"line","character":"TAM","qualifier":"vo"}]}]}]}},
+          "strings":{"en":{"L":"Hello")JSON" + strings + "}}}";
+        const Bundle bundle = parseBundle(JsonParser(json).parse());   // the engine reads it by reference
+        Engine engine(bundle, EngineOptions{});
+        return engine.openFlow("f", "s")->advance();
+    };
+    const auto bare = run("");
+    if (!bare.hasQualifier || bare.qualifier != "vo") fail("nameless-qualifier", "qualifier", "the line lost its qualifier");
+    if (bare.hasQualifierName) fail("nameless-qualifier", "no name", "a nameless qualifier gave a shown name (\"" + bare.qualifierName + "\")");
+    const auto named = run(",\"qualifier:vo\":\"V.O.\"");
+    if (!named.hasQualifierName || named.qualifierName != "V.O.") fail("nameless-qualifier", "locale string", "a locale string did not name a nameless qualifier");
+    std::cout << "  [nameless-qualifier] a qualifier without a name gives no shown name; a locale string still can\n";
 }
 
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
@@ -2677,6 +2749,8 @@ int main(int argc, char** argv)
     runKernelErrorCases();
     runBundleReaderCase();
     runPendingClearedCheck();
+    runOldSavePromptPadCheck();
+    runNamelessQualifierCheck();
     runHostScopeWritableSmoke();
     runPlayErrorCases();
     runAddressLookupCases();

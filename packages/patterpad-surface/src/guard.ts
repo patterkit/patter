@@ -7,8 +7,8 @@
 // removes the whole choice. So every transaction passes through one filter here,
 // which refuses it when it would make a logic-carrying snippet, or any group,
 // disappear, and hands the host a short sentence naming what would be lost. A
-// snippet's own default pause (line padding) is protected the same way when its
-// lines would land in a bubble with a different one, since they'd change timing.
+// snippet's own default pause (line padding) is no reason to refuse: when its
+// lines land in another bubble, they keep their timing by the rule in pad.ts.
 //
 // One filter covers every route at once - Backspace and Delete merges, a range
 // delete, typing over a selection, cut, paste, and drop - because they all arrive
@@ -26,7 +26,6 @@ import { ReplaceAroundStep, ReplaceStep } from "prosemirror-transform";
 import { isHistoryTransaction } from "prosemirror-history";
 import type { Node as PMNode } from "prosemirror-model";
 import { isChoiceGroup, modelIdOf, rawAttr } from "./zoneutil.js";
-import { padDefaultOf } from "./pad.js";
 
 /** Transaction meta: this transaction removes structure on purpose (the author asked for it through a
  *  menu, a confirm, or a drag), so the guard lets it through. */
@@ -76,24 +75,6 @@ export function snippetLossMessage(subject: string, node: PMNode): string | null
   if (!logic.length) return null;
   const pronoun = logic.length > 1 || logic[0] === "effects" ? "them" : "it";
   return `${subject} has ${listOf(logic)}. Move or clear ${pronoun} first.`;
-}
-
-/** The sentence for a snippet whose own default pause (line padding) would go when its lines join
- *  `host`, a snippet with a different one (or none): the lines would change timing without a word. Null
- *  when the snippet sets no default, or `host` sets the same. */
-export function padDefaultLossMessage(subject: string, lost: PMNode, host: PMNode | null): string | null {
-  const own = padDefaultOf(lost);
-  if (own === undefined || (host && padDefaultOf(host) === own)) return null;
-  return `${subject} has its own default pause. Clear it, or give both bubbles the same one, first.`;
-}
-
-/** The snippet that holds `pos` in `doc` after an edit, or the one just before it (where a merged
- *  bubble's lines went). */
-function snippetAt(doc: PMNode, pos: number): PMNode | null {
-  const $p = doc.resolve(Math.max(0, Math.min(pos, doc.content.size)));
-  for (let d = $p.depth; d >= 0; d--) if ($p.node(d).type.name === "snippet") return $p.node(d);
-  const before = $p.nodeBefore;
-  return before?.type.name === "snippet" ? before : null;
 }
 
 /** The sentence for a group an edit would remove wholesale. */
@@ -163,8 +144,7 @@ export function structureLoss(tr: Transaction, state: EditorState): string | nul
   const group = lost.find((c) => c.node.type.name === "group");
   if (group) return groupLossMessage(subjectFor(group, groupNoun(group.node, group.parent), state));
   for (const c of lost) {
-    const subject = subjectFor(c, "bubble", state);
-    const msg = snippetLossMessage(subject, c.node) ?? padDefaultLossMessage(subject, c.node, snippetAt(tr.doc, tr.mapping.map(c.pos)));
+    const msg = snippetLossMessage(subjectFor(c, "bubble", state), c.node);
     if (msg) return msg;
   }
   return null;

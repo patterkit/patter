@@ -23,7 +23,7 @@ import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the
 import { colourFor } from "@patterkit/patterpad-surface/colour";
 import { estimateDuration } from "@wildwinter/game-subtitles"; // the same estimate Patterstage times a line by
 import type { PlayBatch, PlayChoiceOption, PlayStep } from "../../shared/api.js";
-import { Timeline, SPEED_RATE, readSpeed, toMs, type PlaySpeed } from "./timing.js";
+import { Timeline, PlayClock, SPEED_RATE, lineLength, readSpeed, type PlaySpeed } from "./timing.js";
 
 // The THEMED rollover. Without this call `data-tip` is inert: the shell's `pinButton` sets it and
 // nothing renders it, so this window had a pin with no tooltip at all. Only the editor mounted it.
@@ -57,10 +57,11 @@ let audioOn = localStorage.getItem("patter.playAudio") !== "0";
 let continueMode = localStorage.getItem("patter.playContinue") !== "0";
 let runGen = 0; // bumped on start / restart / stale so a paced read bails the moment it's superseded
 // Stop / pause a paced run: `stopRequested` halts the reveal before the NEXT beat (the un-played rest waits
-// behind a resume control - it never rushes ahead); `skipFire` cuts short the wait in flight; `stopSounding`
-// stops every line still sounding. `resumeState` remembers where a paused reveal left off.
+// behind a resume control - it never rushes ahead); `wake` wakes the wait in flight, which then stops (Stop,
+// a restart, a stale script) or works its time out again (a change of speed); `stopSounding` stops every
+// line still sounding. `resumeState` remembers where a paused reveal left off.
 let stopRequested = false;
-let skipFire: (() => void) | null = null;
+let wake: (() => void) | null = null;
 let resumeState: { batch: PlayBatch; gen: number; nextIdx: number } | null = null;
 
 function setAudio(on: boolean): void {
@@ -79,7 +80,7 @@ function setContinue(on: boolean): void {
   // Turning Continue OFF while a paced run is in flight (the Stop control is up) pauses it at the current
   // line - otherwise the reveal keeps auto-advancing, ignoring the toggle. If we're paused mid-reveal, or on
   // an idle Step row, re-label the control to the new mode instead.
-  if (!on && controlsEl.querySelector(".play-stop")) { stopRequested = true; skipFire?.(); stopSounding(); }
+  if (!on && controlsEl.querySelector(".play-stop")) { stopRequested = true; wake?.(); stopSounding(); }
   else if (controlsEl.querySelector(".presume") && resumeState) showResume(resumeState.batch, resumeState.gen, resumeState.nextIdx);
   else if (controlsEl.querySelector(".padv-row")) showAdvance();
 }
@@ -105,20 +106,28 @@ ccEl.addEventListener("click", () => { reflectCaptions(!captionsOn); void play.s
 // the shape of the scene. Instant reveals a played-through run at once, with no audio. Stored under the key
 // and values the playable HTML export reads too. The old reading paces (slow, fast) map across when read,
 // but nothing is written back until the writer picks a speed, so an older Patterpad still reads its own.
+// A change mid-run applies at once: the run's clock keeps the time already played and re-times the rest,
+// the wait in flight is worked out again, and the lines still sounding take the new rate.
 let speed: PlaySpeed = readSpeed(localStorage.getItem("patter.playSpeed"));
+/** The paced reveal's clock while one is running. */
+let activeClock: PlayClock | null = null;
 const speedEl = document.getElementById("play-speed") as HTMLSelectElement | null;
 if (speedEl) {
   speedEl.value = speed; // the options are in the markup (index.html and the preview copy), in PLAY_SPEEDS order
   speedEl.addEventListener("change", () => {
     speed = readSpeed(speedEl.value);
     localStorage.setItem("patter.playSpeed", speed);
+    activeClock?.setRate(performance.now(), SPEED_RATE[speed]);
+    for (const s of [...sounding]) s.retime();
+    wake?.();
   });
 }
 
 /** The rate a clip plays at: the speed's, except under Instant, where only Step sounds a clip (at its own pace). */
 const clipRate = (): number => (speed === "instant" ? 1 : SPEED_RATE[speed]);
 
-/** A line's recording, loaded far enough to know its length. */
+/** A line's recording, loaded far enough to know its length. `duration` is NaN or Infinity when the file
+ *  doesn't say: it still plays, and the line is timed by the estimate (`lineLength`). */
 interface Clip { audio: HTMLAudioElement; url: string; duration: number }
 
 /** Load a line's recording (Audio Folders mode), or null when there's no file for it or it won't load. */
@@ -129,17 +138,21 @@ async function loadClip(beatId: string): Promise<Clip | null> {
   const url = URL.createObjectURL(new Blob([data.bytes as BlobPart], { type: data.mime }));
   const audio = new Audio(url);
   audio.preload = "auto";
-  const duration = await new Promise<number>((res) => {
+  const duration = await new Promise<number | null>((res) => {
     audio.onloadedmetadata = () => res(audio.duration);
-    audio.onerror = () => res(Number.NaN);
+    audio.onerror = () => res(null);
   });
-  if (!Number.isFinite(duration)) { URL.revokeObjectURL(url); return null; }
+  if (duration === null) { URL.revokeObjectURL(url); return null; } // it won't load: nothing to play
   return { audio, url, duration };
 }
 
-/** Everything sounding now (a clip, or a line held for its length): Stop and a restart end them all. */
-const sounding = new Set<() => void>();
-function stopSounding(): void { for (const stop of [...sounding]) stop(); }
+/** Something sounding now (a clip, or a line held for its length): Stop and a restart end them all, and a
+ *  change of speed re-times them. */
+interface Sounding { stop(): void; retime(): void }
+const sounding = new Set<Sounding>();
+/** Bumped by `stopSounding`, so a Step clip still loading when everything was stopped never starts. */
+let soundGen = 0;
+function stopSounding(): void { soundGen++; for (const s of [...sounding]) s.stop(); }
 
 /** Play a loaded clip without waiting for it. While it sounds, `lineEl` (the transcript line) pulses via
  *  `.pline-playing`, so overlapping lines both show. */
@@ -147,43 +160,70 @@ function playLoaded(clip: Clip, lineEl: HTMLElement): void {
   let over = false;
   const done = (): void => {
     if (over) return;
-    over = true; sounding.delete(stop);
+    over = true; sounding.delete(entry);
     lineEl.classList.remove("pline-playing");
     URL.revokeObjectURL(clip.url);
   };
-  const stop = (): void => { clip.audio.pause(); done(); };
-  sounding.add(stop);
+  const entry: Sounding = {
+    stop: () => { clip.audio.pause(); done(); },
+    retime: () => { clip.audio.playbackRate = clipRate(); }, // the pitch is kept (the element's default)
+  };
+  sounding.add(entry);
   lineEl.classList.add("pline-playing");
-  clip.audio.playbackRate = clipRate(); // the pitch is kept (the element's default)
+  entry.retime();
   clip.audio.onended = done;
   clip.audio.onerror = done;
   void clip.audio.play().catch(done);
 }
 
-/** Mark a line as playing for `ms` with no audio, so a cut-in still shows against the line it cuts into. */
-function holdLine(lineEl: HTMLElement, ms: number): void {
-  if (ms <= 0) return;
+/** Mark a line as playing for `seconds` of script time with no audio, so a cut-in still shows against the
+ *  line it cuts into. It keeps its own clock, so a change of speed re-times what's left of it. */
+function holdLine(lineEl: HTMLElement, seconds: number): void {
+  if (seconds <= 0 || speed === "instant") return;
+  const clock = new PlayClock(performance.now(), SPEED_RATE[speed]);
+  let t: ReturnType<typeof setTimeout> | undefined;
+  const entry: Sounding = {
+    stop: () => { clearTimeout(t); sounding.delete(entry); lineEl.classList.remove("pline-playing"); },
+    retime: () => {
+      clearTimeout(t);
+      clock.setRate(performance.now(), SPEED_RATE[speed]);
+      const ms = clock.at(seconds) - performance.now();
+      if (ms <= 0) entry.stop(); else t = setTimeout(entry.stop, ms);
+    },
+  };
+  sounding.add(entry);
   lineEl.classList.add("pline-playing");
-  const stop = (): void => { clearTimeout(t); sounding.delete(stop); lineEl.classList.remove("pline-playing"); };
-  const t = setTimeout(stop, ms);
-  sounding.add(stop);
+  entry.retime();
 }
 
-/** Step: fire a line's clip if audio is on, without waiting (Step has no timing). */
+/** Step: fire a line's clip if audio is on, without waiting (Step has no timing). A clip that finishes
+ *  loading after a restart, or after Stop silenced everything, is dropped. */
 function soundOnStep(step: PlayStep, lineEl: HTMLElement): void {
   if (!audioOn || step.kind !== "line") return;
-  void loadClip(step.id).then((clip) => { if (clip) playLoaded(clip, lineEl); });
+  const gen = runGen, sound = soundGen;
+  void loadClip(step.id).then((clip) => {
+    if (!clip) return;
+    if (gen !== runGen || sound !== soundGen) { URL.revokeObjectURL(clip.url); return; }
+    playLoaded(clip, lineEl);
+  });
 }
 
-/** Wait until `at` (a performance.now() time), or until Stop cuts it short (via `skipFire`). Only one wait
- *  is ever in flight at a time. */
-function waitUntil(at: number): Promise<void> {
-  const ms = at - performance.now();
-  if (ms <= 0) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const t = setTimeout(resolve, ms);
-    skipFire = () => { clearTimeout(t); resolve(); };
-  });
+/** Wait until script time `seconds` comes on `clock`. Woken (via `wake`), it works the time out again, so
+ *  a change of speed re-times it; it returns early once the run is superseded or Stop is pressed. Only one
+ *  wait is ever in flight at a time. */
+async function waitFor(clock: PlayClock, seconds: number, gen: number): Promise<void> {
+  for (;;) {
+    if (gen !== runGen || stopRequested) return;
+    const ms = clock.at(seconds) - performance.now();
+    if (ms <= 0) return;
+    let mine: (() => void) | null = null;
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, ms);
+      mine = () => { clearTimeout(t); resolve(); };
+      wake = mine;
+    });
+    if (wake === mine) wake = null;
+  }
 }
 
 /** A control button. `icon` is a LEADING drawn icon from the family's vocabulary (a text button never
@@ -266,7 +306,7 @@ function scrollToEnd(): void {
  *  clip / delay). The un-played beats stay queued behind a resume control (showResume) - it does NOT rush
  *  ahead through the rest. */
 function showStop(): void {
-  controlsEl.replaceChildren(button("Stop", "play-stop", () => { stopRequested = true; skipFire?.(); stopSounding(); }));
+  controlsEl.replaceChildren(button("Stop", "play-stop", () => { stopRequested = true; wake?.(); stopSounding(); }));
 }
 
 function showAdvance(): void {
@@ -306,6 +346,7 @@ function showEnd(error?: string): void {
 function showStale(): void {
   trayShown = false;
   runGen++; // freeze any in-flight table-read - the script changed underneath it
+  wake?.(); stopSounding(); // and end its wait in flight and the lines still sounding
   // The shell's banner, which carries its own Restart. A BAR rather than the centred grey note this
   // used to draw, because the session is frozen until you act and a note that reads like the end of a
   // passage does not say so. Everything else this function does is unchanged.
@@ -340,40 +381,48 @@ async function advance(pending: Promise<PlayBatch>, paced = false): Promise<void
 
 /** Reveal a paced (Continue) batch from `startIdx`, on the timeline of timing.ts: each line lasts as long as
  *  its recording (whether or not audio is on) or the duration estimate, and the next starts its `padAfter`
- *  later, so a negative pause brings it in before the last one ends (their clips overlap). The batch's
- *  controls appear when the last line still playing ends. Stop pauses before the next beat - the un-played
- *  rest waits behind a resume control (showResume) rather than rushing through. */
+ *  later, so a negative pause brings it in before the last one ends (their clips overlap). The choices
+ *  appear as the last line starts (they show while it plays); the end when every line still playing has
+ *  ended. Stop pauses before the next beat - the un-played rest waits behind a resume control (showResume)
+ *  rather than rushing through. */
 async function revealFrom(batch: PlayBatch, gen: number, startIdx: number): Promise<void> {
   stopRequested = false;
   showStop();
   const timeline = new Timeline(); // the first beat starts at once: nothing before it carries a pause
-  const t0 = performance.now();
-  const at = (seconds: number): number => t0 + toMs(seconds, speed);
+  const clock = new PlayClock(performance.now(), SPEED_RATE[speed]); // re-anchored by a change of speed
+  activeClock = clock;
   for (let i = startIdx; i < batch.steps.length; i++) {
     if (gen !== runGen) return;
     const s = batch.steps[i]!;
     // Load the recording while waiting for the beat's turn: its length is what times the next one.
     const pending = s.kind === "line" && speed !== "instant" ? loadClip(s.id) : Promise.resolve(null);
-    await waitUntil(at(timeline.startOf(s)));
+    const start = timeline.startOf(s);
+    await waitFor(clock, start, gen);
     const clip = await pending;
     if (gen !== runGen || stopRequested) {
       if (clip) URL.revokeObjectURL(clip.url);
       if (gen === runGen) { stopRequested = false; showResume(batch, gen, i); } // paused: queue the rest
       return;
     }
-    const length = s.kind === "gameEvent" ? 0 : clip?.duration ?? estimateDuration(s.text);
+    // A recording that loaded after the beat's turn starts it late: the rest of the run moves on by as
+    // much, so no overlap appears that nobody set.
+    clock.delay(performance.now() - clock.at(start));
+    const length = s.kind === "gameEvent" ? 0 : lineLength(clip?.duration, estimateDuration(s.text));
     timeline.place(s, length);
     const el = appendStep(s); play.mark(s.id, s.scene); scrollToEnd();
     if (clip && audioOn) playLoaded(clip, el);
     else {
       if (clip) URL.revokeObjectURL(clip.url);
-      holdLine(el, toMs(length, speed));
+      holdLine(el, length);
     }
   }
-  await waitUntil(at(timeline.end)); // the last line's own pause is ignored: nothing follows it here
+  // The last line's own pause is ignored: the choices come as it starts, the end as the last line still
+  // playing ends.
+  await waitFor(clock, batch.stop === "choice" ? timeline.choicesAt : timeline.end, gen);
   if (gen !== runGen) return;
+  if (activeClock === clock) activeClock = null;
   stopRequested = false;
-  skipFire = null;
+  wake = null;
   showTerminal(batch);
 }
 
@@ -419,13 +468,15 @@ function showTerminal(batch: PlayBatch): void {
 const firstAdvance = (): Promise<PlayBatch> => (continueMode ? play.toStop() : play.step());
 
 async function chooseThen(optionId: string): Promise<void> {
+  const gen = runGen; // a restart while the pick lands has begun its own run: don't advance that one too
   await play.choose(optionId);
+  if (gen !== runGen) return;
   await advance(firstAdvance(), continueMode); // advance immediately on the pick - don't wait for another Advance
 }
 
 async function startRun(): Promise<void> {
   const gen = ++runGen; // cancel any in-flight table-read from the previous run
-  stopRequested = false; skipFire?.(); stopSounding(); resumeState = null; // stop any sounding clip / pending wait / paused reveal
+  stopRequested = false; wake?.(); stopSounding(); resumeState = null; // stop any sounding clip / pending wait / paused reveal
   transcriptEl.replaceChildren();
   play.resetMarks();
   await play.start();

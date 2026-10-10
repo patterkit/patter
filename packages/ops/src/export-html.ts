@@ -11,7 +11,9 @@
 
 import { canonicalStringify } from "@patterkit/core";
 import { runExportFull } from "./export.js";
+import { DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { PLAYABLE_RUNTIME_JS, PLAYABLE_TIMING_JS } from "./playable-runtime.js";
+import { createTimeline, createClock } from "./play-timeline.js";
 import type { LoadedProject } from "./load.js";
 
 const esc = (s: string): string => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
@@ -38,35 +40,44 @@ const PLAYER_JS = String.raw`
   // Pacing (line padding): a source-only reader carries no audio, so each line is timed by the estimate
   // Patterstage uses for a line with no recording (game-subtitles' estimateDuration), and the step's padAfter
   // says when the next one starts: after a pause, at once, or cutting in before this one ends. The player
-  // rules: the first line starts at once, as does the reply to a choice; the line before a choice keeps no
-  // pause (its options appear while it plays), nor does the last line (the end comes as it ends); a cut-in
-  // never starts before the line it cuts into; and a game event is never held here, so it's done at once.
-  // Every line fades in (see CSS). The Speed control scales the whole timing (half, normal, or double speed)
-  // or drops it (instant). It is stored under the key Patterpad's Play window uses, so the two keep one
-  // choice; the old reading paces carry over (slow is half speed, fast is double).
+  // rules are play-timeline.ts's, inlined below by their source: the first line starts at once, as does the
+  // reply to a choice; a cut-in never starts before the line it cuts into; a game event is never held here,
+  // so it's done at once; the choices appear as the last line before them starts (while it plays); and the
+  // end comes when every line still playing has finished. Every line fades in (see CSS).
+  // The Speed control scales the whole timing (half, normal, or double speed) or drops it (instant), from
+  // the moment it's changed: the clock keeps the time already played and re-times only what's to come. It
+  // is stored under the key Patterpad's Play window uses, so the two keep one choice; the old reading paces
+  // carry over (slow is half speed, fast is double).
   // A run token cancels an in-flight wait the moment the player restarts, loads, or picks a choice.
-  var SPEED_SCALE = { half: 2, normal: 1, double: 0.5, instant: 0 }, OLD_SPEED = { slow: "half", fast: "double" }, runToken = 0;
+  var createTimeline = (${createTimeline.toString()});
+  var createClock = (${createClock.toString()});
+  var DEFAULT_PAD = ${DEFAULT_PAD_AFTER}; // the built-in pause, for a bundle from before padding
+  var SPEED_RATE = { half: 0.5, normal: 1, double: 2, instant: Infinity }, OLD_SPEED = { slow: "half", fast: "double" }, runToken = 0;
   function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
   var speedKey = (function () { try { return localStorage.getItem("patter.playSpeed") || "normal"; } catch (e) { return "normal"; } })();
   if (own(OLD_SPEED, speedKey)) speedKey = OLD_SPEED[speedKey];
-  if (!own(SPEED_SCALE, speedKey)) speedKey = "normal";
+  if (!own(SPEED_RATE, speedKey)) speedKey = "normal";
   var estimate = window.GameSubtitles.estimateDuration;
-  // How long after a line or text step starts the step after it starts, in ms, given what that step is.
-  function gapAfter(s, next) {
-    var scale = SPEED_SCALE[speedKey];
-    if (!scale) return 0; // "Instant": no waits
-    var length = estimate(s.text);
-    var pad = typeof s.padAfter === "number" ? s.padAfter : 0.6; // the built-in, for a bundle from before padding
-    var secs = next.type === "choice" ? 0 // the options appear while the line plays
-      : next.type === "line" || next.type === "text" ? Math.max(0, length + pad) // never before this line starts
-      : length; // the end: the line plays out, its pause unused
-    return Math.round(secs * scale * 1000);
+  var clock = null, wake = null; // the run's clock, and a hook that re-times the wait in flight
+  // Call then() when script time "at" comes on the run's clock. A change of speed wakes the wait, which
+  // works out the time again; a superseded run's wait just stops.
+  function waitUntil(at, token, then) {
+    if (token !== runToken) return;
+    var ms = clock.at(at) - Date.now();
+    if (ms <= 0) { wake = null; then(); return; }
+    var t = setTimeout(function () { waitUntil(at, token, then); }, ms);
+    wake = function () { clearTimeout(t); waitUntil(at, token, then); };
   }
   function scrollDown() { window.scrollTo(0, document.body.scrollHeight); }
   var speedSel = document.getElementById("speed");
   if (speedSel) {
-    speedSel.value = speedKey; // gapAfter() reads speedKey each line, so a change applies from the next line
-    speedSel.onchange = function () { speedKey = speedSel.value; try { localStorage.setItem("patter.playSpeed", speedKey); } catch (e) {} };
+    speedSel.value = speedKey;
+    speedSel.onchange = function () {
+      speedKey = speedSel.value;
+      try { localStorage.setItem("patter.playSpeed", speedKey); } catch (e) {}
+      if (clock) clock.setRate(Date.now(), SPEED_RATE[speedKey]);
+      if (wake) wake();
+    };
   }
 
   function build() { engine = new Engine(BUNDLE); flow = engine.openFlow("main", { scene: startScene }); }
@@ -87,11 +98,19 @@ const PLAYER_JS = String.raw`
   function run() {
     controls.innerHTML = "";
     var token = ++runToken;
-    (function show(s) {
-      if (token !== runToken) return; // superseded by a restart / load / choice pick
+    var timeline = createTimeline(DEFAULT_PAD);
+    clock = createClock(Date.now(), SPEED_RATE[speedKey]);
+    // A step read ahead appears when its time comes: a line or text when its pause is over, the choices
+    // as the last line starts, the end as the last line still playing ends.
+    function next(s) {
+      var at = !s || s.type === "end" ? timeline.endAt() : s.type === "choice" ? timeline.choicesAt() : timeline.startOf();
+      waitUntil(at, token, function () { show(s); });
+    }
+    function show(s) {
       resumeSave = null; // what's shown is where the engine is
       if (!s || s.type === "end") { add("end", "The End"); return; } // no step is defensive: never hard-crash
       if (s.type === "choice") { renderChoice(s); return; }
+      timeline.place(s, estimate(s.text));
       if (s.type === "line") {
         var who = s.characterName || s.character || "";
         // A speaker qualifier follows the name, as the script's cue has it: TAM (O.S.).
@@ -103,9 +122,9 @@ const PLAYER_JS = String.raw`
         add("text", esc(s.text));
       }
       scrollDown();
-      var next = readNext();
-      setTimeout(function () { show(next); }, gapAfter(s, next || { type: "end" }));
-    })(readNext()); // the first line (or the reply to a choice) starts at once
+      next(readNext());
+    }
+    next(readNext()); // the first line (or the reply to a choice) starts at once
   }
 
   function renderChoice(step) {

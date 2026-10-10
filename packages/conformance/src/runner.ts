@@ -267,6 +267,12 @@ export function envelopeKeyPaths(env: SaveEnvelope): string[] {
   return out.sort();
 }
 
+/** A pause as a transcript records it. A step that should carry one and doesn't records a marker rather than
+ *  nothing, so a runtime that drops the field fails even where the expected pause is the built-in default. */
+function padField(v: unknown): number {
+  return (typeof v === "number" ? v : "<missing>") as number;
+}
+
 /** Normalise a StepResult, keeping the fields the contract pins (drops undefined). */
 export function normaliseStep(r: StepResult): TranscriptStep {
   switch (r.type) {
@@ -277,14 +283,14 @@ export function normaliseStep(r: StepResult): TranscriptStep {
       if (r.direction !== undefined) s.direction = r.direction;
       if (r.qualifier !== undefined) s.qualifier = r.qualifier;             // speaker qualifier gameId
       if (r.qualifierName !== undefined) s.qualifierName = r.qualifierName; // and its locale-resolved name
-      if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = r.padAfter;          // line padding, when not the default
+      if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);          // line padding, when not the default
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
       return s;
     }
     case "text": {
       const s: TranscriptStep = { type: "text", id: r.id, text: r.text };
-      if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = r.padAfter;
+      if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.tags !== undefined) s.tags = r.tags;
       return s;
@@ -306,6 +312,7 @@ export function normaliseStep(r: StepResult): TranscriptStep {
           if (o.prompt.direction !== undefined) p.direction = o.prompt.direction;
           if (o.prompt.qualifier !== undefined) p.qualifier = o.prompt.qualifier;
           if (o.prompt.qualifierName !== undefined) p.qualifierName = o.prompt.qualifierName;
+          if (o.prompt.padAfter !== DEFAULT_PAD_AFTER) p.padAfter = padField(o.prompt.padAfter);
           opt.prompt = p;
         }
         if (o.gameData !== undefined) opt.gameData = o.gameData;

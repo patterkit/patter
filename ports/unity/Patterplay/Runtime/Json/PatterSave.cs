@@ -172,6 +172,7 @@ namespace Patterkit.Patterplay
             if (prompt.Direction != null) p["direction"] = prompt.Direction;
             if (prompt.Qualifier != null) p["qualifier"] = prompt.Qualifier;
             if (prompt.QualifierName != null) p["qualifierName"] = prompt.QualifierName;
+            if (prompt.PadAfter != null) p["padAfter"] = prompt.PadAfter.Value; // line padding; absent in an older save
             return p;
         }
 
@@ -180,6 +181,7 @@ namespace Patterkit.Patterplay
             Kind = StrOrNull(p, "kind"), Text = StrOrNull(p, "text"), Character = StrOrNull(p, "character"),
             CharacterName = StrOrNull(p, "characterName"), Direction = StrOrNull(p, "direction"),
             Qualifier = StrOrNull(p, "qualifier"), QualifierName = StrOrNull(p, "qualifierName"),
+            PadAfter = NumOrNull(p, "padAfter"), // absent in a save written before prompts carried it: re-resolved on load
         };
 
         private static JObject OptionToken(ChoiceOption o)
@@ -252,6 +254,15 @@ namespace Patterkit.Patterplay
         {
             var t = Get(o, key);
             return t == null || t.Type == JTokenType.Null ? null : (string)t;
+        }
+
+        // A finite number, or null when the key is absent or holds anything else.
+        private static double? NumOrNull(JObject o, string key)
+        {
+            var t = Get(o, key);
+            if (t == null || (t.Type != JTokenType.Integer && t.Type != JTokenType.Float)) return null;
+            double v = (double)t;
+            return double.IsNaN(v) || double.IsInfinity(v) ? (double?)null : v;
         }
 
         private static SaveGame ReadSave(JObject o)

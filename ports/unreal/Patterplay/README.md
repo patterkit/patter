@@ -52,8 +52,8 @@ your code to switch on, and `QualifierName` its shown name (`O.S.`), so a dialog
 A line or text step also carries `PadAfter`, the pause after it in seconds, before the next line: the
 line's own, else the nearest default above it (its snippet, groups, block, scene, then the project's),
 else the built-in 0.6. A negative value starts the next line that long before this one ends (a cut-in);
-a snippet's last line is never negative. The step only reports the pause: timing the lines is your
-player's job.
+only a snippet's last line is never negative (a negative pause before a game event stands). An option's
+`Prompt` carries its pause too, as `PadAfter`, for a game that voices the prompts itself. When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects.
 
 The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint** (with `FPatterStep`
 and `FPatterOption` as Blueprint structs), so a designer can drive the flow and bind steps to

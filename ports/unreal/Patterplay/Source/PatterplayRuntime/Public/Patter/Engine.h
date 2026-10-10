@@ -1187,6 +1187,14 @@ namespace patter
                     if (it == host_->nodeIndex.end()) continue;
                     byId[o.id] = it->second;
                     options.push_back(o);
+                    // A save from before prompts carried their pause has none: work it out again from the
+                    // prompt's beat.
+                    ChoiceOption& added = options.back();
+                    if (added.prompt && !added.prompt->hasPadAfter)
+                    {
+                        added.prompt = std::make_shared<ChoicePrompt>(*added.prompt);
+                        added.prompt->hasPadAfter = true; added.prompt->padAfter = promptPadOf(it->second);
+                    }
                 }
                 if (!options.empty()) { hasPendingChoice_ = true; pendingGroupId_ = snap.pendingGroupId; pendingOptions_ = options; pendingById_ = byId; }
             }
@@ -1205,7 +1213,11 @@ namespace patter
                 if (it != host_->nodeIndex.end()) pendingPromptBeat_ = authoredPromptOf(it->second);
             }
             if (!pendingPromptBeat_) pendingPromptOwnerId_.clear();
-            else if (snap.pendingPrompt) pendingPromptShown_ = std::make_shared<ChoicePrompt>(*snap.pendingPrompt);
+            else if (snap.pendingPrompt)
+            {
+                pendingPromptShown_ = std::make_shared<ChoicePrompt>(*snap.pendingPrompt);
+                if (!pendingPromptShown_->hasPadAfter) { pendingPromptShown_->hasPadAfter = true; pendingPromptShown_->padAfter = padOf(pendingPromptBeat_->id); }
+            }
         }
 
         /** Inside a checkpoint, the first change to this flow records its cursor and PRNG, so a rollback
@@ -1979,6 +1991,7 @@ namespace patter
                 std::string qn; if (resolveQualifierName(*beat, qn)) { p->hasQualifierName = true; p->qualifierName = qn; }
             }
             else { p->kind = "text"; p->text = text; }
+            p->hasPadAfter = true; p->padAfter = padOf(beat->id);
             return p;
         }
         // An option's AUTHORED prompt beat: an Option group's own prompt. The only prompt a replay speaks.
@@ -2002,6 +2015,13 @@ namespace patter
             if (shown.hasQualifier) { r.hasQualifier = true; r.qualifier = shown.qualifier; }
             if (shown.hasQualifierName) { r.hasQualifierName = true; r.qualifierName = shown.qualifierName; }
             return r;
+        }
+        // The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first
+        // content line), for a saved option that predates prompts carrying one.
+        double promptPadOf(const Node* node)
+        {
+            const Beat* beat = promptBeatOf(node);
+            return beat ? padOf(beat->id) : DEFAULT_PAD_AFTER;
         }
         const Beat* promptBeatOf(const Node* node)
         {
@@ -2133,7 +2153,8 @@ namespace patter
             auto ds = allStrings.find(bundle.locales.defaultLocale); if (ds != allStrings.end()) host_.defaultStrings = &ds->second;
 
             for (const auto& c : bundle.cast) if (!c.displayName.empty()) host_.castDisplay[c.name] = c.displayName;
-            for (const auto& q : bundle.qualifiers) if (!q.gameId.empty()) host_.qualifierDisplay[q.gameId] = q.name;
+            // A nameless qualifier gives no shown name of its own (a locale string still can), as the reference.
+            for (const auto& q : bundle.qualifiers) if (!q.gameId.empty() && q.hasName) host_.qualifierDisplay[q.gameId] = q.name;
             defaultSeed_ = options.hasSeed ? Mulberry32::ToUint32(options.seed) : 0x9e3779b9u;
 
             for (const auto& kv : bundle.scenes)
@@ -3042,9 +3063,11 @@ namespace patter
         }
         // Line padding (design/proposals/line-padding.md): record each line and text beat's pause, its own
         // `padAfter` else the nearest `padAfterDefault` above it (snippet, then each group innermost first; the
-        // caller passes the block's, scene's, or project's). A snippet's last line or text beat, and one followed
-        // by a game event, is clamped to zero or more: it can't cut in across the seam or the event. An option's
-        // prompt is the head of its option's run: it resolves through the option and is never clamped.
+        // caller passes the block's, scene's, or project's). A snippet's last line or text beat is clamped to
+        // zero or more: what follows the seam isn't certain, so nothing can cut in on it. A negative pause before
+        // a game event stands (the event starts as the line ends), and a game event doesn't count as a snippet's
+        // last line. An option's prompt is the head of its option's run: it resolves through the option and is
+        // never clamped.
         void setPad(const Beat& beat, double inherited, bool clamp)
         {
             BeatPad pad;
@@ -3065,14 +3088,11 @@ namespace patter
                     indexPads(n->children, def);
                     continue;
                 }
-                // A pause can be negative only when the very next beat is a line or text beat: a snippet's last
-                // one (the seam) and one followed by a game event (a cut-in can't cross it) are clamped.
+                // Only the snippet's last line or text beat (game events don't count) is clamped.
+                std::size_t last = n->beats.size();
+                for (std::size_t i = 0; i < n->beats.size(); ++i) if (spoken(n->beats[i])) last = i;
                 for (std::size_t i = 0; i < n->beats.size(); ++i)
-                {
-                    if (!spoken(n->beats[i])) continue;
-                    const bool nextSpoken = i + 1 < n->beats.size() && spoken(n->beats[i + 1]);
-                    setPad(n->beats[i], def, !nextSpoken);
-                }
+                    if (spoken(n->beats[i])) setPad(n->beats[i], def, i == last);
             }
         }
     };

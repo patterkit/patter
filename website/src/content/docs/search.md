@@ -19,7 +19,7 @@ and the **pin** button keeps it on top. Close it with **✕** or **Escape**.
 
 <figure class="doc-shot">
   <img src="/doc-images/SearchWindow.png" alt="The floating search window over a dimmed editor: tabs for Text, Replace, Writing, Recording, Property and Tags, a query box holding choice, and a ranked list of Beat and Block results each showing its scene path and internal id." />
-  <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Tags; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
+  <figcaption>The floating search window. Tabs across the top switch modes, Text, Replace, Writing, Recording, Property, Tags, Qualifier, and Suggestions; each result shows its kind, its scene path, and its internal id, so a match is never ambiguous. <code>↑ / ↓</code> move, <code>Enter</code> jumps, and you can drag the bar to reposition the window.</figcaption>
 </figure>
 
 Type in the box and matches appear instantly. Search covers **dialogue and narration**, the words your
@@ -59,7 +59,7 @@ before the replace runs, and reloads with the new text afterward.
 ## Browsing by writing status
 
 The **Writing** tab finds lines by how finished they are. Open it from the tab, or jump straight in
-with **Review ▸ Find Lines by Status…** (**⌘⇧L** / **Ctrl-Shift-L**).
+with **Review ▸ Find Lines by Writing Status…** (**⌘⇧L** / **Ctrl-Shift-L**).
 
 Pick a **status chip**, one per stage of your [writing-status ladder](/writing-status/), each
 with its own colour, and the window lists every line at that stage across the project (a line with no
@@ -77,7 +77,7 @@ If your project is [**Voiced** and tracks audio status](/production/audio/#recor
 **Recording** tab appears alongside Writing. It works the same way: pick a recording stage (missing,
 scratch, recorded, final, or your own) and it lists every spoken line at that stage, so you can pull up
 "everything still **missing** a take" and work through it. The tab stays hidden until both **Voiced**
-and **Track Audio Status?** are on.
+and **Track audio status** are on.
 
 ## Finding where a property is used
 
@@ -98,3 +98,12 @@ list. Open it from the tab or from **Review ▸ Find by Tag…**.
 
 It matches the tag where you actually *applied* it, not the runtime-accumulated set, so a beat only
 shows up under a tag if that beat itself carries it, not because its scene does.
+
+## Browsing by speaker qualifier
+
+The **Qualifier** tab finds lines by their [speaker qualifier](/setup/cast/#speaker-qualifiers). It
+shows a **chip for each of the project's qualifiers** with how many lines carry it; pick one and the
+window lists every line, and every option prompt, with that qualifier, the scene you're in first. Type
+in the box to filter the list, then jump the same way. Open it from the tab or from **Review ▸ Find
+Lines by Qualifier…**. It's the quick way to walk every `(V.O.)` thought in the game, or check each
+`RADIO` line before it goes to the studio.

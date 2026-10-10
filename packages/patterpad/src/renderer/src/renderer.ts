@@ -94,7 +94,7 @@ import "@wildwinter/app-shell/comments.css"; // a shared module carries its own 
 import { openSuggestionCompose, openSuggestionReview, type SuggestionRow } from "./suggestion-popover.js";
 import type { PropertyDecl, DocLine, Comment, Suggestion } from "@patterkit/model";
 import { DEFAULT_DOCUMENTATION_CLASSES, DEFAULT_PAD_AFTER, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
-import { openValuePicker } from "./value-picker.js";
+import { openValuePicker, qualifierRows } from "./value-picker.js";
 import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt } from "../../shared/api.js";
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
@@ -1097,13 +1097,12 @@ async function applyCurrentFix(): Promise<void> {
     // Surface edit: pick one of the project's qualifiers (or none) for the line, save, re-validate. The
     // line may be in another scene: open it first, as Go to issue would.
     const p = problems[problemAt];
-    const list = project?.qualifiers ?? [];
-    const NONE = "None";
+    const rows = qualifierRows(project?.qualifiers ?? []); // read by row: a qualifier may be named "None"
     openValuePicker({
-      anchor, title: `Instead of “${fix.bad}”`, values: [...list.map((q) => q.name), NONE],
-      onPick: async (name) => {
+      anchor, title: `Instead of “${fix.bad}”`, values: rows.values,
+      onPick: async (_name, index) => {
         if (p?.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
-        const gameId = name === NONE ? "" : (list.find((q) => q.name === name)?.gameId ?? "");
+        const gameId = rows.gameIdAt(index);
         if (surface?.setQualifier(fix.lineId, gameId)) { await save(); await refreshProblems(); }
       },
     });
@@ -1958,6 +1957,7 @@ async function loadSceneNow(sceneId: string, opts?: { restoreCaret?: string }): 
   surface = mountSurface({
     editor: editorEl,
     hintbar: hintbarEl,
+    projectPadAfterDefault: () => project?.padAfterDefault, // so a moved line is pinned to the pause it was playing
     flowSource,
     locSource,
     formatting: project.formatting,

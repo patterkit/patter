@@ -27,7 +27,7 @@ namespace patter { namespace bundlereadercase
   "closedCaptions": { "open": "<", "close": ">", "character": "FX" },
   "locales": { "default": "en", "included": ["en", "fr"] },
   "cast": [{ "name": "ANNA", "displayName": "Anna" }, { "name": "FX" }],
-  "qualifiers": [{ "gameId": "os", "name": "O.S." }, { "gameId": "radio", "name": "RADIO" }],
+  "qualifiers": [{ "gameId": "os", "name": "O.S." }, { "gameId": "radio", "name": "RADIO" }, { "gameId": "vo" }],
   "properties": [
     { "name": "gold", "type": "number", "shared": true, "default": 5 },
     { "name": "mood", "type": "enum", "values": ["calm", "cross"], "default": "calm", "temporary": true },
@@ -87,7 +87,8 @@ namespace patter { namespace bundlereadercase
         expect(b.closedCaptions.present && b.closedCaptions.open == "<" && b.closedCaptions.close == ">" && b.closedCaptions.character == "FX", "closedCaptions");
         expect(b.locales.defaultLocale == "en" && b.locales.included == std::vector<std::string>{"en", "fr"}, "locales");
         expect(b.cast.size() == 2 && b.cast[0].displayName == "Anna" && b.cast[1].name == "FX" && b.cast[1].displayName.empty(), "cast");
-        expect(b.qualifiers.size() == 2 && b.qualifiers[0].gameId == "os" && b.qualifiers[0].name == "O.S." && b.qualifiers[1].gameId == "radio", "qualifiers");
+        expect(b.qualifiers.size() == 3 && b.qualifiers[0].gameId == "os" && b.qualifiers[0].hasName && b.qualifiers[0].name == "O.S." && b.qualifiers[1].gameId == "radio", "qualifiers");
+        expect(b.qualifiers.size() == 3 && b.qualifiers[2].gameId == "vo" && !b.qualifiers[2].hasName, "a nameless qualifier has no name");
 
         expect(b.properties.size() == 4, "properties");
         if (b.properties.size() == 4)

@@ -6,14 +6,23 @@
 //
 // The edits that rebuild a beat decide where its pause goes. The pause belongs to
 // the END of a line, so when one line's words end another's (a merge), the merged
-// line takes the pause of the line whose end it now has; when a line is split, the
-// pause goes with the tail. A snippet split gives the tail bubble the same default,
-// so the lines that move keep their timing.
+// line takes the pause of the line whose end it now has (a blank line has no end
+// to give, so the line it joins keeps its own); when a line is split, the pause
+// goes with the tail. A snippet split gives the tail bubble the same default, so
+// the lines that move keep their timing.
+//
+// When lines come under a different default (a bubble joined or merged into
+// another, a group's default gone with an ungroup), one rule holds. If none of
+// the moved lines sets its own pause, they simply take the new default. If any
+// does, the writer has been timing them, so all of them keep their timing: the
+// own pauses stay, and each line that set none is pinned to the pause it had.
 // ---------------------------------------------------------------------------
 
 import type { Node as PMNode } from "prosemirror-model";
-import type { EditorState, Transaction } from "prosemirror-state";
-import { rawAttr, isZoneBeat } from "./zoneutil.js";
+import { Plugin, PluginKey, type EditorState, type Transaction } from "prosemirror-state";
+import { isHistoryTransaction } from "prosemirror-history";
+import { DEFAULT_PAD_AFTER } from "@patterkit/model";
+import { rawAttr, isZoneBeat, modelIdOf, editsInsideTextblocks, findBeatsByIds } from "./zoneutil.js";
 
 /** A finite number, else undefined (what a hand-edited `raw` may hold instead). */
 const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
@@ -76,11 +85,97 @@ export function endsSnippet(snippet: PMNode, beat: PMNode): boolean {
   return last === beat;
 }
 
-/** Is the line or text beat `beat` followed straight away by a game event in `snippet`? A cut-in can't cross
- *  the event, so the runtime clamps a negative pause there to zero too. */
-export function beforeGameEvent(snippet: PMNode, beat: PMNode): boolean {
-  let found = false;
-  let next: PMNode | null = null;
-  snippet.forEach((b) => { if (found && next === null) next = b; if (b === beat) found = true; });
-  return next !== null && (next as PMNode).type.name === "gameEvent";
+const projectPadKey = new PluginKey<() => number | undefined>("patterProjectPad");
+
+/** Tells the surface's commands the project's default pause (what a beat plays with when nothing in the
+ *  scene sets one), so the pause a moved line is pinned to is the one it really had. Without it they
+ *  take DEFAULT_PAD_AFTER. */
+export function projectPad(get: () => number | undefined): Plugin {
+  return new Plugin({ key: projectPadKey, state: { init: () => get, apply: (_tr, get) => get } });
+}
+
+/** The project's default pause, as the host gives it (projectPad), else DEFAULT_PAD_AFTER. */
+export const projectPadOf = (state: EditorState): number => projectPadKey.getState(state)?.() ?? DEFAULT_PAD_AFTER;
+
+/** The pause the line or text beat at `pos` in `doc` plays with: its own, else the nearest default above
+ *  it, else `project`. A snippet's last line or text beat can't cut in across the seam, so a negative
+ *  pause there is none (the runtime's clamp). Undefined when there's no such beat at `pos`. */
+export function resolvedPadAt(doc: PMNode, pos: number, project: number): number | undefined {
+  const beat = doc.nodeAt(pos);
+  if (!beat || !isZoneBeat(beat)) return undefined;
+  const $pos = doc.resolve(pos);
+  let pad = padOf(beat);
+  for (let d = $pos.depth; pad === undefined && d >= 0; d--) pad = padDefaultOf($pos.node(d));
+  pad ??= project;
+  return pad < 0 && $pos.parent.type.name === "snippet" && endsSnippet($pos.parent, beat) ? 0 : pad;
+}
+
+/** A line about to come under a different default: its id, the pause it plays with now, and whether
+ *  that pause is its own. */
+export interface MovedLine { id: string; before: number; own: boolean }
+
+/** Every line or text beat inside `node` (at `pos` in `doc`), as a MovedLine, in document order. */
+export function linesIn(doc: PMNode, node: PMNode, pos: number, project: number): MovedLine[] {
+  const out: MovedLine[] = [];
+  node.descendants((n, off) => {
+    if (!isZoneBeat(n)) return true;
+    const id = modelIdOf(n);
+    const before = resolvedPadAt(doc, pos + 1 + off, project);
+    if (id && before !== undefined) out.push({ id, before, own: padOf(n) !== undefined });
+    return false;
+  });
+  return out;
+}
+
+/** The rule for lines that moved under a different default, applied in `tr` (see the header): when any
+ *  of `moved` that is still in `tr.doc` sets its own pause, each one that sets none and would now play
+ *  differently is pinned to the pause it had. Lines the edit deleted count for nothing; every change
+ *  keeps each beat's size, so positions hold. */
+export function keepMovedTiming(tr: Transaction, moved: readonly MovedLine[], project: number): void {
+  const now = findBeatsByIds(tr.doc, new Set(moved.map((m) => m.id)));
+  const kept = moved.filter((m) => now.has(m.id));
+  if (!kept.some((m) => m.own)) return; // all inherit: they take the new default
+  for (const m of kept) {
+    const at = now.get(m.id)!;
+    if (m.own || resolvedPadAt(tr.doc, at.pos, project) === m.before) continue;
+    tr.setNodeMarkup(at.pos, undefined, { ...at.node.attrs, raw: rawWithPad(at.node.attrs.raw, m.before) });
+  }
+}
+
+/** Every snippet in `doc` by model id, with its position. */
+function snippetsById(doc: PMNode): Map<string, { node: PMNode; pos: number }> {
+  const out = new Map<string, { node: PMNode; pos: number }>();
+  doc.descendants((node, pos) => {
+    const t = node.type.name;
+    if (t === "snippet") { const id = modelIdOf(node); if (id) out.set(id, { node, pos }); return false; }
+    return t === "doc" || t === "block" || t === "group";
+  });
+  return out;
+}
+
+/**
+ * The same rule for the edits no command of ours builds: a range delete, a cut, or typing over a
+ * selection that runs from one bubble into the next joins the rest of the second bubble's lines onto the
+ * first (ProseMirror's own join). An appended transaction finds a bubble that went while some of its
+ * lines stayed, and keeps their timing. Commands that apply the rule themselves (Join, the merges, and
+ * ungroup) leave nothing for it to do, and undo / redo restore what was there.
+ */
+export function keepTimingOnJoin(): Plugin {
+  return new Plugin({
+    key: new PluginKey("patterKeepTimingOnJoin"),
+    appendTransaction(trs, oldState, newState) {
+      if (!trs.some((t) => t.docChanged) || trs.some(isHistoryTransaction)) return null;
+      if (trs.every((t) => !t.docChanged || editsInsideTextblocks(t))) return null;
+      const after = snippetsById(newState.doc);
+      const project = projectPadOf(newState);
+      const moved: MovedLine[] = [];
+      for (const [id, { node, pos }] of snippetsById(oldState.doc)) {
+        if (!after.has(id)) moved.push(...linesIn(oldState.doc, node, pos, project));
+      }
+      if (!moved.length) return null;
+      const tr = newState.tr;
+      keepMovedTiming(tr, moved, project);
+      return tr.docChanged ? tr : null;
+    },
+  });
 }

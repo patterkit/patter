@@ -138,41 +138,56 @@ const DEFAULT_PAD_AFTER := 0.6
 # Line padding: the pause after a line or text beat, `padAfter`, in seconds. A beat without its own takes
 # the nearest `padAfterDefault` above it (snippet, then each group, innermost first, then block, then
 # scene), else the project's (the bundle root's), else DEFAULT_PAD_AFTER. A snippet's last line or text
-# beat can't cut in on what follows the seam, nor one followed by a game event across the event, so a
-# negative value there is clamped to zero. An option's
-# prompt resolves through the option, and is never clamped (its reply is certain).
+# beat can't be cut in on (what follows the seam isn't certain), so a negative value there is clamped to
+# zero. A negative pause before a game event stands: the event starts as the line ends. An option's prompt
+# resolves through the option, and is never clamped (its reply is certain).
 #
 # The answer depends only on where a beat sits, so it is worked out once into a flat index:
 # beat id -> {"resolved": float, "own": float only when the beat sets one}. Mirrors the JS buildPadIndex.
 static func build_pad_index(bundle: Dictionary) -> Dictionary:
 	var index := {}
-	var project_default := float(bundle.get("padAfterDefault", DEFAULT_PAD_AFTER))
+	var project_default := _pad_or(bundle.get("padAfterDefault"), DEFAULT_PAD_AFTER)
 	var scenes: Dictionary = bundle.get("scenes", {})
 	for sid in scenes:
 		var scene: Dictionary = scenes[sid]
-		var scene_default := float(scene.get("padAfterDefault", project_default))
+		var scene_default := _pad_or(scene.get("padAfterDefault"), project_default)
 		for block in scene.get("blocks", []):
-			var block_default := float(block.get("padAfterDefault", scene_default))
+			var block_default := _pad_or(block.get("padAfterDefault"), scene_default)
 			for child in block.get("children", []):
 				_index_pads(index, child, block_default)
 	return index
 
 
+## A pause value as a bundle holds it: a finite number, else `inherited` (anything else, which validation
+## refuses, inherits). Mirrors the JS num().
+static func _pad_or(v, inherited: float) -> float:
+	return float(v) if _is_pad(v) else inherited
+
+
+static func _is_pad(v) -> bool:
+	var t := typeof(v)
+	if t == TYPE_INT:
+		return true
+	return t == TYPE_FLOAT and is_finite(v)
+
+
 static func _index_pads(index: Dictionary, node: Dictionary, inherited: float) -> void:
-	var def := float(node.get("padAfterDefault", inherited))
+	var def := _pad_or(node.get("padAfterDefault"), inherited)
 	if node.get("type", "") == "group":
 		if node.get("prompt") is Dictionary:
 			_set_pad(index, node["prompt"], def, false)
 		for child in node.get("children", []):
 			_index_pads(index, child, def)
 		return
-	# A pause can be negative only when the very next beat is a line or text beat: a snippet's last one
-	# (the seam) and one followed by a game event (a cut-in can't cross it) are clamped.
+	# Only the snippet's last line or text beat (a game event doesn't count) is clamped: the seam.
 	var beats: Array = node.get("beats", [])
+	var last := -1
 	for i in beats.size():
 		if _spoken(beats[i]):
-			var next_spoken := i + 1 < beats.size() and _spoken(beats[i + 1])
-			_set_pad(index, beats[i], def, not next_spoken)
+			last = i
+	for i in beats.size():
+		if _spoken(beats[i]):
+			_set_pad(index, beats[i], def, i == last)
 
 
 static func _spoken(beat: Dictionary) -> bool:
@@ -181,11 +196,12 @@ static func _spoken(beat: Dictionary) -> bool:
 
 
 static func _set_pad(index: Dictionary, beat: Dictionary, inherited: float, clamp_last: bool) -> void:
-	var own = beat.get("padAfter") if beat.get("kind", "") != "gameEvent" else null
-	var resolved := float(own) if own != null else inherited
+	var raw = beat.get("padAfter") if beat.get("kind", "") != "gameEvent" else null
+	var has_own := _is_pad(raw)
+	var resolved := float(raw) if has_own else inherited
 	if clamp_last and resolved < 0.0:
 		resolved = 0.0
 	var pad := {"resolved": resolved}
-	if own != null:
-		pad["own"] = float(own)
+	if has_own:
+		pad["own"] = float(raw)
 	index[beat["id"]] = pad

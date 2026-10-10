@@ -48,6 +48,8 @@ set): present each option's `prompt["text"]`, greyed when `eligible` is false, a
 and `qualifierName` when set, the same shape every Patterplay runtime gives. A `"line"` step carries
 `qualifier` and `qualifierName` the same way: the line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId`, and its localised shown name.
+A `"line"` or `"text"` step always carries `"padAfter"`, the writer's pause after it in seconds,
+already resolved; the [timing rules](/play/engine/#step-shapes) say how to play it.
 
 `open_flow` returns null, with `push_error`, when the address does not resolve: an unknown scene, or
 a block that is not in the scene you named. Nothing opens, and a flow already open under that name

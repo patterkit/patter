@@ -6866,7 +6866,7 @@
       ]
     },
     {
-      "name": "a step carries its pause: its own, else the nearest default, else the project's; a snippet's last line is never negative",
+      "name": "a step carries its pause: its own, else the nearest default, else the project's; only a snippet's last line is never negative",
       "bundle": {
         "schema": "patter/bundle@0",
         "content": {
@@ -7073,7 +7073,7 @@
           "id": "L_cross",
           "text": "Wait",
           "character": "TAM",
-          "padAfter": 0
+          "padAfter": -0.4
         },
         {
           "type": "gameEvent",
@@ -7268,7 +7268,8 @@
               "prompt": {
                 "kind": "line",
                 "text": "Who's there?",
-                "character": "TAM"
+                "character": "TAM",
+                "padAfter": -0.4
               },
               "eligible": true
             },
@@ -7276,7 +7277,8 @@
               "id": "o_wait",
               "prompt": {
                 "kind": "text",
-                "text": "Wait"
+                "text": "Wait",
+                "padAfter": 3
               },
               "eligible": true
             }
@@ -7302,7 +7304,8 @@
               "id": "o_wait",
               "prompt": {
                 "kind": "text",
-                "text": "Wait"
+                "text": "Wait",
+                "padAfter": 3
               },
               "eligible": true
             }
@@ -18497,7 +18500,8 @@
                       "id": "left",
                       "prompt": {
                         "kind": "text",
-                        "text": "Left"
+                        "text": "Left",
+                        "padAfter": 0.6
                       },
                       "eligible": true
                     },
@@ -18505,7 +18509,8 @@
                       "id": "right",
                       "prompt": {
                         "kind": "text",
-                        "text": "Right"
+                        "text": "Right",
+                        "padAfter": 0.6
                       },
                       "eligible": true
                     }
@@ -18535,12 +18540,14 @@
         "save/flows/main/cursor/pendingChoice/options[0]/id",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[1]",
         "save/flows/main/cursor/pendingChoice/options[1]/eligible",
         "save/flows/main/cursor/pendingChoice/options[1]/id",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
@@ -18799,7 +18806,8 @@
                   "text": "Who's there? I have 3.",
                   "character": "ANNA",
                   "characterName": "Anna",
-                  "direction": "quietly"
+                  "direction": "quietly",
+                  "padAfter": 0.6
                 },
                 "selectors": {
                   "o_ask": {
@@ -18826,6 +18834,7 @@
         "save/flows/main/cursor/pendingPrompt/characterName",
         "save/flows/main/cursor/pendingPrompt/direction",
         "save/flows/main/cursor/pendingPrompt/kind",
+        "save/flows/main/cursor/pendingPrompt/padAfter",
         "save/flows/main/cursor/pendingPrompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
@@ -19332,7 +19341,8 @@
                         "text": "Pa",
                         "character": "ANNA",
                         "characterName": "Anna",
-                        "direction": ""
+                        "direction": "",
+                        "padAfter": 0.6
                       },
                       "eligible": true
                     },
@@ -19342,7 +19352,8 @@
                         "kind": "line",
                         "text": "Pb",
                         "character": "BO",
-                        "characterName": ""
+                        "characterName": "",
+                        "padAfter": 0.6
                       },
                       "eligible": true
                     },
@@ -19351,7 +19362,8 @@
                       "prompt": {
                         "kind": "line",
                         "text": "Pn",
-                        "character": ""
+                        "character": "",
+                        "padAfter": 0.6
                       },
                       "eligible": true
                     }
@@ -19384,6 +19396,7 @@
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/characterName",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/direction",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[1]",
         "save/flows/main/cursor/pendingChoice/options[1]/eligible",
@@ -19392,6 +19405,7 @@
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/character",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/characterName",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[2]",
         "save/flows/main/cursor/pendingChoice/options[2]/eligible",
@@ -19399,6 +19413,7 @@
         "save/flows/main/cursor/pendingChoice/options[2]/prompt",
         "save/flows/main/cursor/pendingChoice/options[2]/prompt/character",
         "save/flows/main/cursor/pendingChoice/options[2]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[2]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[2]/prompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
@@ -19670,7 +19685,8 @@
                         "character": "TAM",
                         "characterName": "Tam",
                         "qualifier": "radio",
-                        "qualifierName": "RADIO"
+                        "qualifierName": "RADIO",
+                        "padAfter": 0.6
                       },
                       "eligible": true
                     }
@@ -19702,6 +19718,7 @@
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/character",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/characterName",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifier",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifierName",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
@@ -20776,7 +20793,7 @@
                       "direction": "warmly",
                       "qualifier": "os",
                       "qualifierName": "O.S.",
-                      "padAfter": 0,
+                      "padAfter": -0.3,
                       "ownPadAfter": -0.3,
                       "text": "Hello.",
                       "gameData": {
@@ -20998,7 +21015,7 @@
             "direction": "warmly",
             "qualifier": "os",
             "qualifierName": "O.S.",
-            "padAfter": 0,
+            "padAfter": -0.3,
             "ownPadAfter": -0.3,
             "text": "Hello.",
             "gameData": {

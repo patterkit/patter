@@ -18,9 +18,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   a merge, the problems bar says so straight away.
 - **Play times a scene the way the game will.** Continue holds each line for the length of its recording,
   or for an estimate of its reading time when there's no recording, then waits its pause. A cut-in line
-  arrives while the one before is still playing, and with audio on you hear the two overlap. Speed is now
-  Half, Normal, Double, or Instant, and speeds up or slows down the whole timing. Step still moves on only
-  when you ask.
+  arrives while the one before is still playing, and with audio on you hear the two overlap. The choices
+  appear as the last line before them starts, while it's still playing, and The End once every line has
+  finished. Speed is now Half, Normal, Double, or Instant, speeds up or slows down the whole timing, and
+  takes effect as soon as you change it. Step still moves on only when you ask.
+- **Publish Playable HTML times a scene the same way.** The page holds each line for an estimate of its
+  reading time, then waits its pause, so a cut-in arrives before the line it cuts into has finished, and
+  its choices and its end come when Play's do. Its Speed control is now Half, Normal, Double, or Instant
+  too.
 
 ## [0.27.0] - 2026-10-10
 
