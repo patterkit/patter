@@ -1,5 +1,19 @@
 # @patterkit/ops
 
+## 0.16.1
+
+### Patch Changes
+
+- b3ecb18: - `@patterkit/model`: `FlowState`, one flow taken out of a game as plain data (its `FlowSnapshot`, a `version`, and its own property values), and `FlowValues`, those values in a version 2 save's per-flow spelling (`scopes` and `sceneBags`). `FlowSnapshotV2` is now `FlowSnapshot` plus `FlowValues`, the same shape as before.
+
+  - `@patterkit/ops`: the runtime inlined in playable HTML exports is refreshed to this one.
+
+- 07e5628: Uses `@patterkit/runtime` 0.24.0, the Patterplay 0.24.0 release.
+- Updated dependencies [b3ecb18]
+  - @patterkit/model@0.13.0
+  - @patterkit/compiler@0.6.1
+  - @patterkit/core@0.6.1
+
 ## 0.16.0
 
 ### Minor Changes
