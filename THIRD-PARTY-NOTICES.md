@@ -30,8 +30,9 @@ A bundle or a compiled binary keeps none of its libraries' licence files, so the
 
 - **Patterpad** writes the licence and copyright notice of every library bundled into each part of the
   app to `out/licences/` (main, preload, renderer), with Patter's own `LICENSE` beside them, and the
-  font licences to `out/fonts/`. Electron's licence and Chromium's notices ship in the app's resources
-  under `licences/electron/`. Libraries left external ship in `node_modules` with their own files.
+  font licences to `out/fonts/`. Electron's licence (`LICENSE.electron.txt`) and Chromium's
+  notices (`LICENSES.chromium.html`) ship in the app's resources, put there by electron-builder
+  (26.16.1 and later; earlier versions dropped them from macOS apps). Libraries left external ship in `node_modules` with their own files.
 - **The standalone `patter` binaries** embed the same for everything compiled into them, and print it
   with `patter licences`.
 
