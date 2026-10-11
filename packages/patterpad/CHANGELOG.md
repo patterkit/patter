@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-10-11
+
 ### Fixed
 
 - **Literata, Source Serif, and Courier come through in every window.** Choosing one under View ▸ Font
