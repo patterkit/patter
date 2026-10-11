@@ -19,6 +19,7 @@ operations you reach for most (see your engine's [guide](/play/overview/) for th
 | Read a step's Game Data | `step.gameData` | `step.GameData` | `Step.GameData` | `step.get("gameData")` |
 | Get / set a property | `flow.getProperty` / `setProperty` | `flow.GetProperty` / `SetProperty` | `Engine->GetPropertyNumber` / `SetPropertyNumber` | `flow.get_property` / `set_property` |
 | Switch language live | `engine.setLocale("fr")` | `engine.SetLocale("fr")` | `Engine->Raw()->setLocale("fr")` | `engine.set_locale("fr")` |
+| Set one flow aside, and bring it back | `engine.captureFlow(id)` / `restoreFlow(id, state)` | `engine.CaptureFlow(id)` / `RestoreFlow(id, state)` | `Engine->CaptureFlow(Name)` / `RestoreFlow(Name, Json)` | `engine.capture_flow(id)` / `restore_flow(id, state)` |
 
 Save/load differs per engine (see each engine guide's *Save and load*).
 
@@ -57,6 +58,32 @@ import { serializeState, deserializeState } from "@patterkit/play-helpers";
 localStorage.setItem("save", serializeState(engine));   // → a JSON string in an envelope
 deserializeState(engine, localStorage.getItem("save"));
 ```
+
+### Taking one flow out
+
+A whole-game save is the usual thing to keep. When a game wants to set one conversation aside instead (a
+bark cut short, or an exchange the player walked away from) and perhaps carry it on later, it can take that
+flow out as data and close it:
+
+```ts
+const held = engine.captureFlow("bob");   // plain data: the flow's place and its own values
+engine.closeFlow("bob");
+// ...later, in this session or after a save and load...
+const flow = engine.restoreFlow("bob-again", held);
+```
+
+`captureFlow(id)` returns the flow's part of a save: its position (a pending choice included), its PRNG, its
+own visit counts and selector cursors, and the values of its own properties (its flow-local `@patter`
+properties, and its own `@scene` values for every scene it has been in). The flow's id isn't in it, so it can
+come back under any id. **Capture before you close**: closing a flow drops its values. Capturing only reads,
+so it works while a checkpoint is open.
+
+`restoreFlow(id, state)` opens a flow under `id` from that data, the way `loadGame` restores each flow.
+Shared state isn't in a captured flow, so restoring one never rewinds anything else: global properties and
+shared scene properties keep whatever other flows did in the meantime. Against an edited bundle it finds its
+place by id, as a load does. It refuses an id that is already open, a state it can't read, and any restore
+while a checkpoint is open, changing nothing. The data is in the same format on every runtime, and your game saves it however
+it likes.
 
 ## One registry per game
 

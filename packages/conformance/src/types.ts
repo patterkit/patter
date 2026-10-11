@@ -165,6 +165,13 @@ export type ScriptOp =
   // asserts directly rather than through the transcript. Every port must agree on all of it.
   | { op: "goto"; scene: string; block?: string; expectResult?: boolean }
   | { op: "saveLoad" }
+  // A flow taken out as data and put back (engine.captureFlow / restoreFlow). `captureFlow` keeps the state
+  // under `into`, sent through JSON to prove it is plain data; `restoreFlow` opens flow `flow` from the state
+  // kept under `from` and makes it current. `expectRefused`: the runtime must refuse the call (an open id, an
+  // open checkpoint) and leave everything as it was.
+  | { op: "captureFlow"; flow: string; into: string }
+  | { op: "closeFlow"; flow: string }
+  | { op: "restoreFlow"; flow: string; from: string; expectRefused?: boolean }
   | { op: "setLocale"; locale: string } // live language switch: re-points the active string table, no state change
   | { op: "setClosedCaptions"; on: boolean } // live caption toggle (#214): strip dialogue cues when off; no state change
   // Live bundle refresh (§9.8 cross-bundle drift): serialise the whole game, construct a fresh engine

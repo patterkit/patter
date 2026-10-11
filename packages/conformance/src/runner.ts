@@ -21,7 +21,7 @@ import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
-import type { Bundle, GameData, SaveEnvelope } from "@patterkit/model";
+import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
 import type {
   AudioCase, LogCase,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
@@ -97,6 +97,7 @@ export function runScript(
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
   let checkpoint: Checkpoint | undefined;
+  const captured = new Map<string, FlowState>(); // captureFlow states, by name, for restoreFlow
   // A call the runtime must refuse: it throws, and the engine is as it was (still inside its checkpoint).
   const refused = (what: string, call: () => unknown): void => {
     const wasIn = engine.inCheckpoint;
@@ -143,6 +144,20 @@ export function runScript(
         if (op.expectResult !== undefined && moved !== op.expectResult) {
           throw new Error(`goto ${op.scene}${op.block === undefined ? "" : `/${op.block}`}: expected ${op.expectResult}, got ${moved}`);
         }
+        break;
+      }
+      case "captureFlow":
+        captured.set(op.into, JSON.parse(JSON.stringify(engine.captureFlow(op.flow))) as FlowState);
+        break;
+      case "closeFlow":
+        engine.closeFlow(op.flow);
+        break;
+      case "restoreFlow": {
+        const state = captured.get(op.from);
+        if (!state) throw new Error(`restoreFlow: nothing captured under '${op.from}'`);
+        if (op.expectRefused) { refused("restoreFlow", () => engine.restoreFlow(op.flow, state)); break; }
+        engine.restoreFlow(op.flow, state);
+        current = op.flow;
         break;
       }
       case "saveLoad": {

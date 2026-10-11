@@ -1898,6 +1898,117 @@ const linePaddingPrompt = {
   ],
 } satisfies RuntimeFixture;
 
+// --- a flow taken out and put back (captureFlow / restoreFlow) ------------------------------------------
+// A captured flow is its save snapshot plus its OWN property values (its @patter locals and its own @scene
+// bag), without its id: closed at once, restored later under another id, it carries on exactly where it was,
+// with its own values, while shared state (here @bell and the scene's shared @scene.tally) keeps whatever the
+// other flows did meanwhile: a restore never rewinds anything but the flow itself. Captured mid-snippet and
+// again at a pending choice. The state goes through JSON between capture and restore.
+const flowStateScenes: Scene[] = [{
+  id: "s", type: "scene", name: "S",
+  sceneProps: [
+    { name: "mine", type: "number", default: 0, shared: false },
+    { name: "tally", type: "number", default: 0, shared: true },
+  ],
+  blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn1", type: "snippet",
+      onEnter: [
+        { kind: "set", target: "@gold", value: "@gold + 5" },
+        { kind: "set", target: "@bell", value: "@bell + 1" },
+        { kind: "set", target: "@scene.mine", value: "@scene.mine + 2" },
+        { kind: "set", target: "@scene.tally", value: "@scene.tally + 1" },
+      ],
+      beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }] },
+    { id: "g", type: "group", selector: "choice", children: [
+      { id: "o1", type: "group", prompt: { id: "P1", kind: "text" }, children: [
+        { id: "o1_c", type: "snippet", beats: [{ id: "T3", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ] }],
+}];
+const flowStateProject = project({ properties: [
+  { name: "gold", type: "number", default: 0, shared: false },
+  { name: "bell", type: "number", default: 0, shared: true },
+] });
+const flowStateLocales = [loc("s", {
+  T1: "One: gold {@gold}", T2: "Two: mine {@scene.mine}, bell {@bell}, tally {@scene.tally}", P1: "Go",
+  T3: "Gold {@gold}, mine {@scene.mine}",
+})];
+const flowStateChoice: TranscriptStep = { type: "choice", groupId: "g", options: [{ id: "o1", prompt: { kind: "text", text: "Go" }, eligible: true }] };
+
+const scriptedFlowState = {
+  name: "a flow captured, closed, and restored under a new id carries on with its own values; shared state isn't rewound",
+  project: flowStateProject,
+  scenes: flowStateScenes,
+  locales: flowStateLocales,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "One: gold 5" }] },
+    { op: "captureFlow", flow: "main", into: "mid" },                       // mid-snippet: gold 5, mine 2
+    { op: "closeFlow", flow: "main" },
+    { op: "openFlow", flow: "other", scene: "s" },                          // another flow moves the shared state on
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "One: gold 5" }] },
+    { op: "restoreFlow", flow: "carried", from: "mid" },                    // a new id
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "Two: mine 2, bell 2, tally 2" }] },
+    { op: "advance", expect: [flowStateChoice] },
+    { op: "captureFlow", flow: "carried", into: "atChoice" },               // at a pending choice
+    { op: "closeFlow", flow: "carried" },
+    { op: "restoreFlow", flow: "again", from: "atChoice" },
+    { op: "advance", expect: [flowStateChoice] },                           // the choice comes back whole
+    { op: "choose", id: "o1" },
+    { op: "advance", expect: [{ type: "text", id: "T3", text: "Gold 5, mine 2" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// What restoreFlow refuses, leaving everything as it was: an id that is open, and an open checkpoint. Capturing
+// only reads, so a checkpoint doesn't stop it.
+const scriptedFlowStateRefusals = {
+  name: "restoreFlow is refused over an open id and inside a checkpoint; captureFlow isn't",
+  project: flowStateProject,
+  scenes: flowStateScenes,
+  locales: flowStateLocales,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "One: gold 5" }] },
+    { op: "captureFlow", flow: "main", into: "mid" },
+    { op: "restoreFlow", flow: "main", from: "mid", expectRefused: true },  // "main" is open
+    { op: "checkpoint" },
+    { op: "restoreFlow", flow: "spare", from: "mid", expectRefused: true }, // a checkpoint is open
+    { op: "captureFlow", flow: "main", into: "inside" },                    // allowed: it only reads
+    { op: "commit" },
+    { op: "closeFlow", flow: "main" },
+    { op: "restoreFlow", flow: "main", from: "inside" },                    // the same id, now free
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "Two: mine 2, bell 1, tally 1" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// Against an edited bundle a restore re-finds its place by id, as a load does: here the line it stopped before
+// was reworded, and a line was inserted before its place, which neither replays nor shifts it.
+const scriptedFlowStateEdited = {
+  name: "a captured flow restored onto an edited bundle re-finds its place by id",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  locales: [loc("s", { T1: "first", T2: "second" })],
+  scenesB: [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "sn0", type: "snippet", beats: [{ id: "T0", kind: "text" }] },
+    { id: "sn", type: "snippet", beats: [{ id: "T1", kind: "text" }, { id: "T2", kind: "text" }], jump: { to: "END" } },
+  ] }] }],
+  localesB: [loc("s", { T0: "inserted", T1: "first", T2: "second, reworded" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "first" }] },
+    { op: "captureFlow", flow: "main", into: "mid" },
+    { op: "closeFlow", flow: "main" },
+    { op: "hotSwap" },                                                      // the game is now on the edited bundle
+    { op: "restoreFlow", flow: "main", from: "mid" },
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "second, reworded" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // ---------------------------------------------------------------------------
 // gameData merge-at-read - a node's sparse override resolved against its TYPE's
 // declared field defaults (runtime effectiveGameData). Not a transcript; a host
@@ -3007,7 +3118,7 @@ export const cases: Fixtures = {
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties,
-    scriptedQualifierSaveLoad],
+    scriptedQualifierSaveLoad, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

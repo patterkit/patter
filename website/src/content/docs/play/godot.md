@@ -201,6 +201,10 @@ written here loads in Unity or Unreal. A save written before property values mov
 before 0.11.0 (its old snake_case shape) still load too, and are written back in the shared shape on
 the next save. [Save/load & Game Data](/play/integration/) covers the format.
 
+To set one flow aside instead, `engine.capture_flow(id)` returns its part of a save as a Dictionary, and
+`engine.restore_flow(new_id, state)` opens it again later (null, with a `push_error`, if it is refused). See
+[Taking one flow out](/play/integration/#taking-one-flow-out).
+
 ## Exporting your game
 
 **Nothing to configure.** From Patterplay 0.4.5 the plugin puts your `.patterc` into the export

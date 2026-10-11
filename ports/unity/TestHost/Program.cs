@@ -102,6 +102,7 @@ namespace Patterkit.Patterplay.TestHost
             RunHostScopeWritableCheck();
             RunOneRegistryChecks();
             RunCheckpointChecks();
+            RunFlowStateChecks();
             RunStaleShuffleCheck();
             RunPendingClearedCheck();
             RunPlayErrorChecks();
@@ -837,6 +838,7 @@ namespace Patterkit.Patterplay.TestHost
         {
             bool ok = true;
             Checkpoint checkpoint = null;
+            var captured = new Dictionary<string, FlowState>(); // captureFlow states, by name, for restoreFlow
                     foreach (var op in script.EnumerateArray())
                     {
                         var chunk = new List<object>();
@@ -925,6 +927,23 @@ namespace Patterkit.Patterplay.TestHost
                                     engine = new Engine(bundle, opts);
                                     engine.LoadGame(blob);
                                 }
+                                break;
+                            }
+                            case "captureFlow":
+                                // Sent through PatterSave's JSON, to prove the state is plain data.
+                                captured[op.GetProperty("into").GetString()] = PatterSave.ReadFlowState(Newtonsoft.Json.Linq.JObject.Parse(
+                                    PatterSave.SaveFlowState(engine.CaptureFlow(op.GetProperty("flow").GetString())).ToString(Newtonsoft.Json.Formatting.None)));
+                                break;
+                            case "closeFlow":
+                                engine.CloseFlow(op.GetProperty("flow").GetString());
+                                break;
+                            case "restoreFlow":
+                            {
+                                string flowId = op.GetProperty("flow").GetString(), from = op.GetProperty("from").GetString();
+                                if (!captured.TryGetValue(from, out var state)) throw new Exception($"restoreFlow: nothing captured under '{from}'");
+                                if (Refused(op)) { ExpectRefused(engine, "restoreFlow", () => engine.RestoreFlow(flowId, state)); break; }
+                                engine.RestoreFlow(flowId, state);
+                                current = flowId;
                                 break;
                             }
                             case "hotSwap":

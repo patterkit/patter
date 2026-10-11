@@ -4,7 +4,9 @@
 # failing condition, a failing effect, a refused read-only @world write and a Best-match part that fails;
 # the decision log gets a `diagnostic` entry for each and no `write` entry for a skipped effect. It also
 # pins the save rules the corpus cannot express: a bare snapshot with no envelope and a save with no
-# flows are refused, and a refused load leaves the engine exactly as it was.
+# flows are refused, and a refused load leaves the engine exactly as it was; and restore_flow's
+# refusals (an open id, an open checkpoint, a version it cannot read, a state with no cursor), which
+# change nothing.
 #
 #   godot --headless --path ports/godot --script res://test/test_play_errors.gd
 extends SceneTree
@@ -77,6 +79,7 @@ func _initialize() -> void:
 	_check_reports(false)
 	_check_default_reporting()
 	_check_save_refusals()
+	_check_flow_state_refusals()
 	print("test_play_errors: ALL PASS" if _fails == 0 else "test_play_errors: %d FAILED" % _fails)
 	quit(1 if _fails > 0 else 0)
 
@@ -198,6 +201,55 @@ func _check_save_refusals() -> void:
 	_expect(PatterSave.load_state(engine, {"schema": PatterSave.SCHEMA, "save": bare_v2}),
 		"a version 2 save inside the envelope still loads")
 	_expect(engine.get_property("@a") == 9.0, "the version 2 save's values reach the registry: " + str(engine.get_property("@a")))
+
+
+## restore_flow refuses an id that is open, an open checkpoint, a version it cannot read, and a state
+## with no cursor, and a refusal changes nothing. capture_flow only reads, so a checkpoint doesn't
+## stop it.
+func _check_flow_state_refusals() -> void:
+	var engine := PatterEngine.new(_bundle(), {"seed": 1})
+	var flow := engine.open_flow("main", "s")
+	_expect(flow.advance().get("text") == "vals", "the flow starts")
+	engine.set_property("@a", 5)
+	var state: Dictionary = engine.capture_flow("main")
+	_expect(not state.is_empty() and int(state.get("version", 0)) == PatterEngine.SAVE_VERSION, "a flow is captured: " + str(state.keys()))
+	_expect(engine.capture_flow("nobody").is_empty(), "a flow that isn't open has nothing to capture")
+	var before: Dictionary = engine.save_game()
+
+	_expect(engine.restore_flow("main", state) == null, "restore_flow is refused over an id that is open")
+	_untouched(engine, flow, "after a restore over its id")
+	_expect(_same(engine.save_game(), before), "a restore over an open id changes nothing")
+
+	var stale: Dictionary = state.duplicate(true)
+	stale["version"] = 4
+	_expect(engine.restore_flow("spare", stale) == null, "flow state version 4 is refused")
+	_expect(engine.get_flow("spare") == null and _same(engine.save_game(), before), "a refused version changes nothing")
+
+	var cp := engine.checkpoint()
+	_expect(engine.restore_flow("spare", state) == null, "restore_flow is refused while a checkpoint is open")
+	_expect(engine.in_checkpoint() and engine.get_flow("spare") == null, "a refused restore leaves the checkpoint open and opens nothing")
+	var inside: Dictionary = engine.capture_flow("main")
+	_expect(_same(inside, state), "capture_flow is allowed while a checkpoint is open, and only reads")
+	engine.commit(cp)
+
+	# A state that won't restore (here, no cursor) is refused before anything changes, so it leaves
+	# nothing behind: no flow under the id, and no values in the registry.
+	engine.close_flow("main")
+	var closed: Dictionary = engine.save_game()
+	var broken: Dictionary = inside.duplicate(true)
+	broken["cursor"] = null
+	_expect(engine.restore_flow("main", broken) == null, "a state with no cursor is refused")
+	_expect(engine.get_flow("main") == null and _same(engine.save_game(), closed), "a state that won't restore leaves nothing behind")
+
+	# The same id, once it is free.
+	var back := engine.restore_flow("main", inside)
+	_expect(back != null and engine.get_flow("main") == back, "a closed flow's id takes a restore")
+	_expect(back != null and back.advance().get("text") == "ok", "and the restored flow carries on")
+
+
+## Two plain-data Dictionaries, compared through JSON (key order aside, as a save is read).
+static func _same(a: Dictionary, b: Dictionary) -> bool:
+	return JSON.parse_string(JSON.stringify(a)) == JSON.parse_string(JSON.stringify(b))
 
 
 func _untouched(engine: PatterEngine, flow: PatterFlow, when: String) -> void:

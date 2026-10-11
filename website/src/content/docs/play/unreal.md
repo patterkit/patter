@@ -262,6 +262,10 @@ you are holding refers to a flow that no longer exists; `UPatterSave` re-binds y
 restored flows for you, and a flow the save did not carry comes back closed rather than dangling.
 Calling `loadGame()` on the core engine through `UPatterEngine::Raw()` skips that step. [Save/load & Game Data](/play/integration/) covers the format.
 
+To set one flow aside instead, `UPatterEngine::CaptureFlow(Name)` returns its part of a save as JSON, and
+`RestoreFlow(Name, Json)` opens it again later as a new `UPatterFlow`, under that name or another (null, and
+logged, if it is refused). See [Taking one flow out](/play/integration/#taking-one-flow-out).
+
 ## Build against the writer's structure
 
 `UPatterEngine::GetOutline()` and `GetBeatSequence()` expose the authored tree (scenes → blocks →

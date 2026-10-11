@@ -610,6 +610,7 @@ func _run_scripted(arr: Array) -> int:
 func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: Dictionary, options: Dictionary, name: String) -> bool:
 	var current := ""
 	var cp = null   # the open checkpoint, between a "checkpoint" op and its "rollback" / "commit"
+	var captured := {}   # captureFlow states, by name, for restoreFlow
 	var ok := true
 	for op in ops:
 		var chunk: Array = []
@@ -668,6 +669,35 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					if not parked:
 						_fail("scripted", name, "envelope round-trip changed flattened state at " + str(change["path"]))
 						break
+			"captureFlow":
+				# Sent through JSON, to prove the state is plain data.
+				var state: Dictionary = holder["engine"].capture_flow(op["flow"])
+				if state.is_empty():
+					_fail("scripted", name, "captureFlow %s: nothing captured" % op["flow"])
+					return false
+				captured[op["into"]] = JSON.parse_string(JSON.stringify(state))
+			"closeFlow":
+				holder["engine"].close_flow(op["flow"])
+			"restoreFlow":
+				if not captured.has(op["from"]):
+					_fail("scripted", name, "restoreFlow: nothing captured under '%s'" % op["from"])
+					return false
+				var restore_id: String = op["flow"]
+				var restore_state: Dictionary = captured[op["from"]]
+				if op.get("expectRefused", false):
+					# Refused over an open id as well as inside a checkpoint, so a checkpoint needn't be open.
+					# The name must still mean the same flow (or none), and that flow must still be open.
+					var held = holder["engine"].get_flow(restore_id)
+					if not _refused(holder, name, "restoreFlow", func(e): return e.restore_flow(restore_id, restore_state) == null, false):
+						return false
+					if holder["engine"].get_flow(restore_id) != held or (held != null and held.is_closed()):
+						_fail("scripted", name, "restoreFlow %s: a refused restore changed the flow under that id" % restore_id)
+						return false
+				else:
+					if holder["engine"].restore_flow(restore_id, restore_state) == null:
+						_fail("scripted", name, "restoreFlow %s: refused" % restore_id)
+						return false
+					current = restore_id
 			"hotSwap":
 				# Live bundle refresh (spec 9.8): the whole game carried onto the EDITED bundle. A refused
 				# swap hands back this same engine, unchanged.
@@ -758,16 +788,18 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 
 ## A call the runtime must refuse (the reference throws; this addon cannot, so it push_errors and
 ## changes nothing). `call` makes it on the engine and returns whether its result reads as a refusal.
-## Only an open checkpoint is grounds for these refusals, so one must be open before and still after.
-func _refused(holder: Dictionary, name: String, what: String, call: Callable) -> bool:
+## With `checkpoint_only` an open checkpoint is the only grounds for the refusal, so one must be open
+## before; either way, a refusal leaves the checkpoint as it was.
+func _refused(holder: Dictionary, name: String, what: String, call: Callable, checkpoint_only := true) -> bool:
 	var engine: PatterEngine = holder["engine"]
-	if not engine.in_checkpoint():
+	var was_in := engine.in_checkpoint()
+	if checkpoint_only and not was_in:
 		_fail("scripted", name, "%s: expected a refusal, but no checkpoint is open to refuse it" % what)
 		return false
 	if not call.call(engine):
 		_fail("scripted", name, "%s: expected the runtime to refuse it" % what)
 		return false
-	if not engine.in_checkpoint():
+	if engine.in_checkpoint() != was_in:
 		_fail("scripted", name, "%s: a refusal changed the checkpoint" % what)
 		return false
 	return true

@@ -1161,31 +1161,33 @@ namespace Patterkit.Patterplay
         // -- save / restore -----------------------------------------------------
 
         /// <summary>Snapshot this flow's cursor, PRNG, and visits. Its properties are the registry's.</summary>
-        public FlowSnapshot Snapshot()
+        public FlowSnapshot Snapshot() => SnapshotInto(new FlowSnapshot());
+
+        /// <summary>The snapshot written onto <paramref name="snap"/>: a plain FlowSnapshot, or the FlowState
+        /// Engine.CaptureFlow builds round it.</summary>
+        internal T SnapshotInto<T>(T snap) where T : FlowSnapshot
         {
-            return new FlowSnapshot
+            snap.RngState = _rngState;
+            snap.Visits = new Dictionary<string, int>(_visitCounts);
+            snap.FlowEnded = _flowEnded;
+            snap.CurrentSceneId = _currentSceneId;
+            // Stamp each frame with the id of the child it would run next, so a restore against an
+            // EDITED bundle re-finds the position by id instead of trusting the raw index (§9.8).
+            snap.Stack = _stack.Select(f =>
             {
-                RngState = _rngState,
-                Visits = new Dictionary<string, int>(_visitCounts),
-                FlowEnded = _flowEnded,
-                CurrentSceneId = _currentSceneId,
-                // Stamp each frame with the id of the child it would run next, so a restore against an
-                // EDITED bundle re-finds the position by id instead of trusting the raw index (§9.8).
-                Stack = _stack.Select(f =>
-                {
-                    var clone = f.Clone();
-                    var children = ChildrenOf(f.ContainerId);
-                    if (children != null && f.Index < children.Count) clone.NextId = children[f.Index].Id;
-                    return clone;
-                }).ToList(),
-                ActiveSnippetId = _activeSnippet?.Id,
-                BeatIndex = _beatIndex,
-                PendingOptions = _pendingChoice?.Options.Select(CloneOption).ToList(),
-                PendingGroupId = _pendingChoice?.GroupId,
-                PendingPromptOwnerId = _pendingPromptOwnerId,
-                PendingPrompt = ClonePrompt(_pendingPromptShown),
-                Selectors = Engine.CloneSelectors(_selectors),
-            };
+                var clone = f.Clone();
+                var children = ChildrenOf(f.ContainerId);
+                if (children != null && f.Index < children.Count) clone.NextId = children[f.Index].Id;
+                return clone;
+            }).ToList();
+            snap.ActiveSnippetId = _activeSnippet?.Id;
+            snap.BeatIndex = _beatIndex;
+            snap.PendingOptions = _pendingChoice?.Options.Select(CloneOption).ToList();
+            snap.PendingGroupId = _pendingChoice?.GroupId;
+            snap.PendingPromptOwnerId = _pendingPromptOwnerId;
+            snap.PendingPrompt = ClonePrompt(_pendingPromptShown);
+            snap.Selectors = Engine.CloneSelectors(_selectors);
+            return snap;
         }
 
         /// <summary>Restore this flow from a snapshot: its cursor, PRNG, visits, and selector cursors. Its

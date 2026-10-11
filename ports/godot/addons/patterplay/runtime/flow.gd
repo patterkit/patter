@@ -1398,6 +1398,11 @@ static func _esc(s: String) -> String:
 	return s.replace("%", "%25").replace("/", "%2F")
 
 
+## The inverse of _esc.
+static func _unesc(s: String) -> String:
+	return s.replace("%2F", "/").replace("%25", "%")
+
+
 ## A scene's SHARED `@scene` props (one bag per scene, every flow's).
 static func key_stage(scene_id: String) -> String:
 	return "patter/scene/" + _esc(scene_id)
@@ -1472,16 +1477,41 @@ static func sections_from_v2(save: Dictionary) -> Dictionary:
 	var flows = save.get("flows", {})
 	if flows is Dictionary:
 		for fid in flows:
-			var f = flows[fid]
-			if not (f is Dictionary):
-				continue
-			if f.get("scopes") is Dictionary:
-				out[key_flow_globals(str(fid))] = _unwrap_scope(f["scopes"], "patter")
-			var bags = _k(f, "sceneBags", "scene_bags")
-			if bags is Dictionary:
-				for sid in bags:
-					out[key_flow_scene(str(fid), str(sid))] = bags[sid]
+			if flows[fid] is Dictionary:
+				out.merge(flow_sections(str(fid), flows[fid]), true)
 	return out
+
+
+## One flow's own values (a version 2 save's per-flow sections, or a PatterEngine.capture_flow
+## state's) as registry sections under flow `flow_id`'s keys.
+static func flow_sections(flow_id: String, f: Dictionary) -> Dictionary:
+	var out := {}
+	if f.get("scopes") is Dictionary:
+		out[key_flow_globals(flow_id)] = _unwrap_scope(f["scopes"], "patter")
+	var bags = _k(f, "sceneBags", "scene_bags")
+	if bags is Dictionary:
+		for sid in bags:
+			out[key_flow_scene(flow_id, str(sid))] = bags[sid]
+	return out
+
+
+## The inverse of flow_sections: flow `flow_id`'s sections in a registry save, without the id, as
+## {"scopes": {"patter": values}, "sceneBags": {sceneId: values}}. Values still waiting in the
+## registry for a scene the flow hasn't re-entered are in the save, so they come too.
+static func flow_values_from(flow_id: String, saved: Dictionary) -> Dictionary:
+	var scopes := {}
+	var scene_bags := {}
+	var prefix := key_flow(flow_id)
+	for key in saved:
+		var k := str(key)
+		if not k.begins_with(prefix):
+			continue
+		var rest := k.substr(prefix.length())
+		if rest == "patter":
+			scopes["patter"] = saved[key]
+		elif rest.begins_with("scene/"):
+			scene_bags[_unesc(rest.substr("scene/".length()))] = saved[key]
+	return {"scopes": scopes, "sceneBags": scene_bags}
 
 
 # -- save / restore ------------------------------------------------------------
@@ -1624,7 +1654,8 @@ func restore(snap: Dictionary) -> void:
 	# defaults. Released KEEPING their values, so a live flow restored in place keeps its property
 	# values (a fresh one, made by a load, is claiming the loaded values either way). The scenes the
 	# cursor stands in are registered now; any other scene's bag is claimed on entry. A version 2
-	# snapshot's own "scopes" / "sceneBags" were moved into the registry by load_game before this ran.
+	# snapshot's own "scopes" / "sceneBags" were moved into the registry by load_game (or a flow
+	# state's by PatterEngine.restore_flow) before this ran.
 	_release_bags(true)
 	_mount_local()
 	var here := {}

@@ -7,6 +7,18 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Taking one flow out**: `UPatterEngine::CaptureFlow` returns one open flow as data, a JSON string in the
+  save's own spelling (its place, PRNG, visits, and selector cursors, and its own property values without its
+  name), and `UPatterEngine::RestoreFlow` opens a flow from it, under the same name or another, the way
+  loading a save restores each flow. Capture before `CloseFlow`, which drops the flow's values. Shared state
+  isn't in it, so restoring one rewinds nothing else; against an edited bundle it re-finds its place by id.
+  `RestoreFlow` refuses (logged, answering null, with nothing changed) a name that is open, an open
+  checkpoint, a version a save reader would refuse, or a state with no cursor; capturing only reads, so a
+  checkpoint doesn't stop it. In the C++ core: `patter::Engine::captureFlow` / `restoreFlow`,
+  `patter::FlowState`, and `patter::serializeFlowState` / `deserializeFlowState`.
+
 ## [0.23.0] - 2026-10-10
 
 ### Added

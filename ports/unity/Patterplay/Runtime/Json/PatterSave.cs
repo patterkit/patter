@@ -22,6 +22,9 @@
 // still loads. A bare snapshot with no envelope is refused, as the JS reference refuses it. Lookups are
 // case-insensitive, so one reader serves.
 //
+// A flow state (Engine.CaptureFlow: one flow as a save writes it, with its own values) goes through the same
+// code: SaveFlowState writes it, and ReadFlowState reads it as the flow part of a save is read.
+//
 // Pure (no UnityEngine), so it is corpus-verified in the dotnet TestHost too.
 
 using System;
@@ -100,7 +103,7 @@ namespace Patterkit.Patterplay
         /// <summary>A registry's values as JSON (registry key -> name -> value), for a game that made its own
         /// registry and saves it once beside each engine's part. The same shape a standalone engine's save
         /// carries under `registry`, and the same one `JSON.stringify(registry.save())` writes on the web.</summary>
-        public static JObject SaveRegistry(ScopeRegistry registry) => RegistryMap(registry.Save());
+        public static JObject SaveRegistry(ScopeRegistry registry) => SectionMap(registry.Save());
 
         /// <summary>Lay a <see cref="SaveRegistry"/> object over a registry. Values for a key nobody has
         /// registered yet wait in the registry and are handed over when it registers, so this can run
@@ -108,6 +111,32 @@ namespace Patterkit.Patterplay
         public static void LoadRegistry(ScopeRegistry registry, JObject values)
         {
             registry.Load(ReadRegistry(values) ?? new OrderedMap<string, OrderedMap<string, ExprValue>>());
+        }
+
+        /// <summary>A <see cref="FlowState"/> (Engine.CaptureFlow) as JSON: a flow as a save writes it, with its
+        /// `version` first and its own values after, in a version 2 save's per-flow sections (`scopes.patter`,
+        /// `sceneBags`). The same shape `JSON.stringify(engine.captureFlow(id))` writes on the web.</summary>
+        public static JObject SaveFlowState(FlowState state)
+        {
+            var o = FlowToken(state);
+            o.AddFirst(new JProperty("version", state.Version));
+            o["scopes"] = state.Scopes != null ? new JObject { ["patter"] = ValueMap(state.Scopes) } : new JObject();
+            o["sceneBags"] = SectionMap(state.SceneBags ?? new Dictionary<string, Dictionary<string, ExprValue>>());
+            return o;
+        }
+
+        /// <summary>A <see cref="SaveFlowState"/> object back as a <see cref="FlowState"/>, for Engine.RestoreFlow,
+        /// which refuses a version it can't read. Throws on anything but a JSON object, and on a state with no
+        /// `cursor`: a flow state never had the flat shape this port's saves once did, so a missing cursor is
+        /// refused here rather than read as an empty one, as every runtime's restore refuses it.</summary>
+        public static FlowState ReadFlowState(JObject o)
+        {
+            if (o == null) throw new Exception("PatterSave: not a flow state");
+            int version = ReadVersion(Get(o, "version"), "flow state");
+            if (!(Get(o, "cursor") is JObject)) throw new Exception("malformed flow state: no cursor");
+            var state = ReadFlow(o, new FlowState());
+            state.Version = version;
+            return state;
         }
 
         // -- writing: literal keys, in the JS reference's order -----------------------------------
@@ -118,7 +147,7 @@ namespace Patterkit.Patterplay
             foreach (var kv in s.Flows ?? new Dictionary<string, FlowSnapshot>()) flows[kv.Key] = FlowToken(kv.Value);
             var save = new JObject { ["version"] = s.Version };
             // Registry key -> name -> value, present only when the engine made its own registry.
-            if (s.Registry != null) save["registry"] = RegistryMap(s.Registry);
+            if (s.Registry != null) save["registry"] = SectionMap(s.Registry);
             save["sharedVisits"] = IntMap(s.SharedVisits);
             save["sharedSelectors"] = SelectorMap(s.SharedSelectors);
             save["flows"] = flows;
@@ -209,7 +238,9 @@ namespace Patterkit.Patterplay
             return o;
         }
 
-        private static JObject RegistryMap(OrderedMap<string, OrderedMap<string, ExprValue>> m)
+        /// <summary>Sections of values (key -> name -> value): a registry's, or a flow state's scene bags.</summary>
+        private static JObject SectionMap<TValues>(IEnumerable<KeyValuePair<string, TValues>> m)
+            where TValues : IEnumerable<KeyValuePair<string, ExprValue>>
         {
             var o = new JObject();
             foreach (var kv in m) o[kv.Key] = ValueMap(kv.Value);
@@ -273,7 +304,7 @@ namespace Patterkit.Patterplay
             if (fl != null)
             {
                 flows = new Dictionary<string, FlowSnapshot>();
-                foreach (var p in fl.Properties()) flows[p.Name] = ReadFlow(p.Value as JObject ?? new JObject());
+                foreach (var p in fl.Properties()) flows[p.Name] = ReadFlow(p.Value as JObject ?? new JObject(), new FlowSnapshot());
             }
             var save = new SaveGame
             {
@@ -290,10 +321,10 @@ namespace Patterkit.Patterplay
             return save;
         }
 
-        /// <summary>The save's version, which must be a whole number: a string or a fraction is refused here with
-        /// the engine's own sentence, where a cast would have read "3" or 3.9 as a version it accepts.
-        /// Absent reads as 0, which the engine refuses.</summary>
-        private static int ReadVersion(JToken v)
+        /// <summary>The save's (or flow state's) version, which must be a whole number: a string or a fraction is
+        /// refused here with the engine's own sentence, where a cast would have read "3" or 3.9 as a version it
+        /// accepts. Absent reads as 0, which the engine refuses.</summary>
+        private static int ReadVersion(JToken v, string what = "save")
         {
             if (v == null || v.Type == JTokenType.Null) return 0;
             if (v.Type == JTokenType.Integer || v.Type == JTokenType.Float)
@@ -303,7 +334,7 @@ namespace Patterkit.Patterplay
             }
             string shown = v.Type == JTokenType.String ? (string)v
                 : v.ToString(Formatting.None);
-            throw new Exception($"unsupported save version: {shown}");
+            throw new Exception($"unsupported {what} version: {shown}");
         }
 
         /// <summary>A version 3 save's `registry` section (registry key -> name -> value), in document
@@ -331,7 +362,9 @@ namespace Patterkit.Patterplay
             return ReadValueMap(twoLevel ? Obj(o, "patter") : o);
         }
 
-        private static FlowSnapshot ReadFlow(JObject f)
+        /// <summary>A flow as a save writes it, read onto <paramref name="snapshot"/>: a FlowSnapshot, or the
+        /// FlowState <see cref="ReadFlowState"/> reads.</summary>
+        private static T ReadFlow<T>(JObject f, T snapshot) where T : FlowSnapshot
         {
             var c = Obj(f, "cursor") ?? f;   // the family nests the cursor; this port's old shape kept it flat
             var stack = new List<StackFrame>();
@@ -357,26 +390,22 @@ namespace Patterkit.Patterplay
                 pendingGroupId = StrOrNull(c, "pendingGroupId");
             }
 
-            var snapshot = new FlowSnapshot
-            {
-                // Through ToUint32: the JS runtime wrote this SIGNED until it was fixed.
-                RngState = Mulberry32.ToUint32((double?)Get(f, "rngState") ?? 0),
-                Visits = ReadIntMap(Obj(f, "visits")),
-                FlowEnded = (bool?)Get(c, "flowEnded") ?? false,
-                CurrentSceneId = StrOrNull(c, "currentSceneId"),
-                Stack = stack,
-                ActiveSnippetId = StrOrNull(c, "activeSnippetId"),
-                BeatIndex = (int?)Get(c, "beatIndex") ?? 0,
-                PendingOptions = pendingOptions,
-                PendingGroupId = pendingGroupId,
-                PendingPromptOwnerId = StrOrNull(c, "pendingPromptOwnerId"),
-                PendingPrompt = Obj(c, "pendingPrompt") is JObject pp ? ReadPrompt(pp) : null,
-                Selectors = ReadSelectorMap(Obj(c, "selectors")),
-            };
-#pragma warning disable CS0618 // version 2's property sections
+            // Through ToUint32: the JS runtime wrote this SIGNED until it was fixed.
+            snapshot.RngState = Mulberry32.ToUint32((double?)Get(f, "rngState") ?? 0);
+            snapshot.Visits = ReadIntMap(Obj(f, "visits"));
+            snapshot.FlowEnded = (bool?)Get(c, "flowEnded") ?? false;
+            snapshot.CurrentSceneId = StrOrNull(c, "currentSceneId");
+            snapshot.Stack = stack;
+            snapshot.ActiveSnippetId = StrOrNull(c, "activeSnippetId");
+            snapshot.BeatIndex = (int?)Get(c, "beatIndex") ?? 0;
+            snapshot.PendingOptions = pendingOptions;
+            snapshot.PendingGroupId = pendingGroupId;
+            snapshot.PendingPromptOwnerId = StrOrNull(c, "pendingPromptOwnerId");
+            snapshot.PendingPrompt = Obj(c, "pendingPrompt") is JObject pp ? ReadPrompt(pp) : null;
+            snapshot.Selectors = ReadSelectorMap(Obj(c, "selectors"));
+            // A flow's own values: a version 2 save's per-flow sections, or a flow state's.
             snapshot.Scopes = ReadScope(Obj(f, "scopes"));
             snapshot.SceneBags = ReadBagMap(Obj(f, "sceneBags"));
-#pragma warning restore CS0618
             return snapshot;
         }
 

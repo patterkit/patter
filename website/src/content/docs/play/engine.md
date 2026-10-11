@@ -66,6 +66,8 @@ Dropping a flow **finishes** it: after `closeFlow(id)`, a `reset()`, or having i
 re-opened, a reference you are still holding is inert (advancing reports the end, `goto`
 refuses to move it), so a forgotten reference cannot keep running scene entry effects
 behind your back.
+To set a flow aside as data and bring it back later, under the same id or another, see
+[Taking one flow out](/play/integration/#taking-one-flow-out).
 
 ### Playing an address in one call
 

@@ -445,9 +445,9 @@ func _undo_open_flow(id: String, flow: PatterFlow, prior: PatterFlow) -> void:
 ##
 ## One checkpoint at a time: a second is refused (push_error, returns null). Inside one, the calls
 ## that replace or drop flows or their bags wholesale (reset, load_game, hot_swap, close_flow,
-## open_flow on the name of an open flow, and a flow's own start and restore) are refused the same
-## way. Not undone: trace and log events already emitted, and draws from a custom "rng" the game
-## supplied.
+## open_flow on the name of an open flow, restore_flow, and a flow's own start and restore) are
+## refused the same way. Not undone: trace and log events already emitted, and draws from a custom
+## "rng" the game supplied.
 func checkpoint() -> Checkpoint:
 	if _host.journal != null:
 		push_error("a checkpoint is already open: roll it back or commit it first")
@@ -800,10 +800,9 @@ func save_game() -> Dictionary:
 func load_game(save: Dictionary) -> bool:
 	if _refused_in_checkpoint("load_game"):
 		return false
-	var version = save.get("version")
-	var v := float(version) if (version is int or version is float) else -1.0
-	if v != 2.0 and v != float(SAVE_VERSION):
-		push_error("unsupported save version: %s" % (str(int(v)) if v == floorf(v) and v >= 0.0 else str(version)))
+	var unreadable := _version_refusal("save", save.get("version"))
+	if unreadable != "":
+		push_error(unreadable)
 		return false
 	# A save missing its flows used to close every flow and load the registry, and only then find
 	# nothing to restore, leaving the engine half-loaded. Refused up front now, as on every runtime.
@@ -830,7 +829,7 @@ func load_game(save: Dictionary) -> bool:
 			reg.remove(PatterFlow.key_stage(sid), {"keep": true})
 	_host.stage_bags = {}
 
-	var values = PatterFlow.sections_from_v2(save) if v == 2.0 else save.get("registry")
+	var values = PatterFlow.sections_from_v2(save) if float(save["version"]) == 2.0 else save.get("registry")
 	if values is Dictionary:
 		# The engine's own registry takes the save wholesale. A game's registry may hold values the
 		# game loaded for other engines, still waiting to be claimed: add to those, never replace them.
@@ -848,6 +847,75 @@ func load_game(save: Dictionary) -> bool:
 		flow.restore(saved_flows[id])
 		_flows[str(id)] = flow
 	return true
+
+
+## "" when `version` is one a load reads (exactly 2 or SAVE_VERSION), else the refusal, naming
+## `what` (a save, or a flow state).
+static func _version_refusal(what: String, version) -> String:
+	var v := float(version) if (version is int or version is float) else -1.0
+	if v == 2.0 or v == float(SAVE_VERSION):
+		return ""
+	return "unsupported %s version: %s" % [what, str(int(v)) if v == floorf(v) and v >= 0.0 else str(version)]
+
+
+## Take flow `id` out of the engine as plain data, to be put back later with restore_flow(): its
+## snapshot as save_game() writes it, a "version" (SAVE_VERSION), and its own property values without
+## its id, so it can come back under another ("scopes" and "sceneBags", the sections a version 2 save
+## carried per flow). Shared state is never in it. The game saves it as it saves anything else.
+## Doesn't close the flow: close it with close_flow() AFTER capturing, since closing drops its values.
+## Only reads, so it is allowed while a checkpoint is open. Returns {} (with push_error) when no flow
+## of that id is open.
+func capture_flow(id: String) -> Dictionary:
+	var flow: PatterFlow = _flows.get(id)
+	if flow == null:
+		push_error("no open flow '%s' to capture" % id)
+		return {}
+	var out := {"version": SAVE_VERSION}
+	out.merge(flow.snapshot())
+	out.merge(PatterFlow.flow_values_from(id, _host.registry.save()))
+	return out
+
+
+## Open flow `id` from a capture_flow() state, the per-flow half of load_game(): its values go into
+## the registry as a load's do, and the flow is restored as a load restores each flow, claiming them
+## (a scene the cursor isn't in claims its values when the flow enters it). `id` needn't be the id it
+## was captured from. Against an edited bundle it re-finds its place by id, as a load does.
+##
+## Returns the flow, or null (with push_error, and nothing changed) while a checkpoint is open, for a
+## state version this engine cannot read (exactly 2 or 3, as a save), a state with no cursor object,
+## when a flow of that id is open, or when the content names another engine's scope that nothing on
+## this registry registered. Everything it reads is checked before anything changes, as a load's is:
+## GDScript has no exceptions, so a restore can't fail part way and be cleaned up after.
+func restore_flow(id: String, state: Dictionary) -> PatterFlow:
+	if _refused_in_checkpoint("restore_flow"):
+		return null
+	var unreadable := _version_refusal("flow state", state.get("version"))
+	if unreadable != "":
+		push_error(unreadable)
+		return null
+	if not (state.get("cursor") is Dictionary):
+		push_error("malformed flow state: no cursor")
+		return null
+	if _flows.has(id):
+		push_error("a flow '%s' is already open; close it before restoring another under that id" % id)
+		return null
+	if _init_error != "":
+		push_error("restore_flow: this engine was refused its registration (%s)" % _init_error)
+		return null
+	var unregistered := _external_scope_refusal()
+	if unregistered != "":
+		push_error("restore_flow: " + unregistered)
+		return null
+	# Anything a load left waiting under this id belonged to a flow that has gone, as when a flow
+	# starts. Then the state's values, added to whatever else the registry holds (other flows' and
+	# engines' values still waiting to be claimed), never replacing it.
+	_host.registry.discard_parked(PatterFlow.key_flow(id))
+	_host.registry.load(PatterFlow.flow_sections(id, state), {"keep_parked": true})
+	var flow := PatterFlow.new(_host, float(_default_seed))
+	flow.id = id
+	flow.restore(state)
+	_flows[id] = flow
+	return flow
 
 
 

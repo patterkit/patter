@@ -14,6 +14,9 @@ extends SceneTree
 #   3. a hand-written version 2 save (the shape every runtime wrote before the registry held the
 #      properties) loads, its values moving into the registry, alone or beside a game's own load
 #   4. a hand-written PRE-0.11.0 save (snake_case, flat cursor, version 2) still loads
+#   5. a version it cannot read is refused
+#   6. a flow state (capture_flow) is the flow's save snapshot plus a version 2 flow's own sections
+#   7. restoring one drops what a load left waiting under its id
 #
 #   godot --headless --path ports/godot --script res://test/test_save_shape.gd
 
@@ -35,6 +38,26 @@ var _bundle := {
 					"value": {"src": "\"tense\"", "ast": ["s", "tense"]}}],
 				"jump": {"to": "END"}},
 		]}]}},
+}
+
+## Two scenes, the first with a flow's own @scene value, for a flow that has moved on from it (7).
+var _two_scenes := {
+	"schema": "patter/bundle@0",
+	"locales": {"default": "en", "included": ["en"]},
+	"strings": {"en": {"T": "mine", "U": "on", "U2": "still on"}},
+	"scenes": {
+		"s": {"id": "s", "gameId": "s",
+			"sceneProps": [{"name": "mine", "type": "number", "default": 0, "shared": false}],
+			"blocks": [{"id": "bs", "gameId": "bs", "children": [
+				{"id": "sn_s", "type": "snippet", "beats": [{"id": "T", "kind": "text"}],
+					"onEnter": [{"kind": "set", "target": "@scene.mine", "value": {"src": "7", "ast": ["n", 7]}}],
+					"jump": {"to": "t"}},
+			]}]},
+		"t": {"id": "t", "gameId": "t",
+			"blocks": [{"id": "bt", "gameId": "bt", "children": [
+				{"id": "sn_t", "type": "snippet", "beats": [{"id": "U", "kind": "text"}, {"id": "U2", "kind": "text"}]},
+			]}]},
+	},
 }
 
 ## The registry a played standalone game holds, as a player's save carries it.
@@ -189,6 +212,52 @@ func _initialize() -> void:
 	var before: Dictionary = engine6.save_game()
 	_check("an unsupported version is refused", engine6.load_game({"version": 4, "flows": {}}) == false, "")
 	_check("and leaves the game as it was", _eq(engine6.save_game(), before), JSON.stringify(engine6.save_game()))
+
+	# 6. a flow state (capture_flow) is the flow's save snapshot, a version, and its own values in a
+	# version 2 save's per-flow sections, without its id: values still parked for a scene it hasn't
+	# re-entered come too, and an escaped id (or scene id) comes back as it was
+	var flow_reg := PatterScopeRegistry.new()
+	var engine7 = _played({"registry": flow_reg})
+	engine7.open_flow("npc/bob%", "s", "b")
+	flow_reg.load({
+		"patter/flow/npc%2Fbob%25/scene/x%2Fy%25": {"waiting": 1},
+		"patter/flow/npc/patter": {"not": "mine"},
+	}, {"keep_parked": true})
+	var state: Dictionary = engine7.capture_flow("npc/bob%")
+	_check("a flow state's keys are a snapshot's, a version, and a version 2 flow's sections",
+		_sorted(state.keys()) == ["cursor", "rngState", "sceneBags", "scopes", "version", "visits"], str(state.keys()))
+	_check("its version is the save's", _eq(state.get("version"), 3), str(state.get("version")))
+	var snap: Dictionary = engine7.save_game()["flows"]["npc/bob%"]
+	_check("its snapshot is what the save writes for the flow",
+		_eq({"cursor": state["cursor"], "rngState": state["rngState"], "visits": state["visits"]}, snap), JSON.stringify(state))
+	_check("its own values, the parked ones too, without its id",
+		_eq(state["scopes"], {"patter": {}}) and _eq(state["sceneBags"], {"s": {"mood": "calm"}, "x/y%": {"waiting": 1}}),
+		JSON.stringify([state["scopes"], state["sceneBags"]]))
+	var game_reg2 := PatterScopeRegistry.new()
+	var engine8 = PatterEngine.new(_bundle, {"registry": game_reg2})
+	_check("it restores under another id", engine8.restore_flow("carried", JSON.parse_string(JSON.stringify(state))) != null, "")
+	var reg_after: Dictionary = game_reg2.save()
+	_check("its values go under the new id's keys",
+		_eq(reg_after.get("patter/flow/carried/scene/s"), {"mood": "calm"}) and _eq(reg_after.get("patter/flow/carried/scene/x%2Fy%25"), {"waiting": 1}),
+		JSON.stringify(reg_after))
+
+	# 7. a restore drops what a load left waiting under its id, as a fresh start does: those values were
+	# the closed flow's, and the state holds every value the restored flow has
+	var first = PatterEngine.new(_two_scenes, {})
+	var walked = first.open_flow("f", "s")
+	walked.advance()   # into s: its own @scene.mine is set
+	walked.advance()   # on into t
+	var loaded = PatterEngine.new(_two_scenes, {})
+	loaded.load_game(JSON.parse_string(JSON.stringify(first.save_game())))   # f's bag for s waits, parked
+	_check("a load leaves the flow's bag for a scene it isn't in waiting", loaded.capture_flow("f")["sceneBags"].has("s"),
+		JSON.stringify(loaded.capture_flow("f")["sceneBags"]))
+	loaded.close_flow("f")
+	var elsewhere = PatterEngine.new(_two_scenes, {})
+	elsewhere.open_flow("g", "t")   # never been in s
+	var from_t = JSON.parse_string(JSON.stringify(elsewhere.capture_flow("g")))
+	_check("a restore under that id", loaded.restore_flow("f", from_t) != null, "")
+	var kept: Dictionary = loaded.capture_flow("f")["sceneBags"]
+	_check("drops what the load left waiting under it", not kept.has("s"), JSON.stringify(kept))
 
 	print("test_save_shape: " + ("ALL PASS" if _fails == 0 else str(_fails) + " FAILED"))
 	quit(1 if _fails > 0 else 0)

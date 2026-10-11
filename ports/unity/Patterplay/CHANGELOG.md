@@ -6,6 +6,28 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Flow capture and restore**: `engine.CaptureFlow(id)` takes one flow out as a `FlowState`, plain data in the
+  save's own spelling: a `FlowSnapshot` as `SaveGame` writes it (cursor, PRNG, visits, and selectors), a
+  `Version`, and its own property values as a version 2 save's per-flow `Scopes` and `SceneBags`, without its
+  id. Values still waiting for a scene the flow hasn't re-entered come too. `engine.RestoreFlow(id, state)`
+  opens it again under any id, as `LoadGame` restores each flow, re-finding its place by id against an edited
+  bundle. Shared state isn't in it, so a restore rewinds nothing else, and anything a load left waiting under
+  the id is dropped first, as when a flow starts. Refused over an open id, inside a checkpoint, for a version a
+  save couldn't have, and for a state with no cursor (`PatterSave.ReadFlowState` refuses one as it reads, with
+  "malformed flow state: no cursor", since a flow state never had the flat shape older saves did); a state
+  that won't restore leaves nothing behind. Capturing only reads, so it
+  is allowed inside a checkpoint. Capture before `CloseFlow`, which drops the flow's values.
+  `PatterSave.SaveFlowState` and `ReadFlowState` write and read the state as JSON, in the same shape the other
+  runtimes write. Held across all four runtimes by the conformance corpus.
+
+### Changed
+
+- `FlowSnapshot.Scopes` and `SceneBags` are no longer obsolete: a `FlowState` carries them. A version 3 save
+  still doesn't write them, its values being the registry's. `FlowSnapshot` is no longer sealed (`FlowState`
+  extends it).
+
 ## [0.23.0] - 2026-10-10
 
 ### Added

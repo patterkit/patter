@@ -17945,6 +17945,786 @@
           ]
         }
       ]
+    },
+    {
+      "name": "a flow captured, closed, and restored under a new id carries on with its own values; shared state isn't rewound",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0ktyw41",
+          "structureHash": "1dm62hd"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "default": 0,
+            "shared": false
+          },
+          {
+            "name": "bell",
+            "type": "number",
+            "default": 0,
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "mine",
+                "type": "number",
+                "default": 0,
+                "shared": false
+              },
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@gold",
+                        "value": {
+                          "src": "@gold + 5",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "gold"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@bell",
+                        "value": {
+                          "src": "@bell + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "bell"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.mine",
+                        "value": {
+                          "src": "@scene.mine + 2",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "mine"
+                            ],
+                            [
+                              "n",
+                              2
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.tally",
+                        "value": {
+                          "src": "@scene.tally + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "tally"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o1",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "o1_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T3",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P1",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "One: gold {@gold}",
+            "T2": "Two: mine {@scene.mine}, bell {@bell}, tally {@scene.tally}",
+            "P1": "Go",
+            "T3": "Gold {@gold}, mine {@scene.mine}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "One: gold 5"
+            }
+          ]
+        },
+        {
+          "op": "captureFlow",
+          "flow": "main",
+          "into": "mid"
+        },
+        {
+          "op": "closeFlow",
+          "flow": "main"
+        },
+        {
+          "op": "openFlow",
+          "flow": "other",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "One: gold 5"
+            }
+          ]
+        },
+        {
+          "op": "restoreFlow",
+          "flow": "carried",
+          "from": "mid"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "Two: mine 2, bell 2, tally 2"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o1",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Go"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "captureFlow",
+          "flow": "carried",
+          "into": "atChoice"
+        },
+        {
+          "op": "closeFlow",
+          "flow": "carried"
+        },
+        {
+          "op": "restoreFlow",
+          "flow": "again",
+          "from": "atChoice"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o1",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Go"
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o1"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T3",
+              "text": "Gold 5, mine 2"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "restoreFlow is refused over an open id and inside a checkpoint; captureFlow isn't",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0ktyw41",
+          "structureHash": "1dm62hd"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "default": 0,
+            "shared": false
+          },
+          {
+            "name": "bell",
+            "type": "number",
+            "default": 0,
+            "shared": true
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "sceneProps": [
+              {
+                "name": "mine",
+                "type": "number",
+                "default": 0,
+                "shared": false
+              },
+              {
+                "name": "tally",
+                "type": "number",
+                "default": 0,
+                "shared": true
+              }
+            ],
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn1",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@gold",
+                        "value": {
+                          "src": "@gold + 5",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "gold"
+                            ],
+                            [
+                              "n",
+                              5
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@bell",
+                        "value": {
+                          "src": "@bell + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "patter",
+                              "bell"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.mine",
+                        "value": {
+                          "src": "@scene.mine + 2",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "mine"
+                            ],
+                            [
+                              "n",
+                              2
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "kind": "set",
+                        "target": "@scene.tally",
+                        "value": {
+                          "src": "@scene.tally + 1",
+                          "ast": [
+                            "bin",
+                            "+",
+                            [
+                              "sv",
+                              "scene",
+                              "tally"
+                            ],
+                            [
+                              "n",
+                              1
+                            ]
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o1",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "o1_c",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T3",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P1",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "One: gold {@gold}",
+            "T2": "Two: mine {@scene.mine}, bell {@bell}, tally {@scene.tally}",
+            "P1": "Go",
+            "T3": "Gold {@gold}, mine {@scene.mine}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "One: gold 5"
+            }
+          ]
+        },
+        {
+          "op": "captureFlow",
+          "flow": "main",
+          "into": "mid"
+        },
+        {
+          "op": "restoreFlow",
+          "flow": "main",
+          "from": "mid",
+          "expectRefused": true
+        },
+        {
+          "op": "checkpoint"
+        },
+        {
+          "op": "restoreFlow",
+          "flow": "spare",
+          "from": "mid",
+          "expectRefused": true
+        },
+        {
+          "op": "captureFlow",
+          "flow": "main",
+          "into": "inside"
+        },
+        {
+          "op": "commit"
+        },
+        {
+          "op": "closeFlow",
+          "flow": "main"
+        },
+        {
+          "op": "restoreFlow",
+          "flow": "main",
+          "from": "inside"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "Two: mine 2, bell 1, tally 1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a captured flow restored onto an edited bundle re-finds its place by id",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1u79agj",
+          "structureHash": "0dq624h"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "first",
+            "T2": "second"
+          }
+        }
+      },
+      "bundleB": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0f5roih",
+          "structureHash": "1rpo4r3"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn0",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T0",
+                        "kind": "text"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T0": "inserted",
+            "T1": "first",
+            "T2": "second, reworded"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "first"
+            }
+          ]
+        },
+        {
+          "op": "captureFlow",
+          "flow": "main",
+          "into": "mid"
+        },
+        {
+          "op": "closeFlow",
+          "flow": "main"
+        },
+        {
+          "op": "hotSwap"
+        },
+        {
+          "op": "restoreFlow",
+          "flow": "main",
+          "from": "mid"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "second, reworded"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
     }
   ],
   "gameData": [

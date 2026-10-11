@@ -89,6 +89,10 @@ scene** - import, open the scene, press Play, nothing to set up:
 - **Save / load**: `PatterSave.SerializeState(engine)` / `DeserializeState` snapshot and
   restore the whole run as JSON (the family's `patter/save@0`, version 3; version 2 saves still
   load).
+- **Set one flow aside**: `engine.CaptureFlow(id)` returns its part of a save as a `FlowState` (its
+  position, PRNG, visits, selectors, and its own property values, without its id). Close the flow after
+  capturing, keep the state as JSON with `PatterSave.SaveFlowState` / `ReadFlowState`, and
+  `engine.RestoreFlow(newId, state)` opens it again later, under any id, without rewinding shared state.
 - **Your game's state**: bind `@world` through `EngineOptions.HostScopes` (an `IHostScope` per
   token), or leave it unbound and the engine self-backs it from the declared defaults, and saves it.
 - **One registry per game**: every property lives in a `ScopeRegistry`. Pass your own through

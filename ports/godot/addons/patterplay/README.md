@@ -70,6 +70,13 @@ In `demo/` (delete the folder freely):
   `engine.save_game()` / `engine.load_game(blob)` for the bare dictionary) snapshot and restore the
   whole run. Saves are the shared `patter/save@0` format, version 3; a version 2 save in its envelope
   still loads.
+- **One flow as data**: `engine.capture_flow(id)` returns a flow's state as a plain Dictionary (its
+  cursor, PRNG, visits, and selectors, as a save writes them, plus its own `@patter` and `@scene`
+  values), without its id, for your game to keep and save like anything else. `engine.restore_flow(id,
+  state)` opens a flow from it, under that id or another, and carries on where it was; shared state
+  isn't in it, so nothing else is rewound. Capture before `close_flow`, which drops the flow's values.
+  Capturing is allowed inside a checkpoint; restoring isn't, nor over an id that is open (it returns
+  null, with `push_error`).
 - **Your game's state and one registry per game**: bind `@world` to your own store with the
   `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`
   option so every engine in the game shares one set of properties and one save. Without a registry

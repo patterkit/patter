@@ -1385,12 +1385,26 @@ export interface SaveGame {
   flows: Record<string, FlowSnapshot>;
 }
 
-/** A version 2 flow snapshot, which carried the flow's property values itself. Still read. */
-export interface FlowSnapshotV2 extends FlowSnapshot {
+/** One flow's own property values, without its id: the sections a version 2 save carried per flow, and a
+ *  `FlowState` carries now. */
+export interface FlowValues {
   /** The NOT-shared `@patter` globals, under token "patter". */
   scopes: EngineSave;
   /** Per-scene NOT-shared `@scene` bags (scene id -> name -> value). */
   sceneBags: Record<string, Record<string, ScalarValue>>;
+}
+
+/** A version 2 flow snapshot, which carried the flow's property values itself. Still read. */
+export interface FlowSnapshotV2 extends FlowSnapshot, FlowValues {}
+
+/**
+ * One flow taken out of an engine (`engine.captureFlow`) to be put back later (`engine.restoreFlow`), under the
+ * same id or another: its snapshot as a save writes it, and its own property values without its id. Plain data
+ * in the save's spelling, so a game saves it as it saves anything else. Shared state (shared properties, world
+ * visit counts, shared selectors) is never in it, so restoring one rewinds nothing else.
+ */
+export interface FlowState extends FlowSnapshot, FlowValues {
+  version: typeof SAVE_VERSION;
 }
 
 /** A version 2 save, from before the registry held the properties. Every runtime still reads it: its

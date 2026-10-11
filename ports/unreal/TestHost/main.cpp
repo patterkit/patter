@@ -778,6 +778,7 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
         throw std::runtime_error(what + ": expected the runtime to refuse it");
     };
     const auto refusing = [](const JsonValue& op) { const JsonValue* r = op.find("expectRefused"); return r && r->isBool() && r->b; };
+    std::map<std::string, patter::FlowState> captured; // captureFlow states, by name, for restoreFlow
             for (const auto& op : script.arr)
             {
                 JsonValue chunk = JsonValue::Arr();
@@ -823,6 +824,19 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                         op.at("scene").str, op.has("block") ? op.at("block").str : std::string());
                     if (op.has("expectResult") && moved != op.at("expectResult").b)
                         throw std::runtime_error("goto " + op.at("scene").str + ": unexpected result");
+                }
+                // A flow taken out as data and put back: the state goes through JSON (Patter/Save.h) to
+                // prove it is plain data, and a restored flow becomes the current one.
+                else if (kind == "captureFlow")
+                    captured[op.at("into").str] = deserializeFlowState(serializeFlowState(engine->captureFlow(op.at("flow").str)));
+                else if (kind == "closeFlow") engine->closeFlow(op.at("flow").str);
+                else if (kind == "restoreFlow")
+                {
+                    auto state = captured.find(op.at("from").str);
+                    if (state == captured.end()) throw std::runtime_error("restoreFlow: nothing captured under '" + op.at("from").str + "'");
+                    const std::string flowId = op.at("flow").str;
+                    if (refusing(op)) refused("restoreFlow", [&] { engine->restoreFlow(flowId, state->second); });
+                    else { engine->restoreFlow(flowId, state->second); current = flowId; }
                 }
                 else if (kind == "saveLoad")
                 {
@@ -2113,6 +2127,171 @@ static void runExternalScopeCases()
     std::cout << "  [external-scopes] other engines' scopes, read, written, and refused where nobody registered them: " << g_extPass << "/" << g_extTotal << "\n";
 }
 
+// ----- flow state -------------------------------------------------------------------------------------
+//
+// captureFlow / restoreFlow: the host-surface half of the contract the corpus pins (a restored flow carries
+// on with its own values). Ports of the JS reference's flow-state.test.ts (packages/runtime/test), over its
+// bundle as the JS compiler exports it: what restore refuses and that a refusal leaves nothing behind, a
+// state that outlives a save and load, ids that need escaping, the scene bags of scenes the flow has left
+// (or hasn't yet re-entered after a load), and the state's JSON shape.
+
+static int g_fsPass = 0, g_fsTotal = 0;
+
+static void fsCase(const std::string& name, const std::function<void()>& body)
+{
+    ++g_fsTotal;
+    try { body(); ++g_fsPass; }
+    catch (const std::exception& ex) { fail("flow-state", name, ex.what()); }
+}
+
+// `@gold` and `@scene.mine` are both the flow's own; s's onEnter sets them, then jumps to t, which plays
+// two lines and jumps back to s.
+static const Bundle& flowStateBundle()
+{
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","content":{"project":"p","hash":"0eutawq","structureHash":"13o8xbf"},"voiced":false,"locales":{"default":"en","included":["en"]},"properties":[{"name":"gold","type":"number","default":0,"shared":false}],"scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","sceneProps":[{"name":"mine","type":"number","default":0,"shared":false}],"blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"sn","type":"snippet","beats":[{"id":"T","kind":"text"}],"onEnter":[{"kind":"set","target":"@scene.mine","value":{"src":"7","ast":["n",7]}},{"kind":"set","target":"@gold","value":{"src":"3","ast":["n",3]}}],"jump":{"to":"t"}}]}]},"t":{"id":"t","type":"scene","name":"T","gameId":"t","blocks":[{"id":"b2","type":"block","name":"B2","children":[{"id":"sn2","type":"snippet","beats":[{"id":"U","kind":"text"},{"id":"U2","kind":"text"}],"jump":{"to":"s"}}]}]}},"strings":{"en":{"T":"mine {@scene.mine}, gold {@gold}","U":"u","U2":"u2"}}})JSON"));
+    return b;
+}
+
+/** A flow that has been through s (setting its values) and is part-way through t. */
+static Flow* inT(Engine& engine, const std::string& id = "f")
+{
+    Flow* flow = engine.openFlow(id, "s");
+    flow->advance();
+    flow->advance();
+    return flow;
+}
+
+/** A state sent through JSON, to prove it is plain data. */
+static FlowState viaJson(const FlowState& state) { return deserializeFlowState(serializeFlowState(state)); }
+
+static void expectText(const StepResult& r, const std::string& id, const std::string& text, const std::string& what)
+{
+    if (r.type != StepType::Text || r.id != id || (!text.empty() && r.text != text))
+        throw std::runtime_error(what + ": expected text " + id + (text.empty() ? "" : " \"" + text + "\"") + ", got " + r.id + " \"" + r.text + "\"");
+}
+
+static void runFlowStateCases()
+{
+    fsCase("capture the flow's own values without its id, including a scene it has left, in the save's spelling", []
+    {
+        auto engine = standalone(flowStateBundle(), 0);
+        inT(*engine, "npc/bob");
+        const std::string json = serializeFlowState(engine->captureFlow("npc/bob"));
+        JsonValue state = parseJ(json);
+        need(state.at("version").num == 3, "version " + dump(state.at("version")));
+        expectJson(state.at("scopes"), R"({"patter":{"gold":3}})", "scopes");
+        expectJson(state.at("sceneBags").at("s"), R"({"mine":7})", "sceneBags.s");
+        need(json.find("npc") == std::string::npos, "the state names the flow it was captured from: " + json);
+        // The flow's snapshot as a save writes it, plus `version` and the values: nothing else.
+        const auto keys = sortedKeys(state);
+        need(keys == std::vector<std::string>{ "cursor", "rngState", "sceneBags", "scopes", "version", "visits" }, "state keys " + joined(keys));
+    });
+
+    fsCase("restore under another id, escaped or not, and carry on with the flow's own values", []
+    {
+        for (const std::string id : { "g", "npc/alice", "100%" })
+        {
+            auto engine = standalone(flowStateBundle(), 0);
+            inT(*engine, "npc/bob");
+            const FlowState state = viaJson(engine->captureFlow("npc/bob"));
+            engine->closeFlow("npc/bob");
+            Flow* flow = engine->restoreFlow(id, state);
+            need(engine->getFlow(id) == flow, "getFlow('" + id + "') is not the restored flow");
+            expectNumber(flow->getProperty("@gold"), 3, "@gold restored under '" + id + "'");
+            expectText(flow->advance(), "U2", "", "under '" + id + "', the first advance");
+            expectText(flow->advance(), "T", "mine 7, gold 3", "under '" + id + "', back in s");
+        }
+    });
+
+    fsCase("outlive a save and load, including values parked for a scene the flow hasn't re-entered", []
+    {
+        auto first = standalone(flowStateBundle(), 0);
+        inT(*first);
+        auto loaded = standalone(flowStateBundle(), 0);
+        deserializeState(*loaded, serializeState(*first));
+        const FlowState state = viaJson(loaded->captureFlow("f"));   // s's bag is still parked here
+        expectJson(parseJ(serializeFlowState(state)).at("sceneBags").at("s"), R"({"mine":7})", "sceneBags.s, parked");
+        loaded->closeFlow("f");
+        auto later = standalone(flowStateBundle(), 0);
+        deserializeState(*later, serializeState(*loaded));            // a save with no flow in it
+        Flow* flow = later->restoreFlow("f", state);
+        flow->advance();
+        expectText(flow->advance(), "T", "mine 7, gold 3", "back in s after a save and load");
+    });
+
+    fsCase("drop what a load left waiting under the id, as a fresh start does", []
+    {
+        auto first = standalone(flowStateBundle(), 0);
+        inT(*first);
+        auto loaded = standalone(flowStateBundle(), 0);
+        deserializeState(*loaded, serializeState(*first));            // f's bag for s is parked, waiting for it to re-enter
+        loaded->closeFlow("f");
+        auto elsewhere = standalone(flowStateBundle(), 0);
+        elsewhere->openFlow("g", "t");                                 // never been in s
+        const FlowState state = viaJson(elsewhere->captureFlow("g"));
+        loaded->restoreFlow("f", state);
+        need(!loaded->captureFlow("f").sceneBags.count("s"), "the restored flow inherited the closed flow's parked bag for s");
+    });
+
+    // A state with no cursor is refused as it is read, before anything changes (the case below), so what
+    // fails a restore here is a bag that can't register: the game's registry already holds the key the
+    // restored flow's bag for t needs.
+    fsCase("leave nothing behind when a state won't restore", []
+    {
+        auto source = standalone(flowStateBundle(), 0);
+        inT(*source);
+        const FlowState state = viaJson(source->captureFlow("f"));
+        auto registry = std::make_shared<ScopeRegistry>();
+        OwnedScopeOptions game;
+        game.owner = "Game";
+        registry->defineOwned(registrykeys::flowScene("f", "t"), {}, game);
+        EngineOptions opts; opts.registry = registry; opts.hasSeed = true; opts.seed = 0;
+        Engine engine(flowStateBundle(), opts);
+        const std::string before = serializeState(engine);
+        const std::string registryBefore = dump(blobJson(registry->save()));
+        expectThrow([&] { engine.restoreFlow("f", state); }, "patter/flow/f/scene/t", "restoring where its bag can't register");
+        need(engine.getFlow("f") == nullptr, "a failed restore left a flow 'f'");
+        need(serializeState(engine) == before, "a failed restore changed the engine");
+        need(dump(blobJson(registry->save())) == registryBefore, "a failed restore left values behind: " + dump(blobJson(registry->save())));
+        registry->remove(registrykeys::flowScene("f", "t"));
+        Flow* flow = engine.restoreFlow("f", state);
+        expectText(flow->advance(), "U2", "", "the same state, restored once the key is free");
+    });
+
+    fsCase("refuse an unknown capture, an open id, a checkpoint, an unknown version, and no cursor, leaving nothing behind", []
+    {
+        auto engine = standalone(flowStateBundle(), 0);
+        expectThrow([&] { engine->captureFlow("nope"); }, "no open flow 'nope'", "capturing an id that is not open");
+        inT(*engine);
+        const FlowState state = viaJson(engine->captureFlow("f"));
+        const std::string before = serializeState(*engine);
+        expectThrow([&] { engine->restoreFlow("f", state); }, "already open", "restoring over an open id");
+        Checkpoint cp = engine->checkpoint();
+        expectThrow([&] { engine->restoreFlow("g", state); }, "checkpoint", "restoring inside a checkpoint");
+        need(serializeFlowState(engine->captureFlow("f")) == serializeFlowState(state), "capturing inside a checkpoint gave another state");
+        engine->commit(cp);
+        FlowState unknown = state;
+        unknown.version = 99;
+        expectThrow([&] { engine->restoreFlow("g", unknown); }, "unsupported flow state version: 99", "restoring version 99");
+        // A version read from JSON is checked as a save's is: 3.9 is refused, not read as 3.
+        std::string json = serializeFlowState(state);
+        json.replace(json.find("\"version\":3"), 11, "\"version\":3.9");
+        expectThrow([&] { deserializeFlowState(json); }, "unsupported flow state version: 3.9", "reading version 3.9");
+        // A state with no cursor, or one that isn't an object, is refused: a flow state never had the flat
+        // shape an old save's reader still accepts.
+        JsonValue noCursor = parseJ(serializeFlowState(state));
+        noCursor.obj.erase(std::remove_if(noCursor.obj.begin(), noCursor.obj.end(),
+            [](const auto& kv) { return kv.first == "cursor"; }), noCursor.obj.end());
+        expectThrow([&] { engine->restoreFlow("g", deserializeFlowState(dump(noCursor))); }, "malformed flow state: no cursor", "restoring with no cursor");
+        noCursor.set("cursor", JsonValue());
+        expectThrow([&] { engine->restoreFlow("g", deserializeFlowState(dump(noCursor))); }, "malformed flow state: no cursor", "restoring with a null cursor");
+        need(serializeState(*engine) == before, "a refused restore changed the engine");
+        need(engine->getFlow("g") == nullptr, "a refused restore left a flow 'g'");
+    });
+
+    std::cout << "  [flow-state] flows captured as data, restored under any id, and refused where they must be: " << g_fsPass << "/" << g_fsTotal << "\n";
+}
+
 static void runOneRegistry()
 {
     runOneRegistryCases();
@@ -2746,6 +2925,7 @@ int main(int argc, char** argv)
     if (au != static_cast<int>(audioArr->arr.size())) fail("audio", "section total", std::to_string(au) + " of " + std::to_string(audioArr->arr.size()) + " passed");
     runInspectorSmoke();
     runOneRegistry();
+    runFlowStateCases();
     runKernelErrorCases();
     runBundleReaderCase();
     runPendingClearedCheck();

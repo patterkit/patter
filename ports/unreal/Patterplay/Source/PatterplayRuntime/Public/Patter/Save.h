@@ -121,10 +121,10 @@ namespace patter
             return out + "}";
         }
 
-        inline std::string flowJson(const FlowSnapshot& f)
+        // A flow's fields as a save writes them, without the braces, so a FlowState can add its own.
+        inline std::string flowFieldsJson(const FlowSnapshot& f)
         {
-            // A flow holds no properties since version 3: those are the registry's.
-            std::string out = "{";
+            std::string out;
             out += "\"rngState\":" + std::to_string(static_cast<unsigned long long>(f.rngState));
             out += ",\"visits\":" + intMapJson(f.visits);
             // The execution position sits under `cursor`, as the JS reference writes it. An absent id
@@ -156,7 +156,23 @@ namespace patter
             // The prompt still to replay, as the choice showed it: written only in the choose->advance window.
             if (f.pendingPrompt) out += ",\"pendingPrompt\":" + promptJson(*f.pendingPrompt);
             out += ",\"selectors\":" + selectorMapJson(f.selectors);
-            return out + "}}";
+            return out + "}";
+        }
+
+        inline std::string flowJson(const FlowSnapshot& f)
+        {
+            // A flow holds no properties since version 3: those are the registry's.
+            return "{" + flowFieldsJson(f) + "}";
+        }
+
+        // A version 2 save's per-flow property sections, which a FlowState carries: `scopes` in the
+        // family's two-level shape, and `sceneBags` (scene id -> name -> value).
+        inline std::string flowValuesJson(const FlowSnapshot& f)
+        {
+            std::string out = "\"scopes\":{\"patter\":" + valueMapJson(f.scopes) + "},\"sceneBags\":{";
+            bool first = true;
+            for (const auto& kv : f.sceneBags) { if (!first) out += ","; first = false; out += jsonQuote(kv.first) + ":" + valueMapJson(kv.second); }
+            return out + "}";
         }
     }
 
@@ -465,6 +481,28 @@ namespace patter
         }
     }
 
+    namespace savedetail
+    {
+        // Refuse a version this runtime does not read (exactly 2 or SAVE_VERSION: 3.9 is refused, not
+        // read as 3), shown as JS's String() writes it: the same message on every runtime.
+        inline void checkVersion(const JV* version, const std::string& refusal)
+        {
+            if (version && version->t == JV::T::Num && (version->n == 2 || version->n == SAVE_VERSION)) return;
+            std::string shown = "undefined";
+            if (version)
+                switch (version->t)
+                {
+                    case JV::T::Num: shown = PatterValue::JsNumber(version->n); break;
+                    case JV::T::Str: shown = version->s; break;
+                    case JV::T::Bool: shown = version->b ? "true" : "false"; break;
+                    case JV::T::Null: shown = "null"; break;
+                    case JV::T::Arr: shown = ""; break;
+                    case JV::T::Obj: shown = "[object Object]"; break;
+                }
+            throw std::runtime_error(refusal + shown);
+        }
+    }
+
     /// Parse + restore a serializeState string: version 3, or a version 2 save whose values move into the
     /// registry, each inside the `patter/save@0` envelope. Throws on malformed JSON, anything that is not
     /// that envelope (a bare snapshot with no envelope included), a save version this runtime does not
@@ -477,23 +515,8 @@ namespace patter
         const JV* saveObj = root.t == JV::T::Obj && root.str("schema") == SAVE_SCHEMA ? root.get("save") : nullptr;
         if (!saveObj || saveObj->t != JV::T::Obj) throw std::runtime_error(std::string("loadState: not a ") + SAVE_SCHEMA + " envelope");
 
-        // The version as JS's String() writes it, for the refusal: the same message on every runtime.
         const JV* version = saveObj->get("version");
-        if (!version || version->t != JV::T::Num || (version->n != 2 && version->n != SAVE_VERSION))
-        {
-            std::string shown = "undefined";
-            if (version)
-                switch (version->t)
-                {
-                    case JV::T::Num: shown = PatterValue::JsNumber(version->n); break;
-                    case JV::T::Str: shown = version->s; break;
-                    case JV::T::Bool: shown = version->b ? "true" : "false"; break;
-                    case JV::T::Null: shown = "null"; break;
-                    case JV::T::Arr: shown = ""; break;
-                    case JV::T::Obj: shown = "[object Object]"; break;
-                }
-            throw std::runtime_error("unsupported save version: " + shown);
-        }
+        checkVersion(version, "unsupported save version: ");
         const JV* flows = saveObj->get("flows");
         if (!flows || flows->t != JV::T::Obj) throw std::runtime_error("malformed save: no flows");
 
@@ -507,6 +530,32 @@ namespace patter
         s.stageBags = toBagMap(saveObj->get("stageBags"));
         for (const auto& kv : flows->obj) s.flows[kv.first] = toFlow(kv.second);
         engine.loadGame(s);
+    }
+
+    /// A FlowState (Engine::captureFlow) as JSON, in the save's own spelling: `version`, the flow's
+    /// snapshot as a save writes it, and its own values as `scopes` and `sceneBags`.
+    inline std::string serializeFlowState(const FlowState& state)
+    {
+        using namespace savedetail;
+        return "{\"version\":" + std::to_string(state.version) + "," + flowFieldsJson(state) + "," + flowValuesJson(state) + "}";
+    }
+
+    /// Parse a serializeFlowState string (or one another runtime wrote) for Engine::restoreFlow. Throws on
+    /// malformed JSON, anything that is not an object, a version a save reader would refuse, or a state with
+    /// no `cursor` object (a flow state never had the flat shape a save from before 0.11.0 may have).
+    inline FlowState deserializeFlowState(const std::string& json)
+    {
+        using namespace savedetail;
+        JV root = JParse(json).parse();
+        if (root.t != JV::T::Obj) throw std::runtime_error("restoreFlow: not a flow state");
+        const JV* version = root.get("version");
+        checkVersion(version, "unsupported flow state version: ");
+        const JV* cursor = root.get("cursor");
+        if (!cursor || cursor->t != JV::T::Obj) throw std::runtime_error("malformed flow state: no cursor");
+        FlowState state;
+        static_cast<FlowSnapshot&>(state) = toFlow(root);
+        state.version = static_cast<int>(version->n);
+        return state;
     }
 
     /// The game's registry as JSON (registry key -> name -> value), for a game that passed its own

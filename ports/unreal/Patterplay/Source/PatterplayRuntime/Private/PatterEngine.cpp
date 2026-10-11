@@ -3,6 +3,7 @@
 #include "PatterDebug.h"
 #include "PatterWorld.h"
 #include "Patter/Engine.h"
+#include "Patter/Save.h"
 #include "PatterConvert.h"
 #include "UObject/Package.h" // GetTransientPackage() - not transitively available in the Game target
 
@@ -643,6 +644,21 @@ void UPatterEngine::CloseFlow(const FString& FlowName)
 	try { Engine->closeFlow(Std(FlowName)); } // refused while a checkpoint is open
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return; }
 	RebindFlows(); // the flow is gone; its wrapper must stop pointing at a map entry that is not there
+}
+
+FString UPatterEngine::CaptureFlow(const FString& FlowName)
+{
+	if (!Engine) return FString();
+	try { return Ue(patter::serializeFlowState(Engine->captureFlow(Std(FlowName)))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return FString(); }
+}
+
+UPatterFlow* UPatterEngine::RestoreFlow(const FString& FlowName, const FString& State)
+{
+	if (!Engine) return nullptr;
+	try { Engine->restoreFlow(Std(FlowName), patter::deserializeFlowState(Std(State))); } // refused while a checkpoint is open
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
+	return GetFlow(FlowName); // a fresh wrapper, held for re-binding as OpenFlow's is
 }
 
 void UPatterEngine::Reset()

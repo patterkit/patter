@@ -20,7 +20,7 @@ export { DEFAULT_PAD_AFTER } from "@patterkit/model";
 export type { PropertyRow } from "@wildwinter/scoperegistry";
 export type {
   StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, HostScope, WorldResolver,
-  EngineSave, SaveGame, FlowSnapshot, FlowCursor, SelectorSnapshot, SavedChoice, SavedChoiceOption, SavedChoicePrompt, StackFrame, SaveEnvelope,
+  EngineSave, SaveGame, FlowSnapshot, FlowState, FlowValues, FlowCursor, SelectorSnapshot, SavedChoice, SavedChoiceOption, SavedChoicePrompt, StackFrame, SaveEnvelope,
   BeatInfo, OutlineNode, OutlineBlock, OutlineScene, FlatBeat,
   TraceEvent, TraceHandler, EngineTraceHandler, LogEntry, EngineLogEntry, PlayError,
 } from "./engine.js";

@@ -50,7 +50,9 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
   ```
 
 - `test_save_shape.gd` - the save's SHAPE, pinned against hand-written saves: version 3 as written,
-  version 2 and the pre-0.11.0 snake_case shape as still read.
+  version 2 and the pre-0.11.0 snake_case shape as still read, and a flow state from `capture_flow`
+  (the flow's snapshot plus its own values, parked ones included, without its id), and a restore
+  dropping what a load left waiting under its id.
 
   ```sh
   godot --headless --path ports/godot --script res://test/test_save_shape.gd
@@ -74,7 +76,9 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
   `@world` write, and a failing Best-match part; the decision log gets a `diagnostic` entry for each and
   no `write` entry for a skipped effect. Also the load refusals the corpus cannot express: a bare
   snapshot with no envelope, a save with no flows, and a version that is not 2 or 3 are refused, and
-  leave the engine exactly as it was.
+  leave the engine exactly as it was. So is `restore_flow` over an open id, inside a checkpoint, with
+  a version it cannot read, or with a state that has no cursor; `capture_flow` inside a checkpoint is
+  allowed.
 
   ```sh
   godot --headless --path ports/godot --script res://test/test_play_errors.gd

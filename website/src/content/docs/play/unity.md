@@ -240,6 +240,10 @@ package before 0.11.0 (its old PascalCase shape) still load too, and are written
 shape on the next save. Persist the string wherever you keep saves, and see
 [Save/load & Game Data](/play/integration/) for the format.
 
+To set one flow aside instead, `engine.CaptureFlow(id)` returns its part of a save as a `FlowState`, and
+`engine.RestoreFlow(newId, state)` opens it again later; `PatterSave.SaveFlowState` and `ReadFlowState` turn a
+state into JSON and back. See [Taking one flow out](/play/integration/#taking-one-flow-out).
+
 ## Next
 
 - [The play loop](/play/concepts/) is the shared model.

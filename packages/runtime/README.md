@@ -110,6 +110,10 @@ value); `engine.loadGame(blob)` restores it. Saves from before property values m
 registry (version 2) still load. [@patterkit/play-helpers](../play-helpers) wraps these as
 `serializeState` / `deserializeState` with a tagged envelope.
 
+To set one flow aside instead, `engine.captureFlow(id)` returns its part of a save as plain data (its
+position, PRNG, visits, selectors, and its own property values, without its id); close it after capturing,
+and `engine.restoreFlow(newId, state)` opens it again later, under any id, without rewinding shared state.
+
 ## One registry per game
 
 A game has one `ScopeRegistry` holding every property from every engine, except values the game

@@ -6,6 +6,21 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Take a flow out as data and put it back: `capture_flow` and `restore_flow`.** `engine.capture_flow(id)`
+  returns the flow's state as a plain Dictionary: its snapshot as `save_game` writes it (cursor, PRNG, visits,
+  and selectors), a `version`, and its own property values in the sections a version 2 save carried per flow
+  (`scopes.patter` and `sceneBags`), without its id. Values still waiting for a scene the flow hasn't
+  re-entered come too. `engine.restore_flow(id, state)` opens a flow from it, under the same id or another,
+  as `load_game` restores each flow: against an edited bundle it re-finds its place by id. Shared state
+  (shared properties, shared visit counts and selectors) isn't in it, so a restore rewinds nothing else.
+  Anything a load left waiting under the id belonged to a flow that has gone, and is dropped, as when a flow
+  starts. Capturing only reads, so it is allowed inside a checkpoint; restoring is refused there, over an id
+  that is open, for a version a save couldn't have, and for a state with no cursor, returning null with
+  `push_error` and changing nothing. Capture before `close_flow`, which drops the flow's values. Held across
+  all four runtimes by the conformance corpus.
+
 ## [0.23.0] - 2026-10-10
 
 ### Added

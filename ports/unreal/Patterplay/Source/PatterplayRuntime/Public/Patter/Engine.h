@@ -141,6 +141,19 @@ namespace patter
             }
             return out;
         }
+        /** The inverse of esc, for a key read back out of a registry save. */
+        inline std::string unesc(const std::string& key)
+        {
+            std::string out;
+            out.reserve(key.size());
+            for (size_t i = 0; i < key.size(); ++i)
+            {
+                if (key.compare(i, 3, "%2F") == 0) { out += '/'; i += 2; }
+                else if (key.compare(i, 3, "%25") == 0) { out += '%'; i += 2; }
+                else out += key[i];
+            }
+            return out;
+        }
         /** A scene's SHARED @scene props (one bag per scene, every flow's). */
         inline std::string stage(const std::string& sceneId) { return "patter/scene/" + esc(sceneId); }
         /** Everything one flow registers starts with this. */
@@ -358,9 +371,9 @@ namespace patter
     // The serialised cursor + PRNG + visits of a single flow. Its properties are the registry's.
     struct FlowSnapshot
     {
-        // VERSION 2 ONLY, read and never written: the flow's NOT-shared @patter globals and its
-        // per-scene NOT-shared @scene bags, which a version 2 save carried itself. loadGame moves
-        // them into the registry under the flow's keys.
+        // VERSION 2 ONLY in a save, read and never written: the flow's NOT-shared @patter globals and
+        // its per-scene NOT-shared @scene bags, which a version 2 save carried itself. loadGame moves
+        // them into the registry under the flow's keys. A FlowState carries them too, without the id.
         std::map<std::string, PatterValue> scopes;
         std::map<std::string, std::map<std::string, PatterValue>> sceneBags;
         uint32_t rngState = 0;
@@ -379,6 +392,17 @@ namespace patter
 
     /** The save version saveGame() writes. Bumped only when a reader would MISREAD an older save. */
     inline constexpr int SAVE_VERSION = 3;
+
+    // One flow taken out of an engine (Engine::captureFlow) to be put back later (Engine::restoreFlow),
+    // under the same id or another: its snapshot as a save writes it, plus its own property values
+    // without its id (`scopes` and `sceneBags`, the sections a version 2 save carried per flow). Plain
+    // data in the save's spelling (Save.h writes and reads it), so a game saves it as it saves anything
+    // else. Shared state (shared properties, shared visit counts, shared selectors) is never in it, so
+    // restoring one rewinds nothing else.
+    struct FlowState : FlowSnapshot
+    {
+        int version = SAVE_VERSION;
+    };
 
     // A full resumable save-game (version 3): everything that is not a property, plus the registry's
     // values when the engine made its own registry. loadGame also reads version 2, from before the
@@ -2403,6 +2427,57 @@ namespace patter
             auto it = flows_.find(id);
             return it != flows_.end() ? it->second : std::shared_ptr<Flow>();
         }
+        // Take flow `id` out of the engine as plain data, to be put back later with restoreFlow: its
+        // snapshot as saveGame writes it, and its own property values without its id (so it can come back
+        // under another). Shared state is never in it. Doesn't close the flow; close it with closeFlow
+        // AFTER capturing, since closing drops its values. Only reads, so it is allowed while a checkpoint
+        // is open. Throws for an id that is not open.
+        FlowState captureFlow(const std::string& id)
+        {
+            auto it = flows_.find(id);
+            if (it == flows_.end()) throw std::runtime_error("no open flow '" + id + "' to capture");
+            FlowState state;
+            static_cast<FlowSnapshot&>(state) = it->second->snapshot();
+            state.version = SAVE_VERSION;
+            flowValuesFrom(id, host_.registry->save(), state);
+            return state;
+        }
+
+        // Open flow `id` from a captureFlow state, the per-flow half of loadGame: its values go into the
+        // registry as a load's do, and the flow is restored as a load restores each flow (a scene the
+        // cursor isn't in claims its values when the flow enters it). `id` needn't be the id it was
+        // captured from. Against an edited bundle it re-finds its place by id, as a load does. Refused
+        // (throws, before anything changes) while a checkpoint is open, for a version a save reader would
+        // refuse, or if a flow of that id is open. A state that won't restore throws too, leaving nothing
+        // behind under the id.
+        Flow* restoreFlow(const std::string& id, const FlowState& state)
+        {
+            refuseInCheckpoint("restoreFlow");
+            if (state.version != 2 && state.version != SAVE_VERSION)
+                throw std::runtime_error("unsupported flow state version: " + std::to_string(state.version));
+            if (flows_.count(id))
+                throw std::runtime_error("a flow '" + id + "' is already open; close it before restoring another under that id");
+            assertExternalScopes();
+            // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
+            const std::string parked = registrykeys::flow(id);
+            host_.registry->discardParked(parked);
+            host_.registry->load(flowSections(id, state), /*keepParked=*/true);
+            auto flow = std::make_shared<Flow>(id, &host_, static_cast<int64_t>(defaultSeed_));
+            try
+            {
+                flow->restore(state);
+            }
+            catch (...)
+            {
+                flow->close();   // a state that won't restore leaves nothing behind
+                host_.registry->discardParked(parked);
+                throw;
+            }
+            Flow* raw = flow.get();
+            flows_[id] = std::move(flow);
+            return raw;
+        }
+
         // Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
         // holding it cannot keep advancing it into the shared world.
         void closeFlow(const std::string& id)
@@ -2616,9 +2691,9 @@ namespace patter
         // and its shuffle draws never happened.
         //
         // One checkpoint at a time. Inside one, the calls that replace or drop flows or their bags wholesale
-        // (reset, loadGame, hotSwap, closeFlow, openFlow on the name of an open flow, and a flow's own start
-        // and restore) throw. Not undone: log entries already recorded, and draws from a custom `rng` the
-        // game supplied.
+        // (reset, loadGame, hotSwap, closeFlow, restoreFlow, openFlow on the name of an open flow, and a
+        // flow's own start and restore) throw. Not undone: log entries already recorded, and draws from a
+        // custom `rng` the game supplied.
         Checkpoint checkpoint()
         {
             if (host_.journal) throw std::runtime_error("a checkpoint is already open: roll it back or commit it first");
@@ -2883,11 +2958,37 @@ namespace patter
             out.set("patter", orderedOf(save.shared));
             for (const auto& kv : save.stageBags) out.set(registrykeys::stage(kv.first), orderedOf(kv.second));
             for (const auto& f : save.flows)
-            {
-                out.set(registrykeys::flowGlobals(f.first), orderedOf(f.second.scopes));
-                for (const auto& kv : f.second.sceneBags) out.set(registrykeys::flowScene(f.first, kv.first), orderedOf(kv.second));
-            }
+                for (const auto& kv : flowSections(f.first, f.second)) out.set(kv.first, kv.second);
             return out;
+        }
+
+        // One flow's own values (a version 2 save's per-flow sections, or a FlowState's) as registry
+        // sections under flow `id`'s keys.
+        static ScopeRegistry::SaveBlob flowSections(const std::string& id, const FlowSnapshot& f)
+        {
+            ScopeRegistry::SaveBlob out;
+            out.set(registrykeys::flowGlobals(id), orderedOf(f.scopes));
+            for (const auto& kv : f.sceneBags) out.set(registrykeys::flowScene(id, kv.first), orderedOf(kv.second));
+            return out;
+        }
+
+        // The inverse of flowSections: flow `id`'s sections in a registry save, without the id, into
+        // `out`'s scopes and sceneBags. Values still waiting in the registry for a scene the flow hasn't
+        // re-entered are in the save, so they come too.
+        static void flowValuesFrom(const std::string& id, const ScopeRegistry::SaveBlob& saved, FlowSnapshot& out)
+        {
+            const std::string prefix = registrykeys::flow(id);
+            const std::string scenePrefix = "scene/";
+            for (const auto& section : saved)
+            {
+                if (section.first.compare(0, prefix.size(), prefix) != 0) continue;
+                const std::string rest = section.first.substr(prefix.size());
+                std::map<std::string, PatterValue> values;
+                for (const auto& kv : section.second) values[kv.first] = kv.second;
+                if (rest == "patter") out.scopes = std::move(values);
+                else if (rest.compare(0, scenePrefix.size(), scenePrefix) == 0)
+                    out.sceneBags[registrykeys::unesc(rest.substr(scenePrefix.size()))] = std::move(values);
+            }
         }
 
         // Register this engine's game-wide scopes: @patter, every bound host scope (external), and, for a

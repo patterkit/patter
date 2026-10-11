@@ -33,6 +33,16 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Flow capture and restore**: `engine.captureFlow(id)` takes one flow out as a `FlowState`, plain data in the
+  save's own spelling (its snapshot, a `version`, and its own values as a version 2 save's per-flow `scopes`
+  and `sceneBags`, without its id), and `engine.restoreFlow(id, state)` opens it again under any id, as
+  `loadGame` restores each flow. Shared state isn't in it, so a restore rewinds nothing else, and anything a
+  load left waiting under the id is dropped first, as when a flow starts. Refused over an open id, while a
+  checkpoint is open, and for a state with no cursor, changing nothing; capturing is allowed in a checkpoint.
+  The conformance corpus holds every runtime to it.
+
 ## [0.23.0] - 2026-10-10
 
 ### Added

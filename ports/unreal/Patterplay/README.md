@@ -79,6 +79,15 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   own `@world` container with `UPatterEngine::Create(Bundle, World)`.
 - **Save and load**: `UPatterSave::SerializeState` / `DeserializeState` write and read the
   whole run as one JSON string (save version 3; a version 2 save inside the same envelope still loads).
+- **Taking one flow out**: `Engine->CaptureFlow(TEXT("bob"))` returns one flow as a JSON string (its
+  place, a pending choice included, and its own property values, without its name), for your game to keep
+  however it likes; `Engine->RestoreFlow(TEXT("bob-again"), State)` opens a flow from it later, under the
+  same name or another, in this session or after a save and load. **Capture before `CloseFlow`**: closing
+  drops the flow's values. Shared state isn't in it, so restoring rewinds nothing else. `RestoreFlow`
+  refuses a name that is open, and refuses while a checkpoint is open, changing nothing and answering
+  null. In C++, `patter::Engine::captureFlow` / `restoreFlow` take a `patter::FlowState`, and
+  `patter::serializeFlowState` / `deserializeFlowState` turn it into JSON and back. See
+  [Taking one flow out](https://patterkit.dev/play/integration/#taking-one-flow-out).
 - **One registry per game** (C++): every property lives in a `patter::ScopeRegistry`. An engine
   makes its own by default; `UPatterEngine::CreateWithRegistry` builds one on your game's registry,
   which your game then saves once with `patter::saveRegistry`. The registry is the shared kernel's

@@ -52,6 +52,8 @@ namespace Patterkit.Patterplay
         public const string Owner = "Patter";
 
         private static string Esc(string id) => id.Replace("%", "%25").Replace("/", "%2F");
+        /// <summary>An escaped id back as it was: the inverse of the escaping above.</summary>
+        public static string Unesc(string key) => key.Replace("%2F", "/").Replace("%25", "%");
         /// <summary>A scene's SHARED @scene props (one bag per scene, every flow's).</summary>
         public static string Stage(string sceneId) => "patter/scene/" + Esc(sceneId);
         /// <summary>Everything one flow registers starts with this.</summary>
@@ -1208,6 +1210,51 @@ namespace Patterkit.Patterplay
             }
         }
 
+        /// <summary>Take flow <paramref name="id"/> out of the engine as plain data, to be put back later with
+        /// <see cref="RestoreFlow"/>: its snapshot as SaveGame writes it, and its own property values without its
+        /// id (so it can come back under another). Shared state is never in it. Doesn't close the flow; close it
+        /// with <see cref="CloseFlow"/> AFTER capturing, since closing drops its values. Only reads, so it is
+        /// allowed while a checkpoint is open. PatterSave.SaveFlowState writes it as JSON.</summary>
+        public FlowState CaptureFlow(string id)
+        {
+            if (!_flows.TryGetValue(id, out var flow)) throw new Exception($"no open flow '{id}' to capture");
+            var state = flow.SnapshotInto(new FlowState { Version = SaveVersion });
+            FlowValuesFrom(id, _host.Registry.Save(), state);
+            return state;
+        }
+
+        /// <summary>Open flow <paramref name="id"/> from a <see cref="CaptureFlow"/> state, the per-flow half of
+        /// LoadGame: its values go into the registry as a load's do, and the flow is restored as a load restores
+        /// each flow. <paramref name="id"/> needn't be the id it was captured from. Against an edited bundle it
+        /// re-finds its place by id, as a load does. Refused if a flow of that id is open, or while a checkpoint is.
+        /// Values a load left waiting under <paramref name="id"/> are dropped first, as a flow's start drops them,
+        /// and a state that won't restore leaves nothing behind. (A state with no cursor, which the other runtimes
+        /// refuse here, can't reach this call: PatterSave.ReadFlowState refuses it as it reads.)</summary>
+        public Flow RestoreFlow(string id, FlowState state)
+        {
+            RefuseInCheckpoint("RestoreFlow");
+            if (state.Version != 2 && state.Version != SaveVersion) throw new Exception($"unsupported flow state version: {state.Version}");
+            if (_flows.ContainsKey(id)) throw new Exception($"a flow '{id}' is already open; close it before restoring another under that id");
+            AssertExternalScopes();
+            // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
+            string parked = PatterKeys.Flow(id);
+            _host.Registry.DiscardParked(parked);
+            _host.Registry.Load(FlowSections(id, state), keepParked: true);
+            var flow = new Flow(id, _host, _defaultSeed);
+            try
+            {
+                flow.Restore(state);
+            }
+            catch
+            {
+                flow.Close();                                   // a state that won't restore leaves nothing behind
+                _host.Registry.DiscardParked(parked);
+                throw;
+            }
+            _flows[id] = flow;
+            return flow;
+        }
+
         /// <summary>A version 2 save's property values, as registry sections under this engine's keys.</summary>
         private static OrderedMap<string, OrderedMap<string, ExprValue>> SectionsFromV2(SaveGame save)
         {
@@ -1216,14 +1263,39 @@ namespace Patterkit.Patterplay
             if (save.Shared != null) out_.Set("patter", OrderedOf(save.Shared));
             foreach (var kv in save.StageBags ?? new Dictionary<string, Dictionary<string, ExprValue>>())
                 out_.Set(PatterKeys.Stage(kv.Key), OrderedOf(kv.Value));
-            foreach (var f in save.Flows ?? new Dictionary<string, FlowSnapshot>())
-            {
-                if (f.Value.Scopes != null) out_.Set(PatterKeys.FlowGlobals(f.Key), OrderedOf(f.Value.Scopes));
-                foreach (var kv in f.Value.SceneBags ?? new Dictionary<string, Dictionary<string, ExprValue>>())
-                    out_.Set(PatterKeys.FlowScene(f.Key, kv.Key), OrderedOf(kv.Value));
-            }
 #pragma warning restore CS0618
+            foreach (var f in save.Flows ?? new Dictionary<string, FlowSnapshot>())
+                foreach (var kv in FlowSections(f.Key, f.Value)) out_.Set(kv.Key, kv.Value);
             return out_;
+        }
+
+        /// <summary>One flow's own values (a version 2 save's per-flow sections, or a <see cref="FlowState"/>'s)
+        /// as registry sections under flow <paramref name="id"/>'s keys.</summary>
+        private static OrderedMap<string, OrderedMap<string, ExprValue>> FlowSections(string id, FlowSnapshot f)
+        {
+            var out_ = new OrderedMap<string, OrderedMap<string, ExprValue>>();
+            if (f.Scopes != null) out_.Set(PatterKeys.FlowGlobals(id), OrderedOf(f.Scopes));
+            foreach (var kv in f.SceneBags ?? new Dictionary<string, Dictionary<string, ExprValue>>())
+                out_.Set(PatterKeys.FlowScene(id, kv.Key), OrderedOf(kv.Value));
+            return out_;
+        }
+
+        /// <summary>The inverse of <see cref="FlowSections"/>: flow <paramref name="id"/>'s sections in a registry
+        /// save, without the id, onto <paramref name="into"/>. Values still waiting in the registry for a scene the
+        /// flow hasn't re-entered are in the save, so they come too.</summary>
+        private static void FlowValuesFrom(string id, OrderedMap<string, OrderedMap<string, ExprValue>> saved, FlowSnapshot into)
+        {
+            into.Scopes = null;
+            into.SceneBags = new Dictionary<string, Dictionary<string, ExprValue>>();
+            string prefix = PatterKeys.Flow(id);
+            foreach (var pair in saved)
+            {
+                if (!pair.Key.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                string rest = pair.Key.Substring(prefix.Length);
+                if (rest == "patter") into.Scopes = FlatOf(pair.Value);
+                else if (rest.StartsWith("scene/", StringComparison.Ordinal))
+                    into.SceneBags[PatterKeys.Unesc(rest.Substring("scene/".Length))] = FlatOf(pair.Value);
+            }
         }
 
         // -- ref resolution -----------------------------------------------------
@@ -1444,6 +1516,14 @@ namespace Patterkit.Patterplay
             return values;
         }
 
+        /// <summary>The inverse of <see cref="OrderedOf"/>: a registry section as a flat name/value map.</summary>
+        internal static Dictionary<string, ExprValue> FlatOf(OrderedMap<string, ExprValue> values)
+        {
+            var flat = new Dictionary<string, ExprValue>();
+            foreach (var e in values) flat[e.Key] = e.Value;
+            return flat;
+        }
+
         internal static ExprValue PropDefault(PropertyDecl d)
         {
             if (d.Default != null) return d.Default;
@@ -1503,14 +1583,15 @@ namespace Patterkit.Patterplay
         public Dictionary<string, Dictionary<string, ExprValue>> StageBags;
     }
 
-    /// <summary>The serialised cursor, PRNG, and visits of one flow. Its properties are the registry's.</summary>
-    public sealed class FlowSnapshot
+    /// <summary>The serialised cursor, PRNG, and visits of one flow. In a version 3 save its properties are the
+    /// registry's (SaveGame.Registry), so the save doesn't write <see cref="Scopes"/> or <see cref="SceneBags"/>.</summary>
+    public class FlowSnapshot
     {
-        /// <summary>Version 2 only: the flow's not-shared @patter globals. Read, never written.</summary>
-        [Obsolete("Version 2 saves only. Property values are the registry's now: see SaveGame.Registry.")]
+        /// <summary>The flow's not-shared @patter globals, carried by a <see cref="FlowState"/> and by a version 2
+        /// save; a version 3 save leaves them to the registry.</summary>
         public Dictionary<string, ExprValue> Scopes;
-        /// <summary>Version 2 only: the flow's per-scene @scene bags. Read, never written.</summary>
-        [Obsolete("Version 2 saves only. Property values are the registry's now: see SaveGame.Registry.")]
+        /// <summary>The flow's per-scene @scene bags (scene id -> name -> value), carried by a
+        /// <see cref="FlowState"/> and by a version 2 save; a version 3 save leaves them to the registry.</summary>
         public Dictionary<string, Dictionary<string, ExprValue>> SceneBags;
         public uint RngState;
         public Dictionary<string, int> Visits;
@@ -1524,5 +1605,17 @@ namespace Patterkit.Patterplay
         public string PendingPromptOwnerId;        // chosen option owning a prompt still to replay (save in the choose->advance window)
         public ChoicePrompt PendingPrompt;         // that prompt as the choice showed it; null when none, or in a save written before it was carried
         public Dictionary<string, SelectorState> Selectors;
+    }
+
+    /// <summary>One flow taken out of an engine (<see cref="Engine.CaptureFlow"/>) to be put back later
+    /// (<see cref="Engine.RestoreFlow"/>), under the same id or another: its snapshot as a save writes it, and its
+    /// own property values (<see cref="FlowSnapshot.Scopes"/>, <see cref="FlowSnapshot.SceneBags"/>) without its
+    /// id. Plain data in the save's spelling, so a game saves it as it saves anything else
+    /// (PatterSave.SaveFlowState and ReadFlowState). Shared state (shared properties, world visit counts, shared
+    /// selectors) is never in it, so restoring one rewinds nothing else.</summary>
+    public sealed class FlowState : FlowSnapshot
+    {
+        /// <summary>The save version it was written at (<see cref="Engine.SaveVersion"/>).</summary>
+        public int Version;
     }
 }

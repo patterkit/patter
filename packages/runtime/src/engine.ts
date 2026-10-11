@@ -43,6 +43,7 @@ import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
 import type {
   EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoicePrompt, FlowSnapshot, SaveGame, SaveGameV2,
+  FlowState, FlowValues,
   Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet,
   CompiledEffect, Beat, LineBeat, TextBeat, GameData, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
 } from "@patterkit/model";
@@ -82,7 +83,7 @@ function tagsOf(host: { tagIndex: Map<string, string[]> }, id: string): string[]
 // working; this engine's saveGame() output IS that document, and every port writes the same.
 export type {
   EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoiceOption, SavedChoicePrompt,
-  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope, SaveGameV2, FlowSnapshotV2,
+  FlowCursor, FlowSnapshot, SaveGame, SaveEnvelope, SaveGameV2, FlowSnapshotV2, FlowState, FlowValues,
 } from "@patterkit/model";
 
 /** The owner label on everything this engine registers: named in a clash error and carried on
@@ -93,6 +94,7 @@ const OWNER = "Patter";
  *  so a flow named `npc/bob` cannot collide with another flow's scene. Every runtime writes the
  *  same keys: they are in the save. */
 const esc = (id: string): string => id.replace(/%/g, "%25").replace(/\//g, "%2F");
+const unesc = (key: string): string => key.replace(/%2F/g, "/").replace(/%25/g, "%");
 /** Internal: marks a hotSwap replacement of a standalone engine, which shares its predecessor's registry
  *  but is still its own game (it self-backs host scopes and saves the registry's values). */
 const OWNS_REGISTRY = Symbol("ownsRegistry");
@@ -1163,6 +1165,48 @@ export class Engine {
 
   private refuseInCheckpoint(what: string): void {
     if (this.host.journal) throw new Error(`${what} can't be undone, so it isn't allowed while a checkpoint is open`);
+  }
+
+  /**
+   * Take flow `id` out of the engine as plain data, to be put back later with {@link restoreFlow}: its snapshot as
+   * `saveGame` writes it, and its own property values without its id (so it can come back under another). Shared
+   * state is never in it. Doesn't close the flow; close it with {@link closeFlow} AFTER capturing, since closing
+   * drops its values. Only reads, so it is allowed while a checkpoint is open.
+   */
+  captureFlow(id: string): FlowState {
+    const flow = this.flowsById.get(id);
+    if (!flow) throw new Error(`no open flow '${id}' to capture`);
+    return { version: SAVE_VERSION, ...flow.snapshot(), ...flowValuesFrom(id, this.host.registry.save()) };
+  }
+
+  /**
+   * Open flow `id` from a {@link captureFlow} state, the per-flow half of `loadGame`: its values go into the
+   * registry as a load's do, and the flow is restored as a load restores each flow. `id` needn't be the id it was
+   * captured from. Against an edited bundle it re-finds its place by id, as a load does. Refused if a flow of
+   * that id is open, or while a checkpoint is.
+   */
+  restoreFlow(id: string, state: FlowState): Flow {
+    this.refuseInCheckpoint("restoreFlow");
+    const version: unknown = (state as { version?: unknown }).version;
+    if (version !== 2 && version !== SAVE_VERSION) throw new Error(`unsupported flow state version: ${String(version)}`);
+    const cursor: unknown = (state as { cursor?: unknown }).cursor;
+    if (typeof cursor !== "object" || cursor === null) throw new Error("malformed flow state: no cursor");
+    if (this.flowsById.has(id)) throw new Error(`a flow '${id}' is already open; close it before restoring another under that id`);
+    this.assertExternalScopes();
+    // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
+    const parked = keys.flow(id);
+    this.host.registry.discardParked(parked);
+    this.host.registry.load(flowSections(id, state), { keepParked: true });
+    const flow = new Flow(id, this.host, this.defaultSeed);
+    try {
+      flow.restore(state);
+    } catch (e) {
+      flow.close();                                   // a state that won't restore leaves nothing behind
+      this.host.registry.discardParked(parked);
+      throw e;
+    }
+    this.flowsById.set(id, flow);
+    return flow;
   }
 
   /** Close (remove) a flow. The flow object is FINISHED, not merely unregistered, so a host still
@@ -2779,9 +2823,29 @@ function sectionsFromV2(save: SaveGameV2): EngineSave {
   const out: EngineSave = {};
   if (save.shared?.patter) out["patter"] = save.shared.patter;
   for (const [s, v] of Object.entries(save.stageBags ?? {})) out[keys.stage(s)] = v;
-  for (const [id, f] of Object.entries(save.flows ?? {})) {
-    if (f.scopes?.patter) out[keys.flowGlobals(id)] = f.scopes.patter;
-    for (const [s, v] of Object.entries(f.sceneBags ?? {})) out[keys.flowScene(id, s)] = v;
+  for (const [id, f] of Object.entries(save.flows ?? {})) Object.assign(out, flowSections(id, f));
+  return out;
+}
+
+/** One flow's own values (a version 2 save's per-flow sections, or a `FlowState`'s) as registry sections under
+ *  flow `id`'s keys. */
+function flowSections(id: string, f: Partial<FlowValues>): EngineSave {
+  const out: EngineSave = {};
+  if (f.scopes?.patter) out[keys.flowGlobals(id)] = f.scopes.patter;
+  for (const [s, v] of Object.entries(f.sceneBags ?? {})) out[keys.flowScene(id, s)] = v;
+  return out;
+}
+
+/** The inverse of `flowSections`: flow `id`'s sections in a registry save, without the id. Values still waiting
+ *  in the registry for a scene the flow hasn't re-entered are in the save, so they come too. */
+function flowValuesFrom(id: string, saved: EngineSave): FlowValues {
+  const out: FlowValues = { scopes: {}, sceneBags: {} };
+  const prefix = keys.flow(id);
+  for (const [key, values] of Object.entries(saved)) {
+    if (!key.startsWith(prefix)) continue;
+    const rest = key.slice(prefix.length);
+    if (rest === "patter") out.scopes.patter = values;
+    else if (rest.startsWith("scene/")) out.sceneBags[unesc(rest.slice("scene/".length))] = values;
   }
   return out;
 }

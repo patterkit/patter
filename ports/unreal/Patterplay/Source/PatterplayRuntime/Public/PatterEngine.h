@@ -440,6 +440,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void CloseFlow(const FString& FlowName);
 
+	// Take a flow out of the engine as data, to be put back later with RestoreFlow, under the same name or
+	// another: its FlowState as JSON, in the save's own spelling, so the game saves it as it saves anything
+	// else. It holds the flow's cursor, PRNG, visits, and selector cursors, and its own property values
+	// without its name; shared state is never in it, so restoring it rewinds nothing else. Doesn't close
+	// the flow: close it with CloseFlow AFTER capturing, since closing drops its values. Only reads, so it is
+	// allowed while a checkpoint is open. Empty (and logged) for a name that is not open.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	FString CaptureFlow(const FString& FlowName);
+
+	// Open a flow under this name from a CaptureFlow state, the per-flow half of loading a save: its values
+	// go back under the new name and it carries on where it was captured. Against an edited bundle it
+	// re-finds its place by id, as a load does. Null (and logged) when refused, with nothing changed: a flow
+	// of that name is open, a checkpoint is open, or the state is not one this runtime reads.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay")
+	UPatterFlow* RestoreFlow(const FString& FlowName, const FString& State);
+
 	// Close every flow and clear the shared world: back to a freshly created engine, same bundle.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void Reset();
@@ -448,8 +464,9 @@ public:
 	// change the story makes. The use is asking "would this say anything?" without consequences: Goto an
 	// address, Advance, and Rollback if it had nothing to give, so its scene's onEntry effects, its visits,
 	// and its shuffle draws never happened. One at a time, held here, so there is no handle to keep.
-	// While one is open, the calls that replace or drop flows wholesale (Reset, CloseFlow, OpenFlow on the
-	// name of an open flow, HotSwap, and loading a save) are refused and logged, as is a second Checkpoint.
+	// While one is open, the calls that replace or drop flows wholesale (Reset, CloseFlow, RestoreFlow,
+	// OpenFlow on the name of an open flow, HotSwap, and loading a save) are refused and logged, as is a
+	// second Checkpoint.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
 	void Checkpoint();
 
