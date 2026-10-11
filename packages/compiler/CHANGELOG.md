@@ -1,5 +1,15 @@
 # @patterkit/compiler
 
+## 0.6.2
+
+### Patch Changes
+
+- db35050: Each package now carries the MIT licence text (LICENSE) in its own folder, so the licence travels with every install.
+- Updated dependencies [db35050]
+  - @patterkit/model@0.13.1
+  - @patterkit/core@0.6.2
+  - @patterkit/dialect@0.2.10
+
 ## 0.6.1
 
 ### Patch Changes
