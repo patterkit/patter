@@ -1,5 +1,13 @@
 # @patterkit/play-helpers
 
+## 0.8.6
+
+### Patch Changes
+
+- db35050: Each package now carries the MIT licence text (LICENSE) in its own folder, so the licence travels with every install.
+- Updated dependencies [db35050]
+  - @patterkit/model@0.13.1
+
 ## 0.8.5
 
 ### Patch Changes

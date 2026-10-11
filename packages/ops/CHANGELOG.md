@@ -1,5 +1,16 @@
 # @patterkit/ops
 
+## 0.16.2
+
+### Patch Changes
+
+- db35050: The readable-script PDF fonts now come from their upstream npm packages (Fontsource for Newsreader, Inter and Noto; IBM's own release of Plex Mono) instead of a copy inlined into ops, so ops drops from 2.9 MB to 0.4 MB and the fonts arrive with their own licences. Greek, Cyrillic, arrows and maths fall back to Noto Sans and Noto Sans Math instead of DejaVu Sans. The npm CLI is now a thin build (43 KB, down from 8.4 MB) whose dependencies install from npm beside it; the standalone binaries are still one self-contained file each, fonts included. New `patter licences` (also `licenses`) prints patter's own licence, the licence of every font the PDF export embeds, and, in a standalone binary, the licence and copyright notice of every library compiled into it.
+- db35050: Each package now carries the MIT licence text (LICENSE) in its own folder, so the licence travels with every install.
+- Updated dependencies [db35050]
+  - @patterkit/model@0.13.1
+  - @patterkit/core@0.6.2
+  - @patterkit/compiler@0.6.2
+
 ## 0.16.1
 
 ### Patch Changes
