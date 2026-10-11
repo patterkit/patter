@@ -14,7 +14,7 @@
  */
 
 :root {
-  --pt-read: "Newsreader", Georgia, "Iowan Old Style", serif;
+  --pt-read: "Newsreader Variable", "Newsreader", Georgia, "Iowan Old Style", serif;
   --sl-font: "Inter", ui-sans-serif, system-ui, sans-serif;
   --sl-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 

@@ -27,6 +27,12 @@
     "build": "tsup src/index.ts --format esm --dts --clean"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/newsreader": "^5.3.0",
+    "@fontsource/noto-emoji": "^5.3.2",
+    "@fontsource/noto-sans": "^5.3.0",
+    "@fontsource/noto-sans-math": "^5.3.0",
+    "@ibm/plex-mono": "1.0.0",
     "@patterkit/compiler": "0.6.1",
     "@patterkit/core": "0.6.1",
     "@patterkit/model": "0.13.0",

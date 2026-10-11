@@ -1,0 +1,66 @@
+/* ---------------------------------------------------------------------------
+   Every face Patterpad's windows draw, declared once. Each window (the editor, play, search, coverage)
+   and the surface harness import this file, so a reading-font theme (theme.css, data-font) has its faces
+   in every window, not only the one that happened to import them.
+
+   The faces come from their upstream npm packages and are bundled when the app is built; the repository
+   keeps no font files. Fontsource for the families with no Reserved Font Name; IBM's own release for
+   Plex, whose name is reserved, so the copyright holder's files rather than a third party's subset.
+   The family's rule is patterkit's design/fonts.md.
+   --------------------------------------------------------------------------- */
+
+/* Newsreader: the default reading face. */
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/400-italic.css";
+@import "@fontsource/newsreader/600.css";
+@import "@fontsource/newsreader/700.css";
+
+/* Inter: the interface face. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+/* The other reading-font themes: Literata, Source Serif 4, Courier Prime (the "script" set). */
+@import "@fontsource/literata/400.css";
+@import "@fontsource/literata/400-italic.css";
+@import "@fontsource/literata/600.css";
+@import "@fontsource/literata/700.css";
+@import "@fontsource/source-serif-4/400.css";
+@import "@fontsource/source-serif-4/400-italic.css";
+@import "@fontsource/source-serif-4/600.css";
+@import "@fontsource/source-serif-4/700.css";
+@import "@fontsource/courier-prime/400.css";
+@import "@fontsource/courier-prime/400-italic.css";
+@import "@fontsource/courier-prime/700.css";
+
+/* IBM Plex Mono (machine text) and IBM Plex Sans (the Source Serif theme's interface face), from IBM's
+   complete files. IBM's own stylesheets declare every weight, so only the ones used are declared here. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("@ibm/plex-sans/fonts/complete/woff2/IBMPlexSans-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("@ibm/plex-sans/fonts/complete/woff2/IBMPlexSans-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("@ibm/plex-sans/fonts/complete/woff2/IBMPlexSans-Bold.woff2") format("woff2");
+}

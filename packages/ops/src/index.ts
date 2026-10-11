@@ -54,6 +54,7 @@ export { runScriptDoc, cueLabel, qualifierNamer } from "./script-doc.js";
 export type { ScriptDoc, ScriptElement } from "./script-doc.js";
 export { scriptToDocx } from "./script-docx.js";
 export { scriptToPdf } from "./script-pdf.js";
+export { SCRIPT_FONT_FILES, SCRIPT_FONT_PACKAGES, scriptFontLicencePath, scriptFontLicences, useScriptFontFiles, type ScriptFace } from "./script-fonts.js";
 export { runInit, vcsConfigWrites, currentBundlePosture } from "./init.js";
 export type { InitOptions, InitResult, InitVcs, BundlePosture } from "./init.js";
 export { runResolve, runSearch, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags } from "./resolve.js";

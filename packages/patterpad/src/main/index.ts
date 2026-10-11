@@ -26,6 +26,7 @@ import { plural } from "@wildwinter/app-shell/util";
 import { configureUpdater, startBackgroundUpdateCheck } from "@wildwinter/app-shell/updater";
 import { createJobHost } from "@wildwinter/app-shell/job";
 import { createProjectSession } from "@wildwinter/app-shell/session";
+import { SCRIPT_FONT_FILES, useScriptFontFiles } from "@patterkit/ops";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
 import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
@@ -33,6 +34,10 @@ import type { AppPrompt, SceneKitId } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
+// The PDF export's fonts: the build copies just the files ops uses into out/fonts (electron.vite.config.ts)
+// instead of the app carrying whole font packages, so point ops there.
+const scriptFontsDir = join(here, "../fonts");
+useScriptFontFiles(Object.fromEntries([...new Set(Object.values(SCRIPT_FONT_FILES).flat())].map((spec) => [spec, join(scriptFontsDir, spec)])));
 let win: BrowserWindow | null = null;
 let playSceneId: string | null = null;
 let playBlockId: string | null = null; // Play Block: the block the run enters (null = scene start)

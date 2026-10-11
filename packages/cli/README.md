@@ -54,6 +54,7 @@ walks up to the nearest `*.patterproj`. It defaults to the current folder.
 | `merge BASE OURS THEIRS` | 3-way structured merge of Patter source by node id (git's merge driver). |
 | `mergetool BASE THEIRS OURS OUT` | The single merge tool for Perforce, Plastic, and SVN: Patter source to the structured merge, anything else to your usual tool. |
 | `--version` | Print the version (also `-v`, `version`). |
+| `licences` | Print patter's licence, the fonts' licences, and (in a standalone binary) every bundled library's notice (also `licenses`). |
 
 ## Conventions
 

@@ -15,8 +15,7 @@ import "@wildwinter/app-shell/tooltip.css"; // the themed bubble initTooltips() 
 import "@wildwinter/app-shell/controls.css"; // the segmented mode control is the family's `.seg`
 import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./search.css";
-import "@fontsource/newsreader/400.css";
-import "@fontsource-variable/inter";
+import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
 
 import { applyTheme } from "../src/apply-theme.js";
 import { initTooltips } from "@wildwinter/app-shell";

@@ -3,35 +3,16 @@
 // pane, and the theme / font / formatting toggles. The surface itself owns the editor; this file owns
 // only the harness scaffolding.
 
-// Self-hosted web fonts (@fontsource), so the harness works offline. The app bundles its own; the
-// active set is chosen by data-font (theme.css).
 import { DEFAULT_QUALIFIERS } from "@patterkit/model";
-import "@fontsource/newsreader/400.css";
-import "@fontsource/newsreader/400-italic.css";
-import "@fontsource/newsreader/600.css";
-import "@fontsource/newsreader/700.css";
-import "@fontsource/literata/400.css";
-import "@fontsource/literata/400-italic.css";
-import "@fontsource/literata/600.css";
-import "@fontsource/literata/700.css";
-import "@fontsource/source-serif-4/400.css";
-import "@fontsource/source-serif-4/400-italic.css";
-import "@fontsource/source-serif-4/600.css";
-import "@fontsource/source-serif-4/700.css";
-import "@fontsource/courier-prime/400.css";
-import "@fontsource/courier-prime/400-italic.css";
-import "@fontsource/courier-prime/700.css";
-import "@fontsource-variable/inter";
+// Every face the surface draws, bundled from the font packages so the harness works offline (the app's
+// windows import the same file). The active set is chosen by data-font (theme.css).
+import "./fonts.css";
 // The confirm the surface raises is the shell's; its frame, buttons and copy draw from these (the app
 // window imports the same three once, so this is the harness doing what a host does).
 import "@wildwinter/app-shell/dialog.css";
 import "@wildwinter/app-shell/controls.css";
 import "@wildwinter/app-shell/confirm.css";
 import "@wildwinter/app-shell/keys.css"; // the hint bar's keycaps
-import "@fontsource/ibm-plex-sans/400.css";
-import "@fontsource/ibm-plex-sans/600.css";
-import "@fontsource/ibm-plex-sans/700.css";
-import "@fontsource/ibm-plex-mono/400.css";
 
 import { mountSurface } from "./surface.js";
 import { remeasureCues } from "./views.js";

@@ -3,7 +3,8 @@
   "source": "patterkit/site-chrome",
   "files": {
     "site.mjs": "2b472edb5ba0afbee5e79a5f3cf377cdee2dc0f4b936e017601233ec50828b66",
-    "chrome.css": "dc6d554c18fe1f29a66f40a47ba69fc44b384b7d3a834405bddc94819224d53e",
+    "chrome.css": "81698895aec7a8704c1b486c33c382ad81709462b6ae11ec132b298448ca1adc",
+    "fonts.css": "15881be7b3d33daac654e91b75f52667af03950164b8dfe7ede8b27eb227aa3f",
     "Footer.astro": "9baa2f68c856ca1bbcd86a63b28c57936ba10edff19029b7e34a91f89ee5396a",
     "Newsletter.astro": "6919ee38971817b4852eeda30f2807192e7730c0ecf64264bab9fa000fbf1cae",
     "Downloads.astro": "195f985eab80cd4e2bdfabcdb822df007e9a8e32077cb522f34ce6bcb26407cf",

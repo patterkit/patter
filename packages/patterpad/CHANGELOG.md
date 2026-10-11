@@ -6,6 +6,18 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Literata, Source Serif, and Courier come through in every window.** Choosing one under View ▸ Font
+  Theme showed Georgia, or whatever the computer had, because Patterpad never loaded those faces. Every
+  window now loads every face in the set, so the play, search, and coverage windows follow the theme too.
+
+### Changed
+
+- **The readable-script PDF** draws Greek, Cyrillic, arrows, and maths from Noto Sans and Noto Sans Math
+  instead of DejaVu Sans, so its fallbacks are one family. The fonts now come from their makers' npm
+  packages rather than copies kept in Patter.
+
 ## [0.28.0] - 2026-10-10
 
 ### Added

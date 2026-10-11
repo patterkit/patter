@@ -20,7 +20,7 @@ export default defineConfig({
     starlight({
       title: "Patter",
       tagline: "Write playable dialogue.",
-      customCss: ["./src/styles/patter.css", "./src/chrome/chrome.css"],
+      customCss: ["./src/chrome/fonts.css", "./src/styles/patter.css", "./src/chrome/chrome.css"],
       // Every docs page ends with the mailing-list sign-up and the credit line naming the
       // licence and the author. Generated from patterkit/site-chrome, like the stylesheet
       // above; the landing page carries the same credit through its own footer, because it is
@@ -43,15 +43,7 @@ export default defineConfig({
         replacesTitle: true,
         alt: "PatterKit",
       },
-      // The warm Patterpad reading face + UI/mono set, carried to the web (typography-first).
       head: [
-        {
-          tag: "link",
-          attrs: {
-            rel: "stylesheet",
-            href: "https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap",
-          },
-        },
         // Favicon fallbacks beside the SVG above: Safari doesn't do SVG favicons at
         // all, and stray agents request /favicon.ico directly. Same mark, rasterised.
         { tag: "link", attrs: { rel: "icon", href: "/favicon.ico", sizes: "48x48" } },

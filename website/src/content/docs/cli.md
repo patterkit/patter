@@ -35,6 +35,17 @@ Worth knowing if you use the [standalone binary](/download/): it has no
 `package.json` beside it and npm never installed it, so the tool itself is the only
 thing that can tell you which build you have.
 
+### Licences
+
+```sh
+patter licences    # also `patter licenses`
+```
+
+Prints patter's own licence (MIT), then the licence of each font the PDF export embeds (Newsreader,
+Inter, IBM Plex Mono, and Noto for other scripts and emoji, all under the SIL Open Font License). The
+[standalone binary](/download/) also lists every open-source library compiled into it, with its licence
+and copyright notice; installed from npm, those libraries sit in `node_modules` with their own.
+
 ## Authoring & validation
 
 ### `patter init [dir]`
@@ -76,8 +87,8 @@ with `-o -`).
 Export a **readable screenplay** of the script + flow: dialogue, narration, choices (with their
 conditions / flags), and jumps, in reading order, with a speaker qualifier in the cue (`TAM (O.S.)`).
 Format follows the extension; default
-beside the bundle, as `<name>.pdf`. PDF uses built-in fonts (Latin / Western-European); use `.docx` for full
-Unicode. The document's layout is described on [Building & shipping](/setup/building-and-shipping/).
+beside the bundle, as `<name>.pdf`. The PDF embeds its fonts and covers any script or emoji; the `.docx`
+uses fonts every computer has, so Word opens it without a missing-font warning. The document's layout is described on [Building & shipping](/setup/building-and-shipping/).
 
 ### `patter export-html [path] [-o file]`
 Export a single self-contained, **playable** `.html`: the runtime, the whole story, and

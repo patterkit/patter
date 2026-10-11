@@ -20,6 +20,7 @@ const alias: Record<string, string> = {
   "@patterkit/patterpad-surface/views": resolve(root, "packages/patterpad-surface/web/views.ts"),
   "@patterkit/patterpad-surface/styles.css": resolve(root, "packages/patterpad-surface/web/styles.css"),
   "@patterkit/patterpad-surface/theme.css": resolve(root, "packages/patterpad-surface/web/theme.css"),
+  "@patterkit/patterpad-surface/fonts.css": resolve(root, "packages/patterpad-surface/web/fonts.css"),
 };
 
 export default defineConfig({

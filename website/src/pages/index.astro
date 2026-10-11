@@ -9,6 +9,7 @@
 // plain list; the shared footer. The header, the footer and the downloads list come from
 // src/chrome, which is generated from patterkit/site-chrome and is never edited here; the
 // sibling Storylets site draws the same three from the same source, and shares nothing else.
+import "../chrome/fonts.css";
 import "../styles/patter.css";
 import "../chrome/chrome.css";
 import "../styles/landing.css";
@@ -47,12 +48,6 @@ const engines = [
     <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml" />
     <link rel="icon" href={`${base}favicon.ico`} sizes="48x48" />
     <link rel="apple-touch-icon" href={`${base}apple-touch-icon.png`} />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
     <style>{"body{margin:0}"}</style>
   </head>
   <body>

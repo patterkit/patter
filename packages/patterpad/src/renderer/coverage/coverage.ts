@@ -9,8 +9,7 @@ import "@wildwinter/app-shell/controls.css"; // the options bar's buttons are th
 import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./coverage.css";
 import "@wildwinter/app-shell/job.css";
-import "@fontsource/newsreader/400.css";
-import "@fontsource-variable/inter";
+import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
 
 import { mountJobProgress, pinButton, toolWindowHead, plural } from "@wildwinter/app-shell";
 import "@wildwinter/app-shell/tool-window.css"; // the head bar, the pin and the close travel with it

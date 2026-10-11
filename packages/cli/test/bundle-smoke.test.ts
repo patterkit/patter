@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
-// The BUNDLED CLI, run as a user runs it. Everything else in this suite tests src; none of it can see
-// a fault that only exists in the tsup bundle - and one shipped: pdfkit's default-font loader reads an
-// AFM file via `__dirname`, which an ESM bundle does not define, so every `export-script` on the
-// published npm CLI died with "__dirname is not defined". The unit suites stayed green throughout,
-// because they import source, where node_modules and CJS `__dirname` both exist.
+// The BUILT CLI, run as a user runs it. Everything else in this suite tests src; none of it can see
+// a fault that only exists in the build - and one shipped: when dist/cli.js inlined every dependency,
+// pdfkit's default-font loader read an AFM file via `__dirname`, which an ESM bundle does not define, so
+// every `export-script` on the published npm CLI died with "__dirname is not defined". The unit suites
+// stayed green throughout, because they import source. dist/cli.js is thin now (its dependencies load
+// from node_modules), and this still proves the PDF path end to end, the script fonts included.
 //
 // Skips when dist/cli.js is absent (a source-only checkout); CI builds before testing, so the gate is
-// real there. RELEASING.md lists it as a pre-ship step for the standalone binaries too.
+// real there. The standalone binaries get the same check from build-standalone.mjs's smoke run.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";

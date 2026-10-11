@@ -24,12 +24,7 @@ import "@wildwinter/app-shell/link-status.css"; // the live-link chip (mountLink
 import "@wildwinter/app-shell/updater.css"; // the updater prompt (showUpdaterDialog)
 import "@wildwinter/app-shell/job.css"; // the long-job strip the publish paths run under
 import "./shell.css"; // app shell layout, over the surface's page styles
-import "@fontsource/newsreader/400.css";
-import "@fontsource/newsreader/400-italic.css";
-import "@fontsource/newsreader/600.css";
-import "@fontsource/newsreader/700.css";
-import "@fontsource-variable/inter";
-import "@fontsource/ibm-plex-mono/400.css";
+import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
 
 import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";

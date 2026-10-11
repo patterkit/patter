@@ -188,9 +188,10 @@ describe("script renderers", () => {
     ] };
     const buf = await scriptToPdf(uni);
     const raw = buf.toString("latin1");
-    expect(raw).toContain("Newsreader"); // the serif reading face (café / Latin body)
-    expect(raw).toContain("DejaVu");     // the symbol / non-Latin fallback (≥ ← and Cyrillic / Greek)
-    expect(raw).toContain("NotoEmoji");  // the emoji fallback (the 🔥 routed to it)
+    expect(raw).toContain("Newsreader");       // the serif reading face (café / Latin body)
+    expect(raw).toContain("NotoSans-Regular"); // the script fallback (Cyrillic / Greek, which Newsreader lacks)
+    expect(raw).toContain("NotoSansMath");     // the symbol fallback (≥ ←)
+    expect(raw).toContain("NotoEmoji");        // the emoji fallback (the 🔥 routed to it)
   });
 });
 

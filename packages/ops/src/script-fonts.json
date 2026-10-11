@@ -1,0 +1,68 @@
+{
+  "serif": [
+    "@fontsource/newsreader/files/newsreader-latin-400-normal.woff",
+    "@fontsource/newsreader/files/newsreader-latin-ext-400-normal.woff",
+    "@fontsource/newsreader/files/newsreader-vietnamese-400-normal.woff"
+  ],
+  "serifBold": [
+    "@fontsource/newsreader/files/newsreader-latin-600-normal.woff",
+    "@fontsource/newsreader/files/newsreader-latin-ext-600-normal.woff",
+    "@fontsource/newsreader/files/newsreader-vietnamese-600-normal.woff"
+  ],
+  "serifItalic": [
+    "@fontsource/newsreader/files/newsreader-latin-400-italic.woff",
+    "@fontsource/newsreader/files/newsreader-latin-ext-400-italic.woff",
+    "@fontsource/newsreader/files/newsreader-vietnamese-400-italic.woff"
+  ],
+  "serifBoldItalic": [
+    "@fontsource/newsreader/files/newsreader-latin-600-italic.woff",
+    "@fontsource/newsreader/files/newsreader-latin-ext-600-italic.woff",
+    "@fontsource/newsreader/files/newsreader-vietnamese-600-italic.woff"
+  ],
+  "sans": [
+    "@fontsource/inter/files/inter-latin-400-normal.woff",
+    "@fontsource/inter/files/inter-latin-ext-400-normal.woff",
+    "@fontsource/inter/files/inter-greek-400-normal.woff",
+    "@fontsource/inter/files/inter-greek-ext-400-normal.woff",
+    "@fontsource/inter/files/inter-cyrillic-400-normal.woff",
+    "@fontsource/inter/files/inter-cyrillic-ext-400-normal.woff",
+    "@fontsource/inter/files/inter-vietnamese-400-normal.woff"
+  ],
+  "sansBold": [
+    "@fontsource/inter/files/inter-latin-600-normal.woff",
+    "@fontsource/inter/files/inter-latin-ext-600-normal.woff",
+    "@fontsource/inter/files/inter-greek-600-normal.woff",
+    "@fontsource/inter/files/inter-greek-ext-600-normal.woff",
+    "@fontsource/inter/files/inter-cyrillic-600-normal.woff",
+    "@fontsource/inter/files/inter-cyrillic-ext-600-normal.woff",
+    "@fontsource/inter/files/inter-vietnamese-600-normal.woff"
+  ],
+  "mono": [
+    "@ibm/plex-mono/fonts/complete/woff/IBMPlexMono-Regular.woff"
+  ],
+  "fallback": [
+    "@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-latin-ext-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-greek-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-greek-ext-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-cyrillic-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-cyrillic-ext-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-vietnamese-400-normal.woff",
+    "@fontsource/noto-sans/files/noto-sans-devanagari-400-normal.woff",
+    "@fontsource/noto-sans-math/files/noto-sans-math-latin-400-normal.woff"
+  ],
+  "emoji": [
+    "@fontsource/noto-emoji/files/noto-emoji-emoji-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-0-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-1-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-2-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-3-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-4-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-5-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-6-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-7-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-8-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-9-400-normal.woff",
+    "@fontsource/noto-emoji/files/noto-emoji-10-400-normal.woff"
+  ]
+}

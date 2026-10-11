@@ -60,7 +60,7 @@
   --char-10: #9c4486;  /* plum   */
   --char-11: #a83e5c;  /* berry  */
 
-  /* --- typography (the chosen font set; self-hosted via @fontsource in main.ts) --- */
+  /* --- typography (the chosen font set; the faces are declared in fonts.css) --- */
   --font-read: "Newsreader", Georgia, "Iowan Old Style", serif;
   --font-ui: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -137,7 +137,7 @@
 /* --- FONT THEMES (data-font axis). Each is a cohesive reading / UI / mono set plus a per-face
    base-size tweak (faces differ in x-height). Newsreader is the default (= the :root tokens). The
    header "font:" toggle cycles these for testing; the real picker is future Patterpad (§7). All
-   faces are self-hosted via @fontsource (main.ts). --- */
+   faces are declared in fonts.css. --- */
 :root[data-font="newsreader"] { font-size: 110%; --font-read: "Newsreader", Georgia, serif;             --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
 :root[data-font="literata"]   { font-size: 105%; --font-read: "Literata", Georgia, serif;               --font-ui: "Inter", system-ui, sans-serif;        --font-mono: "IBM Plex Mono", ui-monospace, monospace; }
 :root[data-font="source"]     { font-size: 107%; --font-read: "Source Serif 4", Georgia, serif;         --font-ui: "IBM Plex Sans", system-ui, sans-serif; --font-mono: "IBM Plex Mono", ui-monospace, monospace; }

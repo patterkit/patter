@@ -26,9 +26,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.2.8",
-    "@fontsource/ibm-plex-mono": "^5.2.7",
-    "@fontsource/newsreader": "^5.2.10",
     "@patterkit/core": "0.6.1",
     "@patterkit/model": "0.13.0",
     "@patterkit/ops": "0.16.1",
@@ -62,7 +59,9 @@
     "npmRebuild": false,
     "productName": "Patterpad",
     "files": [
-      "out/**/*"
+      "out/**/*",
+      "!node_modules/@fontsource/**",
+      "!node_modules/@ibm/**"
     ],
     "extraResources": [
       {
@@ -76,6 +75,14 @@
       {
         "from": "../../examples/projects/night-ferry.patter",
         "to": "examples/night-ferry.patter"
+      },
+      {
+        "from": "../../node_modules/electron/dist",
+        "to": "licences/electron",
+        "filter": [
+          "LICENSE",
+          "LICENSES.chromium.html"
+        ]
       }
     ],
     "directories": {

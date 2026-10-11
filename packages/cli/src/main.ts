@@ -25,6 +25,7 @@ import {
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf, scanAudioStatus,
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
+  scriptFontLicences,
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog, ImportPlan, LoadedProject } from "@patterkit/ops";
 import { createHash } from "node:crypto";
@@ -75,11 +76,14 @@ import { writeTextFiles, writeBinaryFile, currentUser } from "@wildwinter/simple
 // than a hand-kept constant. A release is tagged from the manifest, so a constant that drifts from it
 // drifts from the name of the file the user downloaded, which is the one thing they can still read.
 import pkg from "../package.json" with { type: "json" };
+import { libraryNotices, patterLicence } from "./notices.js";
 
 export const USAGE = `patter - Patter CLI
 
 Usage:
   patter --version                Print the version (also -v / version)
+  patter licences                 Print patter's licence and those of the fonts and libraries it carries
+                                  (also licenses)
   patter --help                   Print this usage (also -h / help)
   patter <command> --help         Print one command's usage (also help <command>)
   patter init    [dir]            Scaffold a new project (the <dir>.patter folder, starter scene, VCS config)
@@ -113,7 +117,7 @@ Usage:
                  [--locale xx]     (format by extension; --locale overrides the file's)
   patter export-script [path] [-o file.pdf|.docx]  Readable screenplay of the script + flow
                  (dialogue, narration, choices, jumps). Format from the extension; default
-                 beside the bundle, as .pdf. PDF uses built-in fonts (Latin); use .docx for full Unicode.
+                 beside the bundle, as .pdf. The PDF embeds its fonts and covers any script or emoji.
   patter voice-export [path] -o file.xlsx  The voice (VO) recording script
                  [--all]           Include every voiced line (else only "ready to record")
   patter export-editable [path] -o file.docx  An editable script to send to an editor outside Patter
@@ -314,6 +318,19 @@ export async function main(argv: string[]): Promise<number> {
   // Three spellings, because people try all three. A standalone binary has no package.json beside it and
   // was not installed by npm, so without this there is no way to ask a downloaded `patter` what it is.
   if (cmd === "--version" || cmd === "-v" || cmd === "version") { console.log(pkg.version); return 0; }
+  // Patter's licence, then the fonts `export-script` embeds (SIL Open Font License) and, in a standalone
+  // binary, every library compiled into it. Those licences ask to travel with the copies, and a binary
+  // has nothing beside it to carry them, so the tool says what it contains and under what terms.
+  if (cmd === "licences" || cmd === "licenses") {
+    console.log(`patter ${pkg.version} is free software under the MIT License:\n\n${patterLicence()}`);
+    console.log("\n\nIts PDF export (export-script) embeds fonts from these packages, under these licences:");
+    for (const { package: name, text } of scriptFontLicences()) console.log(`\n=== ${name} ===\n\n${text.trim()}`);
+    const libraries = libraryNotices();
+    console.log(libraries === undefined
+      ? "\n\nIts libraries install from npm beside it, each with its own licence file in node_modules."
+      : `\n\nThis standalone build contains these libraries, under these licences:\n\n${libraries}`);
+    return 0;
+  }
   // `help <command>`: that command's usage, as `<command> --help` gives it.
   if (cmd === "help" && rest[0] !== undefined) {
     const asked = ALIASES[rest[0]] ?? rest[0];

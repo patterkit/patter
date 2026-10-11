@@ -11,10 +11,7 @@ import "@wildwinter/app-shell/controls.css"; // the follow toggle is the family'
 import "@wildwinter/app-shell/toast.css"; // a shared module carries its own CSS (multi-window-rules.md)
 import "./play.css";
 import "@wildwinter/app-shell/stale.css";
-import "@fontsource/newsreader/400.css";
-import "@fontsource/newsreader/400-italic.css";
-import "@fontsource/newsreader/600.css";
-import "@fontsource-variable/inter";
+import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw, declared once
 
 import { staleBar, el, toast } from "@wildwinter/app-shell";
 import { applyTheme } from "../src/apply-theme.js";

@@ -2,12 +2,13 @@
 // Render a ScriptDoc to a .pdf screenplay, set like a printed paper script. A view over runScriptDoc, like
 // script-docx. Pure: ScriptDoc in, Buffer out (collected from PDFKit's stream; no file I/O).
 //
-// The design's three type ROLES are embedded as real faces (script-fonts.ts, no font files to ship):
+// The design's three type ROLES are embedded as real faces (from the font packages, see script-fonts.ts):
 //   serif = Newsreader     - reading: dialogue, narration, headings
 //   sans  = Inter          - chrome: character cues, group labels, option tags
 //   mono  = IBM Plex Mono  - machine text: conditions, {@property} values, game events
-// Those are Latin subsets, so any glyph they lack (the ◇ ↪ ⚙ marks, maths, arrows, Greek, Cyrillic) routes
-// per-character to DejaVu Sans (symbol) and emoji to Noto Emoji - full coverage preserved, no tofu.
+// Each role is a chain of Unicode-subset files. Any glyph the chain lacks (the ◇ ↪ ⚙ marks, maths, arrows,
+// scripts the face doesn't cover) routes per-character to Noto Sans and Noto Sans Math, and emoji to Noto
+// Emoji - full coverage preserved, no tofu.
 //
 // Structure is carried by indent + space on a white page. Where snippets cluster inside a selector (a
 // sequence's steps, a branch's rows, a choice's options) a LIGHT vertical edge brackets each snippet, so
@@ -15,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 import PDFDocument from "pdfkit";
+import { scriptFontFiles, type ScriptFace } from "./script-fonts.js";
 import { TOKENS, characterColour, cueLabel, textRuns, type ScriptDoc, type ScriptElement, type TextRun } from "./script-doc.js";
 
 const MARGIN = 64;
@@ -39,10 +41,14 @@ const SERIF = (bold: boolean, italic: boolean): string =>
 /** A piece of text to draw in one font + colour. */
 interface Piece { text: string; font: string; color: string }
 const isEmoji = (cp: number): boolean => cp >= 0x1f000 || (cp >= 0x2600 && cp <= 0x27bf);
+/** The PDFKit font name each role draws in, and the face it reads. */
+const ROLES: Record<string, ScriptFace> = {
+  "Serif": "serif", "Serif-Bold": "serifBold", "Serif-Italic": "serifItalic", "Serif-BoldItalic": "serifBoldItalic",
+  "Sans": "sans", "Sans-Bold": "sansBold", "Mono": "mono",
+};
 
 /** Render the readable screenplay as a PDF. Resolves once PDFKit has flushed the whole document. */
 export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
-  const { scriptFont } = await import("./script-fonts.js"); // lazy: only a PDF export pays the font decode
   return new Promise((resolve, reject) => {
     // `font: null` (cast: the typings only admit a string) stops PDFKit loading its default Helvetica,
     // which it reads as an AFM file via `__dirname` + a data directory. Neither survives being bundled:
@@ -51,37 +57,45 @@ export async function scriptToPdf(doc: ScriptDoc): Promise<Buffer> {
     // renderer draws goes through the embedded faces registered below, so Helvetica was pure start-up
     // cost even where it loaded.
     const pdf = new PDFDocument({ size: "A4", margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, info: { Title: doc.project, Author: "Patter" }, font: null as unknown as string });
-    pdf.registerFont("Serif", scriptFont("serif"));
-    pdf.registerFont("Serif-Bold", scriptFont("serifBold"));
-    pdf.registerFont("Serif-Italic", scriptFont("serifItalic"));
-    pdf.registerFont("Serif-BoldItalic", scriptFont("serifBoldItalic"));
-    pdf.registerFont("Sans", scriptFont("sans"));
-    pdf.registerFont("Sans-Bold", scriptFont("sansBold"));
-    pdf.registerFont("Mono", scriptFont("mono"));
-    pdf.registerFont("Symbol", scriptFont("symbol"));
-    pdf.registerFont("Emoji", scriptFont("emoji"));
+    // Register every file under its own name: a role's first file under the role's name ("Serif"), its
+    // other subsets as "Serif~1", "Serif~2"..., and the shared fallbacks as "Fallback~n" / "Emoji~n".
+    // PDFKit embeds only the fonts a page actually draws with, so registering them all costs nothing.
+    const register = (prefix: string, face: ScriptFace, firstIsPrefix: boolean): string[] =>
+      scriptFontFiles(face).map((bytes, i) => {
+        const name = firstIsPrefix && i === 0 ? prefix : `${prefix}~${i}`;
+        pdf.registerFont(name, bytes);
+        return name;
+      });
+    const roleFiles: Record<string, string[]> = {};
+    for (const [role, face] of Object.entries(ROLES)) roleFiles[role] = register(role, face, true);
+    const fallback = register("Fallback", "fallback", false);
+    const emoji = register("Emoji", "emoji", false);
 
-    // Per-primary glyph coverage + ascent (both via PDFKit's underlying fontkit font): coverage routes a
-    // char the primary lacks to the Symbol / Emoji fallback; ascent lets us baseline-align a small cue
-    // beside larger body text (PDFKit's `continued` chaining mis-aligns baselines across fonts).
+    // Per-font glyph coverage + ascent (both via PDFKit's underlying fontkit font): coverage routes a char
+    // down a role's chain to the first font that has it; ascent lets us baseline-align a small cue beside
+    // larger body text (PDFKit's `continued` chaining mis-aligns baselines across fonts).
     const coverage: Record<string, (cp: number) => boolean> = {};
     const ascender: Record<string, number> = {};
-    for (const name of ["Serif", "Serif-Bold", "Serif-Italic", "Serif-BoldItalic", "Sans", "Sans-Bold", "Mono"]) {
+    for (const name of [...Object.values(roleFiles).flat(), ...fallback, ...emoji]) {
       pdf.font(name);
       const f = (pdf as unknown as { _font: { font: { hasGlyphForCodePoint(cp: number): boolean }; ascender: number } })._font;
       coverage[name] = (cp: number): boolean => f.font.hasGlyphForCodePoint(cp);
       ascender[name] = f.ascender; // per 1000 em units
     }
     const ascentPt = (name: string, size: number): number => (ascender[name]! / 1000) * size;
+    const chains: Record<string, string[]> = {};
+    for (const role of Object.keys(ROLES)) chains[role] = [...roleFiles[role]!, ...fallback];
+    const pick = (chain: readonly string[], cp: number): string | undefined => chain.find((n) => coverage[n]!(cp));
 
-    /** Split a run so each char draws in a font that has its glyph: emoji -> Emoji; else the primary face if
-     *  it covers the char; else the Symbol (DejaVu) fallback. */
+    /** Split a run so each char draws in a font that has its glyph: emoji try Noto Emoji first; everything
+     *  else tries the role's own subsets, then Noto Sans and Noto Sans Math. A char nothing covers stays in
+     *  the role's face (and draws as its missing-glyph box). */
     const split = (text: string, primary: string, color: string): Piece[] => {
-      const cov = coverage[primary]!;
+      const chain = chains[primary]!;
       const out: Piece[] = []; let buf = ""; let cur = primary;
       for (const ch of text) {
         const cp = ch.codePointAt(0)!;
-        const f = isEmoji(cp) ? "Emoji" : cov(cp) ? primary : "Symbol";
+        const f = (isEmoji(cp) ? pick(emoji, cp) : undefined) ?? pick(chain, cp) ?? primary;
         if (f !== cur) { if (buf) out.push({ text: buf, font: cur, color }); buf = ""; cur = f; }
         buf += ch;
       }

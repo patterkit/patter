@@ -151,8 +151,18 @@ want Node.
 
 Published: `@patterkit/runtime`, `@patterkit/play-helpers`, `@patterkit/cli`,
 `@patterkit/model`, `@patterkit/core`, `@patterkit/dialect`, `@patterkit/compiler`,
-`@patterkit/ops`. (`conformance`, `patterpad`, `patterpad-surface` are `private` and
-never published.)
+`@patterkit/ops`. (`conformance`, `patterpad`, `patterpad-surface` are `private` and never published.)
+
+No Patter package carries a font. ops depends on the upstream font packages (Fontsource, and IBM's own
+Plex pinned at exactly 1.0.0, the last release without install-time telemetry), and the npm
+`@patterkit/cli` is a thin build whose dependencies install from npm beside it. The family's rule is
+`design/fonts.md` in patterkit.
+
+Every public package keeps a copy of the root `LICENSE` in its own folder, because npm only packs a
+package's own LICENSE and the MIT licence asks for its text to travel with each copy.
+`scripts/package-licences.test.ts` keeps the copies identical to the root's; a new public package needs
+one. The runtime's copy reaches npm with its next Patterplay release, since its version comes from
+`bump:play`.
 
 > **Exception: `@patterkit/runtime` is versioned by `npm run bump:play`, never by a
 > changeset.** It is the JS member of the lockstep runtime set (see *Patterplay runtimes*
@@ -288,7 +298,8 @@ cross-compiles `patter-linux-x64`, `patter-linux-arm64`, and `patter-windows-x64
 (Windows ships unsigned by policy → SmartScreen) and builds the drop-in. macOS signing
 reuses `CSC_LINK` + `CSC_KEY_PASSWORD` (imported into a runner keychain); absent those,
 the binaries are still produced, ad-hoc signed. We codesign but **don't notarize** the
-CLI. Build locally with `npm run -w @patterkit/cli build:standalone` (host target) or
+CLI. Each binary embeds the PDF fonts, and the build runs the host's own binary once to export a PDF,
+so a font that failed to embed stops it. Build locally with `npm run -w @patterkit/cli build:standalone` (host target) or
 `…:mac` / `…:others`.
 
 ## Patterplay runtimes (JS + Unity + Unreal + Godot)
