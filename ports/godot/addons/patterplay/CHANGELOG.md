@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-11
+
 ### Added
 
 - **Take a flow out as data and put it back: `capture_flow` and `restore_flow`.** `engine.capture_flow(id)`

@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-11
+
 ### Added
 
 - **Flow capture and restore**: `engine.captureFlow(id)` takes one flow out as a `FlowState`, plain data in the

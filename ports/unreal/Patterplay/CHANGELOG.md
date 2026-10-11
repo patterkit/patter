@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-11
+
 ### Added
 
 - **Taking one flow out**: `UPatterEngine::CaptureFlow` returns one open flow as data, a JSON string in the

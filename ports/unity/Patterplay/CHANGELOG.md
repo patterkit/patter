@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-11
+
 ### Added
 
 - **Flow capture and restore**: `engine.CaptureFlow(id)` takes one flow out as a `FlowState`, plain data in the
