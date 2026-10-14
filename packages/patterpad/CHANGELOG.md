@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-14
+
 ### Added
 
 - **Live Link follows the most recent flow.** When a game runs several flows at once (a conversation, a
