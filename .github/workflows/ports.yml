@@ -82,6 +82,10 @@ jobs:
       # on_error report and the log's diagnostic entries, and that a refused load changes nothing.
       - name: Content errors are reported, and a refused load changes nothing
         run: GODOT="$PWD/godot" ports/godot/test/run.sh test_play_errors.gd
+      # The corpus pins a step's speaker label; this pins what it can't: a stale pair string that is
+      # ignored, an older save's prompts working the label out again, and the source-locale beat info.
+      - name: A speaker's label resolves as the other runtimes do
+        run: GODOT="$PWD/godot" ports/godot/test/run.sh test_speaker_label.gd
 
   # The Unity EDITOR assembly and the samples are not compiled here. A licence is not what
   # makes that hard: an installed, activated Unity compiles from the command line, and

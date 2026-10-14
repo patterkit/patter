@@ -112,10 +112,10 @@ const PLAYER_JS = String.raw`
       if (s.type === "choice") { renderChoice(s); return; }
       timeline.place(s, estimate(s.text));
       if (s.type === "line") {
-        var who = s.characterName || s.character || "";
-        // A speaker qualifier follows the name, as the script's cue has it: TAM (O.S.).
-        var qual = s.qualifierName || s.qualifier;
-        if (qual && who) who += " (" + qual + ")";
+        // The speaker's label as the runtime resolved it (TAM (O.S.), or a pair's own label): this page never
+        // puts a name and a qualifier together itself. (Its bundle always carries the strings, so a line with a
+        // speaker always has one.)
+        var who = s.speakerLabel || s.characterName || s.character || "";
         var dir = s.direction ? '<em class="dir">(' + esc(s.direction) + ')</em> ' : "";
         add("line", '<span class="who" style="color:hsl(' + hueOf(s.character || who) + ',55%,38%)">' + esc(who) + '</span>' + dir + esc(s.text));
       } else {

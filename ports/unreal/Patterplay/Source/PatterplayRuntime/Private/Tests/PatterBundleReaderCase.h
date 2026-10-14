@@ -26,8 +26,9 @@ namespace patter { namespace bundlereadercase
   "localisation": { "mode": "ids", "sourceDebug": true },
   "closedCaptions": { "open": "<", "close": ">", "character": "FX" },
   "locales": { "default": "en", "included": ["en", "fr"] },
-  "cast": [{ "name": "ANNA", "displayName": "Anna" }, { "name": "FX" }],
+  "cast": [{ "name": "ANNA", "displayName": "Anna", "qualifierLabels": { "radio": "Anna on the radio", "os": null } }, { "name": "FX" }],
   "qualifiers": [{ "gameId": "os", "name": "O.S." }, { "gameId": "radio", "name": "RADIO" }, { "gameId": "vo" }],
+  "speakerPattern": "{name}, {qualifier}",
   "properties": [
     { "name": "gold", "type": "number", "shared": true, "default": 5 },
     { "name": "mood", "type": "enum", "values": ["calm", "cross"], "default": "calm", "temporary": true },
@@ -89,6 +90,9 @@ namespace patter { namespace bundlereadercase
         expect(b.cast.size() == 2 && b.cast[0].displayName == "Anna" && b.cast[1].name == "FX" && b.cast[1].displayName.empty(), "cast");
         expect(b.qualifiers.size() == 3 && b.qualifiers[0].gameId == "os" && b.qualifiers[0].hasName && b.qualifiers[0].name == "O.S." && b.qualifiers[1].gameId == "radio", "qualifiers");
         expect(b.qualifiers.size() == 3 && b.qualifiers[2].gameId == "vo" && !b.qualifiers[2].hasName, "a nameless qualifier has no name");
+        expect(b.cast.size() == 2 && b.cast[0].qualifierLabels == std::map<std::string, std::string>{{"radio", "Anna on the radio"}} && b.cast[1].qualifierLabels.empty(),
+               "a character's own labels with a qualifier, keyed by its gameId (a null labels nothing)");
+        expect(b.hasSpeakerPattern && b.speakerPattern == "{name}, {qualifier}", "speakerPattern");
 
         expect(b.properties.size() == 4, "properties");
         if (b.properties.size() == 4)

@@ -13,6 +13,9 @@ namespace Patterkit.Patterplay
         /// <summary>The built-in `padAfter`, in seconds, for a project that sets no default of its own (line
         /// padding): the same on every runtime and in Patterpad's Play window.</summary>
         public const double DefaultPadAfter = 0.6;
+        /// <summary>The speaker pattern a project starts with, for a bundle that ships none: `You (V.O.)`.
+        /// `{name}` and `{qualifier}` are plain placeholders, never run through line interpolation.</summary>
+        internal const string DefaultSpeakerPattern = "{name} ({qualifier})";
 
         /// <summary>The bundle schema tag ("patter/bundle@0"). Null if absent (an older compiler).</summary>
         public string Schema;
@@ -31,6 +34,10 @@ namespace Patterkit.Patterplay
         /// <summary>The speaker qualifiers the content uses (`gameId` + authored name), in the project's order.
         /// Empty when no line has one (an older bundle carries none).</summary>
         public List<Qualifier> Qualifiers = new List<Qualifier>();
+        /// <summary>The project's speaker pattern, how a qualified speaker's label reads (`{name} ({qualifier})`
+        /// filled in): the unlocalised fallback for the `speaker:pattern` string. Null when the project keeps the
+        /// default or uses no qualifiers.</summary>
+        public string SpeakerPattern;
         /// <summary>The project's own `padAfterDefault` (line padding); null = <see cref="DefaultPadAfter"/>.</summary>
         public double? PadAfterDefault;
         public List<PropertyDecl> Properties = new List<PropertyDecl>();
@@ -78,6 +85,10 @@ namespace Patterkit.Patterplay
     {
         public string Name;
         public string DisplayName;
+        /// <summary>This character's own label with a qualifier, by the qualifier's `gameId`, in the source
+        /// language (`vo` -> `Your thoughts`): only for the pairs the project overrides, each localised as the
+        /// `speaker:&lt;name&gt;:&lt;gameId&gt;` string. Null when it overrides none.</summary>
+        public Dictionary<string, string> QualifierLabels;
     }
 
     /// <summary>A speaker qualifier as the bundle ships it (`V.O.`, `O.S.`, `RADIO`): the `gameId` a line

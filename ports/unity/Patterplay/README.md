@@ -46,7 +46,7 @@ while (true)
     var step = flow.Advance();
     switch (step.Type)
     {
-        case StepType.Line:   /* show step.CharacterName + step.Text */ break;
+        case StepType.Line:   /* show step.SpeakerLabel + step.Text */  break;
         case StepType.Text:   /* show step.Text */                      break;
         case StepType.GameEvent: /* fire step.GameData cues */          break;
         case StepType.Choice: flow.Choose(step.Options[0].Id);          break;  // your UI picks
@@ -61,7 +61,14 @@ Render each step into your own dialogue UI; on a `Choice`, present `step.Options
 A line step carries its speaker as `Character` (the cast token) and `CharacterName` (the shown name), its
 `Direction`, and, when the writer gave it one, a speaker qualifier: `Qualifier` is the qualifier's `gameId`
 (`vo`, `os`, `radio`), for your code to switch on, and `QualifierName` its shown name (`V.O.`), localised as
-`CharacterName` is. A script shows it after the name, `TAM (O.S.)`; what it means for your game is yours.
+`CharacterName` is. What a qualifier means for your game is yours.
+
+To show who's speaking, use `SpeakerLabel`, so you don't put the names together yourself. It's the
+character's shown name, and with a qualifier the project's speaker pattern filled in (`You (V.O.)` by
+default), or the character's own label for that qualifier when the writer gives one ("Your thoughts"). Each
+piece is translated, the pattern included, so a language can change the order and the punctuation. A choice
+option's line `Prompt` and `BeatInfo` (at the source language) carry it too. It's null with no speaker, on a
+line closed captions have silenced, and in an IDs-only bundle, where your game maps the tokens itself.
 
 A line or text step also carries `PadAfter`, the writer's pause after it in seconds, already resolved from
 the beat's own value and the defaults above it (`Bundle.DefaultPadAfter`, 0.6, when nothing sets one). A

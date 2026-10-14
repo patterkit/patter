@@ -266,15 +266,16 @@ function appendStep(step: PlayStep): HTMLElement {
   const div = document.createElement("div");
   div.className = `pline ${step.kind}`;
   if (step.kind === "line") {
-    // Show the localised display name when the character has one; fall back to the canonical token.
-    const cue = document.createElement("span"); cue.className = "pcue"; cue.textContent = step.characterName ?? step.character ?? "";
+    // The speaker's label as the runtime resolved it, localised: the display name, or with a qualifier the
+    // speaker pattern filled in (TAM (O.S.)) or the pair's own label. This window never builds one itself.
+    const cue = document.createElement("span"); cue.className = "pcue";
+    cue.textContent = step.speakerLabel ?? step.characterName ?? step.character ?? "";
     // Tint the cue by the SAME hash-selected palette slot the editor uses (#196 colour-by-character), so the
     // cast scans by colour here too. Key off the canonical token, never the localised name, so the slot is
     // stable across locales. Empty/narrator keeps the CSS --accent default.
     if (step.character) cue.style.color = colourFor(step.character);
-    // The speaker qualifier after the name, as the script shows it: TAM (O.S.). The localised name the
-    // runtime resolved, else the gameId (an IDs-only build carries no names).
-    const qualifier = step.qualifierName ?? step.qualifier;
+    // A step with no label (an IDs-only build carries no names) shows the token, then the qualifier's gameId.
+    const qualifier = step.speakerLabel === undefined ? step.qualifierName ?? step.qualifier : undefined;
     if (qualifier) { const q = document.createElement("span"); q.className = "pqual"; q.textContent = `(${qualifier})`; cue.append(q); }
     const body = document.createElement("span");
     if (step.direction) { const d = document.createElement("em"); d.className = "pdir"; d.textContent = `(${step.direction}) `; body.appendChild(d); }

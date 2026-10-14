@@ -84,6 +84,16 @@ seconds (default 600) where `timeout` exists. `parse_check.sh` covers the addon'
   godot --headless --path ports/godot --script res://test/test_play_errors.gd
   ```
 
+- `test_speaker_label.gd` - a line's `speakerLabel`, from its one resolver: a `speaker:` string a locale
+  still holds for a pair the bundle doesn't override is ignored, an overridden pair reads its own, a
+  saved choice prompt from before prompts carried the label gets it again on load (in the loading
+  engine's locale), as does a saved prompt still to be spoken back, the beat sequence gives it in the source locale, IDs-only mode gives none, and the
+  pattern's placeholders are plain text replacement.
+
+  ```sh
+  godot --headless --path ports/godot --script res://test/test_speaker_label.gd
+  ```
+
 - `tour_check.gd` - a smoke check that the bundled tour demo loads and steps:
 
   ```sh

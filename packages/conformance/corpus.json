@@ -6417,7 +6417,8 @@
           "character": "TAM",
           "characterName": "Tam",
           "qualifier": "vo",
-          "qualifierName": "V.O."
+          "qualifierName": "V.O.",
+          "speakerLabel": "Tam (V.O.)"
         },
         {
           "type": "line",
@@ -6427,7 +6428,8 @@
           "characterName": "Tam",
           "direction": "muffled",
           "qualifier": "os",
-          "qualifierName": "O.S."
+          "qualifierName": "O.S.",
+          "speakerLabel": "Tam (O.S.)"
         },
         {
           "type": "line",
@@ -6448,7 +6450,8 @@
                 "character": "TAM",
                 "characterName": "Tam",
                 "qualifier": "radio",
-                "qualifierName": "RADIO"
+                "qualifierName": "RADIO",
+                "speakerLabel": "Tam (RADIO)"
               },
               "eligible": true
             }
@@ -6460,7 +6463,8 @@
           "text": "Reading you.",
           "character": "BASE",
           "qualifier": "radio",
-          "qualifierName": "RADIO"
+          "qualifierName": "RADIO",
+          "speakerLabel": "BASE (RADIO)"
         },
         {
           "type": "end"
@@ -6572,7 +6576,8 @@
           "text": "Hm.",
           "character": "TAM",
           "qualifier": "vo",
-          "qualifierName": "VOIX OFF"
+          "qualifierName": "VOIX OFF",
+          "speakerLabel": "TAM (VOIX OFF)"
         },
         {
           "type": "line",
@@ -6580,7 +6585,8 @@
           "text": "Allo ?",
           "character": "TAM",
           "qualifier": "phone",
-          "qualifierName": "TELEPHONE"
+          "qualifierName": "TELEPHONE",
+          "speakerLabel": "TAM (TELEPHONE)"
         },
         {
           "type": "line",
@@ -6588,7 +6594,8 @@
           "text": "J'arrive !",
           "character": "TAM",
           "qualifier": "os",
-          "qualifierName": "O.S."
+          "qualifierName": "O.S.",
+          "speakerLabel": "TAM (O.S.)"
         },
         {
           "type": "end"
@@ -6858,7 +6865,407 @@
           "text": "Sorry!",
           "character": "TAM",
           "qualifier": "os",
-          "qualifierName": "O.S."
+          "qualifierName": "O.S.",
+          "speakerLabel": "TAM (O.S.)"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "a line's speaker label: a pair's own label, else the speaker pattern, else with no qualifier the shown name",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "16jbxpx",
+          "structureHash": "1ldcs1y"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "PLAYER",
+            "displayName": "You",
+            "qualifierLabels": {
+              "vo": "Your thoughts"
+            }
+          },
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_call",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "PLAYER"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_wonder",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "w_c",
+                            "type": "snippet",
+                            "beats": [],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_wonder",
+                          "kind": "line",
+                          "character": "PLAYER",
+                          "qualifier": "vo"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Quiet.",
+            "L_call": "Hello?",
+            "L_tam": "Hm.",
+            "L_plain": "Right.",
+            "P_wonder": "Wonder."
+          },
+          "fr": {
+            "L_think": "Calme.",
+            "L_call": "Allo ?",
+            "L_tam": "Hm.",
+            "L_plain": "Bon.",
+            "P_wonder": "Songer.",
+            "cast:PLAYER": "Vous",
+            "qualifier:os": "H.C.",
+            "speaker:pattern": "{qualifier} : {name}",
+            "speaker:PLAYER:vo": "Vos pensées",
+            "speaker:TAM:vo": "IGNORED"
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_think",
+          "text": "Quiet.",
+          "character": "PLAYER",
+          "characterName": "You",
+          "qualifier": "vo",
+          "qualifierName": "V.O.",
+          "speakerLabel": "Your thoughts"
+        },
+        {
+          "type": "line",
+          "id": "L_call",
+          "text": "Hello?",
+          "character": "PLAYER",
+          "characterName": "You",
+          "qualifier": "os",
+          "qualifierName": "O.S.",
+          "speakerLabel": "You (O.S.)"
+        },
+        {
+          "type": "line",
+          "id": "L_tam",
+          "text": "Hm.",
+          "character": "TAM",
+          "characterName": "Tam",
+          "qualifier": "vo",
+          "qualifierName": "V.O.",
+          "speakerLabel": "Tam (V.O.)"
+        },
+        {
+          "type": "line",
+          "id": "L_plain",
+          "text": "Right.",
+          "character": "PLAYER",
+          "characterName": "You"
+        },
+        {
+          "type": "choice",
+          "groupId": "g",
+          "options": [
+            {
+              "id": "o_wonder",
+              "prompt": {
+                "kind": "line",
+                "text": "Wonder.",
+                "character": "PLAYER",
+                "characterName": "You",
+                "qualifier": "vo",
+                "qualifierName": "V.O.",
+                "speakerLabel": "Your thoughts"
+              },
+              "eligible": true
+            }
+          ]
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
+      "name": "a speaker label follows the active locale: the translated pattern, names, and overridden pair",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "16jbxpx",
+          "structureHash": "1ldcs1y"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "PLAYER",
+            "displayName": "You",
+            "qualifierLabels": {
+              "vo": "Your thoughts"
+            }
+          },
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_call",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "PLAYER"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_wonder",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "w_c",
+                            "type": "snippet",
+                            "beats": [],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_wonder",
+                          "kind": "line",
+                          "character": "PLAYER",
+                          "qualifier": "vo"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Quiet.",
+            "L_call": "Hello?",
+            "L_tam": "Hm.",
+            "L_plain": "Right.",
+            "P_wonder": "Wonder."
+          },
+          "fr": {
+            "L_think": "Calme.",
+            "L_call": "Allo ?",
+            "L_tam": "Hm.",
+            "L_plain": "Bon.",
+            "P_wonder": "Songer.",
+            "cast:PLAYER": "Vous",
+            "qualifier:os": "H.C.",
+            "speaker:pattern": "{qualifier} : {name}",
+            "speaker:PLAYER:vo": "Vos pensées",
+            "speaker:TAM:vo": "IGNORED"
+          }
+        }
+      },
+      "locale": "fr",
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L_think",
+          "text": "Calme.",
+          "character": "PLAYER",
+          "characterName": "Vous",
+          "qualifier": "vo",
+          "qualifierName": "V.O.",
+          "speakerLabel": "Vos pensées"
+        },
+        {
+          "type": "line",
+          "id": "L_call",
+          "text": "Allo ?",
+          "character": "PLAYER",
+          "characterName": "Vous",
+          "qualifier": "os",
+          "qualifierName": "H.C.",
+          "speakerLabel": "H.C. : Vous"
+        },
+        {
+          "type": "line",
+          "id": "L_tam",
+          "text": "Hm.",
+          "character": "TAM",
+          "characterName": "Tam",
+          "qualifier": "vo",
+          "qualifierName": "V.O.",
+          "speakerLabel": "V.O. : Tam"
+        },
+        {
+          "type": "line",
+          "id": "L_plain",
+          "text": "Bon.",
+          "character": "PLAYER",
+          "characterName": "Vous"
+        },
+        {
+          "type": "choice",
+          "groupId": "g",
+          "options": [
+            {
+              "id": "o_wonder",
+              "prompt": {
+                "kind": "line",
+                "text": "Songer.",
+                "character": "PLAYER",
+                "characterName": "Vous",
+                "qualifier": "vo",
+                "qualifierName": "V.O.",
+                "speakerLabel": "Vos pensées"
+              },
+              "eligible": true
+            }
+          ]
         },
         {
           "type": "end"
@@ -17822,7 +18229,8 @@
               "character": "TAM",
               "characterName": "Tam",
               "qualifier": "vo",
-              "qualifierName": "V.O."
+              "qualifierName": "V.O.",
+              "speakerLabel": "Tam (V.O.)"
             }
           ]
         },
@@ -17837,7 +18245,8 @@
               "characterName": "Tam",
               "direction": "muffled",
               "qualifier": "os",
-              "qualifierName": "O.S."
+              "qualifierName": "O.S.",
+              "speakerLabel": "Tam (O.S.)"
             }
           ]
         },
@@ -17868,7 +18277,8 @@
                     "character": "TAM",
                     "characterName": "Tam",
                     "qualifier": "radio",
-                    "qualifierName": "RADIO"
+                    "qualifierName": "RADIO",
+                    "speakerLabel": "Tam (RADIO)"
                   },
                   "eligible": true
                 }
@@ -17894,7 +18304,8 @@
                     "character": "TAM",
                     "characterName": "Tam",
                     "qualifier": "radio",
-                    "qualifierName": "RADIO"
+                    "qualifierName": "RADIO",
+                    "speakerLabel": "Tam (RADIO)"
                   },
                   "eligible": true
                 }
@@ -17919,7 +18330,8 @@
               "character": "TAM",
               "characterName": "Tam",
               "qualifier": "radio",
-              "qualifierName": "RADIO"
+              "qualifierName": "RADIO",
+              "speakerLabel": "Tam (RADIO)"
             }
           ]
         },
@@ -17932,7 +18344,8 @@
               "text": "Reading you.",
               "character": "BASE",
               "qualifier": "radio",
-              "qualifierName": "RADIO"
+              "qualifierName": "RADIO",
+              "speakerLabel": "BASE (RADIO)"
             }
           ]
         },
@@ -17941,6 +18354,230 @@
           "expect": [
             {
               "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a project's own speaker pattern, and labels that follow a live setLocale",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0li9u76",
+          "structureHash": "1ldcs1y"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "PLAYER",
+            "displayName": "You",
+            "qualifierLabels": {
+              "vo": "Your thoughts"
+            }
+          },
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "speakerPattern": "{name}, {qualifier}",
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_call",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "PLAYER"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_wonder",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "w_c",
+                            "type": "snippet",
+                            "beats": [],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_wonder",
+                          "kind": "line",
+                          "character": "PLAYER",
+                          "qualifier": "vo"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Quiet.",
+            "L_call": "Hello?",
+            "L_tam": "Hm.",
+            "L_plain": "Right.",
+            "P_wonder": "Wonder."
+          },
+          "fr": {
+            "L_think": "Calme.",
+            "L_call": "Allo ?",
+            "L_tam": "Hm.",
+            "L_plain": "Bon.",
+            "P_wonder": "Songer.",
+            "cast:PLAYER": "Vous"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Quiet.",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Your thoughts"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_call",
+              "text": "Hello?",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "os",
+              "qualifierName": "O.S.",
+              "speakerLabel": "You, O.S."
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_tam",
+              "text": "Hm.",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Tam, V.O."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_plain",
+              "text": "Bon.",
+              "character": "PLAYER",
+              "characterName": "Vous"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g",
+              "options": [
+                {
+                  "id": "o_wonder",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Songer.",
+                    "character": "PLAYER",
+                    "characterName": "Vous",
+                    "qualifier": "vo",
+                    "qualifierName": "V.O.",
+                    "speakerLabel": "Your thoughts"
+                  },
+                  "eligible": true
+                }
+              ]
             }
           ]
         }
@@ -19587,6 +20224,7 @@
                   "character": "ANNA",
                   "characterName": "Anna",
                   "direction": "quietly",
+                  "speakerLabel": "Anna",
                   "padAfter": 0.6
                 },
                 "selectors": {
@@ -19615,6 +20253,7 @@
         "save/flows/main/cursor/pendingPrompt/direction",
         "save/flows/main/cursor/pendingPrompt/kind",
         "save/flows/main/cursor/pendingPrompt/padAfter",
+        "save/flows/main/cursor/pendingPrompt/speakerLabel",
         "save/flows/main/cursor/pendingPrompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
@@ -20122,6 +20761,7 @@
                         "character": "ANNA",
                         "characterName": "Anna",
                         "direction": "",
+                        "speakerLabel": "Anna",
                         "padAfter": 0.6
                       },
                       "eligible": true
@@ -20133,6 +20773,7 @@
                         "text": "Pb",
                         "character": "BO",
                         "characterName": "",
+                        "speakerLabel": "",
                         "padAfter": 0.6
                       },
                       "eligible": true
@@ -20177,6 +20818,7 @@
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/direction",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/kind",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/speakerLabel",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[1]",
         "save/flows/main/cursor/pendingChoice/options[1]/eligible",
@@ -20186,6 +20828,7 @@
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/characterName",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/kind",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/padAfter",
+        "save/flows/main/cursor/pendingChoice/options[1]/prompt/speakerLabel",
         "save/flows/main/cursor/pendingChoice/options[1]/prompt/text",
         "save/flows/main/cursor/pendingChoice/options[2]",
         "save/flows/main/cursor/pendingChoice/options[2]/eligible",
@@ -20466,6 +21109,7 @@
                         "characterName": "Tam",
                         "qualifier": "radio",
                         "qualifierName": "RADIO",
+                        "speakerLabel": "Tam (RADIO)",
                         "padAfter": 0.6
                       },
                       "eligible": true
@@ -20501,6 +21145,7 @@
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/padAfter",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifier",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/qualifierName",
+        "save/flows/main/cursor/pendingChoice/options[0]/prompt/speakerLabel",
         "save/flows/main/cursor/pendingChoice/options[0]/prompt/text",
         "save/flows/main/cursor/pendingPromptOwnerId",
         "save/flows/main/cursor/selectors",
@@ -20549,7 +21194,8 @@
                     "character": "TAM",
                     "characterName": "Tam",
                     "qualifier": "radio",
-                    "qualifierName": "RADIO"
+                    "qualifierName": "RADIO",
+                    "speakerLabel": "Tam (RADIO)"
                   },
                   "eligible": true
                 }
@@ -20574,7 +21220,8 @@
               "character": "TAM",
               "characterName": "Tam",
               "qualifier": "radio",
-              "qualifierName": "RADIO"
+              "qualifierName": "RADIO",
+              "speakerLabel": "Tam (RADIO)"
             }
           ]
         },
@@ -20587,7 +21234,8 @@
               "text": "Reading you.",
               "character": "BASE",
               "qualifier": "radio",
-              "qualifierName": "RADIO"
+              "qualifierName": "RADIO",
+              "speakerLabel": "BASE (RADIO)"
             }
           ]
         },
@@ -21573,6 +22221,7 @@
                       "direction": "warmly",
                       "qualifier": "os",
                       "qualifierName": "O.S.",
+                      "speakerLabel": "ANNA (O.S.)",
                       "padAfter": -0.3,
                       "ownPadAfter": -0.3,
                       "text": "Hello.",
@@ -21631,6 +22280,7 @@
                         "id": "P_knock",
                         "kind": "line",
                         "character": "BRAM",
+                        "speakerLabel": "BRAM",
                         "padAfter": 0.6,
                         "text": "Knock",
                         "tags": [
@@ -21795,6 +22445,7 @@
             "direction": "warmly",
             "qualifier": "os",
             "qualifierName": "O.S.",
+            "speakerLabel": "ANNA (O.S.)",
             "padAfter": -0.3,
             "ownPadAfter": -0.3,
             "text": "Hello.",

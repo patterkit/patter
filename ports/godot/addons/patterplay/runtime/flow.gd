@@ -1095,6 +1095,9 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		var qn = _resolve_qualifier_name(beat)
 		if qn != null:
 			r["qualifierName"] = qn
+		var label = _speaker_label_of(_host, beat.get("character"), beat.get("qualifier"))
+		if label != null:
+			r["speakerLabel"] = label
 	r["padAfter"] = _pad_of(beat["id"])  # a silent line still fires, so it still carries its pause
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
@@ -1140,8 +1143,9 @@ func interpolate(text: String) -> String:
 
 # An option's prompt (spec 5): its prompt beat, resolved and interpolated, as
 # {"kind": "line" | "text", "text": ..., and for a line "character" / "characterName" / "direction" /
-# "qualifier" / "qualifierName" when set, and always "padAfter", the prompt beat's resolved pause, a float}.
-# The same shape every runtime's choice option carries. null when there is no prompt beat.
+# "qualifier" / "qualifierName" / "speakerLabel" when set, and always "padAfter", the prompt beat's
+# resolved pause, a float}. The same shape every runtime's choice option carries. null when there is no
+# prompt beat.
 func _prompt_for(node: Dictionary):
 	var beat = _prompt_beat_of(node)
 	if beat == null:
@@ -1164,6 +1168,9 @@ func _prompt_for(node: Dictionary):
 	var qn = _resolve_qualifier_name(beat)
 	if qn != null:
 		p["qualifierName"] = qn
+	var label = _speaker_label_of(_host, beat.get("character"), beat.get("qualifier"))
+	if label != null:
+		p["speakerLabel"] = label
 	return p
 
 
@@ -1194,7 +1201,7 @@ func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
 	var tags: Array = _host.tag_index.get(beat["id"], [])
 	var r := {"type": "text" if shown.get("kind", "") == "text" else "line", "id": beat["id"], "text": str(shown.get("text", ""))}
 	if r["type"] == "line":
-		for k in ["character", "characterName", "direction", "qualifier", "qualifierName"]:
+		for k in ["character", "characterName", "direction", "qualifier", "qualifierName", "speakerLabel"]:
 			if shown.has(k):
 				r[k] = str(shown[k])
 	r["padAfter"] = _pad_of(beat["id"])
@@ -1248,15 +1255,7 @@ func _resolve_character_name(beat: Dictionary):
 		return null
 	if _host.emit_ids:
 		return null  # IDs-only: omit the display name; the game maps the `character` token
-	var character := str(beat["character"])
-	var key := "cast:" + character
-	if _host.strings.has(key):
-		return _host.strings[key]
-	if _host.default_strings.has(key):
-		return _host.default_strings[key]
-	if _host.cast_display.has(character):
-		return _host.cast_display[character]
-	return null
+	return _character_name_of(_host, str(beat["character"]))
 
 
 # A line beat's speaker qualifier's shown name, resolved as a character's is: the `qualifier:<gameId>`
@@ -1267,15 +1266,55 @@ func _resolve_qualifier_name(beat: Dictionary):
 		return null
 	if _host.emit_ids:
 		return null
-	var qualifier := str(beat["qualifier"])
-	var key := "qualifier:" + qualifier
-	if _host.strings.has(key):
-		return _host.strings[key]
-	if _host.default_strings.has(key):
-		return _host.default_strings[key]
-	if _host.qualifier_display.has(qualifier):
-		return _host.qualifier_display[qualifier]
-	return null
+	return _qualifier_name_of(_host, str(beat["qualifier"]))
+
+
+# A project-level loc string: the active locale's, else the default locale's (`source`: the default
+# locale's only, as the static structure reads it). null when neither has it; an empty string is a value.
+static func _loc_string(host: FlowHost, key: String, source := false):
+	if not source and host.strings.has(key):
+		return host.strings[key]
+	return host.default_strings.get(key)
+
+
+# A character's shown name: its `cast:<name>` string (see _loc_string), else the cast's displayName. null
+# when neither exists.
+static func _character_name_of(host: FlowHost, character: String, source := false):
+	var nm = _loc_string(host, "cast:" + character, source)
+	return nm if nm != null else host.cast_display.get(character)
+
+
+# A qualifier's shown name: its `qualifier:<gameId>` string (see _loc_string), else its authored name. null
+# when neither exists.
+static func _qualifier_name_of(host: FlowHost, qualifier: String, source := false):
+	var qn = _loc_string(host, "qualifier:" + qualifier, source)
+	return qn if qn != null else host.qualifier_display.get(qualifier)
+
+
+# The name to show for a line's speaker, its `speakerLabel`: with a qualifier, the character's own label
+# for that pair when the bundle overrides it (its `speaker:<name>:<gameId>` string, else the authored
+# label), else the speaker pattern (the `speaker:pattern` string, else the bundle's, else `{name}
+# ({qualifier})`) filled with the character's and the qualifier's shown names; with none, the character's
+# shown name. Each piece is looked up as _loc_string does (`source`: the default locale only). The token
+# stands in for a name the cast doesn't give, and the gameId for a qualifier's. A pair the bundle doesn't
+# override ignores any `speaker:` string a locale holds for it. null with no character (or an empty one),
+# and in IDs-only mode. The one resolver: steps, prompts, saved prompts, and the static structure.
+static func _speaker_label_of(host: FlowHost, character, qualifier, source := false):
+	if character == null or str(character) == "" or host.emit_ids:
+		return null
+	var who := str(character)
+	var nm = _character_name_of(host, who, source)
+	var shown_name: String = str(nm) if nm != null else who
+	if qualifier == null:
+		return shown_name
+	var gid := str(qualifier)
+	var own: Dictionary = host.speaker_labels.get(who, {})
+	if own.has(gid):
+		var label = _loc_string(host, "speaker:%s:%s" % [who, gid], source)
+		return label if label != null else own[gid]
+	var qn = _qualifier_name_of(host, gid, source)
+	var pattern = _loc_string(host, "speaker:pattern", source)
+	return PatterBundle.format_speaker_label(str(pattern) if pattern != null else host.speaker_pattern, shown_name, str(qn) if qn != null else gid)
 
 
 func _seed_scene(scene: Dictionary) -> void:
@@ -1738,8 +1777,15 @@ func _restore_cursor(snap: Dictionary) -> void:
 					prompt = {"kind": "text", "text": str(opt["text"]), "padAfter": PatterBundle.DEFAULT_PAD_AFTER}
 				opt["prompt"] = prompt
 			elif opt.get("prompt") is Dictionary:
+				# A save from before prompts carried their pause, or a speaker's label, has none: work
+				# them out again (the pause from the prompt's beat, the label from the speaker the
+				# choice showed, in the current locale).
 				var saved: Dictionary = opt["prompt"]
 				saved["padAfter"] = _saved_pad(saved, func(): return _prompt_pad_of(node))
+				if saved.get("kind", "") == "line" and not saved.has("speakerLabel"):
+					var label = _speaker_label_of(_host, saved.get("character"), saved.get("qualifier"))
+					if label != null:
+						saved["speakerLabel"] = label
 			opt.erase("text")
 			options.append(opt)
 		if not options.is_empty():
@@ -1762,3 +1808,9 @@ func _restore_cursor(snap: Dictionary) -> void:
 		_pending_prompt_shown = (c["pendingPrompt"] as Dictionary).duplicate()
 		var beat_id: String = _pending_prompt_beat["id"]
 		_pending_prompt_shown["padAfter"] = _saved_pad(_pending_prompt_shown, func(): return _pad_of(beat_id))
+		# As for the pending choice's options: a save from before prompts carried a speaker's label works
+		# it out again, from the speaker the choice showed, in the current locale.
+		if _pending_prompt_shown.get("kind", "") == "line" and not _pending_prompt_shown.has("speakerLabel"):
+			var label = _speaker_label_of(_host, _pending_prompt_shown.get("character"), _pending_prompt_shown.get("qualifier"))
+			if label != null:
+				_pending_prompt_shown["speakerLabel"] = label

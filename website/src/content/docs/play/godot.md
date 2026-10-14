@@ -33,7 +33,7 @@ var flow   := engine.open_flow("main", "intro")     # ("flow id", starting scene
 while true:
     var step := flow.advance()                       # { "type": ..., "text": ..., "options": ... }
     match step["type"]:
-        "line":   print("%s: %s" % [step.get("characterName", ""), step["text"]])
+        "line":   print("%s: %s" % [step.get("speakerLabel", ""), step["text"]])
         "text":   print(step["text"])
         "gameEvent": pass                            # fire step.gameData cues
         "choice": flow.choose(step["options"][0]["id"])   # your UI picks
@@ -45,9 +45,11 @@ its `options`, each `{ "id", "prompt", "eligible", "gameData" }` (`prompt` and `
 set): present each option's `prompt["text"]`, greyed when `eligible` is false, and call
 `flow.choose(id)` with the player's pick. The `prompt` is `{ "kind": "line" | "text", "text" }`, and a
 `"line"` prompt also carries the speaker's `character`, `characterName`, `direction`, `qualifier`,
-and `qualifierName` when set, the same shape every Patterplay runtime gives. A `"line"` step carries
-`qualifier` and `qualifierName` the same way: the line's
+`qualifierName`, and `speakerLabel` when set, the same shape every Patterplay runtime gives. A `"line"`
+step carries `qualifier` and `qualifierName` the same way: the line's
 [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId`, and its localised shown name.
+Show `speakerLabel` as the speaker's name: it's localised and already puts the two together the way
+the writer and the translator chose (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)).
 A `"line"` or `"text"` step always carries `"padAfter"`, the writer's pause after it in seconds,
 already resolved; the [timing rules](/play/engine/#step-shapes) say how to play it.
 
@@ -146,7 +148,7 @@ The game can also decide where the story goes. `run_flow` plays an
 # Reuses the "guard-42" flow, so its shuffles and once-each lists keep their place
 var lines: Array = engine.run_flow("guard-42", "npc-barks", "greet")
 for line in lines:
-    print("%s: %s" % [line.get("characterName", ""), line["text"]])
+    print("%s: %s" % [line.get("speakerLabel", ""), line["text"]])
 
 # Or move a flow you are already driving, exactly as an authored jump would
 var moved: bool = flow.goto("throne-room", "audience")   # false = did not resolve, cursor unmoved

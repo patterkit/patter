@@ -6,6 +6,19 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker labels**: a line step, a choice option's line `Prompt`, and a replayed prompt carry `SpeakerLabel`,
+  the name to show for the speaker in the current locale, so a game never puts the character's and the
+  qualifier's names together itself. With no qualifier it's the character's shown name; with one, the
+  character's own label for that pair when the project overrides it (the bundle's `cast[].qualifierLabels`,
+  translated as `speaker:<NAME>:<gameId>`), else the speaker pattern (`speaker:pattern`, else the bundle's
+  `speakerPattern`, else `{name} ({qualifier})`) filled with the two shown names. It's null with no speaker, on
+  a line closed captions have silenced, and in IDs-only mode. `BeatInfo.SpeakerLabel` gives it at the source
+  locale for `GetOutline` and `GetBeatSequence`. Saved choice prompts carry it, and a save written before it
+  existed works it out again on load. `Bundle.SpeakerPattern` and `Cast.QualifierLabels` read the new bundle
+  fields. The samples show the label. Held across all four runtimes by the conformance corpus.
+
 ## [0.24.0] - 2026-10-11
 
 ### Added

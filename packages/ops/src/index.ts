@@ -43,7 +43,7 @@ export type {
   ReportTotals, VoicedCounts, WrittenCounts,
 } from "./report.js";
 export { runReportXlsx } from "./report-xlsx.js";
-export { extractLoc, applyLoc } from "./localisation.js";
+export { extractLoc, applyLoc, projectStringSources, authoringPath } from "./localisation.js";
 export type { LocEntry, LocCatalog, ApplyStats } from "./localisation.js";
 export { catalogToJson, jsonToCatalog, catalogToPo, poToCatalog } from "./loc-format.js";
 export { catalogToXlsx, xlsxToCatalog } from "./loc-xlsx.js";

@@ -1,20 +1,38 @@
 // The Cast editor (Project Settings > Cast tab). The master cast: each member has a canonical name
 // (matched by a beat's speaker), an optional player-facing display name, a grammatical gender for
-// translators, and free-text production notes. value() returns a clean list (blank names pruned) for
-// the save round-trip.
+// translators, free-text production notes, and its own label with a qualifier where the speaker pattern
+// shouldn't apply ("Shown with V.O."), one field for each qualifier its lines use. value() returns a clean
+// list (blank names pruned) for the save round-trip.
 
 import type { CastMember } from "@patterkit/model";
-import { COMMON_GENDERS } from "@patterkit/model";
+import { COMMON_GENDERS, DEFAULT_SPEAKER_PATTERN, formatSpeakerLabel } from "@patterkit/model";
 import { el } from "./dom.js";
 import { iconBtn, labelled, moveItem, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
-export interface CastHandle { value(): CastMember[]; firstDuplicate(): HTMLInputElement | null; }
+export interface CastHandle {
+  value(): CastMember[];
+  firstDuplicate(): HTMLInputElement | null;
+  /** Repaint the "Shown with" placeholders, after the pattern or a qualifier's name changed elsewhere. */
+  refreshLabels(): void;
+}
+
+/** What the "Shown with" fields need from outside the tab. */
+export interface CastLabelSource {
+  /** Every character and qualifier pair the project's lines use. */
+  pairs: Array<{ character: string; qualifier: string }>;
+  /** A qualifier's shown name, by the gameId the lines hold (live: the Qualifiers tab may be editing it). */
+  qualifierName(gameId: string): string;
+  /** The speaker pattern as it stands, "" for the default (live, as above). */
+  pattern(): string;
+}
 
 let genderListSeq = 0; // unique <datalist> ids so each gender input binds to its own suggestion list
 
-export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle {
+export function mountCast(host: HTMLElement, initial: CastMember[], labels?: CastLabelSource): CastHandle {
   const state: CastMember[] = structuredClone(initial ?? []);
   const guard = dupGuard();
+  /** Each "Shown with" field's placeholder repaint, for the rows as last rendered. */
+  let repaints: Array<() => void> = [];
 
   // Auto-suggest values for the gender field: the everyday defaults plus any gender already used
   // elsewhere in this project's cast, so a second Latin-common or "animate" character reuses the exact
@@ -51,7 +69,8 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
 
     const display = el("input", "gd-input cast-field") as HTMLInputElement;
     display.type = "text"; display.placeholder = "Display name"; display.dataset.tip = "Player-facing name (optional)."; display.value = m.displayName ?? "";
-    display.addEventListener("input", () => { m.displayName = display.value.trim() || undefined; });
+    const shownWith = labelFields(m);
+    display.addEventListener("input", () => { m.displayName = display.value.trim() || undefined; shownWith.repaint(); });
     const actor = el("input", "gd-input cast-field") as HTMLInputElement;
     actor.type = "text"; actor.placeholder = "Actor"; actor.dataset.tip = "Voice actor (optional)."; actor.value = m.actor ?? "";
     actor.addEventListener("input", () => { m.actor = actor.value.trim() || undefined; });
@@ -86,11 +105,46 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
 
     const genderField = labelled("Grammatical gender", gender);
     genderField.append(genderList); // a <datalist> renders nothing; it just needs to be in the DOM
-    return expandableRow({ line: [name, display, actor, acts], details: [genderField, labelled("Notes", notes)] });
+    return expandableRow({ line: [name, display, actor, acts], details: [genderField, labelled("Notes", notes), ...shownWith.fields] });
+  };
+
+  /** One "Shown with" field for each qualifier this character's lines use, then one for each label it has
+   *  that no line uses any more (marked, so it can be cleared). Blank follows the speaker pattern, which
+   *  the placeholder shows filled in. A character whose lines use no qualifier gets none. */
+  const labelFields = (m: CastMember): { fields: HTMLElement[]; repaint(): void } => {
+    if (!labels) return { fields: [], repaint: () => undefined };
+    const used = labels.pairs.filter((p) => p.character === m.name).map((p) => p.qualifier);
+    const unused = Object.keys(m.qualifierLabels ?? {}).filter((q) => !used.includes(q));
+    const paints: Array<() => void> = [];
+    const fields = [...used, ...unused].map((gameId) => {
+      const input = el("input", "gd-input cast-label") as HTMLInputElement;
+      input.type = "text"; input.value = m.qualifierLabels?.[gameId] ?? "";
+      input.dataset.tip = "Leave blank to use the speaker pattern (Qualifiers tab).";
+      input.addEventListener("input", () => {
+        const text = input.value.trim();
+        const next = { ...m.qualifierLabels };
+        if (text) next[gameId] = text; else delete next[gameId];
+        m.qualifierLabels = Object.keys(next).length ? next : undefined;
+      });
+      const field = labelled("Shown with", input, unused.includes(gameId) ? "No lines use this." : undefined);
+      const caption = field.querySelector(".shell-fieldcap");
+      const paint = (): void => {
+        const qualifier = labels.qualifierName(gameId);
+        if (caption) caption.textContent = `Shown with ${qualifier}`;
+        input.placeholder = formatSpeakerLabel(labels.pattern() || DEFAULT_SPEAKER_PATTERN, m.displayName || m.name, qualifier);
+      };
+      paint();
+      paints.push(paint);
+      return field;
+    });
+    const repaint = (): void => { for (const p of paints) p(); };
+    repaints.push(repaint);
+    return { fields, repaint };
   };
 
   const render = (): void => {
     guard.reset();
+    repaints = [];
     host.replaceChildren();
     const list = el("div", "gd-fieldlist");
     if (!state.length) list.append(el("p", "empty", "No cast members yet."));
@@ -105,6 +159,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
 
   return {
     firstDuplicate: () => guard.firstDuplicate(),
+    refreshLabels: () => { for (const r of repaints) r(); },
     value(): CastMember[] {
       return state.filter((m) => m.name.trim()).map((m): CastMember => {
         const c: CastMember = { name: m.name.trim().toUpperCase() };
@@ -112,6 +167,7 @@ export function mountCast(host: HTMLElement, initial: CastMember[]): CastHandle 
         if (m.gender) c.gender = m.gender;
         if (m.actor) c.actor = m.actor;
         if (m.notes) c.notes = m.notes;
+        if (m.qualifierLabels && Object.keys(m.qualifierLabels).length) c.qualifierLabels = { ...m.qualifierLabels };
         if (m.gameData) c.gameData = m.gameData; // preserve any host gameData on the member
         return c;
       });

@@ -33,6 +33,17 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker labels**: a line step, a line choice prompt, and a beat's info carry `speakerLabel`, the name to
+  show for the speaker, localised. With a qualifier it is the character's own label for that pair when the
+  project gives one (`speaker:<NAME>:<qualifier>`), else the project's speaker pattern (`speaker:pattern`,
+  `{name} ({qualifier})` by default) filled with the shown name and the qualifier's shown name; with none, the
+  shown name (the token when the cast gives none). Each piece follows the active locale, then the default, then
+  the authored value. A translated pair label counts only for a pair the project overrides. Absent with no
+  speaker, on a silenced line, and in IDs-only mode. Saved choice prompts carry it, and an older save works it
+  out again on load.
+
 ## [0.24.0] - 2026-10-11
 
 ### Added

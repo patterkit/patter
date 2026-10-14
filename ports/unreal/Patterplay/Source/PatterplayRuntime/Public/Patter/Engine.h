@@ -196,6 +196,7 @@ namespace patter
     {
         std::string id, kind, character, characterName, direction, text;
         std::string qualifier, qualifierName;   // speaker qualifier gameId (`vo`) and shown name (source locale)
+        std::string speakerLabel;               // the speaker's label (source locale): `You (V.O.)`, a pair's own, or the name
         // Line padding (line and text only): the resolved pause after the beat, in seconds, what a delivered
         // step carries (0 for a game event); and the beat's own value, when it sets one.
         double padAfter = 0;
@@ -562,6 +563,36 @@ namespace patter
         std::map<std::string, std::string> castDisplay;
         // Speaker qualifier gameId -> authored name: the fallback for its shown name, as castDisplay is for a speaker's.
         std::map<std::string, std::string> qualifierDisplay;
+        // (character, qualifier gameId) -> that character's own label with that qualifier, for the overridden
+        // pairs only (the unlocalised fallback). A pair not here follows the pattern, whatever a loc file holds for it.
+        std::map<std::pair<std::string, std::string>, std::string> speakerLabels;
+        // The project's speaker pattern (the unlocalised fallback for the `speaker:pattern` string).
+        std::string speakerPattern = DEFAULT_SPEAKER_PATTERN;
+
+        // A project-level string (`cast:`, `qualifier:`, `speaker:`): the active locale's, then the default
+        // locale's; `source` reads the default locale only. Null when neither has it.
+        const std::string* locString(const std::string& key, bool source = false) const
+        {
+            if (!source) { auto a = strings->find(key); if (a != strings->end()) return &a->second; }
+            auto d = defaultStrings->find(key);
+            return d != defaultStrings->end() ? &d->second : nullptr;
+        }
+        // A speaker's shown name: the `cast:<name>` string (see locString), else the cast's displayName. Null
+        // when neither gives one. Every name a line or a beat shows comes through here.
+        const std::string* characterName(const std::string& character, bool source = false) const
+        {
+            if (const std::string* s = locString("cast:" + character, source)) return s;
+            auto c = castDisplay.find(character);
+            return c != castDisplay.end() ? &c->second : nullptr;
+        }
+        // A speaker qualifier's shown name, as a speaker's is: the `qualifier:<gameId>` string, else the
+        // authored name. Null when neither gives one.
+        const std::string* qualifierName(const std::string& gameId, bool source = false) const
+        {
+            if (const std::string* s = locString("qualifier:" + gameId, source)) return s;
+            auto q = qualifierDisplay.find(gameId);
+            return q != qualifierDisplay.end() ? &q->second : nullptr;
+        }
         std::map<std::string, const Node*> nodeIndex;
         std::map<std::string, std::string> blockToScene;
         std::map<std::string, const Block*> blockById;
@@ -611,6 +642,53 @@ namespace patter
         std::string captionClose = "]";
         std::string captionCharacter = "SFX"; // a cast member whose whole lines are captions (silent when off)
     };
+
+    // A qualified speaker's label: the pattern with its placeholders filled. Every `{name}` and every
+    // `{qualifier}` is replaced, as plain text; nothing else in the pattern is read (and nothing the names
+    // bring with them). The one composition rule, on every runtime and in Patterpad.
+    inline std::string formatSpeakerLabel(const std::string& pattern, const std::string& name, const std::string& qualifier)
+    {
+        auto replaceAll = [](const std::string& text, const std::string& token, const std::string& with) {
+            std::string out;
+            std::size_t from = 0;
+            for (std::size_t at; (at = text.find(token, from)) != std::string::npos; from = at + token.size())
+                out.append(text, from, at - from).append(with);
+            return out.append(text, from, std::string::npos);
+        };
+        // The name goes in last, so a `{qualifier}` inside the name stays as it is (as the reference does).
+        std::string out;
+        std::size_t from = 0;
+        for (std::size_t at; (at = pattern.find("{name}", from)) != std::string::npos; from = at + 6)
+            out.append(replaceAll(pattern.substr(from, at - from), "{qualifier}", qualifier)).append(name);
+        return out.append(replaceAll(pattern.substr(from), "{qualifier}", qualifier));
+    }
+
+    // The name to show for a line's speaker: with a qualifier, the character's own label for that pair when the
+    // bundle overrides it (the `speaker:<name>:<gameId>` string, else the authored label), else the speaker
+    // pattern (`{name} ({qualifier})`, the `speaker:pattern` string, else the bundle's) filled with the
+    // character's and the qualifier's shown names; with none, the character's shown name. Each piece is looked
+    // up as FlowHost::locString does (`source` reads the default locale only), and the token stands in for a
+    // name the cast doesn't give, as the gameId does for a qualifier's. False with no character (or an empty
+    // one), and in IDs-only mode, where the game maps the tokens itself.
+    inline bool speakerLabelOf(const FlowHost& host, bool hasCharacter, const std::string& character,
+                               bool hasQualifier, const std::string& qualifier, std::string& out, bool source = false)
+    {
+        if (!hasCharacter || character.empty() || host.emitIds) return false;
+        const std::string* found = host.characterName(character, source);
+        const std::string name = found ? *found : character;
+        if (!hasQualifier) { out = name; return true; }
+        auto own = host.speakerLabels.find({character, qualifier});
+        if (own != host.speakerLabels.end())
+        {
+            const std::string* label = host.locString("speaker:" + character + ":" + qualifier, source);
+            out = label ? *label : own->second;
+            return true;
+        }
+        const std::string* shown = host.qualifierName(qualifier, source);
+        const std::string* pattern = host.locString("speaker:pattern", source);
+        out = formatSpeakerLabel(pattern ? *pattern : host.speakerPattern, name, shown ? *shown : qualifier);
+        return true;
+    }
 
     struct EngineOptions
     {
@@ -1211,13 +1289,18 @@ namespace patter
                     if (it == host_->nodeIndex.end()) continue;
                     byId[o.id] = it->second;
                     options.push_back(o);
-                    // A save from before prompts carried their pause has none: work it out again from the
-                    // prompt's beat.
+                    // A save from before prompts carried their pause, or a speaker's label, has none: work them out
+                    // again (the pause from the prompt's beat, the label from the speaker the choice showed, in the
+                    // current locale).
                     ChoiceOption& added = options.back();
-                    if (added.prompt && !added.prompt->hasPadAfter)
+                    std::string label;
+                    const bool relabel = added.prompt && added.prompt->kind == "line" && !added.prompt->hasSpeakerLabel
+                        && speakerLabelOf(*host_, added.prompt->hasCharacter, added.prompt->character, added.prompt->hasQualifier, added.prompt->qualifier, label);
+                    if (added.prompt && (!added.prompt->hasPadAfter || relabel))
                     {
                         added.prompt = std::make_shared<ChoicePrompt>(*added.prompt);
-                        added.prompt->hasPadAfter = true; added.prompt->padAfter = promptPadOf(it->second);
+                        if (!added.prompt->hasPadAfter) { added.prompt->hasPadAfter = true; added.prompt->padAfter = promptPadOf(it->second); }
+                        if (relabel) { added.prompt->hasSpeakerLabel = true; added.prompt->speakerLabel = label; }
                     }
                 }
                 if (!options.empty()) { hasPendingChoice_ = true; pendingGroupId_ = snap.pendingGroupId; pendingOptions_ = options; pendingById_ = byId; }
@@ -1241,6 +1324,12 @@ namespace patter
             {
                 pendingPromptShown_ = std::make_shared<ChoicePrompt>(*snap.pendingPrompt);
                 if (!pendingPromptShown_->hasPadAfter) { pendingPromptShown_->hasPadAfter = true; pendingPromptShown_->padAfter = padOf(pendingPromptBeat_->id); }
+                // As for the pending choice's options: a save from before prompts carried a speaker's label works it out again.
+                std::string label;
+                if (pendingPromptShown_->kind == "line" && !pendingPromptShown_->hasSpeakerLabel
+                    && speakerLabelOf(*host_, pendingPromptShown_->hasCharacter, pendingPromptShown_->character,
+                                      pendingPromptShown_->hasQualifier, pendingPromptShown_->qualifier, label))
+                { pendingPromptShown_->hasSpeakerLabel = true; pendingPromptShown_->speakerLabel = label; }
             }
         }
 
@@ -1973,6 +2062,7 @@ namespace patter
                 if (beat.hasDirection) { r.hasDirection = true; r.direction = beat.direction; }
                 if (beat.hasQualifier) { r.hasQualifier = true; r.qualifier = beat.qualifier; }
                 std::string qn; if (resolveQualifierName(beat, qn)) { r.hasQualifierName = true; r.qualifierName = qn; }
+                std::string sl; if (resolveSpeakerLabel(beat, sl)) { r.hasSpeakerLabel = true; r.speakerLabel = sl; }
             }
             r.gameData = beat.gameData;
             applyTags(r);
@@ -2013,6 +2103,7 @@ namespace patter
                 if (beat->hasDirection) { p->hasDirection = true; p->direction = beat->direction; }
                 if (beat->hasQualifier) { p->hasQualifier = true; p->qualifier = beat->qualifier; }
                 std::string qn; if (resolveQualifierName(*beat, qn)) { p->hasQualifierName = true; p->qualifierName = qn; }
+                std::string sl; if (resolveSpeakerLabel(*beat, sl)) { p->hasSpeakerLabel = true; p->speakerLabel = sl; }
             }
             else { p->kind = "text"; p->text = text; }
             p->hasPadAfter = true; p->padAfter = padOf(beat->id);
@@ -2038,6 +2129,7 @@ namespace patter
             if (shown.hasDirection) { r.hasDirection = true; r.direction = shown.direction; }
             if (shown.hasQualifier) { r.hasQualifier = true; r.qualifier = shown.qualifier; }
             if (shown.hasQualifierName) { r.hasQualifierName = true; r.qualifierName = shown.qualifierName; }
+            if (shown.hasSpeakerLabel) { r.hasSpeakerLabel = true; r.speakerLabel = shown.speakerLabel; }
             return r;
         }
         // The resolved pause of the beat an option shows as its prompt (its authored prompt, else its first
@@ -2079,12 +2171,9 @@ namespace patter
         {
             if (!beat.hasCharacter) return false;
             if (host_->emitIds) return false; // IDs-only: omit the display name; the game maps the `character` token
-            const std::string& character = beat.character;
-            std::string key = "cast:" + character;
-            auto a = host_->strings->find(key); if (a != host_->strings->end()) { out = a->second; return true; }
-            auto d = host_->defaultStrings->find(key); if (d != host_->defaultStrings->end()) { out = d->second; return true; }
-            auto c = host_->castDisplay.find(character); if (c != host_->castDisplay.end()) { out = c->second; return true; }
-            return false;
+            const std::string* name = host_->characterName(beat.character);
+            if (!name) return false;
+            out = *name; return true;
         }
         // A speaker qualifier's shown name, resolved as a speaker's is: the active `qualifier:<gameId>` string,
         // the default one, then the authored name. False when the beat has no qualifier, and in IDs-only mode
@@ -2093,11 +2182,14 @@ namespace patter
         {
             if (!beat.hasQualifier) return false;
             if (host_->emitIds) return false;
-            std::string key = "qualifier:" + beat.qualifier;
-            auto a = host_->strings->find(key); if (a != host_->strings->end()) { out = a->second; return true; }
-            auto d = host_->defaultStrings->find(key); if (d != host_->defaultStrings->end()) { out = d->second; return true; }
-            auto q = host_->qualifierDisplay.find(beat.qualifier); if (q != host_->qualifierDisplay.end()) { out = q->second; return true; }
-            return false;
+            const std::string* name = host_->qualifierName(beat.qualifier);
+            if (!name) return false;
+            out = *name; return true;
+        }
+        // The speaker's label in the active locale (see speakerLabelOf). False with no character, and in IDs-only mode.
+        bool resolveSpeakerLabel(const Beat& beat, std::string& out)
+        {
+            return speakerLabelOf(*host_, beat.hasCharacter, beat.character, beat.hasQualifier, beat.qualifier, out);
         }
 
         void seedScene(const Scene& scene)
@@ -2179,6 +2271,9 @@ namespace patter
             for (const auto& c : bundle.cast) if (!c.displayName.empty()) host_.castDisplay[c.name] = c.displayName;
             // A nameless qualifier gives no shown name of its own (a locale string still can), as the reference.
             for (const auto& q : bundle.qualifiers) if (!q.gameId.empty() && q.hasName) host_.qualifierDisplay[q.gameId] = q.name;
+            // The overridden character and qualifier pairs, with their source labels, and the project's pattern.
+            for (const auto& c : bundle.cast) for (const auto& kv : c.qualifierLabels) host_.speakerLabels[{c.name, kv.first}] = kv.second;
+            host_.speakerPattern = bundle.hasSpeakerPattern ? bundle.speakerPattern : DEFAULT_SPEAKER_PATTERN;
             defaultSeed_ = options.hasSeed ? Mulberry32::ToUint32(options.seed) : 0x9e3779b9u;
 
             for (const auto& kv : bundle.scenes)
@@ -2834,18 +2929,15 @@ namespace patter
                 if (!beat.character.empty())
                 {
                     info.character = beat.character;
-                    auto c = host_.defaultStrings->find("cast:" + beat.character);
-                    if (c != host_.defaultStrings->end()) info.characterName = c->second;
-                    else { auto d = host_.castDisplay.find(beat.character); if (d != host_.castDisplay.end()) info.characterName = d->second; }
+                    if (const std::string* name = host_.characterName(beat.character, true)) info.characterName = *name;
                 }
                 info.direction = beat.direction;
                 if (beat.hasQualifier)
                 {
                     info.qualifier = beat.qualifier;
-                    auto q = host_.defaultStrings->find("qualifier:" + beat.qualifier);
-                    if (q != host_.defaultStrings->end()) info.qualifierName = q->second;
-                    else { auto d = host_.qualifierDisplay.find(beat.qualifier); if (d != host_.qualifierDisplay.end()) info.qualifierName = d->second; }
+                    if (const std::string* name = host_.qualifierName(beat.qualifier, true)) info.qualifierName = *name;
                 }
+                speakerLabelOf(host_, beat.hasCharacter, beat.character, beat.hasQualifier, beat.qualifier, info.speakerLabel, true);
             }
             if (beat.kind == "line" || beat.kind == "text")
             {

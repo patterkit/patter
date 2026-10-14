@@ -47,8 +47,12 @@ Flow->Choose(Step.Options[0].Id);
 
 A line step names its speaker (`Character`, and `CharacterName`, the locale-resolved name), its
 `Direction`, and any speaker qualifier: `Qualifier` is the qualifier's gameId (`vo`, `os`, `radio`) for
-your code to switch on, and `QualifierName` its shown name (`O.S.`), so a dialogue widget can show
-`TAM (O.S.)`. An option's `Prompt` carries the same fields, and each has a `bHas` flag for whether it is set.
+your code to switch on, and `QualifierName` its shown name (`O.S.`). `SpeakerLabel` is the name to
+show: with a qualifier, the project's speaker pattern filled in (`Tam (O.S.)`), or the character's own
+label for that pair where the project gives one ("Your thoughts"); with none, the shown name. It's
+translated as the names are, so show it rather than putting the name and the qualifier together yourself.
+An option's `Prompt` carries the same fields, and each has a `bHas` flag for whether it is set; an
+IDs-only build sets no names or label, as your game maps the tokens itself.
 
 A line or text step also carries `PadAfter`, the pause after it in seconds, before the next line: the
 line's own, else the nearest default above it (its snippet, groups, block, scene, then the project's),
@@ -106,7 +110,7 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   cursor to the editor; `ApplyLiveBundle` hot-reloads an edited bundle into the running
   engine. See [Live refresh & debug](https://patterkit.dev/play/live-debug/).
 - **Structure**: `GetOutline` / `GetBeatSequence` expose the authored tree (per-beat text,
-  character, speaker qualifier, resolved `PadAfter` and any `OwnPadAfter`, gameData, tags, plus each scene's and block's own gameData) for tooling like
+  character, speaker qualifier, speaker label, resolved `PadAfter` and any `OwnPadAfter`, gameData, tags, plus each scene's and block's own gameData) for tooling like
   Sequencer binding. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
   a block's own gameData by address, raw (not merged with the declared defaults).
 

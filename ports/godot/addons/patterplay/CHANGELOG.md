@@ -6,6 +6,22 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker labels: a line step carries `speakerLabel`, the name to show for its speaker.** A game can
+  show it alone instead of putting `characterName` and `qualifierName` together, which no single word order
+  or punctuation suits in every language. With a qualifier it is the character's own label for that pair
+  when the project gives one (the `speaker:<NAME>:<qualifier>` string, then the label the bundle carries),
+  else the project's speaker pattern (the `speaker:pattern` string, then the bundle's `speakerPattern`, then
+  `{name} ({qualifier})`) filled with the shown name and the qualifier's shown name; with none, it is the
+  shown name (the token when the cast gives none). Each piece follows the active locale, then the default
+  locale, then the authored value, and a `speaker:` string counts only for a pair the project overrides.
+  Absent with no speaker, on a line closed captions silence, and in an IDs-only build. A line prompt on a
+  choice option, a replayed prompt, a saved choice, and `get_outline` / `get_beat_sequence` (in the source
+  language) carry it too; a save from before it existed works it out again on load, in the current locale.
+  `characterName` and `qualifierName` are unchanged. The demos show the label. Held across all four
+  runtimes by the conformance corpus.
+
 ## [0.24.0] - 2026-10-11
 
 ### Added

@@ -37,7 +37,7 @@ export type ScopeBag = Record<string, ScalarValue>;
  * and doesn't records a "<missing>" marker instead.
  */
 export type TranscriptStep =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter?: number; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData; tags?: string[] }
   | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
@@ -64,6 +64,8 @@ export interface TranscriptPrompt {
   /** The speaker qualifier's `gameId` and resolved shown name (a `line` prompt only, and only when set). */
   qualifier?: string;
   qualifierName?: string;
+  /** The speaker's label, recorded only where it differs from the name an unqualified line shows (as on a step). */
+  speakerLabel?: string;
   /** The prompt's resolved pause, recorded only when it isn't the built-in 0.6 (as on a step). */
   padAfter?: number;
 }

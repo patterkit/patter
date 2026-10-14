@@ -29,7 +29,7 @@ importing back, and staleness, is the project team's side, on the
 import { Engine } from "@patterkit/runtime";
 const engine = new Engine(bundle, { locale: "fr" });   // or omit: the bundle's default
 const flow = engine.openFlow("main", { scene: "intro" });
-const step = flow.advance();   // step.text is resolved, interpolated French; characterName and qualifierName localised
+const step = flow.advance();   // step.text is resolved, interpolated French; the speaker's names and speakerLabel localised
 ```
 
 Switch language live without losing the player's place:
@@ -45,7 +45,9 @@ A string missing in the active locale falls back to the source text flagged
 
 `step.text` is the **beat ID** and `step.characterName` is **omitted** (you still get
 `step.character`, the stable token). A speaker qualifier's `step.qualifierName` is omitted too,
-and `step.qualifier` (its `gameId`) is still there. Look the text up yourself, then apply `{@property}`
+and `step.qualifier` (its `gameId`) is still there; so is `step.speakerLabel`, which your game builds from
+the same strings the export gives it: `speaker:<CHARACTER>:<qualifier>` when it exists, else
+`speaker:pattern` with `{name}` and `{qualifier}` filled in. Look the text up yourself, then apply `{@property}`
 replacement with the flow:
 
 ```js

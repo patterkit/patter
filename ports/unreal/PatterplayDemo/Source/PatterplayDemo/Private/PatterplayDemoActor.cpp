@@ -24,10 +24,9 @@ void APatterplayDemoActor::BeginPlay()
 		{
 			case EPatterStepType::Line:
 			{
-				FString Speaker = Step.CharacterName.IsEmpty() ? Step.Character : Step.CharacterName;
-				// A speaker qualifier shows after the name, as a script's cue does: TAM (O.S.).
-				const FString& Qualifier = Step.QualifierName.IsEmpty() ? Step.Qualifier : Step.QualifierName;
-				if (!Qualifier.IsEmpty()) Speaker += FString::Printf(TEXT(" (%s)"), *Qualifier);
+				// The speaker's label is the name to show, a qualifier included (Tam (O.S.)), already put together
+				// and translated; an IDs-only build has none, so the token stands in.
+				const FString& Speaker = Step.bHasSpeakerLabel ? Step.SpeakerLabel : Step.Character;
 				UE_LOG(LogTemp, Display, TEXT("%s: %s"), *Speaker, *Step.Text);
 				break;
 			}

@@ -27,7 +27,7 @@ const flow = engine.openFlow("main", { scene: "square" });
 
 for (;;) {
   const step = flow.advance();
-  if (step.type === "line")   render(step.character, step.characterName, step.text);
+  if (step.type === "line")   render(step.character, step.speakerLabel, step.text);
   else if (step.type === "text")   narrate(step.text);
   else if (step.type === "gameEvent") host(step.gameData);   // your side-effects
   else if (step.type === "choice") flow.choose(pick(step.options).id);
@@ -106,7 +106,7 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 
 | `step.type` | Fields |
 | --- | --- |
-| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `padAfter`, `gameData?`, `tags?` |
+| `"line"` | `id`, `text`, `character?`, `characterName?`, `direction?`, `qualifier?`, `qualifierName?`, `speakerLabel?`, `padAfter`, `gameData?`, `tags?` |
 | `"text"` | `id`, `text`, `padAfter`, `gameData?`, `tags?` |
 | `"gameEvent"` | `id`, `gameData?`, `tags?`: no text; the host-event beat |
 | `"choice"` | `groupId`, `options: ChoiceOption[]` |
@@ -120,6 +120,13 @@ has none, it's absent and you fall back to the `character` token. **`qualifier`*
 localised as `characterName` is. Both are absent when the line has none, and on a line
 [closed captions](/play/closed-captions/) silence. What a qualifier means is your game's: play a
 `vo` line from a non-positional voice, say, or put a filter on a `radio` one.
+
+**`speakerLabel`** is the name to show for the speaker, localised and ready to display: `You (V.O.)`, or
+the label the writer gave that character with that qualifier ("Your thoughts"), or with no qualifier
+the display name (the `character` token when there's none). Show it as the speaker's name rather than
+putting `characterName` and `qualifierName` together yourself: how they combine is the writer's and the
+translator's (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)). It's
+absent when the line has no speaker, on a silenced line, and in IDs-only mode.
 
 **`padAfter`** is the writer's pause after a line or text beat, in seconds, already resolved from the
 beat's own value and the defaults above it (0.6 when nothing sets one). Negative means the next beat
@@ -138,8 +145,8 @@ these are the rules the writer expects:
 A **`ChoiceOption`** is `{ id, prompt?, eligible, gameData? }`: ineligible options are still present
 (greyed) unless they're secret; pass `id` to `choose()`. Its `prompt` is `{ kind, text, padAfter }`,
 where `kind` is `"line"` or `"text"` and `padAfter` is the pause before the reply, for a game that voices
-the prompts itself; a line prompt adds `character`, `characterName`, `direction`, `qualifier`, and
-`qualifierName` when they're set. With `replayPromptOnChoose`, the chosen prompt comes back as the
+the prompts itself; a line prompt adds `character`, `characterName`, `direction`, `qualifier`,
+`qualifierName`, and `speakerLabel` when they're set. With `replayPromptOnChoose`, the chosen prompt comes back as the
 first step after `choose()`, carrying the same `padAfter`. A choice is only offered
 when at least one option can be taken: if every remaining option is greyed out, the choice runs dry,
 as one with no options does, so its fallback plays if it has one and otherwise the flow moves on.

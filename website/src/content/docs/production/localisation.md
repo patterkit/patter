@@ -66,6 +66,10 @@ The Excel export shows it as a **Status** column:
 - **stale**: it has a translation, but the **source line was edited after it was translated**, so it
   needs re-checking against the new wording.
 
+The names translated beside the lines go stale the same way: changing a character's display name, a
+qualifier's name, the speaker pattern, or a character's own label with a qualifier in **Project Settings**
+flags that string's translations.
+
 Import writes back **every filled-in translation**, whatever its Status (an empty Translation
 cell is left alone). The Status doesn't decide *whether* a row imports, only what happens to its
 staleness. An unflagged row is accepted as fresh (its translation is now current for the source as
@@ -101,6 +105,16 @@ script shows, so a translator knows a line is a thought or heard over a radio:
 It's context only, never text to translate, and it's never read back on import. The qualifier
 **names** themselves (`V.O.`, `RADIO`) are translated with the cast's display names, as
 `qualifier:vo`-style strings beside the `cast:` ones, for the qualifiers your lines use.
+
+Two more strings sit beside them when your lines use a qualifier (see
+[How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)):
+
+- **`speaker:pattern`**, how a name and a qualifier go together, `{name} ({qualifier})` in English. Keep
+  `{name}` and `{qualifier}` as they are; move them, or change the punctuation around them, to suit the
+  language. Most languages copy it unchanged.
+- **`speaker:PLAYER:vo`**, one for each character and qualifier pair the writer gave a label of its own
+  ("Your thoughts"), translated like any other phrase, with the character and the qualifier as context.
+  A pair without one follows the pattern, so there's nothing to translate for it.
 
 ### Who is speaking: grammatical gender
 

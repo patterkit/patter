@@ -53,9 +53,11 @@ dialogue widget without touching C++. It is the API the other runtimes have, und
 a flow's `GetChoices`, `GetProperty` and `SetProperty` (its `@scene` values included), `Log`,
 `Interpolate` and `StripCaptions`; and the engine's `Flows`, addresses, tags, Game Data, and
 `OpenFlow` with a block and a seed. A step's `bHasCharacter`, `bHasCharacterName`,
-`bHasDirection`, `bHasQualifier`, and `bHasQualifierName` tell a field that isn't set from one that is
-empty. `Qualifier` is the line's [speaker qualifier](/setup/cast/#speaker-qualifiers) by its `gameId`
-(`vo`, `os`, `radio`), and `QualifierName` its localised shown name; a line prompt carries both too.
+`bHasDirection`, `bHasQualifier`, `bHasQualifierName`, and `bHasSpeakerLabel` tell a field that isn't set
+from one that is empty. `Qualifier` is the line's [speaker qualifier](/setup/cast/#speaker-qualifiers) by
+its `gameId` (`vo`, `os`, `radio`), and `QualifierName` its localised shown name; a line prompt carries
+both too. Show `SpeakerLabel` as the speaker's name: it's localised and already puts the two together the
+way the writer and the translator chose (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)).
 `PadAfter` is the writer's pause after a line or text step, in seconds, already resolved. It's always
 set on a `Line` or `Text` step and 0 on any other, so it has no `bHas` flag. The
 [timing rules](/play/engine/#step-shapes) say how to play it.

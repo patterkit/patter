@@ -61,3 +61,28 @@ a Game ID updates every line that uses it.
 A qualifier's name is translated like a display name, for the qualifiers your lines use (see
 [Localisation](/production/localisation/)). Only those qualifiers are compiled into the `.patterc`,
 with their Game ID and name; the description is for writers.
+
+### How a qualified speaker is shown
+
+The game shows a qualified line's speaker as the display name and the qualifier together: `PLAYER` with
+`V.O.` shows as **You (V.O.)**. That needs nothing from you. How the two go together is the project's
+**speaker pattern**, `{name} ({qualifier})`, set once in **Project Settings ▸ Qualifiers**.
+
+When one character's version should read differently, give that pair a label of its own: in
+**Project Settings ▸ Cast**, expand the character (▸) and type it in **Shown with V.O.**, so the
+player's thoughts show as **Your thoughts**. A field appears for each qualifier that character's lines
+use; leave it blank to keep the pattern. A label whose lines are gone keeps its field, marked as unused,
+until you clear it.
+
+Translators see the pattern and any pair labels beside the display names, so each language can change
+the order or the punctuation once, and translate a pair label like any other phrase:
+
+| String | English | French |
+| --- | --- | --- |
+| `cast:PLAYER` | You | Vous |
+| `qualifier:os` | O.S. | H.C. |
+| `speaker:pattern` | {name} ({qualifier}) | {name} ({qualifier}) |
+| `speaker:PLAYER:vo` | Your thoughts | Vos pensées |
+
+The script itself always shows `PLAYER (V.O.)`, as a screenplay does; the label is what the player
+sees.

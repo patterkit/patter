@@ -80,7 +80,7 @@ A minimal loop: advance until a choice or the end, rendering each beat as it com
 loop:
     step = flow.advance()
     switch step.type:
-        "line":   show(step.characterName ?? step.character, step.text)
+        "line":   show(step.speakerLabel, step.text)
         "text":   show(step.text)
         "gameEvent": doHostCue(step.id, step.gameData)
         "choice": presentOptions(step.options); break   // wait for the player

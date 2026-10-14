@@ -37,7 +37,7 @@ import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
 import type { LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
-import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, DEFAULT_PAD_AFTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
+import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
 import { buildPadIndex, type BeatPad } from "./pads.js";
 import { SAVE_VERSION } from "@patterkit/model";
@@ -113,7 +113,7 @@ const keys = {
 
 /** What `Flow.advance()` surfaces to the host at each stop. */
 export type StepResult =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter: number; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter: number; gameData?: GameData; tags?: string[] }
   | { type: "text"; id: string; text: string; padAfter: number; gameData?: GameData; tags?: string[] }
   | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
   | { type: "choice"; groupId: string; options: ChoiceOption[] }
@@ -139,6 +139,8 @@ export interface BeatInfo {
   qualifier?: string;
   /** The qualifier's shown name (source locale), e.g. `V.O.`. */
   qualifierName?: string;
+  /** The speaker's label (source locale): `You (V.O.)`, a pair's own label, or with no qualifier the name. */
+  speakerLabel?: string;
   /** The pause after this beat, in seconds, resolved from its own value and the defaults above it (line and
    *  text only; see line padding). What a delivered step carries. */
   padAfter?: number;
@@ -218,6 +220,8 @@ export interface ChoicePrompt {
   /** The speaker qualifier's `gameId` (`vo`), and its resolved shown name (locale-aware). */
   qualifier?: string;
   qualifierName?: string;
+  /** The name to show for the speaker (locale-aware): see {@link speakerLabelOf}. */
+  speakerLabel?: string;
   /** The prompt's resolved pause, in seconds: when it is spoken (by `replayPromptOnChoose`, or by a game that
    *  voices it), the wait before the reply, negative to cut in on the question (line padding). */
   padAfter: number;
@@ -459,6 +463,11 @@ interface FlowHost {
   castDisplay: Map<string, string>;
   /** Speaker qualifier gameId -> authored name (the unlocalised fallback when no loc string exists). */
   qualifierDisplay: Map<string, string>;
+  /** `<name>\0<gameId>` -> a character's own label with that qualifier, for the overridden pairs only (the
+   *  unlocalised fallback). A pair not here follows the pattern, whatever a loc file holds for it. */
+  speakerLabels: Map<string, string>;
+  /** The project's speaker pattern (the unlocalised fallback for the `speaker:pattern` string). */
+  speakerPattern: string;
   nodeIndex: Map<string, SelectableNode>;
   blockIndex: Map<string, { sceneId: string }>;
   blockById: Map<string, CompiledBlock>;
@@ -574,6 +583,10 @@ export class Engine {
     // Qualifier gameId -> authored name: the fallback for its shown name, as castDisplay is for a speaker's.
     const qualifierDisplay = new Map<string, string>();
     for (const q of bundle.qualifiers ?? []) if (q?.gameId) qualifierDisplay.set(q.gameId, q.name);
+    // The overridden character and qualifier pairs, with their source labels.
+    const speakerLabels = new Map<string, string>();
+    for (const c of bundle.cast ?? []) for (const [q, label] of Object.entries(c.qualifierLabels ?? {})) if (typeof label === "string") speakerLabels.set(`${c.name}\u0000${q}`, label);
+    const speakerPattern = bundle.speakerPattern ?? DEFAULT_SPEAKER_PATTERN;
     this.defaultSeed = (options.seed ?? 0x9e3779b9) >>> 0;
 
     const nodeIndex = new Map<string, SelectableNode>();
@@ -649,7 +662,7 @@ export class Engine {
       logEnabled: options.log ?? false,
       tracing: options.log ?? false,
       emitEngine: (flow, event, scene) => this.emitEngine(flow, event, scene),
-      bundle, emitIds, strings, defaultStrings, castDisplay, qualifierDisplay, nodeIndex, blockIndex, blockById,
+      bundle, emitIds, strings, defaultStrings, castDisplay, qualifierDisplay, speakerLabels, speakerPattern, nodeIndex, blockIndex, blockById,
       sceneGameIdToId: this.sceneGameIdToId, blockGameIdToId: this.blockGameIdToId, // same instances the engine resolves with
       tagIndex: tagIndexFor(bundle), padIndex: padIndexFor(bundle), registry, ownsRegistry, patterBag, hostScopes,
       patterSharedDecls, patterLocalDecls, patterSharedNames, sceneSharedNames,
@@ -1062,6 +1075,8 @@ export class Engine {
         const name = this.host.defaultStrings[qualifierStringKey(beat.qualifier)] ?? this.host.qualifierDisplay.get(beat.qualifier);
         if (name !== undefined) info.qualifierName = name;
       }
+      const label = speakerLabelOf(this.host, beat.character, beat.qualifier, true);
+      if (label !== undefined) info.speakerLabel = label;
     }
     if (beat.kind === "line" || beat.kind === "text") {
       const pad = this.host.padIndex.get(beat.id);
@@ -1994,9 +2009,11 @@ export class Flow {
         const node = this.host.nodeIndex.get(o.id);
         if (!node) continue;
         byId.set(o.id, node);
-        // A save from before prompts carried their pause has none: work it out again from the prompt's beat.
+        // A save from before prompts carried their pause, or a speaker's label, has none: work them out again
+        // (the pause from the prompt's beat, the label from the speaker the choice showed, in the current locale).
         const { prompt: saved, ...rest } = o;
-        options.push({ ...rest, ...(saved ? { prompt: { ...saved, padAfter: saved.padAfter ?? this.promptPadOf(node) } } : {}) });
+        const label = saved?.kind === "line" && saved.speakerLabel === undefined ? speakerLabelOf(this.host, saved.character, saved.qualifier) : undefined;
+        options.push({ ...rest, ...(saved ? { prompt: { ...saved, padAfter: saved.padAfter ?? this.promptPadOf(node), ...(label !== undefined ? { speakerLabel: label } : {}) } } : {}) });
       }
       if (options.length > 0) this.pendingChoice = { groupId: c.pendingChoice.groupId, options, byId };
     }
@@ -2011,7 +2028,10 @@ export class Flow {
     if (this.pendingPromptOwnerId) {
       const owner = this.host.nodeIndex.get(this.pendingPromptOwnerId);
       const beat = owner ? this.authoredPromptOf(owner) : undefined;
-      if (beat) this.pendingPrompt = { beat, ...(c.pendingPrompt ? { shown: { ...c.pendingPrompt, padAfter: c.pendingPrompt.padAfter ?? this.padOf(beat.id) } } : {}) };
+      const saved = c.pendingPrompt;
+      // As for the pending choice's options: a save from before prompts carried a speaker's label works it out again.
+      const label = saved?.kind === "line" && saved.speakerLabel === undefined ? speakerLabelOf(this.host, saved.character, saved.qualifier) : undefined;
+      if (beat) this.pendingPrompt = { beat, ...(saved ? { shown: { ...saved, padAfter: saved.padAfter ?? this.padOf(beat.id), ...(label !== undefined ? { speakerLabel: label } : {}) } } : {}) };
       else this.pendingPromptOwnerId = null;
     }
   }
@@ -2442,6 +2462,7 @@ export class Flow {
           direction: silent ? undefined : beat.direction,
           qualifier: silent ? undefined : beat.qualifier,
           qualifierName: silent ? undefined : this.resolveQualifierName(beat.qualifier),
+          speakerLabel: silent ? undefined : speakerLabelOf(this.host, beat.character, beat.qualifier),
           padAfter: this.padOf(beat.id), // a silent line still fires, so it still carries its pause
           gameData: beat.gameData,
           ...withTags,
@@ -2490,7 +2511,8 @@ export class Flow {
     return beat.kind === "line"
       ? {
           kind: "line", text: this.captionLine(text), character: beat.character, characterName: this.resolveCharacterName(beat.character), direction: beat.direction,
-          qualifier: beat.qualifier, qualifierName: this.resolveQualifierName(beat.qualifier), padAfter,
+          qualifier: beat.qualifier, qualifierName: this.resolveQualifierName(beat.qualifier),
+          speakerLabel: speakerLabelOf(this.host, beat.character, beat.qualifier), padAfter,
         }
       : { kind: "text", text, padAfter };
   }
@@ -2509,7 +2531,7 @@ export class Flow {
     return {
       type: "line", id: beat.id, text: shown.text,
       character: shown.character, characterName: shown.characterName, direction: shown.direction,
-      qualifier: shown.qualifier, qualifierName: shown.qualifierName, padAfter: this.padOf(beat.id),
+      qualifier: shown.qualifier, qualifierName: shown.qualifierName, speakerLabel: shown.speakerLabel, padAfter: this.padOf(beat.id),
       gameData: beat.gameData, ...withTags,
     };
   }
@@ -2686,6 +2708,25 @@ function collectCast(nodes: Array<CompiledGroup | CompiledSnippet>, out: Set<str
   });
 }
 
+/**
+ * The name to show for a line's speaker: with a qualifier, the character's own label for that pair when the
+ * project overrides it, else the speaker pattern (`{name} ({qualifier})`) filled with the character's and the
+ * qualifier's shown names; with none, the character's shown name. Each piece is looked up in the active locale,
+ * then the default locale, then the authored value (`source` reads the default locale only). The character's
+ * token stands in for a name the cast doesn't give. Undefined with no character (or an empty one), and in IDs-only
+ * mode.
+ */
+function speakerLabelOf(host: FlowHost, character: string | undefined, qualifier: string | undefined, source = false): string | undefined {
+  if (!character || host.emitIds) return undefined;
+  const lookup = (key: string): string | undefined => (source ? undefined : host.strings[key]) ?? host.defaultStrings[key];
+  const name = lookup(castStringKey(character)) ?? host.castDisplay.get(character) ?? character;
+  if (qualifier === undefined) return name;
+  const own = host.speakerLabels.get(`${character}\u0000${qualifier}`);
+  if (own !== undefined) return lookup(speakerLabelKey(character, qualifier)) ?? own;
+  const shown = lookup(qualifierStringKey(qualifier)) ?? host.qualifierDisplay.get(qualifier) ?? qualifier;
+  return formatSpeakerLabel(lookup(SPEAKER_PATTERN_KEY) ?? host.speakerPattern, name, shown);
+}
+
 /** A `{ gameData }` outline fragment, present only when the node sets any (parity with a beat's). */
 function gameDataField(gameData: GameData | undefined): { gameData?: GameData } {
   return gameData && Object.keys(gameData).length ? { gameData } : {};
@@ -2700,6 +2741,7 @@ function savedPrompt(p: ChoicePrompt): SavedChoicePrompt {
   if (p.direction !== undefined) out.direction = p.direction;
   if (p.qualifier !== undefined) out.qualifier = p.qualifier;
   if (p.qualifierName !== undefined) out.qualifierName = p.qualifierName;
+  if (p.speakerLabel !== undefined) out.speakerLabel = p.speakerLabel;
   if (typeof p.padAfter === "number") out.padAfter = p.padAfter;
   return out;
 }

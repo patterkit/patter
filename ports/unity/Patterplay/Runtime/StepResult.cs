@@ -17,6 +17,9 @@ namespace Patterkit.Patterplay
         public string Direction;       // line only
         public string Qualifier;       // line only: the speaker qualifier's gameId (`vo`)
         public string QualifierName;   // line only: its resolved shown name (`V.O.`)
+        /// <summary>Line only: the name to show for the speaker (locale-aware), as on a line step: `You (V.O.)`,
+        /// a pair's own label, or with no qualifier the shown name. Null with no speaker and in IDs-only mode.</summary>
+        public string SpeakerLabel;
         /// <summary>The prompt's resolved pause, in seconds (line padding): when it is spoken (by
         /// `ReplayPromptOnChoose`, or by a game that voices it), the wait before the reply, negative to cut in on
         /// the question. Always set on a prompt the engine shows.</summary>
@@ -49,6 +52,11 @@ namespace Patterkit.Patterplay
         public string Direction;
         public string Qualifier;             // line only: the speaker qualifier's gameId (`vo`); null when none
         public string QualifierName;         // line only: its resolved shown name (`V.O.`); null in IDs-only mode
+        /// <summary>Line only: the name to show for the speaker, in the current locale. With a qualifier, the
+        /// character's own label for that pair when the project gives one, else the speaker pattern filled in
+        /// (`You (V.O.)`); with none, the shown name (else the token). Null with no speaker, on a line silenced by
+        /// closed captions, and in IDs-only mode (the game maps the tokens itself).</summary>
+        public string SpeakerLabel;
         /// <summary>Line and text only (always set there; null on the others): the pause after this step, in
         /// seconds, resolved from the beat's own value and the defaults above it (line padding). Negative = the
         /// next line cuts in that long before this one ends; never negative on a snippet's last line.</summary>

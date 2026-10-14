@@ -86,6 +86,13 @@ namespace patter
                     Cast cast;
                     cast.name = reqString(c, "name");
                     if (const J* q = field(c, "displayName")) cast.displayName = text(*q);
+                    // The pairs this character overrides, qualifier gameId to source label; a value that isn't
+                    // text labels nothing.
+                    if (const J* q = field(c, "qualifierLabels"))
+                        eachField(*q, [&](const std::string& gameId, const J& label)
+                        {
+                            if (A::isString(label)) cast.qualifierLabels[gameId] = A::str(label);
+                        });
                     out.cast.push_back(cast);
                 });
             if (const J* p = field(root, "qualifiers"))
@@ -98,6 +105,9 @@ namespace patter
                     if (const J* n = field(q, "name")) if (A::isString(*n)) { qualifier.hasName = true; qualifier.name = A::str(*n); }
                     out.qualifiers.push_back(qualifier);
                 });
+
+            if (const J* p = field(root, "speakerPattern"))
+                if (A::isString(*p)) { out.hasSpeakerPattern = true; out.speakerPattern = A::str(*p); }
 
             if (const J* p = field(root, "padAfterDefault")) readPad(*p, out.hasPadAfterDefault, out.padAfterDefault);
 

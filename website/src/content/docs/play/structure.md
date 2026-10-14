@@ -25,7 +25,7 @@ Both hang off the engine (build one from your bundle, then call these, no flow n
 
 Each beat carries the same data a played step would: `id`, `kind` (line / text / gameEvent),
 `character` + resolved `characterName`, `direction`, the speaker `qualifier` + resolved
-`qualifierName`, the resolved `padAfter` (and `ownPadAfter` when the beat sets its own), the **source
+`qualifierName`, the `speakerLabel` a game shows for the speaker, the resolved `padAfter` (and `ownPadAfter` when the beat sets its own), the **source
 `text`** (un-interpolated), the
 author `gameData` overrides, and accumulated `tags`. Text and names are read at the source locale.
 Each outline scene and block carries its `id`, `gameId` address, `name`, its own author `gameData`
@@ -129,8 +129,8 @@ The caption speaker (`SFX` by default, see [closed captions](/play/closed-captio
 like any other, so it appears where it has lines. Filter it out yourself if you are building a casting
 sheet rather than a caption pipeline.
 
-To turn a token into a player-facing name, read `characterName` off a delivered step: that resolves
-through the active locale and follows [`setLocale`](/play/localisation/), which a static list cannot.
+To turn a token into a player-facing name, read `speakerLabel` (or `characterName`) off a delivered
+step: that resolves through the active locale and follows [`setLocale`](/play/localisation/), which a static list cannot.
 
 ## Notes
 
@@ -139,7 +139,7 @@ These reads are read-only and static, so they reflect the compiled bundle, not a
 you want the full set. To read one scene's or block's without walking the outline, use
 [`gameDataForScene` / `gameDataForBlock`](/play/integration/#scene-and-block-game-data).
 
-Text comes from the source locale. `text`, `characterName`, and `qualifierName` come from the source language, and an
+Text comes from the source locale. `text`, `characterName`, `qualifierName`, and `speakerLabel` come from the source language, and an
 IDs-only bundle has no embedded text, so `text` is empty.
 
 Order is authored order. Within a scene, blocks / nodes / beats are in the order they were written.

@@ -922,6 +922,7 @@ namespace Patterkit.Patterplay
                         Direction = silent ? null : beat.Direction,
                         Qualifier = silent ? null : beat.Qualifier,
                         QualifierName = silent ? null : ResolveQualifierName(beat.Qualifier),
+                        SpeakerLabel = silent ? null : _host.SpeakerLabelOf(beat.Character, beat.Qualifier),
                         PadAfter = PadOf(beat.Id), // a silent line still fires, so it still carries its pause
                         GameData = beat.GameData,
                         Tags = tags,
@@ -956,7 +957,8 @@ namespace Patterkit.Patterplay
                 ? new ChoicePrompt
                 {
                     Kind = "line", Text = CaptionLine(text), Character = beat.Character, CharacterName = ResolveCharacterName(beat.Character), Direction = beat.Direction,
-                    Qualifier = beat.Qualifier, QualifierName = ResolveQualifierName(beat.Qualifier), PadAfter = padAfter,
+                    Qualifier = beat.Qualifier, QualifierName = ResolveQualifierName(beat.Qualifier),
+                    SpeakerLabel = _host.SpeakerLabelOf(beat.Character, beat.Qualifier), PadAfter = padAfter,
                 }
                 : new ChoicePrompt { Kind = "text", Text = text, PadAfter = padAfter };
         }
@@ -975,7 +977,7 @@ namespace Patterkit.Patterplay
             {
                 Type = StepType.Line, Id = beat.Id, Text = shown.Text,
                 Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
-                Qualifier = shown.Qualifier, QualifierName = shown.QualifierName, PadAfter = PadOf(beat.Id),
+                Qualifier = shown.Qualifier, QualifierName = shown.QualifierName, SpeakerLabel = shown.SpeakerLabel, PadAfter = PadOf(beat.Id),
                 GameData = beat.GameData, Tags = tags,
             };
         }
@@ -1021,12 +1023,8 @@ namespace Patterkit.Patterplay
 
         private string ResolveCharacterName(string character)
         {
-            if (character == null) return null;
             if (_host.EmitIds) return null; // IDs-only: omit the display name; the game maps the `character` token
-            string key = "cast:" + character;
-            if (_host.Strings.TryGetValue(key, out var a)) return a;
-            if (_host.DefaultStrings.TryGetValue(key, out var d)) return d;
-            return _host.CastDisplay.TryGetValue(character, out var disp) ? disp : null;
+            return _host.CharacterNameOf(character);
         }
 
         /// <summary>A speaker qualifier's shown name, resolved as a character's is: the `qualifier:&lt;gameId&gt;`
@@ -1034,12 +1032,8 @@ namespace Patterkit.Patterplay
         /// (the game maps the `qualifier` gameId itself).</summary>
         private string ResolveQualifierName(string qualifier)
         {
-            if (qualifier == null) return null;
             if (_host.EmitIds) return null;
-            string key = "qualifier:" + qualifier;
-            if (_host.Strings.TryGetValue(key, out var a)) return a;
-            if (_host.DefaultStrings.TryGetValue(key, out var d)) return d;
-            return _host.QualifierDisplay.TryGetValue(qualifier, out var disp) ? disp : null;
+            return _host.QualifierNameOf(qualifier);
         }
 
         // -- scene seeding ------------------------------------------------------
@@ -1250,12 +1244,16 @@ namespace Patterkit.Patterplay
                 {
                     if (!_host.NodeIndex.TryGetValue(o.Id, out var n)) continue;
                     byId[o.Id] = n;
-                    // A save from before prompts carried their pause has none: work it out again from the prompt's beat.
+                    // A save from before prompts carried their pause, or a speaker's label, has none: work them out
+                    // again (the pause from the prompt's beat, the label from the speaker the choice showed, in the
+                    // current locale).
                     var opt = CloneOption(o);
                     if (opt.Prompt != null)
                     {
                         opt.Prompt = ClonePrompt(opt.Prompt);
                         if (opt.Prompt.PadAfter == null) opt.Prompt.PadAfter = PromptPadOf(n);
+                        if (opt.Prompt.Kind == "line" && opt.Prompt.SpeakerLabel == null)
+                            opt.Prompt.SpeakerLabel = _host.SpeakerLabelOf(opt.Prompt.Character, opt.Prompt.Qualifier);
                     }
                     options.Add(opt);
                 }
@@ -1277,13 +1275,16 @@ namespace Patterkit.Patterplay
             {
                 _pendingPromptShown = ClonePrompt(snap.PendingPrompt);
                 if (_pendingPromptShown != null && _pendingPromptShown.PadAfter == null) _pendingPromptShown.PadAfter = PadOf(_pendingPromptBeat.Id);
+                // As for the pending choice's options: a save from before prompts carried a speaker's label works it out again.
+                if (_pendingPromptShown != null && _pendingPromptShown.Kind == "line" && _pendingPromptShown.SpeakerLabel == null)
+                    _pendingPromptShown.SpeakerLabel = _host.SpeakerLabelOf(_pendingPromptShown.Character, _pendingPromptShown.Qualifier);
             }
         }
 
         private static ChoicePrompt ClonePrompt(ChoicePrompt p) => p == null ? null : new ChoicePrompt
         {
             Kind = p.Kind, Text = p.Text, Character = p.Character, CharacterName = p.CharacterName, Direction = p.Direction,
-            Qualifier = p.Qualifier, QualifierName = p.QualifierName, PadAfter = p.PadAfter,
+            Qualifier = p.Qualifier, QualifierName = p.QualifierName, SpeakerLabel = p.SpeakerLabel, PadAfter = p.PadAfter,
         };
 
         private static ChoiceOption CloneOption(ChoiceOption o)

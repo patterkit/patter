@@ -17,7 +17,7 @@ import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
 import { canonicalStringify, hash32 } from "@patterkit/core";
 import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
-import { usedQualifiers } from "@patterkit/model";
+import { usedQualifiers, usedSpeakerPairs, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { compileExpression } from "./expressions.js";
 import { externalGameScopes, projectScopes } from "./game-scopes.js";
 
@@ -162,6 +162,11 @@ export function exportBundle(input: ExportInput): Bundle {
   // The qualifiers the content uses, as the bundle ships them: `gameId` and authored name (the description
   // is for writers). One no line uses stays out, so a project that uses none compiles exactly as before.
   const qualifiers: BundleQualifier[] = usedQualifiers(project, scenes).map((q) => ({ gameId: q.gameId, name: q.name }));
+  // A character's own label with a qualifier ships only for a pair the lines use; the pattern only when the project
+  // changed it and uses a qualifier at all.
+  const usedPairs = new Set(usedSpeakerPairs(scenes).map((p) => `${p.character}\u0000${p.qualifier}`));
+  const speakerPattern = qualifiers.length > 0 && project.speakerPattern !== undefined && project.speakerPattern !== DEFAULT_SPEAKER_PATTERN
+    ? project.speakerPattern : undefined;
 
   const strings: Record<string, Record<string, string>> = {};
   for (const loc of locales) {
@@ -213,10 +218,13 @@ export function exportBundle(input: ExportInput): Bundle {
     cast: project.cast?.map((c): BundleCastMember => {
       const m: BundleCastMember = { name: c.name };
       if (c.displayName !== undefined) m.displayName = c.displayName;
+      const labels = Object.entries(c.qualifierLabels ?? {}).filter(([q, label]) => label !== "" && usedPairs.has(`${c.name}\u0000${q}`));
+      if (labels.length > 0) m.qualifierLabels = Object.fromEntries(labels);
       if (c.gameData !== undefined) m.gameData = c.gameData;
       return m;
     }),
     ...(qualifiers.length > 0 ? { qualifiers } : {}),
+    ...(speakerPattern !== undefined ? { speakerPattern } : {}),
     // The project's own line-padding default, only when it sets one: absent, every runtime uses the built-in one.
     ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
 

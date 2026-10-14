@@ -30,9 +30,8 @@ namespace Patterkit.Patterplay.Samples
                 switch (step.Type)
                 {
                     case StepType.Line:
-                        // The speaker qualifier, when the line has one, shows after the name: TAM (O.S.).
-                        var qualifier = step.QualifierName ?? step.Qualifier;
-                        Debug.Log($"{step.CharacterName ?? step.Character}{(qualifier != null ? $" ({qualifier})" : "")}: {step.Text}");
+                        // The speaker's label puts the name and any qualifier together: TAM (O.S.).
+                        Debug.Log($"{step.SpeakerLabel ?? step.Character}: {step.Text}");
                         break;
                     case StepType.Text: Debug.Log(step.Text); break;
                     case StepType.Choice:

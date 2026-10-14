@@ -26,6 +26,8 @@
     <Compile Include="ShuffleChecks.cs" />
     <!-- A Reset, Goto or Close drops a chosen prompt still waiting to be replayed. -->
     <Compile Include="PendingChecks.cs" />
+    <!-- A line's speaker label: a stale speaker string for a pair not overridden is ignored, an older saved prompt re-resolves. -->
+    <Compile Include="SpeakerLabelChecks.cs" />
     <!-- Content errors play through and are reported (OnError, the log's diagnostic entry); a bare
          snapshot and a save with no flows are refused before anything changes. -->
     <Compile Include="PlayErrorChecks.cs" />

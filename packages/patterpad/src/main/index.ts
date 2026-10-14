@@ -1045,6 +1045,7 @@ function registerIpc(): void {
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
+  ipcMain.handle("project:speakerPairs", () => project.speakerPairs());
   ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
     // A qualifier gameId rename rewrites lines across the project, the open scene's among them: its unsaved
     // edits go to disk first, and it reloads from the rewritten file after.

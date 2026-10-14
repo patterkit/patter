@@ -109,6 +109,7 @@ namespace patter
             if (p.hasDirection) out += ",\"direction\":" + jsonQuote(p.direction);
             if (p.hasQualifier) out += ",\"qualifier\":" + jsonQuote(p.qualifier);
             if (p.hasQualifierName) out += ",\"qualifierName\":" + jsonQuote(p.qualifierName);
+            if (p.hasSpeakerLabel) out += ",\"speakerLabel\":" + jsonQuote(p.speakerLabel);
             if (p.hasPadAfter) out += ",\"padAfter\":" + PatterValue::JsNumber(p.padAfter);   // line padding
             return out + "}";
         }
@@ -405,6 +406,8 @@ namespace patter
             if (const JV* v = p.get("direction")) { prompt->hasDirection = true; prompt->direction = v->t == JV::T::Str ? v->s : ""; }
             if (const JV* v = p.get("qualifier")) { prompt->hasQualifier = true; prompt->qualifier = v->t == JV::T::Str ? v->s : ""; }
             if (const JV* v = p.get("qualifierName")) { prompt->hasQualifierName = true; prompt->qualifierName = v->t == JV::T::Str ? v->s : ""; }
+            // Absent in a save written before prompts carried it: the engine re-resolves it on load, in the current locale.
+            if (const JV* v = p.get("speakerLabel")) if (v->t == JV::T::Str) { prompt->hasSpeakerLabel = true; prompt->speakerLabel = v->s; }
             // Absent in a save written before prompts carried their pause: the engine re-resolves it on load.
             if (const JV* v = p.get("padAfter")) if (v->t == JV::T::Num) { prompt->hasPadAfter = true; prompt->padAfter = v->n; }
             return prompt;

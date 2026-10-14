@@ -292,6 +292,11 @@ namespace Patterkit.Patterplay
         public Dictionary<string, string> CastDisplay;
         /// <summary>Speaker qualifier gameId -> authored name (the fallback when no loc string exists).</summary>
         public Dictionary<string, string> QualifierDisplay;
+        /// <summary>`name\0gameId` -> a character's own label with that qualifier, for the overridden pairs only
+        /// (the unlocalised fallback). A pair not here follows the pattern, whatever a loc file holds for it.</summary>
+        public Dictionary<string, string> SpeakerLabels;
+        /// <summary>The project's speaker pattern (the unlocalised fallback for the `speaker:pattern` string).</summary>
+        public string SpeakerPattern;
         public Dictionary<string, Node> NodeIndex;
         public Dictionary<string, string> BlockToScene;   // block id -> scene id
         public Dictionary<string, Block> BlockById;
@@ -344,6 +349,60 @@ namespace Patterkit.Patterplay
         /// where it would otherwise land in @patter as `story.act`.</summary>
         public bool IsScopeToken(string t) =>
             t == "scene" || Registry.Has(t) || (Bundle.ExternalScopes != null && Bundle.ExternalScopes.Contains(t));
+
+        /// <summary>A project-level string: the active locale's, else the default locale's (`source` reads the
+        /// default locale only); null when neither holds it.</summary>
+        public string Localised(string key, bool source = false)
+        {
+            if (!source && Strings.TryGetValue(key, out var active)) return active;
+            return DefaultStrings.TryGetValue(key, out var d) ? d : null;
+        }
+
+        /// <summary>A character's shown name: the `cast:&lt;name&gt;` string (see <see cref="Localised"/>), else the
+        /// cast's display name; null when neither gives one.</summary>
+        public string CharacterNameOf(string character, bool source = false)
+        {
+            if (character == null) return null;
+            return Localised("cast:" + character, source) ?? (CastDisplay.TryGetValue(character, out var disp) ? disp : null);
+        }
+
+        /// <summary>A speaker qualifier's shown name, as a character's is: the `qualifier:&lt;gameId&gt;` string,
+        /// else the authored name; null when neither gives one.</summary>
+        public string QualifierNameOf(string qualifier, bool source = false)
+        {
+            if (qualifier == null) return null;
+            return Localised("qualifier:" + qualifier, source) ?? (QualifierDisplay.TryGetValue(qualifier, out var disp) ? disp : null);
+        }
+
+        /// <summary>
+        /// The name to show for a line's speaker: with a qualifier, the character's own label for that pair when
+        /// the project overrides it, else the speaker pattern (`{name} ({qualifier})`) filled with the character's
+        /// and the qualifier's shown names; with none, the character's shown name. Each piece is looked up in the
+        /// active locale, then the default locale, then the authored value (`source` reads the default locale
+        /// only). The character's token stands in for a name the cast doesn't give, and the qualifier's gameId for
+        /// a name it has none of. Null with no character (or an empty one), and in IDs-only mode.
+        /// </summary>
+        public string SpeakerLabelOf(string character, string qualifier, bool source = false)
+        {
+            if (string.IsNullOrEmpty(character) || EmitIds) return null;
+            string name = CharacterNameOf(character, source) ?? character;
+            if (qualifier == null) return name;
+            // Only a pair the bundle overrides reads a `speaker:<name>:<gameId>` string.
+            if (SpeakerLabels.TryGetValue(character + "\0" + qualifier, out var own))
+                return Localised("speaker:" + character + ":" + qualifier, source) ?? own;
+            string shown = QualifierNameOf(qualifier, source) ?? qualifier;
+            return FormatSpeakerLabel(Localised("speaker:pattern", source) ?? SpeakerPattern, name, shown);
+        }
+
+        /// <summary>A qualified speaker's label: the pattern with every `{name}` and every `{qualifier}` replaced
+        /// as plain text (the name filled in is not read for `{qualifier}`); nothing else in the pattern is read.
+        /// The one composition rule, as on every runtime.</summary>
+        internal static string FormatSpeakerLabel(string pattern, string name, string qualifier)
+        {
+            var parts = pattern.Split(new[] { "{name}" }, StringSplitOptions.None);
+            for (int i = 0; i < parts.Length; i++) parts[i] = parts[i].Replace("{qualifier}", qualifier);
+            return string.Join(name, parts);
+        }
     }
 
     public sealed class Engine
@@ -422,6 +481,12 @@ namespace Patterkit.Patterplay
             var qualifierDisplay = new Dictionary<string, string>();
             foreach (var q in bundle.Qualifiers ?? new List<Qualifier>())
                 if (q != null && !string.IsNullOrEmpty(q.GameId) && q.Name != null) qualifierDisplay[q.GameId] = q.Name;
+            // The overridden character and qualifier pairs, with their source labels.
+            var speakerLabels = new Dictionary<string, string>();
+            foreach (var c in bundle.Cast ?? new List<Cast>())
+                if (c?.QualifierLabels != null)
+                    foreach (var kv in c.QualifierLabels)
+                        if (kv.Value != null) speakerLabels[c.Name + "\0" + kv.Key] = kv.Value;
 
             _defaultSeed = Mulberry32.ToUint32(options.Seed ?? 0x9e3779b9);
 
@@ -522,6 +587,7 @@ namespace Patterkit.Patterplay
                 OnDryChoice = options.OnDryChoice,
                 OnError = options.OnError,
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,
+                SpeakerLabels = speakerLabels, SpeakerPattern = bundle.SpeakerPattern ?? Bundle.DefaultSpeakerPattern,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
                 PadIndex = BuildPadIndex(bundle),
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
@@ -950,19 +1016,13 @@ namespace Patterkit.Patterplay
             var info = new BeatInfo { Id = beat.Id, Kind = beat.Kind };
             if (beat.Kind == "line")
             {
-                if (beat.Character != null)
-                {
-                    info.Character = beat.Character;
-                    if (_host.DefaultStrings.TryGetValue("cast:" + beat.Character, out var nm)) info.CharacterName = nm;
-                    else if (_host.CastDisplay.TryGetValue(beat.Character, out var disp)) info.CharacterName = disp;
-                }
+                // Names at the source locale (the default locale only).
+                info.Character = beat.Character;
+                info.CharacterName = _host.CharacterNameOf(beat.Character, source: true);
                 info.Direction = beat.Direction;
-                if (beat.Qualifier != null)
-                {
-                    info.Qualifier = beat.Qualifier;
-                    if (_host.DefaultStrings.TryGetValue("qualifier:" + beat.Qualifier, out var qn)) info.QualifierName = qn;
-                    else if (_host.QualifierDisplay.TryGetValue(beat.Qualifier, out var qdisp)) info.QualifierName = qdisp;
-                }
+                info.Qualifier = beat.Qualifier;
+                info.QualifierName = _host.QualifierNameOf(beat.Qualifier, source: true);
+                info.SpeakerLabel = _host.SpeakerLabelOf(beat.Character, beat.Qualifier, source: true);
             }
             if (beat.Kind == "line" || beat.Kind == "text")
             {

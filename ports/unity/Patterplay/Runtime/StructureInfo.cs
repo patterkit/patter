@@ -17,6 +17,7 @@ namespace Patterkit.Patterplay
         public string Direction;       // line only
         public string Qualifier;       // speaker qualifier gameId (line only), e.g. `vo`
         public string QualifierName;   // the qualifier's shown name (source locale), e.g. `V.O.`
+        public string SpeakerLabel;    // the speaker's label (source locale): `You (V.O.)`, a pair's own label, or with no qualifier the name
         public double? PadAfter;       // line/text only: the resolved pause after it (line padding), what a step carries
         public double? OwnPadAfter;    // line/text only: the beat's own padAfter; null when it sets none
         public string Text;            // source text, un-interpolated (line/text); null for gameEvent / IDs-only

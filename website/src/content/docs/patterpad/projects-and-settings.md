@@ -47,8 +47,11 @@ for translation, and an actor. Expand a row (▸) for **Grammatical gender**, fr
 neuter) and any others already used in the cast, sent to translators so a gendered
 language can inflect that character's lines (see
 [Localisation](/production/localisation/#who-is-speaking-grammatical-gender)), and for
-free-text **Notes** on casting, voice, or intent. Each character's colour is shown but
-chosen for you.
+free-text **Notes** on casting, voice, or intent. When the character's lines use a speaker
+qualifier, the expanded row also has a **Shown with** field for each one (**Shown with V.O.**),
+greyed with the label the game shows by default: type in it to give that pair a label of its own,
+and clear it to go back (see [How a qualified speaker is shown](/setup/cast/#how-a-qualified-speaker-is-shown)).
+Each character's colour is shown but chosen for you.
 
 The **Qualifiers** tab holds the project's [speaker qualifiers](/setup/cast/#speaker-qualifiers),
 `V.O.`, `O.S.`, and `RADIO` to start with. Each row has a name, which the script shows, and a
@@ -57,6 +60,8 @@ its name until you edit it, and an existing one's stays as it is when you rename
 reorder them, or start from a standard set. **Screenplay set** (`V.O.`, `O.S.`, `O.C.`) and **Game
 set** (`V.O.`, `O.S.`, `RADIO`, `PHONE`) each replace the list. Changing a Game ID updates every line
 that uses it. Removing a qualifier leaves its lines flagged, with a fix that picks a replacement.
+The **Speaker pattern** beside the list, `{name} ({qualifier})` unless you change it, is how a game
+shows a qualified speaker's name.
 
 The **Writing status** and **Recording status** tabs hold the status ladders, each stage with
 its own colour. Recording status is opt-in (a **Track audio status** switch) and needs the

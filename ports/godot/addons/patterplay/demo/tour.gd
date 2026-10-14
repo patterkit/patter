@@ -61,10 +61,8 @@ func _step() -> void:
 	var step: Dictionary = _flow.advance()
 	match step["type"]:
 		"line":
-			var who: String = step.get("characterName", step.get("character", ""))
-			var qualifier: String = step.get("qualifierName", step.get("qualifier", ""))
-			if qualifier != "":
-				who += " (%s)" % qualifier
+			# The speaker's label: the shown name, with its qualifier as the project words it.
+			var who: String = step.get("speakerLabel", step.get("character", ""))
 			_append("[b]%s[/b]  %s" % [who.to_upper(), _fmt(step["text"])])
 			_play_clip(step["id"])
 			_show_next()

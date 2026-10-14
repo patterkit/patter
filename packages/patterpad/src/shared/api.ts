@@ -174,8 +174,13 @@ export interface ProjectSettingsDto {
    *  when the project has none); saveSettings drops the list when it still matches the defaults. */
   qualifiers: SpeakerQualifier[];
   /** Qualifier gameIds the author changed in the Qualifiers tab, old -> new. Saving rewrites every line
-   *  that uses an old one (through the VC layer), as a cast rename would. Write-only: never read back. */
+   *  that uses an old one (through the VC layer), and every cast member's own label with it. Write-only:
+   *  never read back. */
   qualifierRenames?: Record<string, string>;
+  /** How a character's label reads with a qualifier (the Qualifiers tab), `{name}` and `{qualifier}` filled
+   *  in. "" means the default (`DEFAULT_SPEAKER_PATTERN`), which the project doesn't store. A caller that
+   *  sends none leaves the project's as it is. */
+  speakerPattern?: string;
   /** The ordered writing-status ladder, not-done -> done (the Status settings tab). */
   writingStatuses: WritingStatusDecl[];
   /** Estimating config (the Estimating settings tab): replace a still-guesswork scene's line count with an
@@ -550,9 +555,13 @@ export interface PlayStep {
   /** The speaker's resolved player-facing name (locale-aware), when the character has one. */
   characterName?: string;
   direction?: string;
-  /** The speaker qualifier's gameId (`os`) and its resolved shown name (`O.S.`), shown after the name. */
+  /** The speaker qualifier's gameId (`os`) and its resolved shown name (`O.S.`). */
   qualifier?: string;
   qualifierName?: string;
+  /** The name to show for the speaker, resolved by the runtime (locale-aware): the display name, or with a
+   *  qualifier the speaker pattern filled in (`TAM (O.S.)`) or the pair's own label. Absent in an IDs-only
+   *  build. */
+  speakerLabel?: string;
   /** line / text only: the pause after it before the next line, in seconds, resolved by the runtime
    *  (line padding). Negative = the next line cuts in. */
   padAfter?: number;
@@ -997,6 +1006,9 @@ export interface PatterApi {
    *  unresolved comment threads + open rewrite proposals, in scene order. `scope` mirrors the "Show Resolved"
    *  toggles - when a flag is on, that kind's resolved items join the walk too. */
   reviewFeedback(scope?: ReviewScope): Promise<ReviewItem[]>;
+  /** Every character and qualifier pair the project's lines use (the whole project, loaded first), for the
+   *  Cast tab's "Shown with" fields. */
+  speakerPairs(): Promise<Array<{ character: string; qualifier: string }>>;
   /** Spell-check dictionaries (#177): the built-in languages + every imported Hunspell pair. */
   listDictionaries(): Promise<DictionaryInfo[]>;
   /** The aff/dic text for a dictionary id (built-in or imported); null when not installed on this machine. */

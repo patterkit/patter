@@ -67,12 +67,24 @@ namespace Patterkit.Patterplay
 
             if (b["cast"] is JArray cast)
                 foreach (var c in cast)
-                    bundle.Cast.Add(new Cast { Name = (string)c["name"], DisplayName = (string)c["displayName"] });
+                {
+                    var member = new Cast { Name = (string)c["name"], DisplayName = (string)c["displayName"] };
+                    // A character's own labels with qualifiers, for the pairs the project overrides.
+                    if (c["qualifierLabels"] is JObject labels)
+                    {
+                        member.QualifierLabels = new Dictionary<string, string>();
+                        foreach (var l in labels) member.QualifierLabels[l.Key] = (string)l.Value;
+                    }
+                    bundle.Cast.Add(member);
+                }
 
             // The speaker qualifiers the content uses (absent in an older bundle, or one that uses none).
             if (b["qualifiers"] is JArray quals)
                 foreach (var q in quals)
                     if (q is JObject qo) bundle.Qualifiers.Add(new Qualifier { GameId = (string)qo["gameId"], Name = (string)qo["name"] });
+
+            // The project's speaker pattern (absent = the built-in one).
+            bundle.SpeakerPattern = (string)b["speakerPattern"];
 
             // The project's line-padding default (absent = the built-in one).
             bundle.PadAfterDefault = Num(b["padAfterDefault"]);

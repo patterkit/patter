@@ -26,7 +26,7 @@ var flow   := engine.open_flow("main", "intro")     # ("flow id", starting scene
 while true:
     var step := flow.advance()                       # { "type": ..., "text": ..., "options": ... }
     match step["type"]:
-        "line":      print("%s: %s" % [step.get("characterName", ""), step["text"]])
+        "line":      print("%s: %s" % [step.get("speakerLabel", ""), step["text"]])
         "text":      print(step["text"])
         "gameEvent": pass                            # fire step.gameData cues
         "choice":    flow.choose(step["options"][0]["id"])   # your UI picks
@@ -41,6 +41,14 @@ A `"line"` step names its speaker with `character` (the cast token) and `charact
 name), and carries `direction` when set. A line with a speaker qualifier (`TAM (O.S.)`) also carries
 `qualifier`, the qualifier's `gameId` (`"os"`) for your game to switch on, and `qualifierName`, its
 shown name (`"O.S."`) in the active language. A line prompt on a choice option carries the same fields.
+
+To show who's speaking, use `speakerLabel`, the speaker's label in the active language, rather than putting
+the name and the qualifier together yourself: word order and punctuation differ by language, and a writer
+can give a pair its own label. With a qualifier it's that character's own label for the pair when the
+project gives one (`"Your thoughts"`), else the project's speaker pattern filled in (`"You (V.O.)"` by
+default); with none, it's the shown name (the `character` token when the cast gives no name). It's absent
+when the line has no speaker, when closed captions silence it, and in an IDs-only build. A replayed prompt
+and a saved choice keep it, and `get_outline()` and `get_beat_sequence()` give it in the source language.
 
 Every `"line"` and `"text"` step also carries `padAfter`, the pause after it in seconds, before the next
 line: positive waits, zero follows at once, and negative starts the next line that long before this one

@@ -6,6 +6,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **How a qualified speaker is shown.** A game shows `PLAYER (V.O.)` as the display name and the qualifier
+  together, through the project's **Speaker pattern** (`{name} ({qualifier})`), now under Project Settings ▸
+  Qualifiers. To label one character's version differently, expand the character on the Cast tab and type in
+  its **Shown with V.O.** field ("Your thoughts"); a field appears for each qualifier that character's lines
+  use, and one whose lines are gone is marked so you can clear it. Translators get the pattern and these labels
+  with the display names, and the Play window shows what the game will.
+
+### Fixed
+
+- **Changing a display name or a qualifier's name in Project Settings now marks its translations stale.** So
+  do changes to the speaker pattern and a character's own speaker label: each shows as stale on the next
+  localisation export, as a changed line does, so translators know to check it. Changing a qualifier's Game ID
+  alone doesn't, since the text is the same.
+
 ## [0.28.1] - 2026-10-11
 
 ### Fixed

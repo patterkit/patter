@@ -424,7 +424,7 @@ func _run_runtime(arr: Array) -> int:
 		var transcript: Array = []
 		for i in 1000:
 			var step := flow.advance()
-			transcript.append(_transcript_step(step))
+			transcript.append(_transcript_step(step, _ids_only(c["bundle"])))
 			if step["type"] == "end":
 				break
 			if step["type"] == "choice":
@@ -449,8 +449,9 @@ func _run_runtime(arr: Array) -> int:
 # A step as the corpus transcripts record it (the reference runner's normaliseStep): every line and text
 # step, and every choice option's prompt, carries `padAfter`, a float, but a transcript records it only
 # when it isn't the built-in 0.6. One missing the field, or carrying a non-float, is marked so the
-# comparison fails.
-func _transcript_step(step: Dictionary) -> Dictionary:
+# comparison fails. A line step's or line prompt's `speakerLabel` is recorded as _transcript_label says.
+# `ids_only`: the bundle's strings are IDs-only, so names (the label among them) are the game's.
+func _transcript_step(step: Dictionary, ids_only := false) -> Dictionary:
 	var kind = step.get("type", "")
 	if kind == "choice":
 		var out := step.duplicate()
@@ -458,13 +459,42 @@ func _transcript_step(step: Dictionary) -> Dictionary:
 		for o in step.get("options", []):
 			var opt: Dictionary = (o as Dictionary).duplicate()
 			if opt.get("prompt") is Dictionary:
-				opt["prompt"] = _transcript_pad((opt["prompt"] as Dictionary).duplicate())
+				var p := _transcript_pad((opt["prompt"] as Dictionary).duplicate())
+				if p.get("kind", "") == "line":
+					_transcript_label(p, ids_only)
+				opt["prompt"] = p
 			options.append(opt)
 		out["options"] = options
 		return out
 	if kind != "line" and kind != "text":
 		return step
-	return _transcript_pad(step.duplicate())
+	var t := _transcript_pad(step.duplicate())
+	if kind == "line":
+		_transcript_label(t, ids_only)
+	return t
+
+
+# Whether a bundle's strings are IDs-only, as the runtime reads it (a source-debug build still resolves
+# names). The reference runner's isIdsOnly.
+func _ids_only(bundle: Dictionary) -> bool:
+	var loc = bundle.get("localisation", {})
+	return loc is Dictionary and loc.get("mode", "") == "ids" and not loc.get("sourceDebug", false)
+
+
+# A speaker's label as a transcript records it (the reference runner's labelField): only where it differs
+# from what a line with no qualifier shows (nothing in IDs-only mode or with no speaker, else the display
+# name, else the token). A label that should be there and isn't is marked "<missing>", so a runtime that
+# drops it fails.
+func _transcript_label(out: Dictionary, ids_only: bool) -> void:
+	var character = out.get("character")
+	var plain = null
+	if not ids_only and character != null and str(character) != "":
+		plain = out.get("characterName", character)
+	var label = out.get("speakerLabel")
+	out.erase("speakerLabel")
+	if label == plain:
+		return
+	out["speakerLabel"] = label if label != null else "<missing>"
 
 
 func _transcript_pad(out: Dictionary) -> Dictionary:
@@ -639,7 +669,7 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 			"useFlow":
 				current = op["flow"]
 			"advance":
-				chunk.append(_transcript_step(holder["engine"].get_flow(current).advance()))
+				chunk.append(_transcript_step(holder["engine"].get_flow(current).advance(), _ids_only(bundle)))
 			"choose":
 				holder["engine"].get_flow(current).choose(op["id"])
 			"resetFlow":

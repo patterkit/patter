@@ -15,7 +15,7 @@
 // wired in with the compiler.)
 // ---------------------------------------------------------------------------
 
-import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
+import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers, usedSpeakerPairs, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, ScalarValue, AuthoringFile } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
@@ -40,6 +40,8 @@ export interface ValidationIssue {
     | "pad-overlaps-seam"
     | "prompt-pad-without-beat"
     | "qualifier-without-speaker"
+    | "invalid-speaker-label"
+    | "unused-speaker-label"
     | "invalid-temporary"
     | "invalid-declaration"
     | "invalid-status-ladder"
@@ -433,6 +435,23 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
     }
   }
 
+  // A character's own label with a qualifier is shown only where a line uses that pair: one no line uses is
+  // left over (a rewritten line, a renamed qualifier), so say so where the writer can clear it.
+  // (Malformed scenes are reported above; only the well-formed ones are read here.)
+  const labelled = (project.cast ?? []).filter((c) => c.qualifierLabels && typeof c.qualifierLabels === "object");
+  const usedPairs = labelled.length === 0 ? new Set<string>()
+    : new Set(usedSpeakerPairs(scenes.filter((sc) => Array.isArray(sc?.blocks) && sc.blocks.every((b) => Array.isArray(b?.children))))
+      .map((p) => `${p.character}\u0000${p.qualifier}`));
+  for (const c of labelled) {
+    const labels: unknown = c.qualifierLabels;
+    if (!labels || typeof labels !== "object") continue;
+    for (const q of Object.keys(labels)) {
+      if (usedPairs.has(`${c.name}\u0000${q}`)) continue;
+      issues.push({ code: "unused-speaker-label", severity: "warning",
+        message: `'${c.name}' has its own label with the qualifier '${q}', but no line has that speaker with that qualifier` });
+    }
+  }
+
   return issues;
 }
 
@@ -528,6 +547,23 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
       issues.push({ code: "invalid-qualifier", message: `qualifier address '${q.gameId}' is used more than once` });
     }
     if (typeof q.gameId === "string") seenQualifiers.add(q.gameId);
+  }
+
+  // Speaker labels: the pattern, and each character's own labels by qualifier, are text.
+  const pattern: unknown = project.speakerPattern;
+  if (pattern !== undefined && typeof pattern !== "string") {
+    issues.push({ code: "invalid-speaker-label", message: "the speaker pattern must be text" });
+  }
+  for (const c of project.cast ?? []) {
+    const labels: unknown = c.qualifierLabels;
+    if (labels === undefined) continue;
+    if (!labels || typeof labels !== "object" || Array.isArray(labels)) {
+      issues.push({ code: "invalid-speaker-label", message: `'${c.name}' qualifier labels must map a qualifier to its label` });
+      continue;
+    }
+    for (const [q, label] of Object.entries(labels)) {
+      if (typeof label !== "string") issues.push({ code: "invalid-speaker-label", message: `'${c.name}' label with the qualifier '${q}' must be text` });
+    }
   }
 
   // gameData field definitions (the author-defined custom fields per node type): within each node

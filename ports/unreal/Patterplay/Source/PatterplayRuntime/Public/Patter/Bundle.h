@@ -20,8 +20,15 @@ namespace patter
     // (line padding, design/proposals/line-padding.md): the same on every runtime and in Patterpad's Play window.
     inline constexpr double DEFAULT_PAD_AFTER = 0.6;
 
+    // The speaker pattern a project starts with, how a character's label reads with a qualifier: `You (V.O.)`.
+    // `{name}` and `{qualifier}` are plain placeholders, never run through line interpolation.
+    inline constexpr const char* DEFAULT_SPEAKER_PATTERN = "{name} ({qualifier})";
+
     struct Locales { std::string defaultLocale = "en"; std::vector<std::string> included; };
-    struct Cast { std::string name, displayName; };
+    // A cast member as the bundle ships it. qualifierLabels is the character's own label with a qualifier, by the
+    // qualifier's gameId, in the source language (`{ vo: "Your thoughts" }`): only the pairs a project overrides;
+    // every other pair's label is the speaker pattern filled in.
+    struct Cast { std::string name, displayName; std::map<std::string, std::string> qualifierLabels; };
     // A speaker qualifier as the bundle ships it (`V.O.`): the `gameId` a line stores, and its authored
     // name (the unlocalised fallback for its shown name). hasName is false when the bundle gives no name (or
     // one that isn't a string): then no shown name comes from it, only from a locale string.
@@ -160,6 +167,9 @@ namespace patter
         Locales locales;
         std::vector<Cast> cast;
         std::vector<Qualifier> qualifiers;   // the speaker qualifiers the content uses; empty = none
+        // The project's speaker pattern, the unlocalised fallback for the `speaker:pattern` string; absent when
+        // the project keeps DEFAULT_SPEAKER_PATTERN or uses no qualifiers.
+        bool hasSpeakerPattern = false; std::string speakerPattern;
         // The project's own line-padding default, when it sets one; absent = DEFAULT_PAD_AFTER.
         bool hasPadAfterDefault = false; double padAfterDefault = 0;
         std::vector<PropertyDecl> properties;

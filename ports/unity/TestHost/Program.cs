@@ -105,6 +105,7 @@ namespace Patterkit.Patterplay.TestHost
             RunFlowStateChecks();
             RunStaleShuffleCheck();
             RunPendingClearedCheck();
+            RunSpeakerLabelChecks();
             RunPlayErrorChecks();
             RunOldSaveRuleChecks();
 
@@ -780,7 +781,7 @@ namespace Patterkit.Patterplay.TestHost
                     for (int i = 0; i < 1000; i++)
                     {
                         var step = flow.Advance();
-                        transcript.Add(Normalize(step));
+                        transcript.Add(Normalize(step, IsIdsOnly(bundle)));
                         if (step.Type == StepType.End) break;
                         if (step.Type == StepType.Choice)
                         {
@@ -877,7 +878,7 @@ namespace Patterkit.Patterplay.TestHost
                                 current = op.GetProperty("flow").GetString();
                                 break;
                             case "advance":
-                                chunk.Add(Normalize(engine.GetFlow(current).Advance()));
+                                chunk.Add(Normalize(engine.GetFlow(current).Advance(), IsIdsOnly(bundle)));
                                 break;
                             case "choose":
                                 engine.GetFlow(current).Choose(op.GetProperty("id").GetString());
@@ -1201,7 +1202,24 @@ namespace Patterkit.Patterplay.TestHost
             Check("audio: no take is null", new PatterAudioResolver(manifest, "Audio").Resolve("M") == null, "not null");
         }
 
-        private static object Normalize(StepResult s)
+        /// <summary>Whether a bundle's strings are IDs-only, as the runtime reads it (a source-debug build still
+        /// resolves names).</summary>
+        private static bool IsIdsOnly(Bundle bundle)
+            => bundle.Localisation != null && bundle.Localisation.Mode == "ids" && !bundle.Localisation.SourceDebug;
+
+        /// <summary>A speaker's label as a transcript records it (runner.ts labelField): only where it differs
+        /// from what a line with no qualifier shows (nothing in IDs-only mode or with no speaker, else the display
+        /// name, else the token), so a transcript names it where a qualifier or a pair's own label changes it. A
+        /// runtime that drops a label it should carry records a marker rather than nothing.</summary>
+        private static string LabelField(string character, string characterName, string speakerLabel, bool idsOnly)
+        {
+            string plain = idsOnly || string.IsNullOrEmpty(character) ? null : (characterName ?? character);
+            return speakerLabel == plain ? null : (speakerLabel ?? "<missing>");
+        }
+
+        /// <summary>Normalise a step as runner.ts normaliseStep does. `idsOnly`: the bundle's strings are IDs-only,
+        /// so names (the speaker's label among them) are the game's to resolve.</summary>
+        private static object Normalize(StepResult s, bool idsOnly = false)
         {
             var o = new Dictionary<string, object>();
             switch (s.Type)
@@ -1213,6 +1231,8 @@ namespace Patterkit.Patterplay.TestHost
                     if (s.Direction != null) o["direction"] = s.Direction;
                     if (s.Qualifier != null) o["qualifier"] = s.Qualifier;             // speaker qualifier gameId
                     if (s.QualifierName != null) o["qualifierName"] = s.QualifierName; // and its locale-resolved name
+                    var label = LabelField(s.Character, s.CharacterName, s.SpeakerLabel, idsOnly);
+                    if (label != null) o["speakerLabel"] = label;                       // the speaker's label, where it differs
                     NormalizePad(s, o);                                                 // line padding, when not the default
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
@@ -1236,7 +1256,7 @@ namespace Patterkit.Patterplay.TestHost
                     o["options"] = s.Options.Select(opt =>
                     {
                         var od = new Dictionary<string, object> { ["id"] = opt.Id };
-                        if (opt.Prompt != null) od["prompt"] = NormalizePrompt(opt.Prompt);
+                        if (opt.Prompt != null) od["prompt"] = NormalizePrompt(opt.Prompt, idsOnly);
                         od["eligible"] = opt.Eligible;
                         if (opt.GameData != null) od["gameData"] = GameDataToObject(opt.GameData);
                         return (object)od;
@@ -1257,7 +1277,7 @@ namespace Patterkit.Patterplay.TestHost
             else if (s.PadAfter.Value != Bundle.DefaultPadAfter) o["padAfter"] = s.PadAfter.Value;
         }
 
-        private static Dictionary<string, object> NormalizePrompt(ChoicePrompt p)
+        private static Dictionary<string, object> NormalizePrompt(ChoicePrompt p, bool idsOnly)
         {
             var o = new Dictionary<string, object> { ["kind"] = p.Kind, ["text"] = p.Text };
             if (p.Character != null) o["character"] = p.Character;
@@ -1265,6 +1285,11 @@ namespace Patterkit.Patterplay.TestHost
             if (p.Direction != null) o["direction"] = p.Direction;
             if (p.Qualifier != null) o["qualifier"] = p.Qualifier;
             if (p.QualifierName != null) o["qualifierName"] = p.QualifierName;
+            if (p.Kind == "line")
+            {
+                var label = LabelField(p.Character, p.CharacterName, p.SpeakerLabel, idsOnly);
+                if (label != null) o["speakerLabel"] = label;
+            }
             // The prompt's pause, as on a step: only when it isn't the built-in default, and marked when absent.
             if (p.PadAfter == null) o["padAfter"] = "<missing>";
             else if (p.PadAfter.Value != Bundle.DefaultPadAfter) o["padAfter"] = p.PadAfter.Value;
@@ -1448,7 +1473,16 @@ namespace Patterkit.Patterplay.TestHost
 
             if (b.TryGetProperty("cast", out var cast))
                 foreach (var c in cast.EnumerateArray())
-                    bundle.Cast.Add(new Cast { Name = c.GetProperty("name").GetString(), DisplayName = c.TryGetProperty("displayName", out var dn) ? dn.GetString() : null });
+                {
+                    var member = new Cast { Name = c.GetProperty("name").GetString(), DisplayName = c.TryGetProperty("displayName", out var dn) ? dn.GetString() : null };
+                    // A character's own labels with qualifiers, for the pairs the project overrides.
+                    if (c.TryGetProperty("qualifierLabels", out var ql) && ql.ValueKind == JsonValueKind.Object)
+                    {
+                        member.QualifierLabels = new Dictionary<string, string>();
+                        foreach (var l in ql.EnumerateObject()) member.QualifierLabels[l.Name] = l.Value.GetString();
+                    }
+                    bundle.Cast.Add(member);
+                }
 
             // The speaker qualifiers the content uses (absent in an older bundle, or one that uses none).
             if (b.TryGetProperty("qualifiers", out var quals))
@@ -1457,6 +1491,9 @@ namespace Patterkit.Patterplay.TestHost
                         GameId = q.TryGetProperty("gameId", out var qg) ? qg.GetString() : null,
                         Name = q.TryGetProperty("name", out var qn) ? qn.GetString() : null,
                     });
+
+            // The project's speaker pattern (absent = the built-in one).
+            if (b.TryGetProperty("speakerPattern", out var spat)) bundle.SpeakerPattern = spat.GetString();
 
             // The project's line-padding default (absent = the built-in one).
             bundle.PadAfterDefault = Num(b, "padAfterDefault");

@@ -62,6 +62,7 @@ const api: PatterApi = {
   readSuggestions: (sceneId) => ipcRenderer.invoke("scene:readSuggestions", sceneId),
   saveSuggestions: (sceneId, suggestions) => ipcRenderer.invoke("scene:saveSuggestions", sceneId, suggestions),
   reviewFeedback: (scope) => ipcRenderer.invoke("review:feedback", scope),
+  speakerPairs: () => ipcRenderer.invoke("project:speakerPairs"),
   listDictionaries: () => ipcRenderer.invoke("dict:list"),
   readDictionary: (id) => ipcRenderer.invoke("dict:read", id),
   importDictionary: () => ipcRenderer.invoke("dict:import"),

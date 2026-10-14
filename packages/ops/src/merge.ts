@@ -330,15 +330,35 @@ function mergeEditRecord(o: Obj, t: Obj): Obj {
   return merged;
 }
 
-/** Merge a `name`-keyed array (properties / cast): per-name 3-way, sorted by name. */
-function mergeKeyedByName(base: unknown[], ours: unknown[], theirs: unknown[], path: string, conflicts: Conflict[]): unknown[] {
+/** Merge a `name`-keyed array (properties / cast): per-name 3-way, sorted by name. `resolve` may settle an
+ *  entry both sides changed differently. */
+function mergeKeyedByName(base: unknown[], ours: unknown[], theirs: unknown[], path: string, conflicts: Conflict[], resolve?: (path: string, conflicts: Conflict[]) => Resolver): unknown[] {
   const byName = (arr: unknown[]): Obj => {
     const m: Obj = {};
     for (const p of arr) if (isObj(p) && typeof p.name === "string") m[p.name] = p;
     return m;
   };
-  const merged = mergeMap(byName(base), byName(ours), byName(theirs), path, conflicts);
+  const merged = mergeMap(byName(base), byName(ours), byName(theirs), path, conflicts, resolve?.(path, conflicts));
   return Object.keys(merged).sort().map((name) => merged[name]);
+}
+
+/** A cast member both sides changed differently, merged field by field, so one side's display name and the
+ *  other's notes both land. Its own labels with qualifiers (`qualifierLabels`) merge per qualifier, so two
+ *  sides each labelling a pair both land, and only the same pair labelled two ways is a conflict. A member one
+ *  side removed and the other changed stays a conflict over the whole member. */
+function mergeCastMember(path: string, conflicts: Conflict[]): Resolver {
+  return (name, b, o, t) => {
+    if (!isObj(o) || !isObj(t)) return { resolved: false, kind: deletedKind(b, o, t) };
+    const base = asMap(b);
+    const out: Obj = {};
+    for (const f of new Set([...Object.keys(base), ...Object.keys(o), ...Object.keys(t)])) {
+      const v = f === "qualifierLabels"
+        ? mergeMap(asMap(base[f]), asMap(o[f]), asMap(t[f]), `${path}.${name}.${f}`, conflicts)
+        : merge3(base[f], o[f], t[f], name, `${path}.${name}.${f}`, conflicts);
+      if (f === "qualifierLabels" ? Object.keys(v as Obj).length > 0 : v !== undefined) out[f] = v;
+    }
+    return { resolved: true, value: out };
+  };
 }
 
 // --- Project (`.patterproj`) -------------------------------------------------
@@ -347,8 +367,11 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   const conflicts: Conflict[] = [];
   const merged: Obj = {};
   for (const k of new Set([...Object.keys(base), ...Object.keys(ours), ...Object.keys(theirs)])) {
-    if (k === "properties" || k === "cast") {
+    if (k === "properties") {
       const v = mergeKeyedByName(asArr(base[k]), asArr(ours[k]), asArr(theirs[k]), k, conflicts);
+      if (v.length > 0) merged[k] = v;
+    } else if (k === "cast") {
+      const v = mergeKeyedByName(asArr(base[k]), asArr(ours[k]), asArr(theirs[k]), k, conflicts, mergeCastMember);
       if (v.length > 0) merged[k] = v;
     } else if (k === "gameDataFields") {
       // A per-node-type record of name-keyed field arrays; merge each node type's array independently.

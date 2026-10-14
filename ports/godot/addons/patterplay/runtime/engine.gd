@@ -107,6 +107,19 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	for q in bundle.get("qualifiers", []):
 		if q is Dictionary and str(q.get("gameId", "")) != "" and q.get("name") != null:
 			_host.qualifier_display[str(q["gameId"])] = str(q.get("name", ""))
+	# The overridden character and qualifier pairs, with their source labels.
+	for c in bundle.get("cast", []):
+		var labels = c.get("qualifierLabels") if c is Dictionary else null
+		if not (labels is Dictionary):
+			continue
+		for q in labels:
+			if labels[q] is String:
+				if not _host.speaker_labels.has(str(c["name"])):
+					_host.speaker_labels[str(c["name"])] = {}
+				_host.speaker_labels[str(c["name"])][str(q)] = labels[q]
+	var pattern = bundle.get("speakerPattern")
+	if pattern is String:
+		_host.speaker_pattern = pattern
 
 	if options.has("seed"):
 		_default_seed = PatterMulberry32.to_uint32(float(options["seed"]))
@@ -1159,20 +1172,19 @@ func _beat_info(beat: Dictionary) -> Dictionary:
 	if kind == "line":
 		if beat.has("character"):
 			info["character"] = beat["character"]
-			var nm = _host.default_strings.get("cast:" + str(beat["character"]))
-			if nm == null:
-				nm = _host.cast_display.get(beat["character"])
+			var nm = PatterFlow._character_name_of(_host, str(beat["character"]), true)
 			if nm != null:
 				info["characterName"] = nm
 		if beat.has("direction"):
 			info["direction"] = beat["direction"]
 		if beat.has("qualifier"):
 			info["qualifier"] = beat["qualifier"]
-			var qn = _host.default_strings.get("qualifier:" + str(beat["qualifier"]))
-			if qn == null:
-				qn = _host.qualifier_display.get(beat["qualifier"])
+			var qn = PatterFlow._qualifier_name_of(_host, str(beat["qualifier"]), true)
 			if qn != null:
 				info["qualifierName"] = qn
+		var label = PatterFlow._speaker_label_of(_host, beat.get("character"), beat.get("qualifier"), true)
+		if label != null:
+			info["speakerLabel"] = label
 	if kind == "line" or kind == "text":
 		# Line padding: the resolved pause (what a delivered step carries), and the beat's own when it sets one.
 		var pad: Dictionary = _host.pad_index.get(beat["id"], {})

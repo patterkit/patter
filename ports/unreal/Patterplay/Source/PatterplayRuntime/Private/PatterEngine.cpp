@@ -64,6 +64,7 @@ namespace
 		Out.Direction = Ue(B.direction);
 		Out.Qualifier = Ue(B.qualifier);
 		Out.QualifierName = Ue(B.qualifierName);
+		Out.SpeakerLabel = Ue(B.speakerLabel);
 		Out.PadAfter = B.padAfter;
 		Out.bHasOwnPadAfter = B.hasOwnPadAfter;
 		if (B.hasOwnPadAfter) Out.OwnPadAfter = B.ownPadAfter;
@@ -117,6 +118,8 @@ namespace
 			if (O.prompt->hasQualifier) P.Qualifier = Ue(O.prompt->qualifier);
 			P.bHasQualifierName = O.prompt->hasQualifierName;
 			if (O.prompt->hasQualifierName) P.QualifierName = Ue(O.prompt->qualifierName);
+			P.bHasSpeakerLabel = O.prompt->hasSpeakerLabel;
+			if (O.prompt->hasSpeakerLabel) P.SpeakerLabel = Ue(O.prompt->speakerLabel);
 			P.PadAfter = O.prompt->padAfter;   // line padding: the prompt's resolved pause
 			// The deprecated flat fields, filled as they were, for Blueprints that still read them.
 			Opt.PromptKind = P.Kind;
@@ -151,6 +154,8 @@ namespace
 		if (S.hasQualifier) Out.Qualifier = Ue(S.qualifier);
 		Out.bHasQualifierName = S.hasQualifierName;
 		if (S.hasQualifierName) Out.QualifierName = Ue(S.qualifierName);
+		Out.bHasSpeakerLabel = S.hasSpeakerLabel;
+		if (S.hasSpeakerLabel) Out.SpeakerLabel = Ue(S.speakerLabel);
 		Out.PadAfter = S.padAfter;   // line padding: set on a line or text step, 0 on the rest
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).

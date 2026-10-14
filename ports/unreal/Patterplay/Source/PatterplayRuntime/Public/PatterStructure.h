@@ -47,6 +47,10 @@ struct FPatterBeatInfo
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FString QualifierName;
 
+	/** The speaker's label (source locale): `You (V.O.)`, a pair's own label, or with no qualifier the name. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString SpeakerLabel;
+
 	/** The pause after this beat, in seconds, resolved from its own value and the defaults above it (line and
 	 *  text only; 0 for a gameEvent): what a delivered step carries. See line padding. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")

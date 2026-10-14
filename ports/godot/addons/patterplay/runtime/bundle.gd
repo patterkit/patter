@@ -128,6 +128,24 @@ static func effective_game_data(fields: Array, node) -> Dictionary:
 	return out
 
 
+# -- speaker labels --------------------------------------------------------------
+
+## The speaker pattern a project starts with, `You (V.O.)`: the fallback when a bundle carries no
+## "speakerPattern" and no locale holds the `speaker:pattern` string. `{name}` and `{qualifier}` are plain
+## placeholders, never run through line interpolation.
+const DEFAULT_SPEAKER_PATTERN := "{name} ({qualifier})"
+
+
+## A qualified speaker's label: the pattern with its placeholders filled. Every `{name}` and every
+## `{qualifier}` is replaced; nothing else in the pattern is read, and a filled-in name is never read again.
+## The one composition rule, as every runtime and Patterpad have it.
+static func format_speaker_label(pattern: String, name: String, qualifier: String) -> String:
+	var parts := PackedStringArray()
+	for part in pattern.split("{name}"):
+		parts.append(part.replace("{qualifier}", qualifier))
+	return name.join(parts)
+
+
 # -- line padding ----------------------------------------------------------------
 
 ## The built-in `padAfter`, in seconds, for a project that sets no default of its own: the same on every

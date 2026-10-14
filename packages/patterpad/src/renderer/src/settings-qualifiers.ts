@@ -3,10 +3,10 @@
 // description for writers. A line holds the Game ID, so renaming a qualifier touches no line; changing a
 // Game ID is a rename that rewrites every line using it, which `renames()` reports for the save. A new
 // qualifier's Game ID follows its name (`gameIdify`) until the writer edits it. Two standard sets are
-// offered to start from.
+// offered to start from. Under the list, the speaker pattern: how a name reads with a qualifier.
 
 import type { SpeakerQualifier } from "@patterkit/model";
-import { DEFAULT_QUALIFIERS, gameIdify, isValidGameId } from "@patterkit/model";
+import { DEFAULT_QUALIFIERS, DEFAULT_SPEAKER_PATTERN, gameIdify, isValidGameId } from "@patterkit/model";
 import { el } from "./dom.js";
 import { iconBtn, labelled, moveItem, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
@@ -17,6 +17,18 @@ export interface QualifiersHandle {
   renames(): Record<string, string>;
   /** The first field the Save gate should stop on: a duplicate name or Game ID, or a Game ID that won't do. */
   firstInvalid(): { el: HTMLElement; message: string } | null;
+  /** The speaker pattern as typed, "" for the default. */
+  pattern(): string;
+  /** A qualifier's name as it stands, by the Game ID it had when the tab opened (what the lines still hold),
+   *  else by its Game ID now; the gameId itself for one the list doesn't have. */
+  nameOf(gameId: string): string;
+}
+
+export interface QualifiersOptions {
+  /** The speaker pattern the project stores, "" or absent for the default. */
+  pattern?: string;
+  /** Fired after any edit on the tab (a name, a Game ID, the pattern, a set, a row added or removed). */
+  onChange?: () => void;
 }
 
 /** One row: the qualifier as edited, the Game ID it had when the tab opened (none for a new one), and
@@ -46,12 +58,23 @@ export const QUALIFIER_SETS: Array<{ label: string; tip: string; list: SpeakerQu
   },
 ];
 
-export function mountQualifiers(host: HTMLElement, initial: SpeakerQualifier[]): QualifiersHandle {
+export function mountQualifiers(host: HTMLElement, initial: SpeakerQualifier[], opts: QualifiersOptions = {}): QualifiersHandle {
   const rows: Row[] = (initial ?? []).map((q) => ({ name: q.name, gameId: q.gameId, description: q.description, origin: q.gameId, autoId: false }));
   const origins = new Set(rows.map((r) => r.origin!));
   const names = dupGuard();
   const ids = dupGuard();
   let idInputs: HTMLInputElement[] = [];
+
+  // The speaker pattern: one field, kept across re-renders of the list. Blank means the default.
+  const pattern = el("input", "gd-input qual-pattern") as HTMLInputElement;
+  pattern.type = "text"; pattern.placeholder = DEFAULT_SPEAKER_PATTERN; pattern.value = opts.pattern ?? ""; pattern.spellcheck = false;
+  pattern.dataset.tip = "Leave blank for the default. A character can have its own label on the Cast tab.";
+  const patternField = labelled("Speaker pattern", pattern, [
+    "How a name reads with a qualifier: ", el("code", undefined, "{name}"), " and ", el("code", undefined, "{qualifier}"), " are filled in.",
+  ]);
+  patternField.classList.add("qual-pattern-field");
+  // Every edit on the tab bubbles here, so the Cast tab's placeholders can follow it.
+  host.addEventListener("input", () => opts.onChange?.());
 
   const row = (r: Row, i: number): HTMLElement => {
     const name = el("input", "gd-input gd-name") as HTMLInputElement;
@@ -114,7 +137,8 @@ export function mountQualifiers(host: HTMLElement, initial: SpeakerQualifier[]):
     names.check(); ids.check();
     const add = el("button", "gd-add", "+ Add qualifier") as HTMLButtonElement; add.type = "button";
     add.addEventListener("click", () => { rows.push({ name: "", gameId: "", autoId: true }); render(); focusNewRow(host.querySelector<HTMLElement>(".gd-fieldlist")); });
-    host.append(add);
+    host.append(add, patternField);
+    opts.onChange?.();
   };
   render();
 
@@ -128,6 +152,11 @@ export function mountQualifiers(host: HTMLElement, initial: SpeakerQualifier[]):
       const out: Record<string, string> = {};
       for (const r of kept()) if (r.origin && r.gameId.trim() && r.gameId.trim() !== r.origin) out[r.origin] = r.gameId.trim();
       return out;
+    },
+    pattern: () => pattern.value.trim(),
+    nameOf: (gameId) => {
+      const r = rows.find((x) => x.origin === gameId) ?? rows.find((x) => x.gameId === gameId);
+      return r?.name.trim() || gameId;
     },
     firstInvalid: () => {
       const dupName = names.firstDuplicate();

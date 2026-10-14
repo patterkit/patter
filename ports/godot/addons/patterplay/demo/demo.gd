@@ -17,10 +17,8 @@ func _initialize() -> void:
 		var step := flow.advance()
 		match step["type"]:
 			"line":
-				var speaker = step.get("characterName", step.get("character", ""))
-				var qualifier = step.get("qualifierName", step.get("qualifier", ""))
-				if qualifier != "":
-					speaker += " (%s)" % qualifier
+				# The speaker's label: the shown name, with its qualifier as the project words it.
+				var speaker = step.get("speakerLabel", step.get("character", ""))
 				print("%s: %s" % [speaker, step["text"]])
 			"text":
 				print(step["text"])

@@ -201,6 +201,7 @@ namespace Patterkit.Patterplay
             if (prompt.Direction != null) p["direction"] = prompt.Direction;
             if (prompt.Qualifier != null) p["qualifier"] = prompt.Qualifier;
             if (prompt.QualifierName != null) p["qualifierName"] = prompt.QualifierName;
+            if (prompt.SpeakerLabel != null) p["speakerLabel"] = prompt.SpeakerLabel;
             if (prompt.PadAfter != null) p["padAfter"] = prompt.PadAfter.Value; // line padding; absent in an older save
             return p;
         }
@@ -210,6 +211,7 @@ namespace Patterkit.Patterplay
             Kind = StrOrNull(p, "kind"), Text = StrOrNull(p, "text"), Character = StrOrNull(p, "character"),
             CharacterName = StrOrNull(p, "characterName"), Direction = StrOrNull(p, "direction"),
             Qualifier = StrOrNull(p, "qualifier"), QualifierName = StrOrNull(p, "qualifierName"),
+            SpeakerLabel = StrOrNull(p, "speakerLabel"), // absent in a save written before prompts carried it: re-resolved on load
             PadAfter = NumOrNull(p, "padAfter"), // absent in a save written before prompts carried it: re-resolved on load
         };
 

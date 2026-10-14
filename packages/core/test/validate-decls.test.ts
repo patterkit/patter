@@ -295,6 +295,25 @@ describe("speaker qualifiers", () => {
       .filter((i) => i.code === "qualifier-without-speaker")).toEqual([]);
   });
 
+  it("warns on a character's own label for a pair no line uses, and not for one a line or a prompt uses", () => {
+    const project: ProjectFile = { ...base(), cast: [{ name: "TAM", qualifierLabels: { vo: "Tam, thinking", os: "Tam, off", radio: "Tam, on air" } }] };
+    const issues = validateProject({ project, scenes: [lineScene({ character: "TAM", qualifier: "vo" }, { character: "TAM", qualifier: "radio" })] })
+      .filter((i) => i.code === "unused-speaker-label");
+    expect(issues.map((i) => [i.message, i.severity])).toEqual([
+      ["'TAM' has its own label with the qualifier 'os', but no line has that speaker with that qualifier", "warning"],
+    ]);
+  });
+
+  it("reports a speaker pattern or a character's labels that aren't text", () => {
+    const bad = (extra: Record<string, unknown>, cast: Record<string, unknown>) =>
+      ({ ...base(), ...extra, cast: [{ name: "TAM", ...cast }] }) as unknown as ProjectFile;
+    for (const p of [bad({ speakerPattern: 3 }, {}), bad({}, { qualifierLabels: ["vo"] }), bad({}, { qualifierLabels: { vo: 3 } })]) {
+      expect(validateProject({ project: p, scenes: [] }).map((i) => i.code)).toContain("invalid-speaker-label");
+    }
+    expect(validateProject({ project: bad({ speakerPattern: "{qualifier}: {name}" }, { qualifierLabels: { vo: "Tam, thinking" } }), scenes: [] })
+      .filter((i) => i.code === "invalid-speaker-label")).toEqual([]);
+  });
+
   it("reports a qualifier list that isn't a list, or holds a non-object, instead of throwing", () => {
     for (const qualifiers of [{ vo: "V.O." }, "V.O.", [null], [42, { gameId: "vo", name: "V.O." }], [["vo"]]]) {
       const p = { ...withCast(), qualifiers } as unknown as ProjectFile;

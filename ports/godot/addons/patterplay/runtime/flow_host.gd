@@ -45,6 +45,12 @@ var default_strings: Dictionary = {}
 var cast_display: Dictionary = {}
 ## Speaker qualifier gameId -> authored name (the unlocalised fallback when no loc string exists).
 var qualifier_display: Dictionary = {}
+## A character's own label with a qualifier, for the overridden pairs only (the unlocalised fallback):
+## cast name -> {qualifier gameId -> label}. JS keys one Map by `<name>\0<gameId>`; here it nests. A pair
+## not here follows the pattern, whatever a loc file holds for it.
+var speaker_labels: Dictionary = {}
+## The project's speaker pattern (the unlocalised fallback for the `speaker:pattern` string).
+var speaker_pattern: String = PatterBundle.DEFAULT_SPEAKER_PATTERN
 var node_index: Dictionary = {}
 ## Block id -> the id of the scene it is in. JS maps to `{ sceneId }`; here the value is the id.
 var block_index: Dictionary = {}

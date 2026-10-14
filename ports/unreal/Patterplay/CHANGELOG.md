@@ -7,6 +7,21 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Speaker labels**: a line step and a line prompt carry `SpeakerLabel` (with `bHasSpeakerLabel`), the name
+  to show for the speaker, beside `CharacterName` and `QualifierName`. With a qualifier it's the character's
+  own label for that pair when the project gives one, else the project's speaker pattern (`{name}
+  ({qualifier})` by default) filled with the two shown names, so `Tam (V.O.)`; with no qualifier it's the
+  shown name. Each piece is translated: the `speaker:pattern` string, a pair's own `speaker:<NAME>:<gameId>`
+  string, and the `cast:` and `qualifier:` names, each from the active locale, then the default one, then the
+  authored text. A line with no character has none, nor does an IDs-only build or a line silenced by closed
+  captions. A prompt spoken back on choosing keeps it, a save keeps it on a choice's prompts, and a prompt in
+  an older save is worked out again on load, in the current locale. The outline's `FPatterBeatInfo` gains
+  `SpeakerLabel` (source locale). In the C++ core: `speakerLabel` on `patter::StepResult`,
+  `patter::ChoicePrompt`, and `patter::BeatInfo`, and `patter::Bundle` reads each cast member's
+  `qualifierLabels` and the bundle's `speakerPattern`. The demos show the label.
+
 ## [0.24.0] - 2026-10-11
 
 ### Added

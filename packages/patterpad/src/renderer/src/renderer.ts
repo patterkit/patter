@@ -2741,7 +2741,11 @@ async function exportPlayableHtml(): Promise<void> {
 // state, mount fresh on every open from `settingsRead` (read just before open(), because mount() is
 // synchronous), and hand what they hold to `saveSettingsFromDialog` through `live`.
 
-type SettingsRead = { s: ProjectSettingsDto; dictionaries: Awaited<ReturnType<typeof window.patter.listDictionaries>> };
+type SettingsRead = {
+  s: ProjectSettingsDto; dictionaries: Awaited<ReturnType<typeof window.patter.listDictionaries>>;
+  /** The character and qualifier pairs the lines use (the Cast tab's "Shown with" fields). */
+  speakerPairs: Awaited<ReturnType<typeof window.patter.speakerPairs>>;
+};
 let settingsRead: SettingsRead | null = null;
 /** The controls and editors of the OPEN dialog, filled by each section's mount() and read by Save. */
 interface LiveSettings {
@@ -2860,14 +2864,21 @@ const settingsDlg = mountSettingsDialog({
     { id: "cast", label: "Cast", mount: (host): SettingsSectionHandle => {
       host.append(sNote("settings-note", "A line's speaker must be one of these names."));
       const castHost = el("div"); host.append(castHost);
-      const cast = mountCast(castHost, settingsRead!.s.cast);
+      const { s, speakerPairs } = settingsRead!;
+      // A pair's label follows the Qualifiers tab as it's edited: its names and the pattern, read live.
+      const cast = mountCast(castHost, s.cast, {
+        pairs: speakerPairs,
+        qualifierName: (gameId) => live.qualifiers?.nameOf(gameId) ?? s.qualifiers.find((q) => q.gameId === gameId)?.name ?? gameId,
+        pattern: () => live.qualifiers?.pattern() ?? s.speakerPattern ?? "",
+      });
       live.cast = cast;
       return { firstInvalid: () => { const dup = cast.firstDuplicate(); return dup ? { el: dup, message: DUP_MESSAGE } : null; } };
     } },
     { id: "qualifiers", label: "Qualifiers", mount: (host): SettingsSectionHandle => {
       host.append(sNote("settings-note", "How a line is delivered, shown after the speaker's name: TAM (O.S.). The speaker stays one character."));
       const qHost = el("div"); host.append(qHost);
-      const qualifiers = mountQualifiers(qHost, settingsRead!.s.qualifiers ?? []);
+      const { s } = settingsRead!;
+      const qualifiers = mountQualifiers(qHost, s.qualifiers ?? [], { pattern: s.speakerPattern, onChange: () => live.cast?.refreshLabels() });
       live.qualifiers = qualifiers;
       return { firstInvalid: () => qualifiers.firstInvalid() };
     } },
@@ -2937,7 +2948,7 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   if (!project) return; // nothing open
   const s = await window.patter.readSettings();
   if (!s) return;
-  settingsRead = { s, dictionaries: await window.patter.listDictionaries() };
+  settingsRead = { s, dictionaries: await window.patter.listDictionaries(), speakerPairs: await window.patter.speakerPairs() };
   live = {};
   settingsDlg.open(initialTab);
   if (initialTab === "general") setTimeout(() => live.name?.focus(), 0);
@@ -2958,7 +2969,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     ...l.langs.value(), gameDataFields: l.gd.value(),
     properties: read.s.properties, // @patter lives in the Properties document now; pass the current set through untouched
     ...l.world.value(), cast: l.cast.value(),
-    qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(),
+    qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(), speakerPattern: l.qualifiers.pattern(),
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),
   });

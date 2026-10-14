@@ -197,6 +197,16 @@ struct FPatterChoicePrompt
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasQualifierName = false;
 
+	/** The name to show for the speaker, locale-resolved as CharacterName is: with a qualifier, the character's
+	 *  own label for that pair if the project gives one, else the project's speaker pattern filled in
+	 *  (`You (V.O.)`); with none, the shown name. Show this rather than putting CharacterName and QualifierName
+	 *  together yourself. Unset with no character, and in an IDs-only build. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString SpeakerLabel;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasSpeakerLabel = false;
+
 	/** The prompt's resolved pause, in seconds (line padding), as on a step: when the prompt is spoken (by
 	 *  bReplayPromptOnChoose, or by a game that voices it), the wait before the reply, negative to cut in on
 	 *  the question. Always set. */
@@ -486,6 +496,16 @@ struct FPatterStep
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	bool bHasQualifierName = false;
+
+	/** The name to show for the speaker, locale-resolved as CharacterName is: with a qualifier, the character's
+	 *  own label for that pair if the project gives one, else the project's speaker pattern filled in
+	 *  (`You (V.O.)`); with none, the shown name. Show this rather than putting CharacterName and QualifierName
+	 *  together yourself. Unset with no character, and in an IDs-only build. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString SpeakerLabel;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	bool bHasSpeakerLabel = false;
 
 	/** The pause after this line or text step, in seconds (line padding): the beat's own, else the nearest
 	 *  default above it, else the project's, else the built-in 0.6. Negative = the next line starts that long

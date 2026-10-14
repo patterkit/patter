@@ -188,10 +188,9 @@ void ATourDemoActor::Step()
 	{
 		case EPatterStepType::Line:
 		{
-			FString Speaker = (S.CharacterName.IsEmpty() ? S.Character : S.CharacterName).ToUpper();
-			// A speaker qualifier shows after the name, as a script's cue does: TAM (O.S.).
-			const FString& Qualifier = S.QualifierName.IsEmpty() ? S.Qualifier : S.QualifierName;
-			if (!Qualifier.IsEmpty()) Speaker += FString::Printf(TEXT(" (%s)"), *Qualifier);
+			// The speaker's label is the name to show, a qualifier included (TAM (O.S.)), already put together
+			// and translated; an IDs-only build has none, so the token stands in.
+			const FString Speaker = (S.bHasSpeakerLabel ? S.SpeakerLabel : S.Character).ToUpper();
 			AddLine(Speaker, S.Text, LineColour);
 			const float Clip = PlayClip(S.Id);
 			if (Clip > 0.f) Hold = Clip + 0.25f; // a voiced line holds for its take

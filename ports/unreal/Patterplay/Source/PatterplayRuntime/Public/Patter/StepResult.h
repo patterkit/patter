@@ -21,6 +21,9 @@ namespace patter
         bool hasDirection = false; std::string direction;
         bool hasQualifier = false; std::string qualifier;           // speaker qualifier gameId (`vo`)
         bool hasQualifierName = false; std::string qualifierName;   // and its resolved shown name
+        // The name to show for the speaker, locale-resolved: `You (V.O.)`, a pair's own label, or with no qualifier
+        // the shown name. Unset with no character, and in an IDs-only build.
+        bool hasSpeakerLabel = false; std::string speakerLabel;
         // The prompt's resolved pause, in seconds (line padding): when it is spoken (by replayPromptOnChoose,
         // or by a game that voices it), the wait before the reply, negative to cut in on the question. Always
         // set by the engine; hasPadAfter is false only on a prompt read from a save written before it existed.
@@ -45,6 +48,9 @@ namespace patter
         bool hasDirection = false; std::string direction;
         bool hasQualifier = false; std::string qualifier;           // speaker qualifier gameId (`vo`)
         bool hasQualifierName = false; std::string qualifierName;   // and its resolved shown name
+        // The name to show for the speaker, locale-resolved: `You (V.O.)`, a pair's own label, or with no qualifier
+        // the shown name. Unset with no character, and in an IDs-only build.
+        bool hasSpeakerLabel = false; std::string speakerLabel;
         // The pause after a line or text step, in seconds (line padding): always set on those two, resolved
         // from the beat's own value and the defaults above it; 0 on any other step, which carries none.
         double padAfter = 0;

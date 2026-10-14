@@ -11,15 +11,15 @@ import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defa
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
   discoverGameScopes, gameScopesCatalogue, gameScopeTokens, worldSettingsScopes, planWorldSave, planShareScopes, defaultGameScopesDir,
-  patterScopesWrite, previewRegistry, GAME_SCOPES_DIR, GAME_SCOPES_FILE, PATTER_SCOPES_FILE,
+  patterScopesWrite, previewRegistry, GAME_SCOPES_DIR, GAME_SCOPES_FILE, PATTER_SCOPES_FILE, projectStringSources, authoringPath,
   type LoadedProject, type ReportData, type SearchFocus, type ReplaceOptions, type ReplaceHit, type CoverageReport, type CoverageAsyncHooks, type PlannedWrite } from "@patterkit/ops";
 import { Engine, type Flow, type StepResult, type ChoiceOption } from "@patterkit/runtime";
 import { parseSource, canonicalStringify, newId, slug } from "@patterkit/core";
 import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./scene-kits.js";
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
-import { projectQualifiers, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER } from "@patterkit/model";
-import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
-import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
+import { projectQualifiers, usedSpeakerPairs, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
+import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
+import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
@@ -149,10 +149,15 @@ function authoringWrite(s: SceneShards, mutate: (af: AuthoringFile) => void): { 
  *  suggestions) need this. We feed in the just-mutated `af` (which we serialised to disk) so this costs
  *  nothing - no disk re-read + re-parse of content we already hold in hand. */
 function syncAuthoringModel(s: SceneShards, af: AuthoringFile): void {
+  syncAuthoringAt(s.authoringPath, af);
+}
+
+/** The same for any authoring shard by its path (the project-level `_project.patterx` has no scene). */
+function syncAuthoringAt(path: string, af: AuthoringFile): void {
   if (!loaded) return;
-  const i = loaded.authoringFiles.indexOf(s.authoringPath);
+  const i = loaded.authoringFiles.indexOf(path);
   if (i >= 0) loaded.authoring[i] = af;
-  else { loaded.authoringFiles.push(s.authoringPath); loaded.authoring.push(af); }
+  else { loaded.authoringFiles.push(path); loaded.authoring.push(af); }
 }
 
 /** Land an authoring-shard write and, on success, keep the in-memory model current (see syncAuthoringModel). */
@@ -173,6 +178,39 @@ function changedSourceStringIds(prevLocSource: string | null, nextLocSource: str
   };
   const before = strings(prevLocSource), after = strings(nextLocSource);
   return Object.keys(after).filter((id) => after[id] !== before[id]);
+}
+
+/** The edit trail for project-level strings a settings save changes: a display name, a qualifier's name, the
+ *  speaker pattern, or a character's own label with a qualifier whose SOURCE text changed gets a fresh
+ *  `modifiedAt` in `_project.patterx`, so its translations go stale on the next localisation export, as a
+ *  changed line's do. Only strings some language has translated are stamped (nothing to go stale otherwise).
+ *  A qualifier rename moves ids first, so a renamed string isn't a changed one. Folds into the batch's own
+ *  write of that shard when a rename already queued one. Null when nothing changed. */
+function projectStringStamp(next: ProjectFile, renames: Map<string, string> | null | undefined, writes: { path: string; content: string }[]): { path: string; content: string; af: AuthoringFile } | null {
+  if (!loaded) return null;
+  ensureHydrated(); // the project-level shards aren't in a landing-only load
+  const def = loaded.project.locales.default;
+  const shards = loaded.locales.filter((l) => l.scene === PROJECT_LOCALE_SCENE);
+  const table: Record<string, string> = {};
+  const translated: Record<string, true> = {};
+  for (const l of shards) {
+    if (l.locale === def) Object.assign(table, l.strings);
+    else for (const [id, text] of Object.entries(l.strings ?? {})) if (text) translated[id] = true;
+  }
+  const before = projectStringSources(loaded.project, table);
+  const tableAfter = { ...table };
+  if (renames) { moveQualifierKeys(before, renames); moveQualifierKeys(tableAfter, renames); moveQualifierKeys(translated, renames); }
+  const after = projectStringSources(next, tableAfter);
+  const changed = Object.keys(after).filter((id) => after[id] !== before[id] && translated[id]);
+  if (changed.length === 0) return null;
+  const path = authoringPath(loaded, PROJECT_LOCALE_SCENE);
+  const queued = writes.find((w) => w.path === path);
+  const af = queued ? (parseSource(queued.content) as AuthoringFile) : loadAuthoring(path);
+  const now = new Date().toISOString();
+  const edits = { ...af.edits };
+  for (const id of changed) edits[id] = { ...edits[id], modifiedAt: now };
+  af.edits = edits;
+  return { path, content: canonicalStringify(af), af };
 }
 
 /** Build the planned write that stamps the edit trail into the scene's authoring shard (merged over any
@@ -1216,7 +1254,7 @@ function resetPlaySession(): void { flow = null; engine = null; playBundle = nul
 // where the playhead is. The editor uses it to follow a cross-scene jump.
 const toStep = (r: StepResult, scene: string | null): PlayStep | null => {
   const s = scene ?? undefined;
-  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, padAfter: r.padAfter };
+  if (r.type === "line") return { kind: "line", id: r.id, scene: s, text: r.text, character: r.character, characterName: r.characterName, direction: r.direction, qualifier: r.qualifier, qualifierName: r.qualifierName, speakerLabel: r.speakerLabel, padAfter: r.padAfter };
   if (r.type === "text") return { kind: "text", id: r.id, scene: s, text: r.text, padAfter: r.padAfter };
   if (r.type === "gameEvent") return { kind: "gameEvent", id: r.id, scene: s };
   return null; // choice / end carry no played beat
@@ -1934,6 +1972,13 @@ export function qualifierList(): Array<{ gameId: string; name: string; count: nu
   return qualifierCounts(loaded.project, loaded.scenes);
 }
 
+/** Every character and qualifier pair the lines use, for the Cast tab's "Shown with" fields. */
+export function speakerPairs(): Array<{ character: string; qualifier: string }> {
+  if (!loaded) return [];
+  ensureHydrated(); // pairs span every scene
+  return usedSpeakerPairs(loaded.scenes);
+}
+
 /** Qualifier browse: every line (and line prompt) carrying the qualifier `gameId`, the caret's scene first. */
 export function linesByQualifier(gameId: string, focus?: SearchFocus): SearchEntry[] {
   if (!gameId) return [];
@@ -1972,6 +2017,8 @@ export function readSettings(): ProjectSettingsDto | null {
     // Seeded with the defaults when the project lists none, so the tab is never empty; saveSettings drops
     // the list again when it still matches them.
     qualifiers: projectQualifiers(p),
+    // The speaker pattern, "" while the project keeps the default (the field shows the default greyed).
+    speakerPattern: p.speakerPattern ?? "",
     // Build output (Build tab): the pinned `export.bundle`, else the sibling default - so the field always
     // shows where Publish Bundle will write, and saveSettings drops it back to undefined when left default.
     buildBundle: p.export?.bundle ?? defaultBundleRel(loaded),
@@ -2046,6 +2093,10 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       if (plan.write) sharedWrites.push(plan.write);
       scopeRegistry = plan.scopeRegistry;
     }
+    // A qualifier whose gameId changed is a rename (see below); the cast's own labels with it move too.
+    const renames = cleanRenames(s.qualifierRenames);
+    const cast = structuredClone(s.cast);
+    if (renames) renameQualifierLabels(cast, renames);
     const next: ProjectFile = {
       ...loaded.project,
       project: { ...loaded.project.project, name: s.name },
@@ -2072,11 +2123,14 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       // drivers when present.
       scopeRegistry,
       coverageDrivers: s.coverageDrivers && s.coverageDrivers.length ? s.coverageDrivers : undefined,
-      cast: s.cast.length ? s.cast : undefined,
+      cast: cast.length ? cast : undefined,
       // Speaker qualifiers: stored only when they DIFFER from the defaults, as the ladders are. An empty list
       // is stored as one (the project uses none), which is not the same as absent (the defaults).
       // A caller that sends none (an older settings shape) leaves the project's list as it is.
       qualifiers: s.qualifiers === undefined ? loaded.project.qualifiers : sameJson(s.qualifiers, DEFAULT_QUALIFIERS) ? undefined : s.qualifiers,
+      // The speaker pattern: stored only when it isn't the default, so blank (or the default typed out) drops
+      // it. A caller that sends none leaves the project's as it is.
+      speakerPattern: s.speakerPattern === undefined ? loaded.project.speakerPattern : !s.speakerPattern.trim() || s.speakerPattern === DEFAULT_SPEAKER_PATTERN ? undefined : s.speakerPattern,
       // Status ladders: store only when they DIFFER from the built-in defaults, so a project that takes
       // the standard ladders keeps a clean file (and silently follows any future change to the defaults).
       writingStatuses: sameJson(s.writingStatuses, DEFAULT_WRITING_STATUSES) ? undefined : s.writingStatuses,
@@ -2099,10 +2153,17 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     };
     const writes = [...sharedWrites, { path: loaded.projectFile, content: canonicalStringify(next) }, ...patterScopesWrites(next)];
     // A qualifier whose gameId changed is a rename: every line using the old gameId is rewritten to the new
-    // one, and its translated names, suggestions, edit records, and handoff records move with it, in the
-    // same batch as the project file (the caller flushed the open scene first, and reloads it after).
-    const renames = cleanRenames(s.qualifierRenames);
+    // one, and its translated names and labels, suggestions, edit records, and handoff records move with it,
+    // in the same batch as the project file (the caller flushed the open scene first, and reloads it after).
     if (renames) writes.push(...qualifierRenameWrites(renames));
+    // A display name, qualifier name, speaker pattern, or pair label changed in the source language makes its
+    // translations stale: stamp it, in the same batch (replacing a rename's write of the same shard).
+    const stamp = projectStringStamp(next, renames, writes);
+    if (stamp) {
+      const at = writes.findIndex((w) => w.path === stamp.path);
+      if (at >= 0) writes[at] = { path: stamp.path, content: stamp.content };
+      else writes.push({ path: stamp.path, content: stamp.content });
+    }
     // Switching VCS re-emits its config files (vcs-setup.md, .gitattributes, ignore) for the new system.
     // The bundle posture carries over, read from the files the old system was set up with.
     if (s.vcs !== prevVcs && s.vcs !== "none") writes.push(...vcsConfigWrites(loaded.root, s.vcs, currentBundlePosture(loaded.root, prevVcs === "none" ? undefined : prevVcs)));
@@ -2119,6 +2180,7 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       }
     }
     loaded.project = next; // reflect in the cached project
+    if (stamp && !renames) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
     if (renames) reloadFromDisk(); // the rewritten scenes and strings, read back whole
     if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)

@@ -29,7 +29,7 @@ export interface PlayOptions {
 /** One thing that happened during a playthrough, in order. */
 export type PlayEvent =
   /** `padAfter` is the step's resolved pause after it, in seconds (line padding), as the runtime delivers it. */
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; padAfter?: number; gameData?: GameData }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData }
   | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData }
   | { type: "gameEvent"; id: string; gameData?: GameData }
   | { type: "choice"; options: ChoiceOption[]; picked?: string }

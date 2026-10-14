@@ -93,7 +93,7 @@ save/load to `localStorage`. (A working copy ships in
     controls.innerHTML = "";
     for (;;) {
       const step = flow.advance();
-      if (step.type === "line")   add(`${step.characterName ?? step.character ?? ""}: ${step.text}`);
+      if (step.type === "line")   add(`${step.speakerLabel ?? ""}: ${step.text}`);
       else if (step.type === "text")   add(step.text);
       else if (step.type === "gameEvent") doHostCue(step);          // your game's cue
       else if (step.type === "choice") return renderChoice(step);

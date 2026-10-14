@@ -280,9 +280,11 @@ const stub = {
     coverageDrivers: [{ ref: "@world.mood", kind: "recurring", cadence: "sometimes", values: ["calm", "tense", "hostile"] }],
     cast: [
       { name: "BARKEEP", displayName: "The Barkeep", notes: "Gruff, warm underneath." },
-      { name: "ANNA" },
+      // ANNA's thoughts have a label of their own, and a radio label no line uses any more (marked unused).
+      { name: "ANNA", qualifierLabels: { vo: "Anna's thoughts", radio: "Anna, on the radio" } },
     ],
     qualifiers: QUALIFIERS,
+    speakerPattern: "",
     writingStatuses: [
       { name: "stub", colour: 0 }, { name: "draft 1", colour: 1 }, { name: "draft 2", colour: 2 },
       { name: "edited", readyToRecord: true, colour: 4 }, { name: "final", readyToShip: true, colour: 9 },
@@ -297,6 +299,8 @@ const stub = {
   saveSettings: async (s: { name: string }) => ({ ok: true, project: { ...project, name: s.name } }),
   // Spell-check (#177): the built-ins plus a fake imported dictionary; readDictionary serves the REAL
   // vendored en-GB/en-US bytes so the live squiggle engine works in the preview.
+  // The character and qualifier pairs the lines use (the Cast tab's "Shown with" fields).
+  speakerPairs: async () => [{ character: "BARKEEP", qualifier: "os" }, { character: "ANNA", qualifier: "vo" }],
   listDictionaries: async () => ([
     { id: "en-US", label: "English (US)", builtin: true },
     { id: "en-GB", label: "English (UK)", builtin: true },

@@ -114,7 +114,27 @@ static JsonValue tagsToJson(const std::vector<std::string>& tags)
     for (const auto& t : tags) a.push(JsonValue::Str(t));
     return a;
 }
-static JsonValue normalize(const StepResult& s)
+// Whether a bundle's strings are IDs-only, as the runtime reads it (a source-debug build still resolves names).
+static bool isIdsOnly(const Bundle& bundle)
+{
+    return bundle.localisation.mode == "ids" && !bundle.localisation.sourceDebug;
+}
+
+// A speaker's label as a transcript records it: only where it differs from what a line with no qualifier shows
+// (nothing in IDs-only mode or with no speaker, else the display name, else the token), so a transcript names it
+// where a qualifier or a pair's own label changes it. A runtime that drops a label it should carry records a
+// marker rather than nothing. Set on `o` only when recorded. The JS runner's labelField.
+static void setLabelField(JsonValue& o, bool hasCharacter, const std::string& character, bool hasCharacterName, const std::string& characterName,
+                          bool hasSpeakerLabel, const std::string& speakerLabel, bool idsOnly)
+{
+    const bool hasPlain = !idsOnly && hasCharacter && !character.empty();
+    const std::string plain = !hasPlain ? std::string() : hasCharacterName ? characterName : character;
+    if (hasSpeakerLabel == hasPlain && (!hasPlain || speakerLabel == plain)) return;
+    o.set("speakerLabel", JsonValue::Str(hasSpeakerLabel ? speakerLabel : "<missing>"));
+}
+
+// `idsOnly`: the bundle's strings are IDs-only, so names (the speaker's label among them) are the game's to resolve.
+static JsonValue normalize(const StepResult& s, bool idsOnly = false)
 {
     JsonValue o = JsonValue::Obj();
     switch (s.type)
@@ -126,6 +146,7 @@ static JsonValue normalize(const StepResult& s)
             if (s.hasDirection) o.set("direction", JsonValue::Str(s.direction));
             if (s.hasQualifier) o.set("qualifier", JsonValue::Str(s.qualifier));               // speaker qualifier gameId
             if (s.hasQualifierName) o.set("qualifierName", JsonValue::Str(s.qualifierName));   // and its locale-resolved name
+            setLabelField(o, s.hasCharacter, s.character, s.hasCharacterName, s.characterName, s.hasSpeakerLabel, s.speakerLabel, idsOnly); // where it differs
             if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter)); // line padding, when not the default
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
@@ -162,6 +183,9 @@ static JsonValue normalize(const StepResult& s)
                     if (opt.prompt->hasDirection) p.set("direction", JsonValue::Str(opt.prompt->direction));
                     if (opt.prompt->hasQualifier) p.set("qualifier", JsonValue::Str(opt.prompt->qualifier));
                     if (opt.prompt->hasQualifierName) p.set("qualifierName", JsonValue::Str(opt.prompt->qualifierName));
+                    if (opt.prompt->kind == "line")
+                        setLabelField(p, opt.prompt->hasCharacter, opt.prompt->character, opt.prompt->hasCharacterName, opt.prompt->characterName,
+                                      opt.prompt->hasSpeakerLabel, opt.prompt->speakerLabel, idsOnly);
                     // Line padding, when not the default; a prompt without one records a marker, as normaliseStep does.
                     if (!opt.prompt->hasPadAfter) p.set("padAfter", JsonValue::Str("<missing>"));
                     else if (opt.prompt->padAfter != DEFAULT_PAD_AFTER) p.set("padAfter", JsonValue::Num(opt.prompt->padAfter));
@@ -363,7 +387,7 @@ static int runRuntime(const JsonValue& arr)
             for (int i = 0; i < 1000; ++i)
             {
                 StepResult step = flow->advance();
-                transcript.push(normalize(step));
+                transcript.push(normalize(step, isIdsOnly(bundle)));
                 if (step.type == StepType::End) break;
                 if (step.type == StepType::Choice)
                 {
@@ -599,6 +623,7 @@ static JsonValue beatInfoToJson(const BeatInfo& b)
     if (!b.direction.empty()) o.set("direction", JsonValue::Str(b.direction));
     if (!b.qualifier.empty()) o.set("qualifier", JsonValue::Str(b.qualifier));
     if (!b.qualifierName.empty()) o.set("qualifierName", JsonValue::Str(b.qualifierName));
+    if (!b.speakerLabel.empty()) o.set("speakerLabel", JsonValue::Str(b.speakerLabel));
     // Line padding: a line or text beat always has its resolved pause, defaults included; its own only when set.
     if (b.kind == "line" || b.kind == "text") o.set("padAfter", JsonValue::Num(b.padAfter));
     if (b.hasOwnPadAfter) o.set("ownPadAfter", JsonValue::Num(b.ownPadAfter));
@@ -811,7 +836,7 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                     }
                 }
                 else if (kind == "useFlow") current = op.at("flow").str;
-                else if (kind == "advance") chunk.push(normalize(engine->getFlow(current)->advance()));
+                else if (kind == "advance") chunk.push(normalize(engine->getFlow(current)->advance(), isIdsOnly(bundle)));
                 else if (kind == "choose") engine->getFlow(current)->choose(op.at("id").str);
                 // Host navigation by address. No transcript of its own; the next advance shows where it
                 // landed. expectResult pins the returned bool.
@@ -1259,6 +1284,84 @@ static void runNamelessQualifierCheck()
     const auto named = run(",\"qualifier:vo\":\"V.O.\"");
     if (!named.hasQualifierName || named.qualifierName != "V.O.") fail("nameless-qualifier", "locale string", "a locale string did not name a nameless qualifier");
     std::cout << "  [nameless-qualifier] a qualifier without a name gives no shown name; a locale string still can\n";
+}
+
+// Speaker labels, beyond what the corpus pins. A `speaker:<name>:<gameId>` string counts only for a pair the bundle
+// overrides (the cast's qualifierLabels): a stale one a locale still holds for a pair that follows the pattern is
+// ignored. A save written before prompts carried their label has none, and loading it works the label out again
+// from the saved speaker, in the locale the loading engine plays. And the pattern's placeholders are plain text:
+// each is replaced wherever it appears, and nothing a name brings with it is read.
+static void runSpeakerLabelCheck()
+{
+    const char* json = R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en","fr"]},
+      "cast":[{"name":"TAM","displayName":"Tam","qualifierLabels":{"os":"Tam offstage"}}],
+      "qualifiers":[{"gameId":"vo","name":"V.O."},{"gameId":"os","name":"O.S."}],
+      "scenes":{"s":{"id":"s","type":"scene","name":"S","gameId":"s","blocks":[{"id":"b","type":"block","name":"B","gameId":"b","children":[
+        {"id":"sn","type":"snippet","beats":[{"id":"L_vo","kind":"line","character":"TAM","qualifier":"vo"},{"id":"L_os","kind":"line","character":"TAM","qualifier":"os"}]},
+        {"id":"g","type":"group","selector":"choice","children":[
+          {"id":"o","type":"group","prompt":{"id":"P","kind":"line","character":"TAM","qualifier":"vo"},"children":[
+            {"id":"sn_ans","type":"snippet","beats":[{"id":"ANS","kind":"text"}],"jump":{"to":"END"}}]}]}]}]}},
+      "strings":{"en":{"L_vo":"Hm.","L_os":"Hey!","P":"Think","ANS":"ok","speaker:TAM:vo":"STALE"},
+                 "fr":{"L_vo":"Hm.","L_os":"Hé !","P":"Penser","ANS":"ok","qualifier:vo":"voix off","speaker:pattern":"{name}, {qualifier}","speaker:TAM:vo":"STALE","speaker:TAM:os":"Tam hors champ"}}})JSON";
+    const Bundle bundle = parseBundle(JsonParser(json).parse());
+    auto labelOf = [](const StepResult& r) { return r.hasSpeakerLabel ? r.speakerLabel : std::string("<none>"); };
+    auto promptLabel = [](Flow* f) {
+        for (const auto& o : f->getChoices()) if (o.id == "o" && o.prompt) return o.prompt->hasSpeakerLabel ? o.prompt->speakerLabel : std::string("<none>");
+        return std::string("<no prompt>");
+    };
+    EngineOptions en; EngineOptions fr; fr.locale = "fr";
+    {
+        Engine e(bundle, en); Flow* f = e.openFlow("f", "s");
+        const std::string vo = labelOf(f->advance()), os = labelOf(f->advance());
+        if (vo != "Tam (V.O.)") fail("speaker-label", "stale string", "a speaker: string for a pair the bundle doesn't override was used: got " + vo);
+        if (os != "Tam offstage") fail("speaker-label", "own label", "an overridden pair did not show its own label: got " + os);
+    }
+    {
+        Engine e(bundle, fr); Flow* f = e.openFlow("f", "s");
+        const std::string vo = labelOf(f->advance()), os = labelOf(f->advance());
+        if (vo != "Tam, voix off") fail("speaker-label", "stale string, translated", "a translated pattern lost to a stale speaker: string: got " + vo);
+        if (os != "Tam hors champ") fail("speaker-label", "own label, translated", "an overridden pair did not show its translated label: got " + os);
+    }
+    {
+        // An old save: the pending prompt's label stripped, as a save from before labels existed has none.
+        Engine live(bundle, en); Flow* f = live.openFlow("f", "s"); f->advance(); f->advance(); f->advance();
+        if (promptLabel(f) != "Tam (V.O.)") fail("speaker-label", "live prompt", "the prompt did not carry its label: got " + promptLabel(f));
+        std::string old = serializeState(live);
+        const std::string key = ",\"speakerLabel\":\"Tam (V.O.)\"";
+        for (std::size_t at; (at = old.find(key)) != std::string::npos;) old.erase(at, key.size());
+        if (old.find("speakerLabel") != std::string::npos) fail("speaker-label", "strip", "the test could not make an old save");
+        Engine same(bundle, en); deserializeState(same, old);
+        Flow* g = same.getFlow("f");
+        if (!g || promptLabel(g) != "Tam (V.O.)") fail("speaker-label", "old save", "an old save's prompt label was not re-resolved");
+        if (serializeState(same).find(key) == std::string::npos) fail("speaker-label", "old save, saved again", "a re-resolved label did not save again");
+        Engine other(bundle, fr); deserializeState(other, old);
+        Flow* h = other.getFlow("f");
+        if (!h || promptLabel(h) != "Tam, voix off") fail("speaker-label", "old save, current locale", "an old save's prompt label was not re-resolved in the current locale: got " + (h ? promptLabel(h) : std::string("no flow")));
+    }
+    {
+        // An old save taken between choose() and advance(): the prompt waiting to be spoken back has no label
+        // either, and the replayed line works it out again, in the loading engine's locale.
+        EngineOptions enReplay = en; enReplay.replayPromptOnChoose = true;
+        EngineOptions frReplay = fr; frReplay.replayPromptOnChoose = true;
+        Engine live(bundle, enReplay); Flow* f = live.openFlow("f", "s"); f->advance(); f->advance(); f->advance(); f->choose("o");
+        std::string old = serializeState(live);
+        const std::string key = ",\"speakerLabel\":\"Tam (V.O.)\"";
+        if (old.find("pendingPrompt") == std::string::npos || old.find(key) == std::string::npos)
+            fail("speaker-label", "replay save", "the save did not carry the prompt waiting to be spoken back, with its label");
+        for (std::size_t at; (at = old.find(key)) != std::string::npos;) old.erase(at, key.size());
+        Engine same(bundle, enReplay); deserializeState(same, old);
+        if (serializeState(same).find(key) == std::string::npos) fail("speaker-label", "replay, saved again", "a re-resolved replay label did not save again");
+        Flow* g = same.getFlow("f");
+        const StepResult r = g ? g->advance() : StepResult{};
+        if (r.id != "P" || labelOf(r) != "Tam (V.O.)") fail("speaker-label", "replay", "an old save's replayed prompt lost its label: got " + labelOf(r));
+        Engine other(bundle, frReplay); deserializeState(other, old);
+        Flow* h = other.getFlow("f");
+        const StepResult t = h ? h->advance() : StepResult{};
+        if (t.id != "P" || labelOf(t) != "Tam, voix off") fail("speaker-label", "replay, current locale", "an old save's replayed prompt label was not re-resolved in the current locale: got " + labelOf(t));
+    }
+    if (formatSpeakerLabel("{name}/{qualifier}/{name}", "A{qualifier}", "Q{name}") != "A{qualifier}/Q{name}/A{qualifier}")
+        fail("speaker-label", "placeholders", "the pattern's placeholders were not filled as plain text");
+    std::cout << "  [speaker-label] a stale speaker: string for a pair that isn't overridden is ignored; an old saved prompt's label, pending or waiting to be replayed, is worked out again\n";
 }
 
 // A small local check for Engine::listProperties() (the live-inspector contract): it isn't part of
@@ -2758,7 +2861,7 @@ static void runOutlineSmoke()
 {
     Bundle b;
     b.locales.defaultLocale = "en";
-    b.cast.push_back(Cast{ "GUARD", "The Guard" });
+    b.cast.push_back(Cast{ "GUARD", "The Guard", {} });
     b.strings["en"]["L1"] = "Halt!";
     b.strings["en"]["T1"] = "The gate creaks.";
 
@@ -2931,6 +3034,7 @@ int main(int argc, char** argv)
     runPendingClearedCheck();
     runOldSavePromptPadCheck();
     runNamelessQualifierCheck();
+    runSpeakerLabelCheck();
     runHostScopeWritableSmoke();
     runPlayErrorCases();
     runAddressLookupCases();

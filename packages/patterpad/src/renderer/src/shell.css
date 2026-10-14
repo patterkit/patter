@@ -672,6 +672,8 @@ input::placeholder, textarea::placeholder {
 .set-rowline .qual-gameid.bad-id { border-color: var(--danger); }
 .qual-sets { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
 .qual-sets-label { color: var(--muted); font-size: 12px; }
+/* The speaker pattern, under the list and its add button: set apart from them, as a setting of its own. */
+.qual-pattern-field { margin-top: 16px; }
 /* Dictionary tab (#177): the language picker row (select + Import / Remove) and the import error line. */
 .dict-lang-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 1.5px; }
 .dict-lang-row .gd-add { margin-top: 0; }

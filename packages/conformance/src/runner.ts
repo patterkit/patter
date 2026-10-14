@@ -69,7 +69,7 @@ export function runRuntimeCase(c: RuntimeCase, maxSteps = 1000): TranscriptStep[
 
   for (let i = 0; i < maxSteps; i++) {
     const r = flow.advance();
-    out.push(normaliseStep(r));
+    out.push(normaliseStep(r, isIdsOnly(c.bundle)));
     if (r.type === "end") break;
     if (r.type === "choice") {
       const pick = scripted.shift() ?? r.options.find((o) => o.eligible)?.id;
@@ -132,7 +132,7 @@ export function runScript(
         break;
       case "advance": {
         const r = engine.getFlow(current)!.advance();
-        chunk.push(normaliseStep(r));
+        chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
         break;
       }
       case "choose":
@@ -282,14 +282,29 @@ export function envelopeKeyPaths(env: SaveEnvelope): string[] {
   return out.sort();
 }
 
+/** Whether a bundle's strings are IDs-only, as the runtime reads it (a source-debug build still resolves names). */
+function isIdsOnly(bundle: Bundle): boolean {
+  return bundle.localisation?.mode === "ids" && !bundle.localisation.sourceDebug;
+}
+
 /** A pause as a transcript records it. A step that should carry one and doesn't records a marker rather than
  *  nothing, so a runtime that drops the field fails even where the expected pause is the built-in default. */
 function padField(v: unknown): number {
   return (typeof v === "number" ? v : "<missing>") as number;
 }
 
-/** Normalise a StepResult, keeping the fields the contract pins (drops undefined). */
-export function normaliseStep(r: StepResult): TranscriptStep {
+/** A speaker's label as a transcript records it: only where it differs from what a line with no qualifier shows
+ *  (nothing in IDs-only mode or with no speaker, else the display name, else the token), so a transcript names
+ *  it where a qualifier or a pair's own label changes it. A runtime that drops a label it should carry records a
+ *  marker rather than nothing. */
+function labelField(character: string | undefined, characterName: string | undefined, speakerLabel: string | undefined, idsOnly: boolean): string | undefined {
+  const plain = idsOnly || !character ? undefined : (characterName ?? character);
+  return speakerLabel === plain ? undefined : (speakerLabel ?? "<missing>");
+}
+
+/** Normalise a StepResult, keeping the fields the contract pins (drops undefined). `idsOnly`: the bundle's
+ *  strings are IDs-only, so names (the speaker's label among them) are the game's to resolve. */
+export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
   switch (r.type) {
     case "line": {
       const s: TranscriptStep = { type: "line", id: r.id, text: r.text };
@@ -298,6 +313,8 @@ export function normaliseStep(r: StepResult): TranscriptStep {
       if (r.direction !== undefined) s.direction = r.direction;
       if (r.qualifier !== undefined) s.qualifier = r.qualifier;             // speaker qualifier gameId
       if (r.qualifierName !== undefined) s.qualifierName = r.qualifierName; // and its locale-resolved name
+      const label = labelField(r.character, r.characterName, r.speakerLabel, idsOnly);
+      if (label !== undefined) s.speakerLabel = label;                      // the speaker's label, where it differs
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);          // line padding, when not the default
       if (r.gameData !== undefined) s.gameData = r.gameData;
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
@@ -327,6 +344,10 @@ export function normaliseStep(r: StepResult): TranscriptStep {
           if (o.prompt.direction !== undefined) p.direction = o.prompt.direction;
           if (o.prompt.qualifier !== undefined) p.qualifier = o.prompt.qualifier;
           if (o.prompt.qualifierName !== undefined) p.qualifierName = o.prompt.qualifierName;
+          if (o.prompt.kind === "line") {
+            const label = labelField(o.prompt.character, o.prompt.characterName, o.prompt.speakerLabel, idsOnly);
+            if (label !== undefined) p.speakerLabel = label;
+          }
           if (o.prompt.padAfter !== DEFAULT_PAD_AFTER) p.padAfter = padField(o.prompt.padAfter);
           opt.prompt = p;
         }

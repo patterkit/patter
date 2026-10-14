@@ -11,22 +11,28 @@
 //
 // Population mirrors report.ts's localisation set (written-line ids with source
 // text), PLUS the project-level cast display names (the `@project` shard, keyed
-// `cast:<NAME>`, seeded from CastMember.displayName). Localiser comments are the
+// `cast:<NAME>`, seeded from CastMember.displayName), the speaker qualifiers' names
+// (`qualifier:<gameId>`), and the speaker labels (`speaker:pattern`, and
+// `speaker:<NAME>:<gameId>` for a pair a writer overrode). Localiser comments are the
 // `loc`-channel documentation (resolveDocumentation(loaded, "loc")). Staleness is
 // EditRecord.localisedAt vs source modifiedAt - the same rule report.ts uses.
 // ---------------------------------------------------------------------------
 
 import { basename, dirname, join, sep } from "node:path";
 import { canonicalStringify } from "@patterkit/core";
-import { walkNodes, castStringKey, qualifierStringKey, usedQualifiers, projectQualifiers, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA } from "@patterkit/model";
-import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, Snippet } from "@patterkit/model";
+import {
+  walkNodes, castStringKey, qualifierStringKey, speakerLabelKey, usedQualifiers, usedSpeakerPairs, projectQualifiers,
+  SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, PROJECT_LOCALE_SCENE, projectLayout, STRINGS_SCHEMA, AUTHORING_SCHEMA,
+} from "@patterkit/model";
+import type { AuthoringFile, GrammaticalGender, Group, LocaleFile, ProjectFile, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
 import { tableFor, mergeAuthoring } from "./loaded-helpers.js";
 import type { PlannedWrite } from "./write.js";
 import { resolveDocumentation } from "./documentation.js";
 
 /** One localisable string. `id` is the beat id (or `cast:<NAME>` for a display name, `qualifier:<gameId>` for a
- *  speaker qualifier's name). */
+ *  speaker qualifier's name, `speaker:pattern` for the speaker pattern, `speaker:<NAME>:<gameId>` for a
+ *  character's own label with a qualifier). */
 export interface LocEntry {
   id: string;
   /** Owning scene id, or `@project` for project-level strings (display names). */
@@ -63,6 +69,26 @@ export interface ApplyStats {
 
 
 /**
+ * The source text of every project-level string the project defines, by id: each cast display name
+ * (`cast:<NAME>`), each qualifier's name (`qualifier:<gameId>`), the speaker pattern (`speaker:pattern`), and
+ * each character's own label with a qualifier (`speaker:<NAME>:<gameId>`). A string's source is the default
+ * locale's `@project` shard value where it has one, else what the project file authors. Not filtered by what
+ * the lines use: the export picks from it, and a settings save compares it before and after to know which
+ * translations a change makes stale.
+ */
+export function projectStringSources(project: ProjectFile, sourceTable: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  const put = (id: string, authored: string | undefined): void => { if (authored) out[id] = sourceTable[id] ?? authored; };
+  for (const c of project.cast ?? []) {
+    put(castStringKey(c.name), c.displayName);
+    for (const [q, label] of Object.entries(c.qualifierLabels ?? {})) put(speakerLabelKey(c.name, q), label);
+  }
+  for (const q of projectQualifiers(project)) put(qualifierStringKey(q.gameId), q.name);
+  put(SPEAKER_PATTERN_KEY, project.speakerPattern ?? DEFAULT_SPEAKER_PATTERN);
+  return out;
+}
+
+/**
  * Build the format-neutral localisation catalog. With no `locale` (or the default locale) it is a
  * TEMPLATE: every `translation` is "". Otherwise translations come from that locale's shards.
  */
@@ -74,6 +100,7 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
   const source = tableFor(loaded, defaultLocale);
   const target = targetLocale ? tableFor(loaded, targetLocale) : {};
   const edits = mergeAuthoring(loaded).edits;
+  const projectSources = projectStringSources(loaded.project, source);
   const docs = resolveDocumentation(loaded, "loc");
   const commentsOf = (id: string): string[] => (docs.get(id) ?? []).map((d) => d.text);
   const staleFor = (id: string, translation: string): boolean => {
@@ -128,7 +155,7 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
   for (const c of loaded.project.cast ?? []) {
     if (!c.displayName) continue;
     const id = castStringKey(c.name);
-    const src = source[id] ?? c.displayName; // default shard if present, else the authoring displayName
+    const src = projectSources[id]!; // default shard if present, else the authoring displayName
     const translation = isTemplate ? "" : (target[id] ?? "");
     entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: commentsOf(id), context: withGender({ character: c.name }), stale: staleFor(id, translation) });
   }
@@ -137,13 +164,39 @@ export function extractLoc(loaded: LoadedProject, opts: { locale?: string } = {}
   // from the authored name as a cast display name is from its displayName.
   for (const q of usedQualifiers(loaded.project, loaded.scenes)) {
     const id = qualifierStringKey(q.gameId);
-    const src = source[id] ?? q.name;
+    const src = projectSources[id] ?? q.name;
     const translation = isTemplate ? "" : (target[id] ?? "");
     entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: commentsOf(id), context: { kind: "qualifier" }, stale: staleFor(id, translation) });
   }
 
+  // Speaker labels, only when a line has a speaker with a qualifier. The pattern (`speaker:pattern`) builds
+  // every qualified speaker's label, so a language changes its order or punctuation once; seeded from the
+  // project's own, else the default. A pair's own label (`speaker:<NAME>:<gameId>`) is a string only where a
+  // writer overrode it and a line uses it: every other pair follows the pattern.
+  const pairs = usedSpeakerPairs(loaded.scenes);
+  if (pairs.length > 0) {
+    const id = SPEAKER_PATTERN_KEY;
+    const src = projectSources[id]!;
+    const translation = isTemplate ? "" : (target[id] ?? "");
+    entries.push({ id, scene: PROJECT_LOCALE_SCENE, source: src, translation, comments: [SPEAKER_PATTERN_NOTE, ...commentsOf(id)], context: { kind: "speaker pattern" }, stale: staleFor(id, translation) });
+    const labelsOf = new Map((loaded.project.cast ?? []).map((c) => [c.name, c.qualifierLabels]));
+    for (const p of pairs) {
+      const label = labelsOf.get(p.character)?.[p.qualifier];
+      if (!label) continue;
+      const pid = speakerLabelKey(p.character, p.qualifier);
+      const psrc = projectSources[pid] ?? label;
+      const ptranslation = isTemplate ? "" : (target[pid] ?? "");
+      const qualifier = qualifierName.get(p.qualifier) ?? p.qualifier;
+      entries.push({ id: pid, scene: PROJECT_LOCALE_SCENE, source: psrc, translation: ptranslation, comments: commentsOf(pid), context: withGender({ character: p.character, kind: "speaker", qualifier }), stale: staleFor(pid, ptranslation) });
+    }
+  }
+
   return { project: loaded.project.project.id, defaultLocale, locale: targetLocale, entries };
 }
+
+/** The translator's note on the speaker pattern: its placeholders are filled in, never translated. */
+export const SPEAKER_PATTERN_NOTE =
+  "{name} and {qualifier} are filled in with the speaker's name and the qualifier, so keep both as they are. You can put them in any order.";
 
 const layoutOf = (loaded: LoadedProject): { strings: string; authoring: string } => projectLayout(loaded.project);
 

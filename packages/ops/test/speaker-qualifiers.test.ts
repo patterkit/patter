@@ -116,9 +116,9 @@ describe("playthrough and playable HTML", () => {
     expect(out.slice(0, 4)).toEqual(["TAM: Who's there?", "TAM (O.S.): Open up.", "TAM (Radio): Base, come in.", "TAM (phone): Hello?"]);
   });
 
-  it("the player page appends the qualifier to the name", () => {
+  it("the player page shows the runtime's speaker label, which carries the qualifier", () => {
     const html = runExportHtml(loadProject(makeProject(false)));
-    expect(html).toContain("s.qualifierName || s.qualifier");
+    expect(html).toContain("s.speakerLabel || s.characterName");
   });
 
   it("the inlined runtime snapshot carries the qualifier on a line step", () => {

@@ -490,6 +490,10 @@ export interface CastMember {
   /** The voice actor cast for this character, if known - surfaced in the VO script export (spec §16).
    *  Authoring-only (not shipped in the runtime bundle). */
   actor?: string;
+  /** This character's own label with a qualifier, by the qualifier's `gameId`, in the source language
+   *  (`{ vo: "Your thoughts" }`), where the project's speaker pattern shouldn't apply. Localised as the
+   *  `speaker:<name>:<gameId>` string (`speakerLabelKey`). Absent for every pair that follows the pattern. */
+  qualifierLabels?: Record<string, string>;
   gameData?: GameData;
 }
 
@@ -533,6 +537,32 @@ export function usedQualifiers(project: Pick<ProjectFile, "qualifiers">, scenes:
     }
   }
   return projectQualifiers(project).filter((q) => used.has(q.gameId));
+}
+
+/** Every character and qualifier pair the lines use (a line's speaker with its qualifier, option prompts
+ *  included), once each, in the order first met. A pair's label is shown only for these. */
+export function usedSpeakerPairs(scenes: Scene[]): { character: string; qualifier: string }[] {
+  const seen = new Set<string>();
+  const out: { character: string; qualifier: string }[] = [];
+  const add = (beat: LineBeat): void => {
+    if (!beat.character || !beat.qualifier) return;
+    const key = `${beat.character}\u0000${beat.qualifier}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ character: beat.character, qualifier: beat.qualifier });
+  };
+  for (const scene of scenes) {
+    for (const block of scene.blocks) {
+      walkNodes<Group | Snippet>(block.children, (node) => {
+        if (node.type === "group") {
+          if (node.prompt?.kind === "line") add(node.prompt);
+          return;
+        }
+        for (const beat of node.beats ?? []) if (beat.kind === "line") add(beat);
+      });
+    }
+  }
+  return out;
 }
 
 /** The built-in `padAfter`, in seconds, for a project that sets no default of its own: the same on every runtime
@@ -810,6 +840,9 @@ export interface ProjectFile {
   /** The speaker qualifiers a line can pick from, in display order; default `DEFAULT_QUALIFIERS`. An empty
    *  list means the project uses none. */
   qualifiers?: SpeakerQualifier[];
+  /** How a character's label reads with a qualifier, in the source language: `{name}` and `{qualifier}` filled
+   *  in. Absent = `DEFAULT_SPEAKER_PATTERN`. Localised as the `speaker:pattern` string. */
+  speakerPattern?: string;
   /** The project's default `padAfter` for every line and text beat that sets none and has no default above it.
    *  Absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
@@ -874,6 +907,27 @@ export function castStringKey(name: string): string {
  *  cast display name is: the active locale, then the default locale, then the authored `name`. */
 export function qualifierStringKey(gameId: string): string {
   return `qualifier:${gameId}`;
+}
+
+/** The project-level loc-string key for one character's own label with one qualifier, e.g. `speaker:PLAYER:vo`:
+ *  only for a pair someone has overridden (`CastMember.qualifierLabels`). Every other pair's label is built from
+ *  the speaker pattern. */
+export function speakerLabelKey(name: string, gameId: string): string {
+  return `speaker:${name}:${gameId}`;
+}
+
+/** The project-level loc-string key for the speaker pattern, the label a character shows with a qualifier. */
+export const SPEAKER_PATTERN_KEY = "speaker:pattern";
+
+/** The speaker pattern a project starts with: `You (V.O.)`. `{name}` and `{qualifier}` are plain placeholders,
+ *  never run through line interpolation. */
+export const DEFAULT_SPEAKER_PATTERN = "{name} ({qualifier})";
+
+/** A qualified speaker's label: the pattern with its placeholders filled. Each placeholder is replaced
+ *  wherever it appears; nothing else in the pattern is read. The one composition rule, on every runtime and
+ *  in Patterpad. */
+export function formatSpeakerLabel(pattern: string, name: string, qualifier: string): string {
+  return pattern.split("{name}").map((part) => part.split("{qualifier}").join(qualifier)).join(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -1203,6 +1257,9 @@ export interface Bundle {
   /** The speaker qualifiers the content uses, in the project's order. Absent when no line has one, so a
    *  bundle without qualifiers is exactly as before. */
   qualifiers?: BundleQualifier[];
+  /** The project's speaker pattern, the unlocalised fallback for a qualified speaker's label. Absent when the
+   *  project keeps `DEFAULT_SPEAKER_PATTERN` or uses no qualifiers. */
+  speakerPattern?: string;
   /** The project's own `padAfterDefault`, when it sets one; absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
   properties?: PropertyDecl[];
@@ -1320,6 +1377,8 @@ export interface SavedChoicePrompt {
   direction?: string;
   qualifier?: string;
   qualifierName?: string;
+  /** The speaker's label as the choice showed it. Absent in a save written before it existed. */
+  speakerLabel?: string;
   /** The prompt's resolved pause (line padding). Absent in a save written before it existed. */
   padAfter?: number;
 }

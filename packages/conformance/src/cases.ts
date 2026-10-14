@@ -10,7 +10,7 @@
 
 import type { DescribeFixture, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
-import { castStringKey, qualifierStringKey } from "@patterkit/model";
+import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
 
 // A minimal project scaffold shared by the runtime fixtures.
 const project = (extra: Partial<ProjectFile> = {}): ProjectFile => ({
@@ -1699,13 +1699,13 @@ const speakerQualifiers = {
   locales: qualifierLocales,
   choices: ["o_call"],
   expectedTranscript: [
-    { type: "line", id: "L_think", text: "Too quiet.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O." },
-    { type: "line", id: "L_door", text: "Who's there?", character: "TAM", characterName: "Tam", direction: "muffled", qualifier: "os", qualifierName: "O.S." },
+    { type: "line", id: "L_think", text: "Too quiet.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Tam (V.O.)" },
+    { type: "line", id: "L_door", text: "Who's there?", character: "TAM", characterName: "Tam", direction: "muffled", qualifier: "os", qualifierName: "O.S.", speakerLabel: "Tam (O.S.)" },
     { type: "line", id: "L_plain", text: "Hello.", character: "TAM", characterName: "Tam" }, // none: neither field
     { type: "choice", groupId: "g_radio", options: [
-      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }, eligible: true },
+      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO", speakerLabel: "Tam (RADIO)" }, eligible: true },
     ] },
-    { type: "line", id: "L_reply", text: "Reading you.", character: "BASE", qualifier: "radio", qualifierName: "RADIO" },
+    { type: "line", id: "L_reply", text: "Reading you.", character: "BASE", qualifier: "radio", qualifierName: "RADIO", speakerLabel: "BASE (RADIO)" },
     { type: "end" },
   ],
 } satisfies RuntimeFixture;
@@ -1735,9 +1735,9 @@ const speakerQualifiersLocale = {
   ],
   locale: "fr",
   expectedTranscript: [
-    { type: "line", id: "L_vo", text: "Hm.", character: "TAM", qualifier: "vo", qualifierName: "VOIX OFF" },        // fr string
-    { type: "line", id: "L_phone", text: "Allo ?", character: "TAM", qualifier: "phone", qualifierName: "TELEPHONE" }, // default-locale string
-    { type: "line", id: "L_os", text: "J'arrive !", character: "TAM", qualifier: "os", qualifierName: "O.S." },       // authored name
+    { type: "line", id: "L_vo", text: "Hm.", character: "TAM", qualifier: "vo", qualifierName: "VOIX OFF", speakerLabel: "TAM (VOIX OFF)" },        // fr string
+    { type: "line", id: "L_phone", text: "Allo ?", character: "TAM", qualifier: "phone", qualifierName: "TELEPHONE", speakerLabel: "TAM (TELEPHONE)" }, // default-locale string
+    { type: "line", id: "L_os", text: "J'arrive !", character: "TAM", qualifier: "os", qualifierName: "O.S.", speakerLabel: "TAM (O.S.)" },       // authored name
     { type: "end" },
   ],
 } satisfies RuntimeFixture;
@@ -1778,7 +1778,7 @@ const speakerQualifiersSilent = {
   engineOptions: { closedCaptions: false },
   expectedTranscript: [
     { type: "line", id: "L_sfx", text: "" },
-    { type: "line", id: "L_tam", text: "Sorry!", character: "TAM", qualifier: "os", qualifierName: "O.S." },
+    { type: "line", id: "L_tam", text: "Sorry!", character: "TAM", qualifier: "os", qualifierName: "O.S.", speakerLabel: "TAM (O.S.)" },
     { type: "end" },
   ],
 } satisfies RuntimeFixture;
@@ -1793,21 +1793,113 @@ const scriptedQualifierSaveLoad = {
   engineOptions: { replayPromptOnChoose: true },
   script: [
     { op: "openFlow", flow: "main", scene: "s" },
-    { op: "advance", expect: [{ type: "line", id: "L_think", text: "Too quiet.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O." }] },
-    { op: "advance", expect: [{ type: "line", id: "L_door", text: "Who's there?", character: "TAM", characterName: "Tam", direction: "muffled", qualifier: "os", qualifierName: "O.S." }] },
+    { op: "advance", expect: [{ type: "line", id: "L_think", text: "Too quiet.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Tam (V.O.)" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_door", text: "Who's there?", character: "TAM", characterName: "Tam", direction: "muffled", qualifier: "os", qualifierName: "O.S.", speakerLabel: "Tam (O.S.)" }] },
     { op: "advance", expect: [{ type: "line", id: "L_plain", text: "Hello.", character: "TAM", characterName: "Tam" }] },
     { op: "advance", expect: [{ type: "choice", groupId: "g_radio", options: [
-      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }, eligible: true },
+      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO", speakerLabel: "Tam (RADIO)" }, eligible: true },
     ] }] },
     { op: "saveLoad" }, // at the pending choice
     { op: "advance", expect: [{ type: "choice", groupId: "g_radio", options: [
-      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }, eligible: true },
+      { id: "o_call", prompt: { kind: "line", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO", speakerLabel: "Tam (RADIO)" }, eligible: true },
     ] }] },
     { op: "choose", id: "o_call" },
     { op: "saveLoad" }, // the prompt is still to be spoken back
-    { op: "advance", expect: [{ type: "line", id: "P_call", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO" }] },
-    { op: "advance", expect: [{ type: "line", id: "L_reply", text: "Reading you.", character: "BASE", qualifier: "radio", qualifierName: "RADIO" }] },
+    { op: "advance", expect: [{ type: "line", id: "P_call", text: "Base, come in.", character: "TAM", characterName: "Tam", qualifier: "radio", qualifierName: "RADIO", speakerLabel: "Tam (RADIO)" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_reply", text: "Reading you.", character: "BASE", qualifier: "radio", qualifierName: "RADIO", speakerLabel: "BASE (RADIO)" }] },
     { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// --- speaker labels ------------------------------------------------------------------------------
+// A line carries `speakerLabel`, the name to show for its speaker: with a qualifier, the character's own label
+// for that pair if the project overrides it, else the speaker pattern filled with the shown name and the
+// qualifier's shown name; with none, the shown name. Each piece follows the active locale, then the default, then
+// the authored value. A pair's translated label counts only when the project overrides that pair. (Transcripts
+// record the label only where it differs from the name an unqualified line shows.)
+const speakerLabelScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "sn", type: "snippet", beats: [
+    { id: "L_think", kind: "line", character: "PLAYER", qualifier: "vo" },  // overridden pair
+    { id: "L_call", kind: "line", character: "PLAYER", qualifier: "os" },   // the pattern
+    { id: "L_tam", kind: "line", character: "TAM", qualifier: "vo" },       // the pattern, a name with no translation
+    { id: "L_plain", kind: "line", character: "PLAYER" },                   // no qualifier: the shown name
+  ] },
+  { id: "g", type: "group", selector: "choice", children: [
+    { id: "o_wonder", type: "group", prompt: { id: "P_wonder", kind: "line", character: "PLAYER", qualifier: "vo" }, children: [
+      { id: "w_c", type: "snippet", beats: [], jump: { to: "END" } },
+    ] },
+  ] },
+] }] }];
+const speakerLabelProject = (speakerPattern?: string): ReturnType<typeof project> => project({
+  cast: [{ name: "PLAYER", displayName: "You", qualifierLabels: { vo: "Your thoughts" } }, { name: "TAM", displayName: "Tam" }],
+  locales: { default: "en", all: ["en", "fr"] },
+  ...(speakerPattern !== undefined ? { speakerPattern } : {}),
+});
+const speakerLabelLocales = [
+  loc("s", { L_think: "Quiet.", L_call: "Hello?", L_tam: "Hm.", L_plain: "Right.", P_wonder: "Wonder." }),
+  loc("s", { L_think: "Calme.", L_call: "Allo ?", L_tam: "Hm.", L_plain: "Bon.", P_wonder: "Songer." }, "fr"),
+  loc("@project", {
+    [castStringKey("PLAYER")]: "Vous", [qualifierStringKey("os")]: "H.C.",
+    [SPEAKER_PATTERN_KEY]: "{qualifier} : {name}",                // the order changes in French
+    [speakerLabelKey("PLAYER", "vo")]: "Vos pensées",             // the overridden pair, translated
+    [speakerLabelKey("TAM", "vo")]: "IGNORED",                    // a pair the project doesn't override: not used
+  }, "fr"),
+];
+
+const speakerLabels = {
+  name: "a line's speaker label: a pair's own label, else the speaker pattern, else with no qualifier the shown name",
+  project: speakerLabelProject(),
+  scenes: speakerLabelScenes,
+  locales: speakerLabelLocales,
+  expectedTranscript: [
+    { type: "line", id: "L_think", text: "Quiet.", character: "PLAYER", characterName: "You", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Your thoughts" },
+    { type: "line", id: "L_call", text: "Hello?", character: "PLAYER", characterName: "You", qualifier: "os", qualifierName: "O.S.", speakerLabel: "You (O.S.)" },
+    { type: "line", id: "L_tam", text: "Hm.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Tam (V.O.)" },
+    { type: "line", id: "L_plain", text: "Right.", character: "PLAYER", characterName: "You" },
+    { type: "choice", groupId: "g", options: [
+      { id: "o_wonder", prompt: { kind: "line", text: "Wonder.", character: "PLAYER", characterName: "You", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Your thoughts" }, eligible: true },
+    ] },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// In French: the translated pattern, names, and overridden pair; a name the locale lacks falls back to the
+// default locale's, and a pair the project doesn't override follows the pattern, whatever the locale holds.
+const speakerLabelsLocale = {
+  name: "a speaker label follows the active locale: the translated pattern, names, and overridden pair",
+  project: speakerLabelProject(),
+  scenes: speakerLabelScenes,
+  locales: speakerLabelLocales,
+  locale: "fr",
+  expectedTranscript: [
+    { type: "line", id: "L_think", text: "Calme.", character: "PLAYER", characterName: "Vous", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Vos pensées" },
+    { type: "line", id: "L_call", text: "Allo ?", character: "PLAYER", characterName: "Vous", qualifier: "os", qualifierName: "H.C.", speakerLabel: "H.C. : Vous" },
+    { type: "line", id: "L_tam", text: "Hm.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "V.O. : Tam" },
+    { type: "line", id: "L_plain", text: "Bon.", character: "PLAYER", characterName: "Vous" },
+    { type: "choice", groupId: "g", options: [
+      { id: "o_wonder", prompt: { kind: "line", text: "Songer.", character: "PLAYER", characterName: "Vous", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Vos pensées" }, eligible: true },
+    ] },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// A project's own pattern is the fallback for a locale that doesn't translate it; a live language switch
+// changes the labels from the next line on.
+const scriptedSpeakerLabelsSetLocale = {
+  name: "a project's own speaker pattern, and labels that follow a live setLocale",
+  project: speakerLabelProject("{name}, {qualifier}"),
+  scenes: speakerLabelScenes,
+  locales: [speakerLabelLocales[0]!, speakerLabelLocales[1]!, loc("@project", { [castStringKey("PLAYER")]: "Vous" }, "fr")],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "line", id: "L_think", text: "Quiet.", character: "PLAYER", characterName: "You", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Your thoughts" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_call", text: "Hello?", character: "PLAYER", characterName: "You", qualifier: "os", qualifierName: "O.S.", speakerLabel: "You, O.S." }] },
+    { op: "setLocale", locale: "fr" },
+    { op: "advance", expect: [{ type: "line", id: "L_tam", text: "Hm.", character: "TAM", characterName: "Tam", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Tam, V.O." }] },
+    { op: "advance", expect: [{ type: "line", id: "L_plain", text: "Bon.", character: "PLAYER", characterName: "Vous" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g", options: [
+      { id: "o_wonder", prompt: { kind: "line", text: "Songer.", character: "PLAYER", characterName: "Vous", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Your thoughts" }, eligible: true },
+    ] }] },                                                                        // the pair isn't translated: the source label
   ],
 } satisfies ScriptedFixture;
 
@@ -3107,7 +3199,7 @@ export const cases: Fixtures = {
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
     characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
-    speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent,
+    speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent, speakerLabels, speakerLabelsLocale,
     linePadding, linePaddingPrompt,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
@@ -3118,7 +3210,7 @@ export const cases: Fixtures = {
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties,
-    scriptedQualifierSaveLoad, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
+    scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
