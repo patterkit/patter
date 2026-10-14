@@ -28,7 +28,7 @@
   "dependencies": {
     "@patterkit/core": "0.7.0",
     "@patterkit/model": "0.14.0",
-    "@patterkit/ops": "0.17.0",
+    "@patterkit/ops": "0.17.1",
     "@patterkit/patterpad-surface": "0.0.0",
     "@patterkit/runtime": "0.26.0",
     "@wildwinter/app-shell": "^0.47.0",

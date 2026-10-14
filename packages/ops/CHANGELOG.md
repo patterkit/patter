@@ -1,5 +1,12 @@
 # @patterkit/ops
 
+## 0.17.1
+
+### Patch Changes
+
+- 1c849f7: Uses `@patterkit/runtime` 0.26.0, the Patterplay 0.26.0 release.
+- 8ff7d3d: The runtime inlined in playable HTML exports is refreshed to this one (it gains `flow.stepFor`).
+
 ## 0.17.0
 
 ### Minor Changes
