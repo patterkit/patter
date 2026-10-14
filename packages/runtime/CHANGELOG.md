@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-14
+
 ### Added
 
 - **Speaker labels**: a line step, a line choice prompt, and a beat's info carry `speakerLabel`, the name to

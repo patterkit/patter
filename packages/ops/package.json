@@ -36,7 +36,7 @@
     "@patterkit/compiler": "0.6.2",
     "@patterkit/core": "0.6.2",
     "@patterkit/model": "0.13.1",
-    "@patterkit/runtime": "0.24.0",
+    "@patterkit/runtime": "0.25.0",
     "@wildwinter/toolkit": "^0.1.0",
     "@xmldom/xmldom": "^0.8.15",
     "docx": "^9.7.1",

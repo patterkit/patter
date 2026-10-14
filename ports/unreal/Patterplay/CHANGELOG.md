@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-14
+
 ### Added
 
 - **Speaker labels**: a line step and a line prompt carry `SpeakerLabel` (with `bHasSpeakerLabel`), the name
