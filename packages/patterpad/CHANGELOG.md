@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-10-14
+
 ### Added
 
 - **How a qualified speaker is shown.** A game shows `PLAYER (V.O.)` as the display name and the qualifier
