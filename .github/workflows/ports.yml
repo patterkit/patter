@@ -22,7 +22,15 @@ name: Ports
 on:
   push:
     branches: [main]
+  # Not on a pull request that only bumps versions: the Version Packages PR touches nothing but these, so a run
+  # there has nothing to test, and as the bot's it parks awaiting an approval nobody gives (ship:npm approves only
+  # CI's), then shows as a zero-job failure once the PR merges. The merge's push to main runs Ports in full.
   pull_request:
+    paths-ignore:
+      - ".changeset/**"
+      - "package-lock.json"
+      - "packages/*/CHANGELOG.md"
+      - "packages/*/package.json"
 
 env:
   GODOT_VERSION: "4.7-stable"
