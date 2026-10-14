@@ -23,6 +23,7 @@
 #include <stdexcept>
 #include <cstdint>
 #include <utility>
+#include <optional>
 #include <iostream>
 #include "Kernel.h"         // the shared kernel, its names in `patter`, and kernelCall
 #include "Mulberry32.h"   // ToUint32: the shared JS seed coercion
@@ -603,6 +604,9 @@ namespace patter
         std::map<std::string, std::vector<std::string>> tagIndex;   // author tags (#215): node id -> accumulated
         // Line padding: every line and text beat's resolved pause, worked out once per bundle (indexPads).
         std::map<std::string, BeatPad> padIndex;
+        // Every beat by its id (a snippet's beats and an option's prompt), for Flow::stepFor; built once per
+        // bundle with the indexes above.
+        std::map<std::string, const Beat*> beatIndex;
         /** The game's one registry: @patter (the SHARED globals), host scopes, every instance bag. */
         std::shared_ptr<ScopeRegistry> registry;
         /** True when the engine made the registry (a standalone game): saveGame() then carries its values. */
@@ -1012,6 +1016,21 @@ namespace patter
 
         /** How many times this flow has entered each node, by node id. */
         const std::map<std::string, int>& getVisitCounts() const { return visitCounts_; }
+
+        /**
+         * The step this flow would deliver for beat `beatId` right now, as advance() would give it: its text in
+         * the active locale, interpolated against this flow's values (unless the project is voiced), closed
+         * captions applied, and the speaker's names and label, its pause, Game Data, and tags. Built by the same
+         * function that builds a delivered step, so the two can't differ. It doesn't move the flow, count a
+         * visit, or run an effect. Empty for an id that is neither a beat nor an option's prompt. For a game
+         * that keeps lines by id and shows them again (after a load, or a language switch).
+         */
+        std::optional<StepResult> stepFor(const std::string& beatId)
+        {
+            auto it = host_->beatIndex.find(beatId);
+            if (it == host_->beatIndex.end()) return std::nullopt;
+            return beatResult(*it->second);
+        }
 
         StepResult advance()
         {
@@ -2291,7 +2310,12 @@ namespace patter
                     blockAddrs[effectiveGameId(block.gameId, block.name)] = block.id;
                     std::vector<std::string> blockTags = dedupeTags(block.tags, sceneTags);
                     host_.tagIndex[block.id] = blockTags;
-                    walkNodes(block.children, [&](const Node* n) { host_.nodeIndex[n->id] = n; });
+                    walkNodes(block.children, [&](const Node* n)
+                    {
+                        host_.nodeIndex[n->id] = n;
+                        if (n->isGroup()) { if (n->prompt) host_.beatIndex[n->prompt->id] = n->prompt.get(); }
+                        else for (const auto& beat : n->beats) host_.beatIndex[beat.id] = &beat;
+                    });
                     indexTags(block.children, blockTags);
                     // Line padding: the nearest default above each beat, block over scene over project.
                     const double projectPad = bundle.hasPadAfterDefault ? bundle.padAfterDefault : DEFAULT_PAD_AFTER;

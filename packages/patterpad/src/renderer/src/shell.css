@@ -308,9 +308,27 @@
 
 /* Live debug link (#181): the chip (the plug, its four states, the copiable address) is the shell's
    `mountLinkStatus` + link-status.css. Ours is the flow picker it carries in its lead slot, shown when a
-   game reports more than one live flow. */
-.linkstatus-flow { font: 11px var(--font-ui); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 1.5px 5px; cursor: pointer; }
+   game reports more than one live flow: a button naming the flow followed, at the address's size and
+   edge, opening a menu in the action-menu vocabulary (debug-panel.ts). */
+.linkstatus-flow {
+  display: inline-flex; align-items: center; gap: 4.5px; max-width: 260px;
+  font: 11px var(--font-ui); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 5px 2px 7px; cursor: pointer;
+  transition: border-color var(--dur-quick) var(--ease-standard);
+}
+.linkstatus-flow:hover, .linkstatus-flow.open { border-color: var(--accent); }
 .linkstatus-flow[hidden] { display: none; }
+.linkstatus-flow [data-icon], .linkstatus-flow svg { flex: none; color: var(--muted); }
+.flowpick-mode { color: var(--muted); white-space: nowrap; }
+.flowpick-current { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The menu: the shell's popover at the action menu's tighter padding. Names on the left, each flow's
+   scene in a second column, right-aligned and quieter. The flow being shown reads a step firmer, so
+   in most-recent mode the menu still says which one that is. */
+.popover:has(> .flowpick) { padding: 5px; }
+.flowpick { display: flex; flex-direction: column; gap: 0.5px; min-width: 220px; max-width: 380px; max-height: 60vh; overflow: auto; }
+.flowpick-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flowpick-name.is-following { font-weight: 600; }
+.flowpick-scene { margin-left: auto; padding-left: 16px; flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
 
 /* Scratch-recording blocking overlay (#224): covers the whole window during a take; nothing behind it is
    reachable. Driven entirely by keys (Space finish, Esc cancel). */

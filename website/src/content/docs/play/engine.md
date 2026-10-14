@@ -87,6 +87,11 @@ does not resolve throws. See [Host navigation](/play/navigation/).
 - **`flow.advanceToStop()`**: `{ played, stop }`, collecting beats until the next choice
   or the end (handy when you render a whole exchange at once).
 - **`flow.getChoices()`**: the options of a pending choice.
+- **`flow.stepFor(beatId)`**: the step this flow would deliver for that line or text beat right now, as
+  `advance()` would give it (in the current language, with this flow's values filled in, closed captions applied,
+  and the speaker's names and label), without moving the flow or running anything. For a game that keeps lines by
+  id and shows them again, after a load or a language switch. Undefined for an id that isn't a beat or an option's
+  prompt. Every runtime has it (`StepFor` in C# and Blueprint, `step_for` in GDScript).
 - **`flow.choose(id)`**: pick an eligible option by id, and the next `advance()` runs it.
   It throws if there's no pending choice, or the id is unknown or ineligible.
 - **`flow.isEnded()`, `flow.currentScene`**: state for tooling that follows the

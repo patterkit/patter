@@ -6,6 +6,15 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`flow.step_for(beat_id)`: the step a flow would deliver for a beat right now.** It's what `advance()`
+  gives for that beat, built by the same function: the text in the active locale, interpolated against the
+  flow's values (unless the project is voiced), closed captions applied, and the speaker's names and label,
+  its pause, Game Data, and tags. It doesn't move the flow, count a visit, or run an effect, and it returns
+  `null` for an id that's neither a beat nor an option's prompt. For a game that keeps lines by id and shows
+  them again, after a load or a language switch. Held across all four runtimes by the conformance corpus.
+
 ## [0.25.0] - 2026-10-14
 
 ### Added

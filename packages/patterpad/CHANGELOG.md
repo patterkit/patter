@@ -6,6 +6,21 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Live Link follows the most recent flow.** When a game runs several flows at once (a conversation, a
+  bark, ambient chatter), the editor now moves to whichever one played last. Pick a flow in the flow picker
+  to stay on it instead; choose **Most recent** to go back. A picked flow holds until it ends.
+- **A readable flow picker.** Flows are grouped by the part of their name before the first slash
+  (`patterstage/`, `menu/`), with the full name in the tooltip, and each shows the scene it's in.
+- **The option a game took is marked.** When the game reports a choice made, the playhead moves onto that
+  option's prompt and leaves its dot there as play moves on, as it does for every line the game passes.
+
+### Fixed
+
+- **When the followed flow ends, the editor shows where the next one is at once.** It used to stay where the
+  ended flow left it until the next flow played another line.
+
 ## [0.29.0] - 2026-10-14
 
 ### Added

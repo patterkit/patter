@@ -33,6 +33,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **`flow.stepFor(beatId)`**: the step this flow would deliver for a beat right now, built by the same function
+  `advance` uses, so it carries the text in the active locale (interpolated, unless the project is voiced, with
+  closed captions applied) and the speaker's names and label, its pause, Game Data, and tags. It doesn't move the
+  flow, count a visit, or run an effect. Undefined for an id that is neither a beat nor an option's prompt. The
+  conformance corpus pins it on every runtime.
+
 ## [0.25.0] - 2026-10-14
 
 ### Added

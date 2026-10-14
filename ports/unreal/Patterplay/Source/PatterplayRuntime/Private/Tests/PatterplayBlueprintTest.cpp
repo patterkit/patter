@@ -1,7 +1,8 @@
 // The Blueprint surface the other runtimes' users already have: a flow's choices, properties (its @scene
 // included), log, interpolation and caption stripping; the engine's locale, captions and source-debug
 // getters, addresses, scene and block tags and Game Data, every open flow, and OpenFlow with a block and
-// a seed; an option's prompt as one value, and the flags that tell an unset speaker from an empty one.
+// a seed; an option's prompt as one value, the flags that tell an unset speaker from an empty one, and
+// StepFor, a beat's step before it plays.
 // Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Blueprint"
 
@@ -105,8 +106,30 @@ bool FPatterplayBlueprintTest::RunTest(const FString& Parameters)
 	const TArray<UPatterFlow*> Open = Engine->Flows();
 	TestTrue(TEXT("Flows hands back the open flow's wrapper"), Open.Num() == 1 && Open[0] == Flow);
 
+	// --- StepFor: the step a beat would give now, without playing it ----------------------------
+	const TMap<FString, int32> VisitsBefore = Flow->GetVisitCounts();
+	FPatterStep Ahead;
+	TestTrue(TEXT("StepFor finds a line before it plays"), Flow->StepFor(TEXT("L_greet"), Ahead));
+	FPatterStep Prompt;
+	TestTrue(TEXT("StepFor finds an option's prompt"), Flow->StepFor(TEXT("P_knock"), Prompt));
+	TestTrue(TEXT("StepFor: the prompt's label, the pattern filled in"), Prompt.Type == EPatterStepType::Line && Prompt.bHasSpeakerLabel && Prompt.SpeakerLabel == TEXT("ANNA on the RADIO"));
+	FPatterStep Unknown;
+	TestFalse(TEXT("StepFor: an unknown id isn't found"), Flow->StepFor(TEXT("L_nothing"), Unknown));
+	TestTrue(TEXT("StepFor: an unknown id leaves the step empty"), Unknown.Type == EPatterStepType::End && Unknown.Id.IsEmpty());
+	TestTrue(TEXT("StepFor counts no visit"), Flow->GetVisitCounts().OrderIndependentCompareEqual(VisitsBefore));
+
 	// --- a step says whether its speaker is set ------------------------------------------------
 	const FPatterStep Line = Flow->Advance();
+	// What StepFor gave is what Advance then delivers.
+	TestTrue(TEXT("StepFor equals Advance: type and id"), Ahead.Type == Line.Type && Ahead.Id == Line.Id && Ahead.Id == TEXT("L_greet"));
+	TestEqual(TEXT("StepFor equals Advance: text"), Ahead.Text, Line.Text);
+	TestTrue(TEXT("StepFor equals Advance: speaker"), Ahead.bHasCharacter == Line.bHasCharacter && Ahead.Character == Line.Character
+		&& Ahead.bHasCharacterName == Line.bHasCharacterName && Ahead.CharacterName == Line.CharacterName);
+	TestTrue(TEXT("StepFor equals Advance: label"), Ahead.bHasSpeakerLabel == Line.bHasSpeakerLabel && Ahead.SpeakerLabel == Line.SpeakerLabel);
+	TestTrue(TEXT("StepFor equals Advance: qualifier and direction"), Ahead.bHasQualifier == Line.bHasQualifier && Ahead.bHasQualifierName == Line.bHasQualifierName
+		&& Ahead.bHasDirection == Line.bHasDirection);
+	TestEqual(TEXT("StepFor equals Advance: pause"), Ahead.PadAfter, Line.PadAfter);
+	TestTrue(TEXT("StepFor equals Advance: tags and Game Data"), Ahead.Tags == Line.Tags && Ahead.GameData.Num() == Line.GameData.Num());
 	TestEqual(TEXT("the line interpolates @gold"), Line.Text, FString(TEXT("Gold 3.")));
 	TestTrue(TEXT("bHasCharacter"), Line.bHasCharacter);
 	TestEqual(TEXT("Character"), Line.Character, FString(TEXT("ANNA")));

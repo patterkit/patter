@@ -31,7 +31,7 @@ public:
 	void FlowOpened(const FString& FlowId);
 	/** Tell the editor a flow closed. */
 	void FlowClosed(const FString& FlowId);
-	/** Report a flow's current position - call after each Advance()/Choose(). Empty BeatId -> null on the wire. */
+	/** Report a flow's current position - call after each Advance()/Choose(). An empty SceneId or BeatId goes as null on the wire. */
 	void Observe(const FString& FlowId, const FString& SceneId, const FString& BeatId, const FString& Type, const FString& ChoiceId = FString());
 	/** Close the link. */
 	void Close();

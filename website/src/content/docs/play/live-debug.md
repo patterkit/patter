@@ -52,8 +52,26 @@ still follows scenes, but rebuild and relaunch to re-sync for exact-beat highlig
 for [live bundle refresh](#live-bundle-refresh) re-syncs itself, since saving in Patterpad pushes
 the new bundle straight into the running game.
 
-If more than one flow is live, a small **flow picker** appears next to the address to choose which one
-the playhead tracks.
+### Several flows at once
+
+A game can run several flows at once: a conversation, a bark, ambient chatter. If more than one flow
+is live, a small **flow picker** appears next to the address. It names the flow the editor is
+following, and clicking it lists every live flow with the scene each one is in.
+
+- **Most recent** is the default. The editor moves to whichever flow played last, so it keeps up with
+  a game whose flows open and close all the time. With one flow, it simply follows that flow.
+- **Pick a flow** to stay on it. Lines from the other flows don't move the editor. Choose **Most
+  recent** to go back.
+- **When the flow you're following ends**, the editor moves to the flow that played most recently and
+  shows its current line straight away. A flow you picked counts as done when it ends, and following goes
+  back to the most recent.
+
+Flows are grouped by the part of their name before the first slash, so `patterstage/gate/talk` is
+listed as `gate/talk` under **patterstage**. Hover a flow for its full name.
+
+When the game reports the option a player took, the editor moves the playhead onto that option's
+prompt. As play moves on, the prompt keeps the small dot every line the game passes leaves behind, so
+you can see which way the conversation went.
 
 ## Live bundle refresh
 
@@ -197,9 +215,13 @@ WebSocket:
 ```json
 { "t": "hello", "v": 1, "build": "<bundle hash>", "project": "My Game", "flows": ["main"] }
 { "t": "frame", "flow": "main", "sceneId": "<scene id>", "beatId": "<beat id|null>", "type": "line|text|gameEvent|choice|end" }
+{ "t": "frame", "flow": "main", "sceneId": "<scene id>", "beatId": "<choice id>", "type": "choice", "choiceId": "<option id>" }
 { "t": "flowOpen",  "flow": "main" }
 { "t": "flowClose", "flow": "main" }
 ```
+
+A choice frame sent again with `choiceId` set to the option taken marks that option in the editor.
+Every client's `observe` takes it as an optional last argument.
 
 One message travels the OTHER way, editor to game ([live bundle refresh](#live-bundle-refresh), above):
 

@@ -670,6 +670,12 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				current = op["flow"]
 			"advance":
 				chunk.append(_transcript_step(holder["engine"].get_flow(current).advance(), _ids_only(bundle)))
+			"stepFor":
+				# The step a flow would deliver for a beat now, recorded as a delivered one is; none for an
+				# unknown id. The flow named, else the current one.
+				var sf = holder["engine"].get_flow(op.get("flow", current)).step_for(op["beat"])
+				if sf != null:
+					chunk.append(_transcript_step(sf, _ids_only(bundle)))
 			"choose":
 				holder["engine"].get_flow(current).choose(op["id"])
 			"resetFlow":

@@ -11,7 +11,7 @@
 import { compileExpression, exportBundle } from "@patterkit/compiler";
 import { Engine, describeBundle } from "@patterkit/runtime";
 import { SAVE_SCHEMA } from "@patterkit/model";
-import type { SaveEnvelope } from "@patterkit/model";
+import type { Bundle, SaveEnvelope } from "@patterkit/model";
 import { envelopeKeyPaths, runScript } from "./runner.js";
 import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
 
@@ -33,11 +33,12 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     expected: f.expected,
   }));
 
+  // An IDs-only build: no strings, so the runtime emits beat ids and omits character names.
+  const idsOnlyIf = (idsOnly: boolean | undefined, bundle: Bundle): Bundle =>
+    idsOnly ? { ...bundle, strings: {}, localisation: { mode: "ids" } } : bundle;
+
   const runtime: RuntimeCase[] = fixtures.runtime.map((f) => {
-    let bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
-    if (f.idsOnly) { // IDs-only build: no strings, runtime emits beat IDs + omits character names
-      bundle = { ...bundle, strings: {}, localisation: { mode: "ids" } };
-    }
+    const bundle = idsOnlyIf(f.idsOnly, exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }));
     return {
       name: f.name,
       bundle,
@@ -55,7 +56,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
 
   const scripted: ScriptedCase[] = fixtures.scripted.map((f) => ({
     name: f.name,
-    bundle: exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }),
+    bundle: idsOnlyIf(f.idsOnly, exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales })),
     // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, §9.8): same project,
     // edited scenes/strings.
     ...(f.scenesB ? { bundleB: exportBundle({ project: f.projectB ?? f.project, scenes: f.scenesB, locales: f.localesB ?? f.locales }) } : {}),

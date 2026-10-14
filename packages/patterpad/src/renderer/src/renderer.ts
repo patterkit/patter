@@ -94,6 +94,7 @@ import type { SearchEntry, AudioEntry, SceneKitId, PackMergeSummary, AppPrompt }
 import { recordScratch, isScratchRecording } from "./scratch-recorder.js";
 import { textHash } from "./wav.js";
 import { mountDebugLink } from "./debug-panel.js";
+import { markTarget } from "./debug-flows.js";
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -253,7 +254,9 @@ const overviewScenesEl = $("overview-scenes");
 const propsDocHostEl = $("props-doc-host");
 const propsDocWorldEl = $<HTMLButtonElement>("props-doc-world");
 propsDocWorldEl.addEventListener("click", () => void openProjectSettings("world"));
-const debugLink = mountDebugLink(); // live debug link control (#181): the bottom-right connect icon
+// Live debug link control (#181): the bottom-right connect icon, and the flow picker that names each
+// flow's scene as the Scenes list does.
+const debugLink = mountDebugLink({ sceneName: (id) => project?.scenes.find((s) => s.id === id)?.name });
 // The six modal dialogs below (scene properties, Notes, the voice script, localisation, Production
 // Information, the start prompt) are built on the shell's `dialogFrame` each time they open, like every
 // other dialog in the family; none of them lives in index.html any more.
@@ -3372,12 +3375,14 @@ window.patter.onMenu((cmd) => {
 // and a reset that clears the trail on a fresh run. When play crosses into another scene, SWITCH the
 // editor to it first so the marker stays visible. Marks arrive in a rapid burst (a Continue plays many
 // beats), so serialize them on a promise chain - otherwise two marks for a new scene would both fire
-// loadScene before currentSceneId updates, double-loading it.
+// loadScene before currentSceneId updates, double-loading it. The live debug link rides the same path,
+// and marks an option a game took by moving the playhead onto its prompt (debug-flows.ts markTarget).
 let markChain: Promise<void> = Promise.resolve();
-window.patter.onPlayMark((id, sceneId) => {
+window.patter.onPlayMark((id, sceneId, optionId) => {
   markChain = markChain.then(async () => {
     if (sceneId && sceneId !== currentSceneId) await loadScene(sceneId);
-    surface?.markLine(id);
+    const s = surface;
+    s?.markLine(markTarget(id, optionId, (option) => s.promptOf(option)));
   }).catch(() => {}); // a failed scene load shouldn't wedge the chain
 });
 window.patter.onPlayReset(() => surface?.resetPlay());

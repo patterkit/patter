@@ -72,6 +72,24 @@ function padIndexFor(bundle: Bundle): Map<string, BeatPad> {
   return index;
 }
 
+// Every beat by its id (a snippet's beats and an option's prompt), for `Flow.stepFor`; structural, cached the same way.
+const beatIndexCache = new WeakMap<Bundle, Map<string, Beat>>();
+function beatIndexFor(bundle: Bundle): Map<string, Beat> {
+  let index = beatIndexCache.get(bundle);
+  if (index) return index;
+  index = new Map<string, Beat>();
+  for (const scene of Object.values(bundle.scenes)) {
+    for (const block of scene.blocks) {
+      walkNodes<SelectableNode>(block.children, (n) => {
+        if (n.type === "group") { if (n.prompt) index!.set(n.prompt.id, n.prompt); return; }
+        for (const beat of n.beats ?? []) index!.set(beat.id, beat);
+      });
+    }
+  }
+  beatIndexCache.set(bundle, index);
+  return index;
+}
+
 /** A node's tags as a COPY: the index is shared by every engine on the bundle, so a host that edits an
  *  array it was given (a step's tags, `tagsForBeat`) must not change the answer for all of them. */
 function tagsOf(host: { tagIndex: Map<string, string[]> }, id: string): string[] | undefined {
@@ -1837,6 +1855,19 @@ export class Flow {
   /** How many times this flow has entered each node, by node id. */
   getVisitCounts(): Record<string, number> {
     return Object.fromEntries(this.visitCounts);
+  }
+
+  /**
+   * The step this flow would deliver for beat `beatId` right now, as `advance` would give it: its text in the
+   * active locale, interpolated against this flow's values (unless the project is voiced), closed captions
+   * applied, and the speaker's names and label, its pause, Game Data, and tags. Built by the same function that
+   * builds a delivered step, so the two can't differ. It doesn't move the flow, count a visit, or run an effect.
+   * Undefined for an id that is neither a beat nor an option's prompt. For a game that keeps lines by id and
+   * shows them again (after a load, or a language switch).
+   */
+  stepFor(beatId: string): StepResult | undefined {
+    const beat = beatIndexFor(this.host.bundle).get(beatId);
+    return beat ? this.beatResult(beat) : undefined;
   }
 
   /** The options of a pending choice (empty when not at a choice point). */

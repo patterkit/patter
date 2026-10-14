@@ -35,7 +35,7 @@ import { setSnippetJump, commitSlashJump } from "../src/special.js";
 import { openTargetPicker, closeTargetPicker, isTargetPickerOpen, type JumpData } from "./targetpicker.js";
 import { setPlayBlockHandler } from "./actionmenu.js";
 import { confirmDeleteBlock, confirmDeleteChunk, confirmDeleteSet } from "./confirm.js";
-import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr, isZoneBeat } from "../src/zoneutil.js";
+import { modelIdOf, cueText, isChoiceGroup, findByModelId, findBeatById, optionPromptId, sayText as sayTextOf, sayStartOf, offCue, isBlankBeat, rawAttr, isZoneBeat } from "../src/zoneutil.js";
 import { patterSchema } from "../src/schema.js";
 import { nodeViews, setJumpLabelResolver, setJumpNavHandler, refreshJumpLabels, openSceneMenu, destroyActionMenu } from "./views.js";
 import { problemsPlugin, setProblemMarks, type ProblemMark } from "./problems.js";
@@ -243,6 +243,9 @@ export interface SurfaceHandle {
   markLine(id: string | null): void;
   /** Clear the play marks entirely - the playhead and the whole visited trail (on a fresh run / reset). */
   resetPlay(): void;
+  /** The id of the prompt beat of the choice option with this id, or null (not an option here, or one
+   *  with no prompt). The host marks an option a running game took by moving the playhead onto it. */
+  promptOf(optionId: string): string | null;
   /** Set the inline validation squiggles: each node id present in this scene gets a wavy underline /
    *  accent by severity. Pass [] to clear. Ids not in this scene are ignored (cross-scene problems). */
   markProblems(marks: Array<{ id: string; severity: "error" | "warning" }>): void;
@@ -1252,6 +1255,7 @@ export function mountSurface(opts: MountOptions): SurfaceHandle {
       visitedEls.clear();
       repositionPointer();
     },
+    promptOf: (optionId: string) => optionPromptId(view.state.doc, optionId),
     markProblems: (marks: ProblemMark[]) => setProblemMarks(view, marks),
     setSpellChecker: (checker: SpellChecker | null) => setSpellChecker(view, checker),
     spellingIssues: () => spellingIssues(view),

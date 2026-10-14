@@ -880,6 +880,15 @@ namespace Patterkit.Patterplay.TestHost
                             case "advance":
                                 chunk.Add(Normalize(engine.GetFlow(current).Advance(), IsIdsOnly(bundle)));
                                 break;
+                            case "stepFor":
+                            {
+                                // The step the flow would deliver for a beat now, recorded as a delivered one
+                                // is; none for an unknown id.
+                                string on = op.TryGetProperty("flow", out var sf) ? sf.GetString() : current;
+                                var r = engine.GetFlow(on).StepFor(op.GetProperty("beat").GetString());
+                                if (r != null) chunk.Add(Normalize(r, IsIdsOnly(bundle)));
+                                break;
+                            }
                             case "choose":
                                 engine.GetFlow(current).Choose(op.GetProperty("id").GetString());
                                 break;

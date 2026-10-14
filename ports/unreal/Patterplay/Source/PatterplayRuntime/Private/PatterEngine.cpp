@@ -288,6 +288,20 @@ TMap<FString, int32> UPatterFlow::GetVisitCounts() const
 	return Out;
 }
 
+bool UPatterFlow::StepFor(const FString& BeatId, FPatterStep& OutStep)
+{
+	OutStep = FPatterStep();
+	if (!Flow) return false;
+	try
+	{
+		std::optional<patter::StepResult> S = Flow->stepFor(Std(BeatId));
+		if (!S) return false;
+		OutStep = Convert(*S);
+		return true;
+	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
 // ----- UPatterEngine ----------------------------------------------------------
 
 UPatterEngine* UPatterEngine::Create(UPatterBundle* Bundle, UPatterWorld* World)

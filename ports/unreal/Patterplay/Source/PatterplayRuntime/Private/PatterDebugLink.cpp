@@ -122,7 +122,15 @@ void FPatterDebugLink::Observe(const FString& FlowId, const FString& SceneId, co
 	TSharedRef<FJsonObject> Msg = MakeShared<FJsonObject>();
 	Msg->SetStringField(TEXT("t"), TEXT("frame"));
 	Msg->SetStringField(TEXT("flow"), FlowId);
-	Msg->SetStringField(TEXT("sceneId"), SceneId);
+	// No scene (or no beat) goes as null, as the other runtimes' clients send it.
+	if (SceneId.IsEmpty())
+	{
+		Msg->SetField(TEXT("sceneId"), MakeShared<FJsonValueNull>());
+	}
+	else
+	{
+		Msg->SetStringField(TEXT("sceneId"), SceneId);
+	}
 	if (BeatId.IsEmpty())
 	{
 		Msg->SetField(TEXT("beatId"), MakeShared<FJsonValueNull>());

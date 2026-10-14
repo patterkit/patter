@@ -259,7 +259,12 @@ func _index_nodes(nodes: Array) -> void:
 	for n in nodes:
 		_host.node_index[n["id"]] = n
 		if n.get("type", "") == "group":
+			if n.get("prompt") is Dictionary:
+				_host.beat_by_id[n["prompt"]["id"]] = n["prompt"]
 			_index_nodes(n.get("children", []))
+		else:
+			for beat in n.get("beats", []):
+				_host.beat_by_id[beat["id"]] = beat
 
 
 # Author tags (#215): walk groups/snippets carrying the parent's accumulated tags; record each node's and

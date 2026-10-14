@@ -135,6 +135,12 @@ export function runScript(
         chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
         break;
       }
+      case "stepFor": {
+        // The step the flow would deliver for a beat now, recorded as a delivered one is; none for an unknown id.
+        const r = engine.getFlow(op.flow ?? current)!.stepFor(op.beat);
+        if (r) chunk.push(normaliseStep(r, isIdsOnly(ctx.bundle)));
+        break;
+      }
       case "choose":
         engine.getFlow(current)!.choose(op.id);
         break;

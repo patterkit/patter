@@ -157,6 +157,9 @@ export type ScriptOp =
   | { op: "openFlow"; flow: string; scene?: string; block?: string; seed?: number; expect?: TranscriptStep[]; expectResult?: boolean }
   | { op: "useFlow"; flow: string }
   | { op: "advance"; expect: TranscriptStep[] }
+  // The step a flow would deliver for a beat right now, without delivering it (the current flow unless `flow`
+  // names one): one step, or none (`[]`) for an id that is neither a beat nor an option's prompt.
+  | { op: "stepFor"; beat: string; flow?: string; expect: TranscriptStep[] }
   | { op: "choose"; id: string; expect?: TranscriptStep[] }
   // Host navigation by ADDRESS (spec §6 gameIds): move the current flow as an authored `go` jump would -
   // target scene onEntry runs, the entry counts as a visit, the callstack is REPLACED (pending call-returns
@@ -393,6 +396,8 @@ export interface ScriptedFixture {
   projectB?: ProjectFile;
   seed?: number;
   engineOptions?: CaseEngineOptions;
+  /** Build the bundle IDs-only, as a runtime case can (no strings; steps carry beat ids and no names). */
+  idsOnly?: boolean;
   script: ScriptOp[];
 }
 

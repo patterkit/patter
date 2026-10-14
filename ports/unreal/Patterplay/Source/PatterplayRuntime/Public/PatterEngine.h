@@ -81,6 +81,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Patterplay|Debug")
 	TMap<FString, int32> GetVisitCounts() const;
 
+	// The step this flow would deliver for a beat right now, exactly as Advance would give it: its text in the
+	// active locale, interpolated against this flow's values (unless the project is voiced), closed captions
+	// applied, and the speaker's names and label, its pause, Game Data, and tags. It doesn't move the flow,
+	// count a visit, or run an effect. False, with an empty step, for an id that is neither a beat nor an
+	// option's prompt. For a game that keeps lines by id and shows them again (after a load, or a language
+	// switch). Flow.stepFor on every runtime.
+	UFUNCTION(BlueprintCallable, Category = "Patterplay", meta = (ReturnDisplayName = "Found"))
+	bool StepFor(const FString& BeatId, FPatterStep& OutStep);
+
 	// Send this flow's cursor to an ADDRESS, exactly as an authored `go` jump would: the target scene's
 	// onEntry runs, entering counts as a visit, and the callstack is REPLACED (pending call-returns
 	// discarded). Scene/Block are host-facing Game IDs (or internal ids); Block is scene-scoped, so it is

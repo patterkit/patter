@@ -60,6 +60,12 @@ else the built-in 0.6. A negative value starts the next line that long before th
 only a snippet's last line is never negative (a negative pause before a game event stands). An option's
 `Prompt` carries its pause too, as `PadAfter`, for a game that voices the prompts itself. When your game times lines itself, follow the [timing rules](https://patterkit.dev/play/engine/#step-shapes) the writer expects.
 
+To show a line again by its id (after a load, or a language switch), `Flow->StepFor(BeatId, OutStep)`
+fills in the step this flow would deliver for that beat right now, exactly as `Advance` would give it (the
+active locale, interpolation, closed captions, names, label, pause, Game Data, and tags), and returns
+false for an id that is neither a beat nor an option's prompt. It doesn't move the flow, count a visit, or
+run an effect. In C++, `patter::Flow::stepFor` returns a `std::optional<patter::StepResult>`.
+
 The same `UPatterEngine` / `UPatterFlow` API is exposed to **Blueprint** (with `FPatterStep`
 and `FPatterOption` as Blueprint structs), so a designer can drive the flow and bind steps to
 a dialogue widget without touching C++.

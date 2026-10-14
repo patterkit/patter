@@ -79,6 +79,12 @@ that voices the prompts itself. When your game times lines itself, follow the
 carries none. `GetOutline` and `GetBeatSequence` report the same `PadAfter` on a line or text
 beat's `BeatInfo`, with `OwnPadAfter` when the beat sets its own.
 
+To show a line again that your game kept by its id (after a load, or a language switch), call
+`flow.StepFor(beatId)`. It gives the step the flow would deliver for that beat right now, built as `Advance`
+builds it: the text in the active locale, interpolated against the flow's values, closed captions applied, the
+names and `SpeakerLabel`, `PadAfter`, Game Data, and tags. It doesn't move the flow, count a visit, or run an
+effect, and it's null for an id that's neither a beat nor an option's prompt.
+
 ## Samples
 
 Import from **Package Manager ▸ Patterplay ▸ Samples**. Each sample ships a **ready-made

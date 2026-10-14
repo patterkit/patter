@@ -1903,6 +1903,89 @@ const scriptedSpeakerLabelsSetLocale = {
   ],
 } satisfies ScriptedFixture;
 
+// --- the step a flow would deliver, by beat id (Flow.stepFor) ------------------------------------------
+// A game that keeps lines by id shows them again (after a load, or a language switch) as `advance` would give
+// them now, built by the same function: the active locale, interpolation against the flow, closed captions, a
+// silenced line, and the speaker's names and label. Nothing moves: asking twice, or before the line plays, changes
+// nothing, and `advance` then gives the same step.
+const stepForProject = project({
+  cast: [{ name: "PLAYER", displayName: "You", qualifierLabels: { vo: "Your thoughts" } }, { name: "TAM", displayName: "Tam" }, { name: "SFX" }],
+  locales: { default: "en", all: ["en", "fr"] },
+  properties: [{ name: "gold", type: "number", default: 3 }],
+});
+const stepForScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+  { id: "sn", type: "snippet", beats: [
+    { id: "L_think", kind: "line", character: "PLAYER", qualifier: "vo" },
+    { id: "L_tam", kind: "line", character: "TAM", qualifier: "os" },
+    { id: "T_gold", kind: "text" },
+    { id: "L_sfx", kind: "line", character: "SFX" },
+    { id: "L_plain", kind: "line", character: "PLAYER" },
+  ] },
+  { id: "g", type: "group", selector: "choice", children: [
+    { id: "o_go", type: "group", prompt: { id: "P_go", kind: "line", character: "PLAYER", qualifier: "vo" }, children: [
+      { id: "go_c", type: "snippet", beats: [], jump: { to: "END" } },
+    ] },
+  ] },
+] }] }];
+const stepForLocales = [
+  loc("s", { L_think: "Quiet. {@gold} left.", L_tam: "Hm. [sighs]", T_gold: "Gold: {@gold}.", L_sfx: "[a door slams]", L_plain: "Right.", P_go: "Go." }),
+  loc("s", { L_think: "Calme. Il en reste {@gold}.", L_tam: "Hm. [soupir]", T_gold: "Or : {@gold}.", L_sfx: "[une porte claque]", L_plain: "Bon.", P_go: "Allons-y." }, "fr"),
+  loc("@project", { [castStringKey("PLAYER")]: "Vous", [speakerLabelKey("PLAYER", "vo")]: "Vos pensées" }, "fr"),
+];
+const stepThink: TranscriptStep = { type: "line", id: "L_think", text: "Quiet. 3 left.", character: "PLAYER", characterName: "You", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Your thoughts" };
+
+const scriptedStepFor = {
+  name: "stepFor gives the step a flow would deliver for a beat now, and moves nothing",
+  project: stepForProject,
+  scenes: stepForScenes,
+  locales: stepForLocales,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "stepFor", beat: "L_think", expect: [stepThink] },                       // before it plays
+    { op: "stepFor", beat: "L_think", expect: [stepThink] },                       // asking again changes nothing
+    { op: "stepFor", beat: "T_gold", expect: [{ type: "text", id: "T_gold", text: "Gold: 3." }] },
+    { op: "stepFor", beat: "P_go", expect: [{ type: "line", id: "P_go", text: "Go.", character: "PLAYER", characterName: "You", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Your thoughts" }] },
+    { op: "stepFor", beat: "o_go", expect: [] },                                   // an option, not a beat: none
+    { op: "stepFor", beat: "nope", expect: [] },
+    { op: "advance", expect: [stepThink] },                                        // advance gives the same step
+    { op: "setLocale", locale: "fr" },
+    { op: "stepFor", beat: "L_think", expect: [{ type: "line", id: "L_think", text: "Calme. Il en reste 3.", character: "PLAYER", characterName: "Vous", qualifier: "vo", qualifierName: "V.O.", speakerLabel: "Vos pensées" }] },
+    { op: "stepFor", beat: "L_tam", expect: [{ type: "line", id: "L_tam", text: "Hm. [soupir]", character: "TAM", characterName: "Tam", qualifier: "os", qualifierName: "O.S.", speakerLabel: "Tam (O.S.)" }] },
+    { op: "setClosedCaptions", on: false },
+    { op: "stepFor", beat: "L_tam", expect: [{ type: "line", id: "L_tam", text: "Hm.", character: "TAM", characterName: "Tam", qualifier: "os", qualifierName: "O.S.", speakerLabel: "Tam (O.S.)" }] },
+    { op: "stepFor", beat: "L_sfx", expect: [{ type: "line", id: "L_sfx", text: "" }] }, // silenced: no speaker
+    { op: "advance", expect: [{ type: "line", id: "L_tam", text: "Hm.", character: "TAM", characterName: "Tam", qualifier: "os", qualifierName: "O.S.", speakerLabel: "Tam (O.S.)" }] },
+    { op: "stepFor", beat: "L_plain", expect: [{ type: "line", id: "L_plain", text: "Bon.", character: "PLAYER", characterName: "Vous" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A voiced project's lines are static, so stepFor doesn't interpolate them either; text beats still do. In an
+// IDs-only build the step carries the beat's id and no names, as a delivered one does.
+const scriptedStepForVoiced = {
+  name: "stepFor follows a voiced project's static lines",
+  project: { ...stepForProject, voiced: true },
+  scenes: stepForScenes,
+  locales: stepForLocales,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "stepFor", beat: "L_think", expect: [{ ...stepThink, text: "Quiet. {@gold} left." }] },
+    { op: "stepFor", beat: "T_gold", expect: [{ type: "text", id: "T_gold", text: "Gold: 3." }] },
+  ],
+} satisfies ScriptedFixture;
+
+const scriptedStepForIds = {
+  name: "stepFor in an IDs-only build gives the beat's id and no names",
+  project: stepForProject,
+  scenes: stepForScenes,
+  locales: stepForLocales,
+  idsOnly: true,
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "stepFor", beat: "L_think", expect: [{ type: "line", id: "L_think", text: "L_think", character: "PLAYER", qualifier: "vo" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_think", text: "L_think", character: "PLAYER", qualifier: "vo" }] },
+  ],
+} satisfies ScriptedFixture;
+
 // --- line padding -----------------------------------------------------------------------------------
 // A line or text step carries `padAfter`, the pause after it in seconds: its own, else the nearest
 // `padAfterDefault` above it (snippet, each group innermost first, block, scene), else the project's, else the
@@ -3210,7 +3293,7 @@ export const cases: Fixtures = {
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties,
-    scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
+    scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),

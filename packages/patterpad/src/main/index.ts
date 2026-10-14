@@ -47,13 +47,14 @@ let searchFocus: SearchFocus | undefined; // the editor's last scene + caret, fo
 let lastCoverageResult: import("../shared/api.js").CoverageResult | null = null; // session cache (the window shows it on reopen)
 
 // Live debug link (#181): created on first use. Frames for the followed flow ride the existing play:mark
-// path; status is pushed to the renderer's debug panel.
+// path (a choice frame carrying the option taken passes it on, for the editor to mark); status is pushed
+// to the renderer's debug panel.
 let debugServer: DebugServer | null = null;
 function ensureDebugServer(): DebugServer {
   if (!debugServer) {
     debugServer = createDebugServer({
       currentBuildHash: () => project.currentBuildHash(),
-      onFrame: (f) => { win?.webContents.send("play:mark", f.beatId, f.sceneId); },
+      onFrame: (f) => { win?.webContents.send("play:mark", f.beatId, f.sceneId, f.type === "choice" ? f.choiceId : undefined); },
       onReset: () => { win?.webContents.send("play:reset"); },
       onStatus: (s) => { win?.webContents.send("debug:status", s); refreshMenu(); }, // keep the menu checkbox in sync
     });
@@ -1223,7 +1224,7 @@ function registerIpc(): void {
   ipcMain.handle("debug:start", () => { ensureDebugServer().start(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:stop", () => { ensureDebugServer().stop(); refreshMenu(); return ensureDebugServer().status(); });
   ipcMain.handle("debug:status", () => ensureDebugServer().status());
-  ipcMain.handle("debug:follow", (_e, flowId: string) => { ensureDebugServer().follow(flowId); });
+  ipcMain.handle("debug:follow", (_e, flowId: string | null) => { ensureDebugServer().follow(typeof flowId === "string" ? flowId : null); });
   ipcMain.handle("project:validate", (_e, live?: { sceneId: string; flow: string; loc: string }) => project.validate(live));
   // The detached search window (#205): open/focus it, and serve its index queries + jump back to the editor.
   ipcMain.handle("search:open", (_e, mode: SearchMode, focus?: SearchFocus, query?: string) => openSearchWindow(mode, focus, query));

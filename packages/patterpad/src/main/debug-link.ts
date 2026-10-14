@@ -7,14 +7,20 @@
 //
 // Wire protocol `patterplay/debug@1` (mirrors @patterkit/play-helpers' createDebugLink):
 //   hello : { t:"hello", v, build, project?, token?, flows? }   - verified, seeds the flow list
-//   frame : { t:"frame", flow, sceneId, beatId, type, choiceId? }
+//   frame : { t:"frame", flow, sceneId, beatId, type, choiceId? } - a choice frame sent again with
+//           `choiceId` set names the option taken, which the editor marks
 //   flow  : { t:"flowOpen" | "flowClose", flow }
 //   bundle: { t:"bundle", v:1, build, data }   - SERVER -> client: live bundle refresh. `data` is the
 //           full .patterc JSON; the client picks the tier itself (strings-only vs full hot swap) by
 //           comparing structure hashes, applies it, and re-hellos with the new build.
 
+//
+// Which flow the editor follows (the most recent, or one picked in the editor, and the hand-over when the
+// followed flow closes) is shared/debug-follow.ts, which the browser preview's fake link drives too.
+
 import { WebSocketServer, type WebSocket } from "ws";
 import type { DebugStatus } from "../shared/api.js";
+import { createFlowFollower, type DebugFrame } from "../shared/debug-follow.js";
 import { isLocalOrigin } from "@wildwinter/app-shell/util";
 
 const DEFAULT_PORT = 4471;
@@ -29,15 +35,15 @@ const DEFAULT_PORT = 4471;
  */
 export { isLocalOrigin };
 
-/** A position frame for one flow. */
-export interface DebugFrame { flow: string; sceneId: string | null; beatId: string | null; type: string; choiceId?: string }
+export type { DebugFrame };
 
 export interface DebugServer {
   start(): void;
   stop(): void;
   status(): DebugStatus;
-  /** Follow a different flow's cursor (re-points the single editor playhead). */
-  follow(flowId: string): void;
+  /** Follow a chosen flow's cursor (re-points the single editor playhead), or the most recent flow's
+   *  with null. */
+  follow(flowId: string | null): void;
   isOn(): boolean;
   /** Live bundle refresh: push a freshly compiled bundle to the connected game. No-op when nothing is
    *  connected / handshaken, or when the client already runs this exact build. The client applies it
@@ -62,24 +68,17 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
   let wss: WebSocketServer | null = null;
   let client: WebSocket | null = null;
   let connected: { project?: string; build: "match" | "stale" | "unknown" } | null = null;
-  const flows = new Set<string>();
-  const lastFrame = new Map<string, DebugFrame>(); // per-flow last position, so following a flow jumps at once
-  let following: string | null = null;
   let authed = false; // a hello must land before any frame is honoured (so we have the build/flow context)
   let clientBuild: string | null = null; // the build the game reported (last hello) - gates pushBundle
 
   const status = (): DebugStatus => {
     if (!wss) return { state: "off" };
     if (!client || !connected) return { state: "listening", port };
-    return { state: "connected", port, project: connected.project, build: connected.build, flows: [...flows], following };
+    return { state: "connected", port, project: connected.project, build: connected.build, ...follower.view() };
   };
   const push = (): void => deps.onStatus(status());
-
-  const setFollowing = (id: string | null): void => {
-    following = id;
-    const f = id ? lastFrame.get(id) : undefined;
-    if (f) deps.onFrame(f); // jump the playhead to where that flow is right now
-  };
+  // Pushes only once handshaken: before that the status is "listening" and nothing it shows has changed.
+  const follower = createFlowFollower({ onFrame: deps.onFrame, onChange: () => { if (connected) push(); } });
 
   const handleMessage = (raw: string): void => {
     let msg: Record<string, unknown>;
@@ -92,36 +91,29 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
         const current = deps.currentBuildHash();
         const build = current == null ? "unknown" : msg.build === current ? "match" : "stale";
         connected = { project: typeof msg.project === "string" ? msg.project : undefined, build };
-        flows.clear(); lastFrame.clear();
-        for (const f of Array.isArray(msg.flows) ? msg.flows : []) if (typeof f === "string") flows.add(f);
-        following = flows.size ? [...flows][0]! : null;
-        deps.onReset(); push();
+        // The trail clears first, so a re-hello (after a live bundle refresh) that keeps a flow's last
+        // frame puts the playhead back on it.
+        deps.onReset();
+        follower.hello(Array.isArray(msg.flows) ? msg.flows.filter((f): f is string => typeof f === "string") : []);
         break;
       }
       case "flowOpen": {
-        if (typeof msg.flow === "string") { flows.add(msg.flow); if (following == null) following = msg.flow; push(); }
+        if (typeof msg.flow === "string") follower.flowOpen(msg.flow);
         break;
       }
       case "flowClose": {
-        if (typeof msg.flow === "string") {
-          flows.delete(msg.flow); lastFrame.delete(msg.flow);
-          if (following === msg.flow) following = flows.size ? [...flows][0]! : null;
-          push();
-        }
+        if (typeof msg.flow === "string") follower.flowClose(msg.flow);
         break;
       }
       case "frame": {
         if (typeof msg.flow !== "string") break;
-        const frame: DebugFrame = {
+        follower.frame({
           flow: msg.flow,
           sceneId: typeof msg.sceneId === "string" ? msg.sceneId : null,
           beatId: typeof msg.beatId === "string" ? msg.beatId : null,
           type: typeof msg.type === "string" ? msg.type : "",
           choiceId: typeof msg.choiceId === "string" ? msg.choiceId : undefined,
-        };
-        flows.add(frame.flow); lastFrame.set(frame.flow, frame);
-        if (following == null) { following = frame.flow; push(); }
-        if (frame.flow === following) deps.onFrame(frame);
+        });
         break;
       }
     }
@@ -130,7 +122,7 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
   return {
     isOn: (): boolean => wss !== null,
     status,
-    follow(flowId: string): void { if (flows.has(flowId)) { setFollowing(flowId); push(); } },
+    follow(flowId: string | null): void { follower.follow(flowId); },
     pushBundle(build: string, data: string): void {
       if (!client || !authed) return;       // nothing connected / handshaken
       if (clientBuild === build) return;    // the game already runs this exact build
@@ -146,16 +138,16 @@ export function createDebugServer(deps: DebugServerDeps): DebugServer {
       wss.on("connection", (ws) => {
         // One game at a time: a new connection replaces the old.
         if (client) { try { client.close(); } catch { /* gone */ } }
-        client = ws; connected = null; authed = false; clientBuild = null; flows.clear(); lastFrame.clear(); following = null;
+        client = ws; connected = null; authed = false; clientBuild = null; follower.clear();
         ws.on("message", (data) => handleMessage(data.toString()));
-        ws.on("close", () => { if (client === ws) { client = null; connected = null; authed = false; clientBuild = null; flows.clear(); lastFrame.clear(); following = null; push(); } });
+        ws.on("close", () => { if (client === ws) { client = null; connected = null; authed = false; clientBuild = null; follower.clear(); push(); } });
         ws.on("error", () => { /* a flaky client shouldn't crash the editor */ });
         push();
       });
     },
     stop(): void {
       try { client?.close(); } catch { /* gone */ }
-      client = null; connected = null; authed = false; clientBuild = null; flows.clear(); lastFrame.clear(); following = null;
+      client = null; connected = null; authed = false; clientBuild = null; follower.clear();
       const s = wss; wss = null;
       try { s?.close(); } catch { /* already closing */ }
       push();

@@ -7,6 +7,22 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A line's step by its id**: `UPatterFlow::StepFor(BeatId, OutStep)` fills in the step the flow would
+  deliver for a beat right now, exactly as `Advance` would give it: its text in the active locale,
+  interpolated against the flow's values (unless the project is voiced), closed captions applied, and the
+  speaker's names and label, its pause, Game Data, and tags. It returns false, with an empty step, for an id
+  that is neither a beat nor an option's prompt. It doesn't move the flow, count a visit, or run an effect,
+  so a game that keeps lines by id can show them again after a load or a language switch without working the
+  text, names, or label out itself. In the C++ core: `patter::Flow::stepFor`, returning a
+  `std::optional<patter::StepResult>`, built by the same function as a delivered step.
+
+### Fixed
+
+- **The debug link sends no scene as `null`.** `FPatterDebugLink::Observe` sent an empty scene id as `""`,
+  where the other runtimes' clients send `null`; it now sends `null`, as it already did for an empty beat id.
+
 ## [0.25.0] - 2026-10-14
 
 ### Added

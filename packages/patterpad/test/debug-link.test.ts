@@ -1,6 +1,7 @@
 // The live debug link (#181) end to end: the editor-side WebSocket server (main/debug-link.ts) talking to
 // the game-side client (@patterkit/play-helpers createDebugLink) over a real localhost socket. Verifies the
-// build handshake (match / stale / unknown), per-flow tracking, and that only the FOLLOWED flow forwards.
+// build handshake (match / stale / unknown), per-flow tracking, that only the FOLLOWED flow forwards, the
+// most-recent mode across flows opening and closing, and the hand-over to the next flow's last frame.
 
 import { describe, it, expect, afterEach } from "vitest";
 import { WebSocket } from "ws";
@@ -62,7 +63,7 @@ describe("live debug link", () => {
   it("handshake reports build 'match' when the running build equals the project's", async () => {
     const h = await startServer("HASH_A");
     const link = await connect(h, "HASH_A", ["main"]);
-    expect(h.connected()).toMatchObject({ state: "connected", build: "match", project: "Test", flows: ["main"], following: "main" });
+    expect(h.connected()).toMatchObject({ state: "connected", build: "match", project: "Test", flows: ["main"], following: "main", mostRecent: true });
     expect(h.resets()).toBeGreaterThan(0); // a fresh run cleared the editor trail
     link.close();
   });
@@ -93,6 +94,8 @@ describe("live debug link", () => {
   it("forwards only the FOLLOWED flow's frames, and switching follow replays its last position", async () => {
     const h = await startServer("H");
     const link = await connect(h, "H", ["main", "ambient"]);
+    server!.follow("main");                  // a chosen flow: the others' frames don't move the editor
+    await h.waitFor((s) => s.state === "connected" && !s.mostRecent && s.following === "main");
 
     link.observe("main", "scn1", "beatA", "line");
     link.observe("ambient", "scn9", "beatZ", "line"); // not followed -> dropped
@@ -131,6 +134,108 @@ describe("live debug link", () => {
     server!.pushBundle("HASH_NEW", "{\"fake\":\"bundle\"}");
     await new Promise((r) => setTimeout(r, 150));
     expect(pushed).toHaveLength(1);
+    link.close();
+  });
+});
+
+// A game running Patterstage has several flows at once (a conversation, a bark, a second Director),
+// opening and closing all the time. The editor follows the most recent by default; a flow picked in the
+// editor holds until it closes; and a close hands over to the next flow AT its last frame.
+describe("following several flows", () => {
+  const connectedWith = (pred: (s: Extract<DebugStatus, { state: "connected" }>) => boolean) =>
+    (s: DebugStatus): boolean => s.state === "connected" && pred(s);
+
+  it("follows the most recent flow across flows opening and closing", async () => {
+    const h = await startServer("H");
+    const link = await connect(h, "H");
+    expect(h.connected()).toMatchObject({ mostRecent: true, following: null });
+
+    link.observe("patterstage/@oda", "scnA", "a1", "line");       // announces itself, and is followed
+    link.observe("patterstage/gate/talk", "scnB", "b1", "line");  // the newest frame moves the editor
+    link.observe("patterstage/@oda", "scnA", "a2", "line");       // and back again
+    await waitUntil(() => h.frames.length >= 3);
+    expect(h.frames.map((f) => f.beatId)).toEqual(["a1", "b1", "a2"]);
+    await h.waitFor(connectedWith((s) => s.following === "patterstage/@oda"));
+
+    link.flowOpened("menu/title");                                  // opening isn't moving
+    link.observe("patterstage/gate/talk", "scnB", "b2", "line");
+    await waitUntil(() => h.frames.length >= 4);
+    expect(h.frames[3]).toMatchObject({ flow: "patterstage/gate/talk", beatId: "b2" });
+
+    link.observe("patterstage/@oda", null, null, "end");            // a flow finishing doesn't take the editor
+    link.flowClosed("patterstage/@oda");
+    link.observe("menu/title", "scnM", "m1", "line");
+    await waitUntil(() => h.frames.length >= 5);
+    expect(h.frames[4]).toMatchObject({ flow: "menu/title", beatId: "m1" });
+    const s = await h.waitFor(connectedWith((st) => st.following === "menu/title" && st.flows.length === 2));
+    expect(s).toMatchObject({ mostRecent: true, flows: ["patterstage/gate/talk", "menu/title"] });
+    link.close();
+  });
+
+  it("hands over to the flow with the newest frame when the followed flow closes, showing that frame at once", async () => {
+    const h = await startServer("H");
+    const link = await connect(h, "H", ["bark", "talk", "chatter"]);
+    link.observe("talk", "scnT", "t1", "line");
+    link.observe("chatter", "scnC", "c1", "line");
+    link.observe("bark", "scnB", "b1", "line");                    // followed: the newest
+    await waitUntil(() => h.frames.length >= 3);
+
+    link.flowClosed("bark");                                        // the hand-over: chatter moved last
+    await waitUntil(() => h.frames.length >= 4);
+    expect(h.frames[3]).toEqual({ flow: "chatter", sceneId: "scnC", beatId: "c1", type: "line", choiceId: undefined });
+    await h.waitFor(connectedWith((s) => s.following === "chatter" && s.mostRecent));
+    link.close();
+  });
+
+  it("a chosen flow ignores frames from the others, and closing it hands over and goes back to most recent", async () => {
+    const h = await startServer("H");
+    const link = await connect(h, "H", ["talk", "bark"]);
+    link.observe("talk", "scnT", "t1", "line");
+    link.observe("bark", "scnB", "b1", "line");
+    await waitUntil(() => h.frames.length >= 2);
+
+    server!.follow("talk");                                         // picked: jumps to its last frame
+    await waitUntil(() => h.frames.length >= 3);
+    expect(h.frames[2]).toMatchObject({ flow: "talk", beatId: "t1" });
+    await h.waitFor(connectedWith((s) => !s.mostRecent && s.following === "talk"));
+
+    link.observe("bark", "scnB", "b2", "line");                    // ignored: not the chosen flow
+    link.observe("bark", "scnB", "b3", "line");
+    link.observe("talk", "scnT", "t2", "line");
+    await waitUntil(() => h.frames.length >= 4);
+    expect(h.frames.slice(3)).toEqual([{ flow: "talk", sceneId: "scnT", beatId: "t2", type: "line", choiceId: undefined }]);
+
+    link.flowClosed("talk");                                        // the choice is spent
+    await waitUntil(() => h.frames.length >= 5);
+    expect(h.frames[4]).toMatchObject({ flow: "bark", beatId: "b3" });
+    await h.waitFor(connectedWith((s) => s.mostRecent && s.following === "bark"));
+
+    server!.follow("talk");                                         // a closed flow can't be chosen
+    server!.follow(null);                                           // most recent, chosen again: re-shows bark
+    await waitUntil(() => h.frames.length >= 6);
+    expect(h.frames[5]).toMatchObject({ flow: "bark", beatId: "b3" });
+    link.close();
+  });
+
+  it("reports each flow's current scene, and pushes when one moves to another scene", async () => {
+    const h = await startServer("H");
+    const link = await connect(h, "H", ["talk", "bark"]);
+    expect(h.connected()).toMatchObject({ scenes: { talk: null, bark: null } });
+    link.observe("talk", "scnT", "t1", "line");
+    link.observe("bark", "scnB", "b1", "line");
+    await h.waitFor(connectedWith((s) => s.scenes["talk"] === "scnT" && s.scenes["bark"] === "scnB"));
+    link.observe("talk", "scnU", "u1", "line");
+    await h.waitFor(connectedWith((s) => s.scenes["talk"] === "scnU"));
+    link.close();
+  });
+
+  it("passes a choice frame's taken option on", async () => {
+    const h = await startServer("H");
+    const link = await connect(h, "H", ["talk"]);
+    link.observe("talk", "scnT", "grp_choice", "choice");
+    link.observe("talk", "scnT", "grp_choice", "choice", "opt_work");
+    await waitUntil(() => h.frames.length >= 2);
+    expect(h.frames[1]).toEqual({ flow: "talk", sceneId: "scnT", beatId: "grp_choice", type: "choice", choiceId: "opt_work" });
     link.close();
   });
 });

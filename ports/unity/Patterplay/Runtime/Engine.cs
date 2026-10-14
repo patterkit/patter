@@ -306,6 +306,7 @@ namespace Patterkit.Patterplay
         public Dictionary<string, Dictionary<string, string>> BlockGameIdToId;
         public Dictionary<string, List<string>> TagIndex; // author tags (#215): node id -> accumulated tags
         public Dictionary<string, BeatPad> PadIndex;      // line padding: line / text beat id -> its pause
+        public Dictionary<string, Beat> BeatIndex;        // every beat by id (a snippet's beats and an option's prompt), for Flow.StepFor
         /// <summary>The game's one registry: @patter (the SHARED globals), host scopes, every instance bag.</summary>
         public ScopeRegistry Registry;
         /// <summary>True when the engine made the registry (a standalone game): SaveGame then carries its values.</summary>
@@ -589,7 +590,7 @@ namespace Patterkit.Patterplay
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,
                 SpeakerLabels = speakerLabels, SpeakerPattern = bundle.SpeakerPattern ?? Bundle.DefaultSpeakerPattern,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
-                PadIndex = BuildPadIndex(bundle),
+                PadIndex = BuildPadIndex(bundle), BeatIndex = BuildBeatIndex(bundle),
                 SceneGameIdToId = _sceneGameIdToId, BlockGameIdToId = _blockGameIdToId,
                 Registry = registry, OwnsRegistry = ownsRegistry, SelfBackedTokens = selfBacked, BoundTokens = bound,
                 SharedPatter = sharedPatter, PatterSharedDecls = sharedDecls, PatterLocalDecls = localDecls,
@@ -1468,6 +1469,21 @@ namespace Patterkit.Patterplay
                 foreach (var block in scene.Blocks)
                     IndexPads(block.Children, Finite(block.PadAfterDefault) ?? sceneDefault, index);
             }
+            return index;
+        }
+
+        // Every beat by its id: each snippet's beats and each option's prompt, for Flow.StepFor. Like the pad
+        // index, it depends only on the bundle's structure, so it is worked out once per bundle.
+        internal static Dictionary<string, Beat> BuildBeatIndex(Bundle bundle)
+        {
+            var index = new Dictionary<string, Beat>();
+            foreach (var scene in bundle.Scenes.Values)
+                foreach (var block in scene.Blocks)
+                    WalkNodes(block.Children, n =>
+                    {
+                        if (n.IsGroup) { if (n.Prompt != null) index[n.Prompt.Id] = n.Prompt; return; }
+                        foreach (var beat in n.Beats ?? new List<Beat>()) index[beat.Id] = beat;
+                    });
             return index;
         }
 

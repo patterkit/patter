@@ -374,6 +374,17 @@ namespace Patterkit.Patterplay
             return BeatResult(_activeSnippet.Beats[_beatIndex++]);
         }
 
+        /// <summary>
+        /// The step this flow would deliver for beat <paramref name="beatId"/> right now, as <see cref="Advance"/>
+        /// would give it: its text in the active locale, interpolated against this flow's values (unless the
+        /// project is voiced), closed captions applied, and the speaker's names and label, its pause, Game Data,
+        /// and tags. Built by the same function that builds a delivered step, so the two can't differ. It doesn't
+        /// move the flow, count a visit, or run an effect. Null for an id that is neither a beat nor an option's
+        /// prompt. For a game that keeps lines by id and shows them again (after a load, or a language switch).
+        /// </summary>
+        public StepResult StepFor(string beatId)
+            => beatId != null && _host.BeatIndex.TryGetValue(beatId, out var beat) ? BeatResult(beat) : null;
+
         public List<ChoiceOption> GetChoices() => _pendingChoice?.Options ?? new List<ChoiceOption>();
 
         /// <summary>This flow's decisions, in order. Empty unless the run was opened with

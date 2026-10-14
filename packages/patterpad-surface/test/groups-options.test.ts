@@ -10,6 +10,7 @@ import type { Scene, Group } from "@patterkit/model";
 import { sceneToDoc, docToScene } from "../src/bridge.js";
 import { insertChunk, insertOption, insertOptionAfter, setGroupProps, addOptionPrompt, seedSnippet } from "../src/groups.js";
 import { context } from "../src/context.js";
+import { optionPromptId } from "../src/zoneutil.js";
 
 /** A scene with one empty bubble, caret in its say (so insertChunk is allowed). */
 function emptyBubbleState(): EditorState {
@@ -115,5 +116,26 @@ describe("choice option editing", () => {
     expect(opt2.children).toHaveLength(1);         // a fresh bubble was added (after the prompt)
     expect(opt2.children[0]!.type).toBe("snippet");
     expect(opt2.prompt).toBeDefined();             // the prompt is preserved
+  });
+});
+
+// The live debug link marks the option a running game took by its prompt (Patterpad's flow following).
+describe("optionPromptId", () => {
+  const scene: Scene = { id: "s", type: "scene", name: "S", blocks: [{ id: "b", type: "block", name: "B", children: [
+    { id: "ch", type: "group", selector: "choice", children: [
+      { id: "o1", type: "group", prompt: { id: "P1", kind: "text" }, children: [{ id: "sn1", type: "snippet", beats: [{ id: "L1", kind: "line" }] }] },
+      { id: "o2", type: "group", children: [{ id: "sn2", type: "snippet", beats: [{ id: "L2", kind: "line" }] }] },
+    ] },
+  ] }] };
+  const doc = sceneToDoc(scene, { P1: "Ask about work", L1: "", L2: "" });
+
+  it("finds an option's prompt beat", () => {
+    expect(optionPromptId(doc, "o1")).toBe("P1");
+  });
+
+  it("is null for an option with no prompt, a node that isn't an option, and an unknown id", () => {
+    expect(optionPromptId(doc, "o2")).toBeNull();
+    expect(optionPromptId(doc, "sn1")).toBeNull();
+    expect(optionPromptId(doc, "nope")).toBeNull();
   });
 });

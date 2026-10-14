@@ -623,6 +623,10 @@ aside { border-left: 1px solid var(--line); overflow: auto; background: var(--su
   content: "◇"; flex: 0 0 auto; color: var(--accent);
   font: 0.8rem var(--font-ui); line-height: 1; user-select: none;
 }
+/* A prompt the play marks have reached (the live debug link marks the option a game took by its prompt):
+   the playhead or visited dot falls where the marker sits, so the dot takes the marker's place rather
+   than drawing over it. */
+.option-prompt:has(.beat.visited)::before, .option-prompt:has(.beat.playing)::before { visibility: hidden; }
 .option-prompt > .option-prompt-body { flex: 1 1 auto; min-width: 0; }
 /* The prompt is a single-line label, so drop the prose hanging-indent (padding-left + negative
    text-indent): on an EMPTY prompt that -2ch pulled the caret left, over the ◇ marker, so typing

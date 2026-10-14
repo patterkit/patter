@@ -18584,6 +18584,683 @@
       ]
     },
     {
+      "name": "stepFor gives the step a flow would deliver for a beat now, and moves nothing",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0e8ia0t",
+          "structureHash": "0q2k4mc"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "PLAYER",
+            "displayName": "You",
+            "qualifierLabels": {
+              "vo": "Your thoughts"
+            }
+          },
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "T_gold",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L_sfx",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "PLAYER"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "beats": [],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "line",
+                          "character": "PLAYER",
+                          "qualifier": "vo"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Quiet. {@gold} left.",
+            "L_tam": "Hm. [sighs]",
+            "T_gold": "Gold: {@gold}.",
+            "L_sfx": "[a door slams]",
+            "L_plain": "Right.",
+            "P_go": "Go."
+          },
+          "fr": {
+            "L_think": "Calme. Il en reste {@gold}.",
+            "L_tam": "Hm. [soupir]",
+            "T_gold": "Or : {@gold}.",
+            "L_sfx": "[une porte claque]",
+            "L_plain": "Bon.",
+            "P_go": "Allons-y.",
+            "cast:PLAYER": "Vous",
+            "speaker:PLAYER:vo": "Vos pensées"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_think",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Quiet. 3 left.",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Your thoughts"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_think",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Quiet. 3 left.",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Your thoughts"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "T_gold",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_gold",
+              "text": "Gold: 3."
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "P_go",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_go",
+              "text": "Go.",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Your thoughts"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "o_go",
+          "expect": []
+        },
+        {
+          "op": "stepFor",
+          "beat": "nope",
+          "expect": []
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Quiet. 3 left.",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Your thoughts"
+            }
+          ]
+        },
+        {
+          "op": "setLocale",
+          "locale": "fr"
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_think",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Calme. Il en reste 3.",
+              "character": "PLAYER",
+              "characterName": "Vous",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Vos pensées"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_tam",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_tam",
+              "text": "Hm. [soupir]",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "os",
+              "qualifierName": "O.S.",
+              "speakerLabel": "Tam (O.S.)"
+            }
+          ]
+        },
+        {
+          "op": "setClosedCaptions",
+          "on": false
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_tam",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_tam",
+              "text": "Hm.",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "os",
+              "qualifierName": "O.S.",
+              "speakerLabel": "Tam (O.S.)"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_sfx",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_sfx",
+              "text": ""
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_tam",
+              "text": "Hm.",
+              "character": "TAM",
+              "characterName": "Tam",
+              "qualifier": "os",
+              "qualifierName": "O.S.",
+              "speakerLabel": "Tam (O.S.)"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_plain",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_plain",
+              "text": "Bon.",
+              "character": "PLAYER",
+              "characterName": "Vous"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stepFor follows a voiced project's static lines",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0e8ia0t",
+          "structureHash": "0q2k4mc"
+        },
+        "voiced": true,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "PLAYER",
+            "displayName": "You",
+            "qualifierLabels": {
+              "vo": "Your thoughts"
+            }
+          },
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "T_gold",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L_sfx",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "PLAYER"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "beats": [],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "line",
+                          "character": "PLAYER",
+                          "qualifier": "vo"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_think": "Quiet. {@gold} left.",
+            "L_tam": "Hm. [sighs]",
+            "T_gold": "Gold: {@gold}.",
+            "L_sfx": "[a door slams]",
+            "L_plain": "Right.",
+            "P_go": "Go."
+          },
+          "fr": {
+            "L_think": "Calme. Il en reste {@gold}.",
+            "L_tam": "Hm. [soupir]",
+            "T_gold": "Or : {@gold}.",
+            "L_sfx": "[une porte claque]",
+            "L_plain": "Bon.",
+            "P_go": "Allons-y.",
+            "cast:PLAYER": "Vous",
+            "speaker:PLAYER:vo": "Vos pensées"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_think",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "Quiet. {@gold} left.",
+              "character": "PLAYER",
+              "characterName": "You",
+              "qualifier": "vo",
+              "qualifierName": "V.O.",
+              "speakerLabel": "Your thoughts"
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "T_gold",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_gold",
+              "text": "Gold: 3."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stepFor in an IDs-only build gives the beat's id and no names",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0e8ia0t",
+          "structureHash": "0q2k4mc"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en",
+            "fr"
+          ]
+        },
+        "cast": [
+          {
+            "name": "PLAYER",
+            "displayName": "You",
+            "qualifierLabels": {
+              "vo": "Your thoughts"
+            }
+          },
+          {
+            "name": "TAM",
+            "displayName": "Tam"
+          },
+          {
+            "name": "SFX"
+          }
+        ],
+        "qualifiers": [
+          {
+            "gameId": "vo",
+            "name": "V.O."
+          },
+          {
+            "gameId": "os",
+            "name": "O.S."
+          }
+        ],
+        "properties": [
+          {
+            "name": "gold",
+            "type": "number",
+            "default": 3
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_think",
+                        "kind": "line",
+                        "character": "PLAYER",
+                        "qualifier": "vo"
+                      },
+                      {
+                        "id": "L_tam",
+                        "kind": "line",
+                        "character": "TAM",
+                        "qualifier": "os"
+                      },
+                      {
+                        "id": "T_gold",
+                        "kind": "text"
+                      },
+                      {
+                        "id": "L_sfx",
+                        "kind": "line",
+                        "character": "SFX"
+                      },
+                      {
+                        "id": "L_plain",
+                        "kind": "line",
+                        "character": "PLAYER"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "go_c",
+                            "type": "snippet",
+                            "beats": [],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "line",
+                          "character": "PLAYER",
+                          "qualifier": "vo"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {},
+        "localisation": {
+          "mode": "ids"
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "stepFor",
+          "beat": "L_think",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "L_think",
+              "character": "PLAYER",
+              "qualifier": "vo"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_think",
+              "text": "L_think",
+              "character": "PLAYER",
+              "qualifier": "vo"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "a flow captured, closed, and restored under a new id carries on with its own values; shared state isn't rewound",
       "bundle": {
         "schema": "patter/bundle@0",

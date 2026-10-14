@@ -55,6 +55,9 @@ var node_index: Dictionary = {}
 ## Block id -> the id of the scene it is in. JS maps to `{ sceneId }`; here the value is the id.
 var block_index: Dictionary = {}
 var block_by_id: Dictionary = {}
+## Every beat by its id: a snippet's beats and an option's prompt, for PatterFlow.step_for. Built once
+## (PatterEngine._index_nodes), like the other structural indexes. JS caches one per bundle (beatIndexFor).
+var beat_by_id: Dictionary = {}
 ## Host-facing addresses (spec §6), shared with the engine: scene gameId -> internal id, and
 ## per-scene block gameId -> internal id. A flow needs them to resolve goto() by address.
 var scene_game_id_to_id: Dictionary = {}

@@ -176,6 +176,15 @@ export function findByModelId(doc: PMNode, id: string, match?: (n: PMNode) => bo
   return found;
 }
 
+/** The id of the prompt beat of the choice option with this id, or null when `optionId` isn't an option
+ *  here or the option has no prompt. The live debug link marks the option a game took by its prompt. */
+export function optionPromptId(doc: PMNode, optionId: string): string | null {
+  const option = findByModelId(doc, optionId, (n) => n.type.name === "group")?.node;
+  const prompt = option && option.childCount > 0 && option.child(0).type.name === "optionprompt" ? option.child(0) : null;
+  const beat = prompt && prompt.childCount > 0 ? prompt.child(0) : null;
+  return beat ? modelIdOf(beat) : null;
+}
+
 /** Locate a line / prose beat by id (node + its position), or null. The one shared id-walk
  *  used wherever a freshly built / just-moved beat must be found again to land the caret. */
 export function findBeatById(doc: PMNode, id: string): BeatRef | null {

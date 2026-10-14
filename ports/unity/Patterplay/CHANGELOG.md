@@ -6,6 +6,16 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **`Flow.StepFor(beatId)`**: the step a flow would deliver for a beat right now, without delivering it, for a
+  game that keeps lines by id and shows them again after a load or a language switch. It's built by the same
+  function as a delivered step, so it carries what `Advance` would: the text in the active locale, interpolated
+  (unless the project is voiced), closed captions applied, the character's and qualifier's names, the speaker
+  label, the pause, Game Data, and tags. It follows `SetLocale` and the closed-captions toggle. It doesn't move
+  the flow, count a visit, or run an effect, and it's null for an id that's neither a beat nor an option's
+  prompt. Held across all four runtimes by the conformance corpus.
+
 ## [0.25.0] - 2026-10-14
 
 ### Added

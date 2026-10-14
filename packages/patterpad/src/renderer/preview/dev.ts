@@ -9,6 +9,7 @@ import enGbAff from "../../../resources/dictionaries/en-GB/index.aff?raw";
 import enGbDic from "../../../resources/dictionaries/en-GB/index.dic?raw";
 import enUsAff from "../../../resources/dictionaries/en-US/index.aff?raw";
 import enUsDic from "../../../resources/dictionaries/en-US/index.dic?raw";
+import { createFlowFollower } from "../../shared/debug-follow.js";
 const DICT_BYTES: Record<string, { aff: string; dic: string }> = {
   "en-GB": { aff: enGbAff, dic: enGbDic },
   "en-US": { aff: enUsAff, dic: enUsDic },
@@ -87,6 +88,33 @@ const SEARCH_INDEX = [
 const view = new URLSearchParams(location.search).get("view");
 let identity: { name: string; email?: string } | null = view === "firstrun" ? null : { name: "Ian Thomas" };
 // ?view=overview -> the #3a landing (open with no remembered scene); default -> the editor on a scene.
+// Live debug link (#181): a fake link over the REAL follow state (shared/debug-follow.ts), so the flow
+// picker, most-recent following, the hand-over, and the taken-option mark run as they do in the app.
+// Play > Live Link (or the chip) "connects" a game with three flows. Drive it from the console:
+// `__debug.frame(flow, sceneId, beatId, type, choiceId?)`, `__debug.open(flow)`, `__debug.close(flow)`.
+let playMark: ((id: string | null, sceneId?: string, optionId?: string) => void) | null = null;
+let debugPush: ((s: unknown) => void) | null = null;
+let debugOn = false;
+const debugNow = (): unknown => debugOn ? { state: "connected", port: 4471, project: "The Tavern", build: "match", ...follower.view() } : { state: "off" };
+const follower = createFlowFollower({
+  onFrame: (f) => playMark?.(f.beatId, f.sceneId ?? undefined, f.type === "choice" ? f.choiceId : undefined),
+  onChange: () => { if (debugOn) debugPush?.(debugNow()); },
+});
+(window as unknown as { __debug: unknown }).__debug = {
+  open: (flow: string) => follower.flowOpen(flow),
+  close: (flow: string) => follower.flowClose(flow),
+  frame: (flow: string, sceneId: string | null, beatId: string | null, type = "line", choiceId?: string) => follower.frame({ flow, sceneId, beatId, type, choiceId }),
+  status: debugNow,
+};
+const debugConnect = (): unknown => {
+  debugOn = true;
+  follower.hello(["patterstage/@oda", "patterstage/gate/talk", "patterstage/gate/tale#p7", "patterstage/gate/tale#p12", "menu/title"]);
+  follower.frame({ flow: "menu/title", sceneId: "scn_street", beatId: null, type: "line" });
+  follower.frame({ flow: "patterstage/@oda", sceneId: "scn_tavern", beatId: "L_bo_reply", type: "line" });
+  follower.frame({ flow: "patterstage/gate/talk", sceneId: "scn_tavern", beatId: "L_greet", type: "line" });
+  return debugNow();
+};
+
 const open = view === "welcome" || view === "firstrun" ? null : view === "overview" ? { project } : { project, lastScene: "scn_tavern" };
 let castAdded = false;     // preview-only: the add-to-cast quick-fix flips this so the BO problem clears
 let propDeclared = false;  // preview-only: the declare-property quick-fix flips this so the @strength problem clears
@@ -139,12 +167,12 @@ const stub = {
   micAccess: async () => true, // no TCC gate in the browser preview
 
   setRecordingMode: () => undefined,
-  // Live debug link (#181): a fake server that "connects" a couple of flows so the panel UI is exercisable.
-  debugStart: async () => ({ state: "connected", port: 4471, project: "The Tavern", build: "match", flows: ["main", "ambient"], following: "main" }),
-  debugStop: async () => ({ state: "off" }),
-  debugStatus: async () => ({ state: "off" }),
-  debugFollow: () => undefined,
-  onDebugStatus: () => undefined,
+  // Live debug link (#181): the fake link above, which "connects" several flows so the picker is exercisable.
+  debugStart: async () => debugConnect(),
+  debugStop: async () => { debugOn = false; follower.clear(); return debugNow(); },
+  debugStatus: async () => debugNow(),
+  debugFollow: (flow: string | null) => follower.follow(flow),
+  onDebugStatus: (h: (s: unknown) => void) => { debugPush = h; },
   // In-memory rewrite proposals so the suggest-rewrite flow round-trips within a preview session.
   readSuggestions: async () => (window as unknown as { __suggestions?: unknown[] }).__suggestions ?? [],
   saveSuggestions: async (_sceneId: string, s: unknown[]) => { (window as unknown as { __suggestions?: unknown }).__suggestions = s; return { ok: true }; },
@@ -315,7 +343,7 @@ const stub = {
   rememberScene: async () => undefined,
   hydrate: async () => project, // lazy-open phase 2 (#171): the full scene list is already complete here
   openPlay: async () => undefined,
-  onPlayMark: () => undefined,
+  onPlayMark: (h: (id: string | null, sceneId?: string, optionId?: string) => void) => { playMark = h; }, // the fake debug link's frames
   onPlayFollow: () => undefined,
   onPlayReset: () => undefined,
   // The search tool window is a separate Electron window (#205); inert in the browser preview.

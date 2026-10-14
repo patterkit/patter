@@ -111,7 +111,7 @@ const api: PatterApi = {
   openPlay: (sceneId, blockId) => ipcRenderer.invoke("play:open", sceneId, blockId),
   resetWindows: () => ipcRenderer.invoke("view:resetWindows"),
   playEdited: (sceneId, flow, loc) => { void ipcRenderer.invoke("play:edited", sceneId, flow, loc); },
-  onPlayMark: (handler) => { ipcRenderer.on("play:mark", (_e, id: string | null, sceneId?: string) => handler(id, sceneId)); },
+  onPlayMark: (handler) => { ipcRenderer.on("play:mark", (_e, id: string | null, sceneId?: string, optionId?: string) => handler(id, sceneId, optionId)); },
   onPlayFollow: (handler) => { ipcRenderer.on("play:follow", (_e, sceneId: string, beatId: string) => handler(sceneId, beatId)); },
   onPlayReset: (handler) => { ipcRenderer.on("play:reset", () => handler()); },
   validate: (live) => ipcRenderer.invoke("project:validate", live),

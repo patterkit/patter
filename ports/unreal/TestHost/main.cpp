@@ -837,6 +837,12 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                 }
                 else if (kind == "useFlow") current = op.at("flow").str;
                 else if (kind == "advance") chunk.push(normalize(engine->getFlow(current)->advance(), isIdsOnly(bundle)));
+                // The step a flow would deliver for a beat now, recorded as a delivered one is; none for an unknown id.
+                else if (kind == "stepFor")
+                {
+                    const std::string flowId = op.has("flow") ? op.at("flow").str : current;
+                    if (auto s = engine->getFlow(flowId)->stepFor(op.at("beat").str)) chunk.push(normalize(*s, isIdsOnly(bundle)));
+                }
                 else if (kind == "choose") engine->getFlow(current)->choose(op.at("id").str);
                 // Host navigation by address. No transcript of its own; the next advance shows where it
                 // landed. expectResult pins the returned bool.

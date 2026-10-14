@@ -312,6 +312,17 @@ func get_visit_counts() -> Dictionary:
 	return _visit_counts.duplicate()
 
 
+## The step this flow would deliver for beat `beat_id` right now, as advance() would give it: its text in
+## the active locale, interpolated against this flow's values (unless the project is voiced), closed
+## captions applied, and the speaker's names and label, its pause, Game Data, and tags. Built by the same
+## function that builds a delivered step, so the two can't differ. It doesn't move the flow, count a
+## visit, or run an effect. Null for an id that is neither a beat nor an option's prompt. For a game that
+## keeps lines by id and shows them again (after a load, or a language switch). JS: Flow.stepFor.
+func step_for(beat_id: String):
+	var beat = _host.beat_by_id.get(beat_id)
+	return _beat_result(beat) if beat != null else null
+
+
 func get_choices() -> Array:
 	return _pending["options"] if _pending != null else []
 

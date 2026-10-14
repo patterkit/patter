@@ -43,6 +43,7 @@ export interface DictionaryInfo { id: string; label: string; builtin: boolean }
 /** The raw Hunspell bytes (UTF-8 text) the renderer builds its nspell engine from. */
 export interface DictionaryData { aff: string; dic: string }
 import type { ReportData, SearchFocus, CoverageReport } from "@patterkit/ops";
+import type { FollowView } from "./debug-follow.js";
 
 export type { ReportData, SearchFocus, CoverageReport, CoverageBeat } from "@patterkit/ops";
 export type { CoverageDriver, HostScopeRegistry } from "@patterkit/model";
@@ -652,12 +653,14 @@ export interface AudioEntry { status: string; path: string; textHash?: string }
 
 /** Live debug link status (#181) shown in the debug panel. `build` compares the running game's bundle hash
  *  to the project's current one: "match" (in sync), "stale" (rebuild to re-sync), "unknown" (no project).
- *  The link is loopback-only (127.0.0.1), so there's no pairing token: only local processes can reach it. */
+ *  The link is loopback-only (127.0.0.1), so there's no pairing token: only local processes can reach it.
+ *  Connected, it carries the follow state (shared/debug-follow.ts): the live flows, the one followed,
+ *  whether that's the most recent or a flow picked in the editor, and each flow's current scene. */
 export type DebugStatus =
   | { state: "off" }
   | { state: "error"; message: string }
   | { state: "listening"; port: number }
-  | { state: "connected"; port: number; project?: string; build: "match" | "stale" | "unknown"; flows: string[]; following: string | null };
+  | ({ state: "connected"; port: number; project?: string; build: "match" | "stale" | "unknown" } & FollowView);
 
 /** The detached SEARCH window's bridge (window.patterSearch). It queries the project-wide index in the
  *  main process and drives the editor window (jump) over IPC - the editor stays live underneath. */
@@ -992,11 +995,12 @@ export interface PatterApi {
    *  behind the blocking overlay). */
   setRecordingMode(on: boolean): void;
   /** Live debug link (#181): start / stop the localhost server an external game streams its cursor into,
-   *  query the current status, follow a specific flow, and subscribe to status pushes. */
+   *  query the current status, follow a chosen flow (or the most recent one, with null), and subscribe to
+   *  status pushes. */
   debugStart(): Promise<DebugStatus>;
   debugStop(): Promise<DebugStatus>;
   debugStatus(): Promise<DebugStatus>;
-  debugFollow(flowId: string): void;
+  debugFollow(flowId: string | null): void;
   onDebugStatus(handler: (status: DebugStatus) => void): void;
   /** Read a scene's "suggest a rewrite" proposals (review flow): open + resolved alike. */
   readSuggestions(sceneId: string): Promise<Suggestion[]>;
@@ -1045,8 +1049,10 @@ export interface PatterApi {
    *  on its next restart, and an open run is marked stale until then. */
   playEdited(sceneId: string, flow: string, loc: string): void;
   /** Subscribe to the editor step-marker (the play window's current beat id, or null to clear). The
-   *  beat's `sceneId` lets the editor switch scenes when play crosses into a different one. */
-  onPlayMark(handler: (beatId: string | null, sceneId?: string) => void): void;
+   *  beat's `sceneId` lets the editor switch scenes when play crosses into a different one. `optionId`
+   *  comes only from the live debug link: a choice frame sent again with the option the game took, which
+   *  the editor marks by moving the playhead onto that option's prompt. */
+  onPlayMark(handler: (beatId: string | null, sceneId?: string, optionId?: string) => void): void;
   /** "Follow in the editor" is on and the run just played this beat: reveal it. Never focuses. */
   onPlayFollow(handler: (sceneId: string, beatId: string) => void): void;
   /** Subscribe to a play-marks reset (clear the visited trail + playhead). */
