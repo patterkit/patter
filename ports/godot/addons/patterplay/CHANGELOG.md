@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-14
+
 ### Added
 
 - **`flow.step_for(beat_id)`: the step a flow would deliver for a beat right now.** It's what `advance()`

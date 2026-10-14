@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-14
+
 ### Added
 
 - **A line's step by its id**: `UPatterFlow::StepFor(BeatId, OutStep)` fills in the step the flow would

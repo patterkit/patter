@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-14
+
 ### Added
 
 - **`Flow.StepFor(beatId)`**: the step a flow would deliver for a beat right now, without delivering it, for a

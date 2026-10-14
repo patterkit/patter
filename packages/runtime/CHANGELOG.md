@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-14
+
 ### Added
 
 - **`flow.stepFor(beatId)`**: the step this flow would deliver for a beat right now, built by the same function
