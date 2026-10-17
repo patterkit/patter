@@ -65,6 +65,14 @@ An `openFlow` op may carry `expectResult`: `false` means the address must not re
 must change nothing - no flow opened, a flow already open under that name neither
 closed nor replaced, and the current flow unmoved.
 
+### Characters outside the Basic Multilingual Plane
+
+The corpus writes a character outside the BMP (an emoji, say) inside a case's inputs, its
+`bundle`, `bundleB`, and `envelope`, as an escaped UTF-16 surrogate pair (`"\ud83d\ude00"`), as
+some JSON writers do, and everywhere else, the expectations included, as raw UTF-8. A port's
+JSON reader must join the pair into the one character: one that decodes each half on its own
+reads a string other than the one it's compared with. `serializeCorpus` writes the file.
+
 ### Locale resolution
 
 A string the active locale is missing falls back to the **default-locale (source)**
@@ -83,8 +91,8 @@ is `floor(next() * (b - a + 1)) + a`; `shuffle` picks `floor(next() * poolSize)`
 
 - Fixtures are authored in [`src/cases.ts`](./src/cases.ts) as **source** with
   **hand-authored** `expected` / `expectedTranscript` - the expectations are the
-  contract, never derived from the engine. `buildCorpus` compiles them to
-  `corpus.json`.
+  contract, never derived from the engine. `buildCorpus` compiles them, and
+  `serializeCorpus` writes them as `corpus.json`.
 - The test ([`test/conformance.test.ts`](./test/conformance.test.ts)) replays the
   corpus through the runtime-only runners and asserts every expectation, and file-
   snapshots `corpus.json`. After changing fixtures, regenerate + review:

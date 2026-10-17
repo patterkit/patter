@@ -4059,6 +4059,86 @@
       ]
     },
     {
+      "name": "an emoji the bundle escapes as a surrogate pair reads as the one character",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "0z1wy5m",
+          "structureHash": "0xvta7n"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "mood",
+            "type": "string",
+            "shared": true,
+            "default": "\ud83d\ude00"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L",
+                        "kind": "line",
+                        "character": "NPC"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L": "Welcome \ud83d\udc4b, I'm {@mood}."
+          }
+        }
+      },
+      "start": {
+        "scene": "s"
+      },
+      "expectedTranscript": [
+        {
+          "type": "line",
+          "id": "L",
+          "text": "Welcome 👋, I'm 😀.",
+          "character": "NPC"
+        },
+        {
+          "type": "end"
+        }
+      ]
+    },
+    {
       "name": "line carries the resolved character name (default locale -> authoring displayName)",
       "bundle": {
         "schema": "patter/bundle@0",
@@ -10515,6 +10595,133 @@
               "type": "text",
               "id": "TR",
               "text": "went right"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "save/load keeps an emoji property value, escaped as a surrogate pair in the save",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ueekmc",
+          "structureHash": "0c4vt4y"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "mood",
+            "type": "string",
+            "shared": true,
+            "default": "calm"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "one",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@mood",
+                        "value": {
+                          "src": "\"\ud83d\ude42\"",
+                          "ast": [
+                            "s",
+                            "\ud83d\ude42"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "two",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "mood={@mood}",
+            "T2": "still {@mood}"
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T1",
+              "text": "mood=🙂"
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "still 🙂"
             }
           ]
         },
@@ -21597,6 +21804,203 @@
               "type": "text",
               "id": "T_a",
               "text": "Gone."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a save written by the JS reference with an emoji property value, escaped as a surrogate pair, loads as the one character",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ueekmc",
+          "structureHash": "0c4vt4y"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "NPC"
+          }
+        ],
+        "properties": [
+          {
+            "name": "mood",
+            "type": "string",
+            "shared": true,
+            "default": "calm"
+          }
+        ],
+        "scenes": {
+          "s": {
+            "id": "s",
+            "type": "scene",
+            "name": "S",
+            "blocks": [
+              {
+                "id": "b",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "one",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T1",
+                        "kind": "text"
+                      }
+                    ],
+                    "onEnter": [
+                      {
+                        "kind": "set",
+                        "target": "@mood",
+                        "value": {
+                          "src": "\"\ud83d\ude42\"",
+                          "ast": [
+                            "s",
+                            "\ud83d\ude42"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "two",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "T2",
+                        "kind": "text"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "T1": "mood={@mood}",
+            "T2": "still {@mood}"
+          }
+        }
+      },
+      "envelope": {
+        "schema": "patter/save@0",
+        "save": {
+          "version": 3,
+          "registry": {
+            "patter": {
+              "mood": "\ud83d\ude42"
+            },
+            "patter/flow/main/patter": {},
+            "patter/flow/main/scene/s": {},
+            "patter/scene/s": {}
+          },
+          "sharedVisits": {
+            "s": 1,
+            "b": 1,
+            "one": 1
+          },
+          "sharedSelectors": {},
+          "flows": {
+            "main": {
+              "rngState": 2654435769,
+              "visits": {
+                "s": 1,
+                "b": 1,
+                "one": 1
+              },
+              "cursor": {
+                "flowEnded": false,
+                "currentSceneId": "s",
+                "stack": [
+                  {
+                    "sceneId": "s",
+                    "containerId": "b",
+                    "index": 1,
+                    "nextId": "two"
+                  }
+                ],
+                "activeSnippetId": "one",
+                "beatIndex": 1,
+                "pendingChoice": null,
+                "pendingPromptOwnerId": null,
+                "selectors": {}
+              }
+            }
+          }
+        }
+      },
+      "keyPaths": [
+        "save",
+        "save/flows",
+        "save/flows/main",
+        "save/flows/main/cursor",
+        "save/flows/main/cursor/activeSnippetId",
+        "save/flows/main/cursor/beatIndex",
+        "save/flows/main/cursor/currentSceneId",
+        "save/flows/main/cursor/flowEnded",
+        "save/flows/main/cursor/pendingChoice",
+        "save/flows/main/cursor/pendingPromptOwnerId",
+        "save/flows/main/cursor/selectors",
+        "save/flows/main/cursor/stack",
+        "save/flows/main/cursor/stack[0]",
+        "save/flows/main/cursor/stack[0]/containerId",
+        "save/flows/main/cursor/stack[0]/index",
+        "save/flows/main/cursor/stack[0]/nextId",
+        "save/flows/main/cursor/stack[0]/sceneId",
+        "save/flows/main/rngState",
+        "save/flows/main/visits",
+        "save/flows/main/visits/b",
+        "save/flows/main/visits/one",
+        "save/flows/main/visits/s",
+        "save/registry",
+        "save/registry/patter",
+        "save/registry/patter/flow/main/patter",
+        "save/registry/patter/flow/main/scene/s",
+        "save/registry/patter/mood",
+        "save/registry/patter/scene/s",
+        "save/sharedSelectors",
+        "save/sharedVisits",
+        "save/sharedVisits/b",
+        "save/sharedVisits/one",
+        "save/sharedVisits/s",
+        "save/version",
+        "schema"
+      ],
+      "script": [
+        {
+          "op": "useFlow",
+          "flow": "main"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T2",
+              "text": "still 🙂"
             }
           ]
         },

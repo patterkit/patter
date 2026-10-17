@@ -125,6 +125,26 @@ const interpolation = {
   ],
 } satisfies RuntimeFixture;
 
+// --- a character outside the Basic Multilingual Plane, escaped in the bundle --------------------------
+// The corpus writes every bundle and save envelope with such characters as escaped surrogate pairs
+// ("\ud83d\ude00"), as some JSON writers do, while the expectations keep them as raw UTF-8: a reader that
+// decodes each half of the pair on its own reads a different string from the one it is compared with.
+const escapedEmoji = {
+  name: "an emoji the bundle escapes as a surrogate pair reads as the one character",
+  project: project({ properties: [{ name: "mood", type: "string", shared: true, default: "\u{1F600}" }] }),
+  scenes: [{
+    id: "s", type: "scene", name: "S",
+    blocks: [{ id: "b", type: "block", name: "B", children: [
+      { id: "sn", type: "snippet", beats: [{ id: "L", kind: "line", character: "NPC" }], jump: { to: "END" } },
+    ] }],
+  }],
+  locales: [loc("s", { L: "Welcome \u{1F44B}, I'm {@mood}." })],
+  expectedTranscript: [
+    { type: "line", id: "L", text: "Welcome \u{1F44B}, I'm \u{1F600}.", character: "NPC" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
 // --- a seeded shuffle sequence (pins the PRNG: seed 7 -> index 0 of 3) --------
 const shuffle = {
   name: "seeded shuffle selects a deterministic child",
@@ -1351,6 +1371,26 @@ const scriptedSaveLoad = {
     { op: "saveLoad" }, // serialise everything, fresh engine, restore
     { op: "advance", expect: [{ type: "text", id: "T2", text: "second" }] }, // sequence cursor survived
     { op: "advance", expect: [{ type: "text", id: "TD", text: "laps=1" }] }, // scene prop + visit count survived
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+const scriptedEscapedEmojiSaveLoad = {
+  name: "save/load keeps an emoji property value, escaped as a surrogate pair in the save",
+  project: project({ properties: [{ name: "mood", type: "string", shared: true, default: "calm" }] }),
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b", type: "block", name: "B", children: [
+      { id: "one", type: "snippet", beats: [{ id: "T1", kind: "text" }],
+        onEnter: [{ kind: "set", target: "@mood", value: '"\u{1F642}"' }] },
+      { id: "two", type: "snippet", beats: [{ id: "T2", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }],
+  locales: [loc("s", { T1: "mood={@mood}", T2: "still {@mood}" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T1", text: "mood=\u{1F642}" }] },
+    { op: "saveLoad" }, // the value comes back from the save
+    { op: "advance", expect: [{ type: "text", id: "T2", text: "still \u{1F642}" }] },
     { op: "advance", expect: [{ type: "end" }] },
   ],
 } satisfies ScriptedFixture;
@@ -3280,13 +3320,13 @@ export const cases: Fixtures = {
     crossScene, cycle, once, voiced, escaped, shuffle, sequence,
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
-    characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
+    escapedEmoji, characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent, speakerLabels, speakerLabelsLocale,
     linePadding, linePaddingPrompt,
     specAndSums, specFiller, specCheckFlags, specTie, specDegrades,
   ruleErrorsPlayThrough, ruleBestMatchFailingPart, ruleNumberText, rulePromptTags, ruleAllGreyedRunsDry],
-  scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedSetLocale,
+  scripted: [scriptedMultiFlow, scriptedDefaultStartScene, scriptedGoto, scriptedReset, scriptedSaveLoad, scriptedSaveLoadChoice, scriptedEscapedEmojiSaveLoad, scriptedSetLocale,
     scriptedClosedCaptions, scriptedOptionGroup, scriptedStickyOnce, scriptedFallback,
     scriptedHotSwapReword, scriptedHotSwapInsert, scriptedHotSwapDeleteActive, scriptedHotSwapDropOption,
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
@@ -3314,6 +3354,7 @@ export const cases: Fixtures = {
       ],
     },
     asSaveFixture(scriptedEmptySpeakerSaveLoad, "a save written by the JS reference keeps a pending choice's empty speaker fields"),
+    asSaveFixture(scriptedEscapedEmojiSaveLoad, "a save written by the JS reference with an emoji property value, escaped as a surrogate pair, loads as the one character"),
     asSaveFixture(scriptedQualifierSaveLoad, "a save written by the JS reference keeps a qualified prompt's qualifier, pending and spoken back"),
   ],
   logs: [decisionLog],

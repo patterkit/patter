@@ -8,6 +8,7 @@
 #include <utility>
 #include <stdexcept>
 #include <cstdlib>
+#include "Patter/JsonEscape.h"
 
 struct JsonValue
 {
@@ -127,33 +128,14 @@ private:
                     case 'b': out += '\b'; break;
                     case 'f': out += '\f'; break;
                     case 'u':
-                    {
-                        // Decode \uXXXX to UTF-8 (BMP only - enough for the corpus).
-                        unsigned code = 0;
-                        for (int k = 0; k < 4; ++k) { char h = next(); code = code * 16 + hexVal(h); }
-                        appendUtf8(out, code);
+                        if (!patter::jsonescape::decodeUnicodeEscape(s_, i_, out)) err("bad \\u escape");
                         break;
-                    }
                     default: out += e; break;
                 }
             }
             else out += c;
         }
         err("unterminated string");
-    }
-
-    static int hexVal(char h)
-    {
-        if (h >= '0' && h <= '9') return h - '0';
-        if (h >= 'a' && h <= 'f') return h - 'a' + 10;
-        if (h >= 'A' && h <= 'F') return h - 'A' + 10;
-        return 0;
-    }
-    static void appendUtf8(std::string& out, unsigned code)
-    {
-        if (code < 0x80) out += static_cast<char>(code);
-        else if (code < 0x800) { out += static_cast<char>(0xC0 | (code >> 6)); out += static_cast<char>(0x80 | (code & 0x3F)); }
-        else { out += static_cast<char>(0xE0 | (code >> 12)); out += static_cast<char>(0x80 | ((code >> 6) & 0x3F)); out += static_cast<char>(0x80 | (code & 0x3F)); }
     }
 
     JsonValue parseArray()

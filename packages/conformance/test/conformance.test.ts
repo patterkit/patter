@@ -11,14 +11,17 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
 import { describeBundle, Engine } from "@patterkit/runtime";
-import { buildCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runAudioCase, cases } from "../src/index.js";
+import { buildCorpus, serializeCorpus, runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runSaveCase, runGameDataCase, runLogCase, runAudioCase, cases } from "../src/index.js";
 
 const corpus = buildCorpus(cases);
 const corpusPath = fileURLToPath(new URL("../corpus.json", import.meta.url));
 
 describe("conformance corpus", () => {
   it("matches the committed portable corpus.json", async () => {
-    await expect(JSON.stringify(corpus, null, 2) + "\n").toMatchFileSnapshot(corpusPath);
+    await expect(serializeCorpus(corpus)).toMatchFileSnapshot(corpusPath);
+  });
+  it("reads back as the corpus it was written from, escaped surrogate pairs and all", () => {
+    expect(JSON.parse(serializeCorpus(corpus))).toEqual(corpus);
   });
 });
 

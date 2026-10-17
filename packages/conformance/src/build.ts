@@ -120,3 +120,24 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
 
   return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio };
 }
+
+// The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a
+// character outside the Basic Multilingual Plane as an escaped UTF-16 surrogate pair ("\ud83d\ude00"), as some
+// JSON writers do, while the expectations keep it as raw UTF-8. A reader must join the pair into the one
+// character: one that decodes each half on its own reads a string other than the one it is compared with.
+const ESCAPED_INPUTS = new Set(["bundle", "bundleB", "envelope"]);
+const escapeAstral = (json: string): string =>
+  json.replace(/[\u{10000}-\u{10FFFF}]/gu, (c) => `\\u${c.charCodeAt(0).toString(16)}\\u${c.charCodeAt(1).toString(16)}`);
+
+export function serializeCorpus(corpus: Corpus): string {
+  // Each input is held out of the first pass behind a marker string, then written escaped at the marker's
+  // indent, so the text is exactly JSON.stringify's apart from the escapes.
+  const held: unknown[] = [];
+  const text = JSON.stringify(corpus, (key, value: unknown) => {
+    if (!ESCAPED_INPUTS.has(key) || value === null || typeof value !== "object") return value;
+    held.push(value);
+    return `\u0000input-${held.length - 1}`;
+  }, 2);
+  return text.replace(/^( *)(.*)"\\u0000input-(\d+)"/gm, (_, indent: string, before: string, i: string) =>
+    indent + before + escapeAstral(JSON.stringify(held[Number(i)], null, 2)).replace(/\n/g, "\n" + indent)) + "\n";
+}

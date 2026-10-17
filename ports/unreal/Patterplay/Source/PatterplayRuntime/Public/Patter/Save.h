@@ -30,6 +30,7 @@
 #include <utility>
 #include <vector>
 #include "Engine.h"
+#include "JsonEscape.h"    // jsonescape::decodeUnicodeEscape, shared with the TestHost's reader
 #include "StateLogger.h"   // loggerdetail::jsonQuote + formatStateValue (the shared value rendering)
 
 namespace patter
@@ -274,23 +275,8 @@ namespace patter
                         case 'b': out += '\b'; break;
                         case 'f': out += '\f'; break;
                         case 'u':
-                        {
-                            if (i_ + 4 > s_.size()) fail("bad \\u escape");
-                            unsigned code = 0;
-                            for (int k = 0; k < 4; ++k)
-                            {
-                                char h = s_[i_++]; code <<= 4;
-                                if (h >= '0' && h <= '9') code += h - '0';
-                                else if (h >= 'a' && h <= 'f') code += 10 + h - 'a';
-                                else if (h >= 'A' && h <= 'F') code += 10 + h - 'A';
-                                else fail("bad \\u escape");
-                            }
-                            // BMP only (the writer never emits surrogate pairs; save keys/values are UTF-8 already).
-                            if (code < 0x80) out += static_cast<char>(code);
-                            else if (code < 0x800) { out += static_cast<char>(0xC0 | (code >> 6)); out += static_cast<char>(0x80 | (code & 0x3F)); }
-                            else { out += static_cast<char>(0xE0 | (code >> 12)); out += static_cast<char>(0x80 | ((code >> 6) & 0x3F)); out += static_cast<char>(0x80 | (code & 0x3F)); }
+                            if (!jsonescape::decodeUnicodeEscape(s_, i_, out)) fail("bad \\u escape");
                             break;
-                        }
                         default: fail("bad escape");
                     }
                 }

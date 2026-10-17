@@ -9,6 +9,6 @@ export type {
   Corpus, ExpressionCase, SpecificityCase, RuntimeCase, ScriptedCase, GameDataCase, SaveCase, ScriptOp, CaseEngineOptions, TranscriptStep, TranscriptOption, TranscriptPrompt, ScopeBag,
   ExpressionFixture, SpecificityFixture, RuntimeFixture, ScriptedFixture, GameDataFixture, SaveFixture, Fixtures,
 } from "./types.js";
-export { buildCorpus } from "./build.js";
+export { buildCorpus, serializeCorpus } from "./build.js";
 export { runExpressionCase, runSpecificityCase, runRuntimeCase, runScriptedCase, runScript, runSaveCase, runGameDataCase, runLogCase, runAudioCase, envelopeKeyPaths, normaliseStep, mulberry32 } from "./runner.js";
 export { cases } from "./cases.js";

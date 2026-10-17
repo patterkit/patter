@@ -966,11 +966,34 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
     return { ok, engine };
 }
 
+// jsonQuote, writing each character outside the Basic Multilingual Plane back as the escaped surrogate
+// pair the corpus gave it as, so the save boundary's own reader (Save.h) has to join the pair too.
+static std::string jsonQuoteAstralEscaped(const std::string& s)
+{
+    const std::string q = patter::loggerdetail::jsonQuote(s);
+    std::string out;
+    for (size_t i = 0; i < q.size(); ++i)
+    {
+        const unsigned char c = static_cast<unsigned char>(q[i]);
+        if ((c & 0xF8) == 0xF0 && i + 3 < q.size())
+        {
+            auto cont = [&](size_t k) { return static_cast<unsigned>(static_cast<unsigned char>(q[i + k]) & 0x3F); };
+            const unsigned cp = (((c & 0x07u) << 18) | (cont(1) << 12) | (cont(2) << 6) | cont(3)) - 0x10000;
+            char buf[16];
+            std::snprintf(buf, sizeof buf, "\\u%04x\\u%04x", 0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+            out += buf;
+            i += 3;
+        }
+        else out += q[i];
+    }
+    return out;
+}
+
 // JSON text of a parsed value, for handing the corpus's envelope to the save boundary as a STRING -
 // which is how a game hands it over, and the only entry the boundary has.
 static std::string jsonText(const JsonValue& v)
 {
-    using patter::loggerdetail::jsonQuote;
+    const auto jsonQuote = jsonQuoteAstralEscaped;
     switch (v.type)
     {
         case JsonValue::Null: return "null";

@@ -7,6 +7,14 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An escaped surrogate pair reads as the one character.** JSON writes a character outside the Basic
+  Multilingual Plane, such as an emoji, as an escaped pair (`"\ud83d\ude00"`), and some writers do so by
+  default. The save reader (`Patter/Save.h`) decoded each half on its own, so a save with an escaped emoji in
+  a property value loaded as two invalid halves. It now joins the pair, and writes a surrogate without its
+  partner as U+FFFD. The plugin reads bundles through Unreal's own JSON library, which already joined them.
+
 ## [0.26.0] - 2026-10-14
 
 ### Added
