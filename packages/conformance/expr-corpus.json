@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "prng": [
     {
       "name": "seed zero",
@@ -4206,6 +4206,730 @@
         }
       },
       "expected": true
+    }
+  ],
+  "qualities": [
+    {
+      "name": "a quality orders by its ladder, not the alphabet",
+      "src": "@v.debt >= \"confronted\"",
+      "ast": [
+        "bin",
+        ">=",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "s",
+          "confronted"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "a later stage is past an earlier one",
+      "src": "@v.debt > \"troubled\"",
+      "ast": [
+        "bin",
+        ">",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "s",
+          "troubled"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "resolved",
+          "mood": "calm",
+          "twin": "resolved"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "an earlier stage is below a later one",
+      "src": "@v.debt < \"resolved\"",
+      "ast": [
+        "bin",
+        "<",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "s",
+          "resolved"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "the quality may stand on either side",
+      "src": "\"confronted\" <= @v.debt",
+      "ast": [
+        "bin",
+        "<=",
+        [
+          "s",
+          "confronted"
+        ],
+        [
+          "sv",
+          "v",
+          "debt"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "resolved",
+          "mood": "calm",
+          "twin": "resolved"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "ordering against a name that is not a stage is an error",
+      "src": "@v.debt >= \"settled\"",
+      "ast": [
+        "bin",
+        ">=",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "s",
+          "settled"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expectError": true
+    },
+    {
+      "name": "two different qualities never order",
+      "src": "@v.debt > @v.mood",
+      "ast": [
+        "bin",
+        ">",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "sv",
+          "v",
+          "mood"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expectError": true
+    },
+    {
+      "name": "two qualities on the same ladder order",
+      "src": "@v.debt >= @v.twin",
+      "ast": [
+        "bin",
+        ">=",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "sv",
+          "v",
+          "twin"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "confronted",
+          "mood": "calm",
+          "twin": "confronted"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "arithmetic on a quality is an error",
+      "src": "@v.debt + 1",
+      "ast": [
+        "bin",
+        "+",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "n",
+          1
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expectError": true
+    },
+    {
+      "name": "equality stays plain string equality",
+      "src": "@v.debt == \"troubled\"",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "s",
+          "troubled"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": true
+    },
+    {
+      "name": "equality with a name that is not a stage is false, not an error",
+      "src": "@v.debt == \"settled\"",
+      "ast": [
+        "bin",
+        "==",
+        [
+          "sv",
+          "v",
+          "debt"
+        ],
+        [
+          "s",
+          "settled"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": false
+    },
+    {
+      "name": "advance steps one rung",
+      "src": "advance(@v.debt)",
+      "ast": [
+        "call",
+        "advance",
+        [
+          "sv",
+          "v",
+          "debt"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": "confronted"
+    },
+    {
+      "name": "advance stays on the top rung",
+      "src": "advance(@v.debt)",
+      "ast": [
+        "call",
+        "advance",
+        [
+          "sv",
+          "v",
+          "debt"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "resolved",
+          "mood": "calm",
+          "twin": "resolved"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expected": "resolved"
+    },
+    {
+      "name": "advance needs a quality reference",
+      "src": "advance(\"troubled\")",
+      "ast": [
+        "call",
+        "advance",
+        [
+          "s",
+          "troubled"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "troubled",
+          "mood": "calm",
+          "twin": "troubled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expectError": true
+    },
+    {
+      "name": "advance from a value off the ladder (a drifted save) is an error",
+      "src": "advance(@v.debt)",
+      "ast": [
+        "call",
+        "advance",
+        [
+          "sv",
+          "v",
+          "debt"
+        ]
+      ],
+      "scopes": {
+        "v": {
+          "debt": "settled",
+          "mood": "calm",
+          "twin": "settled"
+        }
+      },
+      "qualities": {
+        "v.debt": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ],
+        "v.mood": [
+          "calm",
+          "tense"
+        ],
+        "v.twin": [
+          "troubled",
+          "confronted",
+          "resolved"
+        ]
+      },
+      "expectError": true
+    }
+  ],
+  "stages": [
+    {
+      "name": "index is the stage's position",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "index",
+      "args": [
+        "resolved"
+      ],
+      "expected": 2
+    },
+    {
+      "name": "index of the first stage is 0",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "index",
+      "args": [
+        "troubled"
+      ],
+      "expected": 0
+    },
+    {
+      "name": "index of a name that is not a stage is -1",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "index",
+      "args": [
+        "settled"
+      ],
+      "expected": -1
+    },
+    {
+      "name": "index of a value that is not a name is -1",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "index",
+      "args": [
+        1
+      ],
+      "expected": -1
+    },
+    {
+      "name": "compare orders by the ladder, not the alphabet",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "compare",
+      "args": [
+        "troubled",
+        "confronted"
+      ],
+      "expected": -1
+    },
+    {
+      "name": "compare says a later stage is above",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "compare",
+      "args": [
+        "resolved",
+        "confronted"
+      ],
+      "expected": 1
+    },
+    {
+      "name": "compare says a stage is level with itself",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "compare",
+      "args": [
+        "confronted",
+        "confronted"
+      ],
+      "expected": 0
+    },
+    {
+      "name": "compare refuses a name that is not a stage",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "compare",
+      "args": [
+        "troubled",
+        "settled"
+      ],
+      "expectError": true
+    },
+    {
+      "name": "compare refuses a value that is not a name",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "compare",
+      "args": [
+        2,
+        "troubled"
+      ],
+      "expectError": true
+    },
+    {
+      "name": "next steps one rung",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "next",
+      "args": [
+        "troubled"
+      ],
+      "expected": "confronted"
+    },
+    {
+      "name": "next stays on the top rung",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "next",
+      "args": [
+        "resolved"
+      ],
+      "expected": "resolved"
+    },
+    {
+      "name": "next refuses a name that is not a stage",
+      "ladder": [
+        "troubled",
+        "confronted",
+        "resolved"
+      ],
+      "call": "next",
+      "args": [
+        "settled"
+      ],
+      "expectError": true
     }
   ]
 }

@@ -178,6 +178,10 @@ export interface ProjectSettingsDto {
    *  that uses an old one (through the VC layer), and every cast member's own label with it. Write-only:
    *  never read back. */
   qualifierRenames?: Record<string, string>;
+  /** Quality stages the author renamed (the Properties page and the World tab), in the order they were
+   *  renamed. Saving carries each into every condition and set effect that names it (through the VC layer).
+   *  Write-only: never read back. */
+  stageRenames?: StageRenameDto[];
   /** How a character's label reads with a qualifier (the Qualifiers tab), `{name}` and `{qualifier}` filled
    *  in. "" means the default (`DEFAULT_SPEAKER_PATTERN`), which the project doesn't store. A caller that
    *  sends none leaves the project's as it is. */
@@ -331,6 +335,16 @@ export interface SceneSource {
 export interface SaveResult {
   ok: boolean;
   error?: string;
+}
+
+/** A quality's stage renamed in place, `from` to `to`: the quality is a property in a scope (`patter`,
+ *  `scene` with the scene it's declared in, or a host scope such as `world`). */
+export interface StageRenameDto {
+  scope: string;
+  name: string;
+  scene?: string;
+  from: string;
+  to: string;
 }
 
 /** One scene's version-control state (#145), folded from simple-vc-lib `fileStatus` over the scene's
@@ -937,6 +951,11 @@ export interface PatterApi {
   /** Persist edited project-level settings back to the .patterproj (lock-aware). On success returns the
    *  refreshed project summary (name etc.) so the renderer can resync the title bar. */
   saveSettings(settings: ProjectSettingsDto): Promise<SaveResult & { project?: OpenedProject }>;
+  /** Carry stage renames into every condition and set effect that names them (the open scene is saved
+   *  first and reloads after). `expressions` is how many were rewritten. */
+  renameStages(renames: StageRenameDto[]): Promise<SaveResult & { expressions: number }>;
+  /** How many conditions and set effects order a quality against its stages: the gates a reorder changes. */
+  stageGates(target: { scope: string; name: string; scene?: string }): Promise<number>;
   /** Set just the project's start point (ProjectFile.start), lock-aware: used by the "set where your story
    *  starts" prompt that Play from Start / Coverage raise when it is unset. */
   setStart(start: { scene: string; block?: string }): Promise<SaveResult & { project?: OpenedProject }>;

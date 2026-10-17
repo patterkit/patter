@@ -19,6 +19,7 @@ import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAUL
 import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, ScalarValue, AuthoringFile } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
+import { qualityDeclarationProblems } from "@wildwinter/expr";
 
 export interface ValidationIssue {
   code:
@@ -709,17 +710,21 @@ function checkDecls(decls: PropertyDecl[] | undefined, where: string, issues: Va
     if (decl.type === "quality") {
       // The ladder IS the meaning (comparisons are positional, advance() walks it), so a quality with
       // fewer than two stages has nothing to order, and a duplicated stage name makes "which position?"
-      // unanswerable.
-      const stages = decl.stages ?? [];
-      if (stages.length < 2) {
-        issues.push({ code: "invalid-declaration",
-          message: `${where}: '${decl.name}' is a quality but declares ${stages.length === 0 ? "no stages" : "only one stage"} (a ladder needs at least two)` });
-      }
-      const seenStages = new Set<string>();
-      for (const s of stages) {
-        if (!s.trim()) issues.push({ code: "invalid-declaration", message: `${where}: '${decl.name}' has an empty stage name` });
-        else if (seenStages.has(s)) issues.push({ code: "invalid-declaration", message: `${where}: '${decl.name}' declares stage '${s}' more than once` });
-        else seenStages.add(s);
+      // unanswerable. The rule is the family's, from @wildwinter/expr, so Storylets can't drift from it;
+      // the words are Patter's. A default off the ladder is reported below, as any default of the wrong type.
+      for (const problem of qualityDeclarationProblems(decl.stages)) {
+        switch (problem.kind) {
+          case "too-few-stages":
+            issues.push({ code: "invalid-declaration",
+              message: `${where}: '${decl.name}' is a quality but declares ${problem.count === 0 ? "no stages" : "only one stage"} (a ladder needs at least two)` });
+            break;
+          case "empty-stage":
+            issues.push({ code: "invalid-declaration", message: `${where}: '${decl.name}' has an empty stage name` });
+            break;
+          case "duplicate-stage":
+            issues.push({ code: "invalid-declaration", message: `${where}: '${decl.name}' declares stage '${problem.stage}' more than once` });
+            break;
+        }
       }
     }
     if (decl.default !== undefined && !defaultMatchesType(decl.default, decl)) {
@@ -737,6 +742,8 @@ function defaultMatchesType(value: ScalarValue, decl: PropertyDecl): boolean {
     case "enum": return typeof value === "string" && (decl.values?.includes(value) ?? true);
     case "flags":
       return Array.isArray(value) && value.every((v) => typeof v === "string" && (decl.values?.includes(v) ?? true));
-    case "quality": return typeof value === "string" && (decl.stages?.includes(value) ?? true);
+    case "quality":
+      return typeof value === "string"
+        && !qualityDeclarationProblems(decl.stages, value).some((p) => p.kind === "default-not-a-stage");
   }
 }

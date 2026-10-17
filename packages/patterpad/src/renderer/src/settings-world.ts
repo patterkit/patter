@@ -16,6 +16,7 @@
 
 import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, ScalarValue, CoverageDriver } from "@patterkit/model";
 import { el } from "./dom.js";
+import type { StageRenameDto } from "../../shared/api.js";
 import { iconBtn, labelled, moveItem, tagChips, stageChips, bindPropertyName, bindPropertyRef, defaultControl, dupGuard, expandableRow,
   firstIllegalPropertyName, focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
@@ -34,6 +35,8 @@ export interface WorldHandle {
   firstDuplicate(): HTMLInputElement | null;
   /** The first name no expression could reach, for the Save gate. */
   firstIllegalName(): HTMLInputElement | null;
+  /** The stages renamed in place since the tab opened, in order, for the save to carry into the scenes. */
+  stageRenames(): StageRenameDto[];
 }
 
 /** Parse a comma-separated value pool: `true/false` -> boolean, numeric -> number, else the trimmed string. */
@@ -49,8 +52,13 @@ const valuesText = (vals: ScalarValue[]): string => vals.map((v) => String(v)).j
 
 export function mountWorld(
   host: HTMLElement,
-  initial: { scopeRegistry?: HostScopeRegistry; coverageDrivers?: CoverageDriver[]; onPropose: () => Promise<CoverageDriver[]>; worldFile?: string },
+  initial: {
+    scopeRegistry?: HostScopeRegistry; coverageDrivers?: CoverageDriver[]; onPropose: () => Promise<CoverageDriver[]>; worldFile?: string;
+    /** A quality's stages reordered: `note` is a quiet line under them to fill (how many gates it changes). */
+    onStageReorder?: (target: { scope: string; name: string }, note: HTMLElement) => void;
+  },
 ): WorldHandle {
+  const renames: StageRenameDto[] = [];
   // Flatten the registry into editable rows (token carried per row); regrouped by token on save. A scope
   // with no declarations (opaque) has no rows to edit, so it is carried through as it is; so is each
   // scope's own `writable` default, which no row edits.
@@ -119,7 +127,19 @@ export function mountWorld(
     const details: HTMLElement[] = [roLabel];
     if (p.type === "enum" || p.type === "flags") details.push(labelled("Values", tagChips(p, refreshDefault)));
     // A quality's ladder, IN ORDER: the chips carry movers because position is the meaning here.
-    if (p.type === "quality") details.push(labelled("Stages (in order)", stageChips(p, refreshDefault)));
+    if (p.type === "quality") {
+      // A rename is carried into the scenes on save: values are stored by stage name.
+      const note = el("p", "shell-stage-note");
+      const chips = stageChips(p, refreshDefault, {
+        onRename: (from, to) => {
+          if (p.default === from) p.default = to;
+          refreshDefault();
+          renames.push({ scope: p.token, name: p.name.trim(), from, to });
+        },
+        onReorder: () => initial.onStageReorder?.({ scope: p.token, name: p.name.trim() }, note),
+      });
+      details.push(labelled("Stages (in order)", chips), note);
+    }
     // A declaration row, so it carries its name for "Go to definition" to land on. The coverage-driver rows
     // below also use expandableRow and are deliberately NOT stamped: a driver names a property, it does
     // not declare one, and a jump that landed on a driver would be landing on the wrong thing.
@@ -226,6 +246,7 @@ export function mountWorld(
   renderDrivers();
 
   const handle: WorldHandle = {
+    stageRenames: () => [...renames],
     value() {
       // Collect the named rows back into their scopes, in first-seen order (@world for every new row).
       const byToken = new Map<string, HostScopeDecl[]>();

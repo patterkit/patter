@@ -31,7 +31,7 @@ import { buildSpellEngine } from "./spellcheck.js";
 import { adoptSceneName, relabelNavScene } from "./scene-name.js";
 import { selectAllOutsideEditor } from "./edit-commands.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
-import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, ThemePrefs, VcsKind } from "../../shared/api.js";
+import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector, formatSeconds } from "./inspector.js";
 // No per-editor close imports: `closeAnchoredPanel` closes whichever of these is
 // open, because they are all the one panel.
@@ -2188,6 +2188,8 @@ async function showOverview(): Promise<void> {
 let patterProps: PropertyDecl[] = [];
 let propsHandle: { value(): PropertyDecl[]; firstDuplicate(): HTMLInputElement | null; firstIllegalName(): HTMLInputElement | null } | null = null;
 let propsSavedSig = "";
+/** Stages renamed on the Properties page and not yet saved, in order: the next save carries them. */
+let propsStageRenames: StageRenameDto[] = [];
 
 async function refreshPatterProps(): Promise<void> {
   const s = await window.patter.readSettings();
@@ -2213,7 +2215,10 @@ async function savePropsDoc(): Promise<void> {
   if (!s) return;
   // Only the properties changed, so only what reads them is refreshed: rebuilding the spell checker and
   // the writing-status ladder after every settled edit on this page cost a dictionary build each time.
-  if (!(await saveProjectSettings({ ...s, properties: next }, { propertiesOnly: true }))) return; // refused: try again next edit
+  // A stage renamed in place is carried into every condition and set effect that names it, in the same save.
+  const stageRenames = propsStageRenames;
+  if (!(await saveProjectSettings({ ...s, properties: next, ...(stageRenames.length ? { stageRenames } : {}) }, { propertiesOnly: true }))) return; // refused: try again next edit
+  propsStageRenames = propsStageRenames.slice(stageRenames.length); // any renamed while this one saved wait for the next
   propsSavedSig = sig;
   patterProps = next;
   paintPropsCount();
@@ -2239,7 +2244,11 @@ async function showPropertiesDoc(): Promise<void> {
   titleObserver?.disconnect(); titleObserver = null;
   sceneSuffixEl.classList.remove("shown"); sceneSuffixEl.textContent = ""; // no scene is open
   propsDocHostEl.replaceChildren();
-  propsHandle = mountProperties(propsDocHostEl, patterProps);
+  propsStageRenames = [];
+  propsHandle = mountProperties(propsDocHostEl, patterProps, {
+    onStageRename: (decl, from, to) => { propsStageRenames.push({ scope: "patter", name: decl.name.trim(), from, to }); schedulePropsSave(); },
+    onStageReorder: (decl, note) => void fillStageNote(note, { scope: "patter", name: decl.name.trim() }),
+  });
   propsSavedSig = JSON.stringify(patterProps);
   // The control has no change callback: it writes into its own state on every input, and its chips /
   // movers / delete are buttons. So listen for both and read the state back after it settles, which
@@ -2847,7 +2856,8 @@ const settingsDlg = mountSettingsDialog({
     { id: "world", label: "World properties", group: "Story data", mount: (host): SettingsSectionHandle => {
       const { s } = settingsRead!;
       const worldHost = el("div"); host.append(worldHost);
-      const world = mountWorld(worldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers(), ...(s.worldFile ? { worldFile: s.worldFile } : {}) });
+      const world = mountWorld(worldHost, { scopeRegistry: s.scopeRegistry, coverageDrivers: s.coverageDrivers, onPropose: () => window.patter.proposeCoverageDrivers(), ...(s.worldFile ? { worldFile: s.worldFile } : {}),
+        onStageReorder: (target, note) => void fillStageNote(note, target) });
       Object.assign(live, { world, worldHost });
       // Two gates. A duplicate name is a data hazard. An illegal one is a declared property no
       // expression can reach (a hyphen reads as subtraction, a leading digit or a keyword will not parse,
@@ -2957,6 +2967,15 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
   if (initialTab === "general") setTimeout(() => live.name?.focus(), 0);
 }
 
+/** A quality's stages were reordered: say how many gates order it by them, since the new order changes what
+ *  they mean though no value moves. Empty when none do. */
+async function fillStageNote(note: HTMLElement, target: { scope: string; name: string; scene?: string }): Promise<void> {
+  if (!target.name) { note.textContent = ""; return; }
+  const n = await window.patter.stageGates(target);
+  note.textContent = n === 0 ? ""
+    : `${plural(n, "condition orders", "conditions order")} this quality by its stages, so the new order changes what ${n === 1 ? "it means" : "they mean"}.`;
+}
+
 /** Save is clicked and every section's gate passed: read the sections back and persist. False when the
  *  write was refused, which keeps the dialog open with the edits in it. */
 async function saveSettingsFromDialog(): Promise<boolean> {
@@ -2971,7 +2990,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
     ...l.langs.value(), gameDataFields: l.gd.value(),
     properties: read.s.properties, // @patter lives in the Properties document now; pass the current set through untouched
-    ...l.world.value(), cast: l.cast.value(),
+    ...l.world.value(), ...(l.world.stageRenames().length ? { stageRenames: l.world.stageRenames() } : {}), cast: l.cast.value(),
     qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(), speakerPattern: l.qualifiers.pattern(),
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),
@@ -3047,7 +3066,13 @@ function openSceneProps(): HTMLElement | null {
   note.append(el("code", undefined, "@scene"), " properties exist only within this scene. Tick Temporary to reset one on every entry.");
   const host = el("div");
   frame.body.append(note, host);
-  const handle = mountProperties(host, surface.sceneProps(), { scope: "scene" });
+  const sceneId = currentSceneId;
+  const stageRenames: StageRenameDto[] = [];
+  const handle = mountProperties(host, surface.sceneProps(), {
+    scope: "scene",
+    onStageRename: (decl, from, to) => { if (sceneId) stageRenames.push({ scope: "scene", scene: sceneId, name: decl.name.trim(), from, to }); },
+    onStageReorder: (decl, note) => { if (sceneId) void fillStageNote(note, { scope: "scene", scene: sceneId, name: decl.name.trim() }); },
+  });
   const cancel = dialogButton("Cancel");
   const saveBtn = dialogButton("Save", true);
   cancel.addEventListener("click", () => frame.close());
@@ -3072,6 +3097,13 @@ function openSceneProps(): HTMLElement | null {
     if (!surface) return;
     const next = handle.value();
     surface.setSceneProps(next); // dispatches a doc edit -> the surface's onChange marks dirty + revalidates
+    // A stage renamed in place: the scene saves (its declarations with it), then every condition and set
+    // effect in it naming the old stage follows, and it reloads.
+    if (stageRenames.length) void window.patter.renameStages(stageRenames).then((r) => {
+      if (landed(r, "Couldn't carry the stage rename") && r.expressions > 0) {
+        toast(`Renamed in ${plural(r.expressions, "condition or effect", "conditions or effects")}.`);
+      }
+    });
     sceneProps = [
       ...sceneProps.filter((p) => p.scope !== "scene"),
       ...next.map((d) => declToConditionProperty("scene", d)),

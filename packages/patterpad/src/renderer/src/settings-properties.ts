@@ -27,7 +27,14 @@ function axis(label: string, tip: string, checked: boolean, onChange: (on: boole
 
 /** `scope` distinguishes project globals (@patter: default SHARED) from scene-local (@scene: default
  *  per-flow, plus a "reseed each entry" / temporary axis). */
-export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts?: { scope?: "patter" | "scene" }): PropertiesHandle {
+export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts?: {
+  scope?: "patter" | "scene";
+  /** A quality's stage renamed in place (the declaration and its default already follow it), for the caller
+   *  to carry into every condition and set effect naming it. */
+  onStageRename?: (decl: PropertyDecl, from: string, to: string) => void;
+  /** A quality's stages reordered: `note` is a quiet line under them for the caller to fill. */
+  onStageReorder?: (decl: PropertyDecl, note: HTMLElement) => void;
+}): PropertiesHandle {
   const scope = opts?.scope ?? "patter";
   const sharedDefault = scope === "patter"; // @patter globals default shared; @scene props default per-flow
   const state: PropertyDecl[] = structuredClone(initial ?? []);
@@ -36,6 +43,8 @@ export function mountProperties(host: HTMLElement, initial: PropertyDecl[], opts
     typed: true,
     emptyText: scope === "scene" ? "No scene properties yet." : "No global properties yet.",
     newDecl: () => ({ name: "", type: "number" }),
+    ...(opts?.onStageRename ? { onStageRename: opts.onStageRename } : {}),
+    ...(opts?.onStageReorder ? { onStageReorder: opts.onStageReorder } : {}),
     // Behind the disclosure, before Values / Stages / Purpose: Shared, and Temporary for a scene property.
     extraDetails: (p) => [
       axis("Shared", "One value across all flows. Off gives each flow its own value.", p.shared ?? sharedDefault,

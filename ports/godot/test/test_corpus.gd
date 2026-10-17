@@ -111,10 +111,20 @@ func _initialize() -> void:
 	var x_expr: Array = expr_root["expressions"]
 	var xp := _run_expr_prng(x_prng)
 	var xe := _run_expr_expressions(x_expr)
-	print("expr corpus v%d - prng: %d/%d  expressions: %d/%d" % [
-		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size()])
+	# Corpus v4's two families: expressions over qualities (ladders beside the scopes) and the
+	# host's stage helpers. Absent is a failure, as the corpus file is.
+	if not (expr_root.has("qualities") and expr_root.has("stages")):
+		_fail("expr corpus", "families", "no qualities or stages family (corpus v4)")
+	var x_qual: Array = expr_root.get("qualities", [])
+	var x_stage: Array = expr_root.get("stages", [])
+	var xq := _run_expr_expressions(x_qual, "expr/qualities")
+	var xs := _run_expr_stages(x_stage)
+	print("expr corpus v%d - prng: %d/%d  expressions: %d/%d  qualities: %d/%d  stages: %d/%d" % [
+		int(expr_root["version"]), xp, x_prng.size(), xe, x_expr.size(), xq, x_qual.size(), xs, x_stage.size()])
 	_expect_all("expr corpus prng", xp, x_prng.size())
 	_expect_all("expr corpus expressions", xe, x_expr.size())
+	_expect_all("expr corpus qualities", xq, x_qual.size())
+	_expect_all("expr corpus stages", xs, x_stage.size())
 
 	# The registry corpus sits beside it too, vendored from ../expr: the contract every
 	# copy of the ScopeRegistry runs, the `writable` rule included, here through
@@ -340,7 +350,7 @@ func _run_expr_prng(cases: Array) -> int:
 # `expectError` cases, which pin the TYPING contract - which operand combinations
 # the evaluator must REFUSE. GDScript has no exceptions, so a refusal is a returned
 # EvalError, told from an answer by PatterExpr.is_error().
-func _run_expr_expressions(cases: Array) -> int:
+func _run_expr_expressions(cases: Array, family := "expr") -> int:
 	var pass_count := 0
 	for c in cases:
 		var name: String = c["name"]
@@ -352,21 +362,57 @@ func _run_expr_expressions(cases: Array) -> int:
 			for prop in c["scopes"][token].keys():
 				bag[prop] = PatterValues.to_value(c["scopes"][token][prop])
 			ctx["scopes"][token] = func(n): return bag.get(n)
+		# A quality case's ladders, keyed "scope.name", answer the evaluator's quality channel.
+		if c.has("qualities"):
+			var ladders: Dictionary = c["qualities"]
+			ctx["qualities"] = func(scope: String, prop: String) -> Variant: return ladders.get(scope + "." + prop)
 
 		var actual = PatterExpr.evaluate(c["ast"], ctx, _dialect)
 		if expect_error:
 			if PatterExpr.is_error(actual):
 				pass_count += 1
 			else:
-				_fail("expr", name, "expected an eval error, got %s" % str(actual))
+				_fail(family, name, "expected an eval error, got %s" % str(actual))
 		elif PatterExpr.is_error(actual):
-			_fail("expr", name, "unexpected error: %s" % actual.message)
+			_fail(family, name, "unexpected error: %s" % actual.message)
 		else:
 			var expected = PatterValues.to_value(c["expected"])
 			if PatterValues.value_equals(actual, expected):
 				pass_count += 1
 			else:
-				_fail("expr", name, "expected %s, got %s" % [str(expected), str(actual)])
+				_fail(family, name, "expected %s, got %s" % [str(expected), str(actual)])
+	return pass_count
+
+
+# The host's stage helpers over a ladder (expr corpus v4), through PatterExpr: a position, -1, 0
+# or 1, or a stage name, or an EvalError where the case expects one.
+func _run_expr_stages(cases: Array) -> int:
+	var pass_count := 0
+	for c in cases:
+		var name: String = c["name"]
+		var ladder: Array = c["ladder"]
+		var args: Array = c["args"]
+		var actual = null
+		match str(c["call"]):
+			"index": actual = PatterExpr.stage_index(ladder, args[0])
+			"compare": actual = PatterExpr.compare_stages(ladder, args[0], args[1])
+			"next": actual = PatterExpr.next_stage(ladder, args[0])
+			_: actual = PatterExpr.error("unknown call %s" % c["call"])
+		if c.get("expectError", false):
+			if PatterExpr.is_error(actual):
+				pass_count += 1
+			else:
+				_fail("expr/stages", name, "expected an error, got %s" % str(actual))
+		elif PatterExpr.is_error(actual):
+			_fail("expr/stages", name, "unexpected error: %s" % actual.message)
+		else:
+			var expected = c["expected"]
+			var same: bool = (actual is String and expected is String and actual == expected) \
+				or (not (actual is String) and not (expected is String) and float(actual) == float(expected))
+			if same:
+				pass_count += 1
+			else:
+				_fail("expr/stages", name, "expected %s, got %s" % [str(expected), str(actual)])
 	return pass_count
 
 

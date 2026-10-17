@@ -30,7 +30,7 @@ import { SCRIPT_FONT_FILES, useScriptFontFiles } from "@patterkit/ops";
 import { PROPERTIES_PLACE } from "../shared/api.js";
 import { EXAMPLES } from "../shared/examples.js";
 import type { SearchEntry, SearchFocus, SearchMode, EditableExportRequest, EditableImportRequest } from "../shared/api.js";
-import type { AppPrompt, SceneKitId } from "../shared/api.js";
+import type { AppPrompt, SceneKitId, StageRenameDto } from "../shared/api.js";
 import type { BootState, DocLine, ExportResult, Identity, LocExportRequest, LocImportResult, OpenedProject, OpenResult, PackMergeSummary, PaneState, ProjectSettingsDto, QuickFix, RecentProject, ThemePrefs, VcsKind } from "../shared/api.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -1046,11 +1046,21 @@ function registerIpc(): void {
   ipcMain.handle("project:exportLoc", (_e, request: LocExportRequest) => publishJob(() => exportLoc(request)));
   ipcMain.handle("project:importLoc", (_e, fallbackLocale?: string) => importLoc(fallbackLocale));
   ipcMain.handle("project:readSettings", () => project.readSettings());
+  ipcMain.handle("project:renameStages", async (_e, renames: StageRenameDto[]) => {
+    // The open scene's unsaved edits (its own @scene declarations among them) go to disk first, and it
+    // reloads from the rewritten file after.
+    await flushEditorScene();
+    const r = await project.renameStages(renames);
+    if (r.ok && r.expressions > 0) win?.webContents.send("replace:applied");
+    return r;
+  });
+  ipcMain.handle("project:stageGates", (_e, target: { scope: string; name: string; scene?: string }) => project.stageGates(target));
   ipcMain.handle("project:speakerPairs", () => project.speakerPairs());
   ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
     // A qualifier gameId rename rewrites lines across the project, the open scene's among them: its unsaved
     // edits go to disk first, and it reloads from the rewritten file after.
-    const renames = Object.entries(s.qualifierRenames ?? {}).some(([from, to]) => from !== to);
+    const renames = Object.entries(s.qualifierRenames ?? {}).some(([from, to]) => from !== to)
+      || (s.stageRenames ?? []).some((r) => r.from !== r.to); // a stage rename rewrites conditions across the project too
     if (renames) await flushEditorScene();
     const r = await project.saveSettings(s);
     if (r.ok && renames) win?.webContents.send("replace:applied");

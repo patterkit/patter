@@ -245,7 +245,7 @@ static std::string dump(const JsonValue& v)
 
 // ----- sections ---------------------------------------------------------------
 
-static int runExpressions(const JsonValue& arr)
+static int runExpressions(const JsonValue& arr, const std::string& family = "expr")
 {
     int pass = 0;
     for (const auto& c : arr.arr)
@@ -279,6 +279,22 @@ static int runExpressions(const JsonValue& arr)
             PatterHost evalHost;
             if (const JsonValue* seed = c.find("seed")) { rng = std::make_shared<Mulberry32>(seed->num); evalHost.nextRandom = [rng]() { return rng->next(); }; }
             ctx.host = &evalHost;
+            // A quality case's ladders, keyed "scope.name", answer the evaluator's quality channel.
+            std::map<std::string, std::vector<std::string>> ladders;
+            if (const JsonValue* q = c.find("qualities"); q && q->isObject())
+            {
+                for (const auto& pair : q->obj)
+                {
+                    std::vector<std::string> ladder;
+                    for (const auto& stage : pair.second.arr) ladder.push_back(stage.str);
+                    ladders[pair.first] = std::move(ladder);
+                }
+                ctx.qualities = [&ladders](const std::string& scope, const std::string& prop) -> const std::vector<std::string>*
+                {
+                    auto it = ladders.find(scope + "." + prop);
+                    return it == ladders.end() ? nullptr : &it->second;
+                };
+            }
 
             // `expectError` cases pin the TYPING contract: which operand
             // combinations the evaluator must REFUSE. Without them a runtime
@@ -295,20 +311,62 @@ static int runExpressions(const JsonValue& arr)
             if (expectError)
             {
                 if (raised) ++pass;
-                else fail("expr", name, "expected an eval error, got " + actual.toDisplayString());
+                else fail(family, name, "expected an eval error, got " + actual.toDisplayString());
             }
             else if (raised)
             {
-                fail("expr", name, "unexpected error: " + error);
+                fail(family, name, "unexpected error: " + error);
             }
             else
             {
                 PatterValue expected = toValue(c.at("expected"));
                 if (actual.valueEquals(expected)) ++pass;
-                else fail("expr", name, "expected " + valueToJson(expected).str + ", got " + actual.toDisplayString());
+                else fail(family, name, "expected " + valueToJson(expected).str + ", got " + actual.toDisplayString());
             }
         }
-        catch (const std::exception& ex) { fail("expr", name, ex.what()); }
+        catch (const std::exception& ex) { fail(family, name, ex.what()); }
+    }
+    return pass;
+}
+
+/** The host's stage helpers over a ladder (expr corpus v4), through the vendored kernel: a position,
+ *  -1, 0 or 1, or a stage name, or an error where the case expects one. */
+static int runStages(const JsonValue& arr)
+{
+    int pass = 0;
+    for (const auto& c : arr.arr)
+    {
+        const std::string name = c.at("name").str;
+        const bool expectError = c.find("expectError") != nullptr;
+        std::vector<std::string> ladder;
+        for (const auto& stage : c.at("ladder").arr) ladder.push_back(stage.str);
+        std::vector<PatterValue> args;
+        for (const auto& a : c.at("args").arr) args.push_back(toValue(a));
+        std::string got, error;
+        bool raised = false;
+        try
+        {
+            const std::string call = c.at("call").str;
+            if (call == "index") got = std::to_string(StageIndex(ladder, args.at(0)));
+            else if (call == "compare") got = std::to_string(CompareStages(ladder, args.at(0), args.at(1)));
+            else if (call == "next") got = "\"" + NextStage(ladder, args.at(0)) + "\"";
+            else { raised = true; error = "unknown call " + call; }
+        }
+        catch (const std::exception& ex) { raised = true; error = ex.what(); }
+
+        if (expectError)
+        {
+            if (raised) ++pass;
+            else fail("expr/stages", name, "expected an error, got " + got);
+        }
+        else if (raised) fail("expr/stages", name, "unexpected error: " + error);
+        else
+        {
+            const JsonValue& e = c.at("expected");
+            const std::string want = e.isString() ? "\"" + e.str + "\"" : std::to_string(static_cast<int>(e.num));
+            if (got == want) ++pass;
+            else fail("expr/stages", name, "expected " + want + ", got " + got);
+        }
     }
     return pass;
 }
@@ -3092,9 +3150,18 @@ int main(int argc, char** argv)
         const JsonValue& xexpr = exprRoot.at("expressions");
         int xp = runExprPrng(xprng);
         int xe = runExpressions(xexpr);
+        // Corpus v4's two families: expressions over qualities (ladders beside the scopes) and the
+        // host's stage helpers. Absent is a failure, as the corpus file is.
+        const JsonValue* xqual = exprRoot.find("qualities");
+        const JsonValue* xstages = exprRoot.find("stages");
+        if (!xqual || !xstages) fail("expr corpus", "families", "no qualities or stages family (corpus v4)");
+        int xq = xqual ? runExpressions(*xqual, "expr/qualities") : 0;
+        int xs = xstages ? runStages(*xstages) : 0;
         std::cout << "expr corpus v" << static_cast<int>(exprRoot.at("version").num)
             << " - prng: " << xp << "/" << xprng.arr.size()
-            << "  expressions: " << xe << "/" << xexpr.arr.size() << "\n";
+            << "  expressions: " << xe << "/" << xexpr.arr.size()
+            << "  qualities: " << xq << "/" << (xqual ? xqual->arr.size() : 0)
+            << "  stages: " << xs << "/" << (xstages ? xstages->arr.size() : 0) << "\n";
     }
 
     // The registry corpus, vendored from ../expr beside the other two, run through the

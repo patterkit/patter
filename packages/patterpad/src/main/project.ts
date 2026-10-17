@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, renameStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
@@ -29,6 +29,7 @@ import { fileSafeName } from "../shared/file-name.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
+import type { StageRenameDto } from "../shared/api.js";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
 import type { CoverageDriver } from "@patterkit/model";
 import { editorScopes } from "../shared/host-scopes.js";
@@ -1965,6 +1966,54 @@ function qualifierRenameWrites(renames: Map<string, string>): { path: string; co
   return writes;
 }
 
+/** A quality stage renamed in place is carried into every condition and set effect that names it
+ *  (ops' renameStage). `base` holds writes already planned in the same batch (a qualifier rename's scenes):
+ *  a scene among them is renamed from that content, so neither edit loses the other. */
+function stageRenameWrites(renames: StageRenameDto[], base: { path: string; content: string }[] = []): { writes: { path: string; content: string }[]; expressions: number } {
+  if (!loaded || renames.length === 0) return { writes: [], expressions: 0 };
+  ensureHydrated(); // conditions anywhere in the project
+  const planned = new Map(base.map((w) => [w.path, w.content]));
+  const scenes = loaded.scenes.map((scene) => {
+    const path = loaded!.sceneFiles[scene.id];
+    const content = path ? planned.get(path) : undefined;
+    return content ? (JSON.parse(content) as FlowFile).scene : structuredClone(scene);
+  });
+  const dialect = stageDialect(loaded.project, loaded.gameScopes);
+  const touched = new Set<Scene>();
+  let expressions = 0;
+  for (const r of renames) {
+    const result = renameStage(scenes, { scope: r.scope, name: r.name, ...(r.scene ? { scene: r.scene } : {}) }, r.from, r.to, dialect);
+    expressions += result.expressions;
+    for (const scene of result.scenes) touched.add(scene);
+  }
+  const writes: { path: string; content: string }[] = [];
+  for (const scene of touched) {
+    const path = loaded.sceneFiles[scene.id];
+    if (path) writes.push({ path, content: canonicalStringify({ schema: FLOW_SCHEMA, scene } satisfies FlowFile) });
+  }
+  return { writes, expressions };
+}
+
+/** Carry stage renames on their own (the Scene properties dialog, whose declarations the open scene saves). */
+export function renameStages(renames: StageRenameDto[]): Promise<SaveResult & { expressions: number }> {
+  return enqueueWrite(async () => {
+    if (!loaded) return { ok: false, error: "no project open", expressions: 0 };
+    const { writes, expressions } = stageRenameWrites(renames);
+    if (writes.length === 0) return { ok: true, expressions: 0 };
+    const res = await commitWrites(writes);
+    if (!res.ok) return { ...res, expressions: 0 };
+    reloadFromDisk(); // the rewritten scenes, read back whole
+    return { ok: true, expressions };
+  });
+}
+
+/** How many conditions and set effects order a quality against its stages: what a reorder changes. */
+export function stageGates(target: { scope: string; name: string; scene?: string }): number {
+  if (!loaded) return 0;
+  ensureHydrated();
+  return stageGateCount(loaded.scenes, target, stageDialect(loaded.project, loaded.gameScopes));
+}
+
 /** The project's qualifiers with how many lines use each (the search window's Qualifier chips). */
 export function qualifierList(): Array<{ gameId: string; name: string; count: number }> {
   if (!loaded) return [];
@@ -2156,6 +2205,13 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     // one, and its translated names and labels, suggestions, edit records, and handoff records move with it,
     // in the same batch as the project file (the caller flushed the open scene first, and reloads it after).
     if (renames) writes.push(...qualifierRenameWrites(renames));
+    // A quality's stage renamed in place: every condition and set effect naming it follows, in the same batch
+    // (built on the qualifier rename's write of a scene, where there is one).
+    const stages = stageRenameWrites(s.stageRenames ?? [], writes);
+    for (const w of stages.writes) {
+      const at = writes.findIndex((x) => x.path === w.path);
+      if (at >= 0) writes[at] = w; else writes.push(w);
+    }
     // A display name, qualifier name, speaker pattern, or pair label changed in the source language makes its
     // translations stale: stamp it, in the same batch (replacing a rename's write of the same shard).
     const stamp = projectStringStamp(next, renames, writes);
@@ -2180,8 +2236,8 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       }
     }
     loaded.project = next; // reflect in the cached project
-    if (stamp && !renames) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
-    if (renames) reloadFromDisk(); // the rewritten scenes and strings, read back whole
+    if (stamp && !renames && !stages.writes.length) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
+    if (renames || stages.writes.length) reloadFromDisk(); // the rewritten scenes and strings, read back whole
     if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)
     syncAudioIndex();      // audio config may have changed (mode toggle / rung folders) (#206)

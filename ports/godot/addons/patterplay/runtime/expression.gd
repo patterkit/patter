@@ -33,3 +33,22 @@ static func is_error(v) -> bool:
 ## Evaluate `node` in `ctx` under `dialect`; a scalar value or an EvalError.
 static func evaluate(node: Array, ctx: Dictionary, dialect: Dictionary) -> Variant:
 	return Impl.evaluate(node, ctx, dialect)
+
+
+## A quality's ladder outside an expression, for a host holding a Game Data value
+## or a property it read: the position of a stage, or -1. `ladder` is an Array
+## of stage names or a declaration Dictionary with "stages".
+static func stage_index(ladder: Variant, value) -> int:
+	return Impl.stage_index(ladder, value)
+
+
+## -1, 0 or 1 as `a` is below, at or above `b` on the ladder; an EvalError when
+## either is not a stage.
+static func compare_stages(ladder: Variant, a, b) -> Variant:
+	return Impl.compare_stages(ladder, a, b)
+
+
+## One rung up, staying on the top rung, as advance() does; an EvalError when
+## the value is not a stage.
+static func next_stage(ladder: Variant, value) -> Variant:
+	return Impl.next_stage(ladder, value)

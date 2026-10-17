@@ -11,8 +11,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k492cf234_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
-#define WILDWINTER_EXPR_k492cf234_PROPERTYBAG_H
+#if !defined(WILDWINTER_EXPR_k88b76cef_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x88b76cef
+#define WILDWINTER_EXPR_k88b76cef_PROPERTYBAG_H
 
 #include <algorithm>
 #include <cctype>
@@ -26,7 +26,7 @@
 #include "OrderedMap.h"
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k492cf234
+namespace wildwinter { namespace expr { inline namespace k88b76cef
 {
     /** The property type vocabulary (boolean / number / string / enum /
      *  flags). Kept as strings, exactly as the kernel and the bundle carry
@@ -75,6 +75,68 @@ namespace wildwinter { namespace expr { inline namespace k492cf234
             return ExprValue::Bool(false);
         }
     };
+
+    // --- a quality's ladder outside an expression -------------------------------
+    //
+    // The order the evaluator uses, for a host holding a field value, a game-data
+    // value or a property it read (patterkit design/proposals/patter-qualities.md
+    // section 3). Each takes a bare ladder or the declaration carrying one, so a
+    // host writes CompareStages(fieldDecl, card.fields.get("act"), current). The
+    // TypeScript kernel's stageIndex, compareStages and nextStage, word for word.
+
+    /** The position of a stage, or -1 when the value is not one. */
+    inline int StageIndex(const std::vector<std::string>& ladder, const ExprValue& value)
+    {
+        if (!value.isString()) return -1;
+        for (size_t i = 0; i < ladder.size(); i++) if (ladder[i] == value.asString()) return (int)i;
+        return -1;
+    }
+
+    namespace stagesdetail
+    {
+        inline int PositionOf(const std::vector<std::string>& ladder, const ExprValue& value)
+        {
+            if (!value.isString())
+            {
+                const char* word = value.isBool() ? "boolean" : value.isNumber() ? "number" : value.isFlags() ? "flags" : "nothing";
+                throw ExprError(std::string("a stage is a name, got ") + word);
+            }
+            const int i = StageIndex(ladder, value);
+            if (i < 0)
+            {
+                std::string all;
+                for (size_t k = 0; k < ladder.size(); k++) all += (k ? ", " : "") + ladder[k];
+                throw ExprError("\"" + value.asString() + "\" is not a stage of this quality (stages: " + all + ")");
+            }
+            return i;
+        }
+
+        inline const std::vector<std::string>& LadderOf(const ScopeDeclaration& decl)
+        {
+            static const std::vector<std::string> none;
+            return decl.stages.has_value() ? *decl.stages : none;
+        }
+    }
+
+    /** -1, 0 or 1 as `a` is below, at or above `b` on the ladder. Throws
+     *  ExprError when either is not a stage. */
+    inline int CompareStages(const std::vector<std::string>& ladder, const ExprValue& a, const ExprValue& b)
+    {
+        const int d = stagesdetail::PositionOf(ladder, a) - stagesdetail::PositionOf(ladder, b);
+        return d < 0 ? -1 : d > 0 ? 1 : 0;
+    }
+
+    /** One rung up, staying on the top rung, as advance() does. Throws
+     *  ExprError when the value is not a stage (a drifted save, a deleted stage). */
+    inline std::string NextStage(const std::vector<std::string>& ladder, const ExprValue& value)
+    {
+        const int i = stagesdetail::PositionOf(ladder, value);
+        return ladder[std::min(i + 1, (int)ladder.size() - 1)];
+    }
+
+    inline int StageIndex(const ScopeDeclaration& decl, const ExprValue& value) { return StageIndex(stagesdetail::LadderOf(decl), value); }
+    inline int CompareStages(const ScopeDeclaration& decl, const ExprValue& a, const ExprValue& b) { return CompareStages(stagesdetail::LadderOf(decl), a, b); }
+    inline std::string NextStage(const ScopeDeclaration& decl, const ExprValue& value) { return NextStage(stagesdetail::LadderOf(decl), value); }
 
     /** One property change. `silent` marks a host write (the firing rule: it
      *  reaches the audit hook but not subscribers); `reason` is the host's own

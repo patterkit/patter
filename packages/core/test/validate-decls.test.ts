@@ -48,6 +48,42 @@ describe("property declarations", () => {
     expect(codes(p)).toContain("invalid-declaration");
   });
 
+  // The family's quality rule (@wildwinter/expr's qualityDeclarationProblems), in Patter's words.
+  describe("a quality's ladder", () => {
+    const messages = (decl: NonNullable<ProjectFile["properties"]>[number]) => {
+      const p = base();
+      p.properties = [decl];
+      return validateProject({ project: p, scenes: [scene()] })
+        .filter((i) => i.code === "invalid-declaration").map((i) => i.message);
+    };
+
+    it("accepts a ladder of two or more distinct stages, with a default on it", () => {
+      expect(messages({ name: "debt", type: "quality", stages: ["troubled", "confronted", "resolved"], default: "troubled" }))
+        .toEqual([]);
+    });
+
+    it("needs at least two stages", () => {
+      expect(messages({ name: "debt", type: "quality", stages: [] }))
+        .toEqual([expect.stringMatching(/'debt' is a quality but declares no stages \(a ladder needs at least two\)/)]);
+      expect(messages({ name: "debt", type: "quality", stages: ["troubled"] }))
+        .toEqual([expect.stringMatching(/declares only one stage/)]);
+    });
+
+    it("refuses an empty stage and a repeated one", () => {
+      expect(messages({ name: "debt", type: "quality", stages: ["troubled", " ", "troubled"] })).toEqual([
+        expect.stringMatching(/'debt' has an empty stage name/),
+        expect.stringMatching(/'debt' declares stage 'troubled' more than once/),
+      ]);
+    });
+
+    it("reports a default off the ladder once, as a default of the wrong type", () => {
+      expect(messages({ name: "debt", type: "quality", stages: ["troubled", "resolved"], default: "settled" }))
+        .toEqual([expect.stringMatching(/'debt' default "settled" does not match type 'quality'/)]);
+      expect(messages({ name: "debt", type: "quality", stages: ["troubled", "resolved"], default: 1 }))
+        .toEqual([expect.stringMatching(/does not match type 'quality'/)]);
+    });
+  });
+
   // A name expr cannot reach is not a style question: the header of
   // packages/model/src/index.ts records what each of these compiles to.
   const NAME_FAULTS: Array<[string, RegExp]> = [

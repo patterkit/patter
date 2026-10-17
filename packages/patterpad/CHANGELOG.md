@@ -6,6 +6,14 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Rename a quality's stage in place.** Click a stage's name on its chip to rename it. Every condition and
+  effect that names the stage follows, across the project (or within the scene, for a scene property), and so
+  does the default. A condition that uses the same word for another quality is left as it was.
+- **Reordering stages says what it changes.** Moving a stage changes what every "at this stage or past it"
+  condition means, though no value moves, so the stages now say how many conditions order that quality.
+
 ## [0.30.1] - 2026-10-17
 
 ### Changed

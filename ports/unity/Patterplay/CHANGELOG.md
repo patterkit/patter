@@ -6,6 +6,13 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine
+  uses from its next release. It adds three helpers for a quality's ladder outside an expression, for game
+  code holding a quality's value: a stage's position, how two stages compare, and the next stage. In C#:
+  `Wildwinter.Expr.Stages.Index`, `Compare` and `Next`.
+
 ## [0.26.1] - 2026-10-17
 
 ### Changed

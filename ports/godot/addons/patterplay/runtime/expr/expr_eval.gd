@@ -282,6 +282,67 @@ static func _stage_index(value, ladder: Variant, op: String) -> Variant:
 	return i
 
 
+# --- a quality's ladder outside an expression --------------------------------
+#
+# The order the evaluator uses, for a host holding a field value, a game-data
+# value or a property it read (patterkit design/proposals/patter-qualities.md
+# section 3). Each takes a bare ladder (Array) or the declaration carrying one
+# (a Dictionary with "stages"). The TypeScript kernel's stageIndex,
+# compareStages and nextStage, word for word; the two that can fail return an
+# EvalError (test with is_error()).
+
+## The position of a stage, or -1 when the value is not one.
+static func stage_index(ladder: Variant, value) -> int:
+	if typeof(value) != TYPE_STRING:
+		return -1
+	return _stages_from(ladder).find(value)
+
+
+## -1, 0 or 1 as `a` is below, at or above `b` on the ladder; an EvalError when
+## either is not a stage.
+static func compare_stages(ladder: Variant, a, b) -> Variant:
+	var stages := _stages_from(ladder)
+	var ia = _position_of(stages, a)
+	if is_error(ia):
+		return ia
+	var ib = _position_of(stages, b)
+	if is_error(ib):
+		return ib
+	return -1 if ia < ib else (1 if ia > ib else 0)
+
+
+## One rung up, staying on the top rung, as advance() does; an EvalError when
+## the value is not a stage (a drifted save, a deleted stage).
+static func next_stage(ladder: Variant, value) -> Variant:
+	var stages := _stages_from(ladder)
+	var i = _position_of(stages, value)
+	if is_error(i):
+		return i
+	return stages[mini(int(i) + 1, stages.size() - 1)]
+
+
+static func _stages_from(ladder: Variant) -> Array:
+	if ladder is Array:
+		return ladder
+	if ladder is Dictionary:
+		return (ladder as Dictionary).get("stages", [])
+	return []
+
+
+static func _position_of(stages: Array, value) -> Variant:
+	if typeof(value) != TYPE_STRING:
+		var word := "nothing"
+		match typeof(value):
+			TYPE_BOOL: word = "boolean"
+			TYPE_INT, TYPE_FLOAT: word = "number"
+			TYPE_ARRAY: word = "flags"
+		return error("a stage is a name, got %s" % word)
+	var i: int = stages.find(value)
+	if i < 0:
+		return error('"%s" is not a stage of this quality (stages: %s)' % [value, ", ".join(stages)])
+	return i
+
+
 static func _eval_call(node: Array, ctx: Dictionary, dialect: Dictionary, run: Dictionary) -> Variant:
 	var fn = node[1]
 	var args: Array = node.slice(2)

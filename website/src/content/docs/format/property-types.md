@@ -180,6 +180,17 @@ On the **Properties** page (or in **Settings ▸ World Properties**, for a value
 because for a ladder the order is the meaning: reordering the chips reorders the story.
 A quality's default is its first stage unless you pick another.
 
+To rename a stage, click its name on the chip, type the new one and press Enter (Escape keeps
+the old name). Because a quality is stored by stage name, every condition and effect that names
+the stage has to follow, so Patterpad rewrites them for you, across the whole project, when the
+change is saved: `@investigation >= "suspicious"` becomes `>= "wary"` everywhere, and the default
+moves with it. A condition that uses the same word for a different quality is left alone. A
+stage in a scene's own properties (`@scene`) is renamed within that scene.
+
+Reordering is different: no value changes, but every condition that asks "at this stage or past
+it" now means something else. So when you move a stage, Patterpad tells you how many conditions
+order that quality by its stages, which is where to look before you carry on.
+
 From there the condition editor treats it as what it is: the property appears in the
 clause picker, the operator step offers the ordering comparisons as well as the equality
 pair, and the value step lists your stages in ladder order. An effect that targets a

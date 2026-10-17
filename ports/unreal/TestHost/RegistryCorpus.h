@@ -29,8 +29,8 @@
 #include "Patter/Expr/ScopeRegistry.h"
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k492cf234_TESTING_REGISTRYCORPUS_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
-#define WILDWINTER_EXPR_k492cf234_TESTING_REGISTRYCORPUS_H
+#if !defined(WILDWINTER_EXPR_k88b76cef_TESTING_REGISTRYCORPUS_H) && WILDWINTER_EXPR_KERNEL == 0x88b76cef
+#define WILDWINTER_EXPR_k88b76cef_TESTING_REGISTRYCORPUS_H
 
 #include <cmath>
 #include <cstddef>
@@ -48,7 +48,7 @@
 #include <utility>
 #include <vector>
 
-namespace wildwinter { namespace expr { inline namespace k492cf234 { namespace testing
+namespace wildwinter { namespace expr { inline namespace k88b76cef { namespace testing
 {
     namespace registrycorpus
     {

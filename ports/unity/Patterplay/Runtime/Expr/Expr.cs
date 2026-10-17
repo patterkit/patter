@@ -330,4 +330,67 @@ namespace Wildwinter.Expr
             }
         }
     }
+
+    /// <summary>
+    /// A quality's ladder outside an expression (patterkit
+    /// design/proposals/patter-qualities.md section 3): the order the evaluator
+    /// uses, for a host holding a field value, a game-data value or a property it
+    /// read. Each helper takes a bare ladder or the declaration carrying one, so a
+    /// host writes <c>Stages.Compare(fieldDecl, card.Fields["act"], current)</c>.
+    /// The TypeScript kernel's stageIndex, compareStages and nextStage, word for
+    /// word.
+    /// </summary>
+    public static class Stages
+    {
+        /// <summary>The position of a stage, or -1 when the value is not one.</summary>
+        public static int Index(IReadOnlyList<string> ladder, ExprValue value)
+        {
+            if (value == null || !value.IsString || ladder == null) return -1;
+            for (int i = 0; i < ladder.Count; i++) if (ladder[i] == value.AsString) return i;
+            return -1;
+        }
+
+        public static int Index(ScopeDeclaration decl, ExprValue value) => Index(decl?.Stages, value);
+
+        /// <summary>-1, 0 or 1 as <paramref name="a"/> is below, at or above
+        /// <paramref name="b"/> on the ladder. An error when either is not a stage.</summary>
+        public static int Compare(IReadOnlyList<string> ladder, ExprValue a, ExprValue b)
+        {
+            var d = PositionOf(ladder, a) - PositionOf(ladder, b);
+            return d < 0 ? -1 : d > 0 ? 1 : 0;
+        }
+
+        public static int Compare(ScopeDeclaration decl, ExprValue a, ExprValue b) => Compare(decl?.Stages, a, b);
+
+        /// <summary>One rung up, staying on the top rung, as advance() does. An
+        /// error when the value is not a stage (a drifted save, a deleted stage).</summary>
+        public static string Next(IReadOnlyList<string> ladder, ExprValue value)
+        {
+            var i = PositionOf(ladder, value);
+            return ladder[Math.Min(i + 1, ladder.Count - 1)];
+        }
+
+        public static string Next(ScopeDeclaration decl, ExprValue value) => Next(decl?.Stages, value);
+
+        private static int PositionOf(IReadOnlyList<string> ladder, ExprValue value)
+        {
+            if (value == null || !value.IsString) throw new ExprError($"a stage is a name, got {TypeWord(value)}");
+            var i = Index(ladder, value);
+            if (i < 0)
+            {
+                var stages = ladder == null ? "" : string.Join(", ", ladder);
+                throw new ExprError($"\"{value.AsString}\" is not a stage of this quality (stages: {stages})");
+            }
+            return i;
+        }
+
+        private static string TypeWord(ExprValue v)
+        {
+            if (v == null) return "nothing";
+            if (v.IsBool) return "boolean";
+            if (v.IsNumber) return "number";
+            if (v.IsFlags) return "flags";
+            return "string";
+        }
+    }
 }

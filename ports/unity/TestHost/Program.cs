@@ -135,8 +135,19 @@ namespace Patterkit.Patterplay.TestHost
             var xexpr = exprRoot.GetProperty("expressions");
             int xp = RunExprPrng(xprng);
             int xe = RunExpressions(xexpr);
+            // Corpus v4's two families: expressions over qualities (ladders beside the scopes) and
+            // the host's stage helpers. Absent is a failure, as the corpus file is.
+            if (!exprRoot.TryGetProperty("qualities", out var xqual) || !exprRoot.TryGetProperty("stages", out var xstage))
+            {
+                Fail("expr corpus", "families", "no qualities or stages family (corpus v4)");
+                xqual = default; xstage = default;
+            }
+            int xq = xqual.ValueKind == JsonValueKind.Array ? RunExpressions(xqual, "expr/qualities") : 0;
+            int xs = xstage.ValueKind == JsonValueKind.Array ? RunStages(xstage) : 0;
             Console.WriteLine($"expr corpus v{exprRoot.GetProperty("version").GetInt32()}"
-                + $" - prng: {xp}/{xprng.GetArrayLength()}  expressions: {xe}/{xexpr.GetArrayLength()}");
+                + $" - prng: {xp}/{xprng.GetArrayLength()}  expressions: {xe}/{xexpr.GetArrayLength()}"
+                + $"  qualities: {xq}/{(xqual.ValueKind == JsonValueKind.Array ? xqual.GetArrayLength() : 0)}"
+                + $"  stages: {xs}/{(xstage.ValueKind == JsonValueKind.Array ? xstage.GetArrayLength() : 0)}");
 
             // The registry corpus (packages/scoperegistry/corpus.json in ../expr) sits beside
             // it too, and runs through the vendored shared ScopeRegistry. It is the registry's
@@ -670,7 +681,7 @@ namespace Patterkit.Patterplay.TestHost
             return pass;
         }
 
-        private static int RunExpressions(JsonElement arr)
+        private static int RunExpressions(JsonElement arr, string family = "expr")
         {
             int pass = 0;
             foreach (var c in arr.EnumerateArray())
@@ -685,6 +696,14 @@ namespace Patterkit.Patterplay.TestHost
                         var bag = new Dictionary<string, ExprValue>();
                         foreach (var p in scope.Value.EnumerateObject()) bag[p.Name] = ToValue(p.Value);
                         ctx.Scopes[scope.Name] = new BagScope(bag);
+                    }
+                    // A quality case's ladders, keyed "scope.name", answer the evaluator's quality channel.
+                    if (c.TryGetProperty("qualities", out var ladders))
+                    {
+                        var byKey = new Dictionary<string, List<string>>();
+                        foreach (var l in ladders.EnumerateObject())
+                            byKey[l.Name] = l.Value.EnumerateArray().Select(x => x.GetString()).ToList();
+                        ctx.Qualities = (scope, prop) => byKey.TryGetValue(scope + "." + prop, out var ladder) ? ladder : null;
                     }
                     var evalHost = new PatterHost();
                     if (c.TryGetProperty("seed", out var seed)) evalHost.NextRandom = new Mulberry32(seed.GetDouble()).Next;
@@ -704,20 +723,64 @@ namespace Patterkit.Patterplay.TestHost
                     if (expectError)
                     {
                         if (error != null) pass++;
-                        else Fail("expr", name, $"expected an eval error, got {actual}");
+                        else Fail(family, name, $"expected an eval error, got {actual}");
                     }
                     else if (error != null)
                     {
-                        Fail("expr", name, $"unexpected error: {error}");
+                        Fail(family, name, $"unexpected error: {error}");
                     }
                     else
                     {
                         var expected = ToValue(c.GetProperty("expected"));
                         if (actual.ValueEquals(expected)) pass++;
-                        else Fail("expr", name, $"expected {expected}, got {actual}");
+                        else Fail(family, name, $"expected {expected}, got {actual}");
                     }
                 }
-                catch (Exception ex) { Fail("expr", name, ex.Message); }
+                catch (Exception ex) { Fail(family, name, ex.Message); }
+            }
+            return pass;
+        }
+
+        /// <summary>The host's stage helpers over a ladder (expr corpus v4), through the vendored
+        /// kernel's Stages: a position, -1, 0 or 1, or a stage name, or an error where the case expects one.</summary>
+        private static int RunStages(JsonElement arr)
+        {
+            int pass = 0;
+            foreach (var c in arr.EnumerateArray())
+            {
+                string name = c.GetProperty("name").GetString();
+                bool expectError = c.TryGetProperty("expectError", out _);
+                var ladder = c.GetProperty("ladder").EnumerateArray().Select(x => x.GetString()).ToList();
+                var args = c.GetProperty("args").EnumerateArray().Select(ToValue).ToList();
+                object actual = null;
+                string error = null;
+                try
+                {
+                    switch (c.GetProperty("call").GetString())
+                    {
+                        case "index": actual = (double)Stages.Index(ladder, args[0]); break;
+                        case "compare": actual = (double)Stages.Compare(ladder, args[0], args[1]); break;
+                        case "next": actual = Stages.Next(ladder, args[0]); break;
+                        default: error = $"unknown call {c.GetProperty("call").GetString()}"; break;
+                    }
+                }
+                catch (Exception ex) { error = ex.Message; }
+
+                if (expectError)
+                {
+                    if (error != null) pass++;
+                    else Fail("expr/stages", name, $"expected an error, got {actual}");
+                }
+                else if (error != null) Fail("expr/stages", name, $"unexpected error: {error}");
+                else
+                {
+                    var expected = c.GetProperty("expected");
+                    bool same = expected.ValueKind == JsonValueKind.String
+                        ? actual is string str && str == expected.GetString()
+                        : actual is double d && d == expected.GetDouble();
+                    if (same) pass++;
+                    else Fail("expr/stages", name, $"expected {expected}, got {actual}");
+                }
             }
             return pass;
         }

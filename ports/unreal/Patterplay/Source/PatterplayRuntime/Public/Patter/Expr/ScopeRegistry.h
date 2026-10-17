@@ -33,8 +33,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k492cf234_SCOPEREGISTRY_H) && WILDWINTER_EXPR_KERNEL == 0x492cf234
-#define WILDWINTER_EXPR_k492cf234_SCOPEREGISTRY_H
+#if !defined(WILDWINTER_EXPR_k88b76cef_SCOPEREGISTRY_H) && WILDWINTER_EXPR_KERNEL == 0x88b76cef
+#define WILDWINTER_EXPR_k88b76cef_SCOPEREGISTRY_H
 
 #include <cstddef>
 #include <functional>
@@ -50,7 +50,7 @@
 #include "PropertyBag.h"
 #include "Expr.h"
 
-namespace wildwinter { namespace expr { inline namespace k492cf234
+namespace wildwinter { namespace expr { inline namespace k88b76cef
 {
     /** A scope backed by a host resolver rather than a bag this registry
      *  stores: the basis of a foreign scope, whose values live in the game or
