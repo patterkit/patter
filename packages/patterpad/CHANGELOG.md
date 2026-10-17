@@ -6,6 +6,11 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **Built with Patterplay 0.26.1**, the runtime the Play window and playable exports use. Nothing changes in
+  the editor itself.
+
 ## [0.30.0] - 2026-10-14
 
 ### Added
