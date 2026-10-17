@@ -1,5 +1,11 @@
 # @patterkit/ops
 
+## 0.17.2
+
+### Patch Changes
+
+- 68302a3: Uses `@patterkit/runtime` 0.26.1, the Patterplay 0.26.1 release.
+
 ## 0.17.1
 
 ### Patch Changes
