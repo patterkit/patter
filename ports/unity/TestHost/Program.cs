@@ -1104,6 +1104,29 @@ namespace Patterkit.Patterplay.TestHost
                                     throw new Exception($"expectProperties: expected {want.GetRawText()}, got {Dump(got)}");
                                 break;
                             }
+                            case "stage":
+                            {
+                                // A quality's ladder by its ref, on the engine or (onFlow) the current flow.
+                                bool onFlow = op.TryGetProperty("onFlow", out var of) && of.ValueKind == JsonValueKind.True;
+                                var flow = onFlow ? engine.GetFlow(current) : null;
+                                string call = op.GetProperty("call").GetString();
+                                string reff = op.GetProperty("ref").GetString();
+                                var args = op.GetProperty("args").EnumerateArray().Select(ToValue).ToList();
+                                Func<object> run = () => call switch
+                                {
+                                    "index" => onFlow ? flow.StageIndex(reff, args[0]) : engine.StageIndex(reff, args[0]),
+                                    "compare" => onFlow ? flow.CompareStages(reff, args[0], args[1]) : engine.CompareStages(reff, args[0], args[1]),
+                                    "next" => onFlow ? flow.NextStage(reff, args[0]) : (object)engine.NextStage(reff, args[0]),
+                                    _ => throw new Exception($"unknown stage call '{call}'"),
+                                };
+                                if (Refused(op)) { ExpectRefused(engine, $"stage {call} {reff}", () => run()); break; }
+                                var got = run();
+                                var want = op.GetProperty("expectResult");
+                                bool same = want.ValueKind == JsonValueKind.String ? got is string str && str == want.GetString()
+                                    : got is int n && n == want.GetInt32();
+                                if (!same) throw new Exception($"stage {call} {reff}: expected {want.GetRawText()}, got {got}");
+                                break;
+                            }
                             default:
                                 // An op this harness cannot run is a check that cannot fail: refuse it.
                                 throw new Exception($"unknown script op '{kind}'");

@@ -56,6 +56,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	bool GetProperty(const FString& Ref, FPatterValue& OutValue) const;
 
+	// A quality's ladder, for game code holding one of its values: the position of Stage on the ladder of the
+	// quality Ref names (@patter, @scene in the scene this flow is in, or a host scope), or -1 when it isn't one of the stages (or Ref isn't a quality, which is logged).
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
+	int32 StageIndex(const FString& Ref, const FString& Stage) const;
+
+	// -1, 0 or 1 in OutOrder as stage A is below, at or above stage B on that ladder, the order a condition
+	// compares them in. False, logged, when either isn't a stage or Ref isn't a quality.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
+	bool CompareStages(const FString& Ref, const FString& A, const FString& B, int32& OutOrder) const;
+
+	// The stage after Stage on that ladder in OutStage, staying on the top rung, as advance() does. False,
+	// logged, when Stage isn't a stage or Ref isn't a quality.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
+	bool NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const;
+
 	// Write a property by ref from this flow, @scene included. The GAME's write, so a host declaration's
 	// read-only flag (the story's promise) does not refuse it.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")
@@ -228,6 +243,21 @@ public:
 	// The typed getters below are shortcuts for one kind.
 	UFUNCTION(BlueprintPure, Category = "Patterplay")
 	bool GetProperty(const FString& Ref, FPatterValue& OutValue) const;
+
+	// A quality's ladder, for game code holding one of its values: the position of Stage on the ladder of the
+	// quality Ref names (@patter or a host scope such as @world; @scene is read on a flow), or -1 when it isn't one of the stages (or Ref isn't a quality, which is logged).
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
+	int32 StageIndex(const FString& Ref, const FString& Stage) const;
+
+	// -1, 0 or 1 in OutOrder as stage A is below, at or above stage B on that ladder, the order a condition
+	// compares them in. False, logged, when either isn't a stage or Ref isn't a quality.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
+	bool CompareStages(const FString& Ref, const FString& A, const FString& B, int32& OutOrder) const;
+
+	// The stage after Stage on that ladder in OutStage, staying on the top rung, as advance() does. False,
+	// logged, when Stage isn't a stage or Ref isn't a quality.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Qualities")
+	bool NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const;
 
 	// Write a shared property by ref. The typed setters below are shortcuts for one kind.
 	UFUNCTION(BlueprintCallable, Category = "Patterplay")

@@ -3174,6 +3174,45 @@ const scriptedBlockInOtherScene = {
 // The state inspector's rows: each shared @patter property in declaration order, with its qualified path,
 // its value now, its default (the type's own when it declares none), and values / stages only where the
 // declaration has them. A per-flow property is not a row: it has a value per flow.
+// A quality's ladder as game code reads it: the engine's and a flow's stageIndex / compareStages / nextStage,
+// by the quality's ref, for @patter, @world and (on a flow, in the scene it's in) @scene.
+const scriptedStages = {
+  name: "stage helpers: a quality's ladder by its ref, on the engine and on a flow",
+  project: project({
+    properties: [
+      { name: "debt", type: "quality", stages: ["troubled", "confronted", "resolved"], shared: true },
+      { name: "gold", type: "number", shared: true, default: 1 },
+    ],
+    scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [{ name: "act", type: "quality", stages: ["opening", "rising", "end"] }] }] },
+  }),
+  scenes: [{ id: "s", type: "scene", name: "S",
+    sceneProps: [{ name: "step", type: "quality", stages: ["one", "two"] }],
+    blocks: [{ id: "b", type: "block", name: "B", children: [
+      { id: "sn", type: "snippet", beats: [{ id: "T", kind: "text" }], jump: { to: "END" } },
+    ] }] }],
+  locales: [loc("s", { T: "t" })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s" },
+    { op: "stage", call: "index", ref: "@debt", args: ["resolved"], expectResult: 2 },
+    { op: "stage", call: "index", ref: "@patter.debt", args: ["settled"], expectResult: -1 },
+    { op: "stage", call: "compare", ref: "@debt", args: ["troubled", "confronted"], expectResult: -1 },
+    { op: "stage", call: "compare", ref: "@debt", args: ["resolved", "confronted"], expectResult: 1 },
+    { op: "stage", call: "next", ref: "@debt", args: ["troubled"], expectResult: "confronted" },
+    { op: "stage", call: "next", ref: "@debt", args: ["resolved"], expectResult: "resolved" },
+    { op: "stage", call: "compare", ref: "@debt", args: ["troubled", "settled"], expectRefused: true },
+    { op: "stage", call: "next", ref: "@debt", args: ["settled"], expectRefused: true },
+    { op: "stage", call: "next", ref: "@gold", args: [1], expectRefused: true },
+    { op: "stage", call: "next", ref: "@world.act", args: ["opening"], expectResult: "rising" },
+    { op: "stage", call: "compare", ref: "@world.act", args: ["end", "rising"], expectResult: 1 },
+    { op: "stage", call: "next", ref: "@scene.step", args: ["one"], expectRefused: true },
+    { op: "stage", call: "next", ref: "@scene.step", args: ["one"], onFlow: true, expectResult: "two" },
+    { op: "stage", call: "index", ref: "@debt", args: ["confronted"], onFlow: true, expectResult: 1 },
+    { op: "stage", call: "compare", ref: "@world.act", args: ["opening", "opening"], onFlow: true, expectResult: 0 },
+    { op: "advance", expect: [{ type: "text", id: "T", text: "t" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
 const scriptedListProperties = {
   name: "listProperties: the shared @patter rows, in declaration order",
   project: project({ properties: [
@@ -3332,7 +3371,7 @@ export const cases: Fixtures = {
     scriptedHotSwapEmptiedBlock, scriptedCast, scriptedCastAbsent, scriptedSceneBlockGameData, scriptedQualityInsertion,
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
-    scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties,
+    scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
   saves: [

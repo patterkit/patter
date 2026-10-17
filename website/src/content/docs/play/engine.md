@@ -175,6 +175,26 @@ property values) are read and written on a `Flow`. The
 [`@patterkit/play-helpers`](/play/integration/) package adds conveniences like
 `setProperties(engine, { "@hp": 10 })`.
 
+### Qualities
+
+A [quality](/format/property-types/#quality-the-stage-of-a-story)'s value is a stage name, and the order
+of its stages is what makes `>=` and `advance()` work. When your game holds a quality's value and wants
+the same order, ask the engine by the quality's reference rather than keeping a copy of the ladder:
+
+```ts
+engine.stageIndex("@investigation", "certain");                 // 2: its position, or -1 if it isn't a stage
+engine.compareStages("@investigation", "suspicious", "certain"); // -1, 0 or 1, as a condition compares them
+engine.nextStage("@investigation", "suspicious");               // "certain": one rung up, as advance() does
+flow.nextStage("@scene.alarm", "quiet");                        // @scene qualities live on a flow
+```
+
+`compareStages` and `nextStage` refuse a value that isn't one of the stages, and all three refuse a
+reference that isn't a quality. They work for `@patter` globals, `@world` and other host scopes on the
+engine, and for `@scene` on a flow. Every runtime has the same three (`StageIndex`, `CompareStages` and
+`NextStage` in C# and Blueprint, `stage_index`, `compare_stages` and `next_stage` in Godot). Holding a
+ladder yourself? The JavaScript runtime also exports `stageIndex`, `compareStages` and `nextStage` over
+a plain list of stages.
+
 Visit counts, which a story reads with `visits()` and `seen()`, are there for a debug panel too:
 `engine.getVisitCounts()` gives the counts shared across every flow and `flow.getVisitCounts()` a
 flow's own, each by node id. Every runtime has the same call (`GetVisitCounts` in C# and Blueprint,

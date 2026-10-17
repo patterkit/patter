@@ -1108,6 +1108,50 @@ namespace Patterkit.Patterplay
             if (journal != null && prev != null) journal.Undo.Add(() => _host.Registry.Set(scope, name, prev, host: true));
         }
 
+        /// <summary>A quality's ladder, for game code holding one of its values: the position of
+        /// <paramref name="value"/> on the ladder of the quality <paramref name="refStr"/> names (@patter or a
+        /// host scope such as @world), or -1 when it isn't one of the stages. Throws EvalError when the ref isn't
+        /// a quality. @scene qualities are read on a Flow.</summary>
+        public int StageIndex(string refStr, ExprValue value) => Stages.Index(LadderOf(refStr), value);
+
+        /// <summary>-1, 0 or 1 as stage <paramref name="a"/> is below, at or above <paramref name="b"/> on the
+        /// ladder of the quality the ref names, the order a condition compares them in. Throws EvalError when
+        /// either isn't a stage, or the ref isn't a quality.</summary>
+        public int CompareStages(string refStr, ExprValue a, ExprValue b)
+        {
+            var ladder = LadderOf(refStr);
+            try { return Stages.Compare(ladder, a, b); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
+
+        /// <summary>The stage after <paramref name="value"/> on the ladder of the quality the ref names, staying
+        /// on the top rung, as advance() does. Throws EvalError when the value isn't a stage, or the ref isn't a
+        /// quality.</summary>
+        public string NextStage(string refStr, ExprValue value)
+        {
+            var ladder = LadderOf(refStr);
+            try { return Stages.Next(ladder, value); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
+
+        /// <summary>The ladder of a quality outside any flow: a @patter global's, or another scope's (the
+        /// registry's, as another engine or the game declares it, then the bundle's own host-scope
+        /// declarations). Flow.StagesFor without @scene, which belongs to a flow's current scene.</summary>
+        private List<string> LadderOf(string refStr)
+        {
+            var (scope, name) = SplitShared(refStr);
+            var key = name.ToLowerInvariant();
+            var ladder = scope == "patter"
+                ? Flow.Ladders(_host, "patter", () => _host.PatterSharedDecls.Concat(_host.PatterLocalDecls).Select(d => (d.Name, d.Type, d.Stages)), key)
+                : _host.Registry.ToEvalContext().Qualities?.Invoke(scope, name)
+                  ?? Flow.Ladders(_host, "host/" + scope, () =>
+                  {
+                      var spec = _host.Bundle.ScopeRegistry?.Scopes?.Find(s => s != null && s.Token == scope);
+                      return (spec?.Declarations ?? new List<HostScopeDecl>()).Select(d => (d.Name, d.Type, d.Stages));
+                  }, key);
+            return ladder ?? throw new EvalError($"'{refStr}' is not a quality");
+        }
+
         /// <summary>The shared `@patter` global properties with their declared type, current value, and
         /// default - for a debug inspector that lists + edits live state. (Per-flow `@patter` / `@scene`
         /// props live on a Flow.)</summary>

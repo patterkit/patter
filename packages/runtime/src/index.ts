@@ -9,6 +9,9 @@
 // ---------------------------------------------------------------------------
 
 export { Engine, Flow, Checkpoint } from "./engine.js";
+// A quality's ladder over a bare list of stages, as the Storylet Engine's runtime exports them: for a game
+// holding a ladder itself. Engine and Flow take a quality's ref instead.
+export { stageIndex, compareStages, nextStage } from "@wildwinter/expr";
 // The compiled-bundle type the Engine constructor consumes (from the shared model), so hosts can
 // type a parsed .patterc without depending on @patterkit/model directly.
 export type { Bundle } from "@patterkit/model";

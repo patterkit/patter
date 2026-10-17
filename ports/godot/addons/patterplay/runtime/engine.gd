@@ -764,6 +764,57 @@ func set_property(ref: String, value) -> void:
 		journal["undo"].append(Callable(_host.registry, "set_value").bind(sp[0], sp[1], prev, {"host": true}))
 
 
+## A quality's ladder, for game code holding one of its values: the position of `value` on the ladder
+## of the quality `ref` names (@patter or a host scope such as @world), or -1 when it isn't one of the
+## stages. A ref that isn't a quality is push_error'd, and gives -1. @scene qualities are read on a
+## flow.
+func stage_index(ref: String, value) -> int:
+	var ladder = _ladder_of(ref)
+	return -1 if ladder == null else PatterExpr.stage_index(ladder, value)
+
+
+## -1, 0 or 1 as stage `a` is below, at or above stage `b` on that ladder, the order a condition
+## compares them in; an EvalError when either isn't a stage, or `ref` isn't a quality.
+func compare_stages(ref: String, a, b) -> Variant:
+	var ladder = _ladder_of(ref)
+	return PatterExpr.error("'%s' is not a quality" % ref) if ladder == null else PatterExpr.compare_stages(ladder, a, b)
+
+
+## The stage after `value` on that ladder, staying on the top rung, as advance() does; an EvalError
+## when `value` isn't a stage, or `ref` isn't a quality.
+func next_stage(ref: String, value) -> Variant:
+	var ladder = _ladder_of(ref)
+	return PatterExpr.error("'%s' is not a quality" % ref) if ladder == null else PatterExpr.next_stage(ladder, value)
+
+
+# The ladder of a quality outside any flow: a @patter global's, or another scope's (the registry's, as
+# another engine or the game declares it, then the bundle's own host-scope declarations). The flow's
+# _stages_for without @scene, which belongs to a flow's current scene.
+func _ladder_of(ref: String):
+	var sp := PatterFlow.split_host_ref(_host, ref)
+	if sp[0] == "scene":
+		push_error("'%s': @scene properties are scene-scoped - read them on a Flow" % ref)
+		return null
+	var key: String = sp[1].to_lower()
+	var ladder = null
+	if sp[0] == "patter":
+		ladder = PatterFlow.ladders_on(_host, "patter", func(): return _host.patter_shared_decls + _host.patter_local_decls).get(key)
+	else:
+		var qualities = _host.registry.to_eval_context().get("qualities")
+		if qualities is Callable:
+			ladder = (qualities as Callable).call(sp[0], sp[1])
+		if ladder == null:
+			var scope: String = sp[0]
+			ladder = PatterFlow.ladders_on(_host, "host/" + scope, func():
+				for spec in _host.bundle.get("scopeRegistry", {}).get("scopes", []):
+					if spec.get("token", "") == scope:
+						return spec.get("declarations", [])
+				return []).get(key)
+	if ladder == null:
+		push_error("'%s' is not a quality" % ref)
+	return ladder
+
+
 # -- save / load ---------------------------------------------------------------
 
 ## The SHARED kernel bags with the path each answers to in a log: the @patter globals, and

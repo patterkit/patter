@@ -6,12 +6,18 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A quality's stages from game code.** A game holding a quality's value can put it in the story's order
+  without keeping a copy of the ladder: `engine.stage_index(ref, value)`, `engine.compare_stages(ref, a, b)`
+  and `engine.next_stage(ref, value)`, and the same on a flow, which also reaches `@scene`; a refusal is an
+  `EvalError`. They give a stage's position (-1 when the value isn't a stage), how two stages compare (-1, 0
+  or 1, as a condition compares them), and the stage after one, staying on the top rung as `advance()` does.
+
 ### Changed
 
 - **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine
-  uses from its next release. It adds three helpers for a quality's ladder outside an expression, for game
-  code holding a quality's value: a stage's position, how two stages compare, and the next stage. In GDScript:
-  `PatterExpr.stage_index`, `compare_stages` and `next_stage`.
+  uses from its next release.
 
 ## [0.26.1] - 2026-10-17
 

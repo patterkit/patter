@@ -252,6 +252,29 @@ bool UPatterFlow::GetProperty(const FString& Ref, FPatterValue& OutValue) const
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 
+int32 UPatterFlow::StageIndex(const FString& Ref, const FString& Stage) const
+{
+	if (!Flow) return -1;
+	try { return Flow->stageIndex(Std(Ref), patter::PatterValue::Str(Std(Stage))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return -1; }
+}
+
+bool UPatterFlow::CompareStages(const FString& Ref, const FString& A, const FString& B, int32& OutOrder) const
+{
+	OutOrder = 0;
+	if (!Flow) return false;
+	try { OutOrder = Flow->compareStages(Std(Ref), patter::PatterValue::Str(Std(A)), patter::PatterValue::Str(Std(B))); return true; }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+bool UPatterFlow::NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const
+{
+	OutStage = FString();
+	if (!Flow) return false;
+	try { OutStage = Ue(Flow->nextStage(Std(Ref), patter::PatterValue::Str(Std(Stage)))); return true; }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
 void UPatterFlow::SetProperty(const FString& Ref, const FPatterValue& Value)
 {
 	if (!Flow) return;
@@ -429,6 +452,29 @@ bool UPatterEngine::GetProperty(const FString& Ref, FPatterValue& OutValue) cons
 		OutValue = ToUeValue(*V);
 		return true;
 	}
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+int32 UPatterEngine::StageIndex(const FString& Ref, const FString& Stage) const
+{
+	if (!Engine) return -1;
+	try { return Engine->stageIndex(Std(Ref), patter::PatterValue::Str(Std(Stage))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return -1; }
+}
+
+bool UPatterEngine::CompareStages(const FString& Ref, const FString& A, const FString& B, int32& OutOrder) const
+{
+	OutOrder = 0;
+	if (!Engine) return false;
+	try { OutOrder = Engine->compareStages(Std(Ref), patter::PatterValue::Str(Std(A)), patter::PatterValue::Str(Std(B))); return true; }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+bool UPatterEngine::NextStage(const FString& Ref, const FString& Stage, FString& OutStage) const
+{
+	OutStage = FString();
+	if (!Engine) return false;
+	try { OutStage = Ue(Engine->nextStage(Std(Ref), patter::PatterValue::Str(Std(Stage)))); return true; }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }
 

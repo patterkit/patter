@@ -30,7 +30,7 @@
 // when the engine made the registry itself; otherwise the game saves the registry once.
 // ---------------------------------------------------------------------------
 
-import { evaluate, deserialiseAst, makePrng, toUint32 } from "@wildwinter/expr";
+import { evaluate, deserialiseAst, makePrng, toUint32, stageIndex, compareStages, nextStage } from "@wildwinter/expr";
 import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
@@ -1302,6 +1302,32 @@ export class Engine {
     if (this.host.journal && prev !== undefined) this.host.journal.undo.push(() => this.host.registry.set(scope, name, prev, { host: true }));
   }
 
+  /** A quality's ladder, for game code holding one of its values: the position of `value` on the ladder of
+   *  the quality `ref` names (`@patter` or a host scope such as `@world`), or -1 when it isn't one of the
+   *  stages. Throws when `ref` isn't a declared quality. `@scene` qualities are read on a Flow. */
+  stageIndex(ref: string, value: ScalarValue): number {
+    return stageIndex(this.ladderOf(ref), value);
+  }
+
+  /** -1, 0 or 1 as stage `a` is below, at or above stage `b` on the ladder of the quality `ref` names, the
+   *  order a condition compares them in. Throws when either isn't a stage, or `ref` isn't a quality. */
+  compareStages(ref: string, a: ScalarValue, b: ScalarValue): number {
+    return compareStages(this.ladderOf(ref), a, b);
+  }
+
+  /** The stage after `value` on the ladder of the quality `ref` names, staying on the top rung, as
+   *  `advance()` does. Throws when `value` isn't a stage, or `ref` isn't a quality. */
+  nextStage(ref: string, value: ScalarValue): string {
+    return nextStage(this.ladderOf(ref), value);
+  }
+
+  private ladderOf(ref: string): readonly string[] {
+    const { scope, name } = this.splitShared(ref);
+    const ladder = sharedStages(this.host, scope, name);
+    if (!ladder) throw new Error(`'${ref}' is not a quality`);
+    return ladder;
+  }
+
   /** The run's decisions, in order, each naming the flow it happened in. Empty unless the
    *  run was opened with `log: true`. A flow's own log stays flow-local; this is the only
    *  place a story spanning several flows reads as one sequence. */
@@ -1914,6 +1940,32 @@ export class Flow {
    *  it (see `Engine.setProperty`). The story's writes go through `writeProperty` instead. */
   setProperty(ref: string, value: ScalarValue): void {
     this.writeProperty(ref, value, true);
+  }
+
+  /** The position of `value` on the ladder of the quality `ref` names (`@patter`, `@scene` in the scene this
+   *  flow is in, or a host scope), or -1 when it isn't one of the stages. Throws when `ref` isn't a quality. */
+  stageIndex(ref: string, value: ScalarValue): number {
+    return stageIndex(this.ladderOf(ref), value);
+  }
+
+  /** -1, 0 or 1 as stage `a` is below, at or above stage `b` on the ladder of the quality `ref` names. Throws
+   *  when either isn't a stage, or `ref` isn't a quality. */
+  compareStages(ref: string, a: ScalarValue, b: ScalarValue): number {
+    return compareStages(this.ladderOf(ref), a, b);
+  }
+
+  /** The stage after `value` on the ladder of the quality `ref` names, staying on the top rung, as
+   *  `advance()` does. Throws when `value` isn't a stage, or `ref` isn't a quality. */
+  nextStage(ref: string, value: ScalarValue): string {
+    return nextStage(this.ladderOf(ref), value);
+  }
+
+  private ladderOf(ref: string): readonly string[] {
+    const { scope, name } = this.splitRef(ref);
+    this.context(); // the registry's quality lookup, for a scope another engine or the game declares
+    const ladder = this.stagesFor(scope, name);
+    if (!ladder) throw new Error(`'${ref}' is not a quality`);
+    return ladder;
   }
 
   /** The write itself. `host` says WHO is writing, which is the only thing `writable: false` cares
@@ -2841,6 +2893,16 @@ function ladders(host: FlowHost, cacheKey: string, decls: () => ReadonlyArray<{ 
     host.qualityLadders.set(cacheKey, found);
   }
   return found;
+}
+
+/** The ladder of a quality outside any flow: a `@patter` global's, or another scope's (the registry's, as
+ *  another engine or the game declares it, then the bundle's own host-scope declarations). Mirrors
+ *  Flow.stagesFor without `@scene`, which belongs to a flow's current scene. */
+function sharedStages(host: FlowHost, scope: string, name: string): readonly string[] | undefined {
+  const key = name.toLowerCase();
+  if (scope === "patter") return ladders(host, "patter", () => [...host.patterSharedDecls, ...host.patterLocalDecls]).get(key);
+  return host.registry.toEvalContext().qualities?.(scope, name)
+    ?? ladders(host, `host/${scope}`, () => host.bundle.scopeRegistry?.scopes.find((s) => s.token === scope)?.declarations).get(key);
 }
 
 /** A host-scope declaration (`@world.x`) → registry declaration. */

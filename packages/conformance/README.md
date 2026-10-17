@@ -25,7 +25,7 @@ parser or compiler. Four case kinds, each with a reference runner in
   `engineOptions` (see below) sets the engine's construction options.
 - **`scripted[]`** - `{ name, bundle, bundleB?, seed?, engineOptions?, script }`. Execute the `script`
   ops (`openFlow` / `useFlow` / `advance` / `choose` / `saveLoad` / `setLocale` /
-  `setClosedCaptions` / `hotSwap` / `reset`) against your engine; each op carrying
+  `setClosedCaptions` / `hotSwap` / `reset` / `stage`, among others) against your engine; each op carrying
   `expect` must produce exactly that transcript chunk, ops without it none.
   `saveLoad` = serialise the whole game, discard the engine, restore into a fresh one
   (semantic parity, not byte parity). `hotSwap` does the same but restores into the
@@ -45,6 +45,11 @@ on a `line` prompt only, each only when set). There is no flat `text` on an opti
 
 A speaker field (`character`, `characterName`, `direction`) on a line or a line prompt
 is absent only when unset: one set to `""` is written as `""`, never dropped.
+
+A `stage` op calls a quality's ladder helper by the quality's ref (`call`: `index`, `compare` or
+`next`, with `args`), on the engine, or on the current flow with `onFlow` (which also reaches `@scene`),
+and checks `expectResult` (a position, -1 / 0 / 1, or a stage name) or `expectRefused` (JS, C# and C++
+throw; Godot returns an `EvalError`). It produces no transcript.
 
 A `runtime`, `scripted`, or `saves` case may carry `engineOptions`:
 `{ replayPromptOnChoose?, closedCaptions? }`, the engine's construction options of the

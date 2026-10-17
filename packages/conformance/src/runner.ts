@@ -223,6 +223,18 @@ export function runScript(
         }
         break;
       }
+      case "stage": {
+        const on = op.onFlow ? engine.getFlow(current)! : engine;
+        const a = op.args;
+        const call = (): number | string =>
+          op.call === "index" ? on.stageIndex(op.ref, a[0]!)
+            : op.call === "compare" ? on.compareStages(op.ref, a[0]!, a[1]!)
+              : on.nextStage(op.ref, a[0]!);
+        if (op.expectRefused) { refused(`stage ${op.call} ${op.ref}`, call); break; }
+        const got = call();
+        if (got !== op.expectResult) throw new Error(`stage ${op.call} ${op.ref}: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
+        break;
+      }
       case "rollback":
         engine.rollback(checkpoint!);
         checkpoint = undefined;

@@ -18,6 +18,7 @@ operations you reach for most (see your engine's [guide](/play/overview/) for th
 | Advance the flow | `flow.advance()` | `flow.Advance()` | `Flow->Advance()` | `flow.advance()` |
 | Read a step's Game Data | `step.gameData` | `step.GameData` | `Step.GameData` | `step.get("gameData")` |
 | Get / set a property | `flow.getProperty` / `setProperty` | `flow.GetProperty` / `SetProperty` | `Engine->GetPropertyNumber` / `SetPropertyNumber` | `flow.get_property` / `set_property` |
+| Order a quality's stages | `engine.compareStages(ref, a, b)` | `engine.CompareStages(ref, a, b)` | `Engine->CompareStages(Ref, A, B, Order)` | `engine.compare_stages(ref, a, b)` |
 | Switch language live | `engine.setLocale("fr")` | `engine.SetLocale("fr")` | `Engine->Raw()->setLocale("fr")` | `engine.set_locale("fr")` |
 | Set one flow aside, and bring it back | `engine.captureFlow(id)` / `restoreFlow(id, state)` | `engine.CaptureFlow(id)` / `RestoreFlow(id, state)` | `Engine->CaptureFlow(Name)` / `RestoreFlow(Name, Json)` | `engine.capture_flow(id)` / `restore_flow(id, state)` |
 

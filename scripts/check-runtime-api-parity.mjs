@@ -99,6 +99,11 @@ const API = [
   // On the engine (the shared counts) and on a flow (its own); one row covers both spellings here.
   { on: "Engine", js: "getVisitCounts", unity: "GetVisitCounts", godot: "get_visit_counts", unreal: "getVisitCounts", bp: "GetVisitCounts" },
   { on: "Engine", js: "listProperties", unity: "ListProperties", godot: "list_properties", unreal: "listProperties", bp: "ListProperties" },
+  // A quality's ladder for game code, by the quality's ref: on the engine and on a flow (which reaches
+  // @scene); one row covers both spellings here.
+  { on: "Engine", js: "stageIndex", unity: "StageIndex", godot: "stage_index", unreal: "stageIndex", bp: "StageIndex" },
+  { on: "Engine", js: "compareStages", unity: "CompareStages", godot: "compare_stages", unreal: "compareStages", bp: "CompareStages" },
+  { on: "Engine", js: "nextStage", unity: "NextStage", godot: "next_stage", unreal: "nextStage", bp: "NextStage" },
   { on: "Engine", js: "saveGame", unity: "SaveGame", godot: "save_game", unreal: "saveGame", bp: null,
     why: "Blueprint saves via the PatterSave helper" },
   { on: "Engine", js: "loadGame", unity: "LoadGame", godot: "load_game", unreal: "loadGame", bp: null,

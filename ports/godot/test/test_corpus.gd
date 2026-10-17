@@ -853,6 +853,28 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 				if not _deep_equal(rows, op["expectResult"]):
 					_fail("scripted", name, "expectProperties: expected %s, got %s" % [JSON.stringify(op["expectResult"]), JSON.stringify(rows)])
 					return false
+			"stage":
+				# A quality's ladder by its ref, on the engine or (onFlow) the current flow. A refusal is
+				# an EvalError here, as GDScript has no exceptions.
+				var on = holder["engine"].get_flow(current) if op.get("onFlow", false) else holder["engine"]
+				var args: Array = op["args"].map(func(v): return PatterValues.to_value(v))
+				var got = null
+				match str(op["call"]):
+					"index": got = on.stage_index(op["ref"], args[0])
+					"compare": got = on.compare_stages(op["ref"], args[0], args[1])
+					"next": got = on.next_stage(op["ref"], args[0])
+					_: got = PatterExpr.error("unknown stage call %s" % op["call"])
+				if op.get("expectRefused", false):
+					if not PatterExpr.is_error(got):
+						_fail("scripted", name, "stage %s %s: expected a refusal, got %s" % [op["call"], op["ref"], str(got)])
+						return false
+				else:
+					var want = op["expectResult"]
+					var same: bool = (got is String and want is String and got == want) \
+						or (not (got is String) and not (want is String) and not PatterExpr.is_error(got) and float(got) == float(want))
+					if not same:
+						_fail("scripted", name, "stage %s %s: expected %s, got %s" % [op["call"], op["ref"], str(want), str(got)])
+						return false
 			"rollback":
 				holder["engine"].rollback(cp)
 				cp = null

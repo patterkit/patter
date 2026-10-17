@@ -213,7 +213,13 @@ export type ScriptOp =
   | { op: "commit" }
   // The engine's listProperties(), as JSON: each shared @patter property's row in declaration order, with
   // values and stages present only where the declaration has them.
-  | { op: "expectProperties"; expectResult: unknown[] };
+  | { op: "expectProperties"; expectResult: unknown[] }
+  // A quality's ladder, as game code reads it: `call` is the engine's stageIndex / compareStages / nextStage
+  // (`args`: one value, two, one), on the engine, or on the current flow with `onFlow` (which also reaches
+  // @scene, in the scene the flow is in). `expectResult` is the position, the order (-1, 0, 1) or the next
+  // stage's name. `expectRefused`: the call is refused (a value that isn't a stage, a ref that isn't a
+  // quality, @scene on the engine). JS, C# and C++ throw; Godot returns an EvalError. No transcript.
+  | { op: "stage"; call: "index" | "compare" | "next"; ref: string; args: ScalarValue[]; onFlow?: boolean; expectResult?: number | string; expectRefused?: boolean };
 
 /** A compiled scripted case in the portable corpus. */
 export interface ScriptedCase {

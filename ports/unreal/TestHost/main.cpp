@@ -1014,6 +1014,32 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                         throw std::runtime_error("expectProperties: expected " + dump(op.at("expectResult")) + ", got " + dump(got));
                     ++propertyReads;
                 }
+                else if (kind == "stage")
+                {
+                    // A quality's ladder by its ref, on the engine or (onFlow) the current flow.
+                    const JsonValue* onFlowV = op.find("onFlow");
+                    const bool onFlow = onFlowV && onFlowV->b;
+                    const std::string call = op.at("call").str, ref = op.at("ref").str;
+                    std::vector<PatterValue> args;
+                    for (const auto& a : op.at("args").arr) args.push_back(toValue(a));
+                    auto run = [&]() -> std::string
+                    {
+                        Flow* f = onFlow ? engine->getFlow(current) : nullptr;
+                        if (call == "index") return std::to_string(onFlow ? f->stageIndex(ref, args.at(0)) : engine->stageIndex(ref, args.at(0)));
+                        if (call == "compare") return std::to_string(onFlow ? f->compareStages(ref, args.at(0), args.at(1)) : engine->compareStages(ref, args.at(0), args.at(1)));
+                        if (call == "next") return "\"" + (onFlow ? f->nextStage(ref, args.at(0)) : engine->nextStage(ref, args.at(0))) + "\"";
+                        throw std::runtime_error("unknown stage call '" + call + "'");
+                    };
+                    const JsonValue* refusedV = op.find("expectRefused");
+                    if (refusedV && refusedV->b) refused("stage " + call + " " + ref, [&] { run(); });
+                    else
+                    {
+                        const JsonValue& e = op.at("expectResult");
+                        const std::string want = e.isString() ? "\"" + e.str + "\"" : std::to_string(static_cast<int>(e.num));
+                        const std::string got = run();
+                        if (got != want) throw std::runtime_error("stage " + call + " " + ref + ": expected " + want + ", got " + got);
+                    }
+                }
                 // An op this host cannot run is a check that cannot fail: refuse it, never skip it.
                 else throw std::runtime_error("unknown script op '" + kind + "'");
 

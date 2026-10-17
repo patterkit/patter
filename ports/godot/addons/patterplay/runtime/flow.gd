@@ -129,14 +129,18 @@ func _stages_for(scope: String, name: String):
 # every time it runs, and scanning the declarations each time cost a pass and a lowercasing per
 # declaration per comparison.
 func _ladders(cache_key: String, decls: Callable) -> Dictionary:
-	var found = _host.quality_ladders.get(cache_key)
+	return ladders_on(_host, cache_key, decls)
+
+
+static func ladders_on(host, cache_key: String, decls: Callable) -> Dictionary:
+	var found = host.quality_ladders.get(cache_key)
 	if found == null:
 		found = {}
 		for d in decls.call():
 			var k := str(d.get("name", "")).to_lower()
 			if d.get("type", "") == "quality" and d.has("stages") and not found.has(k):
 				found[k] = d["stages"]
-		_host.quality_ladders[cache_key] = found
+		host.quality_ladders[cache_key] = found
 	return found
 
 
@@ -464,6 +468,37 @@ func get_property(ref: String):
 ## own writes (effects) go through _write_property(.., false).
 func set_property(ref: String, value) -> void:
 	_write_property(ref, value, true)
+
+
+## A quality's ladder, for game code holding one of its values: the position of `value` on the ladder
+## of the quality `ref` names (@patter, @scene in the scene this flow is in, or a host scope), or -1
+## when it isn't one of the stages. A ref that isn't a quality is push_error'd, and gives -1.
+func stage_index(ref: String, value) -> int:
+	var ladder = _ladder_of(ref)
+	return -1 if ladder == null else PatterExpr.stage_index(ladder, value)
+
+
+## -1, 0 or 1 as stage `a` is below, at or above stage `b` on that ladder; an EvalError when either
+## isn't a stage, or `ref` isn't a quality.
+func compare_stages(ref: String, a, b) -> Variant:
+	var ladder = _ladder_of(ref)
+	return PatterExpr.error("'%s' is not a quality" % ref) if ladder == null else PatterExpr.compare_stages(ladder, a, b)
+
+
+## The stage after `value` on that ladder, staying on the top rung, as advance() does; an EvalError
+## when `value` isn't a stage, or `ref` isn't a quality.
+func next_stage(ref: String, value) -> Variant:
+	var ladder = _ladder_of(ref)
+	return PatterExpr.error("'%s' is not a quality" % ref) if ladder == null else PatterExpr.next_stage(ladder, value)
+
+
+func _ladder_of(ref: String):
+	var sp := split_host_ref(_host, ref)
+	_context()   # the registry's quality lookup, for a scope another engine or the game declares
+	var ladder = _stages_for(sp[0], sp[1])
+	if ladder == null:
+		push_error("'%s' is not a quality" % ref)
+	return ladder
 
 
 ## The write itself. `host` says WHO is writing, which is all "writable": false cares about. Returns

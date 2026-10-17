@@ -137,8 +137,11 @@ namespace Patterkit.Patterplay
         /// ladder every time it runs, and scanning the declarations each time cost a pass and a lowercasing
         /// per declaration per comparison.</summary>
         private List<string> Ladders(string cacheKey, Func<IEnumerable<(string Name, string Type, List<string> Stages)>> decls, string key)
+            => Ladders(_host, cacheKey, decls, key);
+
+        internal static List<string> Ladders(FlowHost host, string cacheKey, Func<IEnumerable<(string Name, string Type, List<string> Stages)>> decls, string key)
         {
-            if (!_host.QualityLadders.TryGetValue(cacheKey, out var found))
+            if (!host.QualityLadders.TryGetValue(cacheKey, out var found))
             {
                 found = new Dictionary<string, List<string>>();
                 foreach (var d in decls())
@@ -147,7 +150,7 @@ namespace Patterkit.Patterplay
                     var k = d.Name.ToLowerInvariant();
                     if (!found.ContainsKey(k)) found[k] = d.Stages;
                 }
-                _host.QualityLadders[cacheKey] = found;
+                host.QualityLadders[cacheKey] = found;
             }
             return found.TryGetValue(key, out var stages) ? stages : null;
         }
@@ -453,6 +456,38 @@ namespace Patterkit.Patterplay
         /// <summary>Write a property by ref. The GAME's surface, so a host declaration's `writable: false`
         /// binds the story, not the game that owns the value. Effects use WriteProperty(.., host: false).</summary>
         public void SetProperty(string refStr, ExprValue value) => WriteProperty(refStr, value, true);
+
+        /// <summary>The position of <paramref name="value"/> on the ladder of the quality <paramref name="refStr"/>
+        /// names (@patter, @scene in the scene this flow is in, or a host scope), or -1 when it isn't one of the
+        /// stages. Throws EvalError when the ref isn't a quality.</summary>
+        public int StageIndex(string refStr, ExprValue value) => Stages.Index(LadderOf(refStr), value);
+
+        /// <summary>-1, 0 or 1 as stage <paramref name="a"/> is below, at or above <paramref name="b"/> on the
+        /// ladder of the quality the ref names. Throws EvalError when either isn't a stage, or the ref isn't a
+        /// quality.</summary>
+        public int CompareStages(string refStr, ExprValue a, ExprValue b)
+        {
+            var ladder = LadderOf(refStr);
+            try { return Stages.Compare(ladder, a, b); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
+
+        /// <summary>The stage after <paramref name="value"/> on the ladder of the quality the ref names, staying
+        /// on the top rung, as advance() does. Throws EvalError when the value isn't a stage, or the ref isn't a
+        /// quality.</summary>
+        public string NextStage(string refStr, ExprValue value)
+        {
+            var ladder = LadderOf(refStr);
+            try { return Stages.Next(ladder, value); }
+            catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+        }
+
+        private List<string> LadderOf(string refStr)
+        {
+            var (scope, name) = Engine.SplitRef(refStr, _host.IsScopeToken);
+            Context(); // the registry's quality lookup, for a scope another engine or the game declares
+            return StagesFor(scope, name) ?? throw new EvalError($"'{refStr}' is not a quality");
+        }
 
         /// <summary>The write itself. `host` says WHO is writing, which is all `writable: false` cares
         /// about: the story is refused, the game is not.</summary>

@@ -39,6 +39,12 @@
 
 namespace patter
 {
+    // A quality's ladder outside an expression, over a bare list of stages (Engine and Flow take a quality's
+    // ref instead): the kernel's, named here as the rest of the kernel is.
+    using wildwinter::expr::StageIndex;
+    using wildwinter::expr::CompareStages;
+    using wildwinter::expr::NextStage;
+
     // ----- helpers -------------------------------------------------------------
 
     inline std::string toLower(const std::string& s)
@@ -778,6 +784,24 @@ namespace patter
         return split;
     }
 
+    // The stage ladder of each declared quality in one set of declarations, by lowercased name (the first
+    // declaration of a name wins). Built once per set and kept on the host: a comparison asks for a ladder
+    // every time it runs, and scanning the declarations each time cost a pass and a lowercasing per
+    // declaration per comparison. `each` calls the function it is given with every declaration in the set.
+    template <typename Each>
+    const std::vector<std::string>* qualityLadder(FlowHost& host, const std::string& cacheKey, Each each, const std::string& key)
+    {
+        auto found = host.qualityLadders.find(cacheKey);
+        if (found == host.qualityLadders.end())
+        {
+            std::unordered_map<std::string, const std::vector<std::string>*> built;
+            each([&built](const auto& d) { if (d.type == "quality") built.emplace(toLower(d.name), &d.stages); });
+            found = host.qualityLadders.emplace(cacheKey, std::move(built)).first;
+        }
+        auto hit = found->second.find(key);
+        return hit == found->second.end() ? nullptr : hit->second;
+    }
+
     // ----- Flow ----------------------------------------------------------------
 
     // The result of advanceToStop: every beat played on the way to a stop, plus the terminal
@@ -826,6 +850,15 @@ namespace patter
 
         const std::string& currentScene() const { return currentSceneId_; }
 
+        const std::vector<std::string>& ladderOf(const std::string& ref)
+        {
+            auto sp = splitHostRef(*host_, ref);
+            context(); // the registry's quality lookup, for a scope another engine or the game declares
+            const std::vector<std::string>* ladder = stagesFor(sp.first, sp.second);
+            if (!ladder) throw EvalError("'" + ref + "' is not a quality");
+            return *ladder;
+        }
+
         // The stage ladder of `@scope.name` when it is a declared quality, else null. Names compare
         // lowercase, as the compiler emits references. Mirrors the JS Flow.stagesFor.
         const std::vector<std::string>* stagesFor(const std::string& scope, const std::string& name) const
@@ -853,22 +886,10 @@ namespace patter
             }, key);
         }
 
-        // The stage ladder of each declared quality in one set of declarations, by lowercased name (the first
-        // declaration of a name wins). Built once per set and kept on the host: a comparison asks for a ladder
-        // every time it runs, and scanning the declarations each time cost a pass and a lowercasing per
-        // declaration per comparison. `each` calls the function it is given with every declaration in the set.
         template <typename Each>
         const std::vector<std::string>* ladders(const std::string& cacheKey, Each each, const std::string& key) const
         {
-            auto found = host_->qualityLadders.find(cacheKey);
-            if (found == host_->qualityLadders.end())
-            {
-                std::unordered_map<std::string, const std::vector<std::string>*> built;
-                each([&built](const auto& d) { if (d.type == "quality") built.emplace(toLower(d.name), &d.stages); });
-                found = host_->qualityLadders.emplace(cacheKey, std::move(built)).first;
-            }
-            auto hit = found->second.find(key);
-            return hit == found->second.end() ? nullptr : hit->second;
+            return qualityLadder(*host_, cacheKey, each, key);
         }
 
         // The options of the choice currently waiting for the player, empty when none is pending. The same
@@ -1186,6 +1207,25 @@ namespace patter
         // Write a property by ref. The GAME's surface, so a host declaration's `writable: false` binds
         // the story, not the game that owns the value. Effects use writeProperty(.., false).
         void setProperty(const std::string& ref, const PatterValue& value) { writeProperty(ref, value, true); }
+
+        // A quality's ladder, for game code holding one of its values: the position of `value` on the ladder of
+        // the quality `ref` names (@patter, @scene in the scene this flow is in, or a host scope), or -1 when it
+        // isn't one of the stages. Throws EvalError when `ref` isn't a quality.
+        int stageIndex(const std::string& ref, const PatterValue& value) { return StageIndex(ladderOf(ref), value); }
+        // -1, 0 or 1 as stage `a` is below, at or above stage `b` on that ladder. Throws EvalError when either
+        // isn't a stage, or `ref` isn't a quality.
+        int compareStages(const std::string& ref, const PatterValue& a, const PatterValue& b)
+        {
+            const auto& ladder = ladderOf(ref);
+            return kernelCall([&] { return CompareStages(ladder, a, b); });
+        }
+        // The stage after `value` on that ladder, staying on the top rung, as advance() does. Throws EvalError
+        // when `value` isn't a stage, or `ref` isn't a quality.
+        std::string nextStage(const std::string& ref, const PatterValue& value)
+        {
+            const auto& ladder = ladderOf(ref);
+            return kernelCall([&] { return NextStage(ladder, value); });
+        }
 
 
         // Expand {@ref} slots against this flow's CURRENT state. An IDs-only game calls this on a string it
@@ -2798,6 +2838,52 @@ namespace patter
             }
         }
 
+        // A quality's ladder, for game code holding one of its values: the position of `value` on the ladder of
+        // the quality `ref` names (@patter or a host scope such as @world), or -1 when it isn't one of the
+        // stages. Throws EvalError when `ref` isn't a quality. @scene qualities are read on a Flow.
+        int stageIndex(const std::string& ref, const PatterValue& value) { return StageIndex(ladderOf(ref), value); }
+        // -1, 0 or 1 as stage `a` is below, at or above stage `b` on that ladder, the order a condition compares
+        // them in. Throws EvalError when either isn't a stage, or `ref` isn't a quality.
+        int compareStages(const std::string& ref, const PatterValue& a, const PatterValue& b)
+        {
+            const auto& ladder = ladderOf(ref);
+            return kernelCall([&] { return CompareStages(ladder, a, b); });
+        }
+        // The stage after `value` on that ladder, staying on the top rung, as advance() does. Throws EvalError
+        // when `value` isn't a stage, or `ref` isn't a quality.
+        std::string nextStage(const std::string& ref, const PatterValue& value)
+        {
+            const auto& ladder = ladderOf(ref);
+            return kernelCall([&] { return NextStage(ladder, value); });
+        }
+
+        // The ladder of a quality outside any flow: a @patter global's, or another scope's (the registry's, as
+        // another engine or the game declares it, then the bundle's own host-scope declarations).
+        // Flow::stagesFor without @scene, which belongs to a flow's current scene.
+        const std::vector<std::string>& ladderOf(const std::string& ref)
+        {
+            auto sp = splitHostRef(host_, ref);
+            if (sp.first == "scene") throw std::runtime_error("'" + ref + "': @scene properties are scene-scoped - read/write them on a Flow, not the Engine");
+            const std::string key = toLower(sp.second);
+            const std::vector<std::string>* ladder = nullptr;
+            if (sp.first == "patter")
+                ladder = qualityLadder(host_, "patter", [&](auto add) { for (const auto& d : host_.patterSharedDecls) add(d); for (const auto& d : host_.patterLocalDecls) add(d); }, key);
+            else
+            {
+                // Kept on the engine: the ladder the lookup hands back lives as long as the lookup does.
+                stageCtx_ = host_.registry->toEvalContext();
+                if (stageCtx_.qualities) ladder = stageCtx_.qualities(sp.first, sp.second);
+                if (!ladder)
+                    ladder = qualityLadder(host_, "host/" + sp.first, [&](auto add)
+                    {
+                        for (const auto& spec : host_.bundle->scopeRegistry.scopes)
+                            if (spec.token == sp.first) for (const auto& d : spec.declarations) add(d);
+                    }, key);
+            }
+            if (!ladder) throw EvalError("'" + ref + "' is not a quality");
+            return *ladder;
+        }
+
         // Open a checkpoint: from here until rollback() or commit(), the engine keeps what it needs to undo
         // every change the story makes. rollback() puts the game back exactly as it was at the checkpoint:
         // property values (every scope, including a host's `@world`, which is written back through the
@@ -3193,6 +3279,7 @@ namespace patter
         bool released_ = false;
         /// The read slot getProperty hands out for a registry scope's value.
         mutable PatterValue slot_;
+        EvalContext stageCtx_;      // the registry's quality lookup, held while a ladder it handed back is read
         std::vector<LogEntry> engineLog_;
         std::unordered_map<std::string, std::vector<std::string>> sceneCast_, blockCast_;   // see castForScene
         uint32_t defaultSeed_ = 0x9e3779b9u;

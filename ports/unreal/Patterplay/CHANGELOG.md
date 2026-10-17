@@ -7,13 +7,21 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **A quality's stages from game code.** A game holding a quality's value can put it in the story's order
+  without keeping a copy of the ladder: `stageIndex`, `compareStages` and `nextStage` on `patter::Engine` and
+  `patter::Flow` (which also reaches `@scene`), throwing `EvalError` on a refusal, and `StageIndex`,
+  `CompareStages` and `NextStage` on `UPatterEngine` and `UPatterFlow` for Blueprint, which return false (or
+  -1) and log a refusal instead. They give a stage's position (-1 when the value isn't a stage), how two
+  stages compare (-1, 0 or 1, as a condition compares them), and the stage after one, staying on the top rung
+  as `advance()` does.
+
 ### Changed
 
 - **The shared expression kernel is `k88b76cef`** (from `@wildwinter/expr` 0.5.2), the one the Storylet Engine
-  uses from its next release. It adds three helpers for a quality's ladder outside an expression, for game
-  code holding a quality's value: a stage's position, how two stages compare, and the next stage. In C++:
-  `StageIndex`, `CompareStages` and `NextStage`. An Unreal game using Patterplay beside the Storylet Engine
-  needs both on the same kernel.
+  uses from its next release. An Unreal game using Patterplay beside the Storylet Engine needs both on the
+  same kernel.
 
 ## [0.26.1] - 2026-10-17
 
