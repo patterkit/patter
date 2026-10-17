@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-17
+
 ### Added
 
 - **A quality's stages from game code.** A game holding a quality's value can put it in the story's order
