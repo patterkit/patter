@@ -193,20 +193,41 @@ namespace wildwinter { namespace expr { inline namespace k492cf234 { namespace t
                 return Json::MakeNumber(v);
             }
 
+            /** One hex digit's value, or -1 when c is no hex digit. */
+            static int hexDigit(char c)
+            {
+                if (c >= '0' && c <= '9') return c - '0';
+                if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                return -1;
+            }
+
             unsigned hex4()
             {
                 if (pos_ + 4 > text_.size()) fail("short \\u escape");
                 unsigned v = 0;
                 for (int i = 0; i < 4; ++i)
                 {
-                    const char c = text_[pos_++];
-                    v <<= 4;
-                    if (c >= '0' && c <= '9') v |= static_cast<unsigned>(c - '0');
-                    else if (c >= 'a' && c <= 'f') v |= static_cast<unsigned>(c - 'a' + 10);
-                    else if (c >= 'A' && c <= 'F') v |= static_cast<unsigned>(c - 'A' + 10);
-                    else fail("bad \\u escape");
+                    const int d = hexDigit(text_[pos_++]);
+                    if (d < 0) fail("bad \\u escape");
+                    v = (v << 4) | static_cast<unsigned>(d);
                 }
                 return v;
+            }
+
+            /** The low surrogate escaped at pos_ ("\uDC00" to "\uDFFF"), without reading it; 0
+             *  when the next six characters are anything else. */
+            unsigned lowSurrogateAhead() const
+            {
+                if (pos_ + 6 > text_.size() || text_[pos_] != '\\' || text_[pos_ + 1] != 'u') return 0;
+                unsigned v = 0;
+                for (std::size_t i = pos_ + 2; i < pos_ + 6; ++i)
+                {
+                    const int d = hexDigit(text_[i]);
+                    if (d < 0) return 0;
+                    v = (v << 4) | static_cast<unsigned>(d);
+                }
+                return v >= 0xDC00 && v <= 0xDFFF ? v : 0;
             }
 
             static void utf8(std::string& out, unsigned cp)
@@ -256,13 +277,18 @@ namespace wildwinter { namespace expr { inline namespace k492cf234 { namespace t
                         case 't': out += '\t'; break;
                         case 'u':
                         {
+                            // A high surrogate joins the escape after it only when that is a low
+                            // surrogate. A surrogate without its partner has no UTF-8 form, so it
+                            // becomes U+FFFD, as JS's UTF-8 encoding does, and what follows it is
+                            // read on its own.
                             unsigned cp = hex4();
-                            if (cp >= 0xD800 && cp <= 0xDBFF && pos_ + 6 <= text_.size() && text_[pos_] == '\\' && text_[pos_ + 1] == 'u')
+                            if (cp >= 0xD800 && cp <= 0xDBFF)
                             {
-                                pos_ += 2;
-                                const unsigned low = hex4();
-                                cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+                                const unsigned low = lowSurrogateAhead();
+                                if (low) { pos_ += 6; cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00); }
+                                else cp = 0xFFFD;
                             }
+                            else if (cp >= 0xDC00 && cp <= 0xDFFF) cp = 0xFFFD;
                             utf8(out, cp);
                             break;
                         }

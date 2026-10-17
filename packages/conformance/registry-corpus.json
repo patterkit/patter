@@ -111,6 +111,55 @@
       ]
     },
     {
+      "name": "a character outside the Basic Multilingual Plane is one character, written, read, saved and loaded",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "title",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "op": "set",
+          "scope": "game",
+          "name": "title",
+          "value": "Spring \ud83c\udf31"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "title",
+          "expect": "Spring 🌱"
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "title": "Spring 🌱"
+            }
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "title": "Moon \ud83c\udf19"
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "title",
+          "expect": "Moon 🌙"
+        }
+      ]
+    },
+    {
       "name": "a write to an undeclared name lands as a stray, saved but not listed",
       "steps": [
         {
