@@ -30,7 +30,7 @@
     "@patterkit/model": "0.14.0",
     "@patterkit/ops": "0.17.1",
     "@patterkit/patterpad-surface": "0.0.0",
-    "@patterkit/runtime": "0.26.0",
+    "@patterkit/runtime": "0.26.1",
     "@wildwinter/app-shell": "^0.47.0",
     "@wildwinter/expr-editor": "^0.16.1",
     "@wildwinter/game-subtitles": "^0.3.2",

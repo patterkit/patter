@@ -6,6 +6,8 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-17
+
 ### Changed
 
 - Nothing changes in this plugin. It's released with the other Patterplay runtimes, whose 0.26.1 raises the JS

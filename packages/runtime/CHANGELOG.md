@@ -33,6 +33,8 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-17
+
 ### Fixed
 
 - **Dependency floors**: the runtime now asks for `@patterkit/model` 0.14.0 or later and `@patterkit/dialect` 0.2.11

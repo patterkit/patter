@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-17
+
 ### Fixed
 
 - **An escaped surrogate pair reads as the one character.** JSON writes a character outside the Basic
