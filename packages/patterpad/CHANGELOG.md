@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-10-17
+
 ### Added
 
 - **Rename a quality's stage in place.** Click a stage's name on its chip to rename it. Every condition and
