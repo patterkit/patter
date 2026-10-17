@@ -13,6 +13,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   does the default. A condition that uses the same word for another quality is left as it was.
 - **Reordering stages says what it changes.** Moving a stage changes what every "at this stage or past it"
   condition means, though no value moves, so the stages now say how many conditions order that quality.
+- **A quality's declaration is checked by the family's shared rule,** so Patterpad and Storyletter agree about
+  it: at least two stages, none empty, none twice, and a default on the ladder. The messages are as before.
+
+### Changed
+
+- **Built with Patterplay 0.27.0**, the runtime the Play window and playable exports use.
 
 ## [0.30.1] - 2026-10-17
 
