@@ -33,6 +33,13 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Fixed
+
+- **Dependency floors**: the runtime now asks for `@patterkit/model` 0.14.0 or later and `@patterkit/dialect` 0.2.11
+  or later. It said 0.4.0 and 0.1.6, so npm could keep an older model from an existing lockfile, and the runtime
+  broke on the speaker-label exports it imports from model 0.14.0. Each Patterplay release raises the floors to
+  the versions it was built against.
+
 ## [0.26.0] - 2026-10-14
 
 ### Added

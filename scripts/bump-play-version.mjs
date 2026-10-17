@@ -10,6 +10,8 @@
 //        ports/unreal/Patterplay/Patterplay.uplugin     "VersionName" (+ bumps "Version")
 //        ports/godot/addons/patterplay/plugin.cfg       version=
 //      (ports/unreal/PatterplayDemo is a versionless sample .uproject riding the same zip)
+//      and raises the floors of the JS runtime's ranges on @patterkit/model and
+//      @patterkit/dialect to the versions in this workspace
 //   2. stamps today's date into each runtime CHANGELOG.md: an existing
 //        "## [<version>] - Unreleased" heading is dated in place; otherwise the
 //        "## [Unreleased]" section (which must have content) becomes "## [<version>] - <date>"
@@ -62,10 +64,30 @@ for (const f of readdirSync(resolve(root, ".changeset"))) {
 
 // --- 1. manifests ------------------------------------------------------------
 
-// The JS runtime. Line-targeted replace (not a JSON rewrite) to keep the file's formatting.
+// The floors of the runtime's wide ranges on model and dialect move up to the versions in this
+// workspace, the ones it was built and tested against. Only the bottom moves: the `<1.0.0` top is
+// what keeps a model or dialect minor from cascade-bumping the runtime (see RELEASING.md). A stale
+// floor fails nothing here; it breaks a consumer whose lockfile still holds an older model, which
+// npm keeps because it satisfies the range (2026-10-17: Storylets kept model 0.6.0 under runtime
+// 0.26.0's `>=0.4.0`, and the runtime broke on imports that arrived in model 0.14.0). Dialect pins
+// model exactly, so an old dialect would bring an old model with it.
+const floors = {};
+for (const name of ["model", "dialect"]) {
+  floors[`@patterkit/${name}`] = JSON.parse(
+    readFileSync(resolve(root, `packages/${name}/package.json`), "utf8"),
+  ).version;
+}
+
+// The JS runtime. Line-targeted replaces (not a JSON rewrite) to keep the file's formatting.
 edit("packages/runtime/package.json", (s, rel) => {
   if (!/^  "version": "[^"]+",$/m.test(s)) throw new Error(`${rel}: no version line found`);
-  return s.replace(/^  "version": "[^"]+",$/m, `  "version": "${version}",`);
+  s = s.replace(/^  "version": "[^"]+",$/m, `  "version": "${version}",`);
+  for (const [dep, floor] of Object.entries(floors)) {
+    const range = new RegExp(`"${dep}": ">=[^ "]+ <1\\.0\\.0"`);
+    if (!range.test(s)) throw new Error(`${rel}: no ">=x <1.0.0" range on ${dep}`);
+    s = s.replace(range, `"${dep}": ">=${floor} <1.0.0"`);
+  }
+  return s;
 });
 
 // In-repo dependents pin @patterkit/runtime exactly; keep the pins on the lockstep version.
@@ -130,6 +152,9 @@ edit("package-lock.json", (s, rel) => {
   const runtime = lock.packages?.["packages/runtime"];
   if (!runtime) throw new Error(`${rel}: no workspace entry for packages/runtime`);
   runtime.version = version;
+  for (const [dep, floor] of Object.entries(floors)) {
+    if (runtime.dependencies?.[dep]) runtime.dependencies[dep] = `>=${floor} <1.0.0`;
+  }
   for (const dir of ["packages/play-helpers", "packages/ops", "packages/patterpad"]) {
     const deps = lock.packages?.[dir]?.dependencies;
     if (deps && "@patterkit/runtime" in deps) deps["@patterkit/runtime"] = version;
