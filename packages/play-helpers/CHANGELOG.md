@@ -1,5 +1,11 @@
 # @patterkit/play-helpers
 
+## 0.8.10
+
+### Patch Changes
+
+- 9c2b88b: Uses `@patterkit/runtime` 0.27.0, the Patterplay 0.27.0 release.
+
 ## 0.8.9
 
 ### Patch Changes

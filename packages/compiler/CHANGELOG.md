@@ -1,5 +1,12 @@
 # @patterkit/compiler
 
+## 0.7.1
+
+### Patch Changes
+
+- Updated dependencies [6c7eb79]
+  - @patterkit/core@0.7.1
+
 ## 0.7.0
 
 ### Minor Changes
