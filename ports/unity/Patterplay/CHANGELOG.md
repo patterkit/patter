@@ -6,6 +6,11 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- Nothing changes in this plugin. It's released with the other Patterplay runtimes, whose 0.26.1 raises the JS
+  runtime's dependency floors and fixes the Unreal save reader's handling of an escaped emoji.
+
 ## [0.26.0] - 2026-10-14
 
 ### Added
