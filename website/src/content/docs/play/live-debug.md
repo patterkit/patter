@@ -59,7 +59,7 @@ is live, a small **flow picker** appears next to the address. It names the flow 
 following, and clicking it lists every live flow with the scene each one is in.
 
 - **Most recent** is the default. The editor moves to whichever flow played last, so it keeps up with
-  a game whose flows open and close all the time. With one flow, it simply follows that flow.
+  a game whose flows open and close all the time. With one flow, it follows that flow.
 - **Pick a flow** to stay on it. Lines from the other flows don't move the editor. Choose **Most
   recent** to go back.
 - **When the flow you're following ends**, the editor moves to the flow that played most recently and
