@@ -1,5 +1,18 @@
 # @patterkit/ops
 
+## 0.18.0
+
+### Minor Changes
+
+- 6c7eb79: `renameStage` carries a quality's stage rename into every condition and set effect that names the stage, across the scenes it can reach, and `stageGateCount` says how many expressions order the quality by its stages, which is what a reorder changes. `renameStageInExpression` and `stageDialect` are the pieces, for a caller with its own expressions.
+
+### Patch Changes
+
+- 9c2b88b: Uses `@patterkit/runtime` 0.27.0, the Patterplay 0.27.0 release.
+- Updated dependencies [6c7eb79]
+  - @patterkit/core@0.7.1
+  - @patterkit/compiler@0.7.1
+
 ## 0.17.2
 
 ### Patch Changes
