@@ -1,5 +1,20 @@
 # @patterkit/ops
 
+## 0.20.1
+
+### Patch Changes
+
+- e6aa49e: Depends on `@wildwinter/toolkit` ^0.2.1, where a Patter extension's claim may leave out an enum's or flags' values, or a quality's stages, and take the project's gameData field's.
+- 4e3e2d6: Uses `@patterkit/runtime` 0.30.0, the Patterplay 0.30.0 release.
+- Updated dependencies [e6aa49e]
+- Updated dependencies [e6aa49e]
+- Updated dependencies [e6aa49e]
+- Updated dependencies [e6aa49e]
+  - @patterkit/compiler@0.10.0
+  - @patterkit/core@0.9.1
+  - @patterkit/model@0.17.0
+  - @patterkit/dialect@0.2.14
+
 ## 0.20.0
 
 ### Minor Changes
