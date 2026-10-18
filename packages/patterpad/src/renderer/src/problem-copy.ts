@@ -18,7 +18,8 @@
 
 import { defaultProblemCopy, describeProblem, problemName, type ProblemCopyTable, type ProblemLike } from "@wildwinter/app-shell";
 import { PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
-import type { ExtensionDto, ExtensionFieldDto, Problem } from "../../shared/api.js";
+import { entryProblemLine, extensionLine, quoted, valueProblemSentence } from "@wildwinter/app-shell/extension-copy";
+import type { ExtensionDto, Problem } from "../../shared/api.js";
 
 /** The sentence for each code, in Patter nouns (snippet, scene, choice, fallback, cast, prompt),
  *  over the family's defaults. A code the validator never raises costs nothing. */
@@ -161,9 +162,8 @@ const KIND_WORD: Record<string, string> = {
   cast: "cast member", project: "project",
 };
 const kindWord = (kind: string): string => KIND_WORD[kind] ?? kind;
-const quoted = (s: string): string => `“${s}”`;
-const cap = (s: string): string => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
-const article = (s: string): string => (/^[aeiou]/i.test(s) ? "an" : "a");
+/** Where a writer changes an extension's value in Patterpad. */
+const PLACE = "in the inspector";
 
 /** A node as the writer knows it: a line or text by its words, a block or scene by its name. */
 function nodePhrase(kind: string, id: string, ctx: ExtensionProblemContext): string {
@@ -176,54 +176,11 @@ function nodePhrase(kind: string, id: string, ctx: ExtensionProblemContext): str
   return `the ${kindWord(kind)} ${label}`;
 }
 
-/** A field inside a node's entry, by its label: "Note", "sound in cue", "item 2 of words". */
-function fieldPhrase(fields: readonly ExtensionFieldDto[], path: string): string {
-  const tokens = path.split(/\.|(?=\[)/).filter((t) => t !== "");
-  const top = fields.find((f) => f.name === tokens[0]);
-  const topLabel = top?.label ?? tokens[0] ?? "";
-  if (tokens.length <= 1) return topLabel;
-  const last = tokens[tokens.length - 1]!;
-  const index = /^\[(\d+)\]$/.exec(last);
-  if (index) return `item ${Number(index[1]) + 1} of ${topLabel}`;
-  const parts = [...(top?.fields ?? []), ...(top?.of?.fields ?? [])];
-  return `${parts.find((f) => f.name === last)?.label ?? last} in ${topLabel}`;
-}
-
-/** The sentence for one value a check refused, by the toolkit's code; undefined for a code it doesn't know. */
-function valueSentence(code: string | undefined, field: string, node: string, message: string, name: string): { text: string; next?: string } | undefined {
-  const on = `${field} on ${node}`;
-  const value = /^"[^"]*" is "([^"]*)"/.exec(message)?.[1];
-  switch (code) {
-    case "required": return { text: `${node} needs ${article(field)} ${field}.` };
-    case "wrong-type": return { text: `${on} isn't the kind of value ${name} expects.`, next: "Set it again in the inspector." };
-    case "below-min": { const m = / is ([^,]+), below the least it may be, (.+)$/.exec(message); return m ? { text: `${on} is ${m[1]}, but ${name} takes nothing below ${m[2]}.` } : undefined; }
-    case "above-max": { const m = / is ([^,]+), above the most it may be, (.+)$/.exec(message); return m ? { text: `${on} is ${m[1]}, but ${name} takes nothing above ${m[2]}.` } : undefined; }
-    case "not-a-value":
-      if (/not among its flags$/.test(message)) return { text: `${on} has a flag that isn't one of its choices.`, next: "Pick from the choices in the inspector." };
-      return { text: `${on} is ${quoted(value ?? "")}, which isn't one of its choices.`, next: "Pick one in the inspector." };
-    case "not-a-stage": return { text: `${on} is ${quoted(value ?? "")}, which isn't one of its stages.`, next: "Pick one in the inspector." };
-    case "renamed-stage": {
-      const m = / is "([^"]*)", a stage this extension has since renamed "([^"]*)"/.exec(message);
-      return m ? { text: `${on} is ${quoted(m[1]!)}, a stage ${name} has since renamed ${quoted(m[2]!)}.`, next: `Pick ${quoted(m[2]!)} to update it.` } : undefined;
-    }
-    case "no-such-node": {
-      const m = / (?:names|is keyed by) (\w+) "([^"]*)", which does not exist/.exec(message);
-      return m ? { text: `${on} names the ${kindWord(m[1]!)} ${quoted(m[2]!)}, which isn't in the project.`, next: "Choose another, or clear it." } : undefined;
-    }
-    case "missing-id": return { text: `An item in ${field} on ${node} has no id.`, next: "Give it one in the inspector." };
-    case "duplicate-id": { const id = / repeats the id "([^"]*)"/.exec(message)?.[1]; return { text: `Two items in ${field} on ${node} share the id ${quoted(id ?? "")}.`, next: "Give each its own." }; }
-    case "unknown-field": case "unknown-key":
-      return { text: `${node} has a value for ${quoted(field)}, which ${name} doesn't declare any more.`, next: "It's kept, but your game won't get it." };
-    default: return undefined;
-  }
-}
-
 /** The bar's line for a Patter extension's problem, or undefined to show the message as it is. */
 export function extensionProblemLine(p: Pick<Problem, "message" | "detail" | "extension">, ctx: ExtensionProblemContext): string | undefined {
   const x = p.extension ? ctx.extension(p.extension) : undefined;
   const name = x?.name ?? (p.extension ? quoted(p.extension) : "This extension");
-  const say = (c: { text: string; next?: string } | undefined): string | undefined =>
-    c ? `${name}: ${cap(c.text)}${c.next ? ` ${c.next}` : ""}` : undefined;
+  const say = (c: { text: string; next?: string } | undefined): string | undefined => extensionLine(name, c);
   const m = p.message;
 
   // A node's entry: "entries.<kind>.<id>[.<path>]: <what's wrong>".
@@ -231,14 +188,11 @@ export function extensionProblemLine(p: Pick<Problem, "message" | "detail" | "ex
   if (wrongScene) {
     return say({ text: `The values for ${nodePhrase(wrongScene[1]!, wrongScene[2]!, ctx)} are kept in another scene's file.`, next: "They're used all the same." });
   }
-  const entry = /^entries\.(\w+)\.([^.:\s[]+)(\S*?): (.*)$/.exec(m);
-  if (entry) {
-    const [, kind, id, rest, said] = entry as unknown as [string, string, string, string, string];
-    if (p.detail === "orphan") return say({ text: `There are values for ${article(kindWord(kind))} ${kindWord(kind)} that isn't in the project any more.`, next: "They're kept, but your game won't get them." });
-    if (p.detail === "unresolved") return say({ text: `A merge left a clash in this data that hasn't been resolved.`, next: "Resolve it before you publish." });
-    const path = rest.replace(/^\./, "");
-    const field = fieldPhrase(x?.targets[kind]?.fields ?? [], path);
-    return say(valueSentence(p.detail, field, nodePhrase(kind, id, ctx), said, name));
+  if (/^entries\./.test(m)) {
+    return entryProblemLine(m, p.detail, {
+      extension: name, fields: (kind) => x?.targets[kind]?.fields ?? [], node: (kind, id) => nodePhrase(kind, id, ctx),
+      place: PLACE, kindWord,
+    });
   }
 
   // A claimed gameData value: "<kind> '<id>' gameData "<field>", as the Patter extension "<x>" claims it: ...".
@@ -246,7 +200,9 @@ export function extensionProblemLine(p: Pick<Problem, "message" | "detail" | "ex
   if (claim) {
     const [, kind, id, f, said] = claim as unknown as [string, string, string, string, string];
     const label = x?.targets[kind]?.claims.find((c) => c.field === f)?.decl.label ?? f;
-    return say(valueSentence(p.detail, label, nodePhrase(kind, id, ctx), `"${f}" ${said.replace(/^the value /, "")}`, name));
+    return say(valueProblemSentence(p.detail, `"${f}" ${said.replace(/^the value /, "")}`, {
+      extension: name, node: nodePhrase(kind, id, ctx), field: label, place: PLACE, kindWord,
+    }));
   }
 
   // The project's side: its pin, its manifest, and its claims on gameData fields.

@@ -126,24 +126,17 @@ function extensionRows(o: RowsFor): HTMLElement[] {
     if (decl.group !== undefined && decl.group !== group) { group = decl.group; out.push(el("div", "insp-ext-group", group)); }
     // A stage the extension has since renamed says so, alone: not also the shell's "not one of the stages".
     const renamed = renamedStage(decl, o.entry?.[decl.name]);
-    const problem = renamed ? undefined : problems.get(decl.name);
+    const problem = problems.get(decl.name);
     const row = o.cache.row(`${o.extension.id}\u0000${o.kind}\u0000${o.id ?? ""}\u0000${decl.name}`, {
       decl: decl as unknown as ValueDecl,
       value: o.entry?.[decl.name],
       adapter: o.adapter,
       disabled,
       ...(o.readOnly ? {} : { onCommit: (v: unknown) => { if (!disabled) o.commit(decl.name, v); } }),
-      ...(problem ? { problem } : {}),
+      ...(renamed ? { replaceProblem: renamedStageSentence(renamed.from, renamed.to, o.extension.name) }
+        : problem ? { problem } : {}),
       className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
     });
-    // The shell's row joins its own off-ladder sentence to any message it's given, so a renamed stage's sentence
-    // takes the message slot in its place. Any change of value redraws the inspector, which redraws this too.
-    const said = row.querySelector<HTMLElement>(".shell-fieldrow-problem");
-    if (renamed && said) {
-      said.textContent = renamedStageSentence(renamed.from, renamed.to, o.extension.name);
-      said.hidden = false;
-      row.classList.add("has-problem");
-    }
     out.push(row);
   }
   const declared = new Set(fields.map((f) => f.name));

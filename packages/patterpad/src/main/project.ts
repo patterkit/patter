@@ -654,13 +654,10 @@ export async function stepProjectHistory(way: "undo" | "redo", id?: number): Pro
 }
 
 /** A new edit in the open scene clears the project's redo too: the editor's journal has one redo, and the
- *  scene's history has just cleared its own (patterkit design/patterpad-undo.md, "The journal"). The
- *  shell's history has no call for it, so its redo stack is emptied directly; `projectHistoryInternals`
- *  and the tests hold that to account should the shell's field ever change. */
+ *  scene's history has just cleared its own (patterkit design/patterpad-undo.md, "The journal"). */
 export function clearProjectRedo(): void {
   redoMarks = [];
-  const redo = (projectHistory as unknown as { redoStack?: unknown }).redoStack;
-  if (Array.isArray(redo)) redo.length = 0;
+  projectHistory.clearRedo();
 }
 
 /** The shell history's own view, for tests: it must agree with the marks. */
