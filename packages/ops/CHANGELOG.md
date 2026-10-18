@@ -1,5 +1,26 @@
 # @patterkit/ops
 
+## 0.20.0
+
+### Minor Changes
+
+- 54fb3be: `renameGameDataStage` reaches a choice's options for the `option` kind.
+- 247a652: Validate checks a project's Patter extensions (`ValidateResult.extensions`): each manifest, the project's pins and settings, claims on gameData fields (an error when the project declares the field with another type, a warning when it doesn't declare it), and every value in the extension data against its manifest, with an entry for a node that has gone reported per entry and kept. An error fails `ok` and is an export blocker, so export refuses it; a warning doesn't, and that includes a missing manifest (the data is left as it is), an entry in another scene's shard, and a `.gitattributes` set up for Patter's merge with no rule for `.patterextension`. A pack carries the extensions' manifests, and unpack writes them back; merging a pack back merges extension data by the project's own manifest, and keeps the project's manifest where the pack's differs (`manifestsKept`). `patter init` sets up `.patterextension` shards and manifests for every version control system. `planExtensionUpgrades` takes an extension at its manifest's new version, renaming the stages it renamed in the data and moving the pin in one step, and `runFormat` runs it on a project folder (`FormatResult.notes`). A cast rename follows the name into the data (`renameCastKeys`: map keys and reference values to `cast`, at any depth, by the manifest), the lines (`renameCastInScene`), and the project-level strings keyed by it (`renameCastStrings`, `moveCastKeys`).
+- 247a652: An unresolved merge is now marked in the shard itself, under `unresolved`, in every shard type: a mark either side already carries survives a clean merge until somebody removes it, and validate, export, and pack refuse a marked shard as they refuse a `.patterconflict` sidecar (`unresolvedMarkIssues`). Extension data shards (`.patterextension`) load with the project, pack, format, and merge, field by field when `runMerge` is handed the extension's manifest and each node's entry whole when it isn't; `readProjectManifest` and `projectManifests` read a project's manifest as a merge needs it. A project's `extensions` merge per extension, the pin and each setting on their own, and two duplicate ids after a flow merge are now two conflicts rather than one. Patter's own mergers stay hand-written for now: the flow merge's ordered weave and the authoring merge's edit clock have no counterpart in the shared merge engine yet. `compileLoaded` compiles a project's extension values into the bundle, and `loadedExtensions` gives a loaded project's extension files as the compiler's extension pass reads them.
+
+### Patch Changes
+
+- e31f3db: Uses `@patterkit/runtime` 0.29.0, the Patterplay 0.29.0 release.
+- Updated dependencies [54fb3be]
+- Updated dependencies [54fb3be]
+- Updated dependencies [247a652]
+- Updated dependencies [247a652]
+- Updated dependencies [247a652]
+  - @patterkit/core@0.9.0
+  - @patterkit/model@0.16.0
+  - @patterkit/compiler@0.9.0
+  - @patterkit/dialect@0.2.13
+
 ## 0.19.0
 
 ### Minor Changes

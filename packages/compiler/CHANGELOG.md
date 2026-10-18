@@ -1,5 +1,21 @@
 # @patterkit/compiler
 
+## 0.9.0
+
+### Minor Changes
+
+- 247a652: The compiler compiles Patter extensions. `extensionPass` is the one manifest-driven pass over a project's extension files: the manifests' own problems, a manifest or shard named for another extension, an extension the project takes with no manifest (a warning, its data left untouched) or at another version, its settings, claims on the project's gameData fields (one the project doesn't declare is a warning, one it declares with another type an error, and every value a claimed field holds is checked against the claim), entries naming a node the project no longer has (a warning each), an entry in another scene's shard (a warning, compiled all the same), and every value against the extension's declarations, references to cast members included. `extensionNodes` lists every node an extension can attach to. `exportBundle` takes the files as `extensions` and compiles each node's values inline under `extensions` (editor-only fields left out, renamed stages renamed, an entry with an error left out) and each extension's declarations, every default resolved, in the bundle's `extensions` section; both are in the content hashes. A project with no extensions compiles byte for byte as before. Depends on `@wildwinter/toolkit` 0.2.0.
+
+### Patch Changes
+
+- Updated dependencies [54fb3be]
+- Updated dependencies [54fb3be]
+- Updated dependencies [247a652]
+- Updated dependencies [247a652]
+  - @patterkit/core@0.9.0
+  - @patterkit/model@0.16.0
+  - @patterkit/dialect@0.2.13
+
 ## 0.8.0
 
 ### Minor Changes
