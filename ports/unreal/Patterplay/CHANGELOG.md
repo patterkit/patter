@@ -7,6 +7,8 @@ runtime behaviour.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-18
+
 ### Added
 
 - **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an
