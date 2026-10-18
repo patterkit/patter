@@ -1,5 +1,18 @@
 # @patterkit/core
 
+## 0.9.0
+
+### Minor Changes
+
+- 54fb3be: An option's game-data values are checked against the project's `option` fields, as every other node kind's are. Any other group's gameData is still left alone.
+
+### Patch Changes
+
+- 247a652: Depends on `@wildwinter/toolkit` 0.2.0, which carries the shared extension spec and merge.
+- Updated dependencies [54fb3be]
+- Updated dependencies [247a652]
+  - @patterkit/model@0.16.0
+
 ## 0.8.0
 
 ### Minor Changes
