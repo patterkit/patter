@@ -21,6 +21,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 - World properties take the shell's one type list, and a reorder of a quality's stages says how many gates it
   changes in the family's one wording.
+- Play runs on Patterplay 0.28.0: a save holding a stage or value its scene no longer has goes back to the
+  default as it loads, with a warning, instead of reaching the first gate that orders it.
 
 ## [0.31.0] - 2026-10-17
 
