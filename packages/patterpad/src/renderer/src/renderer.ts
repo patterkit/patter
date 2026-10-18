@@ -29,7 +29,7 @@ import "@patterkit/patterpad-surface/fonts.css"; // every face the windows draw,
 import { mountSurface, initTooltips, tipBold, type SurfaceHandle, type InspectorContext, type DocNote, type CommentOpenRequest, type SuggestionOpenRequest, type SpellChecker } from "@patterkit/patterpad-surface/surface";
 import { buildSpellEngine } from "./spellcheck.js";
 import { adoptSceneName, relabelNavScene } from "./scene-name.js";
-import { selectAllOutsideEditor } from "./edit-commands.js";
+import { selectAllOutsideEditor, undoRoute } from "./edit-commands.js";
 import { PROPERTIES_PLACE, PROJECT_SHARD_KEY } from "../../shared/api.js";
 import type { BootState, ColourTheme, ConditionProperty, FontTheme, Identity, OpenResult, OpenedProject, PaneState, Problem, ProblemsDto, ProjectSettingsDto, RecentProject, ReportData, ReviewItem, StageRenameDto, ThemePrefs, VcsKind } from "../../shared/api.js";
 import { renderInspector, formatSeconds } from "./inspector.js";
@@ -1054,6 +1054,23 @@ function selectAllCommand(): void {
   // text. The native fallback is left for the rest; in the scene title it selected the whole window.
   if (selectAllOutsideEditor(document.activeElement, surface?.view.dom ?? null)) return;
   document.execCommand("selectAll");
+}
+
+/** Edit > Undo and Redo in the main window: the scene's history, or the focused field's own text, by
+ *  `undoRoute` (edit-commands.ts). Sent straight to the scene, Cmd+Z in Project Settings or on the
+ *  Properties page undid the scene hidden behind them. */
+async function undoCommand(dir: "undo" | "redo"): Promise<void> {
+  const open = !!surface && !!currentSceneId;
+  const route = undoRoute({
+    active: document.activeElement,
+    sceneAreas: [editorEl, inspectorStackEl],
+    dialogOpen: !!document.querySelector("dialog[open]"),
+    scene: !open ? "none" : overviewEl.hidden && !editorEl.hidden ? "showing" : !overviewEl.hidden ? "hidden" : "none",
+  });
+  if (route === "field") { document.execCommand(dir); return; }
+  if (route === "none") return;
+  if (route === "show-scene" && currentSceneId) await openSceneFromOverview(currentSceneId);
+  if (dir === "undo") surface?.undo(); else surface?.redo();
 }
 
 /** Take the author to a problem's node: switch to its scene first when it lives elsewhere (the surface
@@ -3353,8 +3370,8 @@ window.patter.onMenu((cmd) => {
   else if (cmd === "duplicate") surface?.duplicate();
   else if (cmd === "cycle-qualifier") cycleQualifierCommand();
   else if (cmd === "show-in-storyletter") void showInStoryletter();
-  else if (cmd === "undo") surface?.undo();
-  else if (cmd === "redo") surface?.redo();
+  else if (cmd === "undo") void undoCommand("undo");
+  else if (cmd === "redo") void undoCommand("redo");
   else if (cmd === "toggle-nav") togglePane("nav");
   else if (cmd === "toggle-inspector") togglePane("inspector");
   else if (cmd === "reset-view") resetView();

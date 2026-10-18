@@ -3,7 +3,7 @@
 // document.execCommand("selectAll"), which is not confined to the element. Found reproducing #73.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { selectAllOutsideEditor } from "./src/edit-commands.js";
+import { selectAllOutsideEditor, undoRoute } from "./src/edit-commands.js";
 
 afterEach(() => { document.body.replaceChildren(); window.getSelection()?.removeAllRanges(); });
 
@@ -49,5 +49,48 @@ describe("Select All outside the script editor", () => {
     const off = document.createElement("div"); off.setAttribute("contenteditable", "false"); off.textContent = "x";
     document.body.append(off);
     expect(selectAllOutsideEditor(off, editor)).toBe(false);
+  });
+});
+
+// Edit ▸ Undo went straight to the scene's history whatever had the focus, so Cmd+Z in Project Settings, a
+// dialog or on the Properties page undid the scene hidden behind them, and on the Properties page that undone
+// edit was never saved (patterkit design/patterpad-undo.md, "Where Cmd+Z goes").
+describe("where Undo goes in the main window", () => {
+  const workspace = () => {
+    const editor = document.createElement("div");
+    const script = document.createElement("div"); script.setAttribute("contenteditable", "true");
+    const title = document.createElement("div"); title.setAttribute("contenteditable", "plaintext-only");
+    editor.append(title, script);
+    const inspector = document.createElement("div");
+    const gameData = document.createElement("input"); inspector.append(gameData);
+    const props = document.createElement("div");
+    const propName = document.createElement("input"); props.append(propName);
+    const settings = document.createElement("input");
+    document.body.append(editor, inspector, props, settings);
+    return { editor, script, title, inspector, gameData, propName, settings, sceneAreas: [editor, inspector] };
+  };
+
+  it("goes to the scene from the script, its title and the inspector's fields", () => {
+    const w = workspace();
+    for (const active of [w.script, w.title, w.gameData, document.body]) {
+      expect(undoRoute({ active, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "showing" })).toBe("scene");
+    }
+  });
+
+  it("is the field's own text undo in a field outside the scene, and anywhere while a dialog is open", () => {
+    const w = workspace();
+    expect(undoRoute({ active: w.settings, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "showing" })).toBe("field");
+    expect(undoRoute({ active: w.script, sceneAreas: w.sceneAreas, dialogOpen: true, scene: "showing" })).toBe("field");
+  });
+
+  it("on the Properties page, undoes the field in focus and never the scene behind the page", () => {
+    const w = workspace();
+    expect(undoRoute({ active: w.propName, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "none" })).toBe("field");
+    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "none" })).toBe("none");
+  });
+
+  it("from the overview, shows the scene and then undoes", () => {
+    const w = workspace();
+    expect(undoRoute({ active: document.body, sceneAreas: w.sceneAreas, dialogOpen: false, scene: "hidden" })).toBe("show-scene");
   });
 });

@@ -33,3 +33,35 @@ export function selectAllOutsideEditor(active: Element | null, editorDom: Elemen
   selection.addRange(range);
   return true;
 }
+
+/** Where Edit ▸ Undo and Redo go in the main window (patterkit design/patterpad-undo.md, "Where Cmd+Z goes"):
+ *  - `"field"`: the focused field's own text undo. A field outside the script and the inspector holds text the
+ *    scene's history never saw (Project Settings before its Save, the Find field, a dialog, the Properties page),
+ *    and any open dialog owns the keyboard whatever has the focus.
+ *  - `"scene"`: the open scene's history. The script, its title and the inspector edit the scene, so their
+ *    edits are the history's to undo.
+ *  - `"show-scene"`: the scene is open but out of sight (the overview keeps it mounted): show it, then undo,
+ *    so an undo is always something you can see.
+ *  - `"none"`: no scene to undo (the Properties page, the welcome screen). The scene behind the Properties page
+ *    is remounted on return, so an undo there would change a scene nobody can see and save nothing. */
+export type UndoRoute = "field" | "scene" | "show-scene" | "none";
+
+export interface UndoPlace {
+  /** The focused element (`document.activeElement`). */
+  active: Element | null;
+  /** The elements whose edits are the scene's: the editor column (script and title) and the inspector. */
+  sceneAreas: ReadonlyArray<Element | null>;
+  /** A modal dialog is open. */
+  dialogOpen: boolean;
+  /** Which scene state the window is in: showing, open but hidden behind the overview, or none. */
+  scene: "showing" | "hidden" | "none";
+}
+
+export function undoRoute(p: UndoPlace): UndoRoute {
+  if (p.dialogOpen) return "field";
+  const inScene = !!p.active && p.sceneAreas.some((area) => !!area && area.contains(p.active));
+  if (!inScene && p.active && isEditableTarget(p.active)) return "field";
+  if (p.scene === "showing") return "scene";
+  if (p.scene === "hidden") return "show-scene";
+  return "none";
+}

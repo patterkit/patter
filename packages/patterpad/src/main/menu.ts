@@ -125,10 +125,26 @@ export function applyMenu(win: BrowserWindow, recents: RecentProject[], panes: P
     {
       label: "Edit",
       submenu: [
-        // Undo / redo route to the surface's ProseMirror history (not the native role, which would
-        // run a DOM undo the editor doesn't track).
-        { ...EDIT_MENU.undo, click: () => send("undo") },
-        { ...EDIT_MENU.redo, click: () => send("redo") },
+        // Undo / redo route to the main window, which decides between the scene's ProseMirror history and
+        // a field's own text undo (not the native role, which would run a DOM undo the editor doesn't
+        // track). Any other window (the detached search / coverage / play tools) has no scene of its own,
+        // so it gets the native text undo, as Select All does: sent on, it undid the main window's scene.
+        {
+          ...EDIT_MENU.undo,
+          click: () => {
+            const focused = BrowserWindow.getFocusedWindow();
+            if (focused && focused !== win) { focused.webContents.undo(); return; }
+            send("undo");
+          },
+        },
+        {
+          ...EDIT_MENU.redo,
+          click: () => {
+            const focused = BrowserWindow.getFocusedWindow();
+            if (focused && focused !== win) { focused.webContents.redo(); return; }
+            send("redo");
+          },
+        },
         { type: "separator" },
         { role: "cut" },
         { role: "copy" },

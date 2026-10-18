@@ -22,6 +22,13 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
   template**: name, type, default, values or stages, and purpose in one row each, with the same controls. A
   field name is still any name you like.
 
+### Fixed
+
+- **Undo undoes what you're looking at.** Edit ▸ Undo in the Search, Coverage or Play window undoes that
+  window's own typing, and in Project Settings, a dialog, or on the Properties page it undoes the field you're
+  in. Before, each of these undid the scene behind them, and on the Properties page that change wasn't saved.
+  From the overview, Undo goes back to the scene and undoes there.
+
 ### Security
 
 - **Every window carries a content security policy and stays on its own page**: a window no longer navigates
