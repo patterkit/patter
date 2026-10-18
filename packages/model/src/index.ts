@@ -589,9 +589,12 @@ export type BundleCastMember = Omit<CastMember, "notes" | "actor" | "gender">;
  *  Beat kinds map straight through: dialogue = `line`, narration = `text`, game event = `gameEvent`. */
 export type GameDataNodeKind = "scene" | "block" | "snippet" | "line" | "text" | "gameEvent";
 
-/** The value type of a gameData field - the property-type vocabulary plus a multiline-text variant.
- *  Drives the inspector's editor widget (text / textarea / number / toggle / enum dropdown). */
-export type GameDataFieldType = "text" | "multiline" | "number" | "boolean" | "enum";
+/** The value type of a gameData field: the family's one field-type list, shared with Storylets' card and
+ *  outcome fields (patterkit design/family-parity-2026-10.md item 9, patter-qualities.md section 1). Drives
+ *  the inspector's editor widget (text / textarea / number / toggle / enum dropdown / flags checklist /
+ *  quality ladder). A `quality` value is a stage of the field's own ladder (`stages`), compared by position by
+ *  a host, never by the engine. */
+export type GameDataFieldType = "text" | "multiline" | "number" | "boolean" | "enum" | "flags" | "quality";
 
 /** One author-defined custom field on a node type (host-integration metadata, NOT expression state). */
 export interface GameDataField {
@@ -599,10 +602,15 @@ export interface GameDataField {
   name: string;
   type: GameDataFieldType;
   /** The value used when a node sets nothing. Storage is SPARSE - nodes hold only their overrides, and
-   *  a reader falls back to this default (so changing it here propagates to every node that didn't set it). */
+   *  a reader falls back to this default (so changing it here propagates to every node that didn't set it).
+   *  Optional in source: left out, the type's default holds (by the kernel's `defaultFor`), and the compiler
+   *  writes it into the bundle, so a bundle's field always has one. An enum's may be `""`, none chosen. */
   default?: ScalarValue;
-  /** Allowed values when `type` is "enum". */
+  /** Allowed values when `type` is "enum", or the flags a "flags" value may hold. */
   values?: string[];
+  /** A "quality" field's ordered ladder, by the family's one rule (at least two stages, none empty, none
+   *  twice; `@wildwinter/expr`'s `qualityDeclarationProblems`). */
+  stages?: string[];
   /** Free-text description of what the field is for - shown as a rollover hint in the inspector. */
   purpose?: string;
 }

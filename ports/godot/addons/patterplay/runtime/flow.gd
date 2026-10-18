@@ -1400,6 +1400,7 @@ func _ensure_scene_bags(s: String) -> void:
 	var shared: Dictionary = _host.scene_shared_names.get(s, {})
 	var props: Array = _host.bundle["scenes"].get(s, {}).get("sceneProps", [])
 	var journal = _host.journal
+	var mounted := not _scene_bags.has(s) or not _host.stage_bags.has(s)
 	if not _scene_bags.has(s):
 		var bag = PatterPropertyBag.new(_props_for(props, shared, false), {"path_prefix": "@scene."})
 		var key := key_flow_scene(id, s)
@@ -1418,6 +1419,8 @@ func _ensure_scene_bags(s: String) -> void:
 		_host.stage_bags[s] = bag
 		if journal != null:
 			journal["undo"].append(PatterFlow._unmake_stage_bag.bind(_host, s, bag, _claimed(bag, before)))
+	if mounted:
+		_host.report_refits()   # a bag that claimed values a refitting load parked says what it put back
 
 
 ## Whether a mount CLAIMED values a load had parked: `before` is the fresh bag's values. Only a rollback
@@ -1460,6 +1463,7 @@ func _mount_local() -> void:
 	var key := key_flow_globals(id)
 	if _host.registry.mount_owned(key, _local, {"owner": OWNER}) == "":
 		_registered[key] = true
+	_host.report_refits()
 
 
 ## Engine-driven (close, load_game, hot_swap): remove every bag this flow registered. With `keep`,

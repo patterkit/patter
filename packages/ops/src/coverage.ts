@@ -22,7 +22,7 @@ import type {
   Group, Snippet, Bundle, CompiledGroup, CompiledSnippet, CompiledEffect, Expression,
   CoverageDriver, ScalarValue,
 } from "@patterkit/model";
-import { deserialiseAst, makePrng } from "@wildwinter/expr";
+import { deserialiseAst, makePrng, stagesEitherSide } from "@wildwinter/expr";
 import type { ExprNode } from "@wildwinter/expr";
 import type { LoadedProject } from "./load.js";
 import { sourceStrings, resolveStart } from "./loaded-helpers.js";
@@ -497,6 +497,13 @@ export function proposeCoverageDrivers(loaded: LoadedProject): CoverageDriver[] 
       else if (decl.type === "quality" && decl.stages) values = [...decl.stages]; // stage names ARE the values
     }
     if (values.length === 0) continue;
+    if (decl?.type === "quality" && decl.stages) {
+      // A gate like `@q >= "x"` is covered by the stages either side of it, and a stage's place is its
+      // meaning: the pool is those, in LADDER order (the kernel's stagesEitherSide), never alphabetical.
+      const near = new Set(values.flatMap((v) => stagesEitherSide(decl, v)));
+      drivers.push({ ref, kind: "recurring", cadence: "sometimes", values: decl.stages.filter((st) => near.has(st)) });
+      continue;
+    }
     drivers.push({ ref, kind: "recurring", cadence: "sometimes", values: sortValues(values) });
   }
   return drivers.sort((a, b) => a.ref.localeCompare(b.ref));

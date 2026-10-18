@@ -495,10 +495,27 @@ function mergeNode(b: TNode | undefined, o: TNode, t: TNode | undefined, path: s
 function mergeFields(b: Obj, o: Obj, t: Obj, id: string, path: string, conflicts: Conflict[]): Obj {
   const out: Obj = {};
   for (const k of new Set([...Object.keys(b), ...Object.keys(o), ...Object.keys(t)])) {
-    const v = merge3(b[k], o[k], t[k], id, `${path}.${k}`, conflicts);
+    const v = k === "gameData" && [b[k], o[k], t[k]].every((x) => x === undefined || isObj(x))
+      ? mergeGameData(asMap(b[k]), asMap(o[k]), asMap(t[k]), id, `${path}.${k}`, conflicts)
+      : merge3(b[k], o[k], t[k], id, `${path}.${k}`, conflicts);
     if (v !== undefined) out[k] = v;
   }
   return out;
+}
+
+/**
+ * A node's gameData, per KEY (family parity item 2): two writers setting different fields on the same node
+ * (one the act, the other the mood) both land, and only the same field changed two ways is a conflict, on
+ * that field. Values stay whole: a quality's stage or a flags list is one value. Storage is sparse, so a
+ * node left with no overrides carries no gameData at all.
+ */
+function mergeGameData(b: Obj, o: Obj, t: Obj, id: string, path: string, conflicts: Conflict[]): Obj | undefined {
+  const out: Obj = {};
+  for (const k of new Set([...Object.keys(b), ...Object.keys(o), ...Object.keys(t)])) {
+    const v = merge3(b[k], o[k], t[k], id, `${path}.${k}`, conflicts);
+    if (v !== undefined) out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** The ordered-list merge with identity (§3.2): survival + content, then order. */

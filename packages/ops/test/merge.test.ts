@@ -379,3 +379,29 @@ describe("an authoring merge carries every field the model has", () => {
     expect(r.merged["somethingNew"]).toEqual({ a: 1 });
   });
 });
+
+// A node's gameData merges per KEY (family parity item 2): it is the editor plugins proposal's first
+// prerequisite, and a quality gameData value is one field among several on a node.
+describe("flow merge: gameData per key", () => {
+  const gd = (gameData?: Obj): Obj => one([sn("s", gameData ? { gameData } : {})]);
+  const merged = (r: any): Obj | undefined => r.merged.scene.blocks[0].children[0].gameData;
+
+  it("lands two writers' different fields on one node", () => {
+    const r = runMerge(gd({ act: "arrival" }), gd({ act: "act-1" }), gd({ act: "arrival", mood: "tense" }));
+    expect(r.conflicts).toEqual([]);
+    expect(merged(r)).toEqual({ act: "act-1", mood: "tense" });
+  });
+
+  it("is a conflict on the one field both sides changed, and only on it", () => {
+    const r = runMerge(gd({ act: "arrival", mood: "calm" }), gd({ act: "act-1", mood: "tense" }), gd({ act: "act-2", mood: "calm" }));
+    expect(r.conflicts).toHaveLength(1);
+    expect(r.conflicts[0]!.path.endsWith(".gameData.act")).toBe(true);
+    expect(r.conflicts[0]!.id).toBe("s");
+    expect(merged(r)).toEqual({ act: "act-1", mood: "tense" });
+  });
+
+  it("drops a field one side removed, and the whole gameData when none is left", () => {
+    expect(merged(runMerge(gd({ act: "arrival", mood: "calm" }), gd({ act: "arrival" }), gd({ act: "arrival", mood: "calm" })))).toEqual({ act: "arrival" });
+    expect(merged(runMerge(gd({ act: "arrival" }), gd(), gd({ act: "arrival" })))).toBeUndefined();
+  });
+});

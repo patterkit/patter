@@ -395,6 +395,17 @@ UPatterEngine* UPatterEngine::Build(UPatterBundle* Bundle, UPatterWorld* World, 
 		Out.Message = Ue(Err.message);
 		Self->OnError.Broadcast(Out);
 	};
+	// A saved value a load put back to its default: a Warning in the log, so a drifted save is never silent,
+	// and the Blueprint event.
+	Opts.onRefit = [Weak](const std::vector<patter::LoadMisfit>& Misfits)
+	{
+		for (const patter::LoadMisfit& M : Misfits)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Patterplay: the save's %s.%s was %s, which no longer fits its declaration; it is back at its default"),
+				UTF8_TO_TCHAR(M.scope.c_str()), UTF8_TO_TCHAR(M.name.c_str()), UTF8_TO_TCHAR(M.value.toJsonString().c_str()));
+			if (UPatterEngine* Self = Weak.Get()) Self->OnRefit.Broadcast(Ue(M.scope), Ue(M.name), ToUeValue(M.value));
+		}
+	};
 	try { E->Engine = std::make_shared<patter::Engine>(*Bundle->Raw(), Opts); }
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return nullptr; }
 	E->TapTrace();

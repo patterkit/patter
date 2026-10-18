@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------------
-// A quality's stage rename, carried into the scenes' expressions, and the gates a reorder changes.
+// A quality's stage rename, carried into the scenes' expressions, and the gates a reorder changes. The
+// rewrite inside one expression, and the gate count in one, are the kernel's and tested there.
 // ---------------------------------------------------------------------------
 
 import { describe, it, expect } from "vitest";
 import type { ProjectFile, Scene } from "@patterkit/model";
-import { renameStage, renameStageInExpression, stageDialect, stageGateCount } from "../src/index.js";
+import { renameGameDataStage, renameStage, stageDialect, stageGateCount } from "../src/index.js";
 
 const project: ProjectFile = {
   schema: "patter/project@0", project: { id: "p", name: "P" },
@@ -28,27 +29,6 @@ const scene = (id: string, condition: string, set: string, sceneProps?: Scene["s
         onExit: [{ kind: "set", target: "@mood", value: '"troubled"' }], jump: { to: "END" } },
     ] },
   ] }],
-});
-
-describe("renameStageInExpression", () => {
-  it("rewrites a literal compared with the quality, in the author's own text", () => {
-    expect(renameStageInExpression('@debt >= "confronted" and @gold > 2', dialect, isDebt, "confronted", "faced"))
-      .toBe('@debt >= "faced" and @gold > 2');
-    expect(renameStageInExpression('"confronted" == @patter.debt', dialect, isDebt, "confronted", "faced"))
-      .toBe('"faced" == @patter.debt');
-  });
-
-  it("leaves the same word compared with another quality as it was", () => {
-    expect(renameStageInExpression('@debt == "troubled" or @mood == "troubled"', dialect, isDebt, "troubled", "uneasy"))
-      .toBe('@debt == "uneasy" or @mood == "troubled"');
-  });
-
-  it("rewrites a whole value assigned to the quality, and nothing that isn't about it", () => {
-    expect(renameStageInExpression('"troubled"', dialect, isDebt, "troubled", "uneasy", true)).toBe('"uneasy"');
-    expect(renameStageInExpression('"troubled"', dialect, isDebt, "troubled", "uneasy", false)).toBeUndefined();
-    expect(renameStageInExpression('@gold > 2', dialect, isDebt, "troubled", "uneasy")).toBeUndefined();
-    expect(renameStageInExpression('@debt >= (', dialect, isDebt, "troubled", "uneasy")).toBeUndefined();
-  });
 });
 
 describe("renameStage", () => {
@@ -82,9 +62,45 @@ describe("renameStage", () => {
 });
 
 describe("stageGateCount", () => {
-  it("counts the expressions that order the quality, which a reorder changes", () => {
-    const scenes = [scene("a", '@debt >= "confronted"', '"x"'), scene("b", '@debt == "resolved"', '"x"'), scene("c", 'not (@debt < "resolved")', '"x"')];
-    expect(stageGateCount(scenes, { scope: "patter", name: "debt" }, dialect)).toBe(2);
+  it("counts the gates that order the quality, which a reorder changes", () => {
+    const scenes = [scene("a", '@debt >= "confronted"', '"x"'), scene("b", '@debt == "resolved"', '"x"'),
+      scene("c", 'not (@debt < "resolved")', '"x"'), scene("d", '@debt > "troubled" and @debt < "resolved"', '"x"')];
+    expect(stageGateCount(scenes, { scope: "patter", name: "debt" }, dialect)).toBe(4);
     expect(stageGateCount(scenes, { scope: "patter", name: "mood" }, dialect)).toBe(0);
+  });
+});
+
+describe("renameGameDataStage", () => {
+  const withData = (): Scene[] => [{
+    id: "a", type: "scene", name: "a", gameData: { act: "troubled" },
+    blocks: [{ id: "a_b", type: "block", name: "B", gameData: { act: "troubled" }, children: [
+      { id: "a_s", type: "snippet", gameData: { act: "troubled" }, beats: [
+        { id: "a_L", kind: "line", character: "A", gameData: { act: "troubled" } },
+        { id: "a_T", kind: "text", gameData: { act: "calm" } },
+      ] },
+    ] }],
+  }, { id: "b", type: "scene", name: "b", blocks: [] }];
+
+  it("renames the stage in every node of the field's type, and nowhere else", () => {
+    const scenes = withData();
+    const result = renameGameDataStage(scenes, "line", "act", "troubled", "uneasy");
+    expect(result.values).toBe(1);
+    expect(result.scenes.map((s) => s.id)).toEqual(["a"]);
+    const snippet = scenes[0]!.blocks[0]!.children[0] as { gameData?: Record<string, unknown>; beats: { gameData?: Record<string, unknown> }[] };
+    expect(snippet.beats[0]!.gameData).toEqual({ act: "uneasy" });
+    expect(snippet.gameData).toEqual({ act: "troubled" });   // a snippet's field is another declaration
+    expect(scenes[0]!.gameData).toEqual({ act: "troubled" });
+  });
+
+  it("reaches a scene's, a block's and a snippet's own values for those types", () => {
+    const scenes = withData();
+    expect(renameGameDataStage(scenes, "scene", "act", "troubled", "uneasy").values).toBe(1);
+    expect(renameGameDataStage(scenes, "block", "act", "troubled", "uneasy").values).toBe(1);
+    expect(renameGameDataStage(scenes, "snippet", "act", "troubled", "uneasy").values).toBe(1);
+  });
+
+  it("does nothing for an empty name or a rename to itself", () => {
+    expect(renameGameDataStage(withData(), "line", "act", "troubled", " ").values).toBe(0);
+    expect(renameGameDataStage(withData(), "line", "act", "troubled", "troubled").values).toBe(0);
   });
 });

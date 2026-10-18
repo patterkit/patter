@@ -11,8 +11,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k88b76cef_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x88b76cef
-#define WILDWINTER_EXPR_k88b76cef_PROPERTYBAG_H
+#if !defined(WILDWINTER_EXPR_k1a333a0e_PROPERTYBAG_H) && WILDWINTER_EXPR_KERNEL == 0x1a333a0e
+#define WILDWINTER_EXPR_k1a333a0e_PROPERTYBAG_H
 
 #include <algorithm>
 #include <cctype>
@@ -26,7 +26,7 @@
 #include "OrderedMap.h"
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k88b76cef
+namespace wildwinter { namespace expr { inline namespace k1a333a0e
 {
     /** The property type vocabulary (boolean / number / string / enum /
      *  flags). Kept as strings, exactly as the kernel and the bundle carry
@@ -40,6 +40,9 @@ namespace wildwinter { namespace expr { inline namespace k88b76cef
         inline const char* const Enum = "enum";
         inline const char* const Flags = "flags";
         inline const char* const Quality = "quality";
+        /** A field's text types (the family's field types), plain strings at runtime. */
+        inline const char* const Text = "text";
+        inline const char* const Multiline = "multiline";
     }
 
     /** A property declaration. `defaultValue` seeds an owned bag (absent falls
@@ -61,7 +64,10 @@ namespace wildwinter { namespace expr { inline namespace k88b76cef
             if (defaultValue.has_value()) return *defaultValue;
             if (type == PropertyTypes::Boolean) return ExprValue::Bool(false);
             if (type == PropertyTypes::Number) return ExprValue::Num(0);
-            if (type == PropertyTypes::String) return ExprValue::Str("");
+            if (type == PropertyTypes::String || type == PropertyTypes::Text || type == PropertyTypes::Multiline)
+            {
+                return ExprValue::Str("");
+            }
             if (type == PropertyTypes::Enum)
             {
                 return ExprValue::Str(values.has_value() && !values->empty() ? (*values)[0] : "");
@@ -137,6 +143,61 @@ namespace wildwinter { namespace expr { inline namespace k88b76cef
     inline int StageIndex(const ScopeDeclaration& decl, const ExprValue& value) { return StageIndex(stagesdetail::LadderOf(decl), value); }
     inline int CompareStages(const ScopeDeclaration& decl, const ExprValue& a, const ExprValue& b) { return CompareStages(stagesdetail::LadderOf(decl), a, b); }
     inline std::string NextStage(const ScopeDeclaration& decl, const ExprValue& value) { return NextStage(stagesdetail::LadderOf(decl), value); }
+
+    /** Does a value fit its declaration? The TypeScript kernel's valueFits, word
+     *  for word: the type first, then the declaration's own vocabulary. A
+     *  declaration listing none (values or stages absent) constrains nothing past
+     *  the type, and a type this build does not know constrains nothing. An enum
+     *  may hold "" (none chosen) only when asked. */
+    inline bool ValueFits(
+        const std::string& type,
+        const std::optional<std::vector<std::string>>& values,
+        const std::optional<std::vector<std::string>>& stages,
+        const ExprValue& value,
+        bool noneChosen = false)
+    {
+        auto listed = [](const std::vector<std::string>& list, const std::string& s)
+        {
+            return std::find(list.begin(), list.end(), s) != list.end();
+        };
+        if (type == PropertyTypes::Boolean) return value.isBool();
+        if (type == PropertyTypes::Number) return value.isNumber();
+        if (type == PropertyTypes::String || type == PropertyTypes::Text || type == PropertyTypes::Multiline)
+        {
+            return value.isString();
+        }
+        if (type == PropertyTypes::Enum)
+        {
+            if (!value.isString()) return false;
+            if (value.asString().empty() && noneChosen) return true;
+            return !values.has_value() || listed(*values, value.asString());
+        }
+        if (type == PropertyTypes::Flags)
+        {
+            if (!value.isFlags()) return false;
+            if (!values.has_value()) return true;
+            for (const std::string& f : value.asFlags()) if (!listed(*values, f)) return false;
+            return true;
+        }
+        if (type == PropertyTypes::Quality)
+        {
+            return value.isString() && (!stages.has_value() || listed(*stages, value.asString()));
+        }
+        return true;
+    }
+
+    inline bool ValueFits(const ScopeDeclaration& decl, const ExprValue& value, bool noneChosen = false)
+    {
+        return ValueFits(decl.type, decl.values, decl.stages, value, noneChosen);
+    }
+
+    /** A saved value a refitting load put back to its declaration's default:
+     *  the property's name, and what the save held. */
+    struct BagMisfit
+    {
+        std::string name;
+        ExprValue value;
+    };
 
     /** One property change. `silent` marks a host write (the firing rule: it
      *  reaches the audit hook but not subscribers); `reason` is the host's own
@@ -322,10 +383,32 @@ namespace wildwinter { namespace expr { inline namespace k88b76cef
 
         /** Lay saved values over the current ones (call after a fresh seed:
          *  orphans land as strays, new declarations keep their defaults; the
-         *  product decides whether to prune). Does not fire events. */
-        void load(const OrderedMap<std::string, ExprValue>& values)
+         *  product decides whether to prune). Does not fire events.
+         *
+         *  With `refit`, a saved value that no longer fits its declaration (a
+         *  stage, an enum value or a flag the build has since deleted, or a value
+         *  of another type) goes back to the declaration's default instead, and
+         *  is returned with what the save held, in declaration order. Without it
+         *  the list is empty and every value lands as saved. */
+        std::vector<BagMisfit> load(const OrderedMap<std::string, ExprValue>& values, bool refit = false)
         {
-            for (const auto& pair : values) values_.set(norm_(pair.first), pair.second);
+            OrderedMap<std::string, ExprValue> saved;
+            for (const auto& pair : values)
+            {
+                const std::string n = norm_(pair.first);
+                values_.set(n, pair.second);
+                saved.set(n, pair.second);
+            }
+            std::vector<BagMisfit> misfits;
+            if (!refit) return misfits;
+            for (const auto& pair : decls_)
+            {
+                const ExprValue* value = saved.get(pair.first);
+                if (!value || ValueFits(pair.second, *value)) continue;
+                misfits.push_back(BagMisfit{pair.first, *value});
+                values_.set(pair.first, pair.second.defaultOrTypeDefault());
+            }
+            return misfits;
         }
 
         static PropertyRow RowFor(

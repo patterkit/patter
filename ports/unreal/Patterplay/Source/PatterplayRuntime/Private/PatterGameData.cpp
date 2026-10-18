@@ -40,6 +40,7 @@ TArray<FPatterGameDataField> UPatterGameData::GameDataFields(UPatterBundle* Bund
 			Field.TypedDefault = ToUeValue(F.def);
 		}
 		for (const std::string& V : F.values) Field.Values.Add(Ue(V));
+		for (const std::string& S : F.stages) Field.Stages.Add(Ue(S));
 		Field.Purpose = Ue(F.purpose);
 		Out.Add(Field);
 	}
@@ -79,4 +80,33 @@ TArray<FPatterGameDataEntry> UPatterGameData::EffectiveGameData(const TArray<FPa
 	for (const FPatterGameDataEntry& E : Node)
 		if (!Find(Out, E.Name)) Out.Add(E);
 	return Out;
+}
+
+namespace
+{
+	std::vector<std::string> LadderOf(const FPatterGameDataField& Field)
+	{
+		std::vector<std::string> Out;
+		for (const FString& S : Field.Stages) Out.push_back(Std(S));
+		return Out;
+	}
+}
+
+int32 UPatterGameData::StageIndex(const FPatterGameDataField& Field, const FString& Stage)
+{
+	return wildwinter::expr::StageIndex(LadderOf(Field), patter::PatterValue::Str(Std(Stage)));
+}
+
+bool UPatterGameData::CompareStages(const FPatterGameDataField& Field, const FString& A, const FString& B, int32& OutOrder)
+{
+	OutOrder = 0;
+	try { OutOrder = wildwinter::expr::CompareStages(LadderOf(Field), patter::PatterValue::Str(Std(A)), patter::PatterValue::Str(Std(B))); return true; }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
+}
+
+bool UPatterGameData::NextStage(const FPatterGameDataField& Field, const FString& Stage, FString& OutStage)
+{
+	OutStage = FString();
+	try { OutStage = Ue(wildwinter::expr::NextStage(LadderOf(Field), patter::PatterValue::Str(Std(Stage)))); return true; }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return false; }
 }

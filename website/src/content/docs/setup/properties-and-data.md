@@ -131,7 +131,10 @@ project, and then:
 Properties drive the *story*; **Game Data** hands cues to the *game*. In **Project
 Settings ▸ Game Data**, decide what fields each kind of beat can carry: for example, an `emotion`
 pick-list on **line** beats, a `camera` field on **text**, an `sfx` id on a **game event**. Each
-field has a name, a type, and a default.
+field has a name, a type, and a default if you want one: Text, Text (multiline), Number,
+True / False, List, Flags, or **Quality**, a step on the field's own ordered ladder (an act, a
+mood that only escalates). Left blank, a default is the type's own, and the field says so,
+"default (calm)".
 
 Writers then see only the fields that apply to the beat they're on, and fill them in from the
 inspector. A beat only stores the fields you actually change, so adjusting a default updates

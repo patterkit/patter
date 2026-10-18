@@ -1,20 +1,26 @@
 // The Game Data field-definition editor (Project Settings > Game Data tab). Author-defined custom
 // fields are declared PER NODE TYPE, so the node kinds (scene / block / snippet / dialogue / text /
 // action) sit in their own rail of tabs; the selected kind shows its field list. Each field has a
-// name, a type, an optional default + purpose, and - for an enum - a tag-style list of allowed values
-//. Edits mutate a local copy; the caller reads value() on save (sparse: blank
-// fields / empty kinds are pruned).
+// name, a type from the family's one list (text, multiline, number, boolean, enum, flags, quality), an
+// optional default + purpose, a tag-style list of allowed values for an enum or flags, and the ladder,
+// in order, for a quality. Edits mutate a local copy; the caller reads value() on save (sparse: blank
+// fields / empty kinds are pruned), and stageRenames() for the stages renamed in place, whose node
+// values the save carries in the same batch.
 
 import type { GameDataField, GameDataFields, GameDataFieldType, GameDataNodeKind } from "@patterkit/model";
+import type { StageRenameDto } from "../../shared/api.js";
 import { el } from "./dom.js";
-import { iconBtn, labelled, moveItem, tagChips, defaultControl, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
+import { iconBtn, labelled, moveItem, tagChips, stageChips, defaultControl, dupGuard, expandableRow, focusNewRow } from "@wildwinter/app-shell";
 
 const KINDS: Array<{ kind: GameDataNodeKind; label: string }> = [
   { kind: "scene", label: "Scene" }, { kind: "block", label: "Block" }, { kind: "snippet", label: "Snippet" },
   { kind: "line", label: "Dialogue" }, { kind: "text", label: "Text" }, { kind: "gameEvent", label: "Game Event" },
 ];
+// The family's field types, in Storyletter's Card template order and words (patterkit design/family-parity-2026-10.md
+// item 9).
 const TYPES: Array<[GameDataFieldType, string]> = [
   ["text", "Text"], ["multiline", "Text (multiline)"], ["number", "Number"], ["boolean", "True / False"], ["enum", "List"],
+  ["flags", "Flags"], ["quality", "Quality"],
 ];
 
 export interface GameDataFieldsHandle {
@@ -22,6 +28,9 @@ export interface GameDataFieldsHandle {
   value(): GameDataFields;
   /** The first duplicate-named field anywhere (switching to its node-kind tab so it's visible), or null. */
   firstDuplicate(): HTMLInputElement | null;
+  /** The quality stages renamed in place since the dialog opened, in order: the save carries each into the
+   *  node values that name it. */
+  stageRenames(): StageRenameDto[];
 }
 
 
@@ -30,6 +39,7 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
   let activeKind: GameDataNodeKind = "scene";
   const fieldsOf = (kind: GameDataNodeKind): GameDataField[] => (state[kind] ??= []);
   const guard = dupGuard();
+  const renames: StageRenameDto[] = [];
   // Names are unique PER node kind. Only the active kind is in the DOM, so find the first kind whose data
   // has a clash (for the save gate to jump to).
   const kindWithDup = (): GameDataNodeKind | null => {
@@ -54,13 +64,16 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     type.addEventListener("change", () => {
       f.type = type.value as GameDataFieldType;
       delete f.default;                       // a default rarely survives a type change - reset it
-      if (f.type === "enum") f.values ??= []; else delete f.values;
+      if (f.type === "enum" || f.type === "flags") f.values ??= []; else delete f.values;
+      if (f.type === "quality") f.stages ??= []; else delete f.stages;
       render();                    // re-render: the default + values controls depend on type
     });
 
     // Default on the line; rebuilt in place when enum values change so the new options become selectable.
-    let dflt = defaultControl(f, undefined, { typed: true });
-    const refreshDefault = (): void => { const fresh = defaultControl(f, undefined, { typed: true }); dflt.replaceWith(fresh); dflt = fresh; };
+    // A field's enum may hold none chosen (""), which "(none)" writes; blank gives no default, the type's.
+    const dfltOpts = { typed: true, noneChosen: true } as const;
+    let dflt = defaultControl(f, undefined, dfltOpts);
+    const refreshDefault = (): void => { const fresh = defaultControl(f, undefined, dfltOpts); dflt.replaceWith(fresh); dflt = fresh; };
 
     const acts = el("div", "gd-acts");
     acts.append(
@@ -73,7 +86,19 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
     purpose.type = "text"; purpose.placeholder = "What this field is for"; purpose.value = f.purpose ?? "";
     purpose.addEventListener("input", () => { f.purpose = purpose.value.trim() || undefined; });
     const details: HTMLElement[] = [];
-    if (f.type === "enum") details.push(labelled("Values", tagChips(f, refreshDefault)));
+    if (f.type === "enum" || f.type === "flags") details.push(labelled("Values", tagChips(f, refreshDefault)));
+    // A quality's ladder, IN ORDER (position is the meaning). A stage renamed in place carries every node's
+    // value that names it, at save; no expression reads game data, so a reorder changes no gate.
+    if (f.type === "quality") {
+      const kind = activeKind;
+      details.push(labelled("Stages (in order)", stageChips(f, refreshDefault, {
+        onRename: (from, to) => {
+          if (f.default === from) f.default = to;
+          refreshDefault();
+          if (f.name.trim()) renames.push({ scope: "gameData", gameData: kind, name: f.name.trim(), from, to });
+        },
+      })));
+    }
     details.push(labelled("Purpose", purpose));
 
     return expandableRow({ line: [name, type, dflt, acts], details });
@@ -114,6 +139,9 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
       activeKind = kind; render(); // surface the clashing kind so its red field is on screen
       return guard.firstDuplicate();
     },
+    stageRenames(): StageRenameDto[] {
+      return [...renames];
+    },
     value(): GameDataFields {
       const out: GameDataFields = {};
       for (const { kind } of KINDS) {
@@ -122,7 +150,8 @@ export function mountGameDataFields(host: HTMLElement, initial: GameDataFields):
           .map((f): GameDataField => {
             const c: GameDataField = { name: f.name.trim(), type: f.type };
             if (f.default !== undefined) c.default = f.default;
-            if (f.type === "enum" && f.values?.length) c.values = [...f.values];
+            if ((f.type === "enum" || f.type === "flags") && f.values?.length) c.values = [...f.values];
+            if (f.type === "quality" && f.stages) c.stages = [...f.stages];
             if (f.purpose) c.purpose = f.purpose;
             return c;
           });

@@ -33,6 +33,24 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an
+  enum value or a flag deleted since the save, or a value of another type) goes back to its default as
+  the save loads, instead of reaching the first gate that orders it. Each is reported: the `onRefit`
+  option hears the list of `LoadMisfit`s (scope, name, what the save held); unset, each goes to
+  `console.warn`. A hot swap onto a game's shared registry refits this engine's values too, as does a
+  hot swap that falls back on a fresh engine. An engine reports only its own scopes' values; the rest
+  of a shared registry's stay for their owners.
+- **Game data takes flags and quality**, the family's field types: a game-data field's declaration
+  carries `stages` for a quality, and the stage helpers take one.
+
+### Changed
+
+- The value check, the type defaults and the refitting load now come from the shared kernel
+  (`@wildwinter/expr` 0.6.0, `@wildwinter/scoperegistry` 0.9.0), as in every port. Kernel `k1a333a0e`:
+  the Storylet Engine ships the same kernel in the same release round.
+
 ## [0.27.0] - 2026-10-17
 
 ### Added

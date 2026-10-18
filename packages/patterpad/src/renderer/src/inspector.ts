@@ -3,7 +3,7 @@
 // surface's `onSelect` context; a header click jumps to that node (revealNode). The snippet / group
 // CONDITION rows are editable - clicking opens the visual expression editor (M1, editCondition).
 
-import { iconNode, iconHtml, iconSvg, metaLine } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
+import { defaultLabel, fallbackText, iconNode, iconHtml, iconSvg, metaLine, rungStrip } from "@wildwinter/app-shell"; // the family's drawn icon set: one spelling of every icon across the suite; the drawn separator
 import type {
   InspectorContext, InspectLevel, LeafLevel, SnippetLevel, GroupLevel, BlockLevel, SceneLevel, MultiLevel, GroupPropsPatch, PadSource,
 } from "@patterkit/patterpad-surface/surface";
@@ -85,19 +85,33 @@ function gameDataSection(kind: GameDataNodeKind, id: string | null, gd: GameData
 
 /** One editable gameData field row. `current` is the node's override (undefined = falls back to the
  *  field default). Committing an empty / "default" value clears the override (sparse storage). */
-function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown, h: InspectorHandlers): HTMLElement {
+export function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">): HTMLElement {
   const r = el("div", "insp-row insp-gd-row");
   const key = el("span", "insp-key", f.name);
   if (f.purpose) key.dataset.tip = f.purpose; // rollover hint
   r.append(key);
   const set = (v: unknown): void => { if (id) h.setGameData(id, f.name, v); };
-  const defHint = f.default != null ? String(f.default) : "";
+  const defHint = fallbackText(f);   // what an unset value falls back to: the field's default, else its type's
 
+  if (f.type === "quality" && (f.stages?.length ?? 0) > 0) {
+    // A quality value is a step on the field's LADDER: the family's one strip, the stage marked. Unset, it
+    // says what it falls back to, "default (x)", which also clears an override (sparse storage).
+    const holder = el("span", "insp-gd-rungs");
+    const draw = (value: unknown): void => {
+      holder.replaceChildren(rungStrip({
+        stages: f.stages!, value: typeof value === "string" ? value : undefined, decl: f,
+        ...(id ? { onPick: (stage: string) => { set(stage); draw(stage); }, onClear: () => { set(undefined); draw(undefined); } } : {}),
+      }));
+    };
+    draw(current);
+    r.append(holder);
+    return r;
+  }
   if (f.type === "boolean" || f.type === "enum") {
     const sel = el("select", "insp-select") as HTMLSelectElement;
     const opts: Array<[string, string]> = f.type === "boolean"
-      ? [["", defHint ? `default (${defHint})` : "(unset)"], ["true", "True"], ["false", "False"]]
-      : [["", defHint ? `default (${defHint})` : "(unset)"], ...(f.values ?? []).map((v): [string, string] => [v, v])];
+      ? [["", defaultLabel(f)], ["true", "True"], ["false", "False"]]
+      : [["", defaultLabel(f)], ...(f.values ?? []).map((v): [string, string] => [v, v])];
     for (const [v, l] of opts) { const o = el("option", undefined, l) as HTMLOptionElement; o.value = v; sel.append(o); }
     sel.value = current == null ? "" : String(current);
     sel.addEventListener("change", () => {
@@ -109,8 +123,8 @@ function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown,
   } else {
     const input = el("input", "insp-gd-input") as HTMLInputElement;
     input.type = f.type === "number" ? "number" : "text";
-    input.placeholder = defHint ? `Default is ${defHint}` : f.type === "number" ? "Number" : "Text";
-    input.value = current == null ? "" : String(current);
+    input.placeholder = f.type === "flags" ? `Flags, separated by commas (default: ${defHint})` : `Default is ${defHint}`;
+    input.value = current == null ? "" : Array.isArray(current) ? current.join(", ") : String(current);
     if (!id) input.disabled = true;
     // Commit on change (blur / Enter), not per keystroke, which is where this departs from the family's
     // as-you-type rule (ruling N, 2026-10). The inspector re-renders whenever its levels change, and a
@@ -120,6 +134,7 @@ function gameDataFieldRow(f: GameDataField, id: string | null, current: unknown,
     input.addEventListener("change", () => {
       const raw = input.value.trim();
       if (raw === "") set(undefined);
+      else if (f.type === "flags") set(raw.split(",").map((x) => x.trim()).filter((x) => x.length > 0));
       else set(f.type === "number" ? Number(raw) : raw);
     });
     r.append(input);

@@ -34,9 +34,13 @@ struct FPatterGameDataField
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	FPatterValue TypedDefault;
 
-	/** An enum field's options. */
+	/** An enum field's options, or the flags a flags field may hold. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Values;
+
+	/** A quality field's ladder, in order. Hand the field to StageIndex, CompareStages or NextStage. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FString> Stages;
 
 	/** What the field is for, in the author's words; empty when they gave none. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
@@ -62,4 +66,21 @@ public:
 	 *  no declared field. Fields with no value are left out. */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
 	static TArray<FPatterGameDataEntry> EffectiveGameData(const TArray<FPatterGameDataField>& Fields, const TArray<FPatterGameDataEntry>& Node);
+
+	// A quality field's ladder, for game code holding one of its values: the shared kernel's StageIndex,
+	// CompareStages and NextStage over the field's declaration, as UPatterEngine's take a property's ref.
+
+	/** The position of Stage on the field's ladder, or -1 when it isn't one of its stages. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
+	static int32 StageIndex(const FPatterGameDataField& Field, const FString& Stage);
+
+	/** -1, 0 or 1 in OutOrder as A is below, at or above B on the field's ladder. False, logged, when either
+	 *  isn't a stage (a deleted one, a drifted value). */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
+	static bool CompareStages(const FPatterGameDataField& Field, const FString& A, const FString& B, int32& OutOrder);
+
+	/** The stage after Stage on the field's ladder in OutStage, staying on the top rung, as advance() does.
+	 *  False, logged, when Stage isn't a stage. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|GameData")
+	static bool NextStage(const FPatterGameDataField& Field, const FString& Stage, FString& OutStage);
 };

@@ -5,7 +5,7 @@
 // condition / effect expression in a project against a property schema.
 // ---------------------------------------------------------------------------
 
-import { compile, parse, validateExpr } from "@wildwinter/expr";
+import { compile, parse, validateAssignment, validateExpr } from "@wildwinter/expr";
 import type { ExprNode, ExpressionValidationIssue } from "@wildwinter/expr";
 import { dialectWithForeignScopes, buildSchema, extractSlots, splitRef, withEngineScopes, hostScopesToSpec } from "@patterkit/dialect";
 import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
@@ -134,7 +134,9 @@ export function validateConditions(
     const schema = buildSchema(input.project, sceneProps, foreign);
     const checkedSchema = checked ? buildSchema(input.project, sceneProps, checked) : undefined;
 
-    const check = (nodeId: string, field: string, src: string): void => {
+    /** `assignedTo`: the property a set effect writes this value to, whose quality ladder a stage it names
+     *  must be on (the kernel's validateAssignment). */
+    const check = (nodeId: string, field: string, src: string, assignedTo?: { scope: string; name: string }): void => {
       let ast;
       try {
         ast = parse(src, dialect);
@@ -142,7 +144,7 @@ export function validateConditions(
         issues.push({ nodeId, field, src, severity: "error", message: e instanceof Error ? e.message : String(e) });
         return;
       }
-      const strict = validateExpr(ast, schema, dialect);
+      const strict = [...validateExpr(ast, schema, dialect), ...(assignedTo ? validateAssignment(assignedTo, ast, schema, dialect) : [])];
       for (const iss of strict) {
         issues.push({ nodeId, field, src, severity: iss.severity, message: iss.message });
       }
@@ -190,7 +192,7 @@ export function validateConditions(
       // SET-ONLY (spec §15): an effect is a property mutation - check its target + value expression.
       for (const e of list ?? []) {
         checkTarget(nodeId, `${label}.set`, e.target);
-        check(nodeId, `${label}.set`, e.value);
+        check(nodeId, `${label}.set`, e.value, TARGET_REF.test(e.target) ? splitRef(e.target, isScopeToken) : undefined);
       }
     };
 

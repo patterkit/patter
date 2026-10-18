@@ -171,18 +171,6 @@ namespace patter
         inline std::string flowScene(const std::string& flowId, const std::string& sceneId) { return flow(flowId) + "scene/" + esc(sceneId); }
     }
 
-    inline PatterValue propDefault(const PropertyDecl& d)
-    {
-        if (d.hasDefault) return d.def;
-        if (d.type == "boolean") return PatterValue::Bool(false);
-        if (d.type == "number") return PatterValue::Num(0);
-        if (d.type == "string") return PatterValue::Str("");
-        if (d.type == "flags") return PatterValue::Flags({});
-        if (d.type == "enum") return PatterValue::Str(d.values.empty() ? "" : d.values[0]);
-        if (d.type == "quality") return PatterValue::Str(d.stages.empty() ? "" : d.stages[0]); // the ladder's start
-        return PatterValue::Bool(false);
-    }
-
     // One shared @patter property for a live state inspector: ref, type, current value, declared
     // default (for reset-to-default), and enum options.
     //
@@ -345,6 +333,10 @@ namespace patter
         if (d.hasDefault) sd.defaultValue = d.def;
         return sd;
     }
+
+    /** The seed value for a property declaration (its default, else the type default): the kernel's
+     *  defaultFor, one rule with the bags'. */
+    inline PatterValue propDefault(const PropertyDecl& d) { return toScopeDecl(d).defaultOrTypeDefault(); }
 
     /** One half of a scene's props: the shared ones (stage bag) or the rest (scene bag). */
     inline std::vector<ScopeDeclaration> declsFor(
@@ -559,6 +551,21 @@ namespace patter
         /// Where a content error the engine played through is reported (see PlayError). Unset: nowhere
         /// but the log, as a std-only core has no console of its own to warn on.
         std::function<void(const PlayError&)> onError;
+        /// Where the saved values a load put back to their defaults are reported (EngineOptions::onRefit).
+        std::function<void(const std::vector<LoadMisfit>&)> onRefit;
+        /// Say what the registry's refitting loads have put back since it last said: after a load, a
+        /// flow's restore, and each bag that claims saved values.
+        void reportRefits()
+        {
+            if (!registry) return;
+            // This engine's own keys only: the game's registry may hold other engines' and the game's misfits.
+            std::vector<LoadMisfit> misfits = registry->takeMisfits([this](const std::string& scope)
+            {
+                if (scope == "patter" || scope.rfind("patter/", 0) == 0) return true;
+                return std::find(hostScopes.begin(), hostScopes.end(), scope) != hostScopes.end();
+            });
+            if (!misfits.empty() && onRefit) onRefit(misfits);
+        }
         const Bundle* bundle = nullptr;
         bool emitIds = false; // IDs-only build: emit beat IDs + omit character names (the game localises)
         // The active locale's string table and the default locale's, pointing into the bundle the engine
@@ -719,6 +726,15 @@ namespace patter
         /// records each as a `diagnostic` entry. Unset, the core reports nothing: the UE wrapper sets it
         /// (a Warning in the log and UPatterEngine::OnError), and so should any other host.
         std::function<void(const PlayError&)> onError;
+        /// Called with the saved values a load put back to their defaults because they no longer fit their
+        /// declarations: a stage, an enum value or a flag deleted since the save was taken, or a value of
+        /// another type. Each LoadMisfit says where it was (`scope`, the registry key), its `name`, and what
+        /// the save held. Loads refit, so a stage the build no longer has never reaches a gate that orders
+        /// it. Called after loadGame, restoreFlow, hotSwap and each bag a flow makes that claims saved values;
+        /// a game that loads its own registry passes refit too, and hears those here as the engine's bags
+        /// claim them. Unset, the core reports nothing, as for onError: the UE wrapper sets it (a Warning in
+        /// the log and UPatterEngine::OnRefit). JS's onRefit.
+        std::function<void(const std::vector<LoadMisfit>&)> onRefit;
         // Live game state per host-scope token ("world" -> your resolver): values the GAME keeps. Each
         // binding is registered in the registry as an external scope (read and written through, never
         // stored or saved there). Declared tokens you do not bind are self-backed by a standalone
@@ -1559,6 +1575,7 @@ namespace patter
         void mount(const std::string& key, const std::shared_ptr<PropertyBag>& bag)
         {
             kernelCall([&] { host_->registry->mountOwned(key, bag, std::string(PATTER_OWNER)); });
+            host_->reportRefits();   // a bag that claimed values a refitting load parked says what it put back
         }
 
         /** Mount, and say whether the mount CLAIMED values a load had parked at `key`. Only asked while a
@@ -2321,6 +2338,7 @@ namespace patter
             host_.engineLog = &engineLog_;
             host_.onDryChoice = options.onDryChoice;
             host_.onError = options.onError;
+            host_.onRefit = options.onRefit;
             host_.emitIds = bundle.localisation.mode == "ids" && !bundle.localisation.sourceDebug;
             sourceDebug_ = bundle.localisation.mode == "ids" && bundle.localisation.sourceDebug;
             if (sourceDebug_) std::cerr << "[Patterplay] source-only DEBUG build: strings are the source language for debugging, not a shippable localised build.\n";
@@ -2394,6 +2412,8 @@ namespace patter
             // and the log path.
             host_.patterBag = makeSharedPatter(host_.patterSharedDecls);
             registerScopes(bundle, options);
+            // The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
+            host_.reportRefits();
         }
 
     public:
@@ -2455,7 +2475,20 @@ namespace patter
             EngineOptions options = creationOptions_;
             options.registry = host_.registry;
             const HotSwapTag tag{ host_.ownsRegistry };
+            // On a game's registry, this engine's own values are parked again to be REFITTED as the
+            // replacement claims them: the edit may have deleted a stage, an enum value or a flag one of them
+            // holds, and the snapshot does not carry the game's registry. A standalone engine's snapshot
+            // carries its registry, which the replacement's load refits.
+            ScopeRegistry::SaveBlob own;
+            if (!host_.ownsRegistry)
+            {
+                std::set<std::string> tokens(host_.hostScopes.begin(), host_.hostScopes.end());
+                tokens.insert("patter");
+                for (const auto& kv : host_.registry->save())
+                    if (tokens.count(kv.first) || kv.first.rfind("patter/", 0) == 0) own.set(kv.first, kv.second);
+            }
             release(true);
+            if (!host_.ownsRegistry) host_.registry->load(own, /*keepParked=*/true, /*refit=*/true);
             std::unique_ptr<Engine> next(new Engine(bundle, options, tag));
             try
             {
@@ -2467,6 +2500,10 @@ namespace patter
                 // engine and restart each flow at the top of the scene it was in (dropped when that
                 // scene is gone too).
                 next->release(true);
+                // The values the failed load parked go back unrefitted; park the save's own again, refitted,
+                // before the fallback claims them, so a stage the edit deleted is put back here too.
+                if (host_.ownsRegistry) { if (snapshot.registry) host_.registry->load(*snapshot.registry, true, true); }
+                else host_.registry->load(own, /*keepParked=*/true, /*refit=*/true);
                 next.reset(new Engine(bundle, options, tag));
                 for (const auto& kv : snapshot.flows)
                 {
@@ -2620,7 +2657,7 @@ namespace patter
             // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
             const std::string parked = registrykeys::flow(id);
             host_.registry->discardParked(parked);
-            host_.registry->load(flowSections(id, state), /*keepParked=*/true);
+            host_.registry->load(flowSections(id, state), /*keepParked=*/true, /*refit=*/true);
             auto flow = std::make_shared<Flow>(id, &host_, static_cast<int64_t>(defaultSeed_));
             try
             {
@@ -2634,6 +2671,7 @@ namespace patter
             }
             Flow* raw = flow.get();
             flows_[id] = std::move(flow);
+            host_.reportRefits();
             return raw;
         }
 
@@ -3115,7 +3153,7 @@ namespace patter
                 // The engine's own registry takes the save wholesale. A game's registry may hold values
                 // the game loaded for other engines, still waiting to be claimed: add to those, never
                 // replace them.
-                reg.load(*values, /*keepParked=*/!host_.ownsRegistry);
+                reg.load(*values, /*keepParked=*/!host_.ownsRegistry, /*refit=*/true);
             }
             host_.sharedVisits = save.sharedVisits;
             host_.sharedSelectors = save.sharedSelectors;
@@ -3125,6 +3163,7 @@ namespace patter
                 flow->restore(kv.second);
                 flows_[kv.first] = std::move(flow);
             }
+            host_.reportRefits();
         }
 
     private:

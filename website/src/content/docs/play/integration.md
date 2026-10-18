@@ -42,6 +42,29 @@ property value, `@patter`, `@scene`, and a self-backed `@world` alike, so one ca
 whole game. **Locale is not in the save**: it's presentation, not game state. A saved position
 that points at content you've since deleted resumes best-effort rather than throwing.
 
+A saved value that the content no longer allows goes back to its default as the save loads: a stage
+you've deleted from a quality, an enum value or a flag you've removed, or a value of a type the
+property no longer has. Otherwise the first condition that ordered that quality would fail. Each one
+is reported, so a save that drifted is never silent: pass `onRefit` to hear about them. Each says
+where it was (`scope`, the registry key such as `patter`), its `name`, and what the save held.
+
+```ts
+const engine = new Engine(bundle, {
+  onRefit: (misfits) => { for (const m of misfits) console.info(`${m.scope}.${m.name} was ${m.value}; now its default`); },
+});
+```
+
+| Runtime | How to hear about it | Unset |
+|---|---|---|
+| JS | `onRefit` in the engine options | `console.warn` |
+| Unity | `EngineOptions.OnRefit` (a list of `LoadMisfit`) | `Debug.LogWarning` |
+| Unreal | the engine's `OnRefit` event (scope, name, saved value); `EngineOptions::onRefit` in C++ | a log warning |
+| Godot | `"on_refit"` in the options, a `Callable` taking an Array of Dictionaries | `push_warning` |
+
+A game that keeps one registry for several engines loads it itself; pass `{ refit: true }` to that
+load too (`registry.load(save.registry, { refit: true })`), and the engine reports what was put back as
+its own scopes claim their values.
+
 **Every runtime writes and reads the same save format**, `patter/save@0`, so a save crosses
 engines. A game that saves from a web build loads in Godot, and a Patterpad Play-window save loads
 in Unity. The shape is the JS runtime's, documented in `@patterkit/model`, and the conformance corpus
@@ -158,8 +181,10 @@ The native ports carry the same field on their step: `step.GameData` (Unity), `S
 (Godot).
 
 When you want the defaults filled in, resolve the overrides against the project's field schema with
-the helpers (also on the `window.Patterplay` drop-in). They work on any node's overrides, whether
-from a step, the accessors below, or a node you are not currently playing:
+the helpers (also on the `window.Patterplay` drop-in). Every field in the bundle carries a default
+(the one the project gave, else its type's, which the compiler writes in), so the resolved object has
+every declared field. They work on any node's overrides, whether from a step, the accessors below,
+or a node you are not currently playing:
 
 ```ts
 import { gameDataFields, gameDataValue, effectiveGameData } from "@patterkit/runtime";
@@ -180,6 +205,22 @@ Every runtime has the same three helpers:
 The Unreal C++ core has them too, as `patter::gameDataFields`, `gameDataValue`, and `effectiveGameData`. In
 Blueprint, each Game Data entry carries its value twice: `Value` as text to show, and `TypedValue` (an
 `FPatterValue`) to act on, so a number reads as a number without parsing it.
+
+A **quality** field holds a stage of its own ladder, listed in order on the field's `stages`. To ask
+whether a node's stage is at or past another, hand the field to the stage helpers, which compare by
+position rather than by name:
+
+```ts
+import { compareStages, gameDataFields } from "@patterkit/runtime";
+
+const act = gameDataFields(bundle, "line").find((f) => f.name === "act")!;
+compareStages(act, step.gameData?.act ?? act.default, "act-1");   // -1, 0 or 1
+```
+
+The same helpers take a field on every runtime: `Stages.Compare(field, a, b)` in C# (a
+`GameDataField` is a declaration), `PatterExpr.compare_stages(field, a, b)` in GDScript,
+`wildwinter::expr::CompareStages(field.stages, a, b)` in C++, and `UPatterGameData::CompareStages(Field, A, B)`
+in Blueprint, with `StageIndex` and `NextStage` beside each.
 
 ### Scene and block Game Data
 

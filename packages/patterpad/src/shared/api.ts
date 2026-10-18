@@ -2,7 +2,7 @@
 // onto the Node main process (files, VCS, the @patterkit/ops core). Kept tiny on purpose - every
 // entry is an explicit, auditable operation, never raw fs / shell access.
 
-import type { GameDataFields, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
+import type { GameDataFields, GameDataNodeKind, PropertyDecl, CastMember, WritingStatusDecl, RecordingStatusDecl, EstimatingConfig, DocLine, VcsKind, Comment, CommentMessage, Suggestion, HostScopeRegistry, CoverageDriver, SpeakerQualifier } from "@patterkit/model";
 
 export type { VcsKind } from "@patterkit/model";
 
@@ -343,6 +343,9 @@ export interface StageRenameDto {
   scope: string;
   name: string;
   scene?: string;
+  /** A quality GAME-DATA field's rename rather than a property's: the node type that declares the field
+   *  `name`, whose nodes' values follow (no expression reads game data). `scope` is then unused. */
+  gameData?: GameDataNodeKind;
   from: string;
   to: string;
 }
@@ -803,7 +806,10 @@ export type QuickFix =
   | { kind: "pick-enum-value"; bad: string; options: string[]; src: string }
   /** A line's speaker qualifier is not in the project's list (one removed): pick one that is, or none,
    *  for the line `lineId`. `bad` is the gameId it carries. */
-  | { kind: "pick-qualifier"; lineId: string; bad: string };
+  | { kind: "pick-qualifier"; lineId: string; bad: string }
+  /** A quality game-data value names no stage of its field (a deleted one, most often): pick one of
+   *  `options` (the stages, in ladder order) for node `nodeId`'s field `field`. `bad` is what it holds. */
+  | { kind: "pick-gamedata-stage"; nodeId: string; field: string; bad: string; options: string[] };
 
 export interface Problem {
   category: ProblemCategory;

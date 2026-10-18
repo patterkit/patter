@@ -6,6 +6,8 @@
 extends SceneTree
 
 var _fails := 0
+## What every engine of the running case reported through on_refit, for expectRefits.
+var _refits: Array = []
 var _dialect: Dictionary = PatterDialect.dialect()
 
 ## The shared registry corpus runner (vendored beside this file from ../expr, no
@@ -445,6 +447,9 @@ func _run_specificity(arr: Array) -> int:
 # A case's engineOptions: the construction options it plays under, for its engine and every engine a
 # saveLoad / hotSwap makes (they share `options`). An absent key keeps the engine's default.
 func _apply_engine_options(c: Dictionary, options: Dictionary) -> void:
+	# A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list.
+	_refits.clear()
+	options["on_refit"] = func(misfits: Array) -> void: _refits.append_array(misfits)
 	var eo: Dictionary = c.get("engineOptions", {})
 	if eo.has("replayPromptOnChoose"):
 		options["replay_prompt_on_choose"] = bool(eo["replayPromptOnChoose"])
@@ -881,6 +886,19 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 			"commit":
 				holder["engine"].commit(cp)
 				cp = null
+			"setProperty":
+				# The game's write, with host authority (a game moving @world).
+				holder["engine"].set_property(op["ref"], PatterValues.to_value(op["value"]))
+			"expectRefits":
+				# What the case's loads put back, in order, as { scope, name, value }.
+				if not _deep_equal(_refits, op["expectResult"]):
+					_fail("scripted", name, "expectRefits: expected %s, got %s" % [JSON.stringify(op["expectResult"]), JSON.stringify(_refits)])
+					return false
+				_refits.clear()
+			_:
+				# An op this harness cannot run is a check that cannot fail: refuse it, as the C# host does.
+				_fail("scripted", name, "unknown script op '%s'" % kind)
+				return false
 		var expected = op.get("expect", null)
 		var matched := _deep_equal(chunk, expected) if expected != null else chunk.is_empty()
 		if not matched:

@@ -1167,6 +1167,7 @@ namespace Patterkit.Patterplay
         {
             try { _host.Registry.MountOwned(key, bag, PatterKeys.Owner); }
             catch (Exception e) when (KernelErrors.Is(e)) { throw KernelErrors.As(e); }
+            _host.ReportRefits(); // a bag that claimed values a refitting load parked says what it put back
         }
 
         /// <summary>Mount, and say whether the mount CLAIMED values a load had parked at `key`. Only asked

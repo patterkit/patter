@@ -76,7 +76,8 @@ static func default_for(d: Dictionary) -> Variant:
 			return false
 		"number":
 			return 0.0
-		"string":
+		"string", "text", "multiline":
+			# A property's `string`, and a field's `text` and `multiline` (the family's field types).
 			return ""
 		"enum":
 			var vals: Array = d.get("values", [])
@@ -88,6 +89,39 @@ static func default_for(d: Dictionary) -> Variant:
 			var stages: Array = d.get("stages", [])
 			return str(stages[0]) if not stages.is_empty() else ""
 	return false
+
+
+## Does a value fit its declaration? The TypeScript kernel's valueFits, word for word:
+## the type first, then the declaration's own vocabulary. A declaration listing none
+## ("values" or "stages" absent) constrains nothing past the type, and a type this
+## build does not know constrains nothing. An enum may hold "" (none chosen) only
+## when asked.
+static func value_fits(d: Dictionary, value, none_chosen: bool = false) -> bool:
+	match str(d.get("type", "")):
+		"boolean":
+			return value is bool
+		"number":
+			return value is float or value is int
+		"string", "text", "multiline":
+			return value is String
+		"enum":
+			if not value is String:
+				return false
+			if value == "" and none_chosen:
+				return true
+			return d.get("values") == null or (d["values"] as Array).has(value)
+		"flags":
+			if not value is Array:
+				return false
+			for f in value:
+				if not f is String:
+					return false
+				if d.get("values") != null and not (d["values"] as Array).has(f):
+					return false
+			return true
+		"quality":
+			return value is String and (d.get("stages") == null or (d["stages"] as Array).has(value))
+	return true
 
 
 static func _copy_value(v) -> Variant:
@@ -233,6 +267,24 @@ func save() -> Dictionary:
 
 ## Lay saved values over the current ones (call after a fresh seed: orphans
 ## land as strays, new declarations keep their defaults). Does not fire events.
-func load(saved: Dictionary) -> void:
+##
+## With {"refit": true}, a saved value that no longer fits its declaration (a stage,
+## an enum value or a flag the build has since deleted, or a value of another type)
+## goes back to the declaration's default instead, and is returned as {"name",
+## "value"} with what the save held, in declaration order. Without it the list is
+## empty and every value lands as saved.
+func load(saved: Dictionary, opts: Dictionary = {}) -> Array:
+	var landed: Dictionary = {}
 	for k in saved:
-		values[_normalise.call(str(k))] = _copy_value(Values.to_value(saved[k]))
+		var n: String = _normalise.call(str(k))
+		values[n] = _copy_value(Values.to_value(saved[k]))
+		landed[n] = true
+	var misfits: Array = []
+	if not bool(opts.get("refit", false)):
+		return misfits
+	for name in _decls:
+		if not landed.has(name) or value_fits(_decls[name], values[name]):
+			continue
+		misfits.append({"name": name, "value": values[name]})
+		values[name] = _copy_value(Values.to_value(default_for(_decls[name])))
+	return misfits

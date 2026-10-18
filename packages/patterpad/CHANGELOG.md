@@ -6,6 +6,22 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Added
+
+- **Game data takes Flags and Quality.** Project Settings ▸ Game Data offers the family's seven field types,
+  with a quality's stages declared in order. A stage renamed in place carries every node's value that names it,
+  in the same save. In the inspector a quality value shows as its ladder, the current stage marked; unset, it
+  says what it falls back to, "default (x)", and a click clears an override.
+- **Game data values are checked.** A value that doesn't fit its field shows in the problems bar, and one left
+  on a deleted stage offers the stages to choose from.
+- **A blank default names its fallback**: "default (False)", "default (calm)", "default (first stage)" on every
+  property and field list, from the shared shell. A default is optional, and the type's holds.
+
+### Changed
+
+- World properties take the shell's one type list, and a reorder of a quality's stages says how many gates it
+  changes in the family's one wording.
+
 ## [0.31.0] - 2026-10-17
 
 ### Added

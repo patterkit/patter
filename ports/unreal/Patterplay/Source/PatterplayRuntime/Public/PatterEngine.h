@@ -164,6 +164,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterDryChoiceEvent, const FString
 
 /** A content error the engine played through: what failed, where, and why. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterErrorEvent, const FPatterPlayError&, Error);
+// A saved value a load put back to its default: its scope (the registry key), its name, and what the save held.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPatterRefitEvent, const FString&, Scope, const FString&, Name, const FPatterValue&, Saved);
 
 /** One decision the engine made, as it happens: the entry the log would keep, naming its flow. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPatterTraceEvent, const FPatterLogEntry&, Entry);
@@ -205,6 +207,13 @@ public:
 	// content bug is never silent, and, with the decision log on, recorded as a `diagnostic` entry.
 	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
 	FPatterErrorEvent OnError;
+
+	// Fired with each saved value a load put back to its default because it no longer fits its declaration:
+	// a stage, an enum value or a flag deleted since the save was taken, or a value of another type. Loads
+	// refit, so a stage the build no longer has never reaches a gate that orders it. Each is also logged as
+	// a Warning, so a drifted save is never silent.
+	UPROPERTY(BlueprintAssignable, Category = "Patterplay")
+	FPatterRefitEvent OnRefit;
 
 	// Fired with each decision the engine makes, as it happens, with the decision log on or off: the same
 	// entries Log keeps, for a tool that wants them live rather than retained. The engine's onTrace on

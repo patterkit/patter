@@ -141,9 +141,12 @@ namespace patter
 
     struct GameDataField
     {
-        std::string name, type;
+        std::string name, type;   // type: text, multiline, number, boolean, enum, flags or quality
         bool hasDefault = false; PatterValue def;
         std::vector<std::string> values;
+        /** A quality field's ladder, in order: hand it to the stage helpers (StageIndex, CompareStages,
+         *  NextStage) to compare or step the field's stage. */
+        std::vector<std::string> stages;
         std::string purpose;   // what the field is for, in the author's words; empty when they gave none
     };
 

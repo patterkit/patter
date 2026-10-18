@@ -35,7 +35,7 @@ import type { ScalarValue, EvalContext, ExprNode } from "@wildwinter/expr";
 import { matchedSpecificity as scoreSpecificity, type EvalTruthy } from "@wildwinter/expr-specificity";
 import { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { defaultFor, PropertyBag } from "@wildwinter/scoperegistry";
-import type { LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
+import type { LoadMisfit, LogMount, PropertyRow, ScopeDeclaration, ScopeResolver } from "@wildwinter/scoperegistry";
 import { patterDialect, interpolate, splitRef, stripCaptions } from "@patterkit/dialect";
 import { walkNodes, effectiveGameId, castStringKey, qualifierStringKey, speakerLabelKey, formatSpeakerLabel, SPEAKER_PATTERN_KEY, DEFAULT_SPEAKER_PATTERN, DEFAULT_PAD_AFTER, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER } from "@patterkit/model";
 import { buildTagIndex } from "./tags.js";
@@ -401,6 +401,16 @@ export interface EngineOptions {
    *  that failed and counted as false, an effect that failed and was skipped. Unset, each is written
    *  to `console.warn`, so a content bug is never silent. */
   onError?: (error: PlayError) => void;
+  /** Called with the saved values a load put back to their defaults because they no longer fit their
+   *  declarations: a stage, an enum value or a flag deleted since the save was taken, or a value of another
+   *  type (patter-qualities.md section 7). Each says where it was (`scope`, the registry key), its `name`, and
+   *  what the save held. Loads refit (`registry.load(blob, { refit: true })`), so a stage the build no longer
+   *  has never reaches a gate that orders it. Called after `loadGame`, `restoreFlow` and each bag a flow
+   *  makes that claims saved values, with what the registry had put back since it last said; a game that
+   *  loads its own registry passes `{ refit: true }` too, and hears those here as the engine's bags claim
+   *  them. Unset, each is written to `console.warn`, so a drifted save is never silent. The same hook on
+   *  every runtime. */
+  onRefit?: (misfits: LoadMisfit[]) => void;
   /** Retain a trace of the engine's DECISIONS (what it chose and why), readable through
    *  `engine.log()` and `flow.log()`. Off by default: a shipped game pays nothing for a
    *  debugging surface it never reads. `onDryChoice` above is unaffected and stays useful
@@ -540,6 +550,8 @@ interface FlowHost {
   onDryChoice?: (groupId: string) => void;
   /** Where a content error the engine played through is reported (see PlayError). */
   onError: (error: PlayError) => void;
+  /** Say what the registry's refitting loads have put back since it last said (EngineOptions.onRefit). */
+  reportRefits: () => void;
   /** Memoised `splitRef` results (ref string -> {scope,name}). The split depends only on the registry's
    *  scope set, so the cache is dropped whenever that moves (`refSplitRevision`). */
   refSplitCache: Map<string, { scope: string; name: string }>;
@@ -691,6 +703,14 @@ export class Engine {
       customRng: options.rng,
       onDryChoice: options.onDryChoice,
       onError: options.onError ?? ((e) => console.warn(`Patterplay: ${e.kind} on ${e.node} in flow '${e.flow}' failed, played through: ${e.message}`)),
+      reportRefits: () => {
+        // This engine's own keys only: the game's registry may hold other engines' and the game's misfits,
+        // which are theirs to take.
+        const misfits = registry.takeMisfits((scope) => scope === "patter" || scope.startsWith("patter/") || hostScopes.includes(scope));
+        if (misfits.length === 0) return;
+        if (options.onRefit) options.onRefit(misfits);
+        else for (const m of misfits) console.warn(`Patterplay: the save's ${m.scope}.${m.name} was ${JSON.stringify(m.value)}, which no longer fits its declaration; it is back at its default`);
+      },
       replayPromptOnChoose: options.replayPromptOnChoose ?? false,
       captionsOn: options.closedCaptions ?? true, // captions shown by default (full text)
       captionOpen: (bundle.closedCaptions ?? DEFAULT_CAPTION_DELIMITERS).open,
@@ -699,6 +719,8 @@ export class Engine {
       refSplitCache: new Map(),
       refSplitRevision: registry.revision,
     };
+    // The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
+    this.host.reportRefits();
   }
 
   /** The active locale (string + character-name lookups resolve in it). */
@@ -767,7 +789,15 @@ export class Engine {
     const make = (): Engine => new Engine(bundle, {
       ...this.creationOptions, registry: this.host.registry, [OWNS_REGISTRY]: this.host.ownsRegistry,
     } as InternalOptions);
+    // On a game's registry, this engine's own values are parked again to be REFITTED as the replacement claims
+    // them: the edit may have deleted a stage, an enum value or a flag one of them holds, and the snapshot does
+    // not carry the game's registry, so without this a stray stage would reach the new bundle and throw at its
+    // first gate. A standalone engine's snapshot carries its registry, which the replacement's load refits.
+    const own = new Set(["patter", ...this.host.hostScopes]);
+    const values = this.host.ownsRegistry ? undefined : Object.fromEntries(Object.entries(this.host.registry.save())
+      .filter(([key]) => own.has(key) || key.startsWith("patter/")));
     this.release(true);
+    if (values) this.host.registry.load(values, { keepParked: true, refit: true });
     const next = make();
     try {
       next.loadGame(snapshot);
@@ -776,6 +806,10 @@ export class Engine {
       // A partial load may have mutated `next`: hand its bags back, fall back on a THIRD engine and
       // restart each flow at the top of the scene it was in (dropped when that scene is gone too).
       next.release(true);
+      // The values the failed load parked go back unrefitted; park the save's own again, refitted, before the
+      // fallback claims them, so a stage the edit deleted is put back here too.
+      const again = this.host.ownsRegistry ? snapshot.registry : values;
+      if (again) this.host.registry.load(again, { keepParked: true, refit: true });
       const fresh = make();
       for (const [id, f] of Object.entries(snapshot.flows)) {
         const sceneId = f.cursor.currentSceneId;
@@ -1229,7 +1263,7 @@ export class Engine {
     // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
     const parked = keys.flow(id);
     this.host.registry.discardParked(parked);
-    this.host.registry.load(flowSections(id, state), { keepParked: true });
+    this.host.registry.load(flowSections(id, state), { keepParked: true, refit: true });
     const flow = new Flow(id, this.host, this.defaultSeed);
     try {
       flow.restore(state);
@@ -1239,6 +1273,7 @@ export class Engine {
       throw e;
     }
     this.flowsById.set(id, flow);
+    this.host.reportRefits();
     return flow;
   }
 
@@ -1452,8 +1487,8 @@ export class Engine {
     if (values) {
       // The engine's own registry takes the save wholesale. A game's registry may hold values the game
       // loaded for other engines, still waiting to be claimed: add to those, never replace them.
-      if (this.host.ownsRegistry) reg.load(values);
-      else reg.load(values, { keepParked: true });
+      if (this.host.ownsRegistry) reg.load(values, { refit: true });
+      else reg.load(values, { keepParked: true, refit: true });
     }
     this.host.sharedVisits.clear();
     for (const [id, n] of Object.entries(save.sharedVisits ?? {})) this.host.sharedVisits.set(id, n);
@@ -1464,6 +1499,7 @@ export class Engine {
       flow.restore(snap);
       this.flowsById.set(id, flow);
     }
+    this.host.reportRefits();
   }
 }
 
@@ -2697,6 +2733,7 @@ export class Flow {
     const key = keys.flowGlobals(this.id);
     this.host.registry.mountOwned(key, this.local, { owner: OWNER });
     this.registered.add(key);
+    this.host.reportRefits();
   }
 
   /** @internal Remove every bag this flow registered; with `keep`, their values wait in the registry for
@@ -2722,6 +2759,7 @@ export class Flow {
     // and clones the default so two bags from one declaration set never share a mutable flags array.
     const props = this.host.bundle.scenes[s]?.sceneProps ?? [];
     const journal = this.host.journal;
+    const mounted = !this.sceneBags.has(s) || !this.host.stageBags.has(s);
     if (!this.sceneBags.has(s)) {
       const bag = new PropertyBag(props.filter((d) => !shared.has(d.name.toLowerCase())) as never, { pathPrefix: "@scene." });
       const key = keys.flowScene(this.id, s);
@@ -2747,6 +2785,7 @@ export class Flow {
         this.host.stageBags.delete(s);
       });
     }
+    if (mounted) this.host.reportRefits();   // a bag that claimed values a refitting load parked says what it put back
   }
 
   /**

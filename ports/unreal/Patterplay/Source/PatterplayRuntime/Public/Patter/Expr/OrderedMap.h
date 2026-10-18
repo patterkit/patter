@@ -15,8 +15,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k88b76cef_ORDEREDMAP_H) && WILDWINTER_EXPR_KERNEL == 0x88b76cef
-#define WILDWINTER_EXPR_k88b76cef_ORDEREDMAP_H
+#if !defined(WILDWINTER_EXPR_k1a333a0e_ORDEREDMAP_H) && WILDWINTER_EXPR_KERNEL == 0x1a333a0e
+#define WILDWINTER_EXPR_k1a333a0e_ORDEREDMAP_H
 
 #include <cstddef>
 #include <string>
@@ -26,7 +26,7 @@
 
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k88b76cef
+namespace wildwinter { namespace expr { inline namespace k1a333a0e
 {
     template <typename K, typename V>
     class OrderedMap

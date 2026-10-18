@@ -38,7 +38,7 @@
     "@patterkit/dialect": "0.2.11",
     "@patterkit/model": "0.14.0",
     "@patterkit/runtime": "0.27.0",
-    "@wildwinter/expr": "^0.5.2",
+    "@wildwinter/expr": "^0.6.0",
     "@wildwinter/toolkit": "^0.1.0",
     "@xmldom/xmldom": "^0.8.15",
     "docx": "^9.7.1",
@@ -47,12 +47,12 @@
     "pdfkit": "^0.19.1"
   },
   "peerDependencies": {
-    "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
   },
   "devDependencies": {
     "@types/pdfkit": "^0.17.6",
     "@wildwinter/game-subtitles": "^0.3.2",
-    "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0",
+    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0",
     "esbuild": "^0.28.2"
   }
 }

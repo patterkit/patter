@@ -162,6 +162,7 @@ namespace patter
                         if (const J* q = field(f, "type")) gf.type = text(*q);
                         if (const J* q = field(f, "default")) { gf.hasDefault = true; gf.def = value(*q); }
                         if (const J* q = field(f, "values")) gf.values = strList(*q);
+                        if (const J* q = field(f, "stages")) gf.stages = strList(*q);
                         if (const J* q = field(f, "purpose")) gf.purpose = text(*q);
                         fields.push_back(gf);
                     });

@@ -12,7 +12,7 @@ import { loadProject, runCoverage, proposeCoverageDrivers } from "../src/index.j
 
 // L_intro → a choice → then a gate on @world.threat (>= 50 → L_high, else L_low).
 // Nothing writes @world.threat, so without a driver L_high is unreachable.
-function makeProject(): string {
+function makeProject(extra?: { decl: unknown; gate: string }): string {
   const dir = mkdtempSync(join(tmpdir(), "patter-cov-drivers-"));
   for (const d of ["scenes", "loc/en"]) mkdirSync(join(dir, d), { recursive: true });
   const w = (p: string, o: unknown) => writeFileSync(join(dir, p), JSON.stringify(o));
@@ -23,6 +23,7 @@ function makeProject(): string {
     start: { scene: "s1" },
     scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [
       { name: "threat", type: "number", default: 0 },
+      ...(extra ? [extra.decl] : []),
     ] }] },
   });
 
@@ -36,7 +37,7 @@ function makeProject(): string {
           { id: "oB", type: "group", prompt: { id: "CTb", kind: "text" },
             children: [{ id: "sB", type: "snippet", beats: [{ id: "L_b", kind: "line", character: "A" }] }] },
         ] },
-        { id: "high", type: "snippet", condition: "@world.threat >= 50",
+        { id: "high", type: "snippet", condition: extra?.gate ?? "@world.threat >= 50",
           beats: [{ id: "L_high", kind: "line", character: "A" }], jump: { to: "END" } },
         { id: "low", type: "snippet", beats: [{ id: "L_low", kind: "line", character: "A" }], jump: { to: "END" } },
       ] },
@@ -82,5 +83,23 @@ describe("coverage input drivers", () => {
     const a = runCoverage(loaded, { runs: 200, seed: 7, drivers });
     const b = runCoverage(loaded, { runs: 200, seed: 7, drivers });
     expect(b).toEqual(a);
+  });
+});
+
+// A quality gate (patter-qualities.md section 9): the stages either side of the gate, in LADDER order. The
+// ladder is chosen so alphabetical order disagrees ("rising" sorts after "opening" but before "settled").
+describe("coverage drivers for a quality", () => {
+  const ladder = ["settled", "opening", "rising", "end"];
+  const proposed = (gate: string) => proposeCoverageDrivers(loadProject(makeProject({
+    decl: { name: "act", type: "quality", stages: ladder }, gate,
+  }))).find((d) => d.ref === "@world.act");
+
+  it("proposes the stages either side of a gate, in ladder order", () => {
+    expect(proposed('@world.act >= "rising"')?.values).toEqual(["opening", "rising", "end"]);
+    expect(proposed('@world.act > "settled"')?.values).toEqual(["settled", "opening"]);
+  });
+
+  it("proposes the whole ladder for a bare reference", () => {
+    expect(proposed('@world.act == @world.act')?.values).toEqual(ladder);
   });
 });

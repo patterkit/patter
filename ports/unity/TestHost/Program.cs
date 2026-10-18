@@ -864,8 +864,14 @@ namespace Patterkit.Patterplay.TestHost
 
         /// <summary>A case's `engineOptions`: the construction options it plays under, for its engine and every
         /// engine a saveLoad / hotSwap makes (they share `opts`). An absent key keeps the engine's default.</summary>
+        /// <summary>What every engine of the running case reported through OnRefit, for expectRefits.</summary>
+        private static readonly List<LoadMisfit> _refits = new List<LoadMisfit>();
+
         private static void ApplyEngineOptions(JsonElement c, EngineOptions opts)
         {
+            // A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list.
+            _refits.Clear();
+            opts.OnRefit = _refits.AddRange;
             if (!c.TryGetProperty("engineOptions", out var eo)) return;
             if (eo.TryGetProperty("replayPromptOnChoose", out var rp)) opts.ReplayPromptOnChoose = rp.GetBoolean();
             if (eo.TryGetProperty("closedCaptions", out var cc)) opts.ClosedCaptions = cc.GetBoolean();
@@ -1125,6 +1131,28 @@ namespace Patterkit.Patterplay.TestHost
                                 bool same = want.ValueKind == JsonValueKind.String ? got is string str && str == want.GetString()
                                     : got is int n && n == want.GetInt32();
                                 if (!same) throw new Exception($"stage {call} {reff}: expected {want.GetRawText()}, got {got}");
+                                break;
+                            }
+                            case "setProperty":
+                            {
+                                // The game's write, with host authority (a game moving @world).
+                                string reff = op.GetProperty("ref").GetString();
+                                var value = ToValue(op.GetProperty("value"));
+                                if (Refused(op)) { ExpectRefused(engine, $"setProperty {reff}", () => engine.SetProperty(reff, value)); break; }
+                                engine.SetProperty(reff, value);
+                                break;
+                            }
+                            case "expectRefits":
+                            {
+                                // What the case's loads put back, in order, as { scope, name, value }.
+                                var got = _refits.Select(m => (object)new Dictionary<string, object>
+                                {
+                                    ["scope"] = m.Scope, ["name"] = m.Name, ["value"] = ValueToObject(m.Value),
+                                }).ToList();
+                                var want = op.GetProperty("expectResult");
+                                if (!MatchArray(got, want))
+                                    throw new Exception($"expectRefits: expected {want.GetRawText()}, got {Dump(got)}");
+                                _refits.Clear();
                                 break;
                             }
                             default:
@@ -1659,6 +1687,7 @@ namespace Patterkit.Patterplay.TestHost
             Type = f.TryGetProperty("type", out var t) ? t.GetString() : null,
             Default = f.TryGetProperty("default", out var df) ? ToValue(df) : null,
             Values = f.TryGetProperty("values", out var vs) ? vs.EnumerateArray().Select(x => x.GetString()).ToList() : null,
+            Stages = f.TryGetProperty("stages", out var st) ? st.EnumerateArray().Select(x => x.GetString()).ToList() : null,
         };
 
         private static Scene ParseScene(JsonElement s)

@@ -172,6 +172,7 @@ namespace Patterkit.Patterplay
             Type = (string)f["type"],
             Default = f["default"] != null ? ToValue(f["default"]) : null,
             Values = f["values"] is JArray vs ? ToStringList(vs) : null,
+            Stages = f["stages"] is JArray st ? ToStringList(st) : null,
             Purpose = f["purpose"]?.Type == JTokenType.String && (string)f["purpose"] != "" ? (string)f["purpose"] : null,
         };
 

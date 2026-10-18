@@ -6,7 +6,7 @@
 import { readFile } from "node:fs/promises";
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, isAbsolute, relative, resolve, sep } from "node:path";
-import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, renameStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
+import { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, defaultBundlePath, bundleOutputPath, compileLoaded, planBuild, audioManifestWrite, runExport, runExportFull, runExportHtml, runExportWeb, runInit, runPack, runUnpack, runUnpackMerge, vcsConfigWrites, currentBundlePosture, runValidate, applyWrites, runSearch, runResolve, runStatusBrowse, runPropertyUsage, runTagBrowse, listProjectTags, runReplace, renameStage, renameGameDataStage, stageDialect, stageGateCount, planPins, runReport, runReportXlsx, runCoverageAsync, proposeCoverageDrivers as proposeDrivers,
   extractLoc, applyLoc, catalogToJson, jsonToCatalog, catalogToPo, poToCatalog, catalogToXlsx, xlsxToCatalog,
   runVoiceScript, voiceScriptToXlsx, runScriptDoc, scriptToDocx, scriptToPdf,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, readHandoffs, handoffWrite,
@@ -1522,6 +1522,9 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
         base.fix = { kind: "retarget-jump", snippetId: i.id };
       } else if (i.code === "missing-prompt" && i.id) {
         base.fix = { kind: "add-prompt", optionId: i.id };
+      } else if (i.code === "invalid-gamedata-value" && i.id && i.offLadder) {
+        // A stage the field's ladder no longer has: only the writer knows where the value belongs now.
+        base.fix = { kind: "pick-gamedata-stage", nodeId: i.id, field: i.offLadder.field, bad: i.offLadder.bad, options: i.offLadder.options };
       } else if (i.code === "unknown-qualifier" && i.id) {
         // Pick a qualifier that is in the list (or none) for the line: a surface edit, done in the renderer.
         const bad = /qualifier '([^']*)'/.exec(i.message)?.[1] ?? "";
@@ -1982,6 +1985,11 @@ function stageRenameWrites(renames: StageRenameDto[], base: { path: string; cont
   const touched = new Set<Scene>();
   let expressions = 0;
   for (const r of renames) {
+    if (r.gameData) {
+      // A quality game-data field: its nodes' values follow; no expression reads game data.
+      for (const scene of renameGameDataStage(scenes, r.gameData, r.name, r.from, r.to).scenes) touched.add(scene);
+      continue;
+    }
     const result = renameStage(scenes, { scope: r.scope, name: r.name, ...(r.scene ? { scene: r.scene } : {}) }, r.from, r.to, dialect);
     expressions += result.expressions;
     for (const scene of result.scenes) touched.add(scene);

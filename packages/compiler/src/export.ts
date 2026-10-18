@@ -13,7 +13,8 @@ import type {
   Bundle, BundleCastMember, BundleQualifier, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
   ProjectFile, Scene, Block, Group, Snippet, Effect, LocaleFile,
 } from "@patterkit/model";
-import type { ScopeRegistrySpec } from "@wildwinter/scoperegistry";
+import { defaultFor } from "@wildwinter/scoperegistry";
+import type { ScalarValue, ScopeRegistrySpec } from "@wildwinter/scoperegistry";
 import type { MergedScopes } from "@wildwinter/scoperegistry/scopes";
 import { canonicalStringify, hash32 } from "@patterkit/core";
 import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/dialect";
@@ -134,6 +135,20 @@ function externalScopesIn(scenes: Record<string, CompiledScene>, external: Reado
   return [...found].sort();
 }
 
+/**
+ * Declarations as the bundle carries them: each with its default, the one it was given or else its type's by
+ * the kernel's `defaultFor` (false, 0, "", the first enum value, no flags, the first stage). A default is
+ * optional in source and resolved here, for properties, scene properties and gameData fields alike (the family's
+ * rule, ruled 2026-10-18), so a host always reads one and keeps no defaults table of its own. Only the bundle's
+ * own copy is resolved: the content hashes stay over the source as written. A host scope's declarations are not
+ * the story's to resolve: the game supplies those values.
+ */
+function resolved<D extends { type: string; default?: ScalarValue; values?: string[]; stages?: string[] }>(decls: D[]): D[];
+function resolved<D extends { type: string; default?: ScalarValue; values?: string[]; stages?: string[] }>(decls: D[] | undefined): D[] | undefined;
+function resolved<D extends { type: string; default?: ScalarValue; values?: string[]; stages?: string[] }>(decls: D[] | undefined): D[] | undefined {
+  return decls?.map((d) => (d.default === undefined ? { ...d, default: defaultFor(d) } : d));
+}
+
 /** Compile a project's source into the runtime bundle. */
 export function exportBundle(input: ExportInput): Bundle {
   const { project, scenes, locales = [], includeLocales } = input;
@@ -228,13 +243,18 @@ export function exportBundle(input: ExportInput): Bundle {
     // The project's own line-padding default, only when it sets one: absent, every runtime uses the built-in one.
     ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
 
-    properties: project.properties,
+    properties: resolved(project.properties),
+    // A host scope's declarations ship as written: there, "no default" is the game's to supply, and saying
+    // so is what an integrator reads the bundle for.
     scopeRegistry: hostScopes,
-    gameDataFields: project.gameDataFields,
+    gameDataFields: project.gameDataFields && Object.fromEntries(
+      Object.entries(project.gameDataFields).map(([kind, fields]) => [kind, resolved(fields)]),
+    ) as typeof project.gameDataFields,
     // Closed-caption delimiters ride along only when the project pins a non-default pair (#214); the
     // runtime falls back to `[` / `]` when absent, so default projects keep their exact prior bundle.
     ...(project.closedCaptions ? { closedCaptions: project.closedCaptions } : {}),
-    scenes: scenesOut,
+    scenes: Object.fromEntries(Object.entries(scenesOut).map(([id, sc]) =>
+      [id, sc.sceneProps ? { ...sc, sceneProps: resolved(sc.sceneProps) } : sc])),
     strings,
     // Other engines' scopes the content names, so the engine can say when the game has not registered one.
     ...(externalScopes.length > 0 ? { externalScopes } : {}),

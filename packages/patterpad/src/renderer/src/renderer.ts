@@ -55,7 +55,7 @@ import "@wildwinter/app-shell/save.css"; // the indicator's three states
 import "@wildwinter/app-shell/stepper.css"; // the shape both bottom bars are made of
 import "@wildwinter/app-shell/about.css"; // a shared module carries its own CSS
 import "@wildwinter/app-shell/toast.css"; // the transient remark, drawn one way for both apps
-import { toast } from "@wildwinter/app-shell";
+import { stageGateNote, toast } from "@wildwinter/app-shell";
 import { landed } from "./results.js";
 import { fileSafeName } from "../../shared/file-name.js";
 // The welcome, the locked-document notice, the long-job strip, the updater's view and the small idioms
@@ -945,6 +945,7 @@ function fixLabel(fix: NonNullable<Problem["fix"]>): string {
   if (fix.kind === "add-prompt") return "Add a label";
   if (fix.kind === "pick-enum-value") return `Pick a valid value…`;
   if (fix.kind === "pick-qualifier") return "Pick a qualifier…";
+  if (fix.kind === "pick-gamedata-stage") return "Choose a stage…";
   return "Fix";
 }
 
@@ -1088,6 +1089,20 @@ async function applyCurrentFix(): Promise<void> {
     openValuePicker({
       anchor, title: `Instead of “${fix.bad}”`, values: fix.options,
       onPick: async (v) => { if (surface?.setCondition(nodeId, rewriteEnumValue(fix.src, fix.bad, v))) { await save(); await refreshProblems(); } },
+    });
+    return;
+  }
+  if (fix.kind === "pick-gamedata-stage") {
+    // Surface edit: put the node's game-data value back on its field's ladder, save, re-validate. The node
+    // may be in another scene: open it first, as Go to issue would.
+    const p = problems[problemAt];
+    openValuePicker({
+      anchor, title: `Instead of “${fix.bad}”`, values: fix.options,
+      onPick: async (stage) => {
+        if (p?.sceneId && p.sceneId !== currentSceneId) await loadScene(p.sceneId);
+        surface?.setGameData(fix.nodeId, fix.field, stage);
+        await save(); await refreshProblems();
+      },
     });
     return;
   }
@@ -2971,9 +2986,7 @@ async function openProjectSettings(initialTab = "general"): Promise<void> {
  *  they mean though no value moves. Empty when none do. */
 async function fillStageNote(note: HTMLElement, target: { scope: string; name: string; scene?: string }): Promise<void> {
   if (!target.name) { note.textContent = ""; return; }
-  const n = await window.patter.stageGates(target);
-  note.textContent = n === 0 ? ""
-    : `${plural(n, "condition orders", "conditions order")} this quality by its stages, so the new order changes what ${n === 1 ? "it means" : "they mean"}.`;
+  note.textContent = stageGateNote(await window.patter.stageGates(target));   // the family's one wording
 }
 
 /** Save is clicked and every section's gate passed: read the sections back and persist. False when the
@@ -2990,7 +3003,12 @@ async function saveSettingsFromDialog(): Promise<boolean> {
     buildBundle: l.build.value.trim(), buildLocalisation: l.buildLocales.value as "embedded" | "ids", buildSourceDebug: l.buildSourceDebug.checked,
     ...l.langs.value(), gameDataFields: l.gd.value(),
     properties: read.s.properties, // @patter lives in the Properties document now; pass the current set through untouched
-    ...l.world.value(), ...(l.world.stageRenames().length ? { stageRenames: l.world.stageRenames() } : {}), cast: l.cast.value(),
+    ...l.world.value(), ...(() => {
+      // Stages renamed in place on World properties and on game-data fields: the save carries each into
+      // every value that names it, in the same batch as the declarations.
+      const stageRenames = [...l.world.stageRenames(), ...l.gd.stageRenames()];
+      return stageRenames.length ? { stageRenames } : {};
+    })(), cast: l.cast.value(),
     qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(), speakerPattern: l.qualifiers.pattern(),
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),

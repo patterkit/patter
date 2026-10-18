@@ -13,12 +13,18 @@ define up front.
 
 1. **Define the fields once.** In the project, you define fields grouped by node type
    (scene, block, snippet, line, text, game event). Each field has a name, a type
-   (`text`, `multiline`, `number`, `boolean`, or `enum`), a default, an optional set of
-   enum values, and a note on what it's for.
+   (`text`, `multiline`, `number`, `boolean`, `enum`, `flags`, or `quality`), an optional
+   default, the values of an enum or flags field, the stages of a quality field in order,
+   and a note on what it's for. Left out, a default is the type's own: false, 0, empty
+   text, an enum's first value, no flags, a quality's first stage. The same seven types
+   are Storyletter's card fields.
 2. **Fill in values per node.** Any node (a scene, block, group, snippet, jump, or
    beat) can carry a `gameData` map, and it only stores the values that *differ* from
    the field default. A reader fills in the rest from the defaults as it reads. Change a
-   default and every node that didn't override it follows along.
+   default and every node that didn't override it follows along. Each value is checked
+   against its field, so a typo in an enum or a stage you've since deleted shows as a
+   problem, with a fix that offers the stages. Rename a stage and every value naming it
+   follows.
 
 The runtime never looks inside Game Data: to Patter it's just opaque data, and it's
 entirely yours. Your host reads it off each beat to drive audio, camera, portraits,

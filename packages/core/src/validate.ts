@@ -16,10 +16,11 @@
 // ---------------------------------------------------------------------------
 
 import { walkNodes, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, DEFAULT_DOCUMENTATION_CLASSES, projectQualifiers, usedSpeakerPairs, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
-import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, ScalarValue, AuthoringFile } from "@patterkit/model";
+import type { ProjectFile, Scene, Block, Group, Snippet, PropertyDecl, AuthoringFile, GameData, GameDataField, GameDataNodeKind } from "@patterkit/model";
 import { isValidGameId, effectiveGameId } from "@patterkit/model";
 import { isValidPropertyName, propertyNameify, RESERVED_PROPERTY_NAMES } from "@patterkit/model";
-import { qualityDeclarationProblems } from "@wildwinter/expr";
+import { qualityDeclarationProblems, stagesEitherSide, valueFits } from "@wildwinter/expr";
+import type { QualityDeclarationProblem } from "@wildwinter/expr";
 
 export interface ValidationIssue {
   code:
@@ -56,6 +57,7 @@ export interface ValidationIssue {
     | "unknown-doc-class"
     | "invalid-tag"
     | "invalid-gamedata-field"
+    | "invalid-gamedata-value"
     | "jump-cycle";
   message: string;
   /** Id of the offending node/beat, where applicable. */
@@ -63,6 +65,9 @@ export interface ValidationIssue {
   /** Absent means an error: the project should not be built. A warning still compiles and plays (a choice
    *  that can run dry gathers or falls through at runtime), and every front end shows it as one. */
   severity?: "warning";
+  /** A quality gameData value off its field's ladder (a deleted or renamed stage, most often): the field, the
+   *  value, and the stages to offer in its place, in ladder order. An editor's quick fix reads it. */
+  offLadder?: { field: string; bad: string; options: string[] };
 }
 
 export interface ProjectInput {
@@ -249,6 +254,7 @@ export function validateProject(input: ProjectInput): ValidationIssue[] {
   };
 
   validateProjectFile(project, issues);
+  validateGameDataValues(project, scenes, issues);
 
   for (const scene of scenes) {
     seeId(scene.id, "scene", "project");
@@ -576,9 +582,73 @@ function validateProjectFile(project: ProjectFile, issues: ValidationIssue[]): v
       if (!f.name.trim()) issues.push({ code: "invalid-gamedata-field", message: `${kind} gameData field has no name` });
       else if (seen.has(key)) issues.push({ code: "invalid-gamedata-field", message: `${kind} gameData field '${f.name}' is declared more than once` });
       else seen.add(key);
+      const subject = `${kind} gameData field '${f.name}'`;
       if (f.type === "enum" && !(f.values && f.values.length)) {
-        issues.push({ code: "invalid-gamedata-field", message: `${kind} gameData field '${f.name}' is an enum but lists no values` });
+        issues.push({ code: "invalid-gamedata-field", message: `${subject} is an enum but lists no values` });
+      } else if (f.type === "flags" && !(f.values && f.values.length)) {
+        issues.push({ code: "invalid-gamedata-field", message: `${subject} is flags but lists no values` });
       }
+      if (f.type === "quality") {
+        // The family's ladder rule, as a property's (and a Storylets field's) is checked.
+        for (const problem of qualityDeclarationProblems(f.stages, f.default)) {
+          issues.push({ code: "invalid-gamedata-field", message: `${subject} ${qualityProblemWords(problem)}` });
+        }
+      } else if (f.default !== undefined && !valueFits(f, f.default, { noneChosen: true })) {
+        // A default may be left out (the type's fills in, written into the bundle); one that is given has to
+        // fit. An enum's may be "", none chosen.
+        issues.push({ code: "invalid-gamedata-field",
+          message: `${subject} default ${JSON.stringify(f.default)} does not match type '${f.type}'` });
+      }
+    }
+  }
+}
+
+/** A quality declaration's problem, in Patter's words, after the subject. */
+function qualityProblemWords(problem: QualityDeclarationProblem): string {
+  switch (problem.kind) {
+    case "too-few-stages": return `is a quality but declares ${problem.count === 0 ? "no stages" : "only one stage"} (a ladder needs at least two)`;
+    case "empty-stage": return "has an empty stage name";
+    case "duplicate-stage": return `declares stage '${problem.stage}' more than once`;
+    case "default-not-a-stage": return `default ${JSON.stringify(problem.value)} is not one of its stages`;
+  }
+}
+
+/**
+ * Every node's gameData values against the fields its node type declares (patter-qualities.md section 1,
+ * family parity item 8): a value has to fit its field's type, an enum's values, a flags field's flags and a
+ * quality's ladder, by the kernel's one fit check. A quality value off its ladder (what a deleted stage leaves)
+ * says so in its own words and carries the stages to offer instead. A key no field declares is left alone: it
+ * is the game's own data, and Patterpad keeps it.
+ */
+function validateGameDataValues(project: ProjectFile, scenes: Scene[], issues: ValidationIssue[]): void {
+  const declared = project.gameDataFields ?? {};
+  const check = (kind: GameDataNodeKind, id: string | undefined, values: GameData | undefined): void => {
+    if (!values) return;
+    const fields = declared[kind] ?? [];
+    if (fields.length === 0) return;
+    for (const [name, value] of Object.entries(values)) {
+      const f: GameDataField | undefined = fields.find((d) => d.name === name);
+      if (!f || valueFits(f, value, { noneChosen: true })) continue;
+      const where = `${kind} '${id ?? "?"}'`;
+      if (f.type === "quality" && typeof value === "string") {
+        issues.push({ code: "invalid-gamedata-value", id,
+          message: `${where} gameData '${name}' is '${value}', which is not one of its stages`,
+          offLadder: { field: name, bad: value, options: stagesEitherSide(f, value) } });
+      } else {
+        issues.push({ code: "invalid-gamedata-value", id,
+          message: `${where} gameData '${name}' ${JSON.stringify(value)} does not match type '${f.type}'` });
+      }
+    }
+  };
+  for (const scene of scenes) {
+    check("scene", scene.id, scene.gameData);
+    for (const block of scene.blocks ?? []) {
+      check("block", block.id, block.gameData);
+      walkNodes<Group | Snippet>(block.children ?? [], (node) => {
+        if (node.type !== "snippet") return;
+        check("snippet", node.id, node.gameData);
+        for (const beat of node.beats ?? []) check(beat.kind, beat.id, (beat as { gameData?: GameData }).gameData);
+      });
     }
   }
 }
@@ -727,23 +797,9 @@ function checkDecls(decls: PropertyDecl[] | undefined, where: string, issues: Va
         }
       }
     }
-    if (decl.default !== undefined && !defaultMatchesType(decl.default, decl)) {
+    if (decl.default !== undefined && !valueFits(decl, decl.default)) {
       issues.push({ code: "invalid-declaration",
         message: `${where}: '${decl.name}' default ${JSON.stringify(decl.default)} does not match type '${decl.type}'` });
     }
-  }
-}
-
-function defaultMatchesType(value: ScalarValue, decl: PropertyDecl): boolean {
-  switch (decl.type) {
-    case "boolean": return typeof value === "boolean";
-    case "number": return typeof value === "number";
-    case "string": return typeof value === "string";
-    case "enum": return typeof value === "string" && (decl.values?.includes(value) ?? true);
-    case "flags":
-      return Array.isArray(value) && value.every((v) => typeof v === "string" && (decl.values?.includes(v) ?? true));
-    case "quality":
-      return typeof value === "string"
-        && !qualityDeclarationProblems(decl.stages, value).some((p) => p.kind === "default-not-a-stage");
   }
 }

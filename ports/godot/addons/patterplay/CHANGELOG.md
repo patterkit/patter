@@ -6,6 +6,23 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an
+  enum value or a flag deleted since the save, or a value of another type) goes back to its default as
+  the save loads, instead of reaching the first gate that orders it. Each is reported: `"on_refit"` in the options, a `Callable` taking an Array of `{scope, name, value}`; unset, each is `push_warning`ed. A hot
+  swap onto a game's shared registry refits this engine's values too, as does a hot swap that falls
+  back on a fresh engine. An engine reports only its own scopes' values; the rest of a shared
+  registry's stay for their owners. Every load refits, through the
+  kernel's refitting registry load.
+- **Game data takes flags and quality**, the family's field types: a game-data field's declaration
+  carries `stages` for a quality, and the stage helpers (`PatterExpr.compare_stages(field, a, b)` and its two siblings) take the field Dictionary.
+
+- Kernel `k1a333a0e`, vendored from `@wildwinter/expr`: the value check, the type defaults (`text` and
+  `multiline` seed `""`) and the refitting load, in every port. The kernel id changes, so the Storylet
+  Engine must ship the same kernel in the same release round.
+- The test runner refuses a corpus op it does not know, as the C# and C++ hosts do, rather than passing it.
+
 ## [0.27.0] - 2026-10-17
 
 ### Added

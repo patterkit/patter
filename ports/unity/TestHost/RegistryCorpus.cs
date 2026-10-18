@@ -243,7 +243,46 @@ namespace Wildwinter.Expr.Testing
                     {
                         var blob = ToBlob(step.GetOrDefault("blob"));
                         bool keepParked = step.GetOrDefault("keepParked") is bool kp && kp;
-                        Attempt(at, null, () => r.Load(blob, keepParked));
+                        bool refit = step.GetOrDefault("refit") is bool rf && rf;
+                        Attempt(at, null, () => r.Load(blob, keepParked, refit));
+                        break;
+                    }
+
+                    case "misfits":
+                    {
+                        var got = new List<object>();
+                        List<string> only = step.GetOrDefault("only") is List<object> o ? o.ConvertAll(x => (string)x) : null;
+                        Func<string, bool> pick = only == null ? null
+                            : scope => only.Exists(k => scope == k || scope.StartsWith(k + "/", StringComparison.Ordinal));
+                        foreach (var m in r.TakeMisfits(pick))
+                        {
+                            var row = new OrderedMap<string, object>();
+                            row.Set("scope", m.Scope);
+                            row.Set("name", m.Name);
+                            row.Set("value", Neutral(m.Value));
+                            got.Add(row);
+                        }
+                        var want = Expected(step, "expect");
+                        if (!Same(got, want)) fails.Add($"{at}: misfits {Show(got)}, expected {Show(want)}");
+                        break;
+                    }
+
+                    case "fits":
+                    {
+                        var decl = DeclOf((OrderedMap<string, object>)step.GetOrDefault("decl"));
+                        bool noneChosen = step.GetOrDefault("noneChosen") is bool nc && nc;
+                        bool got = ValueFit.Fits(decl, ToValue(step.GetOrDefault("value")), noneChosen);
+                        bool want = step.GetOrDefault("expect") is bool w && w;
+                        if (got != want) fails.Add($"{at}: {Show(step.GetOrDefault("value"))} fits {decl.Type} is {Js(got)}, expected {Js(want)}");
+                        break;
+                    }
+
+                    case "default":
+                    {
+                        var decl = DeclOf((OrderedMap<string, object>)step.GetOrDefault("decl"));
+                        var got = Neutral(decl.DefaultOrTypeDefault());
+                        var want = Expected(step, "expect");
+                        if (!Same(got, want)) fails.Add($"{at}: {decl.Type} defaults to {Show(got)}, expected {Show(want)}");
                         break;
                     }
 
@@ -408,20 +447,19 @@ namespace Wildwinter.Expr.Testing
         {
             var list = new List<ScopeDeclaration>();
             if (!(step.GetOrDefault("declarations") is List<object> ds)) return list;
-            foreach (OrderedMap<string, object> d in ds)
-            {
-                list.Add(new ScopeDeclaration
-                {
-                    Name = Str(d, "name"),
-                    Type = Str(d, "type"),
-                    Default = d.ContainsKey("default") ? ToValue(d.GetOrDefault("default")) : null,
-                    Values = Strings(d.GetOrDefault("values")),
-                    Stages = Strings(d.GetOrDefault("stages")),
-                    Writable = d.GetOrDefault("writable") as bool?,
-                });
-            }
+            foreach (OrderedMap<string, object> d in ds) list.Add(DeclOf(d));
             return list;
         }
+
+        private static ScopeDeclaration DeclOf(OrderedMap<string, object> d) => new ScopeDeclaration
+        {
+            Name = Str(d, "name"),
+            Type = Str(d, "type"),
+            Default = d.ContainsKey("default") ? ToValue(d.GetOrDefault("default")) : null,
+            Values = Strings(d.GetOrDefault("values")),
+            Stages = Strings(d.GetOrDefault("stages")),
+            Writable = d.GetOrDefault("writable") as bool?,
+        };
 
         private static List<string> Strings(object node)
         {

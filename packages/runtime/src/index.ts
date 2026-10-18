@@ -20,7 +20,7 @@ export { DEFAULT_PAD_AFTER } from "@patterkit/model";
 // The examiner row listProperties() returns, for the same reason: it is the shared kernel's
 // (@wildwinter/scoperegistry, the property implementation both product families use), and a
 // host typing a row should not have to depend on the kernel to name it.
-export type { PropertyRow } from "@wildwinter/scoperegistry";
+export type { LoadMisfit, PropertyRow } from "@wildwinter/scoperegistry";
 export type {
   StepResult, AdvanceToStopResult, ChoiceOption, EngineOptions, OpenFlowOptions, HostScope, WorldResolver,
   EngineSave, SaveGame, FlowSnapshot, FlowState, FlowValues, FlowCursor, SelectorSnapshot, SavedChoice, SavedChoiceOption, SavedChoicePrompt, StackFrame, SaveEnvelope,

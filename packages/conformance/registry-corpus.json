@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "cases": [
     {
       "name": "an owned scope seeds each property from its default, else its type's",
@@ -2611,6 +2611,1307 @@
           "scope": "world",
           "name": "valueOf",
           "expect": 5
+        }
+      ]
+    },
+    {
+      "name": "a plain value fits by its type",
+      "steps": [
+        {
+          "op": "fits",
+          "decl": {
+            "name": "hp",
+            "type": "number"
+          },
+          "value": 3,
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "hp",
+            "type": "number"
+          },
+          "value": "3",
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "met",
+            "type": "boolean"
+          },
+          "value": true,
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "met",
+            "type": "boolean"
+          },
+          "value": 1,
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "title",
+            "type": "string"
+          },
+          "value": "x",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "title",
+            "type": "text"
+          },
+          "value": "",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "title",
+            "type": "multiline"
+          },
+          "value": "a\nb",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "title",
+            "type": "text"
+          },
+          "value": 5,
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "title",
+            "type": "string"
+          },
+          "value": [
+            "x"
+          ],
+          "expect": false
+        }
+      ]
+    },
+    {
+      "name": "an enum, a flags value and a quality fit only their own vocabulary",
+      "steps": [
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ]
+          },
+          "value": "tense",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ]
+          },
+          "value": "loud",
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ]
+          },
+          "value": 1,
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "marks",
+            "type": "flags",
+            "values": [
+              "a",
+              "b"
+            ]
+          },
+          "value": [
+            "b",
+            "a"
+          ],
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "marks",
+            "type": "flags",
+            "values": [
+              "a",
+              "b"
+            ]
+          },
+          "value": [],
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "marks",
+            "type": "flags",
+            "values": [
+              "a",
+              "b"
+            ]
+          },
+          "value": [
+            "a",
+            "c"
+          ],
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "marks",
+            "type": "flags",
+            "values": [
+              "a",
+              "b"
+            ]
+          },
+          "value": "a",
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": [
+              "stranger",
+              "friend",
+              "kin"
+            ]
+          },
+          "value": "friend",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": [
+              "stranger",
+              "friend",
+              "kin"
+            ]
+          },
+          "value": "enemy",
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": [
+              "stranger",
+              "friend",
+              "kin"
+            ]
+          },
+          "value": 1,
+          "expect": false
+        }
+      ]
+    },
+    {
+      "name": "an enum holds none chosen only when asked, and a quality never does",
+      "steps": [
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm"
+            ]
+          },
+          "value": "",
+          "expect": false
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm"
+            ]
+          },
+          "value": "",
+          "noneChosen": true,
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": [
+              "stranger",
+              "friend"
+            ]
+          },
+          "value": "",
+          "noneChosen": true,
+          "expect": false
+        }
+      ]
+    },
+    {
+      "name": "a declaration listing no vocabulary, or of a type the build does not know, constrains nothing past the type",
+      "steps": [
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum"
+          },
+          "value": "anything",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "marks",
+            "type": "flags"
+          },
+          "value": [
+            "z"
+          ],
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "standing",
+            "type": "quality"
+          },
+          "value": "anywhere",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "hue",
+            "type": "colour"
+          },
+          "value": 7,
+          "expect": true
+        }
+      ]
+    },
+    {
+      "name": "a declaration without a default seeds its type's",
+      "steps": [
+        {
+          "op": "default",
+          "decl": {
+            "name": "met",
+            "type": "boolean"
+          },
+          "expect": false
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "hp",
+            "type": "number"
+          },
+          "expect": 0
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "title",
+            "type": "string"
+          },
+          "expect": ""
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "title",
+            "type": "text"
+          },
+          "expect": ""
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "title",
+            "type": "multiline"
+          },
+          "expect": ""
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": [
+              "calm",
+              "tense"
+            ]
+          },
+          "expect": "calm"
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "mood",
+            "type": "enum"
+          },
+          "expect": ""
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "marks",
+            "type": "flags",
+            "values": [
+              "a",
+              "b"
+            ]
+          },
+          "expect": []
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": [
+              "stranger",
+              "friend",
+              "kin"
+            ]
+          },
+          "expect": "stranger"
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "hue",
+            "type": "colour"
+          },
+          "expect": false
+        }
+      ]
+    },
+    {
+      "name": "a given default is the default",
+      "steps": [
+        {
+          "op": "default",
+          "decl": {
+            "name": "hp",
+            "type": "number",
+            "default": 5
+          },
+          "expect": 5
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": [
+              "stranger",
+              "friend",
+              "kin"
+            ],
+            "default": "friend"
+          },
+          "expect": "friend"
+        },
+        {
+          "op": "default",
+          "decl": {
+            "name": "marks",
+            "type": "flags",
+            "values": [
+              "a",
+              "b"
+            ],
+            "default": [
+              "b"
+            ]
+          },
+          "expect": [
+            "b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a refitting load puts a deleted stage, enum value or flag back to the default, and reports each",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            },
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend",
+                "kin"
+              ],
+              "default": "friend"
+            },
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ]
+            },
+            {
+              "name": "marks",
+              "type": "flags",
+              "values": [
+                "a",
+                "b"
+              ],
+              "default": [
+                "b"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "game": {
+              "marks": [
+                "a",
+                "c"
+              ],
+              "mood": "loud",
+              "standing": "enemy",
+              "hp": 3
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 3
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "standing",
+          "expect": "friend"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "mood",
+          "expect": "calm"
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "marks",
+          "expect": [
+            "b"
+          ]
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "game",
+              "name": "standing",
+              "value": "enemy"
+            },
+            {
+              "scope": "game",
+              "name": "mood",
+              "value": "loud"
+            },
+            {
+              "scope": "game",
+              "name": "marks",
+              "value": [
+                "a",
+                "c"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a refitting load puts a value of the wrong type back too, and keeps every value that fits",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            },
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "game": {
+              "hp": "lots",
+              "standing": "friend"
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "hp",
+          "expect": 10
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "standing",
+          "expect": "friend"
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "game",
+              "name": "hp",
+              "value": "lots"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "taking the misfits empties the list",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "game": {
+              "standing": "enemy"
+            }
+          }
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "game",
+              "name": "standing",
+              "value": "enemy"
+            }
+          ]
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "a plain load keeps a stage the build no longer has, and reports nothing",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "blob": {
+            "game": {
+              "standing": "enemy"
+            }
+          }
+        },
+        {
+          "op": "get",
+          "scope": "game",
+          "name": "standing",
+          "expect": "enemy"
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "a refitting load still lands an undeclared value as a stray, which is no misfit",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "game": {
+              "hp": 4,
+              "gone": "x"
+            }
+          }
+        },
+        {
+          "op": "save",
+          "expect": {
+            "game": {
+              "hp": 4,
+              "gone": "x"
+            }
+          }
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "a parked section keeps the refit for its claim, and the claim reports the misfit",
+      "steps": [
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "here": {
+              "standing": "enemy",
+              "hp": 2
+            }
+          }
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        },
+        {
+          "op": "mount",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 10
+            },
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "standing",
+          "expect": "stranger"
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "hp",
+          "expect": 2
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "here",
+              "name": "standing",
+              "value": "enemy"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a section parked by a plain load is claimed as it was saved",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "here": {
+              "standing": "enemy"
+            }
+          }
+        },
+        {
+          "op": "owned",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "standing",
+              "type": "quality",
+              "stages": [
+                "stranger",
+                "friend"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "standing",
+          "expect": "enemy"
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "a plain load keeping parked sections replaces a refitting one's, and its claim is plain",
+      "steps": [
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "here": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "load",
+          "keepParked": true,
+          "blob": {
+            "here": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "mood",
+          "expect": "loud"
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "values a removal keeps are claimed as they were, whatever load first brought them",
+      "steps": [
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "here": {
+              "mood": "tense"
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "remove",
+          "token": "here",
+          "keep": true
+        },
+        {
+          "op": "mount",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "mood",
+          "expect": "tense"
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "discarding a parked section takes its refit with it",
+      "steps": [
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "here": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "discardParked",
+          "prefix": "her"
+        },
+        {
+          "op": "load",
+          "keepParked": true,
+          "blob": {
+            "here": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "mood",
+          "expect": "loud"
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "a load that does not keep parked sections clears their refits too",
+      "steps": [
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "here": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "load",
+          "blob": {
+            "a": {
+              "x": 1
+            }
+          }
+        },
+        {
+          "op": "load",
+          "keepParked": true,
+          "blob": {
+            "here": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "here",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "here",
+          "name": "mood",
+          "expect": "loud"
+        },
+        {
+          "op": "misfits",
+          "expect": []
+        }
+      ]
+    },
+    {
+      "name": "a refitting load that keeps parked sections leaves the others' claims plain",
+      "steps": [
+        {
+          "op": "load",
+          "blob": {
+            "a": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "load",
+          "keepParked": true,
+          "refit": true,
+          "blob": {
+            "b": {
+              "mood": "loud"
+            }
+          }
+        },
+        {
+          "op": "mount",
+          "token": "a",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "mount",
+          "token": "b",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "get",
+          "scope": "a",
+          "name": "mood",
+          "expect": "loud"
+        },
+        {
+          "op": "get",
+          "scope": "b",
+          "name": "mood",
+          "expect": "calm"
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "b",
+              "name": "mood",
+              "value": "loud"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "misfits come in the blob's order of sections, and each section's in declaration order",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "a",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            },
+            {
+              "name": "hp",
+              "type": "number",
+              "default": 1
+            }
+          ]
+        },
+        {
+          "op": "owned",
+          "token": "b",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "b": {
+              "mood": "loud"
+            },
+            "a": {
+              "hp": "x",
+              "mood": "wild"
+            }
+          }
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "b",
+              "name": "mood",
+              "value": "loud"
+            },
+            {
+              "scope": "a",
+              "name": "mood",
+              "value": "wild"
+            },
+            {
+              "scope": "a",
+              "name": "hp",
+              "value": "x"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "an engine takes only its own scopes' misfits, and leaves the rest for their owners",
+      "steps": [
+        {
+          "op": "owned",
+          "token": "game",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "owned",
+          "token": "eng",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "mount",
+          "token": "eng/flow/a",
+          "declarations": [
+            {
+              "name": "mood",
+              "type": "enum",
+              "values": [
+                "calm"
+              ]
+            }
+          ]
+        },
+        {
+          "op": "load",
+          "refit": true,
+          "blob": {
+            "game": {
+              "mood": "loud"
+            },
+            "eng": {
+              "mood": "wild"
+            },
+            "eng/flow/a": {
+              "mood": "odd"
+            }
+          }
+        },
+        {
+          "op": "misfits",
+          "only": [
+            "eng"
+          ],
+          "expect": [
+            {
+              "scope": "eng",
+              "name": "mood",
+              "value": "wild"
+            },
+            {
+              "scope": "eng/flow/a",
+              "name": "mood",
+              "value": "odd"
+            }
+          ]
+        },
+        {
+          "op": "misfits",
+          "expect": [
+            {
+              "scope": "game",
+              "name": "mood",
+              "value": "loud"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a declaration read from JSON with a null vocabulary constrains nothing past the type",
+      "steps": [
+        {
+          "op": "fits",
+          "decl": {
+            "name": "mood",
+            "type": "enum",
+            "values": null
+          },
+          "value": "anything",
+          "expect": true
+        },
+        {
+          "op": "fits",
+          "decl": {
+            "name": "standing",
+            "type": "quality",
+            "stages": null
+          },
+          "value": "anywhere",
+          "expect": true
         }
       ]
     },

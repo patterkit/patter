@@ -90,6 +90,16 @@ namespace Patterkit.Patterplay
         /// <see cref="Engine.DefaultOnError"/>, so a content bug is never silent. Parity with the JS
         /// runtime's onError.</summary>
         public Action<PlayError> OnError;
+        /// <summary>Called with the saved values a load put back to their defaults because they no longer fit
+        /// their declarations: a stage, an enum value or a flag deleted since the save was taken, or a value of
+        /// another type. Each <see cref="LoadMisfit"/> says where it was (Scope, the registry key), its Name, and
+        /// what the save held. Loads refit, so a stage the build no longer has never reaches a gate that orders
+        /// it. Called after LoadGame, RestoreFlow, HotSwap and each bag a flow makes that claims saved values,
+        /// with what the registry had put back since it last said; a game that loads its own registry passes
+        /// refit too, and hears those here as the engine's bags claim them. Unset, each goes to
+        /// <see cref="Engine.DefaultOnRefit"/>, so a drifted save is never silent. Parity with the JS runtime's
+        /// onRefit.</summary>
+        public Action<List<LoadMisfit>> OnRefit;
         /// <summary>Live game state per host-scope token (`"world"` -> your resolver). Each binding is
         /// registered in the registry as a foreign scope: the game keeps the values, and nothing saves them
         /// but the game. A standalone engine self-backs every token the bundle declares and you do not bind,
@@ -285,6 +295,18 @@ namespace Patterkit.Patterplay
         public Action<string> OnDryChoice;
         /// <summary>The game's EngineOptions.OnError, or null to report through Engine.DefaultOnError.</summary>
         public Action<PlayError> OnError;
+        /// <summary>The game's EngineOptions.OnRefit, or null to report through Engine.DefaultOnRefit.</summary>
+        public Action<List<LoadMisfit>> OnRefit;
+        /// <summary>Say what the registry's refitting loads have put back since it last said.</summary>
+        public void ReportRefits()
+        {
+            // This engine's own keys only: the game's registry may hold other engines' and the game's misfits.
+            var misfits = Registry.TakeMisfits(scope => scope == "patter" || scope.StartsWith("patter/", StringComparison.Ordinal)
+                || SelfBackedTokens.Contains(scope));
+            if (misfits.Count == 0) return;
+            if (OnRefit != null) OnRefit(misfits);
+            else foreach (var m in misfits) Engine.DefaultOnRefit?.Invoke(m);
+        }
         public Bundle Bundle;
         public bool EmitIds; // IDs-only build: emit beat IDs + omit character names (the game localises)
         public Dictionary<string, string> Strings;
@@ -428,6 +450,12 @@ namespace Patterkit.Patterplay
         /// Unity game the warning lands in the Console. Read at the moment of each report, so setting it
         /// reaches engines already built.</summary>
         public static Action<PlayError> DefaultOnError = e => System.Console.Error.WriteLine("[Patterplay] " + e);
+
+        /// <summary>Where a value a load put back goes when the engine was built without
+        /// <see cref="EngineOptions.OnRefit"/>: a "[Patterplay]" warning on standard error, which the Unity
+        /// layer points at Debug.LogWarning, as it does DefaultOnError.</summary>
+        public static Action<LoadMisfit> DefaultOnRefit = m => System.Console.Error.WriteLine(
+            $"[Patterplay] the save's {m.Scope}.{m.Name} was {m.Value?.ToJsonString()}, which no longer fits its declaration; it is back at its default");
 
         /// <summary>The run's ordered decision stream; see Log().</summary>
         private readonly List<LogEntry> _engineLog = new List<LogEntry>();
@@ -587,6 +615,7 @@ namespace Patterkit.Patterplay
                 EngineLog = _engineLog,
                 OnDryChoice = options.OnDryChoice,
                 OnError = options.OnError,
+                OnRefit = options.OnRefit,
                 Bundle = bundle, EmitIds = emitIds, Strings = strings, DefaultStrings = defaultStrings, CastDisplay = castDisplay, QualifierDisplay = qualifierDisplay,
                 SpeakerLabels = speakerLabels, SpeakerPattern = bundle.SpeakerPattern ?? Bundle.DefaultSpeakerPattern,
                 NodeIndex = nodeIndex, BlockToScene = blockToScene, BlockById = blockById, TagIndex = tagIndex,
@@ -605,6 +634,8 @@ namespace Patterkit.Patterplay
             // write whether the scope is bound (a foreign scope's declarations) or self-backed (each owned
             // declaration carries its scope's default). The game's own SetProperty writes with host authority,
             // which that promise never binds (ruled across the family 2026-09-05).
+            // The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
+            _host.ReportRefits();
         }
 
         /// <summary>The active locale (string + character-name lookups resolve in it).</summary>
@@ -667,7 +698,20 @@ namespace Patterkit.Patterplay
             // The replacement registers on the SAME registry, and a standalone engine's replacement is still
             // its own game (so its SaveGame keeps carrying the registry's values).
             var options = _creationOptions.OnRegistry(_host.Registry, _host.OwnsRegistry);
+            // On a game's registry, this engine's own values are parked again to be REFITTED as the replacement
+            // claims them: the edit may have deleted a stage, an enum value or a flag one of them holds, and the
+            // snapshot does not carry the game's registry. A standalone engine's snapshot carries its registry,
+            // which the replacement's load refits.
+            OrderedMap<string, OrderedMap<string, ExprValue>> own = null;
+            if (!_host.OwnsRegistry)
+            {
+                own = new OrderedMap<string, OrderedMap<string, ExprValue>>();
+                var tokens = new HashSet<string>(new[] { "patter" }.Concat(_host.SelfBackedTokens));
+                foreach (var kv in _host.Registry.Save())
+                    if (tokens.Contains(kv.Key) || kv.Key.StartsWith("patter/", StringComparison.Ordinal)) own.Set(kv.Key, kv.Value);
+            }
             Release(true);
+            if (own != null) _host.Registry.Load(own, keepParked: true, refit: true);
             var replacement = new Engine(bundle, options);
             try
             {
@@ -680,6 +724,10 @@ namespace Patterkit.Patterplay
                 // engine and restart each flow at the top of the scene it was in (dropped when that scene is
                 // gone too).
                 replacement.Release(true);
+                // The values the failed load parked go back unrefitted; park the save's own again, refitted, before
+                // the fallback claims them, so a stage the edit deleted is put back here too.
+                var again = _host.OwnsRegistry ? snapshot.Registry : own;
+                if (again != null) _host.Registry.Load(again, keepParked: true, refit: true);
                 var fresh = new Engine(bundle, options);
                 foreach (var kv in snapshot.Flows)
                 {
@@ -1300,8 +1348,8 @@ namespace Patterkit.Patterplay
             {
                 // The engine's own registry takes the save wholesale. A game's registry may hold values the
                 // game loaded for other engines, still waiting to be claimed: add to those, never replace them.
-                if (_host.OwnsRegistry) reg.Load(values);
-                else reg.Load(values, keepParked: true);
+                if (_host.OwnsRegistry) reg.Load(values, refit: true);
+                else reg.Load(values, keepParked: true, refit: true);
             }
             _host.SharedVisits.Clear();
             foreach (var kv in save.SharedVisits ?? new Dictionary<string, int>()) _host.SharedVisits[kv.Key] = kv.Value;
@@ -1313,6 +1361,7 @@ namespace Patterkit.Patterplay
                 flow.Restore(kv.Value);
                 _flows[kv.Key] = flow;
             }
+            _host.ReportRefits();
         }
 
         /// <summary>Take flow <paramref name="id"/> out of the engine as plain data, to be put back later with
@@ -1344,7 +1393,7 @@ namespace Patterkit.Patterplay
             // Anything a load left waiting under this id belonged to a flow that has gone, as when a flow starts.
             string parked = PatterKeys.Flow(id);
             _host.Registry.DiscardParked(parked);
-            _host.Registry.Load(FlowSections(id, state), keepParked: true);
+            _host.Registry.Load(FlowSections(id, state), keepParked: true, refit: true);
             var flow = new Flow(id, _host, _defaultSeed);
             try
             {
@@ -1357,6 +1406,7 @@ namespace Patterkit.Patterplay
                 throw;
             }
             _flows[id] = flow;
+            _host.ReportRefits();
             return flow;
         }
 
@@ -1644,20 +1694,7 @@ namespace Patterkit.Patterplay
             return flat;
         }
 
-        internal static ExprValue PropDefault(PropertyDecl d)
-        {
-            if (d.Default != null) return d.Default;
-            switch (d.Type)
-            {
-                case "boolean": return ExprValue.False;
-                case "number": return ExprValue.Num(0);
-                case "string": return ExprValue.Str("");
-                case "flags": return ExprValue.Flags(new List<string>());
-                case "enum": return ExprValue.Str(d.Values != null && d.Values.Count > 0 ? d.Values[0] : "");
-                case "quality": return ExprValue.Str(d.Stages != null && d.Stages.Count > 0 ? d.Stages[0] : ""); // the ladder's start
-                default: return ExprValue.False;
-            }
-        }
+        internal static ExprValue PropDefault(PropertyDecl d) => ToScopeDecl(d).DefaultOrTypeDefault(); // the kernel's defaultFor
 
         /// <summary>Split a ref ("@name" / "@scope.name") into (scope, lowercased name).</summary>
         internal static (string scope, string name) SplitRef(string refStr, Func<string, bool> isScope)

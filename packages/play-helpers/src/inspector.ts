@@ -13,6 +13,7 @@
 //   // ...later: inspector.destroy();
 // ---------------------------------------------------------------------------
 
+import { rungStrip } from "@wildwinter/app-shell/value-control";
 import type { Engine, PropertyRow } from "@patterkit/runtime";
 import { serializeState, deserializeState } from "./save.js";
 import type { PropertyValue } from "./properties.js";
@@ -48,6 +49,11 @@ const CSS = `
 .pp-insp-ctl input[type=text],.pp-insp-ctl input[type=number],.pp-insp-ctl select{width:100%;box-sizing:border-box;font:inherit;padding:.15rem .3rem;border:1px solid #cfc7b8;border-radius:6px;background:#fff;color:inherit}
 .pp-insp-reset{flex:0 0 auto;border:1px solid #cfc7b8;background:#fff;border-radius:6px;cursor:pointer;color:#5c6b62;width:1.6rem;height:1.6rem;line-height:1;padding:0}
 .pp-insp-reset:disabled{opacity:.35;cursor:default}
+.pp-insp-ctl .seg{display:inline-flex;flex-wrap:wrap;border:1px solid #cfc7b8;border-radius:6px;overflow:hidden;background:#fff}
+.pp-insp-ctl .seg-opt{background:none;border:0;cursor:pointer;color:#5c6b62;font:400 .78rem/1.3 ui-monospace,monospace;padding:.12rem .4rem}
+.pp-insp-ctl .seg-opt+.seg-opt{border-left:1px solid #cfc7b8}
+.pp-insp-ctl .seg-opt.on{color:#214f4b;background:#dbe8e4;font-weight:600;cursor:default}
+.pp-insp-ctl .shell-rung.stray{color:#9a3b2e;text-decoration:line-through}
 `;
 
 function injectStyle(doc: Document): void {
@@ -152,10 +158,19 @@ export function createPropertyInspector(engine: Engine, opts: PropertyInspectorO
       inp.addEventListener("change", () => commit(Number(inp.value)));
       ctl.appendChild(inp);
       read = () => { if (!focused(inp)) inp.value = String(engine.getProperty(row.path) ?? ""); };
-    } else if (row.type === "enum" || row.type === "quality") {
-      // A quality edits as a dropdown of its STAGES - the ladder is closed, like an enum's values.
+    } else if (row.type === "quality") {
+      // A quality shows as its LADDER, the current stage marked, as in both editors: the family's one strip
+      // (@wildwinter/app-shell/value-control), built in this inspector's own document.
+      const draw = (): void => {
+        const v = engine.getProperty(row.path);
+        ctl.replaceChildren(rungStrip({ stages: row.stages ?? [], value: typeof v === "string" ? v : undefined, decl: row,
+          onPick: (stage) => { commit(stage); draw(); }, doc }));
+      };
+      read = draw;
+    } else if (row.type === "enum") {
+      // An enum edits as a dropdown of its values.
       const sel = doc.createElement("select");
-      for (const v of (row.type === "quality" ? row.stages : row.values) ?? []) {
+      for (const v of row.values ?? []) {
         const o = doc.createElement("option");
         o.value = v; o.textContent = v;
         sel.appendChild(o);

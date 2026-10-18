@@ -18,11 +18,7 @@ import type { HostScopeRegistry, HostScopeSpec, HostScopeDecl, PropertyType, Sca
 import { el } from "./dom.js";
 import type { StageRenameDto } from "../../shared/api.js";
 import { iconBtn, labelled, moveItem, tagChips, stageChips, bindPropertyName, bindPropertyRef, defaultControl, dupGuard, expandableRow,
-  firstIllegalPropertyName, focusNewRow, PROPERTY_NAME_HINT, revalidatePropertyRefs } from "@wildwinter/app-shell";
-
-const TYPES: Array<[PropertyType, string]> = [
-  ["number", "Number"], ["boolean", "True / False"], ["string", "Text"], ["enum", "List"], ["flags", "Flags"], ["quality", "Quality"],
-];
+  firstIllegalPropertyName, focusNewRow, PROPERTY_NAME_HINT, PROPERTY_TYPES, revalidatePropertyRefs } from "@wildwinter/app-shell";
 
 /** A flat host-scope property row, carrying its scope token alongside the declaration (grouped on save). */
 interface ScopeRow extends HostScopeDecl { token: string; }
@@ -99,7 +95,8 @@ export function mountWorld(
     guard.track(name, () => `${p.token}.${p.name}`);
 
     const type = el("select", "insp-select gd-type") as HTMLSelectElement;
-    for (const [v, l] of TYPES) { const o = el("option", undefined, l) as HTMLOptionElement; o.value = v; if (v === p.type) o.selected = true; type.append(o); }
+    // The shell's one type list, in the family's order and words, shared with every property list.
+    for (const [v, l] of PROPERTY_TYPES) { const o = el("option", undefined, l) as HTMLOptionElement; o.value = v; if (v === p.type) o.selected = true; type.append(o); }
     type.addEventListener("change", () => {
       p.type = type.value as PropertyType; delete p.default;
       if (p.type === "enum" || p.type === "flags") p.values ??= []; else delete p.values;

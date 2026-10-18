@@ -125,6 +125,30 @@ var on_dry_choice = null
 ## Callable as given, taking {flow, kind, node, source?, message}, or null. Unset, each is
 ## push_warning'd, so a content bug is never silent. JS folds that default into onError itself.
 var on_error = null
+## Saved values a load put back to their defaults because they no longer fit their declarations (a stage,
+## an enum value or a flag deleted since the save, or a value of another type): the game's Callable as
+## given, taking an Array of {scope, name, value}, or null. Unset, each is push_warning'd, so a drifted
+## save is never silent. JS's onRefit.
+var on_refit = null
+
+
+## Say what the registry's refitting loads have put back since it last said (EngineOptions.onRefit):
+## after a load, a flow's restore, and each bag that claims saved values.
+func report_refits() -> void:
+	# A game's registry from an older addon's copy of the kernel has no refit to report.
+	if registry == null or not registry.has_method("take_misfits"):
+		return
+	# This engine's own keys only: the game's registry may hold other engines' and the game's misfits.
+	var misfits: Array = registry.take_misfits(func(scope: String) -> bool:
+		return scope == "patter" or scope.begins_with("patter/") or host_scopes.has(scope))
+	if misfits.is_empty():
+		return
+	if on_refit is Callable and (on_refit as Callable).is_valid():
+		(on_refit as Callable).call(misfits)
+		return
+	for m in misfits:
+		push_warning("Patterplay: the save's %s.%s was %s, which no longer fits its declaration; it is back at its default"
+			% [m["scope"], m["name"], JSON.stringify(m["value"])])
 ## Memoised ref splits (ref -> [scope, name]). A split depends only on the registry's scope set, so
 ## the cache is dropped whenever that moves (ref_split_revision).
 var ref_split_cache: Dictionary = {}

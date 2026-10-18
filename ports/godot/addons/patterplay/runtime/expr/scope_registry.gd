@@ -62,6 +62,12 @@ var _scopes: Dictionary = {}
 ## Values loaded for keys nobody has registered yet, waiting to be claimed.
 var _parked: Dictionary = {}
 
+## The parked keys whose load asked for a refit (key -> true), applied when claimed.
+var _parked_refit: Dictionary = {}
+
+## What refitting loads have put back since the last take_misfits().
+var _misfits: Array = []
+
 var _rev := 0
 
 ## A counter that moves whenever a scope is registered or removed, and at no other
@@ -171,8 +177,12 @@ func mount_owned(token: String, bag, opts: Dictionary = {}) -> String:
 	_scopes[token] = e
 	_rev += 1
 	if _parked.has(token):
-		bag.load(_parked[token])
+		if _parked_refit.has(token):
+			_note(token, bag.load(_parked[token], {"refit": true}))
+		else:
+			bag.load(_parked[token])
 		_parked.erase(token)
+		_parked_refit.erase(token)
 	return ""
 
 
@@ -186,6 +196,7 @@ func remove(token: String, opts: Dictionary = {}) -> String:
 	var e: Dictionary = _scopes[token]
 	if bool(opts.get("keep", false)) and e["kind"] == "owned":
 		_parked[token] = e["bag"].save()
+		_parked_refit.erase(token)
 	_scopes.erase(token)
 	_rev += 1
 	return ""
@@ -201,10 +212,38 @@ func remove(token: String, opts: Dictionary = {}) -> String:
 func discard_parked(prefix: String = "") -> void:
 	if prefix == "":
 		_parked.clear()
+		_parked_refit.clear()
 		return
 	for key in _parked.keys():
 		if str(key).begins_with(prefix):
 			_parked.erase(key)
+			_parked_refit.erase(key)
+
+
+## The saved values refitting loads (load with {"refit": true}) have put back to their
+## defaults since the last call, each as {"scope", "name", "value"} with what the save
+## held, in the order they were met; the list is emptied. An engine reports these as a
+## load's drifted values. With `only` (a Callable taking the scope key), it takes the misfits
+## of the scopes `only` accepts (its own keys) and leaves the rest for their owners.
+func take_misfits(only: Variant = null) -> Array:
+	if not (only is Callable):
+		var all := _misfits
+		_misfits = []
+		return all
+	var taken: Array = []
+	var kept: Array = []
+	for m in _misfits:
+		if (only as Callable).call(m["scope"]):
+			taken.append(m)
+		else:
+			kept.append(m)
+	_misfits = kept
+	return taken
+
+
+func _note(scope: String, found: Array) -> void:
+	for m in found:
+		_misfits.append({"scope": scope, "name": m["name"], "value": m["value"]})
 
 
 ## An owned scope's bag (subscribe, audit and rows live there); null (with
@@ -475,15 +514,29 @@ func save() -> Dictionary:
 ## keeps what earlier loads parked instead, adding this blob's unclaimed sections to it
 ## (a section for the same key replaces the parked one): for an engine moving an older
 ## save's values into a registry the game has already loaded.
+##
+## With {"refit": true}, each saved value that no longer fits its declaration goes back
+## to the default and is reported (take_misfits): a save from before a stage, an enum
+## value or a flag was deleted. A section parked for a key nobody has registered keeps
+## the option, and is refitted when that key is claimed.
 func load(blob: Dictionary, opts: Dictionary = {}) -> void:
 	if not bool(opts.get("keep_parked", false)):
 		_parked.clear()
+		_parked_refit.clear()
+	var refit := bool(opts.get("refit", false))
 	for token in blob:
 		var e = _scopes.get(token)
 		if e == null:
 			_parked[token] = (blob[token] as Dictionary).duplicate(true)
+			if refit:
+				_parked_refit[token] = true
+			else:
+				_parked_refit.erase(token)
 		elif e["kind"] == "owned":
-			e["bag"].load(blob[token])
+			if refit:
+				_note(token, e["bag"].load(blob[token], {"refit": true}))
+			else:
+				e["bag"].load(blob[token])
 
 
 ## A token is taken once. There is no reserved-token list: a clash surfaces here, the

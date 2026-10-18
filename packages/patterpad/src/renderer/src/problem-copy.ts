@@ -34,6 +34,12 @@ export const PATTERPAD_PROBLEM_COPY: ProblemCopyTable = {
     text: "A speaker qualifier in Project Settings isn't set up properly.",
     next: "Each one needs a name and its own Game ID.",
   }),
+  "invalid-gamedata-value": (p) => ({
+    text: /not one of its stages/.test(p.message ?? "")
+      ? "This node's game-data value is no longer one of its field's stages."
+      : "This node's game-data value doesn't fit its field's type.",
+    next: /not one of its stages/.test(p.message ?? "") ? "Choose the stage it belongs at now." : "Change it in the inspector, or clear it to use the field's default.",
+  }),
   "invalid-pad": () => ({
     text: "This pause is outside the range Patter allows.",
     next: `Use a number of seconds from ${PAD_AFTER_MIN} to ${PAD_AFTER_MAX}.`,

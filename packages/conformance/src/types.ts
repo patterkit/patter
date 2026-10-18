@@ -219,7 +219,15 @@ export type ScriptOp =
   // @scene, in the scene the flow is in). `expectResult` is the position, the order (-1, 0, 1) or the next
   // stage's name. `expectRefused`: the call is refused (a value that isn't a stage, a ref that isn't a
   // quality, @scene on the engine). JS, C# and C++ throw; Godot returns an EvalError. No transcript.
-  | { op: "stage"; call: "index" | "compare" | "next"; ref: string; args: ScalarValue[]; onFlow?: boolean; expectResult?: number | string; expectRefused?: boolean };
+  | { op: "stage"; call: "index" | "compare" | "next"; ref: string; args: ScalarValue[]; onFlow?: boolean; expectResult?: number | string; expectRefused?: boolean }
+  // The GAME's write to a shared or host-scope property (engine.setProperty), with host authority: a game
+  // moving its own `@world` value, or the value another engine's scope holds. No transcript.
+  | { op: "setProperty"; ref: string; value: ScalarValue; expectRefused?: boolean }
+  // What the engines' loads put back to their defaults since the case began or the last expectRefits, in
+  // order: each saved value that no longer fit its declaration (a stage, an enum value or a flag the edit
+  // deleted), as `{ scope, name, value }` with `scope` the registry key and `value` what the save held. A
+  // runner records every engine's onRefit (OnRefit, on_refit) for it; taking them empties the record.
+  | { op: "expectRefits"; expectResult: { scope: string; name: string; value: ScalarValue }[] };
 
 /** A compiled scripted case in the portable corpus. */
 export interface ScriptedCase {

@@ -7,6 +7,22 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Drifted saves are put back, and said.** A saved value its declaration no longer takes (a stage, an
+  enum value or a flag deleted since the save, or a value of another type) goes back to its default as
+  the save loads, instead of reaching the first gate that orders it. Each is reported: the engine's `OnRefit` event (scope, name, saved value) and a log Warning; `EngineOptions::onRefit` in C++. A hot
+  swap onto a game's shared registry refits this engine's values too, as does a hot swap that falls
+  back on a fresh engine. An engine reports only its own scopes' values; the rest of a shared
+  registry's stay for their owners. Every load refits, through the
+  kernel's refitting registry load.
+- **Game data takes flags and quality**, the family's field types: a game-data field's declaration
+  carries `stages` for a quality, and `FPatterGameDataField` gains `Stages`, with `UPatterGameData::StageIndex`, `CompareStages` and `NextStage` over a field; `patter::GameDataField` carries `stages`.
+
+- Kernel `k1a333a0e`, vendored from `@wildwinter/expr`: the value check, the type defaults (`text` and
+  `multiline` seed `""`) and the refitting load, in every port. The kernel id changes, so the Storylet
+  Engine must ship the same kernel in the same release round.
+
 ## [0.27.0] - 2026-10-17
 
 ### Added

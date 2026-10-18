@@ -3213,6 +3213,179 @@ const scriptedStages = {
   ],
 } satisfies ScriptedFixture;
 
+// --- qualities beyond @patter (the qualities brief, C4; patter-qualities.md sections 7 and 8) -------------
+//
+// A quality on every scope a Patter story reads, a quality game-data value, and a save holding a stage or an
+// enum value the edit deleted. Ladders are again chosen so alphabetical order disagrees with ladder order
+// wherever a gate orders them. Every expectation is read off the rule, not off a run.
+
+// An @scene ladder gating play: the scene's own quality seeds at its first stage ("one", no default given:
+// the compiler writes it in), the early snippet steps it with advance() as it leaves, and the block's second
+// pass finds the gate open.
+const qualityScene = {
+  name: "quality: a @scene ladder gates its own scene's play",
+  project: project(),
+  scenes: [{ id: "s", type: "scene", name: "S", sceneProps: [{ name: "step", type: "quality", stages: ["one", "two", "three"] }], blocks: [
+    { id: "b", type: "block", name: "B", children: [
+      { id: "sn_late", type: "snippet", condition: '@scene.step >= "two"', beats: [{ id: "T_late", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_early", type: "snippet", beats: [{ id: "T_early", kind: "text" }],
+        onExit: [{ kind: "set", target: "@scene.step", value: "advance(@scene.step)" }], jump: { to: "b" } },
+    ] },
+  ] }],
+  locales: [loc("s", { T_late: "late {@scene.step}", T_early: "early {@scene.step}" })],
+  expectedTranscript: [
+    { type: "text", id: "T_early", text: "early one" },
+    { type: "text", id: "T_late", text: "late two" },
+    { type: "end" },
+  ],
+} satisfies RuntimeFixture;
+
+// A @world quality the GAME moves: the story only reads it. Self-backed here (a standalone engine is its own
+// game), written with the game's authority; the gate orders the new stage by position and the value survives
+// a save.
+const worldActProject = project({
+  scopeRegistry: { version: 1, scopes: [{ token: "world", declarations: [{ name: "act", type: "quality", stages: ["opening", "rising", "end"] }] }] },
+});
+const worldActScene = [{ id: "s", type: "scene", name: "S", blocks: [
+  { id: "b_probe", type: "block", name: "Probe", gameId: "probe", children: [
+    { id: "sn_r", type: "snippet", condition: '@world.act >= "rising"', beats: [{ id: "T_r", kind: "text" }], jump: { to: "END" } },
+    { id: "sn_o", type: "snippet", beats: [{ id: "T_o", kind: "text" }], jump: { to: "END" } },
+  ] },
+] }] as Scene[];
+const scriptedWorldQuality = {
+  name: "quality: a @world quality the game moves gates by ladder position",
+  project: worldActProject,
+  scenes: worldActScene,
+  locales: [loc("s", { T_r: "past the opening at {@world.act}", T_o: "still {@world.act}" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T_o", text: "still opening" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "setProperty", ref: "@world.act", value: "rising" },
+    { op: "saveLoad" },
+    { op: "goto", scene: "s", block: "probe", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_r", text: "past the opening at rising" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "stage", call: "compare", ref: "@world.act", args: ["end", "rising"], expectResult: 1 },
+  ],
+} satisfies ScriptedFixture;
+
+// A @story quality, as a Patter bundle compiled against the Storylet Engine's spec declares it: the other
+// engine's ladder, which this engine reads and orders. Standalone here, so the engine backs @story itself; the
+// game's write stands in for the Storylet Engine moving its act. (The two engines on one registry, each
+// moving the other's quality, are the combined-game tests on every runtime.)
+const storyActProject = project({
+  scopeRegistry: { version: 1, scopes: [{ token: "story", declarations: [{ name: "act", type: "quality", stages: ["arrival", "act-1", "act-2"] }] }] },
+});
+const scriptedStoryQuality = {
+  name: "quality: a @story quality from the Storylet Engine's spec gates Patter's play",
+  project: storyActProject,
+  scenes: [{ id: "s", type: "scene", name: "S", blocks: [
+    { id: "b_probe", type: "block", name: "Probe", gameId: "probe", children: [
+      { id: "sn_a", type: "snippet", condition: '@story.act >= "act-1"', beats: [{ id: "T_a", kind: "text" }], jump: { to: "END" } },
+      { id: "sn_b", type: "snippet", beats: [{ id: "T_b", kind: "text" }], jump: { to: "END" } },
+    ] },
+  ] }] as Scene[],
+  locales: [loc("s", { T_a: "into {@story.act}", T_b: "on {@story.act}" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T_b", text: "on arrival" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "setProperty", ref: "@story.act", value: "act-2" },
+    { op: "goto", scene: "s", block: "probe", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_a", text: "into act-2" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A save holding a stage the edit DELETED. The live refresh carries the game onto the edited bundle, whose
+// ladder no longer has "done": the value goes back to the quality's default (its first stage, none given),
+// is reported, and the probe reads it there instead of throwing at its first ordering gate.
+const negotiationScenes = (probe: string): Scene[] => [{ id: "s", type: "scene", name: "S", blocks: [
+  { id: "b_set", type: "block", name: "Set", children: [
+    { id: "sn_set", type: "snippet", beats: [{ id: "T_set", kind: "text" }],
+      onExit: [{ kind: "set", target: "@negotiation", value: '"done"' }], jump: { to: "END" } },
+  ] },
+  { id: "b_probe", type: "block", name: "Probe", gameId: "probe", children: [
+    { id: "sn_past", type: "snippet", condition: probe, beats: [{ id: "T_past", kind: "text" }], jump: { to: "END" } },
+    { id: "sn_pre", type: "snippet", beats: [{ id: "T_pre", kind: "text" }], jump: { to: "END" } },
+  ] },
+] }] as Scene[];
+const scriptedQualityDeletedStage = {
+  name: "quality: a saved stage the edit deleted goes back to the default, and is reported",
+  project: qualityProject(QUALITY_STAGES),
+  scenes: negotiationScenes('@negotiation >= "done"'),
+  locales: [loc("s", { T_set: "set", T_past: "past {@negotiation}", T_pre: "pre {@negotiation}" })],
+  projectB: qualityProject(["not_started", "underway", "aftermath"]),
+  scenesB: negotiationScenes('@negotiation >= "underway"'),
+  localesB: [loc("s", { T_set: "set", T_past: "past {@negotiation}", T_pre: "pre {@negotiation}" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T_set", text: "set" }] },
+    { op: "advance", expect: [{ type: "end" }] },       // leaving sn_set: @negotiation = "done"
+    { op: "saveLoad" },                                  // the same bundle: "done" still fits
+    { op: "expectRefits", expectResult: [] },
+    { op: "hotSwap" },                                   // the edited ladder has no "done"
+    { op: "expectRefits", expectResult: [{ scope: "patter", name: "negotiation", value: "done" }] },
+    { op: "goto", scene: "s", block: "probe", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_pre", text: "pre not_started" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// The same for an enum value the edit deleted: back to the declared default, and reported.
+const moodProject = (values: string[]) => project({
+  properties: [{ name: "mood", type: "enum", values, default: "calm", shared: true }],
+});
+const moodScenes: Scene[] = [{ id: "s", type: "scene", name: "S", blocks: [
+  { id: "b_set", type: "block", name: "Set", children: [
+    { id: "sn_set", type: "snippet", beats: [{ id: "T_set", kind: "text" }],
+      onExit: [{ kind: "set", target: "@mood", value: '"wary"' }], jump: { to: "END" } },
+  ] },
+  { id: "b_probe", type: "block", name: "Probe", gameId: "probe", children: [
+    { id: "sn_p", type: "snippet", beats: [{ id: "T_p", kind: "text" }], jump: { to: "END" } },
+  ] },
+] }] as Scene[];
+const scriptedEnumDeletedValue = {
+  name: "enum: a saved value the edit deleted goes back to the default, and is reported",
+  project: moodProject(["calm", "tense", "wary"]),
+  scenes: moodScenes,
+  locales: [loc("s", { T_set: "set", T_p: "mood {@mood}" })],
+  projectB: moodProject(["calm", "tense"]),
+  scenesB: moodScenes.map((sc) => ({ ...sc, blocks: sc.blocks.filter((b) => b.id === "b_probe") })),
+  localesB: [loc("s", { T_set: "set", T_p: "mood {@mood}" })],
+  script: [
+    { op: "openFlow", flow: "f", scene: "s" },
+    { op: "advance", expect: [{ type: "text", id: "T_set", text: "set" }] },
+    { op: "advance", expect: [{ type: "end" }] },       // leaving sn_set: @mood = "wary"
+    { op: "hotSwap" },
+    { op: "expectRefits", expectResult: [{ scope: "patter", name: "mood", value: "wary" }] },
+    { op: "goto", scene: "s", block: "probe", expectResult: true },
+    { op: "advance", expect: [{ type: "text", id: "T_p", text: "mood calm" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+  ],
+} satisfies ScriptedFixture;
+
+// A quality game-data value: a node's stage, read through the type's fields like any other value, and the
+// field's default (none given: its first stage, which the compiler writes into the bundle) where the node
+// sets none. The enum beside it takes its first value the same way.
+const gameDataQualityProject = project({ gameDataFields: {
+  line: [
+    { name: "act", type: "quality", stages: ["arrival", "act-1", "act-2"] },
+    { name: "mood", type: "enum", values: ["calm", "tense"] },
+  ],
+} });
+const gameDataQuality = {
+  name: "gameData: a quality field holds a stage, and defaults to its first",
+  project: gameDataQualityProject, kind: "line", node: { act: "act-2" },
+  expected: { act: "act-2", mood: "calm" },
+} satisfies GameDataFixture;
+const gameDataQualityDefaults = {
+  name: "gameData: fields declared with no default take their type's, written into the bundle",
+  project: gameDataQualityProject, kind: "line",
+  expected: { act: "arrival", mood: "calm" },
+} satisfies GameDataFixture;
+
 const scriptedListProperties = {
   name: "listProperties: the shared @patter rows, in declaration order",
   project: project({ properties: [
@@ -3359,7 +3532,7 @@ export const cases: Fixtures = {
     crossScene, cycle, once, voiced, escaped, shuffle, sequence,
     sequentialBlock, callReturn, runGroup, visitGate, sharedScene, temporaryProp,
     branchPicks, shuffleNonRepeating, seenGate, jumpAbandonsReturn, hiddenOption,
-    escapedEmoji, characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance,
+    escapedEmoji, characterName, localeActive, idsMode, tagsAccumulate, choicePrompts, choicePromptsIds, qualityGates, qualityAdvance, qualityScene,
     replayPrompt, replayOff, replayBorrowed, replayCaptionsOff, emptySpeakerFields,
     speakerQualifiers, speakerQualifiersLocale, speakerQualifiersIds, speakerQualifiersSilent, speakerLabels, speakerLabelsLocale,
     linePadding, linePaddingPrompt,
@@ -3372,8 +3545,9 @@ export const cases: Fixtures = {
     scriptedCheckpoint, scriptedRollbackKeepsParked, scriptedCheckpointOwnMemory, scriptedCheckpointNewFlow, scriptedOpenFlowRefused,
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
+    scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
     scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
-  gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults],
+  gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
     asSaveFixture(scriptedSaveLoadChoice, "a save written by the JS reference loads elsewhere at a pending choice, options replayed"),

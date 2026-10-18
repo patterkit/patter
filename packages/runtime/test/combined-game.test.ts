@@ -24,7 +24,7 @@ import { Engine } from "@patterkit/runtime";
 import type { SaveGame } from "@patterkit/runtime";
 import { exportBundle } from "@patterkit/compiler";
 import { ScopeRegistry, readScopeRegistrySpec } from "@wildwinter/scoperegistry";
-import type { ProjectFile, Scene, LocaleFile } from "@patterkit/model";
+import type { Bundle, ProjectFile, Scene, LocaleFile } from "@patterkit/model";
 
 // The storylet's published bundle declares the scopes Patter may read; Patter compiles against it.
 const storyworldBundle = {
@@ -36,7 +36,8 @@ const storyworldBundle = {
         { name: "gold", type: "number" },
         { name: "reputation", type: "number" },
       ] },
-      { token: "story", declarations: [{ name: "act", type: "number" }] },
+      // The Storylet Engine's act: a real quality, a ladder of named stages, as the family's stories use it.
+      { token: "story", declarations: [{ name: "act", type: "quality", stages: ["arrival", "act-1", "act-2"] }] },
     ],
   },
 };
@@ -58,7 +59,7 @@ const scene: Scene = {
     id: "b", type: "block", name: "B",
     children: [{
       id: "buy", type: "snippet",
-      condition: "@world.gold >= 10 && @story.act >= 2",
+      condition: '@world.gold >= 10 && @story.act >= "act-1"',
       onExit: [
         { kind: "set", target: "@world.gold", value: "@world.gold - 10" },
         { kind: "set", target: "@visits", value: "@visits + 1" },
@@ -74,7 +75,7 @@ const bundle = exportBundle({ project, scenes: [scene], locales: [en], foreignSc
 /** The storylet side, as far as this test needs it: an engine that registers its own scope. */
 class StoryStandIn {
   constructor(readonly registry: ScopeRegistry) {
-    registry.defineOwned("story", [{ name: "act", type: "number", default: 1 }], { normalise: (n) => n, owner: "Storylet Engine" });
+    registry.defineOwned("story", [{ name: "act", type: "quality", stages: ["arrival", "act-1", "act-2"] }], { normalise: (n) => n, owner: "Storylet Engine" });
   }
 }
 
@@ -94,10 +95,11 @@ describe("combined game: one registry, one save", () => {
   it("both sides read and write one registry live, and each reads the other's scope", () => {
     const { registry, patter } = combinedGame();
     registry.set("world", "gold", 25, { host: true }); // the game stocks the world
-    registry.set("story", "act", 2);                   // the storylet side moves the story on
+    registry.set("story", "act", "act-1");             // the storylet side moves the story on
 
     const flow = patter.openFlow("main", { scene: "shop" });
-    expect(patter.getProperty("@story.act")).toBe(2);
+    expect(patter.getProperty("@story.act")).toBe("act-1");
+    expect(patter.compareStages("@story.act", "act-1", "arrival")).toBe(1); // Patter orders the other engine's ladder
     expect(flow.advance()).toMatchObject({ type: "line", id: "L", character: "MERCHANT" });
     expect(flow.advance()).toEqual({ type: "end" }); // onExit: spends gold, bumps visits
 
@@ -109,13 +111,13 @@ describe("combined game: one registry, one save", () => {
     const g = combinedGame();
     g.registry.set("world", "gold", 25, { host: true });
     g.registry.set("world", "reputation", 3, { host: true });
-    g.registry.set("story", "act", 2);
+    g.registry.set("story", "act", "act-1");
     const f = g.patter.openFlow("main", { scene: "shop" });
     f.advance(); f.advance();
 
     const save = saveAll(g);
     expect(save.registry.world).toEqual({ gold: 15, reputation: 3 });
-    expect(save.registry.story).toEqual({ act: 2 });
+    expect(save.registry.story).toEqual({ act: "act-1" });
     expect(save.registry.patter).toEqual({ visits: 1 });
     expect(save.patter.registry).toBeUndefined();
     expect(JSON.stringify(save.patter)).not.toContain("reputation");
@@ -124,7 +126,7 @@ describe("combined game: one registry, one save", () => {
   it("resumes both sides from the one save, loading the registry first or last", () => {
     const g1 = combinedGame();
     g1.registry.set("world", "gold", 25, { host: true });
-    g1.registry.set("story", "act", 2);
+    g1.registry.set("story", "act", "act-1");
     const f1 = g1.patter.openFlow("main", { scene: "shop" });
     f1.advance(); f1.advance();
     g1.patter.openFlow("main", { scene: "shop" }); // a fresh run at the gate, saved mid-flow
@@ -137,9 +139,9 @@ describe("combined game: one registry, one save", () => {
       if (!registryFirst) g2.registry.load(save.registry);
 
       expect(g2.patter.getProperty("@world.gold")).toBe(15);
-      expect(g2.patter.getProperty("@story.act")).toBe(2);
+      expect(g2.patter.getProperty("@story.act")).toBe("act-1");
       expect(g2.patter.getProperty("@visits")).toBe(1);
-      // gold(15) >= 10 and act 2: a second purchase proceeds on the restored state.
+      // gold(15) >= 10 and at act-1: a second purchase proceeds on the restored state.
       const f2 = g2.patter.getFlow("main")!;
       expect(f2.advance()).toMatchObject({ type: "line", id: "L" });
       expect(f2.advance()).toEqual({ type: "end" });
@@ -151,7 +153,7 @@ describe("combined game: one registry, one save", () => {
   it("loads a save forward across content drift (lenient by design)", () => {
     // A registry save from older content: a world property that no longer exists, none of the newer
     // `reputation`, and a section for an engine this build no longer runs.
-    const stale = { world: { gold: 7, retired_flag: 1 }, patter: { visits: 9 }, story: { act: 3 }, retired_engine: { x: 1 } };
+    const stale = { world: { gold: 7, retired_flag: 1 }, patter: { visits: 9 }, story: { act: "act-2" }, retired_engine: { x: 1 } };
     const { registry, patter } = combinedGame();
     registry.load(stale);
 
@@ -162,6 +164,54 @@ describe("combined game: one registry, one save", () => {
     expect(registry.save().retired_engine).toEqual({ x: 1 }); // nobody claimed it: kept, until discarded
     registry.discardParked();
     expect(registry.save().retired_engine).toBeUndefined();
+  });
+
+  // Drifted saves on the game's one registry (patter-qualities.md section 7): a refitting load puts a stage the
+  // build no longer has back to its default, and Patter says so as its bags claim them.
+  it("a game's refitting load puts a deleted stage back, and Patter reports its own as its bags claim them", () => {
+    const heard: unknown[] = [];
+    const registry = new ScopeRegistry().defineOwned("world", worldDecls, { owner: "Game" });
+    new StoryStandIn(registry);
+    registry.load({ story: { act: "act-9" }, patter: { visits: "lots" } }, { refit: true });
+    const patter = new Engine(bundle, { registry, onRefit: (m) => heard.push(...m) });
+    expect(registry.get("story", "act")).toBe("arrival");
+    expect(patter.getProperty("@visits")).toBe(0);
+    // Patter reports its own, as its bag claims it; the story scope's misfit is the other engine's, and stays
+    // in the registry for it (or the game) to take.
+    expect(heard).toEqual([{ scope: "patter", name: "visits", value: "lots" }]);
+    expect(registry.takeMisfits()).toEqual([{ scope: "story", name: "act", value: "act-9" }]);
+  });
+
+  it("a hot swap on the game's registry refits Patter's own values onto the edited bundle", () => {
+    const heard: unknown[] = [];
+    const ladder = (stages: string[]): Bundle => exportBundle({
+      project: { ...project, properties: [{ name: "mood", type: "quality", stages, shared: true }] },
+      scenes: [scene], locales: [en], foreignScopes: spec,
+    });
+    const registry = new ScopeRegistry().defineOwned("world", worldDecls, { owner: "Game" });
+    new StoryStandIn(registry);
+    const first = new Engine(ladder(["calm", "uneasy", "wary"]), { registry, onRefit: (m) => heard.push(...m) });
+    first.setProperty("@mood", "wary");
+    const next = first.hotSwap(ladder(["calm", "uneasy"]));
+    expect(next.getProperty("@mood")).toBe("calm");
+    expect(heard).toEqual([{ scope: "patter", name: "mood", value: "wary" }]);
+  });
+
+  it("a standalone hot swap whose load fails still refits on the fallback engine", () => {
+    const heard: unknown[] = [];
+    const build = (stages: string[], condition?: string): Bundle => exportBundle({
+      project: { ...project, properties: [{ name: "mood", type: "quality", stages, shared: true }] },
+      scenes: [{ ...scene, blocks: [{ ...scene.blocks[0]!, children: [{ ...scene.blocks[0]!.children[0]!, condition: condition ?? "true" }] }] }],
+      locales: [en], foreignScopes: spec,
+    });
+    const first = new Engine(build(["calm", "uneasy", "wary"]), { onRefit: (m) => heard.push(...m) });
+    first.openFlow("main", { scene: "shop" });
+    first.setProperty("@mood", "wary");
+    // The edit also names another engine's scope that nothing registered, so the replacement's load refuses
+    // and the hot swap falls back on a third engine.
+    const next = first.hotSwap(build(["calm", "uneasy"], "@story.act >= 1"));
+    expect(next.getProperty("@mood")).toBe("calm");
+    expect(heard).toEqual([{ scope: "patter", name: "mood", value: "wary" }]);
   });
 
   it("a clash between engines fails as the game combines them, naming who holds the token", () => {

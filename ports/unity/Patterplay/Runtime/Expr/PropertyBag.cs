@@ -22,6 +22,61 @@ namespace Wildwinter.Expr
         public const string Enum = "enum";
         public const string Flags = "flags";
         public const string Quality = "quality";
+        /// <summary>A field's text types (the family's field types), plain strings at runtime.</summary>
+        public const string Text = "text";
+        public const string Multiline = "multiline";
+    }
+
+    /// <summary>Does a value fit its declaration? The TypeScript kernel's
+    /// valueFits, word for word: the type first, then the declaration's own
+    /// vocabulary. A declaration listing none (values or stages null)
+    /// constrains nothing past the type, and a type this build does not know
+    /// constrains nothing. An enum may hold "" (none chosen) only when asked.</summary>
+    public static class ValueFit
+    {
+        public static bool Fits(string type, IReadOnlyList<string> values, IReadOnlyList<string> stages, ExprValue value,
+                                bool noneChosen = false)
+        {
+            // A missing value fits no type this build knows, and a type it does not know constrains nothing,
+            // as in the TypeScript kernel.
+            switch (type)
+            {
+                case PropertyTypes.Boolean: return value != null && value.IsBool;
+                case PropertyTypes.Number: return value != null && value.IsNumber;
+                case PropertyTypes.String:
+                case PropertyTypes.Text:
+                case PropertyTypes.Multiline: return value != null && value.IsString;
+                case PropertyTypes.Enum:
+                    if (value == null || !value.IsString) return false;
+                    if (value.AsString == "" && noneChosen) return true;
+                    return values == null || Contains(values, value.AsString);
+                case PropertyTypes.Flags:
+                    if (value == null || !value.IsFlags) return false;
+                    if (values == null) return true;
+                    foreach (var f in value.AsFlags) if (!Contains(values, f)) return false;
+                    return true;
+                case PropertyTypes.Quality:
+                    return value != null && value.IsString && (stages == null || Contains(stages, value.AsString));
+                default: return true;
+            }
+        }
+
+        public static bool Fits(ScopeDeclaration decl, ExprValue value, bool noneChosen = false) =>
+            Fits(decl.Type, decl.Values, decl.Stages, value, noneChosen);
+
+        private static bool Contains(IReadOnlyList<string> list, string s)
+        {
+            for (int i = 0; i < list.Count; i++) if (list[i] == s) return true;
+            return false;
+        }
+    }
+
+    /// <summary>A saved value a refitting load put back to its declaration's
+    /// default: the property's name, and what the save held.</summary>
+    public sealed class BagMisfit
+    {
+        public string Name;
+        public ExprValue Value;
     }
 
     /// <summary>A property declaration. `Default` seeds an owned bag (null falls
@@ -45,7 +100,9 @@ namespace Wildwinter.Expr
             {
                 case PropertyTypes.Boolean: return ExprValue.False;
                 case PropertyTypes.Number: return ExprValue.Num(0);
-                case PropertyTypes.String: return ExprValue.Str("");
+                case PropertyTypes.String:
+                case PropertyTypes.Text:
+                case PropertyTypes.Multiline: return ExprValue.Str("");
                 case PropertyTypes.Enum: return ExprValue.Str(Values != null && Values.Count > 0 ? Values[0] : "");
                 case PropertyTypes.Flags: return ExprValue.Flags(null);
                 // A quality starts at the first rung of its ladder (quality.md).
@@ -264,10 +321,33 @@ namespace Wildwinter.Expr
 
         /// <summary>Lay saved values over the current ones (call after a fresh
         /// seed: orphans land as strays, new declarations keep their defaults; the
-        /// product decides whether to prune). Does not fire events.</summary>
-        public void Load(OrderedMap<string, ExprValue> values)
+        /// product decides whether to prune). Does not fire events.
+        ///
+        /// With <paramref name="refit"/>, a saved value that no longer fits its
+        /// declaration (a stage, an enum value or a flag the build has since
+        /// deleted, or a value of another type) goes back to the declaration's
+        /// default instead, and is returned with what the save held, in
+        /// declaration order. Without it the list is empty and every value lands
+        /// as saved.</summary>
+        public List<BagMisfit> Load(OrderedMap<string, ExprValue> values, bool refit = false)
         {
-            foreach (var pair in values) Values.Set(_norm(pair.Key), pair.Value);
+            var saved = new OrderedMap<string, ExprValue>();
+            foreach (var pair in values)
+            {
+                var n = _norm(pair.Key);
+                Values.Set(n, pair.Value);
+                saved.Set(n, pair.Value);
+            }
+            var misfits = new List<BagMisfit>();
+            if (!refit) return misfits;
+            foreach (var pair in _decls)
+            {
+                if (!saved.TryGetValue(pair.Key, out var value)) continue;
+                if (ValueFit.Fits(pair.Value, value)) continue;
+                Values.Set(pair.Key, pair.Value.DefaultOrTypeDefault());
+                misfits.Add(new BagMisfit { Name = pair.Key, Value = value });
+            }
+            return misfits;
         }
 
         internal static PropertyRow RowFor(ScopeDeclaration d, ExprValue value, bool? writable, string name = null,

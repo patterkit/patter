@@ -78,6 +78,7 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 	h.engine_log = _engine_log
 	h.on_dry_choice = options.get("on_dry_choice")
 	h.on_error = options.get("on_error")
+	h.on_refit = options.get("on_refit")
 	h.bundle = bundle
 	h.emit_ids = emit_ids
 	h.strings = all_strings.get(locale, {})
@@ -164,6 +165,8 @@ func _init(bundle: Dictionary, options: Dictionary = {}) -> void:
 		_host.scene_shared_names[sid] = names
 
 	_register(bundle, options)
+	# The `patter` bag (and any self-backed host scope) claimed values the game may have loaded first.
+	_host.report_refits()
 
 
 ## Register this engine's game-wide scopes in the registry: `@patter`, each host scope the game
@@ -647,12 +650,29 @@ func hot_swap(bundle: Dictionary) -> PatterEngine:
 	var opts := _creation_options.duplicate()
 	opts["registry"] = _host.registry
 	opts[_OWNS_REGISTRY] = _host.owns_registry
+	# On a game's registry, this engine's own values are parked again to be REFITTED as the replacement
+	# claims them: the edit may have deleted a stage, an enum value or a flag one of them holds, and the
+	# snapshot does not carry the game's registry. A standalone engine's snapshot carries its registry,
+	# which the replacement's load refits.
+	var own := {}
+	if not _host.owns_registry:
+		var saved: Dictionary = _host.registry.save()
+		for key in saved:
+			if key == "patter" or str(key).begins_with("patter/") or _host.host_scopes.has(key):
+				own[key] = saved[key]
 	_release(true)
+	if not own.is_empty():
+		_host.registry.load(own, {"keep_parked": true, "refit": true})
 	var next := PatterEngine.new(bundle, opts)
 	if next.init_error() != "" or not next.load_game(snapshot):
 		# A partial load may have mutated `next`: hand its bags back, fall back on a THIRD engine and
 		# restart each flow at the top of the scene it was in (dropped when that scene is gone too).
 		next._release(true)
+		# The values the failed load parked go back unrefitted; park the save's own again, refitted, before
+		# the fallback claims them, so a stage the edit deleted is put back here too.
+		var again = snapshot.get("registry") if _host.owns_registry else own
+		if again is Dictionary and not (again as Dictionary).is_empty():
+			_host.registry.load(again, {"keep_parked": true, "refit": true})
 		next = PatterEngine.new(bundle, opts)
 		var flows: Dictionary = snapshot.get("flows", {})
 		for id in flows:
@@ -903,9 +923,9 @@ func load_game(save: Dictionary) -> bool:
 		# The engine's own registry takes the save wholesale. A game's registry may hold values the
 		# game loaded for other engines, still waiting to be claimed: add to those, never replace them.
 		if _host.owns_registry:
-			reg.load(values)
+			reg.load(values, {"refit": true})
 		else:
-			reg.load(values, {"keep_parked": true})
+			reg.load(values, {"keep_parked": true, "refit": true})
 	# Reads the family's camelCase shape and the snake_case one this addon wrote before 0.11.0.
 	var visits = PatterFlow._k(save, "sharedVisits", "shared_visits")
 	_host.shared_visits = (visits as Dictionary).duplicate(true) if visits is Dictionary else {}
@@ -915,6 +935,7 @@ func load_game(save: Dictionary) -> bool:
 		flow.id = str(id)
 		flow.restore(saved_flows[id])
 		_flows[str(id)] = flow
+	_host.report_refits()
 	return true
 
 
@@ -979,11 +1000,12 @@ func restore_flow(id: String, state: Dictionary) -> PatterFlow:
 	# starts. Then the state's values, added to whatever else the registry holds (other flows' and
 	# engines' values still waiting to be claimed), never replacing it.
 	_host.registry.discard_parked(PatterFlow.key_flow(id))
-	_host.registry.load(PatterFlow.flow_sections(id, state), {"keep_parked": true})
+	_host.registry.load(PatterFlow.flow_sections(id, state), {"keep_parked": true, "refit": true})
 	var flow := PatterFlow.new(_host, float(_default_seed))
 	flow.id = id
 	flow.restore(state)
 	_flows[id] = flow
+	_host.report_refits()
 	return flow
 
 

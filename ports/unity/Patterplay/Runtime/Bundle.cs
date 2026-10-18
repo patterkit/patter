@@ -241,12 +241,12 @@ namespace Patterkit.Patterplay
         public string Exhaust;       // once (default) | repeat | stick
     }
 
-    public sealed class GameDataField
+    /// <summary>One author-defined gameData field: a declaration, as the kernel's ScopeDeclaration is (Name,
+    /// Type, Values, a quality's Stages, Default), so the stage helpers take one as they take a property's:
+    /// <c>Stages.Compare(field, line.GameData["act"], current)</c>. Type is the family's field list: text,
+    /// multiline, number, boolean, enum, flags or quality.</summary>
+    public sealed class GameDataField : ScopeDeclaration
     {
-        public string Name;
-        public string Type;
-        public ExprValue Default;
-        public List<string> Values;
         /// <summary>What the field is for, in the author's words; null when they gave none.</summary>
         public string Purpose;
     }

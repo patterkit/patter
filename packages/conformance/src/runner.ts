@@ -18,7 +18,7 @@ import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
 import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
-import type { Checkpoint, EngineOptions, StepResult } from "@patterkit/runtime";
+import type { Checkpoint, EngineOptions, LoadMisfit, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
 import type { Bundle, FlowState, GameData, SaveEnvelope } from "@patterkit/model";
@@ -93,7 +93,9 @@ export function runRuntimeCase(c: RuntimeCase, maxSteps = 1000): TranscriptStep[
  * save written elsewhere); a port's runner has the same split.
  */
 export function runScript(
-  engine: Engine, ops: ScriptOp[], ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions }, current = "",
+  engine: Engine, ops: ScriptOp[],
+  /** `refits` collects what every engine's `onRefit` reported, when the options feed it (caseOptions does). */
+  ctx: { bundle: Bundle; bundleB?: Bundle; options: EngineOptions; refits?: LoadMisfit[] }, current = "",
 ): { chunks: TranscriptStep[][]; engine: Engine } {
   const chunks: TranscriptStep[][] = [];
   let checkpoint: Checkpoint | undefined;
@@ -235,6 +237,19 @@ export function runScript(
         if (got !== op.expectResult) throw new Error(`stage ${op.call} ${op.ref}: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
         break;
       }
+      case "setProperty":
+        // The game's write (engine.setProperty): host authority, as a game moving @world does.
+        if (op.expectRefused) { refused(`setProperty ${op.ref}`, () => engine.setProperty(op.ref, op.value)); break; }
+        engine.setProperty(op.ref, op.value);
+        break;
+      case "expectRefits": {
+        const got = JSON.parse(JSON.stringify(ctx.refits ?? [])) as unknown[];
+        if (JSON.stringify(got) !== JSON.stringify(op.expectResult)) {
+          throw new Error(`expectRefits: expected ${JSON.stringify(op.expectResult)}, got ${JSON.stringify(got)}`);
+        }
+        ctx.refits?.splice(0);
+        break;
+      }
       case "rollback":
         engine.rollback(checkpoint!);
         checkpoint = undefined;
@@ -249,14 +264,16 @@ export function runScript(
   return { chunks, engine };
 }
 
-/** The options a scripted or save case constructs every engine with: its seed and its engine options. */
-function caseOptions(c: { seed?: number; engineOptions?: ScriptedCase["engineOptions"] }): EngineOptions {
-  return { ...(c.seed !== undefined ? { seed: c.seed } : {}), ...c.engineOptions };
+/** The options a scripted or save case constructs every engine with: its seed and its engine options, and an
+ *  `onRefit` that records into `refits`, for the script's `expectRefits`. */
+function caseOptions(c: { seed?: number; engineOptions?: ScriptedCase["engineOptions"] }, refits: LoadMisfit[] = []): EngineOptions {
+  return { ...(c.seed !== undefined ? { seed: c.seed } : {}), ...c.engineOptions, onRefit: (m) => { refits.push(...m); } };
 }
 
 export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
-  const options = caseOptions(c);
-  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options }).chunks;
+  const refits: LoadMisfit[] = [];
+  const options = caseOptions(c, refits);
+  return runScript(new Engine(c.bundle, options), c.script, { bundle: c.bundle, bundleB: c.bundleB, options, refits }).chunks;
 }
 
 /**
@@ -266,7 +283,8 @@ export function runScriptedCase(c: ScriptedCase): TranscriptStep[][] {
  * writes a different shape has not adopted the contract, it has merely tolerated it.
  */
 export function runSaveCase(c: SaveCase): TranscriptStep[][] {
-  const options = caseOptions(c);
+  const refits: LoadMisfit[] = [];
+  const options = caseOptions(c, refits);
   const engine = new Engine(c.bundle, options);
   if (c.envelope.schema !== SAVE_SCHEMA) throw new Error(`not a ${SAVE_SCHEMA} envelope`);
   engine.loadGame(JSON.parse(JSON.stringify(c.envelope.save)));
@@ -276,7 +294,7 @@ export function runSaveCase(c: SaveCase): TranscriptStep[][] {
     const extra = back.filter((k) => !c.keyPaths.includes(k));
     throw new Error(`re-serialised save has different key paths; missing: [${missing.join(", ")}] extra: [${extra.join(", ")}]`);
   }
-  return runScript(engine, c.script, { bundle: c.bundle, options }).chunks;
+  return runScript(engine, c.script, { bundle: c.bundle, options, refits }).chunks;
 }
 
 /**

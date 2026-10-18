@@ -38,12 +38,13 @@
   },
   "dependencies": {
     "@patterkit/model": "^0.14.0",
-    "@patterkit/runtime": "0.27.0"
+    "@patterkit/runtime": "0.27.0",
+    "@wildwinter/app-shell": ">=0.49.0 <1.0.0"
   },
   "peerDependencies": {
-    "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
   },
   "devDependencies": {
-    "@wildwinter/scoperegistry": ">=0.8.0 <1.0.0"
+    "@wildwinter/scoperegistry": ">=0.9.0 <1.0.0"
   }
 }

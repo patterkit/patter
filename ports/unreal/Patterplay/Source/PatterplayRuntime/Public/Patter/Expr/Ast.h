@@ -18,8 +18,8 @@
 #include "Errors.h"   // the kernel id tripwire, WILDWINTER_EXPR_VISIBLE, ExprError, RegistryError
 // Compiled once per translation unit, and never beside a different kernel: Errors.h stops
 // that build with an #error, and this copy then stays out of the way of the first.
-#if !defined(WILDWINTER_EXPR_k88b76cef_AST_H) && WILDWINTER_EXPR_KERNEL == 0x88b76cef
-#define WILDWINTER_EXPR_k88b76cef_AST_H
+#if !defined(WILDWINTER_EXPR_k1a333a0e_AST_H) && WILDWINTER_EXPR_KERNEL == 0x1a333a0e
+#define WILDWINTER_EXPR_k1a333a0e_AST_H
 
 #include <cstddef>
 #include <memory>
@@ -28,7 +28,7 @@
 
 #include "Value.h"
 
-namespace wildwinter { namespace expr { inline namespace k88b76cef
+namespace wildwinter { namespace expr { inline namespace k1a333a0e
 {
     enum class AstTag { Bool, Number, Str, ScopedVar, Unary, Binary, Call, FlagDelta };
 

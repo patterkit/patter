@@ -410,8 +410,14 @@ static int runSpecificity(const JsonValue& arr)
 
 // A case's `engineOptions`: the construction options it plays under, for its engine and every engine a
 // saveLoad / hotSwap makes (they share `opts`). An absent key keeps the engine's default.
+// What every engine of the running case reported through onRefit, for expectRefits.
+static std::vector<LoadMisfit> caseRefits;
+
 static void applyEngineOptions(const JsonValue& c, EngineOptions& opts)
 {
+    // A fresh case: its engines (and every one a saveLoad or hotSwap makes) record into one list.
+    caseRefits.clear();
+    opts.onRefit = [](const std::vector<LoadMisfit>& m) { caseRefits.insert(caseRefits.end(), m.begin(), m.end()); };
     const JsonValue* eo = c.find("engineOptions");
     if (!eo) return;
     if (const JsonValue* rp = eo->find("replayPromptOnChoose")) opts.replayPromptOnChoose = rp->b;
@@ -1039,6 +1045,29 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                         const std::string got = run();
                         if (got != want) throw std::runtime_error("stage " + call + " " + ref + ": expected " + want + ", got " + got);
                     }
+                }
+                else if (kind == "setProperty")
+                {
+                    // The game's write, with host authority (a game moving @world).
+                    const std::string ref = op.at("ref").str;
+                    const PatterValue value = toValue(op.at("value"));
+                    const JsonValue* refusedV = op.find("expectRefused");
+                    if (refusedV && refusedV->b) refused("setProperty " + ref, [&] { engine->setProperty(ref, value); });
+                    else engine->setProperty(ref, value);
+                }
+                else if (kind == "expectRefits")
+                {
+                    // What the case's loads put back, in order, as { scope, name, value }.
+                    JsonValue got = JsonValue::Arr();
+                    for (const LoadMisfit& m : caseRefits)
+                    {
+                        JsonValue o = JsonValue::Obj();
+                        o.set("scope", JsonValue::Str(m.scope)); o.set("name", JsonValue::Str(m.name)); o.set("value", valueToJson(m.value));
+                        got.push(o);
+                    }
+                    if (!matchValue(got, op.at("expectResult")))
+                        throw std::runtime_error("expectRefits: expected " + dump(op.at("expectResult")) + ", got " + dump(got));
+                    caseRefits.clear();
                 }
                 // An op this host cannot run is a check that cannot fail: refuse it, never skip it.
                 else throw std::runtime_error("unknown script op '" + kind + "'");

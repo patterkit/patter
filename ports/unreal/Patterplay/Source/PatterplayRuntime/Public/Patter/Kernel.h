@@ -62,6 +62,7 @@ namespace patter
     using wildwinter::expr::OwnedScopeOptions;
     using wildwinter::expr::ForeignScopeOptions;
     using wildwinter::expr::RegistrySpecJson;
+    using wildwinter::expr::LoadMisfit;
 
     /** Run fn, rethrowing a kernel error it raises (ExprError, RegistryError) as Patterplay's
      *  EvalError with the kernel's message, as the engine threw before the kernel was shared.

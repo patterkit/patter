@@ -94,3 +94,27 @@ describe("createPropertyInspector", () => {
     insp.destroy();
   });
 });
+
+// A quality shows as its ladder (the family's one strip, @wildwinter/app-shell/value-control), the current
+// stage marked; a rung writes through, and a refresh moves the mark.
+describe("createPropertyInspector: a quality", () => {
+  const qBundle = exportBundle({
+    project: { ...project, properties: [{ name: "act", type: "quality", stages: ["opening", "rising", "end"] }] },
+    scenes: [scene], locales: [en],
+  });
+  const marked = (el: HTMLElement): string[] => Array.from(el.querySelectorAll(".shell-rung.on")).map((r) => r.textContent ?? "");
+
+  it("draws the ladder, writes a picked stage through, and follows the engine", () => {
+    const engine = new Engine(qBundle);
+    const insp = createPropertyInspector(engine, { container: document.body, pollMs: 0 });
+    expect(Array.from(insp.el.querySelectorAll(".shell-rung")).map((r) => r.textContent)).toEqual(["opening", "rising", "end"]);
+    expect(marked(insp.el)).toEqual(["opening"]);
+    (insp.el.querySelectorAll(".shell-rung")[2] as HTMLButtonElement).click();
+    expect(engine.getProperty("@act")).toBe("end");
+    expect(marked(insp.el)).toEqual(["end"]);
+    engine.setProperty("@act", "rising");
+    insp.refresh();
+    expect(marked(insp.el)).toEqual(["rising"]);
+    insp.destroy();
+  });
+});

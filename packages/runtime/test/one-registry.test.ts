@@ -164,23 +164,25 @@ describe("one registry per game: Patter", () => {
   });
 
   it("reads a scope another engine registered again after the flow opened", () => {
+    // The other engine's act: a real quality, ordered by its ladder.
+    const ACT = ["arrival", "act-1", "act-2"];
     const withStory = exportBundle({
       project: { ...project, scopeRegistry: undefined },
       scenes: [{ ...scene, blocks: [{ id: "b", type: "block", name: "B", children: [
         // Evaluated first, so the flow has built its evaluation context before @story is replaced.
         { id: "intro", type: "snippet", condition: "@fame >= 0", beats: [{ id: "I", kind: "text" }] },
-        { id: "yes", type: "snippet", condition: "@story.act >= 2", beats: [{ id: "L", kind: "text" }], jump: { to: "END" } },
+        { id: "yes", type: "snippet", condition: '@story.act >= "act-1"', beats: [{ id: "L", kind: "text" }], jump: { to: "END" } },
       ] }] }],
       locales: [{ ...en, strings: { I: "intro", L: "act two" } }],
-      foreignScopes: { version: 1, scopes: [{ token: "story", declarations: [{ name: "act", type: "number" }] }] },
+      foreignScopes: { version: 1, scopes: [{ token: "story", declarations: [{ name: "act", type: "quality", stages: ACT }] }] },
     });
-    const registry = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "number", default: 1 }], { owner: "Other engine" });
+    const registry = new ScopeRegistry().defineOwned("story", [{ name: "act", type: "quality", stages: ACT }], { owner: "Other engine" });
     const patter = new Engine(withStory, { registry });
     const flow = patter.openFlow("f", { scene: "s" });
     expect(flow.advance()).toMatchObject({ type: "text", text: "intro" });
 
     // The other engine rebuilds (a live edit): its scope goes, and comes back holding a new value.
-    registry.remove("story").defineOwned("story", [{ name: "act", type: "number", default: 2 }], { owner: "Other engine" });
+    registry.remove("story").defineOwned("story", [{ name: "act", type: "quality", stages: ACT, default: "act-1" }], { owner: "Other engine" });
     expect(flow.advance()).toMatchObject({ type: "text", text: "act two" });
   });
 

@@ -125,6 +125,15 @@ namespace Wildwinter.Expr
         }
     }
 
+    /// <summary>A saved value a refitting load put back to its default: where it
+    /// was, and what the save held.</summary>
+    public sealed class LoadMisfit
+    {
+        public string Scope;
+        public string Name;
+        public ExprValue Value;
+    }
+
     public sealed class ScopeRegistry
     {
         /// <summary>The scopeRegistrySpec versions this build understands.</summary>
@@ -272,6 +281,11 @@ namespace Wildwinter.Expr
         /// claimed.</summary>
         private readonly OrderedMap<string, OrderedMap<string, ExprValue>> _parked =
             new OrderedMap<string, OrderedMap<string, ExprValue>>();
+        /// <summary>The parked keys whose load asked for a refit, applied when they
+        /// are claimed.</summary>
+        private readonly HashSet<string> _parkedRefit = new HashSet<string>();
+        /// <summary>What refitting loads have put back since the last TakeMisfits.</summary>
+        private List<LoadMisfit> _misfits = new List<LoadMisfit>();
 
         /// <summary>A counter that moves whenever a scope is registered or removed,
         /// and at no other time: it starts at 0 and each registration or removal
@@ -319,8 +333,9 @@ namespace Wildwinter.Expr
             var waiting = _parked.GetOrDefault(token);
             if (waiting != null)
             {
-                bag.Load(waiting);
+                Note(token, bag.Load(waiting, _parkedRefit.Contains(token)));
                 _parked.Remove(token);
+                _parkedRefit.Remove(token);
             }
             return this;
         }
@@ -334,7 +349,11 @@ namespace Wildwinter.Expr
         {
             var e = _scopes.GetOrDefault(token);
             if (e == null) throw new RegistryError($"unknown scope '@{token}'");
-            if (keep && e is OwnedScope owned) _parked.Set(token, owned.Bag.Save());
+            if (keep && e is OwnedScope owned)
+            {
+                _parked.Set(token, owned.Bag.Save());
+                _parkedRefit.Remove(token);
+            }
             _scopes.Remove(token);
             Revision++;
             return this;
@@ -353,6 +372,7 @@ namespace Wildwinter.Expr
             if (prefix == null)
             {
                 _parked.Clear();
+                _parkedRefit.Clear();
                 return this;
             }
             var doomed = new List<string>();
@@ -360,8 +380,37 @@ namespace Wildwinter.Expr
             {
                 if (key.StartsWith(prefix, StringComparison.Ordinal)) doomed.Add(key);
             }
-            foreach (var key in doomed) _parked.Remove(key);
+            foreach (var key in doomed)
+            {
+                _parked.Remove(key);
+                _parkedRefit.Remove(key);
+            }
             return this;
+        }
+
+        /// <summary>The saved values refitting loads (Load with refit) have put back
+        /// to their defaults since the last call, each with its scope, its name and
+        /// what the save held, in the order they were met; the list is emptied. An
+        /// engine reports these as a load's drifted values. With <paramref name="only"/>, it takes the
+        /// misfits of the scopes `only` accepts (its own keys) and leaves the rest for their owners.</summary>
+        public List<LoadMisfit> TakeMisfits(Func<string, bool> only = null)
+        {
+            if (only == null)
+            {
+                var all = _misfits;
+                _misfits = new List<LoadMisfit>();
+                return all;
+            }
+            var taken = new List<LoadMisfit>();
+            var kept = new List<LoadMisfit>();
+            foreach (var m in _misfits) (only(m.Scope) ? taken : kept).Add(m);
+            _misfits = kept;
+            return taken;
+        }
+
+        private void Note(string scope, List<BagMisfit> found)
+        {
+            foreach (var m in found) _misfits.Add(new LoadMisfit { Scope = scope, Name = m.Name, Value = m.Value });
         }
 
         /// <summary>An owned scope's bag (subscribe, audit, rows live there).</summary>
@@ -627,15 +676,29 @@ namespace Wildwinter.Expr
         /// keepParked, what earlier loads parked is kept and this blob's unclaimed
         /// sections are added to it (a section for the same key replaces the parked
         /// one): for an engine moving an older save's values into a registry the
-        /// game has already loaded.</summary>
-        public void Load(OrderedMap<string, OrderedMap<string, ExprValue>> blob, bool keepParked = false)
+        /// game has already loaded.
+        ///
+        /// With refit, each saved value that no longer fits its declaration goes
+        /// back to the default and is reported (TakeMisfits): a save from before a
+        /// stage, an enum value or a flag was deleted. A section parked for a key
+        /// nobody has registered keeps the option, and is refitted when that key is
+        /// claimed.</summary>
+        public void Load(OrderedMap<string, OrderedMap<string, ExprValue>> blob, bool keepParked = false, bool refit = false)
         {
-            if (!keepParked) _parked.Clear();
+            if (!keepParked)
+            {
+                _parked.Clear();
+                _parkedRefit.Clear();
+            }
             foreach (var pair in blob)
             {
                 var e = _scopes.GetOrDefault(pair.Key);
-                if (e is OwnedScope owned) owned.Bag.Load(pair.Value);
-                else if (e == null) _parked.Set(pair.Key, Copy(pair.Value));
+                if (e is OwnedScope owned) Note(pair.Key, owned.Bag.Load(pair.Value, refit));
+                else if (e == null)
+                {
+                    _parked.Set(pair.Key, Copy(pair.Value));
+                    if (refit) _parkedRefit.Add(pair.Key); else _parkedRefit.Remove(pair.Key);
+                }
             }
         }
 

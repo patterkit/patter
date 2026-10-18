@@ -50,27 +50,11 @@ static func split_ref_with(ref: String, is_scope: Callable) -> Array:
 	return ["patter", body.to_lower()]
 
 
-# The seed value for a property declaration (its default, else the type default).
+# The seed value for a property declaration (its default, else the type default): the kernel's
+# default_for, one rule with the bags'. A flags default is copied, so a write never edits the declaration.
 static func prop_default(decl: Dictionary):
-	if decl.has("default"):
-		return PatterValues.to_value(decl["default"])
-	match decl.get("type", ""):
-		"boolean":
-			return false
-		"number":
-			return 0.0
-		"string":
-			return ""
-		"flags":
-			return []
-		"enum":
-			var vals: Array = decl.get("values", [])
-			return vals[0] if not vals.is_empty() else ""
-		"quality":
-			# The ladder's start: a quality seeds at its FIRST stage.
-			var stages: Array = decl.get("stages", [])
-			return stages[0] if not stages.is_empty() else ""
-	return false
+	var v = PatterValues.to_value(PatterPropertyBag.default_for(decl))
+	return (v as Array).duplicate() if v is Array else v
 
 
 static func game_idify(text: String) -> String:

@@ -235,7 +235,29 @@ static func run_case(c: Dictionary, registry_script: Script, bag_script: Script,
 
 			"load":
 				var opts := {"keep_parked": true} if step.get("keepParked", false) == true else {}
+				if step.get("refit", false) == true:
+					opts["refit"] = true
 				r.load((step["blob"] as Dictionary).duplicate(true), opts)
+
+			"misfits":
+				var only = step.get("only")
+				var got = r.take_misfits() if not (only is Array) else r.take_misfits(func(scope: String) -> bool:
+					for k in only:
+						if scope == k or scope.begins_with(str(k) + "/"):
+							return true
+					return false)
+				if not same(got, step["expect"]):
+					fails.append("%s: misfits %s, expected %s" % [at, _show(got), _show(step["expect"])])
+
+			"fits":
+				var got: bool = bag_script.value_fits(step["decl"], step["value"], step.get("noneChosen", false) == true)
+				if got != bool(step["expect"]):
+					fails.append("%s: %s fits %s is %s, expected %s" % [at, _show(step["value"]), str(step["decl"]["type"]), got, step["expect"]])
+
+			"default":
+				var got = bag_script.default_for(step["decl"])
+				if not same(got, step["expect"]):
+					fails.append("%s: %s defaults to %s, expected %s" % [at, str(step["decl"]["type"]), _show(got), _show(step["expect"])])
 
 			"discardParked":
 				r.discard_parked(str(step.get("prefix", "")))
