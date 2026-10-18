@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-10-18
+
 ### Changed
 
 - **An extension's claim can take a game data field's own choices.** When an extension presents a game data
