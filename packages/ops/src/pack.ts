@@ -19,24 +19,26 @@
 // ---------------------------------------------------------------------------
 
 import JSZip from "jszip";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { parseSource } from "@patterkit/core";
+import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION } from "@patterkit/model";
 import type { ProjectFile } from "@patterkit/model";
 import { findProjectFile, walkFiles } from "./load.js";
-import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
+import { sidecarIssues, unresolvedMarkIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { ARCHIVE_ENTRY_OPTS } from "@wildwinter/toolkit/archive";
 import { gameScopesSnapshot, GAME_SCOPES_DIR } from "./game-scopes.js";
 import { HANDOFF_DIR, parseHandoff } from "./handoff.js";
 
 /** The source-shard extensions a document carries (the merge-friendly truth). */
-export const SHARD_EXTENSIONS = [".patterflow", ".patterloc", ".patterx", ".patterproj"] as const;
+export const SHARD_EXTENSIONS = [".patterflow", ".patterloc", ".patterx", ".patterproj", EXTENSION_SHARD] as const;
 
 /** Manifest embedded at the document root - what this envelope is and contains. */
 export interface DocumentManifest {
   schema: "patter/document@0";
   project: { id: string; name: string };
-  /** Shard paths (relative, forward-slashed), sorted - the document's contents. */
+  /** Shard paths (relative, forward-slashed), sorted - the document's contents. The extensions' manifests
+   *  (`extensions/<id>.extension.json`) are among them: source the project compiles from. */
   files: string[];
   /** The game scopes files the pack carries as `game-scopes/<name>` entries, by name, sorted. Absent
    *  when the project has no game scopes folder (or it holds none). */
@@ -74,9 +76,23 @@ export async function runPack(startPath: string): Promise<Buffer> {
   }
 
   // Gather every source shard under the project root, layout-independent.
-  const files = SHARD_EXTENSIONS.flatMap((ext) => walkFiles(root, ext))
-    .map((abs) => ({ abs, rel: relative(root, abs).split(sep).join("/") }))
-    .sort((a, b) => a.rel.localeCompare(b.rel));
+  const shardFiles = SHARD_EXTENSIONS.flatMap((ext) => walkFiles(root, ext))
+    .map((abs) => ({ abs, rel: relative(root, abs).split(sep).join("/") }));
+
+  // The same rule for the mark a merge writes into a shard (`unresolved`), which is the record that
+  // travels where a sidecar does not: it would reach the recipient inside the very shard it marks.
+  const marked = [...new Set(unresolvedMarkIssues(shardFiles.map((f) => ({ file: f.rel, text: readFileSync(f.abs, "utf8") }))).map((i) => i.file))];
+  if (marked.length) {
+    throw new Error(
+      `${marked.length} shard(s) still marked with an unresolved merge - resolve the clashes each names under ` +
+      `"unresolved", then remove the entries, before packing:\n` +
+      marked.map((f) => `  ${f}`).join("\n"),
+    );
+  }
+
+  // ...and the extensions' manifests, which a project compiles from as it does from its shards: a pack
+  // without them would hand the recipient extension data nothing can check or compile.
+  const files = [...shardFiles, ...extensionManifests(root)].sort((a, b) => a.rel.localeCompare(b.rel));
 
   // The game's scopes, found as the loader finds them: a snapshot the recipient reads and never sends back.
   const scopes = gameScopesSnapshot(root, project);
@@ -103,3 +119,19 @@ export async function runPack(startPath: string): Promise<Buffer> {
 
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", streamFiles: false });
 }
+
+/** A project's extension manifests, as the loader finds them: `extensions/<id>.extension.json`, one level. */
+function extensionManifests(root: string): Array<{ abs: string; rel: string }> {
+  let names: string[];
+  try {
+    names = readdirSync(join(root, EXTENSIONS_DIR), { withFileTypes: true })
+      .filter((e) => e.isFile() && !e.name.startsWith(".") && e.name.endsWith(MANIFEST_EXTENSION)).map((e) => e.name);
+  } catch { return []; }
+  return names.map((name) => ({ abs: join(root, EXTENSIONS_DIR, name), rel: `${EXTENSIONS_DIR}/${name}` }));
+}
+
+/** Whether a pack entry is an extension's manifest: `extensions/<id>.extension.json`, directly in the folder. */
+export const isManifestEntry = (name: string): boolean => {
+  const rest = name.startsWith(`${EXTENSIONS_DIR}/`) ? name.slice(EXTENSIONS_DIR.length + 1) : undefined;
+  return rest !== undefined && !rest.includes("/") && rest.endsWith(MANIFEST_EXTENSION) && rest.length > MANIFEST_EXTENSION.length;
+};

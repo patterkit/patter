@@ -38,6 +38,16 @@ version number always means the same runtime behaviour. This package is versione
 - **A choice's options have game-data fields of their own**: `option` is a node kind, so a project declares
   fields for options as for any other node, and `effectiveGameData(gameDataFields(bundle, "option"), option.gameData)` resolves the gameData an option
   arrives with. Pinned by the corpus.
+- **Patter extension values**: a bundle can carry the values a Patter extension gives each node, and the
+  runtime hands them over where it hands over gameData: `extensions` on a line, text and game event step, a
+  prompt spoken back, a choice's option, and each beat, block and scene of the outline, by extension id, raw
+  as the bundle wrote them (any JSON: records, maps and lists as well as the seven field types).
+  `engine.extensionsForScene(sceneRef)` and `engine.extensionsForBlock(sceneRef, blockRef)` read a scene's
+  and a block's own. `extensionDecls(bundle, extension, kind)` gives an extension's declarations for a node
+  kind, every default resolved, so `effectiveGameData(extensionDecls(...), step.extensions?.[id])` fills in
+  what a node leaves out, and `extensionsOf(bundle, kind, address)` reads any node's values: the project, a
+  scene, a block, a snippet, an option or a beat. A saved pending choice doesn't carry them: they're read
+  off the bundle as it loads. Bundles without extensions are unchanged. Pinned by the corpus (version 3).
 
 
 ## [0.28.0] - 2026-10-18

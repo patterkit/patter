@@ -40,12 +40,13 @@ import { join, resolve, sep } from "node:path";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { parseSource, canonicalStringify } from "@patterkit/core";
 import { findProjectFile } from "./load.js";
-import { runMerge } from "./merge.js";
+import { runMerge, detectMergeType } from "./merge.js";
 import type { MergeResult } from "./merge.js";
 import type { DocumentManifest } from "./pack.js";
 import type { PlannedWrite } from "./write.js";
 import { isUnsafeEntry } from "@wildwinter/toolkit/archive";
-import { SHARD_EXTENSIONS } from "./pack.js";
+import { SHARD_EXTENSIONS, isManifestEntry } from "./pack.js";
+import { projectManifests } from "./extensions.js";
 import type { ProjectFile } from "@patterkit/model";
 import { discoverGameScopes, planReturnedWorld, GAME_SCOPES_DIR, GAME_SCOPES_FILE } from "./game-scopes.js";
 import { SCOPES_FILE_SUFFIX } from "@wildwinter/scoperegistry/scopes";
@@ -73,8 +74,9 @@ export class UnsafeEntryError extends Error {}
 /** Bytes that are not a `.patterpack` at all: not a zip, or a zip holding no project file. */
 export class NotAPackError extends Error {}
 
-/** A shard by its extension, wherever it sits: what the pack walked to gather it. */
-const isShardEntry = (name: string): boolean => SHARD_EXTENSIONS.some((ext) => name.endsWith(ext));
+/** A shard by its extension, wherever it sits: what the pack walked to gather it. An extension's manifest
+ *  travels with the shards (the project compiles from it), in the one place the loader reads it. */
+const isShardEntry = (name: string): boolean => SHARD_EXTENSIONS.some((ext) => name.endsWith(ext)) || isManifestEntry(name);
 
 /** Refuse an entry bound outside the target, or naming a dot-file or dot-folder anywhere in its path
  *  (`.git/config`, `.gitattributes`, `scenes/.hidden/x.patterflow`). Case does not matter: a
@@ -259,6 +261,11 @@ export interface UnpackMergeResult {
   /** Handoff records the pack brought (relative paths): added, or with reimports from their side added to
    *  ours. Their writes are in `writes`. Absent when the pack carried none that changed anything. */
   handoffs?: string[];
+  /** Extension manifests (relative paths) the pack returned with content other than ours. Ours is kept: an
+   *  extension's manifest is the extension's own file, which a recipient never edits, so a difference means
+   *  the two sides had different versions of the extension, and taking one is a decision for the project
+   *  (and `patter format`, after). Theirs is taken only where we have none. Absent when none differ. */
+  manifestsKept?: string[];
 }
 
 /**
@@ -287,6 +294,9 @@ export async function runUnpackMerge(
   const projectRel = projectEntry(theirs);
   let projectSides: { ours: ProjectFile; base: ProjectFile; theirs: ProjectFile; merged: ProjectFile } | undefined;
 
+  // The manifests the extension data merges by: this project's own copies, as a merge driver reads them.
+  const manifests = projectManifests(projectDir);
+  const manifestsKept: string[] = [];
   for (const [rel, theirText] of [...theirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const outPath = containedWrite(projectDir, rel);
     const baseText = base.get(rel);
@@ -303,6 +313,12 @@ export async function runUnpackMerge(
     // and one where both sides say the same thing is already merged. A returned pack is mostly shards
     // nobody touched, and parsing all three sides of each was most of the merge's time.
     const oursText = readFileSync(outPath, "utf8");
+    if (isManifestEntry(rel)) {
+      // An extension's manifest is never merged: ours stands, and a difference is said.
+      if (theirText !== oursText) manifestsKept.push(rel);
+      shards.push({ path: rel, added: false, changed: false });
+      continue;
+    }
     if (theirText === baseText || theirText === oursText) {
       if (rel === projectRel && baseText !== undefined) {
         const read = (t: string): ProjectFile => parseSource(t) as unknown as ProjectFile;
@@ -325,7 +341,9 @@ export async function runUnpackMerge(
     const theirsObj = readSide("theirs", theirText);
     const baseObj = baseText !== undefined ? readSide("base", baseText) : {};
 
-    const result = runMerge(baseObj, oursObj, theirsObj);
+    // Extension data merges field by field by the project's manifest; with none, each entry as one value.
+    const manifest = detectMergeType(oursObj) === "extension" && typeof oursObj["extension"] === "string" ? manifests(oursObj["extension"]) : undefined;
+    const result = runMerge(baseObj, oursObj, theirsObj, manifest !== undefined ? { manifest } : undefined);
     const mergedText = canonicalStringify(result.merged);
     const changed = mergedText !== oursText;
     if (changed) writes.push({ path: outPath, content: mergedText });
@@ -364,8 +382,12 @@ export async function runUnpackMerge(
     if (merged) { writes.push({ path: outPath, content: serialiseHandoff(merged) }); handoffs.push(rel); }
   }
 
-  return { shards, writes, sidecars, other: returnedDoc.other, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}), ...(handoffs.length ? { handoffs } : {}) };
+  return {
+    shards, writes, sidecars, other: returnedDoc.other, conflicts, warnings, provenance, ...(gameScopes ? { gameScopes } : {}),
+    ...(handoffs.length ? { handoffs } : {}), ...(manifestsKept.length ? { manifestsKept } : {}),
+  };
 }
+
 
 /** Our handoff record with any reimports their side logged that ours lacks, and closed if either side
  *  closed it. Undefined when that changes nothing. Everything else about a record is fixed at export. */

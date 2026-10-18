@@ -45,7 +45,7 @@ import type {
   EngineSave, SelectorSnapshot, StackFrame, SavedChoice, SavedChoicePrompt, FlowSnapshot, SaveGame, SaveGameV2,
   FlowState, FlowValues,
   Bundle, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet,
-  CompiledEffect, Beat, LineBeat, TextBeat, GameData, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
+  CompiledEffect, Beat, LineBeat, TextBeat, GameData, NodeExtensions, Expression, PropertyDecl, PropertyType, Jump, HostScopeDecl,
 } from "@patterkit/model";
 
 type SelectableNode = CompiledGroup | CompiledSnippet;
@@ -131,9 +131,9 @@ const keys = {
 
 /** What `Flow.advance()` surfaces to the host at each stop. */
 export type StepResult =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter: number; gameData?: GameData; tags?: string[] }
-  | { type: "text"; id: string; text: string; padAfter: number; gameData?: GameData; tags?: string[] }
-  | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | { type: "text"; id: string; text: string; padAfter: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: ChoiceOption[] }
   | { type: "end" };
 
@@ -168,6 +168,8 @@ export interface BeatInfo {
   text?: string;
   /** Author gameData overrides on this beat (raw, as the step carries them). Omitted when empty. */
   gameData?: GameData;
+  /** The beat's Patter extension values, by extension id, raw, as the step carries them. Omitted when none. */
+  extensions?: NodeExtensions;
   /** Accumulated author tags (scene -> block -> group(s) -> snippet -> beat). Omitted when empty. */
   tags?: string[];
 }
@@ -195,6 +197,8 @@ export interface OutlineBlock {
   name: string;
   /** The block's own author gameData overrides (raw, not merged with defaults). Omitted when empty. */
   gameData?: GameData;
+  /** The block's own Patter extension values, by extension id, raw. Omitted when none. */
+  extensions?: NodeExtensions;
   tags?: string[];
   children: OutlineNode[];
 }
@@ -206,6 +210,8 @@ export interface OutlineScene {
   name: string;
   /** The scene's own author gameData overrides (raw, not merged with defaults). Omitted when empty. */
   gameData?: GameData;
+  /** The scene's own Patter extension values, by extension id, raw. Omitted when none. */
+  extensions?: NodeExtensions;
   tags?: string[];
   blocks: OutlineBlock[];
 }
@@ -258,6 +264,12 @@ export interface ChoiceOption {
   /** False when the option's condition fails; still returned (greyed) unless hidden. */
   eligible: boolean;
   gameData?: GameData;
+  /**
+   * The option's Patter extension values, by extension id, exactly as the bundle carries them: raw and sparse,
+   * any JSON, never read by the engine. Absent when it has none. Fill in defaults with
+   * `effectiveGameData(extensionDecls(bundle, id, "option"), option.extensions?.[id])`.
+   */
+  extensions?: NodeExtensions;
 }
 
 /**
@@ -1007,6 +1019,25 @@ export class Engine {
   }
 
   /**
+   * A scene's own Patter extension values (by internal id or gameId address), by extension id: raw and sparse,
+   * exactly as the bundle carries them, any JSON, never read by the engine (fill in defaults with
+   * `effectiveGameData(extensionDecls(bundle, id, "scene"), ...)`). Not inherited by its blocks. A fresh object
+   * each call, its values the bundle's own and read-only; empty when the scene has none or the ref is unknown.
+   */
+  extensionsForScene(sceneRef: string): NodeExtensions {
+    const id = this.resolveSceneRef(sceneRef);
+    const scene = id != null ? this.host.bundle.scenes[id] : undefined;
+    return { ...scene?.extensions };
+  }
+  /** A block's own Patter extension values, by scene + block ref (id or gameId). Raw, like
+   *  {@link extensionsForScene}; the scene's are not folded in. Empty when none / unknown. */
+  extensionsForBlock(sceneRef: string, blockRef: string): NodeExtensions {
+    const id = this.resolveBlockRef(this.resolveSceneRef(sceneRef), blockRef);
+    const block = id != null ? this.host.blockById.get(id) : undefined;
+    return { ...block?.extensions };
+  }
+
+  /**
    * Every cast member the PROJECT declares, in authored order - the same list `describeBundle` counts.
    * A superset of any scene's cast: the validator holds a beat's `character` to a declared member, so
    * {@link castForScene} and {@link castForBlock} only ever return names that appear here.
@@ -1058,12 +1089,14 @@ export class Engine {
       ...(effectiveGameId(scene) ? { gameId: effectiveGameId(scene) } : {}),
       name: scene.name,
       ...gameDataField(scene.gameData),
+      ...extensionsField(scene.extensions),
       ...this.tagsField(scene.id),
       blocks: scene.blocks.map((block) => ({
         id: block.id,
         ...(effectiveGameId(block) ? { gameId: effectiveGameId(block) } : {}),
         name: block.name,
         ...gameDataField(block.gameData),
+        ...extensionsField(block.extensions),
         ...this.tagsField(block.id),
         children: block.children.map((n) => this.outlineNode(n)),
       })),
@@ -1138,6 +1171,7 @@ export class Engine {
       if (source !== undefined) info.text = source;
     }
     if (beat.gameData && Object.keys(beat.gameData).length) info.gameData = beat.gameData;
+    if (beat.extensions && Object.keys(beat.extensions).length) info.extensions = beat.extensions;
     if (tags && tags.length) info.tags = tags;
     return info;
   }
@@ -2057,7 +2091,9 @@ export class Flow {
         activeSnippetId: this.activeSnippet?.id ?? null,
         beatIndex: this.beatIndex,
         pendingChoice: this.pendingChoice
-          ? { groupId: this.pendingChoice.groupId, options: this.pendingChoice.options.map((o) => ({ ...o })) }
+          // An option's extension values are the bundle's, not the save's: left out, and read off the option's
+          // node again on load.
+          ? { groupId: this.pendingChoice.groupId, options: this.pendingChoice.options.map(({ extensions: _ext, ...o }) => ({ ...o })) }
           : null,
         pendingPromptOwnerId: this.pendingPromptOwnerId,
         // The prompt still to be replayed, as the choice showed it: present only in the choose -> advance window.
@@ -2130,9 +2166,12 @@ export class Flow {
         byId.set(o.id, node);
         // A save from before prompts carried their pause, or a speaker's label, has none: work them out again
         // (the pause from the prompt's beat, the label from the speaker the choice showed, in the current locale).
-        const { prompt: saved, ...rest } = o;
+        const { prompt: saved, extensions: _saved, ...rest } = o as typeof o & { extensions?: unknown };
         const label = saved?.kind === "line" && saved.speakerLabel === undefined ? speakerLabelOf(this.host, saved.character, saved.qualifier) : undefined;
-        options.push({ ...rest, ...(saved ? { prompt: { ...saved, padAfter: saved.padAfter ?? this.promptPadOf(node), ...(label !== undefined ? { speakerLabel: label } : {}) } } : {}) });
+        options.push({
+          ...rest, ...(saved ? { prompt: { ...saved, padAfter: saved.padAfter ?? this.promptPadOf(node), ...(label !== undefined ? { speakerLabel: label } : {}) } } : {}),
+          ...extensionsField(node.extensions),   // the bundle's, never the save's
+        });
       }
       if (options.length > 0) this.pendingChoice = { groupId: c.pendingChoice.groupId, options, byId };
     }
@@ -2219,7 +2258,7 @@ export class Flow {
       const eligible = this.eligible(child);
       const hidden = child.secretUntilEligible === true;
       if (!eligible && hidden) continue; // secret while ineligible; otherwise an ineligible option shows greyed
-      options.push({ id: child.id, prompt: this.promptFor(child), eligible, gameData: child.gameData });
+      options.push({ id: child.id, prompt: this.promptFor(child), eligible, gameData: child.gameData, ...extensionsField(child.extensions) });
       byId.set(child.id, child);
     }
     // A choice is offered only when the player can take something. One whose every remaining option is
@@ -2559,9 +2598,9 @@ export class Flow {
     // static). Game-event beats carry no localised content.
     switch (beat.kind) {
       case "gameEvent":
-        return { type: "gameEvent", id: beat.id, gameData: beat.gameData, ...withTags };
+        return { type: "gameEvent", id: beat.id, gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
       case "text":
-        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), gameData: beat.gameData, ...withTags };
+        return { type: "text", id: beat.id, text: this.interpolate(this.resolveString(beat.id)), padAfter: this.padOf(beat.id), gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
       case "line": {
         const raw = this.resolveString(beat.id);
         // Closed captions (#214) apply to DIALOGUE lines only: strip cues when captions are off. Two ways a
@@ -2584,6 +2623,7 @@ export class Flow {
           speakerLabel: silent ? undefined : speakerLabelOf(this.host, beat.character, beat.qualifier),
           padAfter: this.padOf(beat.id), // a silent line still fires, so it still carries its pause
           gameData: beat.gameData,
+          ...extensionsField(beat.extensions),
           ...withTags,
         };
       }
@@ -2646,12 +2686,12 @@ export class Flow {
   private promptResult(beat: LineBeat | TextBeat, shown: ChoicePrompt): StepResult {
     const tags = tagsOf(this.host, beat.id);
     const withTags = tags && tags.length ? { tags } : {};
-    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, padAfter: this.padOf(beat.id), gameData: beat.gameData, ...withTags };
+    if (shown.kind === "text") return { type: "text", id: beat.id, text: shown.text, padAfter: this.padOf(beat.id), gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags };
     return {
       type: "line", id: beat.id, text: shown.text,
       character: shown.character, characterName: shown.characterName, direction: shown.direction,
       qualifier: shown.qualifier, qualifierName: shown.qualifierName, speakerLabel: shown.speakerLabel, padAfter: this.padOf(beat.id),
-      gameData: beat.gameData, ...withTags,
+      gameData: beat.gameData, ...extensionsField(beat.extensions), ...withTags,
     };
   }
 
@@ -2852,6 +2892,11 @@ function speakerLabelOf(host: FlowHost, character: string | undefined, qualifier
 /** A `{ gameData }` outline fragment, present only when the node sets any (parity with a beat's). */
 function gameDataField(gameData: GameData | undefined): { gameData?: GameData } {
   return gameData && Object.keys(gameData).length ? { gameData } : {};
+}
+
+/** An `{ extensions }` fragment, present only when the node has any Patter extension values (as gameData's). */
+function extensionsField(extensions: NodeExtensions | undefined): { extensions?: NodeExtensions } {
+  return extensions && Object.keys(extensions).length ? { extensions } : {};
 }
 
 /** Serialise a `sequence` selector-cursor map to plain snapshots. */

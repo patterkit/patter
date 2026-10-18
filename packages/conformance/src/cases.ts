@@ -11,6 +11,8 @@
 import type { DescribeFixture, Fixtures, GameDataFixture, LogFixture, RuntimeFixture, SaveFixture, ScriptOp, ScriptedFixture, TranscriptStep } from "./types.js";
 import type { ProjectFile, LocaleFile, Scene } from "@patterkit/model";
 import { castStringKey, qualifierStringKey, speakerLabelKey, SPEAKER_PATTERN_KEY } from "@patterkit/model";
+import type { ExtensionShard } from "@patterkit/model";
+import { readFileSync } from "node:fs";
 
 // A minimal project scaffold shared by the runtime fixtures.
 const project = (extra: Partial<ProjectFile> = {}): ProjectFile => ({
@@ -3441,6 +3443,230 @@ const scriptedListProperties = {
   ],
 } satisfies ScriptedFixture;
 
+// --- Patter extensions (patterkit design/proposals/patter-storylet-extensions.md, phase 3) --------------
+//
+// An extension's values are compiled inline on each node, under `extensions` keyed by extension id, and
+// delivered wherever the node's gameData is: on a line, text or game event step, a replayed prompt, a choice's
+// option, a scene's and a block's own (`extensionsForScene` / `extensionsForBlock`), and for any node, read off
+// the bundle by `extensionsOf`. The engine never interprets them, so the contract is that they arrive exactly as
+// the bundle wrote them, in every type (structured ones included, any JSON, compared deeply), and that
+// `effectiveGameData(extensionDecls(...))` fills in a field a node leaves out from the bundle's resolved
+// declaration. Every case compiles through the real exportBundle. "probe" is the internal test extension
+// (never published; its manifest is fixtures/probe.extension.json); "other" shows two extensions on one line
+// stay apart.
+const probeManifest: unknown = JSON.parse(readFileSync(new URL("../fixtures/probe.extension.json", import.meta.url), "utf8"));
+const otherManifest = {
+  schema: "wildwinter/extension@0", id: "other", name: "Other", version: "0.1.0",
+  targets: { patter: { line: { fields: [{ name: "flag", type: "boolean" }] } } },
+};
+const extShard = (extension: string, scene: string, entries: ExtensionShard["entries"]): ExtensionShard =>
+  ({ schema: "patter/extension@0", extension, scene, entries });
+
+/** The full set of probe line values, raw, as the bundle carries them (keys sorted, as the compiler writes them). */
+const probeLineFull = {
+  act: "turn", beats: [{ id: "b2", at: 3 }, { id: "b1", at: 1 }], cue: { sound: "bell", gain: 0.5 }, loud: true,
+  marks: ["night", "rain"], next: "L_bare", note: "lights down",
+  perf: { ANNA: { expression: "frown", look: "away" }, BO: { expression: "smile", look: "" } },
+  tone: "tense", weight: 4, words: ["salt", "rope"],
+};
+/** Every probe line field from its default: a structured default arrives whole, as the bundle resolved it. */
+const probeLineDefaults = {
+  act: "setup", beats: [], cue: { sound: "", gain: 0 }, loud: false, marks: [], next: "", note: "", perf: {},
+  tone: "calm", weight: 1, words: [],
+};
+
+const probeProject = (extra: Partial<ProjectFile> = {}): ProjectFile => project({
+  cast: [{ name: "ANNA" }, { name: "BO" }],
+  gameDataFields: { line: [{ name: "delivery", type: "enum", values: ["calm", "tense"] }] },
+  extensions: { probe: { version: "1.1.0" }, other: { version: "0.1.0" } },
+  ...extra,
+});
+const probeScenes: Scene[] = [{
+  id: "s_probe", type: "scene", name: "Probe", gameId: "the-probe",
+  blocks: [{ id: "b_main", type: "block", name: "Main", children: [
+    { id: "sn_a", type: "snippet", beats: [
+      { id: "L_full", kind: "line", character: "ANNA", gameData: { delivery: "tense" } },
+      { id: "T_one", kind: "text" },
+      { id: "E_one", kind: "gameEvent" },
+      { id: "L_bare", kind: "line", character: "BO" },
+    ] },
+    { id: "g_pick", type: "group", selector: "choice", children: [
+      { id: "o_go", type: "group", prompt: { id: "P_go", kind: "line", character: "ANNA" }, children: [
+        { id: "sn_go", type: "snippet", beats: [{ id: "T_go", kind: "text" }], jump: { to: "END" } },
+      ] },
+      { id: "o_stay", type: "group", prompt: { id: "P_stay", kind: "text" }, children: [
+        { id: "sn_stay", type: "snippet", beats: [{ id: "T_stay", kind: "text" }], jump: { to: "END" } },
+      ] },
+    ] },
+  ] }],
+}];
+const probeLocales = [loc("s_probe", {
+  L_full: "Lights down.", T_one: "The hall goes quiet.", L_bare: "Now?", P_go: "Let's go.", P_stay: "Stay.", T_go: "Gone.", T_stay: "Stayed.",
+})];
+const probeShards: ExtensionShard[] = [
+  extShard("probe", "s_probe", {
+    scene: { s_probe: { theme: "harbour" } },
+    block: { b_main: { pace: 2 } },
+    snippet: { sn_a: { weight: 3 } },
+    line: { L_full: probeLineFull, P_go: { note: "prompt" } },
+    text: { T_one: { style: "hushed" } },
+    gameEvent: { E_one: { cue: "thunder" } },
+    option: { o_go: { icon: "door" } },
+  }),
+  extShard("other", "s_probe", { line: { L_full: { flag: true } } }),
+  extShard("probe", "@project", { project: { conf: { studio: "Wildwinter" } } }),
+];
+
+const scriptedExtensions: ScriptedFixture = {
+  name: "extension values reach the game raw on every step, option and node, in every type, and the helpers fill in defaults",
+  project: probeProject(),
+  scenes: probeScenes,
+  locales: probeLocales,
+  extensionManifests: [probeManifest, otherManifest],
+  extensionShards: probeShards,
+  engineOptions: { replayPromptOnChoose: true },
+  script: [
+    { op: "openFlow", flow: "main", scene: "s_probe" },
+    // Two extensions on one line, side by side, beside the line's own gameData.
+    { op: "advance", expect: [{ type: "line", id: "L_full", text: "Lights down.", character: "ANNA", gameData: { delivery: "tense" },
+      extensions: { other: { flag: true }, probe: probeLineFull } }] },
+    { op: "advance", expect: [{ type: "text", id: "T_one", text: "The hall goes quiet.", extensions: { probe: { style: "hushed" } } }] },
+    { op: "advance", expect: [{ type: "gameEvent", id: "E_one", extensions: { probe: { cue: "thunder" } } }] },
+    // A beat with none carries no key at all.
+    { op: "advance", expect: [{ type: "line", id: "L_bare", text: "Now?", character: "BO" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g_pick", options: [
+      { id: "o_go", prompt: { kind: "line", text: "Let's go.", character: "ANNA" }, eligible: true, extensions: { probe: { icon: "door" } } },
+      { id: "o_stay", prompt: { kind: "text", text: "Stay." }, eligible: true },
+    ] }] },
+    // Saved at the pending choice: the save carries no extension values, and the options read theirs back off
+    // their nodes on load.
+    { op: "saveLoad" },
+    { op: "advance", expect: [{ type: "choice", groupId: "g_pick", options: [
+      { id: "o_go", prompt: { kind: "line", text: "Let's go.", character: "ANNA" }, eligible: true, extensions: { probe: { icon: "door" } } },
+      { id: "o_stay", prompt: { kind: "text", text: "Stay." }, eligible: true },
+    ] }] },
+    { op: "stepFor", beat: "P_go", expect: [{ type: "line", id: "P_go", text: "Let's go.", character: "ANNA", extensions: { probe: { note: "prompt" } } }] },
+    { op: "choose", id: "o_go" },
+    // The prompt spoken back carries its own beat's values.
+    { op: "advance", expect: [{ type: "line", id: "P_go", text: "Let's go.", character: "ANNA", extensions: { probe: { note: "prompt" } } }] },
+    { op: "advance", expect: [{ type: "text", id: "T_go", text: "Gone." }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    // A scene's and a block's own values, by id or gameId; none for a ref that doesn't resolve.
+    { op: "expectExtensions", scene: "s_probe", expectResult: { probe: { theme: "harbour" } } },
+    { op: "expectExtensions", scene: "the-probe", expectResult: { probe: { theme: "harbour" } } },
+    { op: "expectExtensions", scene: "s_probe", block: "b_main", expectResult: { probe: { pace: 2 } } },
+    { op: "expectExtensions", scene: "the-probe", block: "main", expectResult: { probe: { pace: 2 } } },
+    { op: "expectExtensions", scene: "nowhere", expectResult: {} },
+    { op: "expectExtensions", scene: "s_probe", block: "nowhere", expectResult: {} },
+    // Any node, off the bundle.
+    { op: "expectNodeExtensions", kind: "project", expectResult: { probe: { studio: "Wildwinter" } } },
+    { op: "expectNodeExtensions", kind: "project", effective: { extension: "probe" }, expectResult: { studio: "Wildwinter" } },
+    { op: "expectNodeExtensions", kind: "scene", address: "the-probe", expectResult: { probe: { theme: "harbour" } } },
+    { op: "expectNodeExtensions", kind: "block", address: "the-probe/main", expectResult: { probe: { pace: 2 } } },
+    { op: "expectNodeExtensions", kind: "block", address: "s_probe/b_main", effective: { extension: "probe" }, expectResult: { pace: 2 } },
+    { op: "expectNodeExtensions", kind: "snippet", address: "sn_a", expectResult: { probe: { weight: 3 } } },
+    { op: "expectNodeExtensions", kind: "snippet", address: "sn_go", expectResult: {} },
+    { op: "expectNodeExtensions", kind: "snippet", address: "sn_go", effective: { extension: "probe" }, expectResult: { weight: 0 } },
+    { op: "expectNodeExtensions", kind: "option", address: "o_go", expectResult: { probe: { icon: "door" } } },
+    { op: "expectNodeExtensions", kind: "option", address: "o_stay", effective: { extension: "probe" }, expectResult: { icon: "" } },
+    { op: "expectNodeExtensions", kind: "line", address: "L_full", expectResult: { other: { flag: true }, probe: probeLineFull } },
+    { op: "expectNodeExtensions", kind: "line", address: "L_full", effective: { extension: "probe" }, expectResult: probeLineFull },
+    { op: "expectNodeExtensions", kind: "line", address: "L_bare", effective: { extension: "probe" }, expectResult: probeLineDefaults },
+    { op: "expectNodeExtensions", kind: "line", address: "L_full", effective: { extension: "other" }, expectResult: { flag: true } },
+    { op: "expectNodeExtensions", kind: "line", address: "L_bare", effective: { extension: "other" }, expectResult: { flag: false } },
+    { op: "expectNodeExtensions", kind: "line", address: "P_go", expectResult: { probe: { note: "prompt" } } },
+    { op: "expectNodeExtensions", kind: "text", address: "T_one", expectResult: { probe: { style: "hushed" } } },
+    { op: "expectNodeExtensions", kind: "gameEvent", address: "E_one", expectResult: { probe: { cue: "thunder" } } },
+    // A node of another kind, or no node at all, reads as none.
+    { op: "expectNodeExtensions", kind: "line", address: "T_one", expectResult: {} },
+    { op: "expectNodeExtensions", kind: "line", address: "nowhere", expectResult: {} },
+  ],
+};
+
+// What the compile does to the data: an editor-only field never reaches the bundle (not its value, not its
+// declaration), a stage the extension renamed arrives under its new name, a node left with only editor-only
+// values has no `extensions` at all, an entry with an error is left out, an entry in another scene's shard is
+// compiled all the same, and an `extensions` key written by hand on a source beat never leaks.
+const scriptedExtensionsCompile: ScriptedFixture = {
+  name: "extension values as the compile leaves them: editor-only out, renamed stages renamed, bad entries left out",
+  project: probeProject({ extensions: { probe: { version: "1.1.0" } } }),
+  scenes: [
+    { id: "s_c", type: "scene", name: "C", blocks: [{ id: "b_c", type: "block", name: "B", children: [
+      { id: "sn_c", type: "snippet", beats: [
+        { id: "L_draft", kind: "line", character: "ANNA" },
+        { id: "L_only", kind: "line", character: "ANNA" },
+        { id: "L_bad", kind: "line", character: "ANNA" },
+        { id: "L_hand", kind: "line", character: "ANNA", extensions: { probe: { note: "sneaky" } } },
+      ], jump: { to: "END" } },
+    ] }] },
+    { id: "s_far", type: "scene", name: "Far", blocks: [{ id: "b_far", type: "block", name: "B", children: [
+      { id: "sn_far", type: "snippet", beats: [{ id: "L_far", kind: "line", character: "BO" }], jump: { to: "END" } },
+    ] }] },
+  ],
+  locales: [loc("s_c", { L_draft: "One.", L_only: "Two.", L_bad: "Three.", L_hand: "Four." }), loc("s_far", { L_far: "Far." })],
+  extensionManifests: [probeManifest],
+  extensionShards: [extShard("probe", "s_c", { line: {
+    L_draft: { draft: "working notes", act: "opening", note: "hi" },
+    L_only: { draft: "only this" },
+    L_bad: { weight: 99, note: "too heavy" },
+    L_far: { note: "far" },
+  } })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s_c" },
+    { op: "advance", expect: [{ type: "line", id: "L_draft", text: "One.", character: "ANNA", extensions: { probe: { act: "setup", note: "hi" } } }] },
+    { op: "advance", expect: [{ type: "line", id: "L_only", text: "Two.", character: "ANNA" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_bad", text: "Three.", character: "ANNA" }] },
+    { op: "advance", expect: [{ type: "line", id: "L_hand", text: "Four.", character: "ANNA" }] },
+    { op: "advance", expect: [{ type: "end" }] },
+    { op: "expectNodeExtensions", kind: "line", address: "L_only", expectResult: {} },
+    // The declarations carry no editor-only field, so neither does the filled-in view.
+    { op: "expectNodeExtensions", kind: "line", address: "L_only", effective: { extension: "probe" }, expectResult: probeLineDefaults },
+    { op: "expectNodeExtensions", kind: "line", address: "L_draft", effective: { extension: "probe" }, expectResult: { ...probeLineDefaults, note: "hi" } },
+    { op: "expectNodeExtensions", kind: "line", address: "L_far", expectResult: { probe: { note: "far" } } },
+    { op: "openFlow", flow: "far", scene: "s_far" },
+    { op: "advance", expect: [{ type: "line", id: "L_far", text: "Far.", character: "BO", extensions: { probe: { note: "far" } } }] },
+  ],
+};
+
+// A project that takes no extension: a bundle with none hands none back anywhere, and the helpers read `{}`.
+const scriptedNoExtensions: ScriptedFixture = {
+  name: "a bundle with no extensions hands back none, and the helpers read nothing",
+  project: project({ cast: [{ name: "ANNA" }], gameDataFields: { scene: [{ name: "music", type: "text" }] } }),
+  scenes: [{ id: "s_none", type: "scene", name: "None", gameData: { music: "harp" }, blocks: [{ id: "b_none", type: "block", name: "B", children: [
+    { id: "sn_none", type: "snippet", beats: [{ id: "L_none", kind: "line", character: "ANNA" }, { id: "E_none", kind: "gameEvent" }] },
+    { id: "g_none", type: "group", selector: "choice", children: [
+      { id: "o_none", type: "group", prompt: { id: "P_none", kind: "text" }, children: [{ id: "sn_o", type: "snippet", jump: { to: "END" } }] },
+    ] },
+  ] }] }],
+  locales: [loc("s_none", { L_none: "Plain.", P_none: "On." })],
+  script: [
+    { op: "openFlow", flow: "main", scene: "s_none" },
+    { op: "advance", expect: [{ type: "line", id: "L_none", text: "Plain.", character: "ANNA" }] },
+    { op: "advance", expect: [{ type: "gameEvent", id: "E_none" }] },
+    { op: "advance", expect: [{ type: "choice", groupId: "g_none", options: [{ id: "o_none", prompt: { kind: "text", text: "On." }, eligible: true }] }] },
+    { op: "expectExtensions", scene: "s_none", expectResult: {} },
+    { op: "expectExtensions", scene: "s_none", block: "b_none", expectResult: {} },
+    { op: "expectNodeExtensions", kind: "project", expectResult: {} },
+    { op: "expectNodeExtensions", kind: "line", address: "L_none", expectResult: {} },
+    // An extension the bundle doesn't have: no declarations, nothing filled in.
+    { op: "expectNodeExtensions", kind: "line", address: "L_none", effective: { extension: "probe" }, expectResult: {} },
+    { op: "expectNodeExtensions", kind: "project", effective: { extension: "probe" }, expectResult: {} },
+    { op: "expectNodeExtensions", kind: "scene", address: "nowhere", expectResult: {} },
+    { op: "expectNodeExtensions", kind: "nothing", address: "L_none", expectResult: {} },
+  ],
+};
+
+// The outline carries a scene's, a block's and each beat's extension values beside their gameData, a prompt's
+// included; a node with none has no key.
+const outlineExtensions: DescribeFixture = {
+  name: "the outline and beat sequence carry extension values on scenes, blocks and beats",
+  project: probeProject(),
+  scenes: probeScenes,
+  locales: probeLocales,
+  extensionManifests: [probeManifest, otherManifest],
+  extensionShards: probeShards,
+};
+
 // --- the outline and beat sequence --------------------------------------------------------------------
 // One project with something in every field the structure reads: tags and Game Data on a scene, a block,
 // and beats; a choice with a spoken prompt and a text one; a sequence; a call jump and a plain one; a
@@ -3567,7 +3793,8 @@ export const cases: Fixtures = {
     scriptedReplaySaveLoad, scriptedReplayShown, scriptedEmptySpeakerSaveLoad, ruleConditionOnce, ruleShuffleDrawsEligible, ruleOneAddressRule, scriptedResetFlow,
     scriptedCheckpointRefusals, scriptedSaveInCheckpoint, scriptedBlockInOtherScene, scriptedListProperties, scriptedStages,
     scriptedWorldQuality, scriptedStoryQuality, scriptedQualityDeletedStage, scriptedEnumDeletedValue,
-    scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited],
+    scriptedQualifierSaveLoad, scriptedSpeakerLabelsSetLocale, scriptedStepFor, scriptedStepForVoiced, scriptedStepForIds, scriptedFlowState, scriptedFlowStateRefusals, scriptedFlowStateEdited,
+    scriptedExtensions, scriptedExtensionsCompile, scriptedNoExtensions],
   gameData: [gameDataDefaults, gameDataOrphan, gameDataPureDefaults, gameDataQuality, gameDataQualityDefaults, gameDataOption, gameDataOptionDefaults],
   saves: [
     asSaveFixture(scriptedSaveLoad, "a save written by the JS reference loads elsewhere mid-flow, cursor and selector memory intact"),
@@ -3593,6 +3820,6 @@ export const cases: Fixtures = {
   ],
   logs: [decisionLog],
   describes: [describeEverything],
-  outlines: [outlineEverything],
+  outlines: [outlineEverything, outlineExtensions],
   audio: [audioManifest],
 };

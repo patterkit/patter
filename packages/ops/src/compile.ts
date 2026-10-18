@@ -7,6 +7,7 @@
 
 import { basename, extname, isAbsolute, resolve } from "node:path";
 import { exportBundle } from "@patterkit/compiler";
+import type { ExportInput } from "@patterkit/compiler";
 import { isContentlessBeat } from "@patterkit/model";
 import type { Bundle, Scene, Block, Group, Snippet } from "@patterkit/model";
 import type { LoadedProject } from "./load.js";
@@ -40,7 +41,22 @@ function compileScenes(loaded: LoadedProject): Scene[] {
  * line made a freshly exported bundle read as stale for ever, and coverage counted beats that never ship.
  */
 export function compileLoaded(loaded: LoadedProject): Bundle {
-  return exportBundle({ project: loaded.project, scenes: compileScenes(loaded), locales: loaded.locales, gameScopes: loaded.gameScopes?.merged });
+  return exportBundle({
+    project: loaded.project, scenes: compileScenes(loaded), locales: loaded.locales, gameScopes: loaded.gameScopes?.merged,
+    extensions: loadedExtensions(loaded),
+  });
+}
+
+/**
+ * A loaded project's extension files, as the compiler's extension pass reads them: the manifests, and each
+ * data shard with its file. What is wrong with them is validate's to say (`extensionPass` over the same
+ * input); the compile never throws on it, and leaves an entry with an error out of the bundle.
+ */
+export function loadedExtensions(loaded: LoadedProject): NonNullable<ExportInput["extensions"]> {
+  return {
+    manifests: loaded.manifests,
+    shards: loaded.extensionShards.map((shard, i) => ({ path: loaded.extensionShardFiles[i]!, shard })),
+  };
 }
 
 /**

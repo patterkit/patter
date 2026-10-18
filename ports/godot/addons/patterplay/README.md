@@ -63,7 +63,7 @@ give each line and text beat its resolved `padAfter`, and `ownPadAfter` when the
 To show a line again that your game kept by id (after a load, or a language switch), call
 `flow.step_for(beat_id)`. It gives the step `advance()` would give for that beat right now, built the same
 way: the text in the active locale, interpolated against the flow's values, closed captions applied, and the
-names, label, pause, Game Data, and tags. It doesn't move the flow, count a visit, or run an effect, and it
+names, label, pause, Game Data, extension values, and tags. It doesn't move the flow, count a visit, or run an effect, and it
 returns `null` for an id that isn't a beat or an option's prompt.
 
 ## Demos
@@ -91,6 +91,19 @@ In `demo/` (delete the folder freely):
   isn't in it, so nothing else is rewound. Capture before `close_flow`, which drops the flow's values.
   Capturing is allowed inside a checkpoint; restoring isn't, nor over an id that is open (it returns
   null, with `push_error`).
+- **Game Data**: a step, an option, and each scene and block carry the writer's `gameData` overrides
+  raw (`engine.game_data_for_scene(ref)` and `engine.game_data_for_block(scene, block)` for a scene's and a
+  block's own). `PatterBundle.effective_game_data(PatterBundle.game_data_fields(bundle, kind), node)` fills
+  in the declared defaults.
+- **Patter extension values**: when the project uses Patter extensions, a `"line"`, `"text"` or
+  `"gameEvent"` step, a choice option, and each scene, block and beat of `get_outline()` carry
+  `extensions`, by extension id, raw as the bundle wrote them (any JSON), and only when the node has any.
+  `engine.extensions_for_scene(ref)` and `engine.extensions_for_block(scene, block)` read a scene's and a
+  block's own. Fill in an extension's defaults with the same helper, given its declarations:
+  `PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, id, kind), step["extensions"].get(id))`.
+  `PatterBundle.extensions_of(bundle, kind, address)` reads any node's values off the bundle: `"project"`
+  (no address), `"scene"`, `"block"` (`"scene/block"`), or a `"snippet"`, `"option"`, `"line"`, `"text"` or
+  `"gameEvent"` by id.
 - **Your game's state and one registry per game**: bind `@world` to your own store with the
   `host_scopes` option, or hand the engine your game's `PatterScopeRegistry` with the `registry`
   option so every engine in the game shares one set of properties and one save. Without a registry

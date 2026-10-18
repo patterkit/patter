@@ -14,8 +14,8 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { parseSource } from "@patterkit/core";
-import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene } from "@patterkit/model";
-import { isCaseOnlyPropertyName, projectLayout } from "@patterkit/model";
+import type { ProjectFile, FlowFile, LocaleFile, AuthoringFile, Scene, ExtensionShard } from "@patterkit/model";
+import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, isCaseOnlyPropertyName, projectLayout } from "@patterkit/model";
 import { discoverGameScopes } from "./game-scopes.js";
 import type { GameScopes } from "./game-scopes.js";
 
@@ -38,6 +38,79 @@ export interface LoadedProject {
   gameScopes?: GameScopes;
   /** The project names a game scopes folder (`gameScopes`) that doesn't exist: a project error. */
   gameScopesMissing?: string;
+  /** The extensions' manifests, from `extensions/<id>.extension.json`, sorted by path. Read whether or not
+   *  the project takes them (`ProjectFile.extensions` says which it does). `manifest` is the parsed JSON as
+   *  it came, unchecked: the extension pass says whether it is sound. Empty after a landing load. */
+  manifests: LoadedManifest[];
+  /** The extension data shards (`.patterextension`, under `layout.extensions`), sorted by path. Empty after
+   *  a landing load. */
+  extensionShards: ExtensionShard[];
+  /** Source file of each entry in `extensionShards`, index-aligned. */
+  extensionShardFiles: string[];
+  /** Extension files that would not load (a manifest or a data shard that will not parse, or a shard of
+   *  the wrong shape). Unlike a scene, an extension's file never stops the project loading: it is left out
+   *  and said here, and its data left untouched on disk. */
+  extensionIssues: Array<{ file: string; message: string }>;
+}
+
+/** One extension's manifest, as the project keeps it in `extensions/`. */
+export interface LoadedManifest {
+  /** Absolute path: `<root>/extensions/<id>.extension.json`. */
+  path: string;
+  /** The file's stem, which names the extension it should be. */
+  id: string;
+  manifest: unknown;
+}
+
+/** No extensions: what a landing load carries, and a project with none. */
+const NO_EXTENSIONS = (): Pick<LoadedProject, "manifests" | "extensionShards" | "extensionShardFiles" | "extensionIssues"> =>
+  ({ manifests: [], extensionShards: [], extensionShardFiles: [], extensionIssues: [] });
+
+/**
+ * A project's extension files: the manifests in `extensions/` (one level, `*.extension.json`) and the data
+ * shards under `layout.extensions` (`.patterextension`, at any depth). A file that will not parse, or a
+ * shard of the wrong shape, is an issue rather than a throw: the rest of the project loads.
+ */
+function loadExtensions(root: string, layout: { extensions: string }): ReturnType<typeof NO_EXTENSIONS> {
+  const out = NO_EXTENSIONS();
+  const manifestDir = join(root, EXTENSIONS_DIR);
+  const manifestFiles = readDirSafe(manifestDir)
+    .filter((e) => e.isFile() && !e.name.startsWith(".") && e.name.endsWith(MANIFEST_EXTENSION))
+    .map((e) => join(manifestDir, e.name))
+    .sort();
+  for (const path of manifestFiles) {
+    try {
+      out.manifests.push({ path, id: basename(path).slice(0, -MANIFEST_EXTENSION.length), manifest: parseSource(readFileSync(path, "utf8")) });
+    } catch (e) {
+      out.extensionIssues.push({ file: path, message: `the extension's manifest will not parse: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  }
+  for (const file of walkFiles(join(root, layout.extensions), EXTENSION_SHARD)) {
+    let parsed: unknown;
+    try {
+      parsed = parseSource(readFileSync(file, "utf8"));
+    } catch (e) {
+      out.extensionIssues.push({ file, message: `the extension data will not parse, so it is left out: ${e instanceof Error ? e.message : String(e)}` });
+      continue;
+    }
+    const problem = extensionShardProblem(parsed);
+    if (problem) { out.extensionIssues.push({ file, message: `${problem}, so it is left out` }); continue; }
+    out.extensionShards.push(parsed as ExtensionShard);
+    out.extensionShardFiles.push(file);
+  }
+  return out;
+}
+
+/** What is wrong with an extension data shard's shape, or undefined when it has the shape. */
+function extensionShardProblem(v: unknown): string | undefined {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return "not an extension data file";
+  const o = v as Record<string, unknown>;
+  if (typeof o["schema"] !== "string" || !o["schema"].startsWith("patter/extension@")) return `schema is '${String(o["schema"])}', expected 'patter/extension@...'`;
+  if (typeof o["extension"] !== "string" || o["extension"] === "") return "it names no extension";
+  if (typeof o["scene"] !== "string" || o["scene"] === "") return "it names no scene";
+  const entries = o["entries"];
+  if (typeof entries !== "object" || entries === null || Array.isArray(entries)) return "its entries are not keyed by node kind";
+  return undefined;
 }
 
 /** A project's game scopes, as the two loaders carry them: nothing at all when there is no folder. */
@@ -284,7 +357,7 @@ export function loadProjectLanding(startPath: string, opts?: { launchPath?: stri
     }
   }
 
-  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring: [], authoringFiles: [], ...withGameScopes(root, project) };
+  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring: [], authoringFiles: [], ...withGameScopes(root, project), ...NO_EXTENSIONS() };
 }
 
 /** Sort scenes into the project's authored nav order (`ProjectFile.sceneOrder`), in place.
@@ -338,5 +411,8 @@ export function loadProject(startPath: string): LoadedProject {
     authoringFiles.push(f);
   }
 
-  return { root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring, authoringFiles, ...withGameScopes(root, project) };
+  return {
+    root, projectFile, project, scenes, locales, sceneFiles, localeFiles, authoring, authoringFiles, ...withGameScopes(root, project),
+    ...loadExtensions(root, layout),
+  };
 }

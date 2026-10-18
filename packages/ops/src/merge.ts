@@ -12,14 +12,28 @@
 // them so a caller never silently mis-merges.
 //
 // The merged model is ALWAYS valid canonical source; conflicted values resolve
-// provisionally to OURS and are listed separately (§3.6), for a sidecar a UI
-// can render. Equality is deep + key-order-independent (canonical bytes).
+// provisionally to OURS, and the clashes are written into the merged shard
+// itself under the reserved key `unresolved` (ruled 2026-10-18, in both
+// formats), so the mark travels with the file and validate, export, and pack
+// refuse it wherever the file goes. They are also listed (§3.6) for the
+// `.patterconflict` sidecar a UI can render, which stays uncommitted; a
+// lingering sidecar is refused too. Equality is deep + key-order-independent
+// (canonical bytes).
+//
+// EXTENSION data shards (`.patterextension`) merge by the extension's
+// manifest, through `@wildwinter/toolkit/extensions`' type-driven merge. The
+// hand-written mergers below stay (family parity item 6, moving them onto that
+// engine's `mergeTree`, is still open): the flow merge's ordered-list weave and
+// move conflicts, and the authoring merge's edit-clock last-writer-wins, are
+// behaviours the strategy table has no words for yet.
 // ---------------------------------------------------------------------------
 
-import { canonicalStringify } from "@patterkit/core";
+import { canonicalStringify, parseSource } from "@patterkit/core";
 import { DEFAULT_QUALIFIERS } from "@patterkit/model";
+import { markUnresolved, mergeExtensionData, unresolvedProblems, withoutMark } from "@wildwinter/toolkit/extensions";
+import type { Conflict as ToolkitConflict, Manifest } from "@wildwinter/toolkit/extensions";
 
-export type MergeFileType = "flow" | "loc" | "authoring" | "project";
+export type MergeFileType = "flow" | "loc" | "authoring" | "project" | "extension";
 
 export type ConflictKind =
   | "both-changed"      // both sides changed the same value differently
@@ -50,7 +64,8 @@ export interface Warning {
 
 export interface MergeResult {
   type: MergeFileType;
-  /** The merged model - valid canonical source; conflicts resolved to OURS. */
+  /** The merged model - valid canonical source; conflicts resolved to OURS, and named under `unresolved`
+   *  when there are any. */
   merged: Record<string, unknown>;
   conflicts: Conflict[];
   /** Advisory notes (e.g. both sides inserted at the same anchor, kept ours-then-theirs). */
@@ -89,7 +104,9 @@ export function sidecarIssues(sidecarPaths: readonly string[]): Array<{ file: st
 }
 
 /** Each source schema's name, to the merge strategy for it. */
-const MERGE_TYPES: Record<string, MergeFileType> = { flow: "flow", strings: "loc", authoring: "authoring", project: "project" };
+const MERGE_TYPES: Record<string, MergeFileType> = {
+  flow: "flow", strings: "loc", authoring: "authoring", project: "project", extension: "extension",
+};
 
 export function detectMergeType(file: { schema?: unknown }): MergeFileType {
   const s = typeof file.schema === "string" ? file.schema : "";
@@ -101,15 +118,57 @@ export function detectMergeType(file: { schema?: unknown }): MergeFileType {
   throw new UnsupportedMergeError(`cannot detect a Patter merge type from schema '${s}'`);
 }
 
-/** 3-way merge BASE / OURS / THEIRS (parsed models). Dispatches by file type. */
-export function runMerge(base: Obj, ours: Obj, theirs: Obj, opts?: { type?: MergeFileType }): MergeResult {
+/**
+ * 3-way merge BASE / OURS / THEIRS (parsed models). Dispatches by file type.
+ *
+ * Every shard type carries the `unresolved` mark: a mark already on either side is carried until somebody
+ * resolves it (by removing it), the merge itself runs on the content alone, and this merge's own clashes
+ * are written in beside it. An extension shard merges field by field by its manifest's types when the
+ * caller passes the project's `manifest`; without one, each node's entry merges as one value, which is
+ * always safe.
+ */
+export function runMerge(base: Obj, ours: Obj, theirs: Obj, opts?: { type?: MergeFileType; manifest?: Manifest }): MergeResult {
   const type = opts?.type ?? detectMergeType(ours);
-  switch (type) {
-    case "loc": return mergeLoc(base, ours, theirs);
-    case "authoring": return mergeAuthoring(base, ours, theirs);
-    case "flow": return mergeFlow(base, ours, theirs);
-    case "project": return mergeProject(base, ours, theirs);
+  if (type === "extension") {
+    const r = mergeExtensionData(base, ours, theirs, { host: "patter", ...(opts?.manifest !== undefined ? { manifest: opts.manifest } : {}) });
+    return { type, merged: r.merged, conflicts: [...r.conflicts], warnings: [...r.warnings] };
   }
+  const b = withoutMark(base), o = withoutMark(ours), t = withoutMark(theirs);
+  const r = type === "loc" ? mergeLoc(b, o, t)
+    : type === "authoring" ? mergeAuthoring(b, o, t)
+    : type === "flow" ? mergeFlow(b, o, t)
+    : mergeProject(b, o, t);
+  // Patter's conflict kinds are the family's plus `moved` and `no-timestamp`; the mark records whatever
+  // kind it is handed, so the cast only widens what it may say.
+  return { ...r, merged: markUnresolved(r.merged, r.conflicts as unknown as ToolkitConflict[], { base, ours, theirs }) };
+}
+
+/** A shard's text and where it is, for `unresolvedMarkIssues`. */
+export interface ShardText {
+  file: string;
+  text: string;
+}
+
+/**
+ * The issues a shard carrying the `unresolved` mark raises: one per clash, naming the shard and where in
+ * it. Every shard type, read from the project's files as they are, so a mark is refused whatever shard it
+ * is in (ruled 2026-10-18). `validate`, `export`, and `pack` all ask, as they ask about sidecars. Pure: the
+ * caller reads the files.
+ */
+export function unresolvedMarkIssues(files: readonly ShardText[]): Array<{ file: string; message: string }> {
+  const issues: Array<{ file: string; message: string }> = [];
+  for (const { file, text } of files) {
+    if (!text.includes("unresolved")) continue; // the cheap test first: almost no shard has one
+    let shard: unknown;
+    try { shard = parseSource(text); } catch { continue; } // a broken shard is the loader's to report
+    for (const p of unresolvedProblems(shard)) {
+      issues.push({
+        file,
+        message: `unresolved merge at ${p.path}: the shard holds our side of a clash - resolve it, then remove the entry from "unresolved"`,
+      });
+    }
+  }
+  return issues;
 }
 
 // --- 3-way primitives --------------------------------------------------------
@@ -363,6 +422,9 @@ function mergeCastMember(path: string, conflicts: Conflict[]): Resolver {
 
 // --- Project (`.patterproj`) -------------------------------------------------
 
+/** Every project key with a strategy of its own in `mergeProject`; anything else merges as a plain 3-way. */
+export const PROJECT_HANDLED = new Set(["properties", "cast", "gameDataFields", "qualifiers", "locales", "extensions"]);
+
 function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
   const conflicts: Conflict[] = [];
   const merged: Obj = {};
@@ -382,12 +444,44 @@ function mergeProject(base: Obj, ours: Obj, theirs: Obj): MergeResult {
       if (v !== undefined) merged[k] = v;
     } else if (k === "locales") {
       merged.locales = mergeLocales(asMap(base.locales), asMap(ours.locales), asMap(theirs.locales), conflicts);
+    } else if (k === "extensions" && [base[k], ours[k], theirs[k]].every((x) => x === undefined || isObj(x))) {
+      const v = mergeProjectExtensions(asMap(base[k]), asMap(ours[k]), asMap(theirs[k]), conflicts);
+      if (Object.keys(v).length > 0) merged[k] = v;
     } else {
       const v = merge3(base[k], ours[k], theirs[k], "", k, conflicts);
       if (v !== undefined) merged[k] = v;
     }
   }
   return { type: "project", merged, conflicts, warnings: [] };
+}
+
+/** The extensions the project takes, per id: its pin and each setting merge on their own, so two people
+ *  setting different settings both land, and one taking a new version while the other sets a setting both
+ *  land too. An extension one side dropped and the other changed merges whole, as a conflict. */
+function mergeProjectExtensions(b: Obj, o: Obj, t: Obj, conflicts: Conflict[]): Obj {
+  const out: Obj = {};
+  for (const id of new Set([...Object.keys(b), ...Object.keys(o), ...Object.keys(t)])) {
+    const bv = b[id], ov = o[id], tv = t[id];
+    const path = `extensions.${id}`;
+    if (!isObj(ov) || !isObj(tv) || (bv !== undefined && !isObj(bv))) {
+      const v = merge3(bv, ov, tv, id, path, conflicts);
+      if (v !== undefined) out[id] = v;
+      continue;
+    }
+    const bo = asMap(bv);
+    const entry: Obj = {};
+    for (const f of new Set([...Object.keys(bo), ...Object.keys(ov), ...Object.keys(tv)])) {
+      if (f === "settings" && [bo[f], ov[f], tv[f]].every((x) => x === undefined || isObj(x))) {
+        const settings = mergeMap(asMap(bo[f]), asMap(ov[f]), asMap(tv[f]), `${path}.settings`, conflicts);
+        if (Object.keys(settings).length > 0) entry[f] = settings;
+      } else {
+        const v = merge3(bo[f], ov[f], tv[f], id, `${path}.${f}`, conflicts);
+        if (v !== undefined) entry[f] = v;
+      }
+    }
+    out[id] = entry;
+  }
+  return out;
 }
 
 /** gameDataFields: a record of node-type -> name-keyed field array. Merge each node type's array on its
@@ -603,7 +697,8 @@ function checkDuplicateIds(root: TNode, conflicts: Conflict[]): void {
   const seen = new Set<string>(), dup = new Set<string>();
   const walk = (n: TNode) => { if (n.id) { if (seen.has(n.id)) dup.add(n.id); else seen.add(n.id); } n.children.forEach(walk); };
   walk(root);
-  for (const id of dup) conflicts.push({ id, path: "scene", base: undefined, ours: undefined, theirs: undefined, kind: "structural" });
+  // One path per id: the mark is a set by path, so a shared "scene" kept only the last duplicate.
+  for (const id of dup) conflicts.push({ id, path: `scene[${id}]`, base: undefined, ours: undefined, theirs: undefined, kind: "structural" });
 }
 
 const idMap = (nodes: TNode[]): Map<string, TNode> => new Map(nodes.filter((n) => n.id).map((n) => [n.id, n]));

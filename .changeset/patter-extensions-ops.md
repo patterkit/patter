@@ -1,0 +1,5 @@
+---
+"@patterkit/ops": minor
+---
+
+An unresolved merge is now marked in the shard itself, under `unresolved`, in every shard type: a mark either side already carries survives a clean merge until somebody removes it, and validate, export, and pack refuse a marked shard as they refuse a `.patterconflict` sidecar (`unresolvedMarkIssues`). Extension data shards (`.patterextension`) load with the project, pack, format, and merge, field by field when `runMerge` is handed the extension's manifest and each node's entry whole when it isn't; `readProjectManifest` and `projectManifests` read a project's manifest as a merge needs it. A project's `extensions` merge per extension, the pin and each setting on their own, and two duplicate ids after a flow merge are now two conflicts rather than one. Patter's own mergers stay hand-written for now: the flow merge's ordered weave and the authoring merge's edit clock have no counterpart in the shared merge engine yet. `compileLoaded` compiles a project's extension values into the bundle, and `loadedExtensions` gives a loaded project's extension files as the compiler's extension pass reads them.

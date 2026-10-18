@@ -86,18 +86,21 @@ static func game_data_fields_for(bundle: Dictionary, kind: String) -> Array:
 
 
 # One node's effective value for a field: its sparse OVERRIDE if present, else the field's declared
-# default (null if neither is set). `fields` is the schema for the node's type; `node` may be null.
+# default (null if neither is set). `fields` is the schema for the node's type: its gameData fields, or
+# an extension's declarations for the kind (extension_decls), whose values may be any JSON. `node` may be
+# null.
 static func game_data_value(fields: Array, node, name: String):
 	if node != null and node.has(name):
-		return PatterValues.to_value(node[name])
+		return _declared_value(node[name])
 	for f in fields:
 		if f.get("name", "") == name:
-			return PatterValues.to_value(f["default"]) if f.has("default") else null
+			return _declared_value(f["default"]) if f.has("default") else null
 	return null
 
 
 # A node's FULL effective gameData: declared fields filled (override or default), override-only orphans
-# kept. `node` may be null (pure defaults). Returns a Dictionary {name: value}.
+# kept. `node` may be null (pure defaults). Returns a Dictionary {name: value}. The same for one
+# extension's values, given its declarations (extension_decls): a structured default arrives whole.
 static func effective_game_data(fields: Array, node) -> Dictionary:
 	var out := {}
 	for f in fields:
@@ -108,8 +111,122 @@ static func effective_game_data(fields: Array, node) -> Dictionary:
 	if node != null:
 		for k in node.keys():
 			if not out.has(k):
-				out[k] = PatterValues.to_value(node[k])
+				out[k] = _declared_value(node[k])
 	return out
+
+
+# A value as the two helpers above hand it over: a scalar or a flags list normalised the way a step's
+# gameData is, and a structured extension value (a record, a map, a list of anything but text) whole, as a
+# deep copy, so a host editing what it was handed never edits the bundle.
+static func _declared_value(v):
+	if v is Dictionary:
+		return (v as Dictionary).duplicate(true)
+	if v is Array and not (v as Array).all(func(x): return x is String):
+		return (v as Array).duplicate(true)
+	return PatterValues.to_value(v)
+
+
+# -- Patter extension values -----------------------------------------------------------------------------
+#
+# Patter extension values follow gameData's rule (patterkit design/proposals/patter-storylet-extensions.md,
+# "At runtime"): raw on the node, declarations with every default resolved in the bundle's "extensions"
+# section, and the SAME two helpers above fill them in, given extension_decls. extensions_of reads any
+# node's values off the bundle, by the address a game already uses.
+
+## One extension's declarations for a node kind ("project", "scene", "block", "snippet", "line", "text",
+## "gameEvent", "option"), every default resolved. Empty when the bundle has no such extension or it
+## declares nothing for the kind.
+static func extension_decls(bundle: Dictionary, extension: String, kind: String) -> Array:
+	var exts = bundle.get("extensions")
+	if not (exts is Dictionary) or not (exts.get(extension) is Dictionary):
+		return []
+	var fields = exts[extension].get("fields")
+	if not (fields is Dictionary) or not (fields.get(kind) is Array):
+		return []
+	return fields[kind]
+
+
+## A node's Patter extension values, by extension id, raw; {} when it has none or the address names
+## nothing. By the names a game already holds: "project" (no address); "scene" by id or gameId; "block" as
+## "scene/block", each by id or gameId; "snippet", "line", "text", "gameEvent" and "option" (a group
+## directly inside a choice) by node id. A node of another kind than the one asked for reads as none. A
+## fresh Dictionary each call.
+static func extensions_of(bundle: Dictionary, kind: String, address: String = "") -> Dictionary:
+	var scenes = bundle.get("scenes")
+	if not (scenes is Dictionary):
+		scenes = {}
+	match kind:
+		"project":
+			var out := {}
+			var exts = bundle.get("extensions")
+			if exts is Dictionary:
+				for id in exts:
+					if exts[id] is Dictionary and exts[id].has("project"):
+						out[id] = exts[id]["project"]
+			return out
+		"scene":
+			return _ext_values(_ext_scene(scenes, address))
+		"block":
+			var slash := address.find("/")
+			if slash < 0:
+				return {}
+			var blocks: Array = _ext_scene(scenes, address.substr(0, slash)).get("blocks", [])
+			var ref := address.substr(slash + 1)
+			for b in blocks:
+				if b is Dictionary and b.get("id") == ref:
+					return _ext_values(b)
+			for b in blocks:
+				if b is Dictionary and effective_game_id(b) == ref:
+					return _ext_values(b)
+			return {}
+		"snippet", "option", "line", "text", "gameEvent":
+			for sid in scenes:
+				for block in scenes[sid].get("blocks", []):
+					var found = _ext_find(block.get("children", []), false, kind, address)
+					if found != null:
+						return _ext_values(found)
+			return {}
+	return {}
+
+
+# A scene by internal id, else by gameId; {} when neither names one.
+static func _ext_scene(scenes: Dictionary, ref: String) -> Dictionary:
+	if scenes.get(ref) is Dictionary:
+		return scenes[ref]
+	for sid in scenes:
+		if effective_game_id(scenes[sid]) == ref:
+			return scenes[sid]
+	return {}
+
+
+# The node of `kind` with id `address` among `children` and below, in document order, or null. An option
+# is a group directly inside a choice; its prompt beat counts as a line or text.
+static func _ext_find(children: Array, in_choice: bool, kind: String, address: String):
+	for node in children:
+		if not (node is Dictionary):
+			continue
+		if node.get("type", "") == "group":
+			if in_choice and node.get("id") == address and kind == "option":
+				return node
+			var prompt = node.get("prompt")
+			if in_choice and prompt is Dictionary and prompt.get("id") == address and prompt.get("kind") == kind:
+				return prompt
+			var inner = _ext_find(node.get("children", []), node.get("selector", "") == "choice", kind, address)
+			if inner != null:
+				return inner
+			continue
+		if node.get("id") == address and kind == "snippet":
+			return node
+		for beat in node.get("beats", []):
+			if beat is Dictionary and beat.get("id") == address:
+				return beat if beat.get("kind") == kind else null
+	return null
+
+
+# A shallow copy, so a host editing what it was handed never edits the bundle.
+static func _ext_values(node) -> Dictionary:
+	var values = node.get("extensions") if node is Dictionary else null
+	return (values as Dictionary).duplicate() if values is Dictionary else {}
 
 
 # -- speaker labels --------------------------------------------------------------

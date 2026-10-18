@@ -3,6 +3,7 @@
 // + the runner's normaliseStep (fields present only when set).
 
 using System.Collections.Generic;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -32,6 +33,10 @@ namespace Patterkit.Patterplay
         public ChoicePrompt Prompt;    // null when the option has no prompt at all
         public bool Eligible;
         public GameData GameData;
+        /// <summary>The option's Patter extension values, by extension id, exactly as the bundle carries them:
+        /// raw and sparse, any JSON as the neutral tree, never read by the engine. Null when it has none. Fill in
+        /// defaults with <c>GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(bundle, id, "option"), ...)</c>.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> Extensions;
     }
 
     /// <summary>The result of AdvanceToStop: every beat played on the way to a stop, plus the terminal
@@ -62,6 +67,9 @@ namespace Patterkit.Patterplay
         /// next line cuts in that long before this one ends; never negative on a snippet's last line.</summary>
         public double? PadAfter;
         public GameData GameData;
+        /// <summary>Line, text and game event only: the beat's Patter extension values, by extension id, raw as
+        /// the bundle carries them (any JSON as the neutral tree). Null when it has none.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> Extensions;
         public List<string> Tags;            // author tags (#215); null when none
         public List<ChoiceOption> Options;   // choice only
         public string GroupId;               // choice only

@@ -151,6 +151,37 @@ struct FPatterGameDataEntry
 	FPatterValue TypedValue;
 };
 
+/** One Patter extension field's value on a node: its name and its value as strict JSON text, raw as the
+ *  bundle wrote it. An extension value may be any JSON (a record, a map or a list as well as a scalar),
+ *  which no FPatterValue can hold, so it crosses as text: hand a scalar one to
+ *  UPatterGameData::ExtensionValueToScalar, or parse a structured one with the game's JSON reader. The
+ *  engine never interprets these. */
+USTRUCT(BlueprintType)
+struct FPatterExtensionEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Name;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Json;
+};
+
+/** One Patter extension's values on a node, by extension id, in bundle order. A node carries one of these
+ *  per extension that sets anything on it. */
+USTRUCT(BlueprintType)
+struct FPatterExtensionValues
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	FString Extension;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterExtensionEntry> Values;
+};
+
 /** A choice option's prompt, as the JS runtime's ChoicePrompt: a line someone speaks or plain text. The
  *  bHas flags tell an unset field from an empty one. */
 USTRUCT(BlueprintType)
@@ -235,6 +266,11 @@ struct FPatterOption
 	// The option's author Game Data (raw overrides), so a host can draw the option from data / an icon.
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterGameDataEntry> GameData;
+
+	/** The option's Patter extension values, raw; empty when it has none.
+	 *  UPatterGameData::GetEffectiveExtensionValues fills in the defaults. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterExtensionValues> Extensions;
 
 	/** Prompt.Text, from before the prompt was its own value. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay", meta = (DeprecatedProperty, DeprecationMessage = "Use Prompt.Text, as every Patterplay runtime's option has it."))
@@ -525,6 +561,12 @@ struct FPatterStep
 	// over the declared defaults) via the gameData helpers when you need the defaults too.
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterGameDataEntry> GameData;
+
+	/** A line, text or game-event step's Patter extension values (a replayed prompt's included), raw as the
+	 *  bundle carries them; empty when the beat has none. UPatterGameData::GetEffectiveExtensionValues fills
+	 *  in the defaults. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterExtensionValues> Extensions;
 
 	// Accumulated author tags (own + every ancestor's, outermost-first). Empty when none.
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")

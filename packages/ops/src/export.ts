@@ -6,7 +6,9 @@
 import type { Bundle } from "@patterkit/model";
 import { walkFiles } from "./load.js";
 import type { LoadedProject } from "./load.js";
-import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
+import { sidecarIssues, unresolvedMarkIssues, CONFLICT_SIDECAR } from "./merge.js";
+import { SHARD_EXTENSIONS } from "./pack.js";
+import { readFileSync } from "node:fs";
 import { compileLoaded, bundleOutputPath } from "./compile.js";
 import { canonicalStringify } from "@patterkit/core";
 import { audioManifestWrite, scanAudio } from "./audio-index.js";
@@ -24,11 +26,21 @@ import { exportBlockers } from "./validate.js";
  */
 function refuseUnresolvedMerge(loaded: LoadedProject): void {
   const issues = sidecarIssues(walkFiles(loaded.root, CONFLICT_SIDECAR));
-  if (!issues.length) return;
-  throw new Error(
-    `${issues.length} unresolved merge conflict(s) - resolve them and delete the .patterconflict sidecar(s) first:\n` +
-    issues.map((i) => `  ${i.file}`).join("\n"),
-  );
+  if (issues.length) {
+    throw new Error(
+      `${issues.length} unresolved merge conflict(s) - resolve them and delete the .patterconflict sidecar(s) first:\n` +
+      issues.map((i) => `  ${i.file}`).join("\n"),
+    );
+  }
+  // ...and a shard carrying the `unresolved` mark, the record a merge leaves in the file itself.
+  const marked = [...new Set(unresolvedMarkIssues(SHARD_EXTENSIONS.flatMap((ext) => walkFiles(loaded.root, ext))
+    .map((file) => ({ file, text: readFileSync(file, "utf8") }))).map((i) => i.file))];
+  if (marked.length) {
+    throw new Error(
+      `${marked.length} shard(s) still marked with an unresolved merge - resolve the clashes each names under "unresolved", then remove the entries:\n` +
+      marked.map((f) => `  ${f}`).join("\n"),
+    );
+  }
 }
 
 /** What a shipped build may not be built over. */

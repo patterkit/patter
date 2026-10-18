@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import type { ScalarValue, AstNode } from "@wildwinter/expr";
-import type { Bundle, ProjectFile, Scene, LocaleFile, GameData, GameDataNodeKind, SaveEnvelope, SaveGame } from "@patterkit/model";
+import type { Bundle, ExtensionShard, ProjectFile, Scene, LocaleFile, GameData, GameDataNodeKind, NodeExtensions, SaveEnvelope, SaveGame } from "@patterkit/model";
 
 export type ScopeBag = Record<string, ScalarValue>;
 
@@ -35,11 +35,15 @@ export type ScopeBag = Record<string, ScalarValue>;
  * the cases that are about something else. The outline cases pin every beat's resolved pause, defaults
  * included, so a runtime that leaves the field off still fails, and a step or prompt that should carry a pause
  * and doesn't records a "<missing>" marker instead.
+ *
+ * `extensions` (corpus 3) is a beat's or an option's Patter extension values, by extension id, exactly as the
+ * bundle carries them: raw and sparse, any JSON (records, maps and lists as well as the seven field types), so a
+ * runner compares them deeply, whatever order an object's keys arrive in. Absent when the node has none.
  */
 export type TranscriptStep =
-  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData; tags?: string[] }
-  | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData; tags?: string[] }
-  | { type: "gameEvent"; id: string; gameData?: GameData; tags?: string[] }
+  | { type: "line"; id: string; text: string; character?: string; characterName?: string; direction?: string; qualifier?: string; qualifierName?: string; speakerLabel?: string; padAfter?: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | { type: "text"; id: string; text: string; padAfter?: number; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
+  | { type: "gameEvent"; id: string; gameData?: GameData; extensions?: NodeExtensions; tags?: string[] }
   | { type: "choice"; groupId: string; options: TranscriptOption[] }
   | { type: "end" };
 
@@ -50,6 +54,8 @@ export interface TranscriptOption {
   prompt?: TranscriptPrompt;
   eligible: boolean;
   gameData?: GameData;
+  /** The option's extension values, raw, as a step's (absent when it has none). */
+  extensions?: NodeExtensions;
 }
 
 /** An option's prompt: the runtime's ChoicePrompt. `character`, `characterName`, and `direction` appear
@@ -197,6 +203,21 @@ export type ScriptOp =
   // never merged with the project's declared defaults, never inherited from the scene by its blocks, and
   // `{}` for a node with none or a ref that does not resolve. Key order is not part of the contract.
   | { op: "expectGameData"; scene: string; block?: string; expectResult: GameData }
+  // Scene / block Patter extension values (corpus 3): a STATIC read, as `expectGameData` is. `scene` alone =
+  // `extensionsForScene`, `scene` + `block` = `extensionsForBlock` (refs by internal id or gameId).
+  // `expectResult` is the node's values by extension id, raw, exactly as the bundle carries them: `{}` for a
+  // node with none or a ref that doesn't resolve. Values are any JSON, compared deeply; key order is not part
+  // of the contract.
+  | { op: "expectExtensions"; scene: string; block?: string; expectResult: NodeExtensions }
+  // Any node's extension values, read off the BUNDLE by the helper `extensionsOf(bundle, kind, address)`
+  // (corpus 3): `project` (no address); `scene` by id or gameId; `block` as "scene/block", each by id or
+  // gameId; `snippet`, `line`, `text`, `gameEvent` and `option` by node id (a node of another kind reads as
+  // none). `expectResult` is by extension id, raw; `{}` for none or an address that names nothing. With
+  // `effective`, one extension's values filled in instead:
+  // `effectiveGameData(extensionDecls(bundle, extension, kind), extensionsOf(...)[extension])`, every declared
+  // field with its default where the node sets none (a structured default arrives whole), `{}` for an
+  // extension the bundle doesn't have. Compared deeply, as `expectExtensions`.
+  | { op: "expectNodeExtensions"; kind: string; address?: string; expectResult: Record<string, unknown>; effective?: { extension: string } }
   | { op: "reset"; expectRefused?: boolean }
   // Reset the CURRENT flow (Flow.reset, an alias of start): forget its per-flow state and anything waiting to be
   // delivered, and begin again at the scene (empty: the first authored scene) and block given. No transcript.
@@ -386,6 +407,11 @@ export interface RuntimeFixture {
   start?: { scene?: string; block?: string };
   choices?: string[];
   expectedTranscript: TranscriptStep[];
+  /** The extensions' manifests, as a project keeps them in `extensions/<id>.extension.json` (corpus 3): each
+   *  compiled through the real `exportBundle` with `extensionShards` and the project's `extensions`. */
+  extensionManifests?: unknown[];
+  /** The extension data shards, compiled onto the nodes they name. */
+  extensionShards?: ExtensionShard[];
 }
 
 /** An authored gameData fixture (source form; compiled by buildCorpus into a GameDataCase). */
@@ -413,6 +439,11 @@ export interface ScriptedFixture {
   /** Build the bundle IDs-only, as a runtime case can (no strings; steps carry beat ids and no names). */
   idsOnly?: boolean;
   script: ScriptOp[];
+  /** The extensions' manifests, as a project keeps them in `extensions/<id>.extension.json` (corpus 3): each
+   *  compiled through the real `exportBundle` with `extensionShards` and the project's `extensions`. */
+  extensionManifests?: unknown[];
+  /** The extension data shards, compiled onto the nodes they name. */
+  extensionShards?: ExtensionShard[];
 }
 
 export interface SaveFixture {
@@ -463,4 +494,9 @@ export interface DescribeFixture {
   project: ProjectFile;
   scenes: Scene[];
   locales?: LocaleFile[];
+  /** The extensions' manifests, as a project keeps them in `extensions/<id>.extension.json` (corpus 3): each
+   *  compiled through the real `exportBundle` with `extensionShards` and the project's `extensions`. */
+  extensionManifests?: unknown[];
+  /** The extension data shards, compiled onto the nodes they name. */
+  extensionShards?: ExtensionShard[];
 }

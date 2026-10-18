@@ -7,6 +7,8 @@
 #include "CoreMinimal.h"
 #include "PatterTypes.h"
 #include "Patter/PatterValue.h"
+#include "Patter/Bundle.h"     // NodeExtensions, ExtensionValues
+#include "Patter/JsonTree.h"   // jsonText
 
 #include <string>
 #include <vector>
@@ -43,5 +45,35 @@ namespace PatterConvert
 			}
 			default: return patter::PatterValue::Bool(V.bBool);
 		}
+	}
+
+	/** One Patter extension's values on a node, each as strict JSON text, in bundle order. */
+	inline TArray<FPatterExtensionEntry> ToUeExtensionEntries(const patter::ExtensionValues& Values)
+	{
+		TArray<FPatterExtensionEntry> Out;
+		Out.Reserve(static_cast<int32>(Values.size()));
+		for (const auto& Pair : Values)
+		{
+			FPatterExtensionEntry Entry;
+			Entry.Name = Ue(Pair.first);
+			Entry.Json = Ue(patter::jsonText(Pair.second));
+			Out.Add(MoveTemp(Entry));
+		}
+		return Out;
+	}
+
+	/** A node's Patter extension values, one entry per extension, in bundle order. */
+	inline TArray<FPatterExtensionValues> ToUeExtensions(const patter::NodeExtensions& Extensions)
+	{
+		TArray<FPatterExtensionValues> Out;
+		Out.Reserve(static_cast<int32>(Extensions.size()));
+		for (const auto& Pair : Extensions)
+		{
+			FPatterExtensionValues Values;
+			Values.Extension = Ue(Pair.first);
+			Values.Values = ToUeExtensionEntries(Pair.second);
+			Out.Add(MoveTemp(Values));
+		}
+		return Out;
 	}
 }

@@ -1,0 +1,48 @@
+{
+  "schema": "wildwinter/extension@0",
+  "id": "probe",
+  "name": "Probe",
+  "version": "1.1.0",
+  "docs": "https://patterkit.dev",
+  "settings": [
+    { "name": "deliveryField", "label": "Delivery field", "help": "The line gameData field holding the line's delivery.", "default": "delivery" }
+  ],
+  "targets": {
+    "patter": {
+      "line": {
+        "fields": [
+          { "name": "note", "type": "text", "label": "Note", "help": "A line for the crew." },
+          { "name": "draft", "type": "multiline", "editorOnly": true, "help": "Working notes; never shipped." },
+          { "name": "weight", "type": "number", "min": 0, "max": 10, "default": 1 },
+          { "name": "loud", "type": "boolean" },
+          { "name": "tone", "type": "enum", "values": ["calm", "tense"], "valueHelp": { "calm": "Unhurried.", "tense": "Clipped." } },
+          { "name": "marks", "type": "flags", "values": ["night", "rain"] },
+          { "name": "act", "type": "quality", "stages": ["setup", "turn", "close"], "renamedStages": { "opening": "setup" } },
+          { "name": "next", "type": "reference", "to": "line" },
+          { "name": "cue", "type": "record", "fields": [
+            { "name": "sound", "type": "text", "required": true },
+            { "name": "gain", "type": "number", "min": 0, "max": 1 }
+          ] },
+          { "name": "perf", "type": "map", "key": { "type": "reference", "to": "cast" }, "of": { "type": "record", "fields": [
+            { "name": "expression", "type": "enum", "values": ["smile", "frown"] },
+            { "name": "look", "type": "text" }
+          ] } },
+          { "name": "beats", "type": "list", "id": "id", "of": { "type": "record", "fields": [
+            { "name": "id", "type": "text" }, { "name": "at", "type": "number" }
+          ] } },
+          { "name": "words", "type": "list", "of": { "type": "text" } }
+        ],
+        "claims": [
+          { "setting": "deliveryField", "type": "enum", "values": ["calm", "tense"], "label": "Delivery", "help": "The line's delivery, as the probe reads it." }
+        ]
+      },
+      "scene": { "fields": [{ "name": "theme", "type": "text" }] },
+      "block": { "fields": [{ "name": "pace", "type": "number" }] },
+      "snippet": { "fields": [{ "name": "weight", "type": "number" }] },
+      "text": { "fields": [{ "name": "style", "type": "text" }] },
+      "gameEvent": { "fields": [{ "name": "cue", "type": "text" }] },
+      "option": { "fields": [{ "name": "icon", "type": "text" }] },
+      "project": { "fields": [{ "name": "studio", "type": "text" }] }
+    }
+  }
+}

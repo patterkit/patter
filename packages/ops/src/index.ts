@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 export { loadProject, loadProjectLanding, sceneIdForShard, findProjectFile, applySceneOrder } from "./load.js";
-export type { LoadedProject } from "./load.js";
+export type { LoadedProject, LoadedManifest } from "./load.js";
 export { applyWrites } from "./write.js";
 export type { PlannedWrite } from "./write.js";
 export { runValidate, exportBlockers } from "./validate.js";
@@ -25,7 +25,7 @@ export {
 export type { GameScopes } from "./game-scopes.js";
 export { runExport, runExportFull, planBuild } from "./export.js";
 export type { ExportOptions, BuildPlan } from "./export.js";
-export { compileLoaded, bundleOutputPath, defaultBundlePath, besideBundlePath } from "./compile.js";
+export { compileLoaded, loadedExtensions, bundleOutputPath, defaultBundlePath, besideBundlePath } from "./compile.js";
 export { runExportHtml, runExportWeb } from "./export-html.js";
 export { scanAudio, scanAudioStatus, pickAudio, audioFolderRungs, audioFoldersActive, audioManifest, audioManifestWrite, AUDIO_MANIFEST_FILE, AUDIO_MANIFEST_SCHEMA } from "./audio-index.js";
 export type { AudioRung, AudioEntry, AudioSnapshot } from "./audio-index.js";
@@ -71,8 +71,16 @@ export type { DocumentManifest } from "./pack.js";
 export { runUnpack, runUnpackMerge, UnsafeEntryError, NotAPackError, isUnsafeEntry } from "./unpack.js";
 export type { UnpackResult, UnpackMergeResult, MergedShard, ProvenanceCheck } from "./unpack.js";
 export { resolveDocumentation, classesForChannel } from "./documentation.js";
-export { runMerge, detectMergeType, UnsupportedMergeError, sidecarIssues, CONFLICT_SIDECAR, AUTHORING_HANDLED } from "./merge.js";
-export type { MergeResult, MergeFileType, Conflict, ConflictKind } from "./merge.js";
+export {
+  runMerge, detectMergeType, UnsupportedMergeError, sidecarIssues, unresolvedMarkIssues, CONFLICT_SIDECAR, AUTHORING_HANDLED,
+  PROJECT_HANDLED,
+} from "./merge.js";
+export type { MergeResult, MergeFileType, Conflict, ConflictKind, ShardText } from "./merge.js";
+// Patter extensions: a project's manifests, as a merge reads them from the working tree
+export { manifestPath, readProjectManifest, soundManifest, projectManifests, planExtensionUpgrades, renameCastKeys } from "./extensions.js";
+export type { ExtensionUpgrade, CastKeyRewrite } from "./extensions.js";
+// A cast member renamed: the lines and project-level strings that name them (extension data: renameCastKeys)
+export { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys } from "./cast-rename.js";
 // Editable-script handoff records and markers (patterkit/design/proposals/editable-script-handoff.md)
 export {
   HANDOFF_DIR, handoffPath, handoffWrite, serialiseHandoff, parseHandoff, readHandoffs, readHandoff,

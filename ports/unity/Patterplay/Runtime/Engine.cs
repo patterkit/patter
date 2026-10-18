@@ -910,6 +910,26 @@ namespace Patterkit.Patterplay
             return copy;
         }
 
+        /// <summary>A scene's own Patter extension values (by internal id or gameId address), by extension id: raw
+        /// and sparse, exactly as the bundle carries them, any JSON as the neutral tree, never read by the engine
+        /// (fill in defaults with GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(bundle, id,
+        /// "scene"), ...)). Not inherited by its blocks. A fresh map each call (the values in it are the bundle's
+        /// own); empty (never null) when the scene has none or the ref is unknown.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> ExtensionsForScene(string sceneRef)
+        {
+            var id = ResolveSceneRef(sceneRef);
+            return GameDataHelpers.CopyExtensions(id != null && _host.Bundle.Scenes.TryGetValue(id, out var scene) ? scene.Extensions : null);
+        }
+
+        /// <summary>A block's own Patter extension values, by scene + block ref (id or gameId). Raw, like
+        /// ExtensionsForScene; the scene's are not folded in. A fresh map each call; empty (never null) when none
+        /// or unknown.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> ExtensionsForBlock(string sceneRef, string blockRef)
+        {
+            var id = ResolveBlockRef(ResolveSceneRef(sceneRef), blockRef);
+            return GameDataHelpers.CopyExtensions(id != null && _host.BlockById.TryGetValue(id, out var block) ? block.Extensions : null);
+        }
+
         // --- cast ------------------------------------------------------------
 
         /// <summary>Every cast member the PROJECT declares, in authored order - the same list
@@ -988,6 +1008,7 @@ namespace Patterkit.Patterplay
                     GameId = EffectiveGameId(scene.GameId, scene.Name),
                     Name = scene.Name,
                     GameData = GameDataOrNull(scene.GameData),
+                    Extensions = ExtensionsOrNull(scene.Extensions),
                     Tags = TagsOrNull(scene.Id),
                 };
                 foreach (var block in scene.Blocks)
@@ -998,6 +1019,7 @@ namespace Patterkit.Patterplay
                         GameId = EffectiveGameId(block.GameId, block.Name),
                         Name = block.Name,
                         GameData = GameDataOrNull(block.GameData),
+                        Extensions = ExtensionsOrNull(block.Extensions),
                         Tags = TagsOrNull(block.Id),
                     };
                     foreach (var n in block.Children) ob.Children.Add(OutlineNodeFor(n));
@@ -1081,6 +1103,7 @@ namespace Patterkit.Patterplay
                 if (_host.DefaultStrings.TryGetValue(beat.Id, out var src)) info.Text = src; // source, un-interpolated
             }
             if (beat.GameData != null && beat.GameData.Count > 0) info.GameData = beat.GameData;
+            info.Extensions = ExtensionsOrNull(beat.Extensions);
             info.Tags = TagsOrNull(beat.Id);
             return info;
         }
@@ -1090,6 +1113,11 @@ namespace Patterkit.Patterplay
 
         /// <summary>An outline node's gameData, present only when it sets any (parity with BeatInfo's).</summary>
         private static GameData GameDataOrNull(GameData gd) => gd != null && gd.Count > 0 ? gd : null;
+
+        /// <summary>A node's Patter extension values, present only when it has any (as its gameData's): what a
+        /// step, an option and the outline carry.</summary>
+        internal static OrderedMap<string, OrderedMap<string, object>> ExtensionsOrNull(OrderedMap<string, OrderedMap<string, object>> ext)
+            => ext != null && ext.Count > 0 ? ext : null;
 
         /// <summary>Reset the whole game to its initial state: drop every flow, re-seed the shared @patter
         /// globals to their declared defaults, and clear all shared state (shared @scene bags, world visit

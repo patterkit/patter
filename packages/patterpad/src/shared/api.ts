@@ -178,6 +178,10 @@ export interface ProjectSettingsDto {
    *  that uses an old one (through the VC layer), and every cast member's own label with it. Write-only:
    *  never read back. */
   qualifierRenames?: Record<string, string>;
+  /** Cast members the author renamed in the Cast tab, old name -> new. Saving rewrites every line the old
+   *  name speaks, the member's translated names and labels, and the extension data keyed by it or naming it
+   *  (through the VC layer). Write-only: never read back. */
+  castRenames?: Record<string, string>;
   /** Quality stages the author renamed (the Properties page and the World tab), in the order they were
    *  renamed. Saving carries each into every condition and set effect that names it (through the VC layer).
    *  Write-only: never read back. */
@@ -790,7 +794,7 @@ export interface PatterCoverageApi {
   onTheme(handler: (theme: ThemePrefs) => void): void;
 }
 
-export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling" | "game-scopes";
+export type ProblemCategory = "structure" | "condition" | "interpolation" | "hygiene" | "stale-bundle" | "merge" | "not-in-project" | "spelling" | "game-scopes" | "extensions";
 
 /** A one-click remedy for a problem (spec §4). Extensible discriminated union.
  *  `add-to-cast` / `declare-property` are project-file writes (applyFix); `retarget-jump`,

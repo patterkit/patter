@@ -143,7 +143,7 @@ charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 
-[*.{patterflow,patterloc,patterx,patterproj}]
+[*.{patterflow,patterloc,patterx,patterproj,patterextension}]
 indent_style = space
 indent_size = 2
 `;
@@ -153,6 +153,7 @@ const GITATTRIBUTES = `# Patter source is UTF-8 + LF text (pinned; never let aut
 *.patterloc  text eol=lf
 *.patterx    text eol=lf
 *.patterproj text eol=lf
+*.patterextension text eol=lf
 
 # Id-keyed structured merge for Patter source (the 'patter merge' driver).
 # Register it once per clone (see vcs-setup.md); until then git falls back to a
@@ -161,6 +162,11 @@ const GITATTRIBUTES = `# Patter source is UTF-8 + LF text (pinned; never let aut
 *.patterloc  merge=patter
 *.patterx    merge=patter
 *.patterproj merge=patter
+*.patterextension merge=patter
+
+# An extension's manifest is the extension's own JSON, kept in the project so
+# every machine reads the same one, and never edited here: text, merged as text.
+extensions/*.extension.json text eol=lf
 
 # Generated artifacts (spec §11). The compiled bundle is committed but
 # REGENERATED, never hand-merged - keep ours on conflict and rebuild (the
@@ -187,7 +193,9 @@ function ignoreContent(bundle: BundlePosture): string {
     "# Patter generated artifacts - not source (see vcs-setup.md).",
     "# Packed document (the send-and-return envelope):",
     "*.patterpack",
-    "# Unresolved merge sidecar:",
+    "# Unresolved merge sidecar (a lingering one is a validate error). The merge also names its clashes",
+    "# in the shard itself, under \"unresolved\", which IS committed with the file, so CI refuses an",
+    "# unresolved merge wherever it goes:",
     "*.patterconflict",
   ];
   if (bundle === "ignore") {
@@ -232,6 +240,8 @@ compiled bundle are TEXT with LF; the packed document is BINARY:
     text   //....patterloc
     text   //....patterx
     text   //....patterproj
+    text   //....patterextension
+    text   //....extension.json
     text   //....patterc
     binary //....patterpack
 
@@ -270,6 +280,8 @@ Set auto-props so Patter source keeps LF (\`~/.subversion/config\` or repo confi
     *.patterloc = svn:eol-style=LF
     *.patterx = svn:eol-style=LF
     *.patterproj = svn:eol-style=LF
+    *.patterextension = svn:eol-style=LF
+    *.extension.json = svn:eol-style=LF
     *.patterc = svn:eol-style=LF
     *.patterpack = svn:mime-type=application/octet-stream
 

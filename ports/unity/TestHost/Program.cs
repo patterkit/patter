@@ -1082,6 +1082,37 @@ namespace Patterkit.Patterplay.TestHost
                                 }
                                 break;
                             }
+                            case "expectExtensions":
+                            {
+                                // Static read of a scene's / block's OWN raw Patter extension values (corpus 3):
+                                // any JSON, compared deeply, key order ignored.
+                                string es = op.GetProperty("scene").GetString();
+                                bool hasBlock = op.TryGetProperty("block", out var eb);
+                                var got = hasBlock ? engine.ExtensionsForBlock(es, eb.GetString()) : engine.ExtensionsForScene(es);
+                                string want = ShowJson(op.GetProperty("expectResult")), gotText = ShowJson(got);
+                                if (want != gotText)
+                                    throw new Exception($"expectExtensions {(hasBlock ? $"{es}/{eb.GetString()}" : es)}: expected {want}, got {gotText}");
+                                break;
+                            }
+                            case "expectNodeExtensions":
+                            {
+                                // Any node's values, read off the case's BUNDLE by the helper; with `effective`, one
+                                // extension's values filled in from its declarations for the kind.
+                                string nk = op.GetProperty("kind").GetString();
+                                string addr = op.TryGetProperty("address", out var na) ? na.GetString() : null;
+                                var raw = GameDataHelpers.ExtensionsOf(bundle, nk, addr ?? "");
+                                object got = raw;
+                                string effective = op.TryGetProperty("effective", out var ef) ? ef.GetProperty("extension").GetString() : null;
+                                if (effective != null)
+                                    got = GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(bundle, effective, nk), raw.GetOrDefault(effective));
+                                string want = ShowJson(op.GetProperty("expectResult")), gotText = ShowJson(got);
+                                if (want != gotText)
+                                {
+                                    string scope = nk + (addr == null ? "" : $" {addr}") + (effective == null ? "" : $" (effective {effective})");
+                                    throw new Exception($"expectNodeExtensions {scope}: expected {want}, got {gotText}");
+                                }
+                                break;
+                            }
                             case "reset":
                                 if (Refused(op)) { ExpectRefused(engine, "reset", engine.Reset); break; }
                                 engine.Reset();
@@ -1358,17 +1389,20 @@ namespace Patterkit.Patterplay.TestHost
                     if (label != null) o["speakerLabel"] = label;                       // the speaker's label, where it differs
                     NormalizePad(s, o);                                                 // line padding, when not the default
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
+                    if (s.Extensions != null) o["extensions"] = JsonTreeToObject(s.Extensions); // Patter extension values, raw
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
                 case StepType.Text:
                     o["type"] = "text"; o["id"] = s.Id; o["text"] = s.Text;
                     NormalizePad(s, o);
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
+                    if (s.Extensions != null) o["extensions"] = JsonTreeToObject(s.Extensions); // Patter extension values, raw
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
                 case StepType.GameEvent:
                     o["type"] = "gameEvent"; o["id"] = s.Id;
                     if (s.GameData != null) o["gameData"] = GameDataToObject(s.GameData);
+                    if (s.Extensions != null) o["extensions"] = JsonTreeToObject(s.Extensions); // Patter extension values, raw
                     if (s.Tags != null) o["tags"] = s.Tags.Cast<object>().ToList();
                     break;
                 case StepType.Choice:
@@ -1382,6 +1416,7 @@ namespace Patterkit.Patterplay.TestHost
                         if (opt.Prompt != null) od["prompt"] = NormalizePrompt(opt.Prompt, idsOnly);
                         od["eligible"] = opt.Eligible;
                         if (opt.GameData != null) od["gameData"] = GameDataToObject(opt.GameData);
+                        if (opt.Extensions != null) od["extensions"] = JsonTreeToObject(opt.Extensions);
                         return (object)od;
                     }).ToList();
                     break;
@@ -1654,10 +1689,133 @@ namespace Patterkit.Patterplay.TestHost
                 foreach (var kind in gdf.EnumerateObject())
                     bundle.GameDataFields[kind.Name] = kind.Value.EnumerateArray().Select(ParseGameDataField).ToList();
 
+            // Patter extensions (corpus 3), parsed by BOTH loaders: the section, and each node's values.
+            if (b.TryGetProperty("extensions", out var exts)) bundle.Extensions = ParseBundleExtensions(exts);
+
             foreach (var sc in b.GetProperty("scenes").EnumerateObject())
                 bundle.Scenes[sc.Name] = ParseScene(sc.Value);
 
             return bundle;
+        }
+
+        private static OrderedMap<string, BundleExtension> ParseBundleExtensions(JsonElement o)
+        {
+            var extensions = new OrderedMap<string, BundleExtension>();
+            foreach (var pair in o.EnumerateObject())
+            {
+                var e = pair.Value;
+                var ext = new BundleExtension { Version = e.TryGetProperty("version", out var v) ? v.GetString() : null };
+                if (e.TryGetProperty("fields", out var fields))
+                    foreach (var kind in fields.EnumerateObject())
+                        ext.Fields.Set(kind.Name, kind.Value.EnumerateArray().Select(ParseExtensionDecl).ToList());
+                if (e.TryGetProperty("project", out var project)) ext.Project = (OrderedMap<string, object>)ToJsonTree(project);
+                extensions.Set(pair.Name, ext);
+            }
+            return extensions;
+        }
+
+        private static ExtensionFieldDecl ParseExtensionDecl(JsonElement o)
+        {
+            var decl = new ExtensionFieldDecl
+            {
+                Name = o.TryGetProperty("name", out var n) ? n.GetString() : null,
+                Type = o.TryGetProperty("type", out var t) ? t.GetString() : null,
+                HasDefault = o.TryGetProperty("default", out var df),
+                Default = o.TryGetProperty("default", out var df2) ? ToJsonTree(df2) : null,
+                Values = o.TryGetProperty("values", out var vs) ? vs.EnumerateArray().Select(x => x.GetString()).ToList() : null,
+                Stages = o.TryGetProperty("stages", out var st) ? st.EnumerateArray().Select(x => x.GetString()).ToList() : null,
+                To = o.TryGetProperty("to", out var to) ? to.GetString() : null,
+                IdField = o.TryGetProperty("id", out var id) ? id.GetString() : null,
+                Min = o.TryGetProperty("min", out var mn) ? mn.GetDouble() : (double?)null,
+                Max = o.TryGetProperty("max", out var mx) ? mx.GetDouble() : (double?)null,
+                Required = o.TryGetProperty("required", out var rq) ? rq.GetBoolean() : (bool?)null,
+            };
+            if (o.TryGetProperty("fields", out var fields)) decl.Fields = fields.EnumerateArray().Select(ParseExtensionDecl).ToList();
+            if (o.TryGetProperty("key", out var key))
+                decl.Key = new ExtensionKeyDecl
+                {
+                    Type = key.TryGetProperty("type", out var kt) ? kt.GetString() : null,
+                    To = key.TryGetProperty("to", out var kto) ? kto.GetString() : null,
+                };
+            if (o.TryGetProperty("of", out var of)) decl.Of = ParseExtensionDecl(of);
+            return decl;
+        }
+
+        /// <summary>A node's extension values as the neutral tree; null when it has none.</summary>
+        private static OrderedMap<string, OrderedMap<string, object>> ParseNodeExtensions(JsonElement parent)
+        {
+            if (!parent.TryGetProperty("extensions", out var o) || o.ValueKind != JsonValueKind.Object) return null;
+            var values = new OrderedMap<string, OrderedMap<string, object>>();
+            foreach (var pair in o.EnumerateObject()) values.Set(pair.Name, (OrderedMap<string, object>)ToJsonTree(pair.Value));
+            return values;
+        }
+
+        /// <summary>Any JSON as the Runtime's neutral tree (OrderedMap / List / bool / double / string / null).</summary>
+        private static object ToJsonTree(JsonElement e)
+        {
+            switch (e.ValueKind)
+            {
+                case JsonValueKind.Object:
+                {
+                    var map = new OrderedMap<string, object>();
+                    foreach (var p in e.EnumerateObject()) map.Set(p.Name, ToJsonTree(p.Value));
+                    return map;
+                }
+                case JsonValueKind.Array: return e.EnumerateArray().Select(ToJsonTree).ToList();
+                case JsonValueKind.True: return true;
+                case JsonValueKind.False: return false;
+                case JsonValueKind.Number: return e.GetDouble();
+                case JsonValueKind.String: return e.GetString();
+                case JsonValueKind.Null: return null;
+                default: throw new Exception($"unsupported extension value kind: {e.ValueKind}");
+            }
+        }
+
+        /// <summary>A neutral tree as the plain object tree the transcript matcher reads (Dictionary / List /
+        /// bool / double / string / null), so extension values compare deeply, key order ignored.</summary>
+        private static object JsonTreeToObject(object tree)
+        {
+            switch (tree)
+            {
+                case OrderedMap<string, object> map:
+                {
+                    var d = new Dictionary<string, object>();
+                    foreach (var kv in map) d[kv.Key] = JsonTreeToObject(kv.Value);
+                    return d;
+                }
+                case OrderedMap<string, OrderedMap<string, object>> nested:
+                {
+                    var d = new Dictionary<string, object>();
+                    foreach (var kv in nested) d[kv.Key] = JsonTreeToObject(kv.Value);
+                    return d;
+                }
+                case List<object> list: return list.Select(JsonTreeToObject).ToList();
+                case null: return null;
+                case bool _: case double _: case string _: return tree;
+                default: throw new Exception($"not a JSON tree: {tree.GetType().Name}");
+            }
+        }
+
+        /// <summary>JSON text with every object's keys sorted, from the neutral tree or a JsonElement: two values
+        /// are the same JSON exactly when their texts match, as the JS runner's showJson compares.</summary>
+        private static string ShowJson(object tree)
+        {
+            switch (tree)
+            {
+                case null: return "null";
+                case bool b: return b ? "true" : "false";
+                case double d: return ExprValue.JsNumber(d);
+                case string str: return JsonSerializer.Serialize(str);
+                case OrderedMap<string, object> map:
+                    return "{" + string.Join(",", map.Keys.OrderBy(k => k, StringComparer.Ordinal)
+                        .Select(k => JsonSerializer.Serialize(k) + ":" + ShowJson(map[k]))) + "}";
+                case OrderedMap<string, OrderedMap<string, object>> nested:
+                    return "{" + string.Join(",", nested.Keys.OrderBy(k => k, StringComparer.Ordinal)
+                        .Select(k => JsonSerializer.Serialize(k) + ":" + ShowJson(nested[k]))) + "}";
+                case List<object> list: return "[" + string.Join(",", list.Select(ShowJson)) + "]";
+                case JsonElement e: return ShowJson(ToJsonTree(e));
+                default: throw new Exception($"not a JSON tree: {tree.GetType().Name}");
+            }
         }
 
         private static HostScopeDecl ParseHostDecl(JsonElement d) => new HostScopeDecl
@@ -1702,6 +1860,7 @@ namespace Patterkit.Patterplay.TestHost
             if (s.TryGetProperty("sceneProps", out var sp)) scene.SceneProps = sp.EnumerateArray().Select(ParsePropDecl).ToList();
             if (s.TryGetProperty("onEntry", out var oe)) scene.OnEntry = ParseEffects(oe);
             if (s.TryGetProperty("gameData", out var sgd)) scene.GameData = ParseGameData(sgd);
+            scene.Extensions = ParseNodeExtensions(s);
             scene.PadAfterDefault = Num(s, "padAfterDefault");
             foreach (var blk in s.GetProperty("blocks").EnumerateArray()) scene.Blocks.Add(ParseBlock(blk));
             return scene;
@@ -1717,6 +1876,7 @@ namespace Patterkit.Patterplay.TestHost
             };
             if (b.TryGetProperty("tags", out var bt)) block.Tags = TagList(bt);
             if (b.TryGetProperty("gameData", out var bgd)) block.GameData = ParseGameData(bgd);
+            block.Extensions = ParseNodeExtensions(b);
             block.PadAfterDefault = Num(b, "padAfterDefault");
             if (b.TryGetProperty("children", out var ch)) foreach (var n in ch.EnumerateArray()) block.Children.Add(ParseNode(n));
             return block;
@@ -1729,6 +1889,7 @@ namespace Patterkit.Patterplay.TestHost
             if (n.TryGetProperty("onEnter", out var oen)) node.OnEnter = ParseEffects(oen);
             if (n.TryGetProperty("onExit", out var oex)) node.OnExit = ParseEffects(oex);
             if (n.TryGetProperty("gameData", out var gd)) node.GameData = ParseGameData(gd);
+            node.Extensions = ParseNodeExtensions(n);
             if (n.TryGetProperty("tags", out var nt)) node.Tags = TagList(nt);
             node.PadAfterDefault = Num(n, "padAfterDefault");
             // Option-position flags, on a bare snippet option as on an Option group.
@@ -1772,6 +1933,7 @@ namespace Patterkit.Patterplay.TestHost
                 PadAfter = Num(b, "padAfter"),
             };
             if (b.TryGetProperty("gameData", out var gd)) beat.GameData = ParseGameData(gd);
+            beat.Extensions = ParseNodeExtensions(b);
             if (b.TryGetProperty("tags", out var bt)) beat.Tags = TagList(bt);
             return beat;
         }

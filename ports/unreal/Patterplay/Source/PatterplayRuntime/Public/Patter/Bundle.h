@@ -8,13 +8,23 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <optional>
 #include <utility>
 #include "PatterValue.h"
 #include "Ast.h"
+#include "JsonTree.h"
+#include "Expr/OrderedMap.h"   // NodeExtensions keep the bundle's key order
 
 namespace patter
 {
     using GameData = std::map<std::string, PatterValue>;
+
+    /** One extension's values on a node: field name -> value, raw as the bundle wrote them, in bundle order.
+     *  Any JSON, so held as the neutral tree. */
+    using ExtensionValues = OrderedMap<std::string, JsonTree>;
+    /** A node's Patter extension values: extension id -> field -> value, raw, in bundle order. The engine
+     *  never reads them; it hands them over wherever it hands over gameData. Empty when the node has none. */
+    using NodeExtensions = OrderedMap<std::string, ExtensionValues>;
 
     // The built-in pause after a line or text beat, in seconds, for a project that sets no default of its own
     // (line padding, design/proposals/line-padding.md): the same on every runtime and in Patterpad's Play window.
@@ -89,6 +99,7 @@ namespace patter
         bool hasQualifier = false; std::string qualifier; // speaker qualifier gameId (`vo`), line only
         bool hasPadAfter = false; double padAfter = 0;    // the pause after it, in seconds (line / text only)
         std::shared_ptr<GameData> gameData;             // null = none
+        NodeExtensions extensions;                      // Patter extension values, raw; empty = none
         std::vector<std::string> tags;                  // author tags (#215)
     };
 
@@ -101,6 +112,7 @@ namespace patter
         std::shared_ptr<Expression> condition;
         std::vector<Effect> onEnter, onExit;
         std::shared_ptr<GameData> gameData;
+        NodeExtensions extensions;                      // Patter extension values, raw; empty = none
         std::vector<std::string> tags;                  // author tags (#215)
         bool hasPadAfterDefault = false; double padAfterDefault = 0;   // line padding: the default for the beats inside
 
@@ -126,6 +138,7 @@ namespace patter
         std::vector<NodePtr> children;
         std::vector<std::string> tags;
         std::shared_ptr<GameData> gameData;             // author overrides (raw); null = none
+        NodeExtensions extensions;                      // Patter extension values, raw; empty = none
         bool hasPadAfterDefault = false; double padAfterDefault = 0;   // line padding: the default for the beats inside
     };
     struct Scene
@@ -136,6 +149,7 @@ namespace patter
         std::vector<Effect> onEntry;
         std::vector<std::string> tags;                  // author tags (#215)
         std::shared_ptr<GameData> gameData;             // author overrides (raw); null = none
+        NodeExtensions extensions;                      // Patter extension values, raw; empty = none
         bool hasPadAfterDefault = false; double padAfterDefault = 0;   // line padding: the default for the beats inside
     };
 
@@ -148,6 +162,40 @@ namespace patter
          *  NextStage) to compare or step the field's stage. */
         std::vector<std::string> stages;
         std::string purpose;   // what the field is for, in the author's words; empty when they gave none
+    };
+
+    /** A map field's key: its type, and what a reference key points at. */
+    struct ExtensionKeyDecl { std::string type, to; };
+
+    /** A compiled Patter extension field declaration (@patterkit/model's ExtensionFieldDecl): the editor's words
+     *  gone, every default resolved by the compiler. Structured types carry their parts: `fields` for a record,
+     *  `key` and `of` for a map, `of` and `id` for a list, `to` for a reference. Read by nothing in the engine;
+     *  effectiveGameData fills a node's gaps from it, given extensionDecls. */
+    struct ExtensionFieldDecl
+    {
+        std::string name, type;
+        /** Always present on a top-level declaration, and may be any JSON. Absent only on a map's or a list's
+         *  element (`of`). */
+        std::optional<JsonTree> defaultValue;
+        std::optional<std::vector<std::string>> values;
+        std::optional<std::vector<std::string>> stages;
+        std::string to;                                  // a reference's target kind; empty when not one
+        std::vector<ExtensionFieldDecl> fields;          // a record's fields
+        std::optional<ExtensionKeyDecl> key;             // a map's key
+        std::shared_ptr<ExtensionFieldDecl> of;          // a map's or a list's element
+        std::string id;                                  // a list of records: the field that identifies an item
+        std::optional<double> min, max;
+        std::optional<bool> required;
+    };
+
+    /** One Patter extension as the bundle carries it. */
+    struct BundleExtension
+    {
+        std::string version;
+        /** Compiled declarations by node kind (project, scene, block, snippet, line, text, gameEvent, option). */
+        OrderedMap<std::string, std::vector<ExtensionFieldDecl>> fields;
+        /** The project node's values, raw, when it has any. */
+        std::optional<ExtensionValues> project;
     };
 
     // How strings ship + resolve (spec §11): "embedded" (resolve per locale) or "ids" (emit beat IDs);
@@ -210,7 +258,51 @@ namespace patter
         // vocabulary, opaque to the compiler and never self-backed. A ref to one is a scope even before
         // its engine registers it, and the engine reports when the game has not. Empty = none.
         std::vector<std::string> externalScopes;
+        // The Patter extensions the project takes, by id, in bundle order: each one's declarations by node kind
+        // and the project node's values (patterkit design/proposals/patter-storylet-extensions.md, "At
+        // runtime"). Every other node carries its own values. Empty when the project takes none.
+        OrderedMap<std::string, BundleExtension> extensions;
     };
+
+    // ----- gameIds -------------------------------------------------------------
+
+    inline std::string toLower(const std::string& s)
+    {
+        std::string r = s;
+        for (char& c : r) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
+        return r;
+    }
+
+    inline std::string gameIdify(const std::string& text)
+    {
+        std::string s = toLower(text), tmp;
+        for (size_t i = 0; i < s.size(); ++i)
+        {
+            unsigned char c = static_cast<unsigned char>(s[i]);
+            if (c == '\'') continue;                      // drop apostrophes (incl. the ASCII one)
+            bool keep = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
+            tmp += keep ? static_cast<char>(c) : '-';
+        }
+        // collapse runs of '-' and trim.
+        std::string out; bool prevDash = true;
+        for (char c : tmp)
+        {
+            if (c == '-') { if (!prevDash) { out += '-'; prevDash = true; } }
+            else { out += c; prevDash = false; }
+        }
+        while (!out.empty() && out.back() == '-') out.pop_back();
+        return out;
+    }
+
+    inline std::string effectiveGameId(const std::string& gameId, const std::string& name)
+    {
+        std::string g = gameId;
+        // trim
+        size_t a = g.find_first_not_of(" \t"); size_t b = g.find_last_not_of(" \t");
+        g = (a == std::string::npos) ? "" : g.substr(a, b - a + 1);
+        return !g.empty() ? g : gameIdify(name);
+    }
+
 
     // ----- gameData merge-at-read (port of gamedata.ts) ------------------------
 
@@ -255,5 +347,122 @@ namespace patter
         }
         if (node) for (const auto& kv : *node) if (!has(kv.first)) out.emplace_back(kv.first, kv.second);
         return out;
+    }
+
+    // ----- Patter extension values (port of gamedata.ts) -----------------------
+    //
+    // The same rule as gameData (patterkit design/proposals/patter-storylet-extensions.md, "At runtime"): raw
+    // on the node, the declarations with every default resolved in the bundle's `extensions` section, and the
+    // same two helpers, overloaded for extension declarations, fill a node's values in, given extensionDecls.
+    // extensionsOf reads any node's values off the bundle, by the address a game already uses.
+
+    /** One extension field's effective value: the node's own when it sets one, else the declared default;
+     *  null for a name declared nowhere and set nowhere. `node` may be null. */
+    inline const JsonTree* gameDataValue(const std::vector<ExtensionFieldDecl>& decls, const ExtensionValues* node, const std::string& name)
+    {
+        if (node) if (const JsonTree* v = node->get(name)) return v;
+        for (const auto& d : decls) if (d.name == name) return d.defaultValue ? &*d.defaultValue : nullptr;
+        return nullptr;
+    }
+
+    /** One extension's values on a node, filled in: every declared field resolved (the value set, else the
+     *  default; a structured default arrives whole), in declaration order, then any value set with no
+     *  declaration, kept as it is. `node` may be null (pure defaults). */
+    inline ExtensionValues effectiveGameData(const std::vector<ExtensionFieldDecl>& decls, const ExtensionValues* node)
+    {
+        ExtensionValues out;
+        for (const auto& d : decls)
+            if (const JsonTree* v = gameDataValue(decls, node, d.name)) out.set(d.name, *v);
+        if (node) for (const auto& kv : *node) if (!out.contains(kv.first)) out.set(kv.first, kv.second);
+        return out;
+    }
+
+    /** One extension's declarations for a node kind (project, scene, block, snippet, line, text, gameEvent,
+     *  option), every default resolved. Empty when the bundle has no such extension or it declares nothing
+     *  for the kind. */
+    inline std::vector<ExtensionFieldDecl> extensionDecls(const Bundle& bundle, const std::string& extension, const std::string& kind)
+    {
+        const BundleExtension* ext = bundle.extensions.get(extension);
+        if (!ext) return {};
+        const std::vector<ExtensionFieldDecl>* decls = ext->fields.get(kind);
+        return decls ? *decls : std::vector<ExtensionFieldDecl>{};
+    }
+
+    namespace extensionsdetail
+    {
+        // A node directly inside a choice that is a group is an option; its prompt beat is a line or text.
+        // Mirrors the reference's walk exactly, including where a beat of another kind ends one level's search.
+        inline void find(const std::vector<NodePtr>& children, bool inChoice, const std::string& kind, const std::string& address,
+                         const NodeExtensions*& found)
+        {
+            for (const NodePtr& node : children)
+            {
+                if (found) return;
+                if (node->isGroup())
+                {
+                    if (inChoice && node->id == address && kind == "option") { found = &node->extensions; return; }
+                    if (inChoice && node->prompt && node->prompt->id == address && node->prompt->kind == kind) { found = &node->prompt->extensions; return; }
+                    find(node->children, node->selector == "choice", kind, address, found);
+                    continue;
+                }
+                if (node->id == address && kind == "snippet") { found = &node->extensions; return; }
+                for (const Beat& beat : node->beats)
+                {
+                    if (beat.id != address) continue;
+                    if (beat.kind == kind) found = &beat.extensions;
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * A node's Patter extension values, by extension id, raw; empty when it has none or the address names
+     * nothing. By the names a game already holds: `project` (no address); `scene` by id or gameId; `block` as
+     * "scene/block", each by id or gameId; `snippet`, `line`, `text`, `gameEvent` and `option` (a group
+     * directly inside a choice) by node id. A node of another kind than the one asked for reads as none, as
+     * does an unknown kind. A fresh copy each call.
+     */
+    inline NodeExtensions extensionsOf(const Bundle& bundle, const std::string& kind, const std::string& address = "")
+    {
+        const std::vector<const Scene*> scenes = bundle.scenesInOrder();
+        const auto sceneOf = [&](const std::string& ref) -> const Scene*
+        {
+            auto it = bundle.scenes.find(ref);
+            if (it != bundle.scenes.end()) return &it->second;
+            for (const Scene* s : scenes) if (effectiveGameId(s->gameId, s->name) == ref) return s;
+            return nullptr;
+        };
+        if (kind == "project")
+        {
+            NodeExtensions out;
+            for (const auto& kv : bundle.extensions) if (kv.second.project) out.set(kv.first, *kv.second.project);
+            return out;
+        }
+        if (kind == "scene")
+        {
+            const Scene* scene = sceneOf(address);
+            return scene ? scene->extensions : NodeExtensions{};
+        }
+        if (kind == "block")
+        {
+            const size_t slash = address.find('/');
+            if (slash == std::string::npos) return {};
+            const Scene* scene = sceneOf(address.substr(0, slash));
+            if (!scene) return {};
+            const std::string ref = address.substr(slash + 1);
+            for (const Block& b : scene->blocks) if (b.id == ref) return b.extensions;
+            for (const Block& b : scene->blocks) if (effectiveGameId(b.gameId, b.name) == ref) return b.extensions;
+            return {};
+        }
+        if (kind == "snippet" || kind == "option" || kind == "line" || kind == "text" || kind == "gameEvent")
+        {
+            const NodeExtensions* found = nullptr;
+            for (const Scene* scene : scenes)
+                for (const Block& block : scene->blocks)
+                    if (!found) extensionsdetail::find(block.children, false, kind, address, found);
+            return found ? *found : NodeExtensions{};
+        }
+        return {};
     }
 }

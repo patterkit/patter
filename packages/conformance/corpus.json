@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "expressions": [
     {
       "name": "number comparison",
@@ -21571,6 +21571,1668 @@
           ]
         }
       ]
+    },
+    {
+      "name": "extension values reach the game raw on every step, option and node, in every type, and the helpers fill in defaults",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1bpqu2h",
+          "structureHash": "0gwi7zd"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA"
+          },
+          {
+            "name": "BO"
+          }
+        ],
+        "gameDataFields": {
+          "line": [
+            {
+              "name": "delivery",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "default": "calm"
+            }
+          ]
+        },
+        "extensions": {
+          "other": {
+            "version": "0.1.0",
+            "fields": {
+              "line": [
+                {
+                  "name": "flag",
+                  "type": "boolean",
+                  "default": false
+                }
+              ]
+            }
+          },
+          "probe": {
+            "version": "1.1.0",
+            "fields": {
+              "block": [
+                {
+                  "name": "pace",
+                  "type": "number",
+                  "default": 0
+                }
+              ],
+              "gameEvent": [
+                {
+                  "name": "cue",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "line": [
+                {
+                  "name": "note",
+                  "type": "text",
+                  "default": ""
+                },
+                {
+                  "name": "weight",
+                  "type": "number",
+                  "min": 0,
+                  "max": 10,
+                  "default": 1
+                },
+                {
+                  "name": "loud",
+                  "type": "boolean",
+                  "default": false
+                },
+                {
+                  "name": "tone",
+                  "type": "enum",
+                  "values": [
+                    "calm",
+                    "tense"
+                  ],
+                  "default": "calm"
+                },
+                {
+                  "name": "marks",
+                  "type": "flags",
+                  "values": [
+                    "night",
+                    "rain"
+                  ],
+                  "default": []
+                },
+                {
+                  "name": "act",
+                  "type": "quality",
+                  "stages": [
+                    "setup",
+                    "turn",
+                    "close"
+                  ],
+                  "default": "setup"
+                },
+                {
+                  "name": "next",
+                  "type": "reference",
+                  "to": "line",
+                  "default": ""
+                },
+                {
+                  "name": "cue",
+                  "type": "record",
+                  "fields": [
+                    {
+                      "name": "sound",
+                      "type": "text",
+                      "required": true,
+                      "default": ""
+                    },
+                    {
+                      "name": "gain",
+                      "type": "number",
+                      "min": 0,
+                      "max": 1,
+                      "default": 0
+                    }
+                  ],
+                  "default": {
+                    "sound": "",
+                    "gain": 0
+                  }
+                },
+                {
+                  "name": "perf",
+                  "type": "map",
+                  "key": {
+                    "type": "reference",
+                    "to": "cast"
+                  },
+                  "of": {
+                    "type": "record",
+                    "fields": [
+                      {
+                        "name": "expression",
+                        "type": "enum",
+                        "values": [
+                          "smile",
+                          "frown"
+                        ],
+                        "default": "smile"
+                      },
+                      {
+                        "name": "look",
+                        "type": "text",
+                        "default": ""
+                      }
+                    ]
+                  },
+                  "default": {}
+                },
+                {
+                  "name": "beats",
+                  "type": "list",
+                  "id": "id",
+                  "of": {
+                    "type": "record",
+                    "fields": [
+                      {
+                        "name": "id",
+                        "type": "text",
+                        "default": ""
+                      },
+                      {
+                        "name": "at",
+                        "type": "number",
+                        "default": 0
+                      }
+                    ]
+                  },
+                  "default": []
+                },
+                {
+                  "name": "words",
+                  "type": "list",
+                  "of": {
+                    "type": "text"
+                  },
+                  "default": []
+                }
+              ],
+              "option": [
+                {
+                  "name": "icon",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "project": [
+                {
+                  "name": "studio",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "scene": [
+                {
+                  "name": "theme",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "snippet": [
+                {
+                  "name": "weight",
+                  "type": "number",
+                  "default": 0
+                }
+              ],
+              "text": [
+                {
+                  "name": "style",
+                  "type": "text",
+                  "default": ""
+                }
+              ]
+            },
+            "project": {
+              "studio": "Wildwinter"
+            }
+          }
+        },
+        "scenes": {
+          "s_probe": {
+            "id": "s_probe",
+            "type": "scene",
+            "name": "Probe",
+            "gameId": "the-probe",
+            "extensions": {
+              "probe": {
+                "theme": "harbour"
+              }
+            },
+            "blocks": [
+              {
+                "id": "b_main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "sn_a",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_full",
+                        "kind": "line",
+                        "character": "ANNA",
+                        "gameData": {
+                          "delivery": "tense"
+                        },
+                        "extensions": {
+                          "other": {
+                            "flag": true
+                          },
+                          "probe": {
+                            "act": "turn",
+                            "beats": [
+                              {
+                                "id": "b2",
+                                "at": 3
+                              },
+                              {
+                                "id": "b1",
+                                "at": 1
+                              }
+                            ],
+                            "cue": {
+                              "sound": "bell",
+                              "gain": 0.5
+                            },
+                            "loud": true,
+                            "marks": [
+                              "night",
+                              "rain"
+                            ],
+                            "next": "L_bare",
+                            "note": "lights down",
+                            "perf": {
+                              "ANNA": {
+                                "expression": "frown",
+                                "look": "away"
+                              },
+                              "BO": {
+                                "expression": "smile",
+                                "look": ""
+                              }
+                            },
+                            "tone": "tense",
+                            "weight": 4,
+                            "words": [
+                              "salt",
+                              "rope"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "T_one",
+                        "kind": "text",
+                        "extensions": {
+                          "probe": {
+                            "style": "hushed"
+                          }
+                        }
+                      },
+                      {
+                        "id": "E_one",
+                        "kind": "gameEvent",
+                        "extensions": {
+                          "probe": {
+                            "cue": "thunder"
+                          }
+                        }
+                      },
+                      {
+                        "id": "L_bare",
+                        "kind": "line",
+                        "character": "BO"
+                      }
+                    ],
+                    "extensions": {
+                      "probe": {
+                        "weight": 3
+                      }
+                    }
+                  },
+                  {
+                    "id": "g_pick",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_go",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_go",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "extensions": {
+                          "probe": {
+                            "icon": "door"
+                          }
+                        },
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "extensions": {
+                            "probe": {
+                              "note": "prompt"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "id": "o_stay",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_stay",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_stay",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_stay",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "extensions": {
+                  "probe": {
+                    "pace": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_full": "Lights down.",
+            "T_one": "The hall goes quiet.",
+            "L_bare": "Now?",
+            "P_go": "Let's go.",
+            "P_stay": "Stay.",
+            "T_go": "Gone.",
+            "T_stay": "Stayed."
+          }
+        }
+      },
+      "engineOptions": {
+        "replayPromptOnChoose": true
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s_probe"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_full",
+              "text": "Lights down.",
+              "character": "ANNA",
+              "gameData": {
+                "delivery": "tense"
+              },
+              "extensions": {
+                "other": {
+                  "flag": true
+                },
+                "probe": {
+                  "act": "turn",
+                  "beats": [
+                    {
+                      "id": "b2",
+                      "at": 3
+                    },
+                    {
+                      "id": "b1",
+                      "at": 1
+                    }
+                  ],
+                  "cue": {
+                    "sound": "bell",
+                    "gain": 0.5
+                  },
+                  "loud": true,
+                  "marks": [
+                    "night",
+                    "rain"
+                  ],
+                  "next": "L_bare",
+                  "note": "lights down",
+                  "perf": {
+                    "ANNA": {
+                      "expression": "frown",
+                      "look": "away"
+                    },
+                    "BO": {
+                      "expression": "smile",
+                      "look": ""
+                    }
+                  },
+                  "tone": "tense",
+                  "weight": 4,
+                  "words": [
+                    "salt",
+                    "rope"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_one",
+              "text": "The hall goes quiet.",
+              "extensions": {
+                "probe": {
+                  "style": "hushed"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "gameEvent",
+              "id": "E_one",
+              "extensions": {
+                "probe": {
+                  "cue": "thunder"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_bare",
+              "text": "Now?",
+              "character": "BO"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_pick",
+              "options": [
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Let's go.",
+                    "character": "ANNA"
+                  },
+                  "eligible": true,
+                  "extensions": {
+                    "probe": {
+                      "icon": "door"
+                    }
+                  }
+                },
+                {
+                  "id": "o_stay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Stay."
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "saveLoad"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_pick",
+              "options": [
+                {
+                  "id": "o_go",
+                  "prompt": {
+                    "kind": "line",
+                    "text": "Let's go.",
+                    "character": "ANNA"
+                  },
+                  "eligible": true,
+                  "extensions": {
+                    "probe": {
+                      "icon": "door"
+                    }
+                  }
+                },
+                {
+                  "id": "o_stay",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "Stay."
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "stepFor",
+          "beat": "P_go",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_go",
+              "text": "Let's go.",
+              "character": "ANNA",
+              "extensions": {
+                "probe": {
+                  "note": "prompt"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "op": "choose",
+          "id": "o_go"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "P_go",
+              "text": "Let's go.",
+              "character": "ANNA",
+              "extensions": {
+                "probe": {
+                  "note": "prompt"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "text",
+              "id": "T_go",
+              "text": "Gone."
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "s_probe",
+          "expectResult": {
+            "probe": {
+              "theme": "harbour"
+            }
+          }
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "the-probe",
+          "expectResult": {
+            "probe": {
+              "theme": "harbour"
+            }
+          }
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "s_probe",
+          "block": "b_main",
+          "expectResult": {
+            "probe": {
+              "pace": 2
+            }
+          }
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "the-probe",
+          "block": "main",
+          "expectResult": {
+            "probe": {
+              "pace": 2
+            }
+          }
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "nowhere",
+          "expectResult": {}
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "s_probe",
+          "block": "nowhere",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "project",
+          "expectResult": {
+            "probe": {
+              "studio": "Wildwinter"
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "project",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "studio": "Wildwinter"
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "scene",
+          "address": "the-probe",
+          "expectResult": {
+            "probe": {
+              "theme": "harbour"
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "block",
+          "address": "the-probe/main",
+          "expectResult": {
+            "probe": {
+              "pace": 2
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "block",
+          "address": "s_probe/b_main",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "pace": 2
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "snippet",
+          "address": "sn_a",
+          "expectResult": {
+            "probe": {
+              "weight": 3
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "snippet",
+          "address": "sn_go",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "snippet",
+          "address": "sn_go",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "weight": 0
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "option",
+          "address": "o_go",
+          "expectResult": {
+            "probe": {
+              "icon": "door"
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "option",
+          "address": "o_stay",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "icon": ""
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_full",
+          "expectResult": {
+            "other": {
+              "flag": true
+            },
+            "probe": {
+              "act": "turn",
+              "beats": [
+                {
+                  "id": "b2",
+                  "at": 3
+                },
+                {
+                  "id": "b1",
+                  "at": 1
+                }
+              ],
+              "cue": {
+                "sound": "bell",
+                "gain": 0.5
+              },
+              "loud": true,
+              "marks": [
+                "night",
+                "rain"
+              ],
+              "next": "L_bare",
+              "note": "lights down",
+              "perf": {
+                "ANNA": {
+                  "expression": "frown",
+                  "look": "away"
+                },
+                "BO": {
+                  "expression": "smile",
+                  "look": ""
+                }
+              },
+              "tone": "tense",
+              "weight": 4,
+              "words": [
+                "salt",
+                "rope"
+              ]
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_full",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "act": "turn",
+            "beats": [
+              {
+                "id": "b2",
+                "at": 3
+              },
+              {
+                "id": "b1",
+                "at": 1
+              }
+            ],
+            "cue": {
+              "sound": "bell",
+              "gain": 0.5
+            },
+            "loud": true,
+            "marks": [
+              "night",
+              "rain"
+            ],
+            "next": "L_bare",
+            "note": "lights down",
+            "perf": {
+              "ANNA": {
+                "expression": "frown",
+                "look": "away"
+              },
+              "BO": {
+                "expression": "smile",
+                "look": ""
+              }
+            },
+            "tone": "tense",
+            "weight": 4,
+            "words": [
+              "salt",
+              "rope"
+            ]
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_bare",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "act": "setup",
+            "beats": [],
+            "cue": {
+              "sound": "",
+              "gain": 0
+            },
+            "loud": false,
+            "marks": [],
+            "next": "",
+            "note": "",
+            "perf": {},
+            "tone": "calm",
+            "weight": 1,
+            "words": []
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_full",
+          "effective": {
+            "extension": "other"
+          },
+          "expectResult": {
+            "flag": true
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_bare",
+          "effective": {
+            "extension": "other"
+          },
+          "expectResult": {
+            "flag": false
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "P_go",
+          "expectResult": {
+            "probe": {
+              "note": "prompt"
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "text",
+          "address": "T_one",
+          "expectResult": {
+            "probe": {
+              "style": "hushed"
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "gameEvent",
+          "address": "E_one",
+          "expectResult": {
+            "probe": {
+              "cue": "thunder"
+            }
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "T_one",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "nowhere",
+          "expectResult": {}
+        }
+      ]
+    },
+    {
+      "name": "extension values as the compile leaves them: editor-only out, renamed stages renamed, bad entries left out",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "16ny7lo",
+          "structureHash": "01tq2z9"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA"
+          },
+          {
+            "name": "BO"
+          }
+        ],
+        "gameDataFields": {
+          "line": [
+            {
+              "name": "delivery",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "default": "calm"
+            }
+          ]
+        },
+        "extensions": {
+          "probe": {
+            "version": "1.1.0",
+            "fields": {
+              "block": [
+                {
+                  "name": "pace",
+                  "type": "number",
+                  "default": 0
+                }
+              ],
+              "gameEvent": [
+                {
+                  "name": "cue",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "line": [
+                {
+                  "name": "note",
+                  "type": "text",
+                  "default": ""
+                },
+                {
+                  "name": "weight",
+                  "type": "number",
+                  "min": 0,
+                  "max": 10,
+                  "default": 1
+                },
+                {
+                  "name": "loud",
+                  "type": "boolean",
+                  "default": false
+                },
+                {
+                  "name": "tone",
+                  "type": "enum",
+                  "values": [
+                    "calm",
+                    "tense"
+                  ],
+                  "default": "calm"
+                },
+                {
+                  "name": "marks",
+                  "type": "flags",
+                  "values": [
+                    "night",
+                    "rain"
+                  ],
+                  "default": []
+                },
+                {
+                  "name": "act",
+                  "type": "quality",
+                  "stages": [
+                    "setup",
+                    "turn",
+                    "close"
+                  ],
+                  "default": "setup"
+                },
+                {
+                  "name": "next",
+                  "type": "reference",
+                  "to": "line",
+                  "default": ""
+                },
+                {
+                  "name": "cue",
+                  "type": "record",
+                  "fields": [
+                    {
+                      "name": "sound",
+                      "type": "text",
+                      "required": true,
+                      "default": ""
+                    },
+                    {
+                      "name": "gain",
+                      "type": "number",
+                      "min": 0,
+                      "max": 1,
+                      "default": 0
+                    }
+                  ],
+                  "default": {
+                    "sound": "",
+                    "gain": 0
+                  }
+                },
+                {
+                  "name": "perf",
+                  "type": "map",
+                  "key": {
+                    "type": "reference",
+                    "to": "cast"
+                  },
+                  "of": {
+                    "type": "record",
+                    "fields": [
+                      {
+                        "name": "expression",
+                        "type": "enum",
+                        "values": [
+                          "smile",
+                          "frown"
+                        ],
+                        "default": "smile"
+                      },
+                      {
+                        "name": "look",
+                        "type": "text",
+                        "default": ""
+                      }
+                    ]
+                  },
+                  "default": {}
+                },
+                {
+                  "name": "beats",
+                  "type": "list",
+                  "id": "id",
+                  "of": {
+                    "type": "record",
+                    "fields": [
+                      {
+                        "name": "id",
+                        "type": "text",
+                        "default": ""
+                      },
+                      {
+                        "name": "at",
+                        "type": "number",
+                        "default": 0
+                      }
+                    ]
+                  },
+                  "default": []
+                },
+                {
+                  "name": "words",
+                  "type": "list",
+                  "of": {
+                    "type": "text"
+                  },
+                  "default": []
+                }
+              ],
+              "option": [
+                {
+                  "name": "icon",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "project": [
+                {
+                  "name": "studio",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "scene": [
+                {
+                  "name": "theme",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "snippet": [
+                {
+                  "name": "weight",
+                  "type": "number",
+                  "default": 0
+                }
+              ],
+              "text": [
+                {
+                  "name": "style",
+                  "type": "text",
+                  "default": ""
+                }
+              ]
+            }
+          }
+        },
+        "scenes": {
+          "s_c": {
+            "id": "s_c",
+            "type": "scene",
+            "name": "C",
+            "blocks": [
+              {
+                "id": "b_c",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_c",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_draft",
+                        "kind": "line",
+                        "character": "ANNA",
+                        "extensions": {
+                          "probe": {
+                            "act": "setup",
+                            "note": "hi"
+                          }
+                        }
+                      },
+                      {
+                        "id": "L_only",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "L_bad",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "L_hand",
+                        "kind": "line",
+                        "character": "ANNA"
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "s_far": {
+            "id": "s_far",
+            "type": "scene",
+            "name": "Far",
+            "blocks": [
+              {
+                "id": "b_far",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_far",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_far",
+                        "kind": "line",
+                        "character": "BO",
+                        "extensions": {
+                          "probe": {
+                            "note": "far"
+                          }
+                        }
+                      }
+                    ],
+                    "jump": {
+                      "to": "END"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_draft": "One.",
+            "L_only": "Two.",
+            "L_bad": "Three.",
+            "L_hand": "Four.",
+            "L_far": "Far."
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s_c"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_draft",
+              "text": "One.",
+              "character": "ANNA",
+              "extensions": {
+                "probe": {
+                  "act": "setup",
+                  "note": "hi"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_only",
+              "text": "Two.",
+              "character": "ANNA"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_bad",
+              "text": "Three.",
+              "character": "ANNA"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_hand",
+              "text": "Four.",
+              "character": "ANNA"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "end"
+            }
+          ]
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_only",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_only",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "act": "setup",
+            "beats": [],
+            "cue": {
+              "sound": "",
+              "gain": 0
+            },
+            "loud": false,
+            "marks": [],
+            "next": "",
+            "note": "",
+            "perf": {},
+            "tone": "calm",
+            "weight": 1,
+            "words": []
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_draft",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {
+            "act": "setup",
+            "beats": [],
+            "cue": {
+              "sound": "",
+              "gain": 0
+            },
+            "loud": false,
+            "marks": [],
+            "next": "",
+            "note": "hi",
+            "perf": {},
+            "tone": "calm",
+            "weight": 1,
+            "words": []
+          }
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_far",
+          "expectResult": {
+            "probe": {
+              "note": "far"
+            }
+          }
+        },
+        {
+          "op": "openFlow",
+          "flow": "far",
+          "scene": "s_far"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_far",
+              "text": "Far.",
+              "character": "BO",
+              "extensions": {
+                "probe": {
+                  "note": "far"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "a bundle with no extensions hands back none, and the helpers read nothing",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1ntpin7",
+          "structureHash": "0ev0a47"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA"
+          }
+        ],
+        "gameDataFields": {
+          "scene": [
+            {
+              "name": "music",
+              "type": "text",
+              "default": ""
+            }
+          ]
+        },
+        "scenes": {
+          "s_none": {
+            "id": "s_none",
+            "type": "scene",
+            "name": "None",
+            "gameData": {
+              "music": "harp"
+            },
+            "blocks": [
+              {
+                "id": "b_none",
+                "type": "block",
+                "name": "B",
+                "children": [
+                  {
+                    "id": "sn_none",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_none",
+                        "kind": "line",
+                        "character": "ANNA"
+                      },
+                      {
+                        "id": "E_none",
+                        "kind": "gameEvent"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "g_none",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_none",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_o",
+                            "type": "snippet",
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_none",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_none": "Plain.",
+            "P_none": "On."
+          }
+        }
+      },
+      "script": [
+        {
+          "op": "openFlow",
+          "flow": "main",
+          "scene": "s_none"
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "line",
+              "id": "L_none",
+              "text": "Plain.",
+              "character": "ANNA"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "gameEvent",
+              "id": "E_none"
+            }
+          ]
+        },
+        {
+          "op": "advance",
+          "expect": [
+            {
+              "type": "choice",
+              "groupId": "g_none",
+              "options": [
+                {
+                  "id": "o_none",
+                  "prompt": {
+                    "kind": "text",
+                    "text": "On."
+                  },
+                  "eligible": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "s_none",
+          "expectResult": {}
+        },
+        {
+          "op": "expectExtensions",
+          "scene": "s_none",
+          "block": "b_none",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "project",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_none",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "line",
+          "address": "L_none",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "project",
+          "effective": {
+            "extension": "probe"
+          },
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "scene",
+          "address": "nowhere",
+          "expectResult": {}
+        },
+        {
+          "op": "expectNodeExtensions",
+          "kind": "nothing",
+          "address": "L_none",
+          "expectResult": {}
+        }
+      ]
     }
   ],
   "gameData": [
@@ -25195,6 +26857,746 @@
             "kind": "text",
             "padAfter": 0.6,
             "text": "gate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the outline and beat sequence carry extension values on scenes, blocks and beats",
+      "bundle": {
+        "schema": "patter/bundle@0",
+        "content": {
+          "project": "conf",
+          "hash": "1bpqu2h",
+          "structureHash": "0gwi7zd"
+        },
+        "voiced": false,
+        "locales": {
+          "default": "en",
+          "included": [
+            "en"
+          ]
+        },
+        "cast": [
+          {
+            "name": "ANNA"
+          },
+          {
+            "name": "BO"
+          }
+        ],
+        "gameDataFields": {
+          "line": [
+            {
+              "name": "delivery",
+              "type": "enum",
+              "values": [
+                "calm",
+                "tense"
+              ],
+              "default": "calm"
+            }
+          ]
+        },
+        "extensions": {
+          "other": {
+            "version": "0.1.0",
+            "fields": {
+              "line": [
+                {
+                  "name": "flag",
+                  "type": "boolean",
+                  "default": false
+                }
+              ]
+            }
+          },
+          "probe": {
+            "version": "1.1.0",
+            "fields": {
+              "block": [
+                {
+                  "name": "pace",
+                  "type": "number",
+                  "default": 0
+                }
+              ],
+              "gameEvent": [
+                {
+                  "name": "cue",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "line": [
+                {
+                  "name": "note",
+                  "type": "text",
+                  "default": ""
+                },
+                {
+                  "name": "weight",
+                  "type": "number",
+                  "min": 0,
+                  "max": 10,
+                  "default": 1
+                },
+                {
+                  "name": "loud",
+                  "type": "boolean",
+                  "default": false
+                },
+                {
+                  "name": "tone",
+                  "type": "enum",
+                  "values": [
+                    "calm",
+                    "tense"
+                  ],
+                  "default": "calm"
+                },
+                {
+                  "name": "marks",
+                  "type": "flags",
+                  "values": [
+                    "night",
+                    "rain"
+                  ],
+                  "default": []
+                },
+                {
+                  "name": "act",
+                  "type": "quality",
+                  "stages": [
+                    "setup",
+                    "turn",
+                    "close"
+                  ],
+                  "default": "setup"
+                },
+                {
+                  "name": "next",
+                  "type": "reference",
+                  "to": "line",
+                  "default": ""
+                },
+                {
+                  "name": "cue",
+                  "type": "record",
+                  "fields": [
+                    {
+                      "name": "sound",
+                      "type": "text",
+                      "required": true,
+                      "default": ""
+                    },
+                    {
+                      "name": "gain",
+                      "type": "number",
+                      "min": 0,
+                      "max": 1,
+                      "default": 0
+                    }
+                  ],
+                  "default": {
+                    "sound": "",
+                    "gain": 0
+                  }
+                },
+                {
+                  "name": "perf",
+                  "type": "map",
+                  "key": {
+                    "type": "reference",
+                    "to": "cast"
+                  },
+                  "of": {
+                    "type": "record",
+                    "fields": [
+                      {
+                        "name": "expression",
+                        "type": "enum",
+                        "values": [
+                          "smile",
+                          "frown"
+                        ],
+                        "default": "smile"
+                      },
+                      {
+                        "name": "look",
+                        "type": "text",
+                        "default": ""
+                      }
+                    ]
+                  },
+                  "default": {}
+                },
+                {
+                  "name": "beats",
+                  "type": "list",
+                  "id": "id",
+                  "of": {
+                    "type": "record",
+                    "fields": [
+                      {
+                        "name": "id",
+                        "type": "text",
+                        "default": ""
+                      },
+                      {
+                        "name": "at",
+                        "type": "number",
+                        "default": 0
+                      }
+                    ]
+                  },
+                  "default": []
+                },
+                {
+                  "name": "words",
+                  "type": "list",
+                  "of": {
+                    "type": "text"
+                  },
+                  "default": []
+                }
+              ],
+              "option": [
+                {
+                  "name": "icon",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "project": [
+                {
+                  "name": "studio",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "scene": [
+                {
+                  "name": "theme",
+                  "type": "text",
+                  "default": ""
+                }
+              ],
+              "snippet": [
+                {
+                  "name": "weight",
+                  "type": "number",
+                  "default": 0
+                }
+              ],
+              "text": [
+                {
+                  "name": "style",
+                  "type": "text",
+                  "default": ""
+                }
+              ]
+            },
+            "project": {
+              "studio": "Wildwinter"
+            }
+          }
+        },
+        "scenes": {
+          "s_probe": {
+            "id": "s_probe",
+            "type": "scene",
+            "name": "Probe",
+            "gameId": "the-probe",
+            "extensions": {
+              "probe": {
+                "theme": "harbour"
+              }
+            },
+            "blocks": [
+              {
+                "id": "b_main",
+                "type": "block",
+                "name": "Main",
+                "children": [
+                  {
+                    "id": "sn_a",
+                    "type": "snippet",
+                    "beats": [
+                      {
+                        "id": "L_full",
+                        "kind": "line",
+                        "character": "ANNA",
+                        "gameData": {
+                          "delivery": "tense"
+                        },
+                        "extensions": {
+                          "other": {
+                            "flag": true
+                          },
+                          "probe": {
+                            "act": "turn",
+                            "beats": [
+                              {
+                                "id": "b2",
+                                "at": 3
+                              },
+                              {
+                                "id": "b1",
+                                "at": 1
+                              }
+                            ],
+                            "cue": {
+                              "sound": "bell",
+                              "gain": 0.5
+                            },
+                            "loud": true,
+                            "marks": [
+                              "night",
+                              "rain"
+                            ],
+                            "next": "L_bare",
+                            "note": "lights down",
+                            "perf": {
+                              "ANNA": {
+                                "expression": "frown",
+                                "look": "away"
+                              },
+                              "BO": {
+                                "expression": "smile",
+                                "look": ""
+                              }
+                            },
+                            "tone": "tense",
+                            "weight": 4,
+                            "words": [
+                              "salt",
+                              "rope"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "id": "T_one",
+                        "kind": "text",
+                        "extensions": {
+                          "probe": {
+                            "style": "hushed"
+                          }
+                        }
+                      },
+                      {
+                        "id": "E_one",
+                        "kind": "gameEvent",
+                        "extensions": {
+                          "probe": {
+                            "cue": "thunder"
+                          }
+                        }
+                      },
+                      {
+                        "id": "L_bare",
+                        "kind": "line",
+                        "character": "BO"
+                      }
+                    ],
+                    "extensions": {
+                      "probe": {
+                        "weight": 3
+                      }
+                    }
+                  },
+                  {
+                    "id": "g_pick",
+                    "type": "group",
+                    "selector": "choice",
+                    "children": [
+                      {
+                        "id": "o_go",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_go",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_go",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "extensions": {
+                          "probe": {
+                            "icon": "door"
+                          }
+                        },
+                        "prompt": {
+                          "id": "P_go",
+                          "kind": "line",
+                          "character": "ANNA",
+                          "extensions": {
+                            "probe": {
+                              "note": "prompt"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "id": "o_stay",
+                        "type": "group",
+                        "children": [
+                          {
+                            "id": "sn_stay",
+                            "type": "snippet",
+                            "beats": [
+                              {
+                                "id": "T_stay",
+                                "kind": "text"
+                              }
+                            ],
+                            "jump": {
+                              "to": "END"
+                            }
+                          }
+                        ],
+                        "prompt": {
+                          "id": "P_stay",
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "extensions": {
+                  "probe": {
+                    "pace": 2
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "strings": {
+          "en": {
+            "L_full": "Lights down.",
+            "T_one": "The hall goes quiet.",
+            "L_bare": "Now?",
+            "P_go": "Let's go.",
+            "P_stay": "Stay.",
+            "T_go": "Gone.",
+            "T_stay": "Stayed."
+          }
+        }
+      },
+      "expectedOutline": [
+        {
+          "id": "s_probe",
+          "gameId": "the-probe",
+          "name": "Probe",
+          "extensions": {
+            "probe": {
+              "theme": "harbour"
+            }
+          },
+          "blocks": [
+            {
+              "id": "b_main",
+              "gameId": "main",
+              "name": "Main",
+              "extensions": {
+                "probe": {
+                  "pace": 2
+                }
+              },
+              "children": [
+                {
+                  "type": "snippet",
+                  "id": "sn_a",
+                  "beats": [
+                    {
+                      "id": "L_full",
+                      "kind": "line",
+                      "character": "ANNA",
+                      "speakerLabel": "ANNA",
+                      "padAfter": 0.6,
+                      "text": "Lights down.",
+                      "gameData": {
+                        "delivery": "tense"
+                      },
+                      "extensions": {
+                        "other": {
+                          "flag": true
+                        },
+                        "probe": {
+                          "act": "turn",
+                          "beats": [
+                            {
+                              "id": "b2",
+                              "at": 3
+                            },
+                            {
+                              "id": "b1",
+                              "at": 1
+                            }
+                          ],
+                          "cue": {
+                            "sound": "bell",
+                            "gain": 0.5
+                          },
+                          "loud": true,
+                          "marks": [
+                            "night",
+                            "rain"
+                          ],
+                          "next": "L_bare",
+                          "note": "lights down",
+                          "perf": {
+                            "ANNA": {
+                              "expression": "frown",
+                              "look": "away"
+                            },
+                            "BO": {
+                              "expression": "smile",
+                              "look": ""
+                            }
+                          },
+                          "tone": "tense",
+                          "weight": 4,
+                          "words": [
+                            "salt",
+                            "rope"
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "T_one",
+                      "kind": "text",
+                      "padAfter": 0.6,
+                      "text": "The hall goes quiet.",
+                      "extensions": {
+                        "probe": {
+                          "style": "hushed"
+                        }
+                      }
+                    },
+                    {
+                      "id": "E_one",
+                      "kind": "gameEvent",
+                      "extensions": {
+                        "probe": {
+                          "cue": "thunder"
+                        }
+                      }
+                    },
+                    {
+                      "id": "L_bare",
+                      "kind": "line",
+                      "character": "BO",
+                      "speakerLabel": "BO",
+                      "padAfter": 0.6,
+                      "text": "Now?"
+                    }
+                  ]
+                },
+                {
+                  "type": "group",
+                  "id": "g_pick",
+                  "selector": "choice",
+                  "children": [
+                    {
+                      "type": "group",
+                      "id": "o_go",
+                      "prompt": {
+                        "id": "P_go",
+                        "kind": "line",
+                        "character": "ANNA",
+                        "speakerLabel": "ANNA",
+                        "padAfter": 0.6,
+                        "text": "Let's go.",
+                        "extensions": {
+                          "probe": {
+                            "note": "prompt"
+                          }
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "snippet",
+                          "id": "sn_go",
+                          "beats": [
+                            {
+                              "id": "T_go",
+                              "kind": "text",
+                              "padAfter": 0.6,
+                              "text": "Gone."
+                            }
+                          ],
+                          "jumpTo": "END"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "group",
+                      "id": "o_stay",
+                      "prompt": {
+                        "id": "P_stay",
+                        "kind": "text",
+                        "padAfter": 0.6,
+                        "text": "Stay."
+                      },
+                      "children": [
+                        {
+                          "type": "snippet",
+                          "id": "sn_stay",
+                          "beats": [
+                            {
+                              "id": "T_stay",
+                              "kind": "text",
+                              "padAfter": 0.6,
+                              "text": "Stayed."
+                            }
+                          ],
+                          "jumpTo": "END"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "expectedBeatSequence": [
+        {
+          "sceneId": "s_probe",
+          "blockId": "b_main",
+          "snippetId": "sn_a",
+          "beat": {
+            "id": "L_full",
+            "kind": "line",
+            "character": "ANNA",
+            "speakerLabel": "ANNA",
+            "padAfter": 0.6,
+            "text": "Lights down.",
+            "gameData": {
+              "delivery": "tense"
+            },
+            "extensions": {
+              "other": {
+                "flag": true
+              },
+              "probe": {
+                "act": "turn",
+                "beats": [
+                  {
+                    "id": "b2",
+                    "at": 3
+                  },
+                  {
+                    "id": "b1",
+                    "at": 1
+                  }
+                ],
+                "cue": {
+                  "sound": "bell",
+                  "gain": 0.5
+                },
+                "loud": true,
+                "marks": [
+                  "night",
+                  "rain"
+                ],
+                "next": "L_bare",
+                "note": "lights down",
+                "perf": {
+                  "ANNA": {
+                    "expression": "frown",
+                    "look": "away"
+                  },
+                  "BO": {
+                    "expression": "smile",
+                    "look": ""
+                  }
+                },
+                "tone": "tense",
+                "weight": 4,
+                "words": [
+                  "salt",
+                  "rope"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "sceneId": "s_probe",
+          "blockId": "b_main",
+          "snippetId": "sn_a",
+          "beat": {
+            "id": "T_one",
+            "kind": "text",
+            "padAfter": 0.6,
+            "text": "The hall goes quiet.",
+            "extensions": {
+              "probe": {
+                "style": "hushed"
+              }
+            }
+          }
+        },
+        {
+          "sceneId": "s_probe",
+          "blockId": "b_main",
+          "snippetId": "sn_a",
+          "beat": {
+            "id": "E_one",
+            "kind": "gameEvent",
+            "extensions": {
+              "probe": {
+                "cue": "thunder"
+              }
+            }
+          }
+        },
+        {
+          "sceneId": "s_probe",
+          "blockId": "b_main",
+          "snippetId": "sn_a",
+          "beat": {
+            "id": "L_bare",
+            "kind": "line",
+            "character": "BO",
+            "speakerLabel": "BO",
+            "padAfter": 0.6,
+            "text": "Now?"
+          }
+        },
+        {
+          "sceneId": "s_probe",
+          "blockId": "b_main",
+          "snippetId": "sn_go",
+          "beat": {
+            "id": "T_go",
+            "kind": "text",
+            "padAfter": 0.6,
+            "text": "Gone."
+          }
+        },
+        {
+          "sceneId": "s_probe",
+          "blockId": "b_main",
+          "snippetId": "sn_stay",
+          "beat": {
+            "id": "T_stay",
+            "kind": "text",
+            "padAfter": 0.6,
+            "text": "Stayed."
           }
         }
       ]

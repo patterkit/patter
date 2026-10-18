@@ -6,15 +6,15 @@
 // ---------------------------------------------------------------------------
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, isAbsolute, join, relative } from "node:path";
-import { sidecarIssues, CONFLICT_SIDECAR } from "./merge.js";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { sidecarIssues, unresolvedMarkIssues, CONFLICT_SIDECAR } from "./merge.js";
 import { validateProject, parseSource } from "@patterkit/core";
 import type { ValidationIssue } from "@patterkit/core";
-import { validateConditions, validateInterpolation, hostScopesToSpec, projectScopes } from "@patterkit/compiler";
-import { compileLoaded, bundleOutputPath } from "./compile.js";
-import type { ConditionIssue } from "@patterkit/compiler";
+import { validateConditions, validateInterpolation, hostScopesToSpec, projectScopes, extensionPass } from "@patterkit/compiler";
+import { compileLoaded, bundleOutputPath, loadedExtensions } from "./compile.js";
+import type { ConditionIssue, ExtensionIssue } from "@patterkit/compiler";
 import type { Bundle } from "@patterkit/model";
-import { PROJECT_LOCALE_SCENE, projectLayout } from "@patterkit/model";
+import { EXTENSION_SHARD, PROJECT_LOCALE_SCENE, projectLayout } from "@patterkit/model";
 import { reachabilityIssues } from "./reachability.js";
 import { walkFilesByExt } from "./load.js";
 import { SHARD_EXTENSIONS } from "./pack.js";
@@ -50,7 +50,8 @@ export interface ValidateResult {
    *  deliberately NOT part of `ok`: content is written in pieces, so a gate whose writer has not been
    *  authored yet is the normal state mid-work and must never fail a build. */
   reachability: ConditionIssue[];
-  /** Lingering `.patterconflict` sidecars - an unresolved merge (patter-merge.md §3.6). */
+  /** Lingering `.patterconflict` sidecars, and shards carrying the `unresolved` mark a merge writes into the
+   *  shard itself: an unresolved merge (patter-merge.md §3.6). */
   unresolvedMerges: HygieneIssue[];
   /** Patter shards on disk that the project does NOT contain - see `orphanShards`. */
   orphans: HygieneIssue[];
@@ -61,6 +62,12 @@ export interface ValidateResult {
    *  error: the compile refuses it), and as warnings a shard for a scene the project lacks, one in a
    *  language it does not declare, or two shards for one scene and language. */
   localisation: GameScopesIssue[];
+  /** The project's Patter extensions: their manifests, the project's pins and settings, claims on gameData
+   *  fields, and every value in the extension data shards against its manifest (the compiler's
+   *  `extensionPass`), with an entry for a node that has gone reported per entry, and an extension file that
+   *  would not load. Errors count against `ok`, and export refuses them; warnings (a missing manifest, an
+   *  orphaned entry, a `.gitattributes` with no merge rule for the data) don't. */
+  extensions: ExtensionIssue[];
   /** Only ERRORS count: a warning (another tool's scope, say) never fails a build. */
   ok: boolean;
 }
@@ -79,7 +86,7 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   const conditions = validateConditions({ project, scenes }, { foreignScopes, gameScopes: merged });
   const interpolation = validateInterpolation({ project, scenes, locales }, { foreignScopes, gameScopes: merged });
   const gameScopes = gameScopesIssues(loaded, scopes.notes);
-  const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles]);
+  const hygiene = checkHygiene([loaded.projectFile, ...Object.values(loaded.sceneFiles), ...loaded.localeFiles, ...loaded.authoringFiles, ...loaded.extensionShardFiles]);
   // One walk of the tree for every kind of file the checks below look for.
   const tree = walkFilesByExt(loaded.root, [...SHARD_EXTENSIONS, CONFLICT_SIDECAR, ".patterc"]);
   const localisation = locIssues(loaded);
@@ -89,8 +96,11 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
   try { compiled = compileLoaded(loaded); } catch { compiled = undefined; }
   const staleBundles = checkBundles(loaded, compiled, tree.get(".patterc")!);
   if (compiled) gameScopes.push(...unplayableScopes(loaded, compiled));
-  const unresolvedMerges = sidecarIssues(tree.get(CONFLICT_SIDECAR)!);
+  // A shard carrying the `unresolved` mark is the record that travels with the file (a sidecar is never
+  // committed): refused here, so CI refuses it on every machine. Every shard type, project file included.
+  const unresolvedMerges = [...sidecarIssues(tree.get(CONFLICT_SIDECAR)!), ...markedShards(SHARD_EXTENSIONS.flatMap((ext) => tree.get(ext)!))];
   const orphans = orphanShards(loaded, tree);
+  const extensions = [...extensionIssues(loaded), ...gitattributesHint(loaded)];
   // Only worth asking of a project that compiles: over a broken bundle the answer would be about the
   // breakage, and the real errors are already being told. A structural WARNING (a choice that can run
   // dry) compiles, and once switched this off, hiding real latch faults behind an advisory.
@@ -107,7 +117,8 @@ export function runValidate(loaded: LoadedProject): ValidateResult {
     orphans,
     gameScopes,
     localisation,
-    ok: !localisation.some(isError) && structuralErrors.length === 0 && !conditions.some(isError) && !interpolation.some(isError)
+    extensions,
+    ok: !localisation.some(isError) && !extensions.some(isError) && structuralErrors.length === 0 && !conditions.some(isError) && !interpolation.some(isError)
       && hygiene.length === 0 && staleBundles.length === 0 && unresolvedMerges.length === 0
       && orphans.length === 0 && !gameScopes.some(isError),
   };
@@ -131,7 +142,51 @@ export function exportBlockers(loaded: LoadedProject): string[] {
     ...structural.map((i) => `[${i.code}] ${i.message}`),
     ...[...conditions, ...interpolation].map((i) => `[${i.field}] ${i.nodeId}: ${i.message}  (${i.src})`),
     ...locIssues(loaded).filter(isError).map((i) => `[localisation] ${i.file}: ${i.message}`),
+    ...extensionIssues(loaded).filter(isError).map((i) => `[extension] ${i.file}: ${i.message}`),
   ];
+}
+
+/**
+ * Everything wrong with the project's Patter extensions: an extension file that would not load (an error:
+ * it is left out of the compile), and the extension pass over the rest, the same pass the compile runs.
+ */
+function extensionIssues(loaded: LoadedProject): ExtensionIssue[] {
+  const loadIssues = loaded.extensionIssues.map((i): ExtensionIssue => ({ severity: "error", file: i.file, message: i.message }));
+  if (loaded.project.extensions === undefined && loaded.manifests.length === 0 && loaded.extensionShards.length === 0) return loadIssues;
+  const { issues } = extensionPass({
+    project: loaded.project, scenes: loaded.scenes, ...loadedExtensions(loaded),
+    projectPath: loaded.projectFile, sceneFiles: loaded.sceneFiles,
+  });
+  return [...loadIssues, ...issues];
+}
+
+/**
+ * A project with extension data, set up for git's structured merge (a `.gitattributes` naming the `patter`
+ * driver, from the project folder up to the repository's root), whose `.gitattributes` has no rule for the
+ * data shards: they would merge as plain text. A project made before extensions existed is the usual one.
+ * A warning: the project is fine, the next merge is the risk.
+ */
+function gitattributesHint(loaded: LoadedProject): ExtensionIssue[] {
+  if (loaded.extensionShardFiles.length === 0) return [];
+  const files: string[] = [];
+  let dir = loaded.root, repo = false;
+  for (;;) {
+    const f = join(dir, ".gitattributes");
+    if (existsSync(f)) files.push(f);
+    if (existsSync(join(dir, ".git"))) { repo = true; break; }
+    const up = dirname(dir);
+    if (up === dir) break;
+    dir = up;
+  }
+  // Outside a repository, only the project's own file says anything about how it is set up.
+  const consulted = repo ? files : files.filter((f) => dirname(f) === loaded.root);
+  const texts = consulted.map((f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } });
+  if (!texts.some((t) => /\bmerge=patter\b/.test(t))) return [];
+  if (texts.some((t) => /^\s*\*\.patterextension\b.*\bmerge=patter\b/m.test(t))) return [];
+  return [{
+    severity: "warning", file: consulted[0]!,
+    message: "the project has extension data, but .gitattributes has no merge rule for it, so git merges it as plain text: add the line \"*.patterextension text eol=lf merge=patter\"",
+  }];
 }
 
 /**
@@ -192,6 +247,7 @@ export function orphanShards(loaded: LoadedProject, tree: Map<string, string[]> 
     ".patterloc": { what: "strings", home: layout.strings },
     ".patterx": { what: "authoring", home: layout.authoring },
     ".patterproj": { what: "project", home: null },
+    [EXTENSION_SHARD]: { what: "extension data", home: layout.extensions },
   };
   const inside = (file: string, dir: string): boolean => {
     const r = relative(dir, file);
@@ -276,6 +332,28 @@ function locIssues(loaded: LoadedProject): GameScopesIssue[] {
 // the on-disk source bytes don't change between saves - so a cheap stat lets us skip re-reading every file.
 // Pruned to the files of the latest call, so a project closed in Patterpad leaves nothing behind.
 const hygieneCache = new Map<string, { mtimeMs: number; issues: HygieneIssue[] }>();
+
+/** The mark's verdict per shard, by mtime, as `hygieneCache` keeps its own: a project validated on every
+ *  save reads only the shards that changed. */
+const markCache = new Map<string, { mtimeMs: number; issues: HygieneIssue[] }>();
+
+/** The shards carrying the `unresolved` mark (`unresolvedMarkIssues`), read through `markCache`. */
+function markedShards(files: string[]): HygieneIssue[] {
+  const wanted = new Set(files);
+  for (const file of markCache.keys()) if (!wanted.has(file)) markCache.delete(file);
+  const issues: HygieneIssue[] = [];
+  for (const file of files) {
+    let mtimeMs: number, text: string;
+    try { mtimeMs = statSync(file).mtimeMs; } catch { continue; }
+    const hit = markCache.get(file);
+    if (hit && hit.mtimeMs === mtimeMs) { issues.push(...hit.issues); continue; }
+    try { text = readFileSync(file, "utf8"); } catch { continue; }
+    const found = unresolvedMarkIssues([{ file, text }]);
+    markCache.set(file, { mtimeMs, issues: found });
+    issues.push(...found);
+  }
+  return issues;
+}
 
 function checkHygiene(files: string[]): HygieneIssue[] {
   const wanted = new Set(files);

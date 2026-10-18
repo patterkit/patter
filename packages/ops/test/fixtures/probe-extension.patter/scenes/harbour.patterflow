@@ -1,0 +1,86 @@
+{
+  "scene": {
+    "blocks": [
+      {
+        "children": [
+          {
+            "beats": [
+              {
+                "character": "ANNA",
+                "gameData": {
+                  "delivery": "tense",
+                },
+                "id": "L_bell",
+                "kind": "line",
+              },
+              {
+                "character": "BEN",
+                "id": "L_reply",
+                "kind": "line",
+              },
+              {
+                "id": "T_tide",
+                "kind": "text",
+              },
+              {
+                "id": "E_horn",
+                "kind": "gameEvent",
+              },
+            ],
+            "id": "sn_open",
+            "type": "snippet",
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "id": "sn_stay",
+                    "jump": {
+                      "to": "END",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "o_stay",
+                "prompt": {
+                  "id": "P_stay",
+                  "kind": "text",
+                },
+                "type": "group",
+              },
+              {
+                "children": [
+                  {
+                    "id": "sn_go",
+                    "jump": {
+                      "to": "END",
+                    },
+                    "type": "snippet",
+                  },
+                ],
+                "id": "o_go",
+                "prompt": {
+                  "character": "ANNA",
+                  "id": "P_go",
+                  "kind": "line",
+                },
+                "type": "group",
+              },
+            ],
+            "id": "g_pick",
+            "selector": "choice",
+            "type": "group",
+          },
+        ],
+        "id": "b_dock",
+        "name": "The Dock",
+        "type": "block",
+      },
+    ],
+    "id": "scn_harbour",
+    "name": "The Harbour",
+    "type": "scene",
+  },
+  "schema": "patter/flow@0",
+}

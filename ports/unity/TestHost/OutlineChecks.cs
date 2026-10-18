@@ -48,6 +48,7 @@ namespace Patterkit.Patterplay.TestHost
             if (!string.IsNullOrEmpty(s.GameId)) o["gameId"] = s.GameId;
             o["name"] = s.Name;
             if (s.GameData != null && s.GameData.Count > 0) o["gameData"] = GameDataToObject(s.GameData);
+            if (s.Extensions != null && s.Extensions.Count > 0) o["extensions"] = JsonTreeToObject(s.Extensions);
             if (s.Tags != null && s.Tags.Count > 0) o["tags"] = s.Tags.Cast<object>().ToList();
             o["blocks"] = s.Blocks.Select(OutlineBlockToObject).ToList();
             return o;
@@ -59,6 +60,7 @@ namespace Patterkit.Patterplay.TestHost
             if (!string.IsNullOrEmpty(b.GameId)) o["gameId"] = b.GameId;
             o["name"] = b.Name;
             if (b.GameData != null && b.GameData.Count > 0) o["gameData"] = GameDataToObject(b.GameData);
+            if (b.Extensions != null && b.Extensions.Count > 0) o["extensions"] = JsonTreeToObject(b.Extensions);
             if (b.Tags != null && b.Tags.Count > 0) o["tags"] = b.Tags.Cast<object>().ToList();
             o["children"] = b.Children.Select(OutlineNodeToObject).ToList();
             return o;
@@ -97,6 +99,7 @@ namespace Patterkit.Patterplay.TestHost
             if (b.OwnPadAfter != null) o["ownPadAfter"] = b.OwnPadAfter.Value; // and the beat's own, when it sets one
             if (b.Text != null) o["text"] = b.Text;
             if (b.GameData != null && b.GameData.Count > 0) o["gameData"] = GameDataToObject(b.GameData);
+            if (b.Extensions != null && b.Extensions.Count > 0) o["extensions"] = JsonTreeToObject(b.Extensions);
             if (b.Tags != null && b.Tags.Count > 0) o["tags"] = b.Tags.Cast<object>().ToList();
             return o;
         }

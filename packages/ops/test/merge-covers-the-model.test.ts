@@ -19,7 +19,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { SHARD_EXTENSIONS } from "../src/pack.js";
-import { detectMergeType, runMerge, AUTHORING_HANDLED } from "../src/merge.js";
+import { detectMergeType, runMerge, AUTHORING_HANDLED, PROJECT_HANDLED } from "../src/merge.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MODEL_SRC = resolve(here, "../../model/src");
@@ -43,6 +43,7 @@ const SCHEMA_FOR: Record<string, string> = {
   ".patterloc": "patter/strings@0",
   ".patterx": "patter/authoring@0",
   ".patterproj": "patter/project@0",
+  ".patterextension": "patter/extension@0",
 };
 
 describe("every packed shard type can be merged", () => {
@@ -99,5 +100,33 @@ describe("the authoring merger names no field the model has lost", () => {
     const fields = new Set(modelFields("AuthoringFile"));
     const orphans = [...AUTHORING_HANDLED].filter((k) => !fields.has(k));
     expect(orphans, `the merger handles ${orphans.join(", ")}, which AuthoringFile no longer declares`).toEqual([]);
+  });
+});
+
+// The project merger's special keys, held to ProjectFile the same way: one it names that the model has
+// lost is a strategy for nothing, and `extensions` (the extensions a project takes) must be among them,
+// or two people setting different settings of one extension would be a conflict over the whole entry.
+describe("the project merger names no field the model has lost", () => {
+  it("has every specially-handled key on ProjectFile", () => {
+    const fields = new Set(modelFields("ProjectFile"));
+    const orphans = [...PROJECT_HANDLED].filter((k) => !fields.has(k));
+    expect(orphans, `the merger handles ${orphans.join(", ")}, which ProjectFile no longer declares`).toEqual([]);
+    expect(PROJECT_HANDLED.has("extensions")).toBe(true);
+  });
+
+  it("merges the extensions a project takes per id: the pin and each setting on their own", () => {
+    const proj = (extensions: unknown) => ({ schema: "patter/project@0", project: { id: "p", name: "P" }, extensions });
+    const base = proj({ probe: { version: "1.0.0", settings: { deliveryField: "delivery" } } });
+    const ours = proj({ probe: { version: "1.1.0", settings: { deliveryField: "delivery" } } });
+    const theirs = proj({ probe: { version: "1.0.0", settings: { deliveryField: "mood", other: "x" } }, second: { version: "2.0.0" } });
+    const r = runMerge(base, ours, theirs);
+    expect(r.conflicts).toEqual([]);
+    expect(r.merged["extensions"]).toEqual({
+      probe: { version: "1.1.0", settings: { deliveryField: "mood", other: "x" } },
+      second: { version: "2.0.0" },
+    });
+    const clash = runMerge(base, proj({ probe: { version: "1.0.0", settings: { deliveryField: "a" } } }),
+      proj({ probe: { version: "1.0.0", settings: { deliveryField: "b" } } }));
+    expect(clash.conflicts.map((c) => c.path)).toEqual(["extensions.probe.settings.deliveryField"]);
   });
 });

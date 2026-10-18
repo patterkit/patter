@@ -22,6 +22,49 @@ namespace
 	{
 		return Node.FindByPredicate([&Name](const FPatterGameDataEntry& E) { return E.Name == Name; });
 	}
+
+	/** A gameData default as the neutral tree, for its JSON text. */
+	patter::JsonTree ValueTree(const patter::PatterValue& V)
+	{
+		if (V.isNumber()) return patter::JsonTree::makeNumber(V.n);
+		if (V.isString()) return patter::JsonTree::makeString(V.s);
+		if (V.isFlags())
+		{
+			patter::JsonTree Out = patter::JsonTree::makeArray();
+			for (const std::string& F : V.f) Out.arr.push_back(patter::JsonTree::makeString(F));
+			return Out;
+		}
+		return patter::JsonTree::makeBool(V.b);
+	}
+
+	/** A JSON scalar as a Patter value, as the bundle reader reads a gameData value. False for a record, a
+	 *  map, a list holding anything but strings, or null. */
+	bool TreeToScalar(const patter::JsonTree& V, patter::PatterValue& Out)
+	{
+		switch (V.type)
+		{
+			case patter::JsonTree::Bool: Out = patter::PatterValue::Bool(V.b); return true;
+			case patter::JsonTree::Number: Out = patter::PatterValue::Num(V.num); return true;
+			case patter::JsonTree::String: Out = patter::PatterValue::Str(V.str); return true;
+			case patter::JsonTree::Array:
+			{
+				std::vector<std::string> Flags;
+				for (const patter::JsonTree& Item : V.arr)
+				{
+					if (!Item.isString()) return false;
+					Flags.push_back(Item.str);
+				}
+				Out = patter::PatterValue::Flags(std::move(Flags));
+				return true;
+			}
+			default: return false;
+		}
+	}
+
+	const FPatterExtensionValues* ExtensionNamed(const TArray<FPatterExtensionValues>& Extensions, const FString& Extension)
+	{
+		return Extensions.FindByPredicate([&Extension](const FPatterExtensionValues& E) { return E.Extension == Extension; });
+	}
 }
 
 TArray<FPatterGameDataField> UPatterGameData::GameDataFields(UPatterBundle* Bundle, const FString& Kind)
@@ -33,11 +76,13 @@ TArray<FPatterGameDataField> UPatterGameData::GameDataFields(UPatterBundle* Bund
 		FPatterGameDataField Field;
 		Field.Name = Ue(F.name);
 		Field.Type = FieldType(F.type);
+		Field.TypeName = Ue(F.type);
 		Field.bHasDefault = F.hasDefault;
 		if (F.hasDefault)
 		{
 			Field.Default = Ue(F.def.toDisplayString());
 			Field.TypedDefault = ToUeValue(F.def);
+			Field.DefaultJson = Ue(patter::jsonText(ValueTree(F.def)));
 		}
 		for (const std::string& V : F.values) Field.Values.Add(Ue(V));
 		for (const std::string& S : F.stages) Field.Stages.Add(Ue(S));
@@ -80,6 +125,98 @@ TArray<FPatterGameDataEntry> UPatterGameData::EffectiveGameData(const TArray<FPa
 	for (const FPatterGameDataEntry& E : Node)
 		if (!Find(Out, E.Name)) Out.Add(E);
 	return Out;
+}
+
+TArray<FPatterGameDataField> UPatterGameData::ExtensionDecls(UPatterBundle* Bundle, const FString& Extension, const FString& Kind)
+{
+	TArray<FPatterGameDataField> Out;
+	if (!Bundle || !Bundle->Raw()) return Out;
+	for (const patter::ExtensionFieldDecl& D : patter::extensionDecls(*Bundle->Raw(), Std(Extension), Std(Kind)))
+	{
+		FPatterGameDataField Field;
+		Field.Name = Ue(D.name);
+		Field.Type = FieldType(D.type);
+		Field.TypeName = Ue(D.type);
+		if (D.values) for (const std::string& V : *D.values) Field.Values.Add(Ue(V));
+		if (D.stages) for (const std::string& S : *D.stages) Field.Stages.Add(Ue(S));
+		if (D.defaultValue)
+		{
+			Field.bHasDefault = true;
+			Field.DefaultJson = Ue(patter::jsonText(*D.defaultValue));
+			patter::PatterValue Scalar;
+			if (TreeToScalar(*D.defaultValue, Scalar))
+			{
+				Field.Default = Ue(Scalar.toDisplayString());
+				Field.TypedDefault = ToUeValue(Scalar);
+			}
+		}
+		Out.Add(MoveTemp(Field));
+	}
+	return Out;
+}
+
+TArray<FPatterExtensionValues> UPatterGameData::ExtensionsOf(UPatterBundle* Bundle, const FString& Kind, const FString& Address)
+{
+	if (!Bundle || !Bundle->Raw()) return {};
+	return ToUeExtensions(patter::extensionsOf(*Bundle->Raw(), Std(Kind), Std(Address)));
+}
+
+TArray<FPatterExtensionEntry> UPatterGameData::GetEffectiveExtensionValues(UPatterBundle* Bundle, const FString& Kind, const FString& Extension,
+	const TArray<FPatterExtensionValues>& Extensions)
+{
+	// The core's effectiveGameData over extension declarations, done on the text: a value the node sets
+	// crosses back exactly as it came, never re-printed.
+	const FPatterExtensionValues* Own = ExtensionNamed(Extensions, Extension);
+	const TArray<FPatterExtensionEntry> Values = Own ? Own->Values : TArray<FPatterExtensionEntry>();
+	if (!Bundle || !Bundle->Raw()) return Values;
+	TArray<FPatterExtensionEntry> Out;
+	for (const patter::ExtensionFieldDecl& D : patter::extensionDecls(*Bundle->Raw(), Std(Extension), Std(Kind)))
+	{
+		const FString Name = Ue(D.name);
+		if (const FPatterExtensionEntry* Set = Values.FindByPredicate([&Name](const FPatterExtensionEntry& E) { return E.Name == Name; }))
+		{
+			Out.Add(*Set);
+		}
+		else if (D.defaultValue)
+		{
+			FPatterExtensionEntry Entry;
+			Entry.Name = Name;
+			Entry.Json = Ue(patter::jsonText(*D.defaultValue));
+			Out.Add(MoveTemp(Entry));
+		}
+	}
+	for (const FPatterExtensionEntry& E : Values)
+	{
+		if (!Out.ContainsByPredicate([&E](const FPatterExtensionEntry& O) { return O.Name == E.Name; })) Out.Add(E);
+	}
+	return Out;
+}
+
+bool UPatterGameData::FindExtensionValue(const TArray<FPatterExtensionValues>& Extensions, const FString& Extension, const FString& Field, FString& OutJson)
+{
+	OutJson.Reset();
+	const FPatterExtensionValues* Own = ExtensionNamed(Extensions, Extension);
+	if (!Own) return false;
+	const FPatterExtensionEntry* Entry = Own->Values.FindByPredicate([&Field](const FPatterExtensionEntry& E) { return E.Name == Field; });
+	if (!Entry) return false;
+	OutJson = Entry->Json;
+	return true;
+}
+
+bool UPatterGameData::ExtensionValueToScalar(const FString& Json, FPatterValue& OutValue)
+{
+	OutValue = FPatterValue();
+	try
+	{
+		patter::PatterValue Scalar;
+		if (!TreeToScalar(patter::parseJsonText(Std(Json)), Scalar)) return false;
+		OutValue = ToUeValue(Scalar);
+		return true;
+	}
+	catch (const std::exception&)
+	{
+		return false;
+	}
 }
 
 namespace

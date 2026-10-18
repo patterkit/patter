@@ -5,7 +5,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { basename, join } from "node:path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { cpSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { parseArgs, main } from "../src/main.js";
 import { parseSource } from "@patterkit/core";
@@ -482,5 +483,46 @@ describe("share-scopes", () => {
     const project = parseSource(readFileSync(join(dir, "story.patterproj"), "utf8")) as { gameScopes?: string };
     expect(project.gameScopes).toBeDefined();
     expect(await main(["validate", dir])).toBe(0);   // the project finds it through the name, and all is fresh
+  });
+});
+
+describe("merge: extension data, by the project's own manifest", () => {
+  const fixture = fileURLToPath(new URL("../../ops/test/fixtures/probe-extension.patter", import.meta.url));
+  const SHARD = "extensions/probe/harbour.patterextension";
+
+  /** A copy of the probe project, and three sides of its scene shard in a temp folder outside it, as git
+   *  hands a driver: ours sets the cue's sound, theirs its gain. */
+  function sides(): { project: string; base: string; ours: string; theirs: string; tmp: string } {
+    const project = join(mkdtempSync(join(tmpdir(), "patter-cli-ext-")), "probe.patter");
+    cpSync(fixture, project, { recursive: true });
+    const tmp = mkdtempSync(join(tmpdir(), "patter-cli-ext-sides-"));
+    const text = readFileSync(join(project, SHARD), "utf8");
+    const side = (name: string, edit: (cue: Record<string, unknown>) => void): string => {
+      const shard = parseSource(text) as { entries: { line: { L_bell: { cue: Record<string, unknown> } } } };
+      edit(shard.entries.line.L_bell.cue);
+      writeFileSync(join(tmp, name), JSON.stringify(shard));
+      return join(tmp, name);
+    };
+    return { project, base: side("base", () => {}), ours: side("ours", (c) => { c["sound"] = "gong"; }), theirs: side("theirs", (c) => { c["gain"] = 0.9; }), tmp };
+  }
+
+  it("the driver finds the manifest from the real path (--path), so both edits land", async () => {
+    const s = sides();
+    expect(await main(["merge", s.base, s.ours, s.theirs, "-o", s.ours, "--path", join(s.project, SHARD)])).toBe(0);
+    const merged = parseSource(readFileSync(s.ours, "utf8")) as { entries: { line: { L_bell: { cue: unknown } } } };
+    expect(merged.entries.line.L_bell.cue).toEqual({ gain: 0.9, sound: "gong" });
+  });
+
+  it("with no project to read the manifest from, each entry merges whole, and the clash is marked", async () => {
+    const s = sides();
+    expect(await main(["merge", s.base, s.ours, s.theirs, "-o", s.ours])).toBe(1);
+    expect(readFileSync(s.ours, "utf8")).toContain('"unresolved"');
+  });
+
+  it("mergetool, whose output is the real file, finds it too", async () => {
+    const s = sides();
+    const out = join(s.project, SHARD);
+    expect(await main(["mergetool", s.base, s.theirs, s.ours, out])).toBe(0);
+    expect(readFileSync(out, "utf8")).toContain('"gong"');
   });
 });

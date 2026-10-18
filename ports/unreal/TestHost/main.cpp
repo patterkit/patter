@@ -108,6 +108,31 @@ static JsonValue gameDataToJson(const GameData& gd)
     for (const auto& kv : gd) o.set(kv.first, valueToJson(kv.second));
     return o;
 }
+// Patter extension values: the core's neutral tree, back into this host's JsonValue for the comparison.
+static JsonValue treeToJson(const JsonTree& t)
+{
+    switch (t.type)
+    {
+        case JsonTree::Bool: return JsonValue::Boolean(t.b);
+        case JsonTree::Number: return JsonValue::Num(t.num);
+        case JsonTree::String: return JsonValue::Str(t.str);
+        case JsonTree::Array: { JsonValue a = JsonValue::Arr(); for (const auto& x : t.arr) a.push(treeToJson(x)); return a; }
+        case JsonTree::Object: { JsonValue o = JsonValue::Obj(); for (const auto& kv : t.obj) o.set(kv.first, treeToJson(kv.second)); return o; }
+        default: return JsonValue();
+    }
+}
+static JsonValue extensionValuesToJson(const ExtensionValues& values)
+{
+    JsonValue o = JsonValue::Obj();
+    for (const auto& kv : values) o.set(kv.first, treeToJson(kv.second));
+    return o;
+}
+static JsonValue extensionsToJson(const NodeExtensions& ext)
+{
+    JsonValue o = JsonValue::Obj();
+    for (const auto& kv : ext) o.set(kv.first, extensionValuesToJson(kv.second));
+    return o;
+}
 static JsonValue tagsToJson(const std::vector<std::string>& tags)
 {
     JsonValue a = JsonValue::Arr();
@@ -149,17 +174,20 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
             setLabelField(o, s.hasCharacter, s.character, s.hasCharacterName, s.characterName, s.hasSpeakerLabel, s.speakerLabel, idsOnly); // where it differs
             if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter)); // line padding, when not the default
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
+            if (!s.extensions.empty()) o.set("extensions", extensionsToJson(s.extensions));   // Patter extension values, raw
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
             break;
         case StepType::Text:
             o.set("type", JsonValue::Str("text")); o.set("id", JsonValue::Str(s.id)); o.set("text", JsonValue::Str(s.text));
             if (s.padAfter != DEFAULT_PAD_AFTER) o.set("padAfter", JsonValue::Num(s.padAfter));
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
+            if (!s.extensions.empty()) o.set("extensions", extensionsToJson(s.extensions));   // Patter extension values, raw
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
             break;
         case StepType::GameEvent:
             o.set("type", JsonValue::Str("gameEvent")); o.set("id", JsonValue::Str(s.id));
             if (s.gameData) o.set("gameData", gameDataToJson(*s.gameData));
+            if (!s.extensions.empty()) o.set("extensions", extensionsToJson(s.extensions));   // Patter extension values, raw
             if (s.hasTags) o.set("tags", tagsToJson(s.tags));
             break;
         case StepType::Choice:
@@ -193,6 +221,7 @@ static JsonValue normalize(const StepResult& s, bool idsOnly = false)
                 }
                 od.set("eligible", JsonValue::Boolean(opt.eligible));
                 if (opt.gameData) od.set("gameData", gameDataToJson(*opt.gameData));
+                if (!opt.extensions.empty()) od.set("extensions", extensionsToJson(opt.extensions));
                 opts.push(std::move(od));
             }
             o.set("options", std::move(opts));
@@ -693,6 +722,7 @@ static JsonValue beatInfoToJson(const BeatInfo& b)
     if (b.hasOwnPadAfter) o.set("ownPadAfter", JsonValue::Num(b.ownPadAfter));
     if (!b.text.empty()) o.set("text", JsonValue::Str(b.text));
     if (!b.gameData.empty()) o.set("gameData", rawGameDataToJson(b.gameData));
+    if (!b.extensions.empty()) o.set("extensions", extensionsToJson(b.extensions));
     if (!b.tags.empty()) o.set("tags", strsToJson(b.tags));
     return o;
 }
@@ -734,6 +764,7 @@ static JsonValue outlineToJson(const std::vector<OutlineScene>& scenes)
         if (!s.gameId.empty()) so.set("gameId", JsonValue::Str(s.gameId));
         so.set("name", JsonValue::Str(s.name));
         if (!s.gameData.empty()) so.set("gameData", rawGameDataToJson(s.gameData));
+        if (!s.extensions.empty()) so.set("extensions", extensionsToJson(s.extensions));
         if (!s.tags.empty()) so.set("tags", strsToJson(s.tags));
         JsonValue blocks = JsonValue::Arr();
         for (const auto& b : s.blocks)
@@ -743,6 +774,7 @@ static JsonValue outlineToJson(const std::vector<OutlineScene>& scenes)
             if (!b.gameId.empty()) bo.set("gameId", JsonValue::Str(b.gameId));
             bo.set("name", JsonValue::Str(b.name));
             if (!b.gameData.empty()) bo.set("gameData", rawGameDataToJson(b.gameData));
+            if (!b.extensions.empty()) bo.set("extensions", extensionsToJson(b.extensions));
             if (!b.tags.empty()) bo.set("tags", strsToJson(b.tags));
             JsonValue children = JsonValue::Arr();
             for (const auto& c : b.children) children.push(outlineNodeToJson(c));
@@ -842,6 +874,7 @@ static JsonValue propertiesToJson(const std::vector<PropertyRow>& rows)
 
 static int envelopeRoundTrips = 0;
 static int gameDataReads = 0;   // expectGameData ops that ran and matched
+static int extensionReads = 0;  // expectExtensions and expectNodeExtensions ops that ran and matched
 static int propertyReads = 0;   // expectProperties ops that ran and matched
 
 // Run a script's ops against a LIVE engine, returning whether every op matched and the engine that
@@ -1011,6 +1044,44 @@ static std::pair<bool, std::shared_ptr<Engine>> runScript(std::shared_ptr<Engine
                         throw std::runtime_error("expectGameData " + scope + ": expected " + dump(want) + ", got " + dump(produced));
                     }
                     ++gameDataReads;
+                }
+                // Static scene / block Patter extension values (corpus 3): the node's own, raw, by extension id.
+                // Compared deeply; key order is not significant (matchValue finds each key).
+                else if (kind == "expectExtensions")
+                {
+                    const std::string scene = op.at("scene").str;
+                    const bool forBlock = op.has("block");
+                    const JsonValue produced = extensionsToJson(forBlock ? engine->extensionsForBlock(scene, op.at("block").str)
+                                                                         : engine->extensionsForScene(scene));
+                    const JsonValue& want = op.at("expectResult");
+                    if (!matchValue(produced, want))
+                    {
+                        const std::string scope = forBlock ? scene + "/" + op.at("block").str : scene;
+                        throw std::runtime_error("expectExtensions " + scope + ": expected " + dump(want) + ", got " + dump(produced));
+                    }
+                    ++extensionReads;
+                }
+                // Any node's extension values, read off the case's BUNDLE by the core helper extensionsOf; with
+                // `effective`, one extension's values filled in: effectiveGameData(extensionDecls(...), raw[ext]).
+                else if (kind == "expectNodeExtensions")
+                {
+                    const std::string nodeKind = op.at("kind").str;
+                    const std::string address = op.has("address") ? op.at("address").str : std::string();
+                    const NodeExtensions raw = extensionsOf(bundle, nodeKind, address);
+                    const JsonValue* effective = op.find("effective");
+                    JsonValue produced;
+                    std::string scope = nodeKind + (op.has("address") ? " " + address : std::string());
+                    if (effective)
+                    {
+                        const std::string ext = effective->at("extension").str;
+                        produced = extensionValuesToJson(effectiveGameData(extensionDecls(bundle, ext, nodeKind), raw.get(ext)));
+                        scope += " (effective " + ext + ")";
+                    }
+                    else produced = extensionsToJson(raw);
+                    const JsonValue& want = op.at("expectResult");
+                    if (!matchValue(produced, want))
+                        throw std::runtime_error("expectNodeExtensions " + scope + ": expected " + dump(want) + ", got " + dump(produced));
+                    ++extensionReads;
                 }
                 // The state inspector's rows, as JSON: each shared @patter property in declaration order.
                 else if (kind == "expectProperties")
@@ -2999,6 +3070,40 @@ static void runDescribeSmoke()
 // Structure introspection (Engine::getOutline / getBeatSequence) on a hand-built scene -> block -> choice
 // group -> snippets -> beats. The corpus's outlines section holds the shape to the reference; this keeps
 // what that case does not reach, a cast display name read into characterName.
+// Patter extension values as text, the form the Blueprint layer hands a game: jsonText writes the tree in
+// document order with JS numbers, parseJsonText reads it back, and a save leaves an option's values out
+// (they're read off the bundle on load, which the corpus's saveLoad case pins).
+static void runExtensionTextSmoke()
+{
+    std::cout << "  [extension-text] values cross as JSON text and back; a save carries none\n";
+    const std::string text = R"({"sound":"bell\n\u00e9","gain":0.5,"tags":["a",true,null,-3e-7],"n":{}})";
+    const JsonTree tree = parseJsonText(text);
+    const std::string back = jsonText(tree);
+    // The escape decoded to UTF-8 and written as it is, a newline escaped, -3e-7 as JS prints it.
+    if (back != std::string(R"({"sound":"bell\n)") + "\xC3\xA9" + R"(","gain":0.5,"tags":["a",true,null,-3e-7],"n":{}})")
+        fail("extension-text", "round trip", back);
+    if (jsonText(parseJsonText(back)) != back) fail("extension-text", "stable", back);
+    for (const char* bad : { "bell", "{\"a\":1", "[1,]", "1 2" })
+    {
+        bool threw = false;
+        try { parseJsonText(bad); } catch (const std::exception&) { threw = true; }
+        if (!threw) fail("extension-text", "refuses", bad);
+    }
+    static const Bundle b = parseBundle(parseJ(R"JSON({"schema":"patter/bundle@0","locales":{"default":"en","included":["en"]},"extensions":{"probe":{"version":"1.0.0","fields":{"option":[{"name":"icon","type":"text","default":""}]}}},"scenes":{"s":{"id":"s","type":"scene","name":"S","blocks":[{"id":"b","type":"block","name":"B","children":[{"id":"g","type":"group","selector":"choice","children":[{"id":"o","type":"group","extensions":{"probe":{"icon":"door"}},"prompt":{"id":"P","kind":"text"},"children":[]}]}]}]}},"strings":{"en":{"P":"Go"}}})JSON"));
+    Engine engine(b, EngineOptions{});
+    engine.openFlow("f", "", "");
+    const StepResult choice = engine.getFlow("f")->advance();
+    if (choice.type != StepType::Choice || choice.options.size() != 1 || choice.options[0].extensions.empty())
+        fail("extension-text", "option", "the option carries no extensions");
+    const std::string saved = serializeState(engine);
+    if (saved.find("extensions") != std::string::npos) fail("extension-text", "save", "a save carried an option's extension values");
+    Engine loaded(b, EngineOptions{});
+    deserializeState(loaded, saved);
+    const auto options = loaded.getFlow("f")->getChoices();
+    if (options.size() != 1 || jsonText(options[0].extensions.at("probe").at("icon")) != "\"door\"")
+        fail("extension-text", "load", "a loaded option didn't read its values off the bundle");
+}
+
 static void runOutlineSmoke()
 {
     Bundle b;
@@ -3182,11 +3287,13 @@ int main(int argc, char** argv)
     runAddressLookupCases();
     runTraceLogSmoke();
     runOutlineSmoke();
+    runExtensionTextSmoke();
     runDescribeSmoke();
     runCheckpointTiming();
 
     std::cout << "  [envelope] scripted save/load round-trips: " << envelopeRoundTrips << "\n";
     std::cout << "  [gameData] scripted scene / block gameData reads: " << gameDataReads << "\n";
+    std::cout << "  [extensions] scripted extension reads (expectExtensions, expectNodeExtensions): " << extensionReads << "\n";
     std::cout << "  [properties] scripted listProperties reads: " << propertyReads << "\n";
     std::cout << "expressions: " << e << "  specificity: " << sp << "  runtime: " << r << "  scripted: " << s << "  gameData: " << g << "\n";
 

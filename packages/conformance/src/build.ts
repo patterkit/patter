@@ -10,10 +10,40 @@
 
 import { compileExpression, exportBundle } from "@patterkit/compiler";
 import { Engine, describeBundle } from "@patterkit/runtime";
-import { SAVE_SCHEMA } from "@patterkit/model";
-import type { Bundle, SaveEnvelope } from "@patterkit/model";
+import { EXTENSION_SHARD, EXTENSIONS_DIR, MANIFEST_EXTENSION, PROJECT_EXTENSION_STEM, PROJECT_LOCALE_SCENE, SAVE_SCHEMA } from "@patterkit/model";
+import type { Bundle, ExtensionShard, SaveEnvelope } from "@patterkit/model";
+import type { ExportInput } from "@patterkit/compiler";
 import { envelopeKeyPaths, runScript } from "./runner.js";
 import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameDataCase, LogCase, RuntimeCase, SaveCase, ScriptedCase, SpecificityCase } from "./types.js";
+
+/**
+ * The corpus version, which says what a runner must understand.
+ *  2: the corpus as it stood before Patter extensions.
+ *  3: Patter extensions (patterkit design/proposals/patter-storylet-extensions.md, phase 3): a bundle's
+ *  `extensions` section and a node's `extensions` values, `extensions` on a transcript's line, text and
+ *  gameEvent steps and its options, and the ops `expectExtensions` and `expectNodeExtensions`. Values are any
+ *  JSON, so a runner compares them deeply. No earlier expectation changed.
+ */
+export const CORPUS_VERSION = 3;
+
+/**
+ * A fixture's extension files as a project keeps them, for the real compile: each manifest at
+ * `extensions/<id>.extension.json`, and each shard in its extension's folder, named for its scene (the project's
+ * own as `_project`). Undefined for a fixture with none, so every earlier case compiles exactly as it did.
+ */
+function fixtureExtensions(f: { extensionManifests?: unknown[]; extensionShards?: ExtensionShard[] }): ExportInput["extensions"] {
+  if (f.extensionManifests === undefined && f.extensionShards === undefined) return undefined;
+  return {
+    manifests: (f.extensionManifests ?? []).map((manifest) => {
+      const id = String((manifest as { id?: unknown }).id);
+      return { path: `${EXTENSIONS_DIR}/${id}${MANIFEST_EXTENSION}`, id, manifest };
+    }),
+    shards: (f.extensionShards ?? []).map((shard) => ({
+      path: `${EXTENSIONS_DIR}/${shard.extension}/${shard.scene === PROJECT_LOCALE_SCENE ? PROJECT_EXTENSION_STEM : shard.scene}${EXTENSION_SHARD}`,
+      shard,
+    })),
+  };
+}
 
 export function buildCorpus(fixtures: Fixtures): Corpus {
   const expressions: ExpressionCase[] = fixtures.expressions.map((f) => ({
@@ -38,7 +68,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     idsOnly ? { ...bundle, strings: {}, localisation: { mode: "ids" } } : bundle;
 
   const runtime: RuntimeCase[] = fixtures.runtime.map((f) => {
-    const bundle = idsOnlyIf(f.idsOnly, exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales }));
+    const bundle = idsOnlyIf(f.idsOnly, exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales, extensions: fixtureExtensions(f) }));
     return {
       name: f.name,
       bundle,
@@ -56,7 +86,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
 
   const scripted: ScriptedCase[] = fixtures.scripted.map((f) => ({
     name: f.name,
-    bundle: idsOnlyIf(f.idsOnly, exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales })),
+    bundle: idsOnlyIf(f.idsOnly, exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales, extensions: fixtureExtensions(f) })),
     // The EDITED bundle a hotSwap op switches to (cross-bundle drift cases, §9.8): same project,
     // edited scenes/strings.
     ...(f.scenesB ? { bundleB: exportBundle({ project: f.projectB ?? f.project, scenes: f.scenesB, locales: f.localesB ?? f.locales }) } : {}),
@@ -104,12 +134,12 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
   }));
 
   const describes: DescribeCase[] = fixtures.describes.map((f) => {
-    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
+    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales, extensions: fixtureExtensions(f) });
     return { name: f.name, bundle, expected: JSON.parse(JSON.stringify(describeBundle(bundle))) };
   });
 
   const outlines: OutlineCase[] = fixtures.outlines.map((f) => {
-    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales });
+    const bundle = exportBundle({ project: f.project, scenes: f.scenes, locales: f.locales, extensions: fixtureExtensions(f) });
     const engine = new Engine(bundle);
     return {
       name: f.name, bundle,
@@ -118,7 +148,7 @@ export function buildCorpus(fixtures: Fixtures): Corpus {
     };
   });
 
-  return { version: 2, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio };
+  return { version: CORPUS_VERSION, expressions, specificity, runtime, scripted, gameData, saves, logs, describes, outlines, audio: fixtures.audio };
 }
 
 // The corpus as the committed corpus.json text. Every case's inputs (`bundle`, `bundleB`, `envelope`) write a

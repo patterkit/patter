@@ -1,0 +1,13 @@
+{
+  "default": true,
+  "locale": "en",
+  "scene": "scn_harbour",
+  "schema": "patter/strings@0",
+  "strings": {
+    "L_bell": "Ring the bell.",
+    "L_reply": "Twice?",
+    "P_go": "Let's go.",
+    "P_stay": "Stay a while.",
+    "T_tide": "The tide turns.",
+  },
+}

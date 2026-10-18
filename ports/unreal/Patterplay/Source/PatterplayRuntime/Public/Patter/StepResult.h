@@ -36,6 +36,11 @@ namespace patter
         std::shared_ptr<ChoicePrompt> prompt;   // null when no prompt at all
         bool eligible = false;
         std::shared_ptr<GameData> gameData;
+        // The option's Patter extension values, by extension id, exactly as the bundle carries them: raw and
+        // sparse, any JSON, never read by the engine. Empty when it has none. Fill in defaults with
+        // effectiveGameData(extensionDecls(bundle, id, "option"), option.extensions.get(id)). A save doesn't
+        // carry them: a loaded pending choice reads them off the option's node again.
+        NodeExtensions extensions;
     };
 
     struct StepResult
@@ -55,6 +60,9 @@ namespace patter
         // from the beat's own value and the defaults above it; 0 on any other step, which carries none.
         double padAfter = 0;
         std::shared_ptr<GameData> gameData;
+        // A line, text or game-event step's Patter extension values (the beat's, a replayed prompt's
+        // included), by extension id, raw as the bundle carries them; empty when the beat has none.
+        NodeExtensions extensions;
         bool hasTags = false; std::vector<std::string> tags;   // author tags (#215)
         std::vector<ChoiceOption> options;       // choice only
         std::string groupId;                     // choice only

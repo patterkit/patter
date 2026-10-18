@@ -70,6 +70,7 @@ namespace
 		if (B.hasOwnPadAfter) Out.OwnPadAfter = B.ownPadAfter;
 		Out.Text = Ue(B.text);
 		Out.GameData = ConvertGameData(B.gameData);
+		Out.Extensions = ToUeExtensions(B.extensions);
 		for (const std::string& T : B.tags) Out.Tags.Add(Ue(T));
 		return Out;
 	}
@@ -102,6 +103,7 @@ namespace
 		Opt.Id = Ue(O.id);
 		Opt.bEligible = O.eligible;
 		if (O.gameData) Opt.GameData = ConvertGameData(*O.gameData);
+		Opt.Extensions = ToUeExtensions(O.extensions);
 		if (O.prompt)
 		{
 			FPatterChoicePrompt& P = Opt.Prompt;
@@ -160,6 +162,7 @@ namespace
 		// Game Data + tags cross the UObject boundary too: host events ride on Game Data (#116), so a
 		// Blueprint host must be able to read them straight off the step (parity with the other ports).
 		if (S.gameData) Out.GameData = ConvertGameData(*S.gameData);
+		Out.Extensions = ToUeExtensions(S.extensions);   // Patter extension values, raw, as JSON text
 		if (S.hasTags) for (const std::string& T : S.tags) Out.Tags.Add(Ue(T));
 		if (S.type == patter::StepType::Choice) Out.GroupId = Ue(S.groupId);
 		for (const patter::ChoiceOption& O : S.options) Out.Options.Add(ConvertOption(O));
@@ -545,6 +548,20 @@ TArray<FPatterGameDataEntry> UPatterEngine::GameDataForBlock(const FString& Scen
 	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
 }
 
+TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForScene(const FString& SceneRef) const
+{
+	if (!Engine) return {};
+	try { return ToUeExtensions(Engine->extensionsForScene(Std(SceneRef))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+}
+
+TArray<FPatterExtensionValues> UPatterEngine::ExtensionsForBlock(const FString& SceneRef, const FString& BlockRef) const
+{
+	if (!Engine) return {};
+	try { return ToUeExtensions(Engine->extensionsForBlock(Std(SceneRef), Std(BlockRef))); }
+	catch (const std::exception& Ex) { UE_LOG(LogTemp, Error, TEXT("Patterplay: %s"), UTF8_TO_TCHAR(Ex.what())); return {}; }
+}
+
 TArray<FPatterStep> UPatterEngine::RunFlow(const FString& FlowName, const FString& Scene, const FString& Block)
 {
 	TArray<FPatterStep> Played;
@@ -904,6 +921,7 @@ TArray<FPatterOutlineScene> UPatterEngine::GetOutline() const
 		Scene.GameId = Ue(S.gameId);
 		Scene.Name = Ue(S.name);
 		Scene.GameData = ConvertGameData(S.gameData);
+		Scene.Extensions = ToUeExtensions(S.extensions);
 		for (const std::string& T : S.tags) Scene.Tags.Add(Ue(T));
 		for (const patter::OutlineBlock& B : S.blocks)
 		{
@@ -912,6 +930,7 @@ TArray<FPatterOutlineScene> UPatterEngine::GetOutline() const
 			Block.GameId = Ue(B.gameId);
 			Block.Name = Ue(B.name);
 			Block.GameData = ConvertGameData(B.gameData);
+			Block.Extensions = ToUeExtensions(B.extensions);
 			for (const std::string& T : B.tags) Block.Tags.Add(Ue(T));
 			for (const patter::OutlineNode& N : B.children) Block.RootIndices.Add(FlattenNode(N, Block.Nodes));
 			Scene.Blocks.Add(Block);

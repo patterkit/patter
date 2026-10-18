@@ -1,0 +1,75 @@
+{
+  "entries": {
+    "block": {
+      "b_dock": {
+        "pace": 2,
+      },
+    },
+    "gameEvent": {
+      "E_horn": {
+        "cue": "horn",
+      },
+    },
+    "line": {
+      "L_bell": {
+        "act": "opening",
+        "beats": [
+          {
+            "at": 3,
+            "id": "b2",
+          },
+          {
+            "at": 1,
+            "id": "b1",
+          },
+        ],
+        "cue": {
+          "gain": 0.5,
+          "sound": "bell",
+        },
+        "draft": "Maybe three times.",
+        "loud": true,
+        "marks": [
+          "night",
+        ],
+        "next": "L_reply",
+        "note": "Ring it twice.",
+        "perf": {
+          "ANNA": {
+            "expression": "frown",
+            "look": "out to sea",
+          },
+        },
+        "tone": "tense",
+        "weight": 4,
+        "words": [
+          "salt",
+          "rope",
+        ],
+      },
+    },
+    "option": {
+      "o_stay": {
+        "icon": "anchor",
+      },
+    },
+    "scene": {
+      "scn_harbour": {
+        "theme": "salt",
+      },
+    },
+    "snippet": {
+      "sn_open": {
+        "weight": 3,
+      },
+    },
+    "text": {
+      "T_tide": {
+        "style": "far",
+      },
+    },
+  },
+  "extension": "probe",
+  "scene": "scn_harbour",
+  "schema": "patter/extension@0",
+}

@@ -318,10 +318,11 @@ func get_visit_counts() -> Dictionary:
 
 ## The step this flow would deliver for beat `beat_id` right now, as advance() would give it: its text in
 ## the active locale, interpolated against this flow's values (unless the project is voiced), closed
-## captions applied, and the speaker's names and label, its pause, Game Data, and tags. Built by the same
-## function that builds a delivered step, so the two can't differ. It doesn't move the flow, count a
-## visit, or run an effect. Null for an id that is neither a beat nor an option's prompt. For a game that
-## keeps lines by id and shows them again (after a load, or a language switch). JS: Flow.stepFor.
+## captions applied, and the speaker's names and label, its pause, Game Data, extension values, and tags.
+## Built by the same function that builds a delivered step, so the two can't differ. It doesn't move the
+## flow, count a visit, or run an effect. Null for an id that is neither a beat nor an option's prompt.
+## For a game that keeps lines by id and shows them again (after a load, or a language switch). JS:
+## Flow.stepFor.
 func step_for(beat_id: String):
 	var beat = _host.beat_by_id.get(beat_id)
 	return _beat_result(beat) if beat != null else null
@@ -729,6 +730,7 @@ func _setup_choice(group: Dictionary) -> void:
 			opt["prompt"] = prompt
 		if child.has("gameData"):
 			opt["gameData"] = _norm_gamedata(child["gameData"])
+		_put_extensions(opt, child)
 		options.append(opt)
 		by_id[child["id"]] = child
 	# A choice is offered only when the player can take something. One whose every remaining option is
@@ -1107,6 +1109,7 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		var ra := {"type": "gameEvent", "id": beat["id"]}
 		if beat.has("gameData"):
 			ra["gameData"] = _norm_gamedata(beat["gameData"])
+		_put_extensions(ra, beat)
 		if not tags.is_empty():
 			ra["tags"] = tags
 		return ra
@@ -1114,6 +1117,7 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 		var rt := {"type": "text", "id": beat["id"], "text": _interp(_resolve_string(beat["id"])), "padAfter": _pad_of(beat["id"])}
 		if beat.has("gameData"):
 			rt["gameData"] = _norm_gamedata(beat["gameData"])
+		_put_extensions(rt, beat)
 		if not tags.is_empty():
 			rt["tags"] = tags
 		return rt
@@ -1147,6 +1151,7 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 	r["padAfter"] = _pad_of(beat["id"])  # a silent line still fires, so it still carries its pause
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
+	_put_extensions(r, beat)
 	if not tags.is_empty():
 		r["tags"] = tags
 	return r
@@ -1157,6 +1162,15 @@ func _beat_result(beat: Dictionary) -> Dictionary:
 func _pad_of(beat_id: String) -> float:
 	var pad = _host.pad_index.get(beat_id)
 	return float(pad["resolved"]) if pad != null else PatterBundle.DEFAULT_PAD_AFTER
+
+
+# A node's Patter extension values onto a step or an option, by extension id: raw, exactly as the bundle
+# carries them (any JSON, never read by the engine), and left off when the node has none. Fill in the
+# defaults with PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, id, kind), ...).
+static func _put_extensions(out: Dictionary, node: Dictionary) -> void:
+	var ext = node.get("extensions")
+	if ext is Dictionary and not (ext as Dictionary).is_empty():
+		out["extensions"] = ext
 
 
 func _norm_gamedata(gd: Dictionary) -> Dictionary:
@@ -1241,7 +1255,7 @@ func _authored_prompt_of(node: Dictionary):
 	return null
 
 
-# A replayed prompt as a step: the beat's id, gameData, and tags, and the text and speaker fields the
+# A replayed prompt as a step: the beat's id, gameData, extension values, and tags, and the text and speaker fields the
 # choice showed.
 func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
 	var tags: Array = _host.tag_index.get(beat["id"], [])
@@ -1253,6 +1267,7 @@ func _prompt_result(beat: Dictionary, shown: Dictionary) -> Dictionary:
 	r["padAfter"] = _pad_of(beat["id"])
 	if beat.has("gameData"):
 		r["gameData"] = _norm_gamedata(beat["gameData"])
+	_put_extensions(r, beat)
 	if not tags.is_empty():
 		r["tags"] = tags
 	return r
@@ -1708,7 +1723,14 @@ func list_bags() -> Array:
 func snapshot() -> Dictionary:
 	var pending = null
 	if _pending != null:
-		pending = {"groupId": _pending["group_id"], "options": (_pending["options"] as Array).duplicate(true)}
+		# An option's extension values are the bundle's, not the save's: left out, and read off the
+		# option's node again on load.
+		var saved_opts: Array = []
+		for o in _pending["options"]:
+			var so: Dictionary = (o as Dictionary).duplicate(true)
+			so.erase("extensions")
+			saved_opts.append(so)
+		pending = {"groupId": _pending["group_id"], "options": saved_opts}
 	# The cursor, PRNG and visits. This flow's properties are the registry's, saved with it.
 	var out := {
 		"rngState": _prng.a,
@@ -1837,6 +1859,8 @@ func _restore_cursor(snap: Dictionary) -> void:
 					if label != null:
 						saved["speakerLabel"] = label
 			opt.erase("text")
+			opt.erase("extensions")
+			_put_extensions(opt, node)  # the bundle's, never the save's
 			options.append(opt)
 		if not options.is_empty():
 			_pending = {"group_id": group_id, "options": options, "by_id": by_id}

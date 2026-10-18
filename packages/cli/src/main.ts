@@ -26,9 +26,21 @@ import {
   planShareScopes, defaultGameScopesDir, GAME_SCOPES_DIR,
   exportEditableScript, readEditableDocx, planEditableImport, listOpenSuggestions, applySuggestionDecisions, qualifierNamer,
   scriptFontLicences,
+  findProjectFile, readProjectManifest, detectMergeType, // merge: an extension shard merges by the project's own manifest
 } from "@patterkit/ops";
 import type { InitVcs, BundlePosture, MergeFileType, MergeResult, PlannedWrite, LocCatalog, ImportPlan, LoadedProject } from "@patterkit/ops";
 import { createHash } from "node:crypto";
+
+/** The manifest an extension shard (`ours`) merges by: its extension's, from the project the real file
+ *  (`path`) is in. Undefined for any other shard, or when there's no project or no sound manifest. */
+function mergeManifest(ours: Record<string, unknown>, path: string): ReturnType<typeof readProjectManifest> {
+  let type: MergeFileType;
+  try { type = detectMergeType(ours); } catch { return undefined; }
+  if (type !== "extension" || typeof ours["extension"] !== "string") return undefined;
+  let projectFile: string;
+  try { projectFile = findProjectFile(path); } catch { return undefined; }
+  return readProjectManifest(dirname(projectFile), ours["extension"]);
+}
 
 /** A file the structured merger handles (source shards only - not bundle / document). */
 const isPatterSource = (path: string): boolean => SHARD_EXTENSIONS.some((ext) => path.endsWith(ext));
@@ -135,8 +147,9 @@ Usage:
   patter pack    [path] -o file   Pack a project (the .patter folder) into a portable .patterpack
   patter unpack  <file> -o dir    Explode a .patterpack into source shards under dir
                  [--merge --base sent.patterpack]  Merge a returned .patterpack into the project
-  patter merge   BASE OURS THEIRS  3-way merge of Patter source by node id (flow/loc/authoring/project)
-                 [-o out] [--type flow|loc|authoring|project] [--json]
+  patter merge   BASE OURS THEIRS  3-way merge of Patter source by node id (flow/loc/authoring/project),
+                                   and of extension data by its manifest (extension)
+                 [-o out] [--type flow|loc|authoring|project|extension] [--json]
                  [--path realfile]  (where the conflict sidecar belongs when -o is a VCS
                                      temporary file: git's %P)
   patter mergetool BASE THEIRS OURS OUT  VCS merge-tool wrapper: Patter source -> structured merge,
@@ -202,7 +215,7 @@ const SHORT: Record<Command, string> = {
   "share-scopes": "share-scopes [path] [--at DIR]",
   pack: "pack [path] -o FILE",
   unpack: "unpack <file> -o DIR [--merge --base SENT.patterpack]",
-  merge: "merge BASE OURS THEIRS [-o out | --json] [--type flow|loc|authoring|project] [--path realfile]",
+  merge: "merge BASE OURS THEIRS [-o out | --json] [--type flow|loc|authoring|project|extension] [--path realfile]",
   mergetool: "mergetool BASE THEIRS OURS OUT [--fallback cmd]",
 };
 
@@ -413,7 +426,7 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
 
     case "validate": {
       const loaded = loadProject(positionals[0] ?? ".");
-      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, gameScopes, localisation, ok } = runValidate(loaded);
+      const { structural, conditions, interpolation, hygiene, staleBundles, unresolvedMerges, orphans, reachability, gameScopes, localisation, extensions, ok } = runValidate(loaded);
       // A warning (another tool's scope, say) is printed as one and never fails the run.
       const warn = (i: { severity: "error" | "warning" }): string => (i.severity === "warning" ? "warning: " : "");
       for (const i of structural) console.error(`  [${i.code}] ${i.severity === "warning" ? "warning: " : ""}${i.message}`);
@@ -425,13 +438,14 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       for (const i of orphans) console.error(`  [not-in-project] ${i.message}`); // the message names the file
       for (const i of gameScopes) console.error(`  [game-scopes] ${i.file}: ${warn(i)}${i.message}`);
       for (const i of localisation) console.error(`  [localisation] ${i.file}: ${warn(i)}${i.message}`);
+      for (const i of extensions) console.error(`  [extension] ${i.file}: ${warn(i)}${i.message}`);
       // Advisory, and outside `ok` and the count: a gate whose writer is not authored yet is the normal
       // state mid-work, and must never fail a build.
       for (const i of reachability) console.error(`  [unreachable] ${i.nodeId}: ${i.message}  (${i.src})`);
       const isError = (i: { severity: "error" | "warning" }): boolean => i.severity === "error";
       const structuralWarnings = structural.filter((i) => i.severity === "warning").length;
-      const warnings = reachability.length + structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation].filter((i) => !isError(i)).length;
-      const count = structural.length - structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation].filter(isError).length
+      const warnings = reachability.length + structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter((i) => !isError(i)).length;
+      const count = structural.length - structuralWarnings + [...conditions, ...interpolation, ...gameScopes, ...localisation, ...extensions].filter(isError).length
         + hygiene.length + staleBundles.length + unresolvedMerges.length + orphans.length;
       // A warning is not an issue, but "no issues" printed directly under one reads as a contradiction,
       // so say what was said.
@@ -447,10 +461,14 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       const results = runFormat(positionals);
       // Anything that is not a shard is left alone (the bundle and the scopes files must stay strict JSON);
       // said only when nothing named was Patter source, so `format $(git ls-files)` stays quiet.
-      if (results.every((r) => r.skipped)) { console.error("format: no Patter source among the files given (.patterflow, .patterloc, .patterx, .patterproj)"); return 0; }
+      if (results.every((r) => r.skipped)) { console.error("format: no Patter source among the files given (.patterflow, .patterloc, .patterx, .patterproj, .patterextension)"); return 0; }
       const changed = results.filter((r) => r.changed);
       if (!check && !commitWrites(changed.map((r) => r.write!))) return 1;
-      for (const r of changed) console.log(`${check ? "would format" : "formatted"}: ${r.file}`);
+      for (const r of changed) {
+        console.log(`${check ? "would format" : "formatted"}: ${r.file}`);
+        // On a project folder, an extension taken at a new version: said under the file it changed.
+        for (const n of r.notes ?? []) console.log(`  ${check ? "would have " : ""}${n}`);
+      }
       if (changed.length === 0) console.log("already canonical");
       return check && changed.length > 0 ? 1 : 0;
     }
@@ -743,6 +761,8 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
         // returned pack's own copy of the game's scopes is never written: ours is the truth.
         if (res.gameScopes?.error) console.error(`warning: their World properties were not written to ${res.gameScopes.path}: ${res.gameScopes.error}`);
         else if (res.gameScopes) console.log(`game scopes: ${res.gameScopes.path} (their World properties)`);
+        // An extension's manifest is never merged: ours stands. A different one means two versions of it.
+        for (const rel of res.manifestsKept ?? []) console.error(`warning: kept this project's ${rel}; the returned pack has a different version of it`);
         const changed = res.shards.filter((sh) => sh.changed).length;
         console.log(`\n${changed} of ${res.shards.length} shard(s) changed in ${flags.o}; ${res.conflicts} conflict(s), ${res.warnings} warning(s)`);
         return res.conflicts > 0 ? 1 : 0;
@@ -763,9 +783,13 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
       if (!src) return 2;
 
       const typeFlag = typeof flags.type === "string" && flags.type !== "auto" ? (flags.type as MergeFileType) : undefined;
+      // An extension shard merges field by field by its manifest, which the driver reads from the working
+      // tree: git hands it three temp files and the shard's real path (%P), and the project is found from
+      // that path. No manifest, or one mid-conflict itself, merges each node's entry whole.
+      const manifest = mergeManifest(src.ours, typeof flags.path === "string" ? flags.path : typeof flags.o === "string" && flags.o !== "-" ? flags.o : oursP);
       let result;
       try {
-        result = runMerge(src.base, src.ours, src.theirs, { type: typeFlag });
+        result = runMerge(src.base, src.ours, src.theirs, { type: typeFlag, ...(manifest ? { manifest } : {}) });
       } catch (e) {
         if (e instanceof UnsupportedMergeError) { console.error(`merge: ${e.message}`); return 2; }
         throw e;
@@ -805,7 +829,8 @@ async function run(cmd: Command, positionals: string[], flags: Record<string, st
         const src = parseThree(baseP, oursP, theirsP, "mergetool");
         if (!src) return 2;
         try {
-          return writeMergeResult(runMerge(src.base, src.ours, src.theirs), outP, outP, false);
+          const manifest = mergeManifest(src.ours, outP);
+          return writeMergeResult(runMerge(src.base, src.ours, src.theirs, manifest ? { manifest } : undefined), outP, outP, false);
         } catch (e) {
           if (e instanceof UnsupportedMergeError) { console.error(`mergetool: ${e.message}`); return 2; }
           throw e;

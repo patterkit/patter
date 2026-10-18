@@ -11,7 +11,8 @@
 // `problemCode` derives the translator's key from the pair: the category for
 // `stale-bundle` (-> "stale-build") and `merge` (-> "merge-conflict"), the
 // validator's `detail` for the structural codes, and nothing for the categories
-// whose message is already writer-facing (not-in-project, spelling, hygiene),
+// whose message is already writer-facing (not-in-project, spelling, hygiene,
+// game-scopes, and an extension's, which names the entry and field it means),
 // which fall through to the translator's fallback as they are.
 // ---------------------------------------------------------------------------
 
@@ -93,7 +94,7 @@ export function problemCode(p: Pick<Problem, "category" | "detail">): string | u
   switch (p.category) {
     case "stale-bundle": return "stale-build";
     case "merge": return "merge-conflict";
-    case "not-in-project": case "spelling": case "hygiene": case "game-scopes": return undefined; // already writer-facing (#177)
+    case "not-in-project": case "spelling": case "hygiene": case "game-scopes": case "extensions": return undefined; // already writer-facing (#177)
     default: return p.detail;
   }
 }

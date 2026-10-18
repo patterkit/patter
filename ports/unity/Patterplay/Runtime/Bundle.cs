@@ -56,6 +56,53 @@ namespace Patterkit.Patterplay
         /// vocabulary, never self-backed. The engine reports when the game has not registered one. Null when
         /// the content names none.</summary>
         public List<string> ExternalScopes;
+        /// <summary>The Patter extensions the project takes, by id: each one's version, its compiled declarations
+        /// by node kind (every default resolved) and the project node's own values. A node's values sit on the
+        /// node, under Extensions. Null when the project takes none.</summary>
+        public OrderedMap<string, BundleExtension> Extensions;
+    }
+
+    /// <summary>One Patter extension as the bundle carries it.</summary>
+    public sealed class BundleExtension
+    {
+        public string Version;
+        /// <summary>Compiled declarations by node kind (project, scene, block, snippet, line, text, gameEvent,
+        /// option): no editor-only fields, no editor words.</summary>
+        public OrderedMap<string, List<ExtensionFieldDecl>> Fields = new OrderedMap<string, List<ExtensionFieldDecl>>();
+        /// <summary>The project node's values, raw; null when it has none.</summary>
+        public OrderedMap<string, object> Project;
+    }
+
+    /// <summary>A compiled extension field declaration. Default is always present in a decl and may be any
+    /// JSON, held as the neutral tree (so a JSON null default is a null here). Structured types carry their
+    /// parts: Fields for a record, Key and Of for a map, Of and IdField for a list, To for a reference. The
+    /// engine reads none of it; the helpers read Name and Default.</summary>
+    public sealed class ExtensionFieldDecl
+    {
+        /// <summary>Null on a map's or list's element declaration (Of).</summary>
+        public string Name;
+        public string Type;
+        public object Default;
+        /// <summary>False only on an element declaration (Of) that left its default out.</summary>
+        public bool HasDefault;
+        public List<string> Values;
+        public List<string> Stages;
+        public string To;
+        public List<ExtensionFieldDecl> Fields;
+        public ExtensionKeyDecl Key;
+        public ExtensionFieldDecl Of;
+        /// <summary>A list's identity field (the bundle's `id`).</summary>
+        public string IdField;
+        public double? Min;
+        public double? Max;
+        public bool? Required;
+    }
+
+    /// <summary>A map extension field's key: its type, and what a reference key points to.</summary>
+    public sealed class ExtensionKeyDecl
+    {
+        public string Type;
+        public string To;
     }
 
     /// <summary>Closed-caption config (#214): the open/close cue delimiters, plus a `Character` whose whole
@@ -152,6 +199,10 @@ namespace Patterkit.Patterplay
         public List<Effect> OnEntry = new List<Effect>();
         public double? PadAfterDefault; // line padding: the default for the beats inside; null when none
         public GameData GameData;    // author overrides (raw, sparse); null when none
+        /// <summary>Patter extension values: extension id -> field -> value, raw as authored (editor-only fields
+        /// stripped), any JSON as a neutral tree (OrderedMap / List / bool / double / string / null). The engine
+        /// never reads them. Null when the node has none.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> Extensions;
         public List<string> Tags;    // author tags (#215)
     }
 
@@ -163,6 +214,10 @@ namespace Patterkit.Patterplay
         public List<Node> Children = new List<Node>();
         public double? PadAfterDefault; // line padding: the default for the beats inside; null when none
         public GameData GameData;    // author overrides (raw, sparse); null when none
+        /// <summary>Patter extension values: extension id -> field -> value, raw as authored (editor-only fields
+        /// stripped), any JSON as a neutral tree (OrderedMap / List / bool / double / string / null). The engine
+        /// never reads them. Null when the node has none.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> Extensions;
         public List<string> Tags;    // author tags (#215)
     }
 
@@ -178,6 +233,10 @@ namespace Patterkit.Patterplay
         public List<Effect> OnExit;
         public double? PadAfterDefault; // line padding: the default for the beats inside; null when none
         public GameData GameData;
+        /// <summary>Patter extension values: extension id -> field -> value, raw as authored (editor-only fields
+        /// stripped), any JSON as a neutral tree (OrderedMap / List / bool / double / string / null). The engine
+        /// never reads them. Null when the node has none.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> Extensions;
         public List<string> Tags;    // author tags (#215)
 
         // option position (a direct child of a choice): an Option group or a bare snippet option
@@ -212,6 +271,10 @@ namespace Patterkit.Patterplay
         /// <see cref="Bundle.DefaultPadAfter"/>.</summary>
         public double? PadAfter;
         public GameData GameData;
+        /// <summary>Patter extension values: extension id -> field -> value, raw as authored (editor-only fields
+        /// stripped), any JSON as a neutral tree (OrderedMap / List / bool / double / string / null). The engine
+        /// never reads them. Null when the node has none.</summary>
+        public OrderedMap<string, OrderedMap<string, object>> Extensions;
         public List<string> Tags;    // author tags (#215)
     }
 

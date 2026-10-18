@@ -119,5 +119,17 @@ The **PatterplayDemo** sample project holds two working references (see its READ
   character, speaker qualifier, speaker label, resolved `PadAfter` and any `OwnPadAfter`, gameData, tags, plus each scene's and block's own gameData) for tooling like
   Sequencer binding. In C++, `Engine->Raw()->gameDataForScene` / `gameDataForBlock` read a scene's or
   a block's own gameData by address, raw (not merged with the declared defaults).
+- **Patter extension values**: a tool's own fields on Patter's nodes reach the game where gameData does:
+  `Extensions` on a line, text or game event step (a replayed prompt and `StepFor` included), on each
+  option, and on the outline's scenes, blocks and beats, as `FPatterExtensionValues` (the extension id and
+  its values, each an `FPatterExtensionEntry` of name and JSON text, since a value may be a record, a map
+  or a list). `Engine->ExtensionsForScene` / `ExtensionsForBlock` read a scene's or a block's own. On
+  `UPatterGameData`: `ExtensionDecls(Bundle, Extension, Kind)` gives the declarations, every default
+  resolved (in `DefaultJson`, and typed as well when it's a scalar); `GetEffectiveExtensionValues` fills
+  in what a node leaves out; `ExtensionsOf(Bundle, Kind, Address)` reads any node's values (the project, a
+  scene, a block, a snippet, an option or a beat); `FindExtensionValue` picks one value out; and
+  `ExtensionValueToScalar` turns a scalar's text into an `FPatterValue`. In C++ the values are
+  `patter::NodeExtensions` over the neutral `patter::JsonTree`, with `patter::extensionDecls`,
+  `extensionsOf` and `effectiveGameData` over extension declarations. A save doesn't carry them.
 
 Changes per release: [CHANGELOG.md](CHANGELOG.md).

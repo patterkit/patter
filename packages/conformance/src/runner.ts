@@ -17,7 +17,7 @@ import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
-import { Engine, effectiveGameData, gameDataFields } from "@patterkit/runtime";
+import { Engine, effectiveGameData, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, LoadMisfit, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
@@ -26,6 +26,14 @@ import type {
   AudioCase, LogCase,
   ExpressionCase, GameDataCase, RuntimeCase, SaveCase, ScriptedCase, ScriptOp, SpecificityCase, TranscriptOption, TranscriptPrompt, TranscriptStep,
 } from "./types.js";
+
+/** JSON with every object's keys sorted: extension values are any JSON, and a runner compares them deeply,
+ *  whatever order an object's keys arrive in. */
+const sorted = (v: unknown): unknown =>
+  (Array.isArray(v) ? v.map(sorted)
+    : v !== null && typeof v === "object"
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted((v as Record<string, unknown>)[k])])) : v);
+const showJson = (v: unknown): string => JSON.stringify(sorted(v));
 
 /** Evaluate one expression case; returns the actual value to compare with `expected`. */
 export function runExpressionCase(c: ExpressionCase): ScalarValue {
@@ -206,6 +214,27 @@ export function runScript(
         if (!same) throw new Error(`expectGameData ${scope}: expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
         break;
       }
+      case "expectExtensions": {
+        const got = op.block === undefined ? engine.extensionsForScene(op.scene) : engine.extensionsForBlock(op.scene, op.block);
+        const scope = op.block === undefined ? op.scene : `${op.scene}/${op.block}`;
+        if (showJson(got) !== showJson(op.expectResult)) {
+          throw new Error(`expectExtensions ${scope}: expected ${showJson(op.expectResult)}, got ${showJson(got)}`);
+        }
+        break;
+      }
+      case "expectNodeExtensions": {
+        // Read off the case's bundle: the helpers take a bundle, not an engine.
+        const bundle = ctx.bundle;
+        const raw = extensionsOf(bundle, op.kind, op.address);
+        const got = op.effective !== undefined
+          ? effectiveGameData(extensionDecls(bundle, op.effective.extension, op.kind), raw[op.effective.extension])
+          : raw;
+        const scope = `${op.kind}${op.address === undefined ? "" : ` ${op.address}`}${op.effective === undefined ? "" : ` (effective ${op.effective.extension})`}`;
+        if (showJson(got) !== showJson(op.expectResult)) {
+          throw new Error(`expectNodeExtensions ${scope}: expected ${showJson(op.expectResult)}, got ${showJson(got)}`);
+        }
+        break;
+      }
       case "reset":
         if (op.expectRefused) { refused("reset", () => engine.reset()); break; }
         engine.reset();
@@ -353,6 +382,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
       if (label !== undefined) s.speakerLabel = label;                      // the speaker's label, where it differs
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);          // line padding, when not the default
       if (r.gameData !== undefined) s.gameData = r.gameData;
+      if (r.extensions !== undefined) s.extensions = r.extensions; // Patter extension values, raw
       if (r.tags !== undefined) s.tags = r.tags; // accumulated author tags (#215)
       return s;
     }
@@ -360,12 +390,14 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
       const s: TranscriptStep = { type: "text", id: r.id, text: r.text };
       if (r.padAfter !== DEFAULT_PAD_AFTER) s.padAfter = padField(r.padAfter);
       if (r.gameData !== undefined) s.gameData = r.gameData;
+      if (r.extensions !== undefined) s.extensions = r.extensions;
       if (r.tags !== undefined) s.tags = r.tags;
       return s;
     }
     case "gameEvent": {
       const s: TranscriptStep = { type: "gameEvent", id: r.id };
       if (r.gameData !== undefined) s.gameData = r.gameData;
+      if (r.extensions !== undefined) s.extensions = r.extensions;
       if (r.tags !== undefined) s.tags = r.tags;
       return s;
     }
@@ -388,6 +420,7 @@ export function normaliseStep(r: StepResult, idsOnly = false): TranscriptStep {
           opt.prompt = p;
         }
         if (o.gameData !== undefined) opt.gameData = o.gameData;
+        if (o.extensions !== undefined) opt.extensions = o.extensions;
         return opt;
       }) };
     case "end":

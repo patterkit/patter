@@ -71,6 +71,10 @@ struct FPatterBeatInfo
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterGameDataEntry> GameData;
 
+	/** The beat's Patter extension values (raw, as the step carries them); empty when none. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterExtensionValues> Extensions;
+
 	/** Accumulated author tags (scene -> block -> group(s) -> snippet -> beat). */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Tags;
@@ -139,6 +143,10 @@ struct FPatterOutlineBlock
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterGameDataEntry> GameData;
 
+	/** The block's own Patter extension values (raw, not inherited from its scene). Empty when none. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterExtensionValues> Extensions;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Tags;
 
@@ -170,6 +178,10 @@ struct FPatterOutlineScene
 	    Empty when the scene sets none. */
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FPatterGameDataEntry> GameData;
+
+	/** The scene's own Patter extension values (raw). Empty when none. */
+	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
+	TArray<FPatterExtensionValues> Extensions;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Patterplay")
 	TArray<FString> Tags;

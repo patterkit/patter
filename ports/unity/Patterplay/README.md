@@ -85,6 +85,21 @@ builds it: the text in the active locale, interpolated against the flow's values
 names and `SpeakerLabel`, `PadAfter`, Game Data, and tags. It doesn't move the flow, count a visit, or run an
 effect, and it's null for an id that's neither a beat nor an option's prompt.
 
+A step's `GameData` is the writer's own values for that beat, raw and sparse: what the beat sets, and nothing
+it leaves to the field's default. `GameDataHelpers.EffectiveGameData(GameDataHelpers.GameDataFields(bundle,
+"line"), step.GameData)` fills in the defaults. A choice option, and each scene and block
+(`engine.GameDataForScene`, `engine.GameDataForBlock`), carry theirs the same way.
+
+When the project takes Patter extensions, a tool's own fields on the story's nodes, a step, a choice option,
+and the outline's beats, blocks, and scenes also carry `Extensions`: each extension's values by its id, raw as
+the bundle wrote them, as a neutral tree (`OrderedMap<string, object>`, `List<object>`, `double`, `string`,
+`bool`, or null), and null when the node has none. The engine never reads them. Fill in an extension's
+defaults with `GameDataHelpers.EffectiveGameData(GameDataHelpers.ExtensionDecls(bundle, "lighting", "line"),
+step.Extensions?.GetOrDefault("lighting"))`. `engine.ExtensionsForScene` and `engine.ExtensionsForBlock` read a
+scene's and a block's own, and `GameDataHelpers.ExtensionsOf(bundle, kind, address)` reads any node's: the
+project's (no address), a scene's, a block's (`"scene/block"`), or a snippet's, an option's or a beat's by its
+id.
+
 ## Samples
 
 Import from **Package Manager ▸ Patterplay ▸ Samples**. Each sample ships a **ready-made

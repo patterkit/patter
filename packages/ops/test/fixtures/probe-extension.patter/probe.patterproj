@@ -1,0 +1,43 @@
+{
+  "cast": [
+    {
+      "name": "ANNA",
+    },
+    {
+      "name": "BEN",
+    },
+  ],
+  "extensions": {
+    "probe": {
+      "settings": {
+        "deliveryField": "delivery",
+      },
+      "version": "1.1.0",
+    },
+  },
+  "gameDataFields": {
+    "line": [
+      {
+        "default": "calm",
+        "name": "delivery",
+        "type": "enum",
+        "values": [
+          "calm",
+          "tense",
+        ],
+      },
+    ],
+  },
+  "locales": {
+    "all": [
+      "en",
+    ],
+    "default": "en",
+  },
+  "project": {
+    "id": "proj_probe",
+    "name": "Probe",
+  },
+  "schema": "patter/project@0",
+  "voiced": false,
+}

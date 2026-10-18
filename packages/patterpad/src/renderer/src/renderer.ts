@@ -962,7 +962,7 @@ function relToProject(path: string | undefined): string | undefined {
 const PROBLEM_CATEGORY: Record<Problem["category"], string> = {
   structure: "Structure", condition: "Condition", interpolation: "Text",
   hygiene: "Tidy-up", "stale-bundle": "Build", merge: "Merge", "not-in-project": "Not in project",
-  spelling: "Spelling", "game-scopes": "Shared scopes",
+  spelling: "Spelling", "game-scopes": "Shared scopes", extensions: "Extensions",
 };
 
 // The sentences themselves (one per validator code, plus the softened fallback) live in problem-copy.ts,
@@ -3025,7 +3025,7 @@ async function saveSettingsFromDialog(): Promise<boolean> {
       // every value that names it, in the same batch as the declarations.
       const stageRenames = [...l.world.stageRenames(), ...l.gd.stageRenames()];
       return stageRenames.length ? { stageRenames } : {};
-    })(), cast: l.cast.value(),
+    })(), cast: l.cast.value(), castRenames: l.cast.renames(),
     qualifiers: l.qualifiers.value(), qualifierRenames: l.qualifiers.renames(), speakerPattern: l.qualifiers.pattern(),
     writingStatuses: l.writingStatus.value(), estimating: l.estimating.value(), ...l.audio.value(),
     ...l.dictionary.value(),

@@ -19,7 +19,7 @@ import { SCENE_KITS, buildSceneKit, kitNeedsSpeaker, type SceneKit } from "./sce
 import { shardStatus, resetShardStatus, setVcLogPrefix, type ShardRef } from "@wildwinter/app-shell/vc-status";
 import { projectQualifiers, usedSpeakerPairs, DEFAULT_QUALIFIERS, DEFAULT_PAD_AFTER, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { cleanRenames, renameQualifiersInScene, renameQualifierStrings, renameQualifiersInAuthoring, renameQualifiersInHandoff, renameQualifierLabels, moveQualifierKeys, qualifierCounts, linesWithQualifier, qualifierName } from "./qualifiers.js";
-import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE } from "@patterkit/model";
+import { walkNodes, effectiveGameId, isValidGameId, deriveRecordingFolders, DEFAULT_WRITING_STATUSES, DEFAULT_RECORDING_STATUSES, RERECORD_STATUS_DECL, DEFAULT_CAPTION_DELIMITERS, DEFAULT_CAPTION_CHARACTER, projectLayout, FLOW_SCHEMA, STRINGS_SCHEMA, AUTHORING_SCHEMA, PROJECT_LOCALE_SCENE, EXTENSION_SHARD } from "@patterkit/model";
 import type { AuthoringFile, Comment, Suggestion, DocLine, Group, Snippet, Scene, FlowFile, LocaleFile, ProjectFile, ProjectDictionary, VcsKind, CaptionDelimiters, EstimatingConfig } from "@patterkit/model";
 import { PROJECT_SHARD_KEY } from "../shared/api.js";
 import type { ReviewItem } from "../shared/api.js";
@@ -28,6 +28,7 @@ import { writeTextFilesAsync, writeBinaryFileAsync, deleteFileAsync, prepareToWr
 import { fileSafeName } from "../shared/file-name.js";
 import type { EditableExportRequest, EditableImportRequest, EditableImportSummary, OpenSuggestionDto } from "../shared/api.js";
 import type { ImportPlan } from "@patterkit/ops";
+import { cleanCastRenames, renameCastInScene, renameCastStrings, moveCastKeys, renameCastKeys } from "@patterkit/ops";
 import { createHash, randomUUID } from "node:crypto";
 import type { StageRenameDto } from "../shared/api.js";
 import type { OpenedProject, ProjectSettingsDto, SceneSource, SceneDeleteInfo, SaveResult, PlayBatch, PlayStep, PlayChoiceOption, Problem, ProblemsDto, ConditionProperty, SearchEntry, QuickFix, VcStatusDto, SceneVcStatus, CoverageRunOptions, CoverageResult, PackMergeSummary } from "../shared/api.js";
@@ -35,6 +36,7 @@ import type { CoverageDriver } from "@patterkit/model";
 import { editorScopes } from "../shared/host-scopes.js";
 import type { ScopeRegistry } from "@wildwinter/scoperegistry";
 import { startAudioIndex, type AudioIndexHandle, type AudioSnapshot } from "./audio-index.js";
+import { keepUnresolvedMark } from "./unresolved-mark.js";
 
 interface SceneShards {
   flowPath: string;
@@ -187,7 +189,10 @@ function changedSourceStringIds(prevLocSource: string | null, nextLocSource: str
  *  changed line's do. Only strings some language has translated are stamped (nothing to go stale otherwise).
  *  A qualifier rename moves ids first, so a renamed string isn't a changed one. Folds into the batch's own
  *  write of that shard when a rename already queued one. Null when nothing changed. */
-function projectStringStamp(next: ProjectFile, renames: Map<string, string> | null | undefined, writes: { path: string; content: string }[]): { path: string; content: string; af: AuthoringFile } | null {
+function projectStringStamp(
+  next: ProjectFile, renames: Map<string, string> | null | undefined, writes: { path: string; content: string }[],
+  castRenames?: Map<string, string> | null,
+): { path: string; content: string; af: AuthoringFile } | null {
   if (!loaded) return null;
   ensureHydrated(); // the project-level shards aren't in a landing-only load
   const def = loaded.project.locales.default;
@@ -201,6 +206,8 @@ function projectStringStamp(next: ProjectFile, renames: Map<string, string> | nu
   const before = projectStringSources(loaded.project, table);
   const tableAfter = { ...table };
   if (renames) { moveQualifierKeys(before, renames); moveQualifierKeys(tableAfter, renames); moveQualifierKeys(translated, renames); }
+  // A renamed member's strings moved with the name (castRenameWrites): the same text under a new key isn't a change.
+  if (castRenames) { moveCastKeys(before, castRenames); moveCastKeys(tableAfter, castRenames); moveCastKeys(translated, castRenames); }
   const after = projectStringSources(next, tableAfter);
   const changed = Object.keys(after).filter((id) => after[id] !== before[id] && translated[id]);
   if (changed.length === 0) return null;
@@ -879,6 +886,15 @@ export function saveScene(sceneId: string, flowSource: string, locSource: string
     // scene was never read this session. A missing file always "changed".
     const onDisk = (p: string): string | null => { try { return readFileSync(p, "utf8"); } catch { return null; } };
     const prev = sourceMirror.get(sceneId);
+    // A merge's `unresolved` mark on either shard survives the save: the editor's model has no place for
+    // it. The merge that wrote it happened outside the app, so the mirror only answers for a file whose size
+    // hasn't moved since it was last read or written (a mark adds bytes); otherwise the file is read.
+    const current = (p: string, mirrored: string | undefined): string | null => {
+      if (mirrored !== undefined) { try { if (statSync(p).size === Buffer.byteLength(mirrored, "utf8")) return mirrored; } catch { return null; } }
+      return onDisk(p);
+    };
+    flowSource = keepUnresolvedMark(current(s.flowPath, prev?.flow), flowSource);
+    if (s.locPath) locSource = keepUnresolvedMark(current(s.locPath, prev?.loc), locSource);
     const prevFlow = prev ? prev.flow : onDisk(s.flowPath);
     const prevLoc = prev ? prev.loc : (s.locPath ? onDisk(s.locPath) : "");
     const writes: { path: string; content: string }[] = [];
@@ -1570,6 +1586,12 @@ export function validate(live?: { sceneId: string; flow: string; loc: string }):
       // Loc shards that disagree stop the build; a shard nothing reads (an unknown scene or language, a
       // second file for one) is a warning, as a shard outside the layout is.
       ...r.localisation.map((i): Problem => ({ category: i.severity === "error" ? "structure" : "not-in-project", severity: i.severity, message: i.message, file: i.file })),
+      // The project's extensions: a value its manifest refuses, a claim on a gameData field declared with
+      // another type, or a file that won't load is an error (export refuses it); a missing manifest, an
+      // entry for a node that has gone, or a .gitattributes with no merge rule for the data, a warning.
+      ...r.extensions.map((i): Problem => ({
+        category: "extensions", severity: i.severity, message: i.message, file: i.file, ...(i.node ? { nodeId: i.node } : {}), ...(i.code ? { detail: i.code } : {}),
+      })),
     ];
     // Which scene each node-bearing problem is in, so the renderer can switch to it before revealing.
     const sceneOf = sceneIndex(fresh);
@@ -1949,12 +1971,12 @@ function qualifierRenameWrites(renames: Map<string, string>): { path: string; co
   for (const scene of loaded.scenes) {
     const copy = structuredClone(scene);
     const path = loaded.sceneFiles[scene.id];
-    if (path && renameQualifiersInScene(copy, renames) > 0) writes.push({ path, content: canonicalStringify({ schema: FLOW_SCHEMA, scene: copy } satisfies FlowFile) });
+    if (path && renameQualifiersInScene(copy, renames) > 0) writes.push({ path, content: withDiskMark(path, canonicalStringify({ schema: FLOW_SCHEMA, scene: copy } satisfies FlowFile)) });
   }
   loaded.locales.forEach((loc, i) => {
     const copy = structuredClone(loc);
     const path = loaded!.localeFiles[i];
-    if (path && renameQualifierStrings(copy, renames)) writes.push({ path, content: canonicalStringify(copy) });
+    if (path && renameQualifierStrings(copy, renames)) writes.push({ path, content: withDiskMark(path, canonicalStringify(copy)) });
   });
   // Authoring shards as they are on disk now (the loaded set may predate shards written since it was read).
   const authoringPaths = new Set([...loaded.authoringFiles, ...[...shards.values()].map((sh) => sh.authoringPath)]);
@@ -1979,7 +2001,8 @@ function stageRenameWrites(renames: StageRenameDto[], base: { path: string; cont
   const scenes = loaded.scenes.map((scene) => {
     const path = loaded!.sceneFiles[scene.id];
     const content = path ? planned.get(path) : undefined;
-    return content ? (JSON.parse(content) as FlowFile).scene : structuredClone(scene);
+    // Canonical source is JSON5 (trailing commas), which JSON.parse refuses.
+    return content ? (parseSource(content) as FlowFile).scene : structuredClone(scene);
   });
   const dialect = stageDialect(loaded.project, loaded.gameScopes);
   const touched = new Set<Scene>();
@@ -1997,9 +2020,48 @@ function stageRenameWrites(renames: StageRenameDto[], base: { path: string; cont
   const writes: { path: string; content: string }[] = [];
   for (const scene of touched) {
     const path = loaded.sceneFiles[scene.id];
-    if (path) writes.push({ path, content: canonicalStringify({ schema: FLOW_SCHEMA, scene } satisfies FlowFile) });
+    if (path) writes.push({ path, content: withDiskMark(path, canonicalStringify({ schema: FLOW_SCHEMA, scene } satisfies FlowFile)) });
   }
   return { writes, expressions };
+}
+
+/** A rebuilt flow or loc shard's text, keeping the `unresolved` mark its file on disk carries. */
+function withDiskMark(path: string, content: string): string {
+  let disk: string | null;
+  try { disk = readFileSync(path, "utf8"); } catch { disk = null; }
+  return keepUnresolvedMark(disk, content);
+}
+
+/**
+ * The writes a cast rename makes (ruling 8 of patterkit design/proposals/patter-storylet-extensions.md):
+ * each scene with a line the old name speaks, each project-level loc shard holding the member's translated
+ * name or a label of theirs, and each extension data shard keyed by the name or naming it, as its manifest
+ * says (ops' renameCastKeys). `base` holds writes already planned in the same batch: a shard among them is
+ * renamed from that content, so neither edit loses the other. Works on copies. Suggestions, edit records,
+ * and handoff records keep the name they were made with.
+ */
+function castRenameWrites(renames: Map<string, string>, base: { path: string; content: string }[] = []): { path: string; content: string }[] {
+  if (!loaded) return [];
+  ensureHydrated(); // lines, strings, and extension data anywhere in the project
+  const planned = new Map(base.map((w) => [w.path, w.content]));
+  const writes: { path: string; content: string }[] = [];
+  for (const scene of loaded.scenes) {
+    const path = loaded.sceneFiles[scene.id];
+    if (!path) continue;
+    const queued = planned.get(path);
+    const copy = queued !== undefined ? (parseSource(queued) as FlowFile).scene : structuredClone(scene);
+    if (renameCastInScene(copy, renames) > 0) writes.push({ path, content: withDiskMark(path, canonicalStringify({ schema: FLOW_SCHEMA, scene: copy } satisfies FlowFile)) });
+  }
+  loaded.locales.forEach((loc, i) => {
+    const path = loaded!.localeFiles[i];
+    if (!path || loc.scene !== PROJECT_LOCALE_SCENE) return;
+    const queued = planned.get(path);
+    const copy = queued !== undefined ? (parseSource(queued) as LocaleFile) : structuredClone(loc);
+    if (renameCastStrings(copy, renames)) writes.push({ path, content: withDiskMark(path, canonicalStringify(copy)) });
+  });
+  const shards = loaded.extensionShards.map((shard, i) => ({ path: loaded!.extensionShardFiles[i]!, shard }));
+  for (const o of renameCastKeys(shards, loaded.manifests, renames)) writes.push({ path: o.path, content: canonicalStringify(o.shard) });
+  return writes;
 }
 
 /** Carry stage renames on their own (the Scene properties dialog, whose declarations the open scene saves). */
@@ -2133,6 +2195,12 @@ function captionConfig(cc: ProjectSettingsDto["closedCaptions"]): CaptionDelimit
   return character === DEFAULT_CAPTION_CHARACTER ? { open, close } : { open, close, character };
 }
 
+/** The caption character carried through a cast rename (an empty field means the default character). */
+function captionRenamed(cc: ProjectSettingsDto["closedCaptions"], castRenames: ReadonlyMap<string, string> | null | undefined): ProjectSettingsDto["closedCaptions"] {
+  const to = castRenames?.get(cc.character || DEFAULT_CAPTION_CHARACTER);
+  return to === undefined ? cc : { ...cc, character: to };
+}
+
 /** Persist edited project-level settings back to the .patterproj (lock-aware), preserving every other
  *  field. Returns the refreshed project summary on success so the renderer can update the title etc. */
 export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { project?: OpenedProject }> {
@@ -2152,6 +2220,10 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
     }
     // A qualifier whose gameId changed is a rename (see below); the cast's own labels with it move too.
     const renames = cleanRenames(s.qualifierRenames);
+    // A cast member renamed (ruling 8 of the extensions proposal): only a member the project had, to a name
+    // the new cast has.
+    const castRenames = cleanCastRenames(Object.fromEntries(Object.entries(s.castRenames ?? {})
+      .filter(([from, to]) => (loaded!.project.cast ?? []).some((c) => c.name === from) && s.cast.some((c) => c.name === to))));
     const cast = structuredClone(s.cast);
     if (renames) renameQualifierLabels(cast, renames);
     const next: ProjectFile = {
@@ -2203,7 +2275,8 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       // only when non-empty, and `enabled` only when OFF (default on) - keeping a clean project file.
       dictionary: dictionaryFile(s),
       // Closed captions (#214): store only when delimiters / caption character differ from the defaults.
-      closedCaptions: captionConfig(s.closedCaptions),
+      // A renamed cast member who is the caption character stays it under the new name.
+      closedCaptions: captionConfig(captionRenamed(s.closedCaptions, castRenames)),
       // Build settings (Build tab): pin `export.bundle` only when it's NOT the sibling default (keeping a
       // clean file) + `export.localisation` only when IDs-only, preserving any other export fields (e.g. targets).
       export: buildExport(loaded, s.buildBundle, s.buildLocalisation, s.buildSourceDebug, loaded.project.export),
@@ -2220,9 +2293,17 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       const at = writes.findIndex((x) => x.path === w.path);
       if (at >= 0) writes[at] = w; else writes.push(w);
     }
+    // A cast member renamed: every line they speak, their translated names and labels, and the extension data
+    // keyed by the name or naming it follow, in the same batch (built on the writes above, where they share
+    // a shard).
+    const casts = castRenames ? castRenameWrites(castRenames, writes) : [];
+    for (const w of casts) {
+      const at = writes.findIndex((x) => x.path === w.path);
+      if (at >= 0) writes[at] = w; else writes.push(w);
+    }
     // A display name, qualifier name, speaker pattern, or pair label changed in the source language makes its
     // translations stale: stamp it, in the same batch (replacing a rename's write of the same shard).
-    const stamp = projectStringStamp(next, renames, writes);
+    const stamp = projectStringStamp(next, renames, writes, castRenames);
     if (stamp) {
       const at = writes.findIndex((w) => w.path === stamp.path);
       if (at >= 0) writes[at] = { path: stamp.path, content: stamp.content };
@@ -2244,8 +2325,9 @@ export function saveSettings(s: ProjectSettingsDto): Promise<SaveResult & { proj
       }
     }
     loaded.project = next; // reflect in the cached project
-    if (stamp && !renames && !stages.writes.length) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
-    if (renames || stages.writes.length) reloadFromDisk(); // the rewritten scenes and strings, read back whole
+    const reload = !!renames || stages.writes.length > 0 || casts.length > 0;
+    if (stamp && !reload) syncAuthoringAt(stamp.path, stamp.af); // a rename reloads everything below
+    if (reload) reloadFromDisk(); // the rewritten scenes, strings, and extension data, read back whole
     if (loaded.gameScopes) refreshGameScopes(); // the folder may have just changed under us: read it back
     if (s.vcs !== prevVcs) pinVcProvider(next.vcs); // re-pin simple-vc-lib to the newly chosen system (#26)
     syncAudioIndex();      // audio config may have changed (mode toggle / rung folders) (#206)
@@ -2373,8 +2455,9 @@ export function sceneDeleteInfo(sceneId: string): SceneDeleteInfo | null {
   };
 }
 
-/** Delete a scene: its flow shard, its loc shard in EVERY locale, and its authoring shard, each
- *  through the lock-aware VC delete; then drop it from `sceneOrder` and clear a `start` that
+/** Delete a scene: its flow shard, its loc shard in EVERY locale, its authoring shard, and its data for
+ *  every extension (`<layout.extensions>/<extension id>/<flow stem>.patterextension`), each through the
+ *  lock-aware VC delete; then drop it from `sceneOrder` and clear a `start` that
  *  pointed at it. Refuses the last scene (the loader assumes one exists). Not undoable in-app -
  *  the VCS is the safety net, which is why the renderer's confirm carries the weight it does. */
 export function deleteScene(sceneId: string): Promise<SaveResult & { project?: OpenedProject }> {
@@ -2389,10 +2472,12 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
     const locIdx: number[] = [];
     p.locales.forEach((loc, i) => { if (loc.scene === sceneId) locIdx.push(i); });
     const authoringPath = shards.get(sceneId)?.authoringPath;
+    const extensionPaths = sceneExtensionShards(p, sceneId);
     // The flow shard LAST: it is what makes the scene exist, so a delete stopped part way leaves a scene that
     // is still there (missing some strings or notes) rather than strings and notes for a scene that is gone.
     const files = [
       authoringPath && existsSync(authoringPath) ? authoringPath : undefined,
+      ...extensionPaths,
       ...locIdx.map((i) => p.localeFiles[i]),
       p.sceneFiles[sceneId],
     ].filter((f): f is string => !!f);
@@ -2429,10 +2514,31 @@ export function deleteScene(sceneId: string): Promise<SaveResult & { project?: O
     p.scenes.splice(idx, 1);
     delete p.sceneFiles[sceneId];
     for (let i = locIdx.length - 1; i >= 0; i--) { p.locales.splice(locIdx[i]!, 1); p.localeFiles.splice(locIdx[i]!, 1); }
+    const gone = new Set(extensionPaths);
+    for (let i = p.extensionShardFiles.length - 1; i >= 0; i--) {
+      if (gone.has(p.extensionShardFiles[i]!)) { p.extensionShards.splice(i, 1); p.extensionShardFiles.splice(i, 1); }
+    }
     shards = buildShards(p);
     authoringCache.clear();
     return { ok: true, project: summarise(p) };
   });
+}
+
+/** A scene's extension data shards on disk: one per extension folder under `layout.extensions`, named for
+ *  the scene's flow shard (`<extension id>/<flow stem>.patterextension`). */
+function sceneExtensionShards(p: LoadedProject, sceneId: string): string[] {
+  const flowPath = p.sceneFiles[sceneId];
+  if (!flowPath) return [];
+  const stem = basename(flowPath).replace(/\.patterflow$/, "");
+  const dir = join(p.root, projectLayout(p.project).extensions);
+  let folders: string[];
+  try { folders = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith(".")).map((e) => e.name).sort(); }
+  catch { return []; }
+  // By the flow's stem, as the scene's other shards are; and only a shard that says it is this scene's (or says
+  // nothing), so a hand-built layout with two flows of one stem never loses the other scene's data.
+  const owner = new Map(p.extensionShardFiles.map((f, i) => [f, p.extensionShards[i]?.scene]));
+  return folders.map((f) => join(dir, f, `${stem}${EXTENSION_SHARD}`))
+    .filter((f) => existsSync(f) && [sceneId, undefined, ""].includes(owner.get(f)));
 }
 
 /** Persist the nav's authored scene order (ProjectFile.sceneOrder), lock-aware, and re-sort the

@@ -2,7 +2,8 @@
 // (matched by a beat's speaker), an optional player-facing display name, a grammatical gender for
 // translators, free-text production notes, and its own label with a qualifier where the speaker pattern
 // shouldn't apply ("Shown with V.O."), one field for each qualifier its lines use. value() returns a clean
-// list (blank names pruned) for the save round-trip.
+// list (blank names pruned) for the save round-trip, and renames() the members whose name changed, which
+// the save carries into the lines they speak and the extension data that names them.
 
 import type { CastMember } from "@patterkit/model";
 import { COMMON_GENDERS, DEFAULT_SPEAKER_PATTERN, formatSpeakerLabel } from "@patterkit/model";
@@ -11,6 +12,8 @@ import { iconBtn, labelled, moveItem, dupGuard, expandableRow, focusNewRow } fro
 
 export interface CastHandle {
   value(): CastMember[];
+  /** Names changed on members the project already had, old -> new (the lines and data to rewrite). */
+  renames(): Record<string, string>;
   firstDuplicate(): HTMLInputElement | null;
   /** Repaint the "Shown with" placeholders, after the pattern or a qualifier's name changed elsewhere. */
   refreshLabels(): void;
@@ -30,6 +33,9 @@ let genderListSeq = 0; // unique <datalist> ids so each gender input binds to it
 
 export function mountCast(host: HTMLElement, initial: CastMember[], labels?: CastLabelSource): CastHandle {
   const state: CastMember[] = structuredClone(initial ?? []);
+  // The name each member had when the tab opened, by the row's own object (rows move, and are removed, as
+  // objects): what the lines still say. A member added here has none.
+  const origins = new Map<CastMember, string>(state.map((m) => [m, m.name.trim().toUpperCase()]));
   const guard = dupGuard();
   /** Each "Shown with" field's placeholder repaint, for the rows as last rendered. */
   let repaints: Array<() => void> = [];
@@ -160,6 +166,14 @@ export function mountCast(host: HTMLElement, initial: CastMember[], labels?: Cas
   return {
     firstDuplicate: () => guard.firstDuplicate(),
     refreshLabels: () => { for (const r of repaints) r(); },
+    renames(): Record<string, string> {
+      const out: Record<string, string> = {};
+      for (const m of state) {
+        const from = origins.get(m), to = m.name.trim().toUpperCase();
+        if (from && to && to !== from) out[from] = to;
+      }
+      return out;
+    },
     value(): CastMember[] {
       return state.filter((m) => m.name.trim()).map((m): CastMember => {
         const c: CastMember = { name: m.name.trim().toUpperCase() };

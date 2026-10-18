@@ -1058,9 +1058,10 @@ function registerIpc(): void {
   ipcMain.handle("project:stageGates", (_e, target: { scope: string; name: string; scene?: string }) => project.stageGates(target));
   ipcMain.handle("project:speakerPairs", () => project.speakerPairs());
   ipcMain.handle("project:saveSettings", async (_e, s: ProjectSettingsDto) => {
-    // A qualifier gameId rename rewrites lines across the project, the open scene's among them: its unsaved
-    // edits go to disk first, and it reloads from the rewritten file after.
+    // A qualifier gameId rename (or a cast rename) rewrites lines across the project, the open scene's among
+    // them: its unsaved edits go to disk first, and it reloads from the rewritten file after.
     const renames = Object.entries(s.qualifierRenames ?? {}).some(([from, to]) => from !== to)
+      || Object.entries(s.castRenames ?? {}).some(([from, to]) => from !== to)
       || (s.stageRenames ?? []).some((r) => r.from !== r.to); // a stage rename rewrites conditions across the project too
     if (renames) await flushEditorScene();
     const r = await project.saveSettings(s);

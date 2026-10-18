@@ -308,6 +308,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
 	TArray<FPatterGameDataEntry> GameDataForBlock(const FString& SceneRef, const FString& BlockRef) const;
 
+	// A scene's own Patter extension values (raw, by extension id, each value as JSON text); not inherited by
+	// its blocks. Empty when it has none or the ref is unknown. UPatterGameData::GetEffectiveExtensionValues
+	// fills in the defaults.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FPatterExtensionValues> ExtensionsForScene(const FString& SceneRef) const;
+
+	// A block's own Patter extension values (raw); the scene's are not folded in.
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Structure")
+	TArray<FPatterExtensionValues> ExtensionsForBlock(const FString& SceneRef, const FString& BlockRef) const;
+
 	// "Play this address and give me everything it produced" - the one-call bark form. The NAMED flow is
 	// reused if it already exists (moved with Goto) and opened at the address if not, then run to its next
 	// stop. Reuse is the point: a flow owns its selector cursors, so a shuffle keeps its bag and a

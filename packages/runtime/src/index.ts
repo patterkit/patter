@@ -35,8 +35,9 @@ export type {
   PropertySummary, OwnedProperties, GameDataSummary, GameDataFieldSummary, BundleCounts,
 } from "./describe.js";
 
-// gameData read helpers (sparse overrides + field-default merge).
-export { gameDataFields, gameDataValue, effectiveGameData } from "./gamedata.js";
+// gameData read helpers (sparse overrides + field-default merge), and Patter extension values by the same rule.
+export { gameDataFields, gameDataValue, effectiveGameData, extensionDecls, extensionsOf } from "./gamedata.js";
+export type { BundleExtension, ExtensionFieldDecl, NodeExtensions } from "@patterkit/model";
 
 // Author tags (#215): accumulated node-tag index (also surfaced via Engine.tagsFor* + step.tags).
 export { buildTagIndex } from "./tags.js";

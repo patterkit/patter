@@ -76,6 +76,20 @@ describe("speaker qualifiers in the project session", () => {
     expect(project.validate().problems.filter((p) => p.detail === "unknown-qualifier")).toEqual([]);
   });
 
+  it("a Game ID change and a stage rename in one save both land on a scene they share", async () => {
+    const { dir, flowPath } = tavernWithQualifier();
+    project.openProject(dir);
+    const s = project.readSettings()!;
+    const renamed = s.qualifiers.map((q) => (q.gameId === "os" ? { ...q, gameId: "offscreen" } : q));
+    const res = await project.saveSettings({
+      ...s, qualifiers: renamed, qualifierRenames: { os: "offscreen" },
+      stageRenames: [{ scope: "", name: "cue", gameData: "gameEvent", from: "camera_focus", to: "camera_wide" }],
+    });
+    expect(res.ok).toBe(true);
+    expect(qualifierOnDisk(flowPath, "L_greet")).toBe("offscreen");
+    expect(readFileSync(flowPath, "utf8")).toContain("camera_wide");
+  });
+
   it("a Game ID change also moves suggestions, edit records, and handoff records to the new gameId", async () => {
     const { dir } = tavernWithQualifier();
     // An open suggestion from an editable-script reimport, the translation-staleness record of the

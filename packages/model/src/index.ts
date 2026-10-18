@@ -64,6 +64,10 @@ export interface LineBeat {
    *  Never negative on a snippet's last line or text beat: the runtime clamps it to zero there. */
   padAfter?: number;
   gameData?: GameData;
+  /** Bundle only: this node's extension values, by extension id, raw as authored (editor-only fields
+   *  stripped). Source keeps them in extension shards (`.patterextension`), never here. Absent when the
+   *  node has none. */
+  extensions?: NodeExtensions;
   /** Author-defined freeform tags (#215): a cross-cutting label layer that travels to the runtime.
    *  At runtime a beat's tags are the UNION of its own and every ancestor's (scene → block → group(s) →
    *  snippet → beat). Each tag is letters/digits/symbols with NO comma and NO whitespace; deduped. */
@@ -85,6 +89,10 @@ export interface TextBeat {
    *  Never negative on a snippet's last line or text beat: the runtime clamps it to zero there. */
   padAfter?: number;
   gameData?: GameData;
+  /** Bundle only: this node's extension values, by extension id, raw as authored (editor-only fields
+   *  stripped). Source keeps them in extension shards (`.patterextension`), never here. Absent when the
+   *  node has none. */
+  extensions?: NodeExtensions;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
 }
@@ -99,6 +107,10 @@ export interface GameEventBeat {
   id: string;
   kind: "gameEvent";
   gameData?: GameData;
+  /** Bundle only: this node's extension values, by extension id, raw as authored (editor-only fields
+   *  stripped). Source keeps them in extension shards (`.patterextension`), never here. Absent when the
+   *  node has none. */
+  extensions?: NodeExtensions;
   /** Author tags (#215). See LineBeat.tags. */
   tags?: string[];
 }
@@ -820,7 +832,7 @@ export interface ProjectFile {
    *  omitted = the default `(` / `)`. Captions are ON by default (full text shown). */
   closedCaptions?: CaptionDelimiters;
   audio?: { scratchStore: string };
-  layout?: { flow?: string; strings?: string; authoring?: string };
+  layout?: { flow?: string; strings?: string; authoring?: string; extensions?: string };
   /** `bundle`: the compiled `.patterc` output path (relative to the project root,
    *  or absolute); default `../patter-dist/<project-file-stem>.patterc`, beside the project (spec §11).
    *  `localisation`: how strings ship + are resolved (spec §11).
@@ -857,6 +869,14 @@ export interface ProjectFile {
    *  Absent = `DEFAULT_PAD_AFTER`. */
   padAfterDefault?: number;
   gameDataFields?: GameDataFields;
+  /**
+   * The Patter extensions this project takes, by id (ruled 2026-10-18: the project opts in), each pinned to a
+   * version, with its settings (the host fields its claims present, by setting name). The manifest itself
+   * sits in `extensions/<id>.extension.json`, and the data in `.patterextension` shards. Authoring config:
+   * the bundle carries each one's compiled declarations and values, never this block. An extension named
+   * here whose manifest is missing is a warning, and its data is left untouched.
+   */
+  extensions?: Record<string, ProjectExtension>;
   /** Ordered writing-status ladder (not-done -> done); default `DEFAULT_WRITING_STATUSES`. */
   writingStatuses?: WritingStatusDecl[];
   /** Ordered recording-status ladder (not-done -> done); default `DEFAULT_RECORDING_STATUSES`. */
@@ -1197,6 +1217,8 @@ export interface CompiledSnippet {
   onExit?: CompiledEffect[];
   padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
+  /** This node's extension values, by extension id (editor-only fields stripped). Absent when it has none. */
+  extensions?: NodeExtensions;
   tags?: string[];                 // author tags (#215), accumulated down the tree at runtime
   jump?: Jump;
   secretUntilEligible?: boolean;
@@ -1218,6 +1240,8 @@ export interface CompiledGroup {
   children: Array<CompiledGroup | CompiledSnippet>;
   padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
+  /** This node's extension values, by extension id (editor-only fields stripped). Absent when it has none. */
+  extensions?: NodeExtensions;
   tags?: string[];                 // author tags (#215)
   /** Option-position fields (spec §5) - only when a direct child of a `choice`. */
   prompt?: PromptBeat;
@@ -1237,6 +1261,8 @@ export interface CompiledBlock {
   children: Array<CompiledGroup | CompiledSnippet>;
   padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
+  /** This node's extension values, by extension id (editor-only fields stripped). Absent when it has none. */
+  extensions?: NodeExtensions;
   tags?: string[];                 // author tags (#215)
 }
 
@@ -1248,6 +1274,8 @@ export interface CompiledScene {
   gameId?: string;
   padAfterDefault?: number;        // the default padAfter for the line / text beats inside (line padding)
   gameData?: GameData;
+  /** This node's extension values, by extension id (editor-only fields stripped). Absent when it has none. */
+  extensions?: NodeExtensions;
   tags?: string[];                 // author tags (#215)
   onEntry?: CompiledEffect[];
   sceneProps?: PropertyDecl[];
@@ -1281,6 +1309,13 @@ export interface Bundle {
    *  one. Absent when none. */
   externalScopes?: string[];
   gameDataFields?: GameDataFields;
+  /**
+   * The extensions the project takes, by id: each one's version and its compiled declarations by node kind,
+   * every default resolved (what `extensionDecls` reads), and the project node's own values. A node's values
+   * sit on the node, under `extensions`. Absent when the project takes none, so a bundle without them is
+   * byte for byte what it was.
+   */
+  extensions?: Record<string, BundleExtension>;
   scenes: Record<string, CompiledScene>;
   /** locale -> (beatId -> text). In "embedded" localisation this carries every included locale; in "ids"
    *  it is EMPTY (the runtime emits beat IDs), unless `localisation.sourceDebug` embedded the source locale
@@ -1490,11 +1525,14 @@ export interface SaveGameV2 {
 }
 
 /** Where a project keeps its shards unless its `layout` says otherwise, relative to the project root. */
-export const DEFAULT_LAYOUT = { flow: "scenes/", strings: "loc/", authoring: "authoring/" } as const;
+export const DEFAULT_LAYOUT = { flow: "scenes/", strings: "loc/", authoring: "authoring/", extensions: "extensions/" } as const;
+
+/** Where a project keeps each kind of shard, relative to the project root (`ProjectFile.layout`). */
+export interface ProjectLayout { flow: string; strings: string; authoring: string; extensions: string }
 
 /** A project's layout with the defaults filled in: the one place they are written down (the loader,
  *  validate, localisation, the scene scaffold, and Patterpad each had a copy). */
-export function projectLayout(project: { layout?: { flow?: string; strings?: string; authoring?: string } }): { flow: string; strings: string; authoring: string } {
+export function projectLayout(project: { layout?: Partial<ProjectLayout> }): ProjectLayout {
   return { ...DEFAULT_LAYOUT, ...project.layout };
 }
 
@@ -1503,3 +1541,99 @@ export const FLOW_SCHEMA = "patter/flow@0";
 export const PROJECT_SCHEMA = "patter/project@0";
 export const STRINGS_SCHEMA = "patter/strings@0";
 export const AUTHORING_SCHEMA = "patter/authoring@0";
+/** An extension data shard's schema. */
+export const EXTENSION_SCHEMA = "patter/extension@0";
+
+// ---------------------------------------------------------------------------
+// Patter extensions (patterkit design/proposals/patter-storylet-extensions.md): a tool's own fields on
+// Patter's nodes, declared by the extension's manifest, kept in the project's extension shards, compiled
+// inline onto each node and never interpreted by the engine. The spec, the value checks and the merge are
+// `@wildwinter/toolkit/extensions`'.
+// ---------------------------------------------------------------------------
+
+/** An extension data shard's file suffix: one per extension per scene
+ *  (`<layout.extensions>/<extension id>/<scene file stem>.patterextension`), and one for project-level
+ *  data (`<layout.extensions>/<extension id>/_project.patterextension`). Its own shard because a tool's
+ *  pass and a writer's edit must not collide on one file. */
+export const EXTENSION_SHARD = ".patterextension";
+
+/** The stem of an extension's project-level data shard, beside its scene shards. */
+export const PROJECT_EXTENSION_STEM = "_project";
+
+/**
+ * An extension's manifest, as a project keeps it: `extensions/<id>.extension.json` at the project root
+ * (`@wildwinter/toolkit/extensions`' `MANIFEST_FILE_SUFFIX`). Not a shard: JSON the extension ships, never
+ * written by the tools nor put in the canonical form, but source all the same, so a pack carries it and a
+ * project compiles from it.
+ */
+export const MANIFEST_EXTENSION = ".extension.json";
+/** Where a project keeps its extensions' manifests, relative to the root. Fixed, unlike the data shards'
+ *  folder, so a merge driver handed one shard's path can always find the manifest. */
+export const EXTENSIONS_DIR = "extensions";
+
+/**
+ * The extensions a project takes (`ProjectFile.extensions`), one each: the version it is pinned to and its
+ * settings (the host fields its claims present, by setting name).
+ */
+export interface ProjectExtension {
+  version: string;
+  settings?: Record<string, string>;
+}
+
+/**
+ * One extension's data for one scene, or for the project (`scene: "@project"`).
+ *
+ * `entries` is the extension's, by node kind (`scene`, `block`, `snippet`, `line`, `text`, `gameEvent`,
+ * `option`, `project`) and then node id, and the canonical form never reorders anything inside it: its
+ * lists are the extension's, in the extension's order. The values are raw, as a tool wrote them; the
+ * extension's manifest says their types.
+ */
+export interface ExtensionShard {
+  schema: typeof EXTENSION_SCHEMA;
+  /** The extension's id: the same as the folder the shard sits in. */
+  extension: string;
+  /** The scene this shard's entries belong to, or `PROJECT_LOCALE_SCENE` (`"@project"`) for the project's. */
+  scene: string;
+  entries: Record<string, Record<string, Record<string, unknown>>>;
+}
+
+/**
+ * The reserved key a merged shard carries an unresolved merge under, in every shard type
+ * (`@wildwinter/toolkit/extensions`' `UNRESOLVED_KEY`, ruled 2026-10-18 in both formats): the clashes, each
+ * with its path, its kind and the three values, ours being what the shard now holds. Validation, export
+ * and pack refuse a shard carrying it; resolving removes it.
+ */
+export const UNRESOLVED_KEY = "unresolved";
+
+/** One extension as the bundle carries it. */
+export interface BundleExtension {
+  version: string;
+  /** Compiled declarations by node kind: no editor-only fields, no editor words. */
+  fields: Record<string, ExtensionFieldDecl[]>;
+  /** The project node's values, raw, when it has any. */
+  project?: Record<string, unknown>;
+}
+
+/**
+ * A compiled extension field declaration (`@wildwinter/toolkit/extensions`' FieldDecl, less the editor's
+ * words). Its `default` is always present. Structured types carry their parts: `fields` for a record,
+ * `key` and `of` for a map, `of` and `id` for a list, `to` for a reference.
+ */
+export interface ExtensionFieldDecl {
+  name: string;
+  type: string;
+  default: unknown;
+  values?: string[];
+  stages?: string[];
+  to?: string;
+  fields?: ExtensionFieldDecl[];
+  key?: { type: string; to?: string };
+  of?: Omit<ExtensionFieldDecl, "name" | "default"> & { default?: unknown };
+  id?: string;
+  min?: number;
+  max?: number;
+  required?: boolean;
+}
+
+/** A node's extension values in a bundle: extension id -> field -> value, raw. */
+export type NodeExtensions = Record<string, Record<string, unknown>>;

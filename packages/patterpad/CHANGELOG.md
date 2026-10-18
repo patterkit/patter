@@ -8,6 +8,16 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Added
 
+- **Renaming a cast member renames them everywhere.** Change a name in Project Settings ▸ Cast, and every line
+  they speak, their translated name and labels, and any extension data keyed by them or naming them follow it,
+  in the same save. Before, their lines kept the old name and showed as a speaker who isn't in the cast.
+- **The problems bar shows a project's extension problems**, under Extensions: a value an extension's manifest
+  won't take, a claim on a game data field of another type, an entry for something that's gone, or a missing
+  manifest.
+- **A project's Patter extension data travels with it.** Deleting a scene deletes its extension data too, and
+  a pack carries the project's extension manifests and data.
+- **An unresolved merge stays marked when you edit the scene.** A merge that left a clash marks the files it
+  touched, and saving the scene keeps that mark, so the clash can't be committed by accident.
 - **An option has Game Data fields of its own.** Project Settings ▸ Game Data has an Option tab, and an
   option's fields are edited in the inspector like a line's, instead of shown read-only. A key no field
   declares, such as the Storyletter pairing's `outcome`, still shows as it stands.
@@ -24,6 +34,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ### Fixed
 
+- **Changing a qualifier's Game ID and renaming a game data stage in one Project Settings save works.** When
+  both touched the same scene, the save failed.
 - **Undo undoes what you're looking at.** Edit ▸ Undo in the Search, Coverage or Play window undoes that
   window's own typing, and in Project Settings, a dialog, or on the Properties page it undoes the field you're
   in. Before, each of these undid the scene behind them, and on the Properties page that change wasn't saved.

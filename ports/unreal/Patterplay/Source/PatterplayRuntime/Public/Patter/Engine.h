@@ -47,12 +47,7 @@ namespace patter
 
     // ----- helpers -------------------------------------------------------------
 
-    inline std::string toLower(const std::string& s)
-    {
-        std::string r = s;
-        for (char& c : r) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-        return r;
-    }
+    // toLower, gameIdify and effectiveGameId live in Bundle.h: extensionsOf reads a scene and a block by gameId.
 
     // Split a ref into scope + name. `isScope` says which heads are scopes: the registry's tokens
     // (@world, another engine's @story) plus @scene. Without them "@world.gold" splits to a @patter
@@ -197,6 +192,7 @@ namespace patter
         double padAfter = 0;
         bool hasOwnPadAfter = false; double ownPadAfter = 0;
         std::vector<std::pair<std::string, PatterValue>> gameData;   // author overrides (raw)
+        NodeExtensions extensions;                                   // Patter extension values (raw); empty = none
         std::vector<std::string> tags;                               // accumulated
     };
     struct OutlineNode
@@ -216,6 +212,7 @@ namespace patter
     {
         std::string id, gameId, name;
         std::vector<std::pair<std::string, PatterValue>> gameData;   // the block's own overrides (raw, not merged)
+        NodeExtensions extensions;                                   // the block's own Patter extension values (raw)
         std::vector<std::string> tags;
         std::vector<OutlineNode> children;
     };
@@ -223,6 +220,7 @@ namespace patter
     {
         std::string id, gameId, name;
         std::vector<std::pair<std::string, PatterValue>> gameData;   // the scene's own overrides (raw, not merged)
+        NodeExtensions extensions;                                   // the scene's own Patter extension values (raw)
         std::vector<std::string> tags;
         std::vector<OutlineBlock> blocks;
     };
@@ -230,36 +228,6 @@ namespace patter
     // The names these types had before they took the JS names; they go in a later release.
     using OutlineBeat [[deprecated("Use BeatInfo, the name every Patterplay runtime uses.")]] = BeatInfo;
     using OutlineFlatBeat [[deprecated("Use FlatBeat, the name every Patterplay runtime uses.")]] = FlatBeat;
-
-    inline std::string gameIdify(const std::string& text)
-    {
-        std::string s = toLower(text), tmp;
-        for (size_t i = 0; i < s.size(); ++i)
-        {
-            unsigned char c = static_cast<unsigned char>(s[i]);
-            if (c == '\'') continue;                      // drop apostrophes (incl. the ASCII one)
-            bool keep = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-';
-            tmp += keep ? static_cast<char>(c) : '-';
-        }
-        // collapse runs of '-' and trim.
-        std::string out; bool prevDash = true;
-        for (char c : tmp)
-        {
-            if (c == '-') { if (!prevDash) { out += '-'; prevDash = true; } }
-            else { out += c; prevDash = false; }
-        }
-        while (!out.empty() && out.back() == '-') out.pop_back();
-        return out;
-    }
-
-    inline std::string effectiveGameId(const std::string& gameId, const std::string& name)
-    {
-        std::string g = gameId;
-        // trim
-        size_t a = g.find_first_not_of(" \t"); size_t b = g.find_last_not_of(" \t");
-        g = (a == std::string::npos) ? "" : g.substr(a, b - a + 1);
-        return !g.empty() ? g : gameIdify(name);
-    }
 
     inline void walkNodes(const std::vector<NodePtr>& nodes, const std::function<void(const Node*)>& visit)
     {
@@ -1364,6 +1332,8 @@ namespace patter
                     if (it == host_->nodeIndex.end()) continue;
                     byId[o.id] = it->second;
                     options.push_back(o);
+                    // An option's extension values are the bundle's, not the save's: read off its node again.
+                    options.back().extensions = it->second->extensions;
                     // A save from before prompts carried their pause, or a speaker's label, has none: work them out
                     // again (the pause from the prompt's beat, the label from the speaker the choice showed, in the
                     // current locale).
@@ -1774,6 +1744,7 @@ namespace patter
                 opt.prompt = promptFor(child);
                 opt.eligible = elig;
                 opt.gameData = child->gameData;
+                opt.extensions = child->extensions;
                 options.push_back(opt);
                 byId[child->id] = child;
             }
@@ -2116,6 +2087,7 @@ namespace patter
                 auto it = host_->tagIndex.find(beat.id);
                 if (it != host_->tagIndex.end() && !it->second.empty()) { s.hasTags = true; s.tags = it->second; }
             };
+            r.extensions = beat.extensions;   // Patter extension values, raw, on every kind of beat
             if (beat.kind == "gameEvent") { r.type = StepType::GameEvent; r.id = beat.id; r.gameData = beat.gameData; applyTags(r); return r; }
             if (beat.kind == "text") { r.type = StepType::Text; r.id = beat.id; r.text = interp(resolveString(beat.id)); r.padAfter = padOf(beat.id); r.gameData = beat.gameData; applyTags(r); return r; }
             // line
@@ -2195,7 +2167,7 @@ namespace patter
         StepResult promptResult(const Beat& beat, const ChoicePrompt& shown)
         {
             StepResult r;
-            r.id = beat.id; r.text = shown.text; r.gameData = beat.gameData; r.padAfter = padOf(beat.id);
+            r.id = beat.id; r.text = shown.text; r.gameData = beat.gameData; r.extensions = beat.extensions; r.padAfter = padOf(beat.id);
             auto it = host_->tagIndex.find(beat.id);
             if (it != host_->tagIndex.end() && !it->second.empty()) { r.hasTags = true; r.tags = it->second; }
             if (shown.kind == "text") { r.type = StepType::Text; return r; }
@@ -2755,6 +2727,23 @@ namespace patter
             return it != host_.blockById.end() && it->second->gameData ? *it->second->gameData : GameData{};
         }
 
+        // A scene's own Patter extension values (by internal id or gameId address), by extension id: raw and
+        // sparse, exactly as the bundle carries them, any JSON, never read by the engine (fill in defaults with
+        // effectiveGameData(extensionDecls(bundle, id, "scene"), ...)). Not inherited by its blocks. A fresh
+        // copy each call; empty when the scene has none or the ref is unknown.
+        NodeExtensions extensionsForScene(const std::string& sceneRef)
+        {
+            auto it = host_.bundle->scenes.find(resolveSceneRef(sceneRef));
+            return it != host_.bundle->scenes.end() ? it->second.extensions : NodeExtensions{};
+        }
+        // A block's own Patter extension values, by scene + block ref (id or gameId). Raw, like
+        // extensionsForScene; the scene's are not folded in. Empty when the block has none or the ref is unknown.
+        NodeExtensions extensionsForBlock(const std::string& sceneRef, const std::string& blockRef)
+        {
+            auto it = host_.blockById.find(resolveBlockRef(resolveSceneRef(sceneRef), blockRef));
+            return it != host_.blockById.end() ? it->second->extensions : NodeExtensions{};
+        }
+
         // Every cast member the PROJECT declares, in authored order - the same list describeBundle
         // counts. A superset of any scene's cast: a beat's character must be a declared member, so
         // castForScene / castForBlock only ever return names from here.
@@ -3004,6 +2993,7 @@ namespace patter
                 os.gameId = effectiveGameId(scene.gameId, scene.name);
                 os.name = scene.name;
                 if (scene.gameData) os.gameData.assign(scene.gameData->begin(), scene.gameData->end());
+                os.extensions = scene.extensions;
                 os.tags = tagsById(scene.id);
                 for (const Block& block : scene.blocks)
                 {
@@ -3012,6 +3002,7 @@ namespace patter
                     ob.gameId = effectiveGameId(block.gameId, block.name);
                     ob.name = block.name;
                     if (block.gameData) ob.gameData.assign(block.gameData->begin(), block.gameData->end());
+                    ob.extensions = block.extensions;
                     ob.tags = tagsById(block.id);
                     for (const NodePtr& n : block.children) ob.children.push_back(outlineNode(*n));
                     os.blocks.push_back(std::move(ob));
@@ -3096,6 +3087,7 @@ namespace patter
                 if (t != host_.defaultStrings->end()) info.text = t->second;   // source, un-interpolated
             }
             if (beat.gameData) for (const auto& kv : *beat.gameData) info.gameData.emplace_back(kv.first, kv.second);
+            info.extensions = beat.extensions;
             info.tags = tagsById(beat.id);
             return info;
         }

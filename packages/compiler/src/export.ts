@@ -10,8 +10,8 @@
 // ---------------------------------------------------------------------------
 
 import type {
-  Bundle, BundleCastMember, BundleQualifier, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
-  ProjectFile, Scene, Block, Group, Snippet, Effect, LocaleFile,
+  Beat, Bundle, BundleCastMember, BundleExtension, BundleQualifier, CompiledScene, CompiledBlock, CompiledGroup, CompiledSnippet, CompiledEffect,
+  NodeExtensions, ProjectFile, Scene, Block, Group, Snippet, Effect, LocaleFile,
 } from "@patterkit/model";
 import { defaultFor } from "@wildwinter/scoperegistry";
 import type { ScalarValue, ScopeRegistrySpec } from "@wildwinter/scoperegistry";
@@ -21,6 +21,8 @@ import { hostScopesToSpec, withEngineScopes, EXTERNAL_SCOPES } from "@patterkit/
 import { usedQualifiers, usedSpeakerPairs, DEFAULT_SPEAKER_PATTERN } from "@patterkit/model";
 import { compileExpression } from "./expressions.js";
 import { externalGameScopes, projectScopes } from "./game-scopes.js";
+import { extensionPass } from "./extensions.js";
+import type { ExtensionManifestFile, ExtensionShardFile } from "./extensions.js";
 
 export interface ExportInput {
   project: ProjectFile;
@@ -42,6 +44,32 @@ export interface ExportInput {
    * does: named in `externalScopes`, never baked in.
    */
   gameScopes?: MergedScopes;
+  /**
+   * The project's Patter extensions: its manifests and its extension data shards. Each node's values are
+   * compiled inline under `extensions`, and the bundle's `extensions` section carries each extension the
+   * project takes. Absent or empty, with no extension taken, the bundle and its hashes are exactly what they
+   * were. What is wrong with the data is validate's to report (`extensionPass`); here an entry with an
+   * error is simply left out.
+   */
+  extensions?: { manifests: readonly ExtensionManifestFile[]; shards: readonly ExtensionShardFile[] };
+}
+
+/** What the compile walk carries: another owner's scopes, and each node's compiled extension values. */
+interface CompileCtx {
+  foreign?: ScopeRegistrySpec;
+  extensions: ReadonlyMap<string, NodeExtensions>;
+}
+
+/**
+ * A beat as the bundle carries it: the source beat, with its compiled extension values set. Source keeps
+ * them in extension shards, never on the beat, so a hand-written `extensions` key there never reaches the
+ * bundle. A beat with neither is passed through as it is.
+ */
+function compileBeat<B extends Beat>(beat: B, ctx: CompileCtx): B {
+  const values = ctx.extensions.get(beat.id);
+  if (values === undefined && !Object.prototype.hasOwnProperty.call(beat, "extensions")) return beat;
+  const { extensions: _source, ...rest } = beat;
+  return (values !== undefined ? { ...rest, extensions: values } : rest) as B;
 }
 
 function compileEffect(e: Effect, foreign?: ScopeRegistrySpec): CompiledEffect {
@@ -49,7 +77,8 @@ function compileEffect(e: Effect, foreign?: ScopeRegistrySpec): CompiledEffect {
   return { kind: "set", target: e.target, value: compileExpression(e.value, foreign) };
 }
 
-function compileNode(node: Group | Snippet, foreign?: ScopeRegistrySpec): CompiledGroup | CompiledSnippet {
+function compileNode(node: Group | Snippet, ctx: CompileCtx): CompiledGroup | CompiledSnippet {
+  const { foreign } = ctx;
   if (node.type === "group") {
     return {
       id: node.id,
@@ -58,11 +87,12 @@ function compileNode(node: Group | Snippet, foreign?: ScopeRegistrySpec): Compil
       selector: node.selector,
       shared: node.shared,
       options: node.options,
-      children: node.children.map((c) => compileNode(c, foreign)),
+      children: node.children.map((c) => compileNode(c, ctx)),
       padAfterDefault: node.padAfterDefault,   // line padding: the default for the beats inside
       gameData: node.gameData,
+      extensions: ctx.extensions.get(node.id), // a choice's option's extension values
       tags: node.tags,                         // author tags (#215), accumulated at runtime
-      prompt: node.prompt,                     // option-position only (spec §5)
+      prompt: node.prompt && compileBeat(node.prompt, ctx), // option-position only (spec §5)
       secretUntilEligible: node.secretUntilEligible,
       sticky: node.sticky,
       fallback: node.fallback,
@@ -72,11 +102,12 @@ function compileNode(node: Group | Snippet, foreign?: ScopeRegistrySpec): Compil
     id: node.id,
     type: "snippet",
     condition: node.condition !== undefined ? compileExpression(node.condition, foreign) : undefined,
-    beats: node.beats,
+    beats: node.beats && node.beats.map((b) => compileBeat(b, ctx)),
     onEnter: node.onEnter?.map((e) => compileEffect(e, foreign)),
     onExit: node.onExit?.map((e) => compileEffect(e, foreign)),
     padAfterDefault: node.padAfterDefault,   // line padding: the default for the beats inside
     gameData: node.gameData,
+    extensions: ctx.extensions.get(node.id),
     tags: node.tags,                         // author tags (#215)
     jump: node.jump,
     secretUntilEligible: node.secretUntilEligible,
@@ -85,20 +116,22 @@ function compileNode(node: Group | Snippet, foreign?: ScopeRegistrySpec): Compil
   };
 }
 
-function compileBlock(block: Block, foreign?: ScopeRegistrySpec): CompiledBlock {
+function compileBlock(block: Block, ctx: CompileCtx): CompiledBlock {
   return {
     id: block.id,
     type: "block",
     name: block.name,
     ...(block.gameId ? { gameId: block.gameId } : {}), // host-facing address; runtime falls back to the name slug
-    children: block.children.map((c) => compileNode(c, foreign)),
+    children: block.children.map((c) => compileNode(c, ctx)),
     padAfterDefault: block.padAfterDefault,  // line padding: the default for the beats inside
     gameData: block.gameData,
+    extensions: ctx.extensions.get(block.id),
     tags: block.tags,                        // author tags (#215)
   };
 }
 
-function compileScene(scene: Scene, foreign?: ScopeRegistrySpec): CompiledScene {
+function compileScene(scene: Scene, ctx: CompileCtx): CompiledScene {
+  const { foreign } = ctx;
   return {
     id: scene.id,
     type: "scene",
@@ -106,10 +139,11 @@ function compileScene(scene: Scene, foreign?: ScopeRegistrySpec): CompiledScene 
     ...(scene.gameId ? { gameId: scene.gameId } : {}), // host-facing address; runtime falls back to the name slug
     padAfterDefault: scene.padAfterDefault,  // line padding: the default for the beats inside
     gameData: scene.gameData,
+    extensions: ctx.extensions.get(scene.id),
     tags: scene.tags,                        // author tags (#215)
     onEntry: scene.onEntry?.map((e) => compileEffect(e, foreign)),
     sceneProps: scene.sceneProps,
-    blocks: scene.blocks.map((b) => compileBlock(b, foreign)),
+    blocks: scene.blocks.map((b) => compileBlock(b, ctx)),
   };
 }
 
@@ -170,8 +204,17 @@ export function exportBundle(input: ExportInput): Bundle {
     version: foreignScopes?.version ?? 1,
     scopes: [...(foreignScopes?.scopes ?? []), ...gameExternal.map((s) => ({ token: s.token }))],
   });
+  // Patter extensions: one manifest-driven pass (extensions.ts), its values compiled onto the nodes. Only
+  // when the project takes one or has extension files, so a project with none compiles exactly as before.
+  const ext = input.extensions;
+  const compiledExt = project.extensions !== undefined || (ext !== undefined && (ext.manifests.length > 0 || ext.shards.length > 0))
+    ? extensionPass({ project, scenes, manifests: ext?.manifests ?? [], shards: ext?.shards ?? [] }).compiled
+    : undefined;
+  const extensionSection: Record<string, BundleExtension> | undefined =
+    compiledExt !== undefined && Object.keys(compiledExt.bundle).length > 0 ? compiledExt.bundle : undefined;
+  const ctx: CompileCtx = { foreign: compileScopes, extensions: compiledExt?.nodes ?? new Map() };
   const scenesOut: Record<string, CompiledScene> = {};
-  for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, compileScopes);
+  for (const scene of scenes) scenesOut[scene.id] = compileScene(scene, ctx);
   const externalScopes = externalScopesIn(scenesOut, new Set([...EXTERNAL_SCOPES, ...gameExternal.map((s) => s.token)]));
 
   // The qualifiers the content uses, as the bundle ships them: `gameId` and authored name (the description
@@ -211,6 +254,8 @@ export function exportBundle(input: ExportInput): Bundle {
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
         ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
+        // Each node's values are in `scenes`; the declarations and the project's own values are here.
+        ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
       }, { trailingComma: false })),
       // Structure-only fingerprint (live bundle refresh): the same hash with the string tables left
       // out. Same structureHash + a different hash = a text-only edit, safe to swap in place with
@@ -221,6 +266,7 @@ export function exportBundle(input: ExportInput): Bundle {
         ...(foreignScopes ? { scopeRegistry: foreignScopes } : {}),
         ...(qualifiers.length > 0 ? { qualifiers } : {}),
         ...(typeof project.padAfterDefault === "number" ? { padAfterDefault: project.padAfterDefault } : {}),
+        ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
       }, { trailingComma: false })),
     },
     voiced: project.voiced ?? false,
@@ -250,6 +296,9 @@ export function exportBundle(input: ExportInput): Bundle {
     gameDataFields: project.gameDataFields && Object.fromEntries(
       Object.entries(project.gameDataFields).map(([kind, fields]) => [kind, resolved(fields)]),
     ) as typeof project.gameDataFields,
+    // The extensions the project takes: each one's version, its compiled declarations by node kind (every
+    // default resolved, editor-only fields and the editor's words left out) and the project node's values.
+    ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
     // Closed-caption delimiters ride along only when the project pins a non-default pair (#214); the
     // runtime falls back to `[` / `]` when absent, so default projects keep their exact prior bundle.
     ...(project.closedCaptions ? { closedCaptions: project.closedCaptions } : {}),

@@ -25,15 +25,15 @@ const read = (rel) => (existsSync(resolve(root, rel)) ? readFileSync(resolve(roo
 
 /** The surfaces we hold to parity. `bp` (the Unreal Blueprint wrapper) is the API Unreal USERS see. */
 const SURFACES = {
-  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
-  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
-  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd",
+  js: { label: "JS (packages/runtime + play-helpers)", files: ["packages/runtime/src/engine.ts", "packages/runtime/src/describe.ts", "packages/runtime/src/gamedata.ts", "packages/play-helpers/src/bundle-inspector.ts", "packages/play-helpers/src/logger.ts", "packages/play-helpers/src/save.ts"] },
+  unity: { label: "Unity (C#)", files: ["ports/unity/Patterplay/Runtime/Engine.cs", "ports/unity/Patterplay/Runtime/Flow.cs", "ports/unity/Patterplay/Runtime/GameDataHelpers.cs", "ports/unity/Patterplay/Runtime/BundleDescription.cs", "ports/unity/Patterplay/Editor/PatterBundleAssetEditor.cs", "ports/unity/Patterplay/Runtime/StateLogger.cs", "ports/unity/Patterplay/Runtime/Json/PatterSave.cs"] },
+  godot: { label: "Godot (GDScript)", files: ["ports/godot/addons/patterplay/runtime/engine.gd", "ports/godot/addons/patterplay/runtime/flow.gd", "ports/godot/addons/patterplay/runtime/bundle.gd", "ports/godot/addons/patterplay/runtime/describe.gd", "ports/godot/addons/patterplay/editor/patter_bundle_inspector_plugin.gd", "ports/godot/addons/patterplay/runtime/logger.gd",
       // The vendored shared core the logger extends: diff_state and friends are declared
       // there and inherited, and the addon ships both files.
       "ports/godot/addons/patterplay/runtime/expr/state_logger.gd",
       "ports/godot/addons/patterplay/runtime/save.gd"] },
-  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
-  bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h"] },
+  unreal: { label: "Unreal (std C++ core)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Engine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Describe.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Bundle.h", "ports/unreal/Patterplay/Source/PatterplayEditor/Private/PatterBundleDetails.cpp", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/StateLogger.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/Patter/Save.h"] },
+  bp: { label: "Unreal (Blueprint wrapper)", files: ["ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterEngine.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterSave.h", "ports/unreal/Patterplay/Source/PatterplayRuntime/Public/PatterGameData.h"] },
 };
 
 /** How a declaration of `name` looks in each language. */
@@ -121,6 +121,14 @@ const API = [
   // `expectGameData` script op.
   { on: "Engine", js: "gameDataForScene", unity: "GameDataForScene", godot: "game_data_for_scene", unreal: "gameDataForScene", bp: "GameDataForScene" },
   { on: "Engine", js: "gameDataForBlock", unity: "GameDataForBlock", godot: "game_data_for_block", unreal: "gameDataForBlock", bp: "GameDataForBlock" },
+  // Scene / block Patter extension values: the node's own, raw, by address, corpus-gated by the
+  // `expectExtensions` script op (corpus 3).
+  { on: "Engine", js: "extensionsForScene", unity: "ExtensionsForScene", godot: "extensions_for_scene", unreal: "extensionsForScene", bp: "ExtensionsForScene" },
+  { on: "Engine", js: "extensionsForBlock", unity: "ExtensionsForBlock", godot: "extensions_for_block", unreal: "extensionsForBlock", bp: "ExtensionsForBlock" },
+  // The extension helpers, read off a bundle beside the gameData helpers, corpus-gated by the
+  // `expectNodeExtensions` script op: an extension's declarations for a node kind, and any node's values.
+  { on: "Bundle", js: "extensionDecls", unity: "ExtensionDecls", godot: "extension_decls", unreal: "extensionDecls", bp: "ExtensionDecls" },
+  { on: "Bundle", js: "extensionsOf", unity: "ExtensionsOf", godot: "extensions_of", unreal: "extensionsOf", bp: "ExtensionsOf" },
 
   // Cast: who is declared, and who speaks in a scope. Static structure queries, corpus-gated by the
   // `expectCast` script op (declaration order for the project, first-appearance order for a scope).

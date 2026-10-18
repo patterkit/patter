@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Wildwinter.Expr;
 
@@ -13,7 +14,13 @@ namespace Patterkit.Patterplay
 {
     public static class PatterBundleLoader
     {
-        public static Bundle Parse(string json) => FromJson(JObject.Parse(json));
+        public static Bundle Parse(string json)
+        {
+            // Strings stay strings: Newtonsoft's default reads an ISO-looking string as a date, and an extension's
+            // text value (or a line's text) must arrive exactly as the bundle wrote it.
+            using (var reader = new JsonTextReader(new System.IO.StringReader(json)) { DateParseHandling = DateParseHandling.None })
+                return FromJson(JObject.Load(reader));
+        }
 
         public static Bundle FromJson(JObject b)
         {
@@ -102,6 +109,10 @@ namespace Patterkit.Patterplay
                     bundle.GameDataFields[kind.Key] = list;
                 }
 
+            // Patter extensions: carried for the host, never read by the engine. Absent leaves the bundle exactly
+            // as it was.
+            if (b["extensions"] is JObject extensions) bundle.Extensions = ParseBundleExtensions(extensions);
+
             foreach (var sc in (JObject)b["scenes"])
                 bundle.Scenes[sc.Key] = ParseScene((JObject)sc.Value);
 
@@ -143,6 +154,97 @@ namespace Patterkit.Patterplay
             var gd = new GameData();
             foreach (var p in o) gd[p.Key] = ToValue(p.Value);
             return gd;
+        }
+
+        /// <summary>The bundle's extensions section: each extension's version, its compiled declarations by node
+        /// kind and the project node's values, in document order.</summary>
+        private static OrderedMap<string, BundleExtension> ParseBundleExtensions(JObject o)
+        {
+            var extensions = new OrderedMap<string, BundleExtension>();
+            foreach (var pair in o)
+            {
+                if (!(pair.Value is JObject e)) throw new Exception($"extension {pair.Key} is not an object");
+                var ext = new BundleExtension { Version = (string)e["version"] };
+                if (e["fields"] is JObject fields)
+                    foreach (var kind in fields)
+                    {
+                        var decls = new List<ExtensionFieldDecl>();
+                        if (kind.Value is JArray list) foreach (var d in list) decls.Add(ExtensionDecl((JObject)d));
+                        ext.Fields.Set(kind.Key, decls);
+                    }
+                if (e["project"] is JObject project) ext.Project = (OrderedMap<string, object>)ToJsonTree(project);
+                extensions.Set(pair.Key, ext);
+            }
+            return extensions;
+        }
+
+        /// <summary>One compiled extension field declaration. The default is any JSON, held as the neutral tree;
+        /// an element declaration (`of`) may leave it out, which HasDefault records.</summary>
+        private static ExtensionFieldDecl ExtensionDecl(JObject o)
+        {
+            var decl = new ExtensionFieldDecl
+            {
+                Name = (string)o["name"],
+                Type = (string)o["type"],
+                HasDefault = o.ContainsKey("default"),
+                Default = o["default"] != null ? ToJsonTree(o["default"]) : null,
+                Values = o["values"] is JArray vs ? ToStringList(vs) : null,
+                Stages = o["stages"] is JArray st ? ToStringList(st) : null,
+                To = (string)o["to"],
+                IdField = (string)o["id"],
+                Min = Num(o["min"]),
+                Max = Num(o["max"]),
+                Required = (bool?)o["required"],
+            };
+            if (o["fields"] is JArray fields)
+            {
+                decl.Fields = new List<ExtensionFieldDecl>();
+                foreach (var f in fields) decl.Fields.Add(ExtensionDecl((JObject)f));
+            }
+            if (o["key"] is JObject key) decl.Key = new ExtensionKeyDecl { Type = (string)key["type"], To = (string)key["to"] };
+            if (o["of"] is JObject of) decl.Of = ExtensionDecl(of);
+            return decl;
+        }
+
+        /// <summary>A node's extension values (extension id -> field -> value), raw as authored, as the neutral
+        /// JSON tree. Null when the node has none.</summary>
+        private static OrderedMap<string, OrderedMap<string, object>> NodeExtensions(JToken token)
+        {
+            if (!(token is JObject o)) return null;
+            var values = new OrderedMap<string, OrderedMap<string, object>>();
+            foreach (var pair in o)
+            {
+                if (!(pair.Value is JObject fields)) throw new Exception($"extension values for {pair.Key} are not an object");
+                values.Set(pair.Key, (OrderedMap<string, object>)ToJsonTree(fields));
+            }
+            return values;
+        }
+
+        /// <summary>Any JSON as the neutral tree the Runtime holds extension values in: OrderedMap (document
+        /// order) / List / bool / double / string / null.</summary>
+        private static object ToJsonTree(JToken token)
+        {
+            switch (token.Type)
+            {
+                case JTokenType.Object:
+                {
+                    var map = new OrderedMap<string, object>();
+                    foreach (var prop in (JObject)token) map.Set(prop.Key, ToJsonTree(prop.Value));
+                    return map;
+                }
+                case JTokenType.Array:
+                {
+                    var list = new List<object>();
+                    foreach (var item in (JArray)token) list.Add(ToJsonTree(item));
+                    return list;
+                }
+                case JTokenType.Boolean: return (bool)token;
+                case JTokenType.Integer:
+                case JTokenType.Float: return (double)token;
+                case JTokenType.String: return (string)token;
+                case JTokenType.Null: return null;
+                default: throw new Exception($"unsupported extension value token: {token.Type}");
+            }
         }
 
         private static HostScopeDecl HostDecl(JObject d) => new HostScopeDecl
@@ -242,6 +344,7 @@ namespace Patterkit.Patterplay
             if (s["sceneProps"] is JArray sp) foreach (var p in sp) scene.SceneProps.Add(PropDecl((JObject)p));
             if (s["onEntry"] is JArray oe) scene.OnEntry = Effects(oe);
             if (s["gameData"] is JObject sgd) scene.GameData = ParseGameData(sgd);
+            scene.Extensions = NodeExtensions(s["extensions"]);
             scene.PadAfterDefault = Num(s["padAfterDefault"]);
             foreach (var blk in (JArray)s["blocks"]) scene.Blocks.Add(ParseBlock((JObject)blk));
             return scene;
@@ -252,6 +355,7 @@ namespace Patterkit.Patterplay
             var block = new Block { Id = (string)b["id"], Name = (string)b["name"] ?? "", GameId = (string)b["gameId"] };
             if (b["tags"] is JArray bt) block.Tags = ToStringList(bt);
             if (b["gameData"] is JObject bgd) block.GameData = ParseGameData(bgd);
+            block.Extensions = NodeExtensions(b["extensions"]);
             block.PadAfterDefault = Num(b["padAfterDefault"]);
             if (b["children"] is JArray ch) foreach (var n in ch) block.Children.Add(ParseNode((JObject)n));
             return block;
@@ -264,6 +368,7 @@ namespace Patterkit.Patterplay
             if (n["onEnter"] is JArray oen) node.OnEnter = Effects(oen);
             if (n["onExit"] is JArray oex) node.OnExit = Effects(oex);
             if (n["gameData"] is JObject gd) node.GameData = ParseGameData(gd);
+            node.Extensions = NodeExtensions(n["extensions"]);
             if (n["tags"] is JArray nt) node.Tags = ToStringList(nt);
             node.PadAfterDefault = Num(n["padAfterDefault"]);
             // Option-position flags, on a bare snippet option as on an Option group. Read on groups only
@@ -303,6 +408,7 @@ namespace Patterkit.Patterplay
                 PadAfter = Num(b["padAfter"]),
             };
             if (b["gameData"] is JObject gd) beat.GameData = ParseGameData(gd);
+            beat.Extensions = NodeExtensions(b["extensions"]);
             if (b["tags"] is JArray bt) beat.Tags = ToStringList(bt);
             return beat;
         }

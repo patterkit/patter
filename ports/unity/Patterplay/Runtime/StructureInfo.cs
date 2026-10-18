@@ -4,6 +4,7 @@
 // BeatInfo / OutlineNode / OutlineScene / FlatBeat. Static: no flow, no play state.
 
 using System.Collections.Generic;
+using Wildwinter.Expr;
 
 namespace Patterkit.Patterplay
 {
@@ -22,6 +23,7 @@ namespace Patterkit.Patterplay
         public double? OwnPadAfter;    // line/text only: the beat's own padAfter; null when it sets none
         public string Text;            // source text, un-interpolated (line/text); null for gameEvent / IDs-only
         public GameData GameData;      // author overrides (raw); null when empty
+        public OrderedMap<string, OrderedMap<string, object>> Extensions; // Patter extension values (raw, by extension id); null when none
         public List<string> Tags;      // accumulated author tags; null when empty
     }
 
@@ -47,6 +49,7 @@ namespace Patterkit.Patterplay
         public string GameId;
         public string Name;
         public GameData GameData;      // the node's own author overrides (raw, not merged with defaults); null when empty
+        public OrderedMap<string, OrderedMap<string, object>> Extensions; // the node's own Patter extension values (raw); null when none
         public List<string> Tags;
         public List<OutlineNode> Children = new List<OutlineNode>();
     }
@@ -57,6 +60,7 @@ namespace Patterkit.Patterplay
         public string GameId;
         public string Name;
         public GameData GameData;      // the node's own author overrides (raw, not merged with defaults); null when empty
+        public OrderedMap<string, OrderedMap<string, object>> Extensions; // the node's own Patter extension values (raw); null when none
         public List<string> Tags;
         public List<OutlineBlock> Blocks = new List<OutlineBlock>();
     }

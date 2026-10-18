@@ -170,6 +170,25 @@ namespace patter
                     out.gameDataKinds.push_back(kind);
                 });
 
+            // The Patter extensions the project takes: each one's declarations by node kind and the project
+            // node's values. Every other node's values sit on the node, under `extensions`, read below.
+            if (const J* exts = field(root, "extensions"))
+                eachField(*exts, [&](const std::string& id, const J& e)
+                {
+                    if (!T::isObject(e)) return;
+                    BundleExtension ext;
+                    if (const J* p = field(e, "version")) ext.version = text(*p);
+                    if (const J* fs = field(e, "fields"))
+                        eachField(*fs, [&](const std::string& kind, const J& list)
+                        {
+                            std::vector<ExtensionFieldDecl> decls;
+                            eachElement(list, [&](const J& d) { if (T::isObject(d)) decls.push_back(extensionDecl(d)); });
+                            ext.fields.set(kind, std::move(decls));
+                        });
+                    if (const J* p = field(e, "project")) if (T::isObject(*p)) ext.project = extensionValues(*p);
+                    out.extensions.set(id, std::move(ext));
+                });
+
             eachField(reqObject(root, "scenes"), [&](const std::string& key, const J& s)
             {
                 if (!T::isObject(s)) missing("scene");
@@ -179,6 +198,7 @@ namespace patter
                 if (const J* p = field(s, "gameId")) scene.gameId = text(*p);
                 if (const J* p = field(s, "tags")) scene.tags = strList(*p);   // author tags (#215)
                 if (const J* p = field(s, "gameData")) scene.gameData = gameData(*p);
+                if (const J* p = field(s, "extensions")) scene.extensions = nodeExtensions(*p);
                 if (const J* p = field(s, "padAfterDefault")) readPad(*p, scene.hasPadAfterDefault, scene.padAfterDefault);
                 if (const J* p = field(s, "sceneProps")) eachElement(*p, [&](const J& d) { scene.sceneProps.push_back(propDecl(d)); });
                 if (const J* p = field(s, "onEntry")) scene.onEntry = effects(*p);
@@ -191,6 +211,7 @@ namespace patter
                     if (const J* p = field(b, "gameId")) block.gameId = text(*p);
                     if (const J* p = field(b, "tags")) block.tags = strList(*p);   // author tags (#215)
                     if (const J* p = field(b, "gameData")) block.gameData = gameData(*p);
+                    if (const J* p = field(b, "extensions")) block.extensions = nodeExtensions(*p);
                     if (const J* p = field(b, "padAfterDefault")) readPad(*p, block.hasPadAfterDefault, block.padAfterDefault);
                     if (const J* p = field(b, "children")) eachElement(*p, [&](const J& c) { block.children.push_back(node(c)); });
                     scene.blocks.push_back(std::move(block));
@@ -290,6 +311,69 @@ namespace patter
             return gd;
         }
 
+        // Any JSON value as the neutral tree, exactly as written: a null is kept (an extension value may be
+        // one), and an object keeps its document order.
+        static JsonTree tree(const J& v)
+        {
+            if (T::isNull(v)) return JsonTree();
+            if (T::isBool(v)) return JsonTree::makeBool(A::boolean(v));
+            if (T::isNumber(v)) return JsonTree::makeNumber(A::num(v));
+            if (A::isString(v)) return JsonTree::makeString(A::str(v));
+            if (A::isArray(v))
+            {
+                JsonTree out = JsonTree::makeArray();
+                eachElement(v, [&](const J& x) { out.arr.push_back(tree(x)); });
+                return out;
+            }
+            JsonTree out = JsonTree::makeObject();
+            eachField(v, [&](const std::string& key, const J& x) { out.obj.emplace_back(key, tree(x)); });
+            return out;
+        }
+
+        // One extension's values on a node, field name -> value, raw.
+        static ExtensionValues extensionValues(const J& obj)
+        {
+            ExtensionValues out;
+            eachField(obj, [&](const std::string& key, const J& v) { out.set(key, tree(v)); });
+            return out;
+        }
+
+        // A node's `extensions`: extension id -> its values. An extension whose values aren't an object
+        // carries none.
+        static NodeExtensions nodeExtensions(const J& obj)
+        {
+            NodeExtensions out;
+            eachField(obj, [&](const std::string& id, const J& v) { out.set(id, T::isObject(v) ? extensionValues(v) : ExtensionValues{}); });
+            return out;
+        }
+
+        // A compiled extension field declaration. Its default is read as it is, a null one included.
+        static ExtensionFieldDecl extensionDecl(const J& o)
+        {
+            ExtensionFieldDecl d;
+            if (const J* p = field(o, "name")) d.name = text(*p);
+            if (const J* p = field(o, "type")) d.type = text(*p);
+            if (const J* p = T::find(o, "default")) d.defaultValue = tree(*p);
+            if (const J* p = field(o, "values")) d.values = strList(*p);
+            if (const J* p = field(o, "stages")) d.stages = strList(*p);
+            if (const J* p = field(o, "to")) d.to = text(*p);
+            if (const J* p = field(o, "fields")) eachElement(*p, [&](const J& f) { if (T::isObject(f)) d.fields.push_back(extensionDecl(f)); });
+            if (const J* p = field(o, "key"))
+                if (T::isObject(*p))
+                {
+                    ExtensionKeyDecl key;
+                    if (const J* q = field(*p, "type")) key.type = text(*q);
+                    if (const J* q = field(*p, "to")) key.to = text(*q);
+                    d.key = key;
+                }
+            if (const J* p = field(o, "of")) if (T::isObject(*p)) d.of = std::make_shared<ExtensionFieldDecl>(extensionDecl(*p));
+            if (const J* p = field(o, "id")) d.id = text(*p);
+            if (const J* p = field(o, "min")) if (T::isNumber(*p)) d.min = A::num(*p);
+            if (const J* p = field(o, "max")) if (T::isNumber(*p)) d.max = A::num(*p);
+            if (const J* p = field(o, "required")) if (T::isBool(*p)) d.required = A::boolean(*p);
+            return d;
+        }
+
         static Expression expression(const J& o)
         {
             Expression e;
@@ -350,6 +434,7 @@ namespace patter
             if (const J* p = field(o, "qualifier")) { b.hasQualifier = true; b.qualifier = text(*p); }
             if (const J* p = field(o, "padAfter")) readPad(*p, b.hasPadAfter, b.padAfter);   // line padding
             if (const J* p = field(o, "gameData")) b.gameData = gameData(*p);
+            if (const J* p = field(o, "extensions")) b.extensions = nodeExtensions(*p);
             if (const J* p = field(o, "tags")) b.tags = strList(*p);   // author tags (#215)
             return b;
         }
@@ -363,6 +448,7 @@ namespace patter
             if (const J* p = field(o, "onEnter")) n->onEnter = effects(*p);
             if (const J* p = field(o, "onExit")) n->onExit = effects(*p);
             if (const J* p = field(o, "gameData")) n->gameData = gameData(*p);
+            if (const J* p = field(o, "extensions")) n->extensions = nodeExtensions(*p);
             if (const J* p = field(o, "tags")) n->tags = strList(*p);   // author tags (#215)
             if (const J* p = field(o, "padAfterDefault")) readPad(*p, n->hasPadAfterDefault, n->padAfterDefault);
             // Option-position flags, on a bare snippet option as on an Option group.

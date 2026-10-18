@@ -1085,6 +1085,36 @@ static func _own_game_data(node: Dictionary) -> Dictionary:
 	return out
 
 
+# -- scene / block extension values --------------------------------------------
+
+## A scene's own Patter extension values, by internal id or gameId address, by extension id: raw and
+## sparse, exactly as the bundle carries them, any JSON, never read by the engine (fill in the defaults
+## with PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, id, "scene"), ...)). Not
+## inherited by the scene's blocks. A fresh Dictionary each call; empty when the scene has none or the
+## ref does not resolve.
+func extensions_for_scene(scene_ref: String) -> Dictionary:
+	var scene_id := _resolve_scene_ref(scene_ref)
+	if not _host.bundle["scenes"].has(scene_id):
+		return {}
+	return _own_extensions(_host.bundle["scenes"][scene_id])
+
+
+## A block's own Patter extension values, by scene + block ref (id or gameId). Raw, like
+## extensions_for_scene(): the scene's are not folded in. Empty when the block has none or the ref does
+## not resolve.
+func extensions_for_block(scene_ref: String, block_ref: String) -> Dictionary:
+	var block_id := _resolve_block_ref(_resolve_scene_ref(scene_ref), block_ref)
+	if not _host.block_by_id.has(block_id):
+		return {}
+	return _own_extensions(_host.block_by_id[block_id])
+
+
+# A node's own extension values as a fresh shallow copy, or {} when it has none.
+static func _own_extensions(node: Dictionary) -> Dictionary:
+	var ext = node.get("extensions", null)
+	return (ext as Dictionary).duplicate() if ext is Dictionary else {}
+
+
 # -- cast ----------------------------------------------------------------------
 
 # Every cast member the PROJECT declares, in authored order - the same list PatterDescribe counts.
@@ -1169,6 +1199,9 @@ func get_outline() -> Array:
 		var sgd := _own_game_data(scene)
 		if not sgd.is_empty():
 			os["gameData"] = sgd
+		var sext := _own_extensions(scene)
+		if not sext.is_empty():
+			os["extensions"] = sext
 		var st: Array = _host.tag_index.get(scene["id"], [])
 		if not st.is_empty():
 			os["tags"] = st
@@ -1182,6 +1215,9 @@ func get_outline() -> Array:
 			var bgd := _own_game_data(block)
 			if not bgd.is_empty():
 				ob["gameData"] = bgd
+			var bext := _own_extensions(block)
+			if not bext.is_empty():
+				ob["extensions"] = bext
 			var bt: Array = _host.tag_index.get(block["id"], [])
 			if not bt.is_empty():
 				ob["tags"] = bt
@@ -1274,6 +1310,8 @@ func _beat_info(beat: Dictionary) -> Dictionary:
 			info["text"] = src
 	if beat.has("gameData") and not (beat["gameData"] as Dictionary).is_empty():
 		info["gameData"] = beat["gameData"]
+	if beat.get("extensions") is Dictionary and not (beat["extensions"] as Dictionary).is_empty():
+		info["extensions"] = beat["extensions"]
 	var tg: Array = _host.tag_index.get(beat["id"], [])
 	if not tg.is_empty():
 		info["tags"] = tg

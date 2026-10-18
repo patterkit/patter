@@ -630,7 +630,7 @@ namespace Patterkit.Patterplay
                 bool eligible = Eligible(child);
                 bool hidden = child.SecretUntilEligible;
                 if (!eligible && hidden) continue;
-                options.Add(new ChoiceOption { Id = child.Id, Prompt = PromptFor(child), Eligible = eligible, GameData = child.GameData });
+                options.Add(new ChoiceOption { Id = child.Id, Prompt = PromptFor(child), Eligible = eligible, GameData = child.GameData, Extensions = Engine.ExtensionsOrNull(child.Extensions) });
                 byId[child.Id] = child;
             }
             // A choice is offered only when the player can take something. One whose every remaining option is
@@ -944,9 +944,9 @@ namespace Patterkit.Patterplay
             switch (beat.Kind)
             {
                 case "gameEvent":
-                    return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = beat.GameData, Tags = tags };
+                    return new StepResult { Type = StepType.GameEvent, Id = beat.Id, GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "text":
-                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), GameData = beat.GameData, Tags = tags };
+                    return new StepResult { Type = StepType.Text, Id = beat.Id, Text = Interpolate(ResolveString(beat.Id)), PadAfter = PadOf(beat.Id), GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
                 case "line":
                 {
                     string raw = ResolveString(beat.Id);
@@ -971,6 +971,7 @@ namespace Patterkit.Patterplay
                         SpeakerLabel = silent ? null : _host.SpeakerLabelOf(beat.Character, beat.Qualifier),
                         PadAfter = PadOf(beat.Id), // a silent line still fires, so it still carries its pause
                         GameData = beat.GameData,
+                        Extensions = Engine.ExtensionsOrNull(beat.Extensions),
                         Tags = tags,
                     };
                 }
@@ -1018,13 +1019,13 @@ namespace Patterkit.Patterplay
         {
             var tags = _host.TagIndex.TryGetValue(beat.Id, out var t) && t.Count > 0 ? t : null;
             if (shown.Kind == "text")
-                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = beat.GameData, Tags = tags };
+                return new StepResult { Type = StepType.Text, Id = beat.Id, Text = shown.Text, PadAfter = PadOf(beat.Id), GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags };
             return new StepResult
             {
                 Type = StepType.Line, Id = beat.Id, Text = shown.Text,
                 Character = shown.Character, CharacterName = shown.CharacterName, Direction = shown.Direction,
                 Qualifier = shown.Qualifier, QualifierName = shown.QualifierName, SpeakerLabel = shown.SpeakerLabel, PadAfter = PadOf(beat.Id),
-                GameData = beat.GameData, Tags = tags,
+                GameData = beat.GameData, Extensions = Engine.ExtensionsOrNull(beat.Extensions), Tags = tags,
             };
         }
 
@@ -1295,6 +1296,8 @@ namespace Patterkit.Patterplay
                     // again (the pause from the prompt's beat, the label from the speaker the choice showed, in the
                     // current locale).
                     var opt = CloneOption(o);
+                    // An option's extension values are the bundle's, never the save's: read off its node again.
+                    opt.Extensions = Engine.ExtensionsOrNull(n.Extensions);
                     if (opt.Prompt != null)
                     {
                         opt.Prompt = ClonePrompt(opt.Prompt);
@@ -1334,6 +1337,8 @@ namespace Patterkit.Patterplay
             Qualifier = p.Qualifier, QualifierName = p.QualifierName, SpeakerLabel = p.SpeakerLabel, PadAfter = p.PadAfter,
         };
 
+        /// <summary>An option as a snapshot keeps it. Its extension values are left out: they're the bundle's,
+        /// and a restore reads them off the option's node again.</summary>
         private static ChoiceOption CloneOption(ChoiceOption o)
             => new ChoiceOption { Id = o.Id, Prompt = o.Prompt, Eligible = o.Eligible, GameData = o.GameData };
 

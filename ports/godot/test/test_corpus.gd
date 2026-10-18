@@ -831,6 +831,39 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					ok = false
 					_fail("scripted", name, "expectGameData %s: expected %s, got %s" % [scope, JSON.stringify(want_gd), JSON.stringify(gd)])
 					break
+			"expectExtensions":
+				# Static read of a scene's or block's OWN Patter extension values, raw, by extension id.
+				# Values are any JSON, so they compare deeply (key order not significant, and numbers by
+				# value: Godot's JSON parser gives floats). Scene alone = the scene accessor, scene + block
+				# = the block accessor.
+				var ext: Dictionary
+				var ext_scope: String = str(op["scene"])
+				if op.has("block"):
+					ext = holder["engine"].extensions_for_block(op["scene"], op["block"])
+					ext_scope += "/" + str(op["block"])
+				else:
+					ext = holder["engine"].extensions_for_scene(op["scene"])
+				if not _deep_equal(ext, op["expectResult"]):
+					ok = false
+					_fail("scripted", name, "expectExtensions %s: expected %s, got %s" % [ext_scope, _show_json(op["expectResult"]), _show_json(ext)])
+					break
+			"expectNodeExtensions":
+				# Any node's extension values, read off the case's bundle by the helper (the helpers take a
+				# bundle, not an engine). With "effective", one extension's values filled in through
+				# effective_game_data, given extension_decls.
+				var node_kind := str(op["kind"])
+				var node_address := str(op.get("address", ""))
+				var raw := PatterBundle.extensions_of(bundle, node_kind, node_address)
+				var got_node = raw
+				var node_scope := node_kind + ("" if not op.has("address") else " " + node_address)
+				if op.has("effective"):
+					var ext_id := str(op["effective"]["extension"])
+					got_node = PatterBundle.effective_game_data(PatterBundle.extension_decls(bundle, ext_id, node_kind), raw.get(ext_id))
+					node_scope += " (effective %s)" % ext_id
+				if not _deep_equal(got_node, op["expectResult"]):
+					ok = false
+					_fail("scripted", name, "expectNodeExtensions %s: expected %s, got %s" % [node_scope, _show_json(op["expectResult"]), _show_json(got_node)])
+					break
 			"reset":
 				# reset() has nothing to return, and this addon refuses it only inside a checkpoint, so the
 				# refusal shows as the checkpoint still open; the ops after it prove nothing moved.
@@ -996,6 +1029,12 @@ func _run_gamedata(arr: Array) -> int:
 
 
 # -- structural compare (produced floats vs expected JSON ints both ok) --------
+
+# Any JSON as one line, keys sorted, so a failure reads the same whichever order the two sides hold
+# their keys in.
+static func _show_json(v) -> String:
+	return JSON.stringify(v, "", true)
+
 
 func _deep_equal(a, b) -> bool:
 	var ta := typeof(a)

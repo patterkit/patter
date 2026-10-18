@@ -1,0 +1,12 @@
+{
+  "entries": {
+    "project": {
+      "proj_probe": {
+        "studio": "Wildwinter",
+      },
+    },
+  },
+  "extension": "probe",
+  "scene": "@project",
+  "schema": "patter/extension@0",
+}
