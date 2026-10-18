@@ -6,6 +6,8 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-10-18
+
 ### Added
 
 - **Game data takes Flags and Quality.** Project Settings ▸ Game Data offers the family's seven field types,
