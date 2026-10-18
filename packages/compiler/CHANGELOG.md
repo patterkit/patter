@@ -1,5 +1,20 @@
 # @patterkit/compiler
 
+## 0.10.0
+
+### Minor Changes
+
+- e6aa49e: `exportBundle` writes each Patter extension's settings into the bundle's `extensions` section (`settings`, keys sorted): every setting the manifest declares, with the project's value or else the setting's default, as `@wildwinter/toolkit/extensions`' `settingValues` resolves it. They're in the content hashes with the rest of the section. A project with no extensions compiles byte for byte as before.
+
+### Patch Changes
+
+- e6aa49e: A Patter extension's claim may leave out an enum's or flags' `values`, or a quality's `stages` (`@wildwinter/toolkit` 0.2.1): the project's gameData field is then the vocabulary. The extension pass checks a claimed field's values against the claim over the project's declaration (`effectiveClaim`), so a value the field declares passes and one it doesn't is an error, and the claim's value help may describe values the field doesn't declare. A claim on a field declared with another type is still an error, and one on a field the project doesn't declare still a warning. Depends on `@wildwinter/toolkit` ^0.2.1.
+- Updated dependencies [e6aa49e]
+- Updated dependencies [e6aa49e]
+  - @patterkit/core@0.9.1
+  - @patterkit/model@0.17.0
+  - @patterkit/dialect@0.2.14
+
 ## 0.9.0
 
 ### Minor Changes

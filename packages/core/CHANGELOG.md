@@ -1,5 +1,13 @@
 # @patterkit/core
 
+## 0.9.1
+
+### Patch Changes
+
+- e6aa49e: Depends on `@wildwinter/toolkit` ^0.2.1, where a Patter extension's claim may leave out an enum's or flags' values, or a quality's stages, and take the project's gameData field's.
+- Updated dependencies [e6aa49e]
+  - @patterkit/model@0.17.0
+
 ## 0.9.0
 
 ### Minor Changes
