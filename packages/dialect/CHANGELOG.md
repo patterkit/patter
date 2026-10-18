@@ -1,5 +1,13 @@
 # @patterkit/dialect
 
+## 0.2.12
+
+### Patch Changes
+
+- f3e1277: Takes `@wildwinter/expr` 0.6.0 and `@wildwinter/scoperegistry` 0.9.0 or later, the kernel the rest of the release is built against.
+- Updated dependencies [f3e1277]
+  - @patterkit/model@0.15.0
+
 ## 0.2.11
 
 ### Patch Changes

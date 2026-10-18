@@ -1,5 +1,20 @@
 # @patterkit/compiler
 
+## 0.8.0
+
+### Minor Changes
+
+- f3e1277: Defaults are optional in source and resolved in the bundle (the family's rule, ruled 2026-10-18): every property, scene property and game-data field in the bundle carries its default, the one it was given or else its type's by `defaultFor`. The content hashes stay over the source as written, and a host scope's declarations ship as written. A set effect assigning a quality is checked with `validateAssignment`: a stage it names must be one of that quality's.
+
+### Patch Changes
+
+- Updated dependencies [f3e1277]
+- Updated dependencies [f3e1277]
+- Updated dependencies [f3e1277]
+  - @patterkit/core@0.8.0
+  - @patterkit/dialect@0.2.12
+  - @patterkit/model@0.15.0
+
 ## 0.7.1
 
 ### Patch Changes

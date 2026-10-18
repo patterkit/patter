@@ -1,5 +1,17 @@
 # @patterkit/play-helpers
 
+## 0.9.0
+
+### Minor Changes
+
+- f3e1277: The property inspector shows a quality as its ladder, the current stage marked, as both editors do: the family's rung strip from `@wildwinter/app-shell/value-control`, a new dependency with no Electron in it. Picking a rung sets the stage.
+
+### Patch Changes
+
+- cd8a91a: Uses `@patterkit/runtime` 0.28.0, the Patterplay 0.28.0 release.
+- Updated dependencies [f3e1277]
+  - @patterkit/model@0.15.0
+
 ## 0.8.10
 
 ### Patch Changes
