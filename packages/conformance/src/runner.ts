@@ -17,7 +17,7 @@ import { evaluate, deserialiseAst, makePrng } from "@wildwinter/expr";
 import type { EvalContext, ScalarValue } from "@wildwinter/expr";
 import { matchedSpecificity } from "@wildwinter/expr-specificity";
 import { patterDialect } from "@patterkit/dialect";
-import { Engine, effectiveGameData, extensionDecls, extensionsOf, gameDataFields } from "@patterkit/runtime";
+import { Engine, effectiveGameData, extensionDecls, extensionSettings, extensionsOf, gameDataFields } from "@patterkit/runtime";
 import type { Checkpoint, EngineOptions, LoadMisfit, StepResult } from "@patterkit/runtime";
 import { SAVE_SCHEMA, DEFAULT_PAD_AFTER } from "@patterkit/model";
 import { createAudioResolver } from "@patterkit/play-helpers";
@@ -232,6 +232,13 @@ export function runScript(
         const scope = `${op.kind}${op.address === undefined ? "" : ` ${op.address}`}${op.effective === undefined ? "" : ` (effective ${op.effective.extension})`}`;
         if (showJson(got) !== showJson(op.expectResult)) {
           throw new Error(`expectNodeExtensions ${scope}: expected ${showJson(op.expectResult)}, got ${showJson(got)}`);
+        }
+        break;
+      }
+      case "expectExtensionSettings": {
+        const got = extensionSettings(ctx.bundle, op.extension);
+        if (showJson(got) !== showJson(op.expectResult)) {
+          throw new Error(`expectExtensionSettings ${op.extension}: expected ${showJson(op.expectResult)}, got ${showJson(got)}`);
         }
         break;
       }

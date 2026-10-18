@@ -6,6 +6,12 @@ pipeline, separate from the Patterplay runtimes' lockstep version).
 
 ## [Unreleased]
 
+### Changed
+
+- **An extension's claim can take a game data field's own choices.** When an extension presents a game data
+  field without listing its choices, the inspector shows the field's own, with the extension's label, help, and
+  value help, and checks the value against them. A value the field doesn't offer is flagged as before.
+
 ## [0.33.0] - 2026-10-18
 
 ### Added

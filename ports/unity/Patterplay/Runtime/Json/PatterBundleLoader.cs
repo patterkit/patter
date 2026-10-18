@@ -157,7 +157,7 @@ namespace Patterkit.Patterplay
         }
 
         /// <summary>The bundle's extensions section: each extension's version, its compiled declarations by node
-        /// kind and the project node's values, in document order.</summary>
+        /// kind, the project node's values and its settings, in document order.</summary>
         private static OrderedMap<string, BundleExtension> ParseBundleExtensions(JObject o)
         {
             var extensions = new OrderedMap<string, BundleExtension>();
@@ -173,6 +173,11 @@ namespace Patterkit.Patterplay
                         ext.Fields.Set(kind.Key, decls);
                     }
                 if (e["project"] is JObject project) ext.Project = (OrderedMap<string, object>)ToJsonTree(project);
+                if (e["settings"] is JObject settings)
+                {
+                    ext.Settings = new Dictionary<string, string>();
+                    foreach (var s in settings) ext.Settings[s.Key] = (string)s.Value;
+                }
                 extensions.Set(pair.Key, ext);
             }
             return extensions;

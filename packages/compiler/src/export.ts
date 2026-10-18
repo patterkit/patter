@@ -297,7 +297,8 @@ export function exportBundle(input: ExportInput): Bundle {
       Object.entries(project.gameDataFields).map(([kind, fields]) => [kind, resolved(fields)]),
     ) as typeof project.gameDataFields,
     // The extensions the project takes: each one's version, its compiled declarations by node kind (every
-    // default resolved, editor-only fields and the editor's words left out) and the project node's values.
+    // default resolved, editor-only fields and the editor's words left out), the project node's values, and
+    // its settings, each the project's value or else the default.
     ...(extensionSection !== undefined ? { extensions: extensionSection } : {}),
     // Closed-caption delimiters ride along only when the project pins a non-default pair (#214); the
     // runtime falls back to `[` / `]` when absent, so default projects keep their exact prior bundle.

@@ -170,6 +170,29 @@ describe("extension sections in the inspector", () => {
     const plain = draw(handlersWith({ gameDataFields: () => fields, extensions: () => probe({}) }), { kind: "leaf", beat: "line", id: "L_1", gameData: { mood: "hostile" } });
     expect(plain.querySelector(".insp-gd-row .shell-fieldrow-label")?.textContent).toBe("mood");
   });
+
+  it("draws and checks a claim that lists no values through the gameData field's own (toolkit's effectiveClaim)", () => {
+    // The probe's claim with its values left out, and value help for one the field doesn't declare.
+    const open = JSON.parse(probeText) as { targets: { patter: { line: { claims: Record<string, unknown>[] } } } };
+    const claim = open.targets.patter.line.claims[0]!;
+    delete claim.values;
+    claim.valueHelp = { calm: "Unhurried.", whisper: "Barely there." };
+    const openProbe = extensionDtos(
+      { project: { id: "proj_t", name: "T" }, extensions: { probe: { version: "1.1.0", settings: { deliveryField: "mood" } } } } as unknown as ProjectFile,
+      new Map([["probe", parseManifest(JSON.stringify(open))]]), new Map(),
+    )!;
+    const fields: GameDataField[] = [{ name: "mood", type: "enum", values: ["calm", "tense", "hostile"] } as GameDataField];
+    const drawn = (mood: string): HTMLElement => draw(handlersWith({ gameDataFields: (k) => (k === "line" ? fields : []), extensions: () => openProbe }),
+      { kind: "leaf", beat: "line", id: "L_1", gameData: { mood } }).querySelector<HTMLElement>(".insp-gd-section:not(.insp-ext-section) .insp-gd-row")!;
+    // A value the field declares is fine, drawn with the claim's label and help over the field's values.
+    const row = drawn("hostile");
+    expect(row.querySelector(".shell-fieldrow-label")?.textContent).toBe("Delivery");
+    expect(row.querySelector(".shell-fieldrow-purpose")?.textContent).toBe("The line's delivery, as the probe reads it.");
+    expect(row.querySelector(".shell-fieldrow-problem")?.textContent ?? "").toBe("");
+    expect([...row.querySelector("select")!.options].map((o) => o.value)).toEqual(["", "calm", "tense", "hostile"]);
+    // One it doesn't is refused in the field's words (after the shell's own word on it).
+    expect(drawn("shouty").querySelector(".shell-fieldrow-problem")?.textContent).toBe("Probe reads this as calm, tense, or hostile, so it doesn't know “shouty”.");
+  });
 });
 
 describe("an extension's section of Project Settings", () => {

@@ -5,7 +5,8 @@
 //
 // Patter extension values follow the same rule (patterkit design/proposals/patter-storylet-extensions.md,
 // "At runtime"), with each value as JSON text, since it may be a record, a map or a list: ExtensionDecls,
-// ExtensionsOf, GetEffectiveExtensionValues, FindExtensionValue and ExtensionValueToScalar.
+// ExtensionsOf, GetEffectiveExtensionValues, FindExtensionValue and ExtensionValueToScalar; ExtensionSettings
+// gives an extension's settings.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -94,6 +95,13 @@ public:
 	 *  none, the address names nothing, it names a node of another kind, or the kind is unknown. */
 	UFUNCTION(BlueprintPure, Category = "Patterplay|Extensions")
 	static TArray<FPatterExtensionValues> ExtensionsOf(UPatterBundle* Bundle, const FString& Kind, const FString& Address);
+
+	/** One Patter extension's settings, by setting name: every setting its manifest declares, the project's
+	 *  value or else the setting's default. Each names a host field, so a game reads here which gameData field
+	 *  holds what the extension claims. Empty when the bundle has no such extension or it declares no
+	 *  settings. */
+	UFUNCTION(BlueprintPure, Category = "Patterplay|Extensions")
+	static TMap<FString, FString> ExtensionSettings(UPatterBundle* Bundle, const FString& Extension);
 
 	/** One extension's values on a node with every field the extension declares for that node kind filled
 	 *  in from its default where the node sets none (a structured default arrives whole), then any value with

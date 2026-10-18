@@ -2,8 +2,8 @@
 // "At runtime"). The corpus's extension cases are the behaviour gate, replayed by the clang TestHost over the
 // same core; this test exercises the crossing: values riding a step, an option, the outline and a scene or
 // block as JSON text, the defaults filled in through the bundle, any node read by address, a scalar read back
-// as a Patter value, a quality field's ladder handed to the stage functions, and a save that carries none of
-// it while a load reads the option's values back off the bundle.
+// as a Patter value, a quality field's ladder handed to the stage functions, an extension's settings as a map,
+// and a save that carries none of it while a load reads the option's values back off the bundle.
 // Runs via
 //   -ExecCmds="Automation RunTests Patterplay.Extensions"
 
@@ -21,7 +21,7 @@ namespace
 	// Extension "probe" declares for lines a text `note`, a record `cue` and a quality `act`; for options
 	// `icon`; for scenes `theme`; for blocks `pace`; for game events `cue`; for the project `studio`. The line
 	// sets `note` and `cue`, the game event `cue`, the option o_go `icon` and its prompt `note`, the scene and
-	// the block theirs. o_stay sets none.
+	// the block theirs. o_stay sets none. The project sets probe's setting deliveryField to "mood".
 	const TCHAR* ExtensionsBundleJson = TEXT(R"JSON({
   "schema": "patter/bundle@0",
   "content": { "project": "ext", "hash": "0", "structureHash": "0" },
@@ -43,7 +43,8 @@ namespace
         "block": [{ "name": "pace", "type": "number", "default": 0 }],
         "project": [{ "name": "studio", "type": "text", "default": "" }]
       },
-      "project": { "studio": "Wildwinter" }
+      "project": { "studio": "Wildwinter" },
+      "settings": { "deliveryField": "mood" }
     }
   },
   "scenes": {
@@ -220,6 +221,28 @@ bool FPatterExtensionsTest::RunTest(const FString& Parameters)
 		}
 		TestEqual(TEXT("a kind with no declarations"), UPatterGameData::ExtensionDecls(Bundle, TEXT("probe"), TEXT("snippet")).Num(), 0);
 		TestEqual(TEXT("an extension the bundle lacks"), UPatterGameData::ExtensionDecls(Bundle, TEXT("other"), TEXT("line")).Num(), 0);
+	}
+
+	// An extension's settings, by setting name: the project's value where it gives one, else the setting's
+	// default, as the compiler resolved it into the bundle.
+	{
+		const TMap<FString, FString> Chosen = UPatterGameData::ExtensionSettings(Bundle, TEXT("probe"));
+		TestEqual(TEXT("one setting"), Chosen.Num(), 1);
+		const FString* Field = Chosen.Find(TEXT("deliveryField"));
+		TestTrue(TEXT("the project's setting"), Field != nullptr && *Field == TEXT("mood"));
+		TestEqual(TEXT("an extension the bundle lacks has no settings"), UPatterGameData::ExtensionSettings(Bundle, TEXT("other")).Num(), 0);
+		TestEqual(TEXT("no bundle, no settings"), UPatterGameData::ExtensionSettings(nullptr, TEXT("probe")).Num(), 0);
+
+		// The same probe with the setting left out: the bundle carries the default.
+		const FString DefaultJson = FString(ExtensionsBundleJson).Replace(
+			TEXT("\"settings\": { \"deliveryField\": \"mood\" }"), TEXT("\"settings\": { \"deliveryField\": \"delivery\" }"));
+		UPatterBundle* Defaulted = UPatterBundle::LoadFromString(DefaultJson);
+		if (TestNotNull(TEXT("the defaulted bundle loads"), Defaulted))
+		{
+			const TMap<FString, FString> Default = UPatterGameData::ExtensionSettings(Defaulted, TEXT("probe"));
+			const FString* DefaultField = Default.Find(TEXT("deliveryField"));
+			TestTrue(TEXT("the setting's default"), DefaultField != nullptr && *DefaultField == TEXT("delivery"));
+		}
 	}
 	return true;
 }

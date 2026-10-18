@@ -57,8 +57,8 @@ namespace Patterkit.Patterplay
         /// the content names none.</summary>
         public List<string> ExternalScopes;
         /// <summary>The Patter extensions the project takes, by id: each one's version, its compiled declarations
-        /// by node kind (every default resolved) and the project node's own values. A node's values sit on the
-        /// node, under Extensions. Null when the project takes none.</summary>
+        /// by node kind (every default resolved), the project node's own values and its settings, resolved. A
+        /// node's values sit on the node, under Extensions. Null when the project takes none.</summary>
         public OrderedMap<string, BundleExtension> Extensions;
     }
 
@@ -71,6 +71,9 @@ namespace Patterkit.Patterplay
         public OrderedMap<string, List<ExtensionFieldDecl>> Fields = new OrderedMap<string, List<ExtensionFieldDecl>>();
         /// <summary>The project node's values, raw; null when it has none.</summary>
         public OrderedMap<string, object> Project;
+        /// <summary>Every setting the manifest declares, by setting name: the project's value, or else the
+        /// setting's default. Each names a host field. Null when the manifest declares none.</summary>
+        public Dictionary<string, string> Settings;
     }
 
     /// <summary>A compiled extension field declaration. Default is always present in a decl and may be any

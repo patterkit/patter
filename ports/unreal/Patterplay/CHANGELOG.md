@@ -7,6 +7,15 @@ runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest
+  declares, with the project's value or else the setting's default. `UPatterGameData::ExtensionSettings(Bundle,
+  Extension)` reads them as a `TMap<FString, FString>` by setting name, so a game can tell which gameData field
+  holds what the extension claims, and the core's `patter::extensionSettings(bundle, extension)` does the same
+  in C++. It's empty for an extension the bundle doesn't have or one that declares no settings. Pinned by the
+  corpus (version 4).
+
 ## [0.29.0] - 2026-10-18
 
 ### Added

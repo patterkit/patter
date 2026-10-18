@@ -39,7 +39,7 @@
     "@patterkit/model": "0.16.0",
     "@patterkit/runtime": "0.29.0",
     "@wildwinter/expr": "^0.6.0",
-    "@wildwinter/toolkit": "^0.2.0",
+    "@wildwinter/toolkit": "^0.2.1",
     "@xmldom/xmldom": "^0.8.15",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",

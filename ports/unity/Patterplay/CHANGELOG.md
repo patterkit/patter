@@ -6,6 +6,14 @@ same runtime behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest
+  declares, with the project's value or else the setting's default (`BundleExtension.Settings`).
+  `GameDataHelpers.ExtensionSettings(bundle, extension)` reads them as a fresh `Dictionary<string, string>`
+  by setting name, so a game can tell which gameData field holds what the extension claims. It's empty for an
+  extension the bundle doesn't have or one that declares no settings. Pinned by the corpus (version 4).
+
 ## [0.29.0] - 2026-10-18
 
 ### Added

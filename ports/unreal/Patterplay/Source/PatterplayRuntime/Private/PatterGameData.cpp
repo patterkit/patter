@@ -161,6 +161,15 @@ TArray<FPatterExtensionValues> UPatterGameData::ExtensionsOf(UPatterBundle* Bund
 	return ToUeExtensions(patter::extensionsOf(*Bundle->Raw(), Std(Kind), Std(Address)));
 }
 
+TMap<FString, FString> UPatterGameData::ExtensionSettings(UPatterBundle* Bundle, const FString& Extension)
+{
+	TMap<FString, FString> Out;
+	if (!Bundle || !Bundle->Raw()) return Out;
+	for (const auto& Setting : patter::extensionSettings(*Bundle->Raw(), Std(Extension)))
+		Out.Add(Ue(Setting.first), Ue(Setting.second));
+	return Out;
+}
+
 TArray<FPatterExtensionEntry> UPatterGameData::GetEffectiveExtensionValues(UPatterBundle* Bundle, const FString& Kind, const FString& Extension,
 	const TArray<FPatterExtensionValues>& Extensions)
 {

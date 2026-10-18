@@ -218,6 +218,11 @@ export type ScriptOp =
   // field with its default where the node sets none (a structured default arrives whole), `{}` for an
   // extension the bundle doesn't have. Compared deeply, as `expectExtensions`.
   | { op: "expectNodeExtensions"; kind: string; address?: string; expectResult: Record<string, unknown>; effective?: { extension: string } }
+  // One extension's settings, read off the BUNDLE by the helper `extensionSettings(bundle, extension)` (corpus 4):
+  // every setting its manifest declares, by setting name, the project's value or else the setting's default (each
+  // names a host field). `{}` for an extension the bundle doesn't have, or one that declares no settings.
+  // Compared deeply, as `expectNodeExtensions`.
+  | { op: "expectExtensionSettings"; extension: string; expectResult: Record<string, string> }
   | { op: "reset"; expectRefused?: boolean }
   // Reset the CURRENT flow (Flow.reset, an alias of start): forget its per-flow state and anything waiting to be
   // delivered, and begin again at the scene (empty: the first authored scene) and block given. No transcript.

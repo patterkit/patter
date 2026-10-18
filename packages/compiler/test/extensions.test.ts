@@ -94,6 +94,28 @@ describe("extensionPass", () => {
     expect(issues[0]!.message).toContain(`line 'L2' gameData "delivery", as the Patter extension "probe" claims it`);
   });
 
+  it("checks a claim that lists no values against the project's own field (toolkit 0.2.1's effectiveClaim)", () => {
+    // The probe's claim with its values left out, and value help for one the project doesn't declare.
+    const open = JSON.parse(JSON.stringify(probe)) as { targets: { patter: { line: { claims: Record<string, unknown>[] } } } };
+    const claim = open.targets.patter.line.claims[0]!;
+    delete claim.values;
+    claim.valueHelp = { calm: "Unhurried.", whisper: "Barely there." };
+    const openManifests = [{ path: "extensions/probe.extension.json", id: "probe", manifest: open }];
+    // The project's vocabulary is the claim's: "tense" passes, "shouty" doesn't, and the help for "whisper" is fine.
+    const issues = pass({ manifests: openManifests }).issues;
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({ severity: "error", node: "L2", code: "not-a-value" });
+    expect(issues[0]!.message).toContain(`line 'L2' gameData "delivery", as the Patter extension "probe" claims it`);
+    // A project that declares "shouty" takes it.
+    expect(pass({ manifests: openManifests,
+      project: project({ gameDataFields: { line: [{ name: "delivery", type: "enum", values: ["calm", "tense", "shouty"] }] } }) }).issues).toEqual([]);
+    // The type clash and the undeclared field are reported as before.
+    expect(messages(pass({ manifests: openManifests, project: project({ gameDataFields: { line: [{ name: "delivery", type: "text" }] } }) }).issues))
+      .toEqual([`error: the Patter extension "probe" claims the line gameData field "delivery" as enum, but the project declares it as text`]);
+    expect(messages(pass({ manifests: openManifests, project: project({ gameDataFields: {} }) }).issues))
+      .toEqual([`warning: the Patter extension "probe" claims the line gameData field "delivery", which the project doesn't declare`]);
+  });
+
   it("reports orphans, a wrong-scene entry, an unknown kind, and a bad value, per entry", () => {
     const { issues, compiled } = pass({
       project: project({ gameDataFields: { line: [{ name: "delivery", type: "enum", values: ["calm", "tense", "shouty"] }] } }),

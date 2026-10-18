@@ -23,8 +23,10 @@ import type { Corpus, DescribeCase, OutlineCase, ExpressionCase, Fixtures, GameD
  *  `extensions` section and a node's `extensions` values, `extensions` on a transcript's line, text and
  *  gameEvent steps and its options, and the ops `expectExtensions` and `expectNodeExtensions`. Values are any
  *  JSON, so a runner compares them deeply. No earlier expectation changed.
+ *  4: an extension's settings in the bundle (`extensions[id].settings`) and the op `expectExtensionSettings`.
+ *  No earlier expectation changed.
  */
-export const CORPUS_VERSION = 3;
+export const CORPUS_VERSION = 4;
 
 /**
  * A fixture's extension files as a project keeps them, for the real compile: each manifest at

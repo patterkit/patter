@@ -11,7 +11,7 @@ import type { GameData, GameDataField, GameDataNodeKind, PropertyDecl, DocLine, 
 import { RERECORD_STATUS_DECL, PAD_AFTER_MIN, PAD_AFTER_MAX } from "@patterkit/model";
 import { colourIndex } from "@patterkit/patterpad-surface/colour";
 import { el } from "./dom.js";
-import { claimOn, claimProblem, extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
+import { claimOn, claimProblem, effectiveClaimDecl, extensionSections, sweepExtensionRows, type ExtensionHandlers } from "./extension-rows.js";
 import type { ExtensionDto, ExtensionFieldDto } from "../../shared/api.js";
 
 type Reveal = (id: string) => void;
@@ -102,18 +102,20 @@ export function gameDataFieldRow(
   f: GameDataField, id: string | null, current: unknown, h: Pick<InspectorHandlers, "setGameData">, kind = "",
   claim?: { extension: ExtensionDto; decl: ExtensionFieldDto },
 ): HTMLElement {
-  const c = claim?.decl;
+  // The claim over the field's own declaration: a claim with no values draws and checks the field's.
+  const c = claim ? effectiveClaimDecl(claim, f) : undefined;
   const decl: GameDataField = !c ? f : {
     ...f,
     ...(c.help !== undefined ? { purpose: c.help } : {}),
     ...(c.values !== undefined && f.values === undefined ? { values: c.values } : {}),
     ...(c.valueHelp !== undefined ? { valueHelp: c.valueHelp } : {}),
   } as GameDataField;
-  const problem = claim ? claimProblem(claim, current ?? undefined) : "";
+  const problem = claim ? claimProblem(claim, current ?? undefined, f) : "";
   return fieldRowCache.row(`${kind}\u0000${id ?? ""}\u0000${f.name}`, {
     decl, value: current ?? undefined, disabled: id === null,
     ...(c?.label !== undefined ? { label: c.label } : {}),
-    ...(problem ? { problem } : {}),
+    // The claim's sentence says what the row's own check would, in the extension's words: it stands alone.
+    ...(problem ? { replaceProblem: problem } : {}),
     onCommit: (v) => { if (id) h.setGameData(id, f.name, v); },
     className: "insp-row insp-gd-row", labelClassName: "insp-key", controlClassName: "insp-gd-input",
   });

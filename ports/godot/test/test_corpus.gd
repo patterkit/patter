@@ -864,6 +864,14 @@ func _run_script(holder: Dictionary, ops: Array, bundle: Dictionary, bundle_b: D
 					ok = false
 					_fail("scripted", name, "expectNodeExtensions %s: expected %s, got %s" % [node_scope, _show_json(op["expectResult"]), _show_json(got_node)])
 					break
+			"expectExtensionSettings":
+				# One extension's settings, read off the case's bundle by the helper (corpus 4).
+				var settings_ext := str(op["extension"])
+				var got_settings := PatterBundle.extension_settings(bundle, settings_ext)
+				if not _deep_equal(got_settings, op["expectResult"]):
+					ok = false
+					_fail("scripted", name, "expectExtensionSettings %s: expected %s, got %s" % [settings_ext, _show_json(op["expectResult"]), _show_json(got_settings)])
+					break
 			"reset":
 				# reset() has nothing to return, and this addon refuses it only inside a checkpoint, so the
 				# refusal shows as the checkpoint still open; the ops after it prove nothing moved.

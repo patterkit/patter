@@ -33,6 +33,14 @@ version number always means the same runtime behaviour. This package is versione
 
 ## [Unreleased]
 
+### Added
+
+- **An extension's settings**: a bundle now carries each Patter extension's settings, every one its manifest
+  declares, with the project's value or else the setting's default. `extensionSettings(bundle, extension)`
+  reads them, by setting name, so a game can tell which gameData field holds what the extension claims (the
+  probe's `deliveryField`, say). It's `{}` for an extension the bundle doesn't have or one that declares no
+  settings. Pinned by the corpus (version 4).
+
 ## [0.29.0] - 2026-10-18
 
 ### Added

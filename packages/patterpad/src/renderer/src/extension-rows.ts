@@ -16,8 +16,8 @@
 import { el } from "./dom.js";
 import { valueRows } from "@wildwinter/app-shell/value-rows";
 import type { ValueAdapter, ValueDecl, ValueRows } from "@wildwinter/app-shell/value-rows";
-import { entryProblems, valueProblems } from "@wildwinter/toolkit/extensions";
-import type { TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
+import { effectiveClaim, entryProblems, valueProblems } from "@wildwinter/toolkit/extensions";
+import type { ClaimDecl, TargetDecl, TypeDecl } from "@wildwinter/toolkit/extensions";
 import type { ExtensionDto, ExtensionFieldDto, ExtensionNodeDto, Problem } from "../../shared/api.js";
 import { takenLine } from "../../shared/extensions.js";
 
@@ -87,10 +87,21 @@ export function claimOn(extensions: readonly ExtensionDto[], kind: string, field
   return undefined;
 }
 
-/** What a claim says about a gameData value its own constraints refuse, as a sentence; "" when fine. */
-export function claimProblem(claim: { extension: ExtensionDto; decl: ExtensionFieldDto }, value: unknown): string {
+/** The host's side of a claim: the gameData field's own declaration, which gives the values, stages and default
+ *  a claim leaves out. */
+export interface ClaimHost { readonly type?: string; readonly values?: readonly string[]; readonly stages?: readonly string[]; readonly default?: unknown }
+
+/** A claim as the inspector draws and checks its field: the claim over the gameData field's declaration
+ *  (the toolkit's `effectiveClaim`), so a claim that lists no values takes the field's. */
+export function effectiveClaimDecl(claim: { decl: ExtensionFieldDto }, host: ClaimHost): ExtensionFieldDto {
+  return effectiveClaim(claim.decl as unknown as ClaimDecl, host) as unknown as ExtensionFieldDto;
+}
+
+/** What a claim says about a gameData value it refuses, as a sentence; "" when fine. Checked over the gameData
+ *  field's declaration (`host`), so a claim with no values of its own checks against the field's. */
+export function claimProblem(claim: { extension: ExtensionDto; decl: ExtensionFieldDto }, value: unknown, host: ClaimHost = {}): string {
   if (value === undefined) return "";
-  return valueProblems(claim.decl as unknown as TypeDecl, value)
+  return valueProblems(effectiveClaimDecl(claim, host) as unknown as TypeDecl, value)
     .filter((p) => p.severity === "error")
     .map((p) => (p.code === "not-a-value" || p.code === "not-a-stage") && p.options?.length && typeof value === "string"
       ? `${claim.extension.name} reads this as ${orList(p.options)}, so it doesn't know “${value}”.`

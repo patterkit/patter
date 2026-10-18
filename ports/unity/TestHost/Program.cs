@@ -1113,6 +1113,17 @@ namespace Patterkit.Patterplay.TestHost
                                 }
                                 break;
                             }
+                            case "expectExtensionSettings":
+                            {
+                                // One extension's settings, read off the case's BUNDLE by the helper (corpus 4).
+                                string sx = op.GetProperty("extension").GetString();
+                                var settings = GameDataHelpers.ExtensionSettings(bundle, sx);
+                                var gotTree = new OrderedMap<string, object>();
+                                foreach (var kv in settings) gotTree.Set(kv.Key, kv.Value);
+                                string want = ShowJson(op.GetProperty("expectResult")), gotText = ShowJson(gotTree);
+                                if (want != gotText) throw new Exception($"expectExtensionSettings {sx}: expected {want}, got {gotText}");
+                                break;
+                            }
                             case "reset":
                                 if (Refused(op)) { ExpectRefused(engine, "reset", engine.Reset); break; }
                                 engine.Reset();
@@ -1709,6 +1720,8 @@ namespace Patterkit.Patterplay.TestHost
                     foreach (var kind in fields.EnumerateObject())
                         ext.Fields.Set(kind.Name, kind.Value.EnumerateArray().Select(ParseExtensionDecl).ToList());
                 if (e.TryGetProperty("project", out var project)) ext.Project = (OrderedMap<string, object>)ToJsonTree(project);
+                if (e.TryGetProperty("settings", out var settings))
+                    ext.Settings = settings.EnumerateObject().ToDictionary(s => s.Name, s => s.Value.GetString());
                 extensions.Set(pair.Name, ext);
             }
             return extensions;
